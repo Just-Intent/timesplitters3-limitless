@@ -46,6 +46,7 @@ unsigned pc_controls_text_event(uint32_t owner) {(void)owner;CHECK(0);return 0;}
 void pc_controls_menu_mode(int active) { (void)active; CHECK(0); }
 PcMenuPointer pc_controls_menu_pointer(void) { CHECK(0); return (PcMenuPointer){0}; }
 PcMenuPointer pc_controls_menu_hover_pointer(void) { CHECK(0); return (PcMenuPointer){0}; }
+void pc_controls_mapmaker_pointer(int active) { (void)active; }
 void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *ow,unsigned *oh)
 { (void)w;(void)h;CHECK(slider_capture_enabled);*ow=1920;*oh=1080; }
 #define MOUSE_STUB(name) void name(void) { CHECK(0); }

@@ -108,7 +108,7 @@ Rollback: delete the branch; no save, setting or format is touched.
 
 Tracked separately; do not merge their diagnosis.
 
-### MM-1: MapMaker probe fixture fails on Windows (fix applied; Windows recheck pending)
+### MM-1: MapMaker probe fixture fails on Windows (fixed; passes on Windows 2026-10-22)
 
 - **Observed (2026-10-22, Windows 11, MSVC):** `tests/test_mapmaker_probe.py`
   failed the `repeats=11\n` check (`tests/mapmaker_probe.c:148`) and the
@@ -188,6 +188,10 @@ Tracked separately; do not merge their diagnosis.
   game's own per-player pointer (`0x007BA260 + player*0x1E0 + 0x20/+0x24`,
   moved by `sub_00074C50`). See `research/mapmaker-investigation.md` §3a.
   Proposed fix: drive that pointer from the mouse in scene 102 (covers MM-5).
+- **Prototype (2026-10-22, off by default):** `TSFP_MAPMAKER_POINTER=1` places
+  the game pointer at the mouse on the editor screen and holds A while the left
+  button is held. Fixture passes on Windows/MSVC; in-game run pending. See
+  `docs/agent-context/systems.md` (MapMaker editor pointer).
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

@@ -8,6 +8,7 @@
 #include "pc_text_input.h"
 #include "pc_camera.h"
 #include "pc_terminal.h"
+#include "pc_mapmaker_pointer.h"
 #include "pc_settings.h"
 #include "pc_prompts.h"
 #include "texture_mode.h"
@@ -29,6 +30,8 @@ static int wheel_remainder;
 static unsigned long applied;
 static volatile LONG editing;
 static int menu_mode, menu_button_block;
+static int mapmaker_pointer_active;
+static PcMapMakerClick mapmaker_click;
 static PcTextInput text_input;
 
 void pc_controls_text_mode(uint32_t owner) {
@@ -464,6 +467,7 @@ void pc_controls_menu_mode(int active)
     if(changed) {
         menu_button_block=(input.keys[VK_LBUTTON]?1:0)|(input.keys[VK_RBUTTON]?2:0);
         menu_mode=!!active;
+        if(!menu_mode) mapmaker_pointer_active=0;
         menu_wheel=0; wheel_remainder=0;
         input.dx=input.dy=0;
     }
@@ -497,14 +501,24 @@ PcMenuPointer pc_controls_menu_pointer(void) { return menu_pointer(1); }
 /* Drawing must not consume wheel packets or advance the input replay. */
 PcMenuPointer pc_controls_menu_hover_pointer(void) { return menu_pointer(0); }
 
+void pc_controls_mapmaker_pointer(int active)
+{
+    AcquireSRWLockExclusive(&lock);
+    mapmaker_pointer_active = !!active;
+    ReleaseSRWLockExclusive(&lock);
+}
+
 int pc_controls_terminal_click(void)
 {
-    int down;
+    int down, mapmaker;
     if (InterlockedCompareExchange(&editing, 0, 0)) return 0;
     AcquireSRWLockExclusive(&lock);
     replay_tick();
+    /* Always evaluated so its held-button block tracks every poll. */
+    mapmaker = pc_mapmaker_click(&mapmaker_click, menu_mode && mapmaker_pointer_active,
+                                 input.keys[VK_LBUTTON]);
     down = (replaying || GetForegroundWindow() == window_handle) &&
-           pc_input_terminal_click(&input, input.keys[VK_LBUTTON]);
+           (pc_input_terminal_click(&input, input.keys[VK_LBUTTON]) || mapmaker);
     ReleaseSRWLockExclusive(&lock);
     return down;
 }

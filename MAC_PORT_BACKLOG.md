@@ -196,6 +196,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-059 | Physical keyboard entry in original text dialogs (issue #136) | Awaiting validation |
 | MAC-060 | MapMaker capacity meter probe (debug instrumentation) | Awaiting validation |
 | MAC-061 | Compile-only Windows build mode | Not applicable |
+| MAC-062 | MapMaker editor mouse pointer (prototype, off by default) | Awaiting validation |
 
 ### MAC-048 - Companion vehicle zero-flag joins (#100)
 
@@ -3163,6 +3164,27 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   policy in the Windows-only build script; no shared game behavior changes.
 - **Mac acceptance checks:** None beyond existing native build checks.
 - **Mac implementation and evidence:** Not applicable.
+
+### MAC-062 — MapMaker editor mouse pointer (prototype, off by default)
+
+- **Status:** Awaiting validation
+- **PC behavior:** With `TSFP_MAPMAKER_POINTER=1`, on the MapMaker editor screen
+  (scene 102, no list or pause menu open) moving the mouse places the game's own
+  pointer under it, and holding the left button holds A. A still mouse leaves
+  controller movement alone. Off by default.
+- **PC source:** Branch `mapmaker-recon`; shared `src/pc_mapmaker_pointer.inc`
+  (called from `pc_display_menu_mouse_input`), host policy
+  `src/pc_mapmaker_pointer.h`, `pc_controls_mapmaker_pointer` and the click path
+  in `src/pc_controls.c`; fixture `tests/mapmaker_pointer.c`.
+- **PC validation:** Fixture and mutations pass on Windows/MSVC. In-game run pending.
+- **Existing Mac support:** `src/native/input_sdl.c` implements
+  `pc_controls_mapmaker_pointer` and adds the held-A path to its
+  `pc_controls_terminal_click`. Not compiled or run on a Mac.
+- **Mac adaptation needed:** None identified beyond the input_sdl.c change.
+- **Mac acceptance checks:** Native Mac build; with `TSFP_MAPMAKER_POINTER=1`,
+  open the editor, hover and click a toolbar icon and a grid cell; confirm the
+  controller still moves the pointer when the mouse is still.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
 ## Shared uncertainties, not confirmed Mac-only omissions
 

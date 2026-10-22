@@ -41,6 +41,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 }
 
 #include "pc_mapmaker_probe.inc"
+#include "pc_mapmaker_pointer.inc"
 #include "pc_menu_sliders.inc"
 static void menu_team_arrow(unsigned direction);
 #include "pc_menu_choices.inc"
@@ -364,6 +365,7 @@ void pc_display_menu_mouse_input(void (*original)(void))
     float x,y,gw,gh;
     unsigned sw,sh;
     original();
+    mapmaker_pointer_input(menu); /* off unless TSFP_MAPMAKER_POINTER=1 */
     menu_text_input(menu);
     if(!s || s->sampled || s->menu!=menu || !menu_mouse_context() || !guest_writable(menu,0x23c) ||
        WORD_AT(menu+0x38)!=0 || WORD_AT(menu+0x1b0)!=3) return;

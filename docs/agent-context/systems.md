@@ -34,7 +34,7 @@ Consult `docs/shared-platform.md` for shared versus adapter responsibilities.
 | Saves and profiles | Runtime save-routing patch; `tools/testing_profile.py`, `tools/test-native-mac.py` | `docs/testing-profile.md`, `tests/test_testing_profile.py` |
 | Crash/hang diagnostics | `src/pc_crash.c`, `pc_hang_policy.h`, `tools/crash-symbols.py` | `tests/test_crash_capture.py`, `test_native_crash.py`, `test_crash_symbols.py` |
 | Guest lift/runtime correctness | Runtime `tools/recomp/`, manual hooks, `tools/recomp-generation.py` | `tests/test_recomp_float_joins.py`, `test_recomp_vehicle_joins.py` |
-| MapMaker (reconnaissance only; no MapMaker code yet) | `research/mapmaker-investigation.md`, `research/capacity-constraints.md`; known anchors: editor scene 102 (map play likely 100), meter `sub_0030C210` → `sub_000814B0` | `docs/development-roadmap.md` |
+| MapMaker (probe and off-by-default editor pointer prototype) | `src/pc_mapmaker_pointer.inc`, `pc_mapmaker_pointer.h`, `research/mapmaker-investigation.md`, `research/capacity-constraints.md`; known anchors: editor scene 102 (map play likely 100), meter `sub_0030C210` → `sub_000814B0` | `docs/development-roadmap.md` |
 | Audio/movie startup | Runtime `src/hle/` sound and XMV files | `tests/test_audio_timing.py`, `test_xmv_stop.py` |
 
 Names in this table are entry points, not a complete call graph. Read the
@@ -149,3 +149,18 @@ layout after the original runs (before its context checks, so rejected menus
 are logged too), and the click after hit testing. No guest regeneration. It must never write guest memory or registers;
 `tests/test_mapmaker_probe.py` enforces this with mutations. Usage and the
 experiment protocol: `docs/mapmaker-meter-probe.md`. Mac: MAC-060.
+
+## MapMaker editor pointer (prototype)
+
+Off unless `TSFP_MAPMAKER_POINTER=1`. `src/pc_mapmaker_pointer.inc` runs right
+after the original `sub_00073870` inside `pc_display_menu_mouse_input`. When
+scene 102 dispatches a menu with no rows and no open child (the editor screen)
+and the host cursor moved or a button was pressed, it places the game's
+per-player pointer (`0x007BA260 + player*0x1E0`, player `0x007BA9E0`) at the
+mouse with the arithmetic of `sub_00071140`/`sub_00071050` (offsets
+`+0x18/+0x1C`, position `+0x20/+0x24`, clamp `+0x48..+0x54`, bit 2 of `+0x00`).
+It reports ownership through `pc_controls_mapmaker_pointer`; the host then
+reports a held left button as held A via `pc_controls_terminal_click`
+(`pc_mapmaker_click` in `pc_mapmaker_pointer.h` blocks a button already held
+when ownership changes). No guest regeneration. Fixture:
+`tests/test_mapmaker_pointer.py`. Mac: MAC-062.

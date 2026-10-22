@@ -14,6 +14,8 @@ void pc_controls_attach(HWND window);
 int pc_controls_message(HWND window, UINT message, WPARAM wp, LPARAM lp, LRESULT *result);
 int pc_controls_key_down(int key);
 int pc_controls_terminal_click(void);
+/* MapMaker editor screen owns the game pointer: left button acts as A. */
+void pc_controls_mapmaker_pointer(int active);
 void pc_controls_menu_mode(int active);
 PcMenuPointer pc_controls_menu_pointer(void);
 PcMenuPointer pc_controls_menu_hover_pointer(void);

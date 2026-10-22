@@ -41,6 +41,7 @@ void sub_00021780(void) {mode=14;}
 static PcMenuPointer pc_controls_menu_pointer(void) { PcMenuPointer p=cursor;cursor.wheel=0;return p; }
 static PcMenuPointer pc_controls_menu_hover_pointer(void) { return cursor; }
 static void pc_controls_menu_mode(int on) { mode=on; }
+static void pc_controls_mapmaker_pointer(int on) { (void)on; }
 void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh)
 { (void)w;(void)h;*sw=shape_w;*sh=shape_h; }
 void sub_00074760(void) { mode=5; }
