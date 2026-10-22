@@ -183,6 +183,12 @@ Tracked separately; do not merge their diagnosis.
   4/7/8 clickable). Toolbar and grid clicks fail because they are not such
   rows, not because the editor is in gameplay mode.
 
+- **2026-10-22 capture (second run):** toolbar, floor and grid clicks all hit
+  nothing; the editor root menu has no items. The editor HUD hover-tests the
+  game's own per-player pointer (`0x007BA260 + player*0x1E0 + 0x20/+0x24`,
+  moved by `sub_00074C50`). See `research/mapmaker-investigation.md` §3a.
+  Proposed fix: drive that pointer from the mouse in scene 102 (covers MM-5).
+
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 
 - Moving the editor cursor with W/A/S/D works, but is slow and awkward.

@@ -85,6 +85,39 @@ HYPOTHESES (each needs one bounded Windows run with the disposable unlocked prof
 | H-IN3 | Editor pop-up menus (item lists, logic editor, pause) use the generic menu engine (`sub_00073750`/`sub_0007A7B0`) and would get mouse support if the context test admitted them. | With the pause flag set inside MapMaker, verify the menu-mouse hit test already works; then trace whether editor lists go through `sub_00073750`. |
 | H-IN4 | The editor cursor/grid position is a small integer/float struct reachable from a MapMaker global; writing it directly (like the terminal pointer) is feasible. | Find writers of the cursor value with `RECOMP_WATCH_WRITE` once a candidate address is found by memory diffing while moving the cursor one cell. |
 
+## 3a. Editor screen and game pointer (2026-10-22, second Windows run)
+
+Probe flags 11, build `2699a91`. The user clicked the category arrows and
+icons, empty grid cells, each floor button and each row of the right-hand
+pause menu. 72 clicks and 87 menu layouts were logged (all scene 102).
+
+- CONFIRMED (log): the editor's root menu `0x006FEBE8` has **no items** and
+  an empty 0,0,0,38.4 rectangle. Every toolbar click (y about 50-55,
+  x 388-599: left arrow, six icons, right arrow), floor-button click
+  (x about 585, y 107-160) and grid click returned `hit=0`. These elements
+  are **not menu rows**; they are drawn by the editor HUD.
+- CONFIRMED (log): the pause menu (descriptor `0x0052D464`, 12 type-7 rows,
+  x 361.6-614.4) and the category lists (for example tiles, descriptor
+  `0x0052DDFC`, 4-column type-7 grid, callback `0x00316500`) are normal
+  menus, and clicks hit their rows. The pause-menu misses fell on rows with
+  flag bit 0 set (disabled), which the PC hit test skips by design.
+- CONFIRMED (code): `sub_000711F0(rect)` tests the **game's own per-player
+  pointer**: floats at `0x007BA260 + player*0x1E0 + 0x20/+0x24` (player index
+  `0x007BA9E0`) against `{x0,y0,x1,y1}`. Callers include the editor HUD
+  (`sub_0030B150`, `sub_0030BE60`, the meter painter) and menu code.
+- CONFIRMED (code): `sub_00074C50` (called by `sub_00074F70`) moves that
+  pointer each frame for every player, clamps it to bounds at `+0x48/+0x4C`
+  (min) and `+0x50/+0x54` (max), and when clamped sets bits in `+0x00` and
+  edge-push values in `+0x18/+0x1C` (likely edge scrolling).
+- HYPOTHESIS: this pointer is the cursor the user moves with W/A/S/D in the
+  editor, and the toolbar/floor/grid react to it through `sub_000711F0`-style
+  tests plus the confirm button. Check: log `+0x20/+0x24` for player 0 in
+  scene 102 while moving the cursor with the keyboard.
+- Consequence for MM-4/MM-5: instead of a per-widget click handler, write the
+  mouse position (game UI coordinates) into this pointer in scene 102 and map
+  left click to the editor's select button. The editor's own hover, hit and
+  edge-scroll logic then applies unchanged.
+
 ## 4. Capacity meter
 
 See `research/capacity-constraints.md`. The single solid lead is the
