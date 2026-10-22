@@ -108,7 +108,7 @@ Rollback: delete the branch; no save, setting or format is touched.
 
 Tracked separately; do not merge their diagnosis.
 
-### MM-1: MapMaker probe fixture fails on Windows (open)
+### MM-1: MapMaker probe fixture fails on Windows (fix applied; Windows recheck pending)
 
 - **Observed (2026-10-22, Windows 11, MSVC):** `tests/test_mapmaker_probe.py`
   failed the `repeats=11\n` check (`tests/mapmaker_probe.c:148`) and the
@@ -122,6 +122,9 @@ Tracked separately; do not merge their diagnosis.
   the cap.
 - **Proposed fix (not applied):** open the log in binary mode (`"wb"`), then rerun
   the fixture on Windows. Until then, treat the fixture as failing on Windows.
+- **Fix (2026-10-22):** the log is now opened with `"wb"`, and the fixture
+  asserts it contains no `\r`. Linux passes; rerun `tests\test_mapmaker_probe.py`
+  on Windows to close this.
 - **Independent of** the black-screen startup report (MM-2).
 
 ### MM-2: black screen after direct launch of the Windows build (resolved by launch settings)
@@ -168,8 +171,9 @@ Tracked separately; do not merge their diagnosis.
   character, team and choice-arrow carousels each needed their own handler,
   and this toolbar appears to be another one. Its item type, rectangles and
   selection routine are unknown.
-- **Next step:** a read-only, default-off capture of the active MapMaker
-  menu's descriptor and item list, run together with the meter probe.
+- **Next step (implemented, awaiting a run):** probe flag `8` logs each menu
+  laid out while scene 100 is active and every left click's pointer position
+  and hit item. See the toolbar steps in `docs/mapmaker-meter-probe.md`.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

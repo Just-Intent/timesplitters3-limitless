@@ -13,8 +13,10 @@ PROBE = ROOT / 'src/pc_mapmaker_probe.inc'
 MUTATIONS = {
     'writes-guest': ('mapmaker_probe.bars=0;', 'mapmaker_probe.bars=0;WORD_AT(g_esp+4u)^=1u;'),
     'unscoped': ('    mapmaker_probe.depth++;\n', '\n'),
-    'default-on': ('mapmaker_probe.flags=(text && end!=text && !*end)?(unsigned)(value&7u):0;',
-                   'mapmaker_probe.flags=(text && end!=text && !*end)?(unsigned)(value&7u):1;'),
+    'default-on': ('mapmaker_probe.flags=(text && end!=text && !*end)?(unsigned)(value&MAPMAKER_PROBE_ALL):0;',
+                   'mapmaker_probe.flags=(text && end!=text && !*end)?(unsigned)(value&MAPMAKER_PROBE_ALL):1;'),
+    'menus-any-scene': ("if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS) || mapmaker_probe_scene()!=MAPMAKER_PROBE_SCENE)return;",
+                        "if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS))return;"),
     'uncapped': ('if(mapmaker_probe.written+length>MAPMAKER_PROBE_CAP) {', 'if(0) {'),
 }
 
@@ -68,3 +70,10 @@ def test_meter_wrapper_patch():
     assert 'mapmaker_probe_bar();' in sliders_src.split('void pc_display_menu_slider_bar', 1)[1].split('original();', 1)[0]
     guest = (ROOT / 'src/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
     assert 'void pc_display_mapmaker_meter(void (*original)(void)) { original(); }' in guest
+    # Menu capture uses the existing sub_00073750 wrapper: the caller is read
+    # before the original returns, the layout after, and clicks after hit testing.
+    hook = guest.split('void pc_display_menu_mouse(void (*original)(void))', 1)[1]
+    assert hook.index('uint32_t caller=WORD_AT(g_esp);') < hook.index('original();') < \
+        hook.index('mapmaker_probe_menu(menu,caller);') < hook.index('if(!menu_mouse_context()')
+    assert hook.index('choice_direction=menu_choice_hit(') < hook.index('mapmaker_probe_click(menu,x,y,hit,actions);')
+    assert 'fopen(path,"wb")' in PROBE.read_text(encoding='utf-8')

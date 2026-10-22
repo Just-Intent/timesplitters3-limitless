@@ -9,6 +9,7 @@ static uint32_t memory[0x800000/4],g_esp,g_ecx;
 static uintptr_t g_xbox_mem_offset;
 static unsigned long long tick=1000;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+#define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
 static unsigned long long GetTickCount64(void) { return tick; }
 #define TSFP_MAPMAKER_PROBE_TEST
@@ -129,7 +130,7 @@ int main(int argc,char **argv)
     CHECK(checksum()==before);
     n=read_log();
     CHECK(n>0);
-    CHECK(strstr(log_text,"[mapmaker-probe] v1 flags=1")!=NULL);
+    CHECK(strstr(log_text,"[mapmaker-probe] v2 flags=1")!=NULL);
     CHECK(strstr(log_text,"caller=0x00401234 scene=0 ecx=0x00200000 args=0x00310000 0x00200000 0x00123456 0x00000007")!=NULL);
     CHECK(strstr(log_text,"bar[0] ret=0x0030C2A0 fraction=0.250000 (0x3E800000) rect=40,200,100,8")!=NULL);
     CHECK(strstr(log_text,"bars=1")!=NULL);
@@ -177,6 +178,52 @@ int main(int argc,char **argv)
     WORD_AT(0x0079094Cu)=5;
     draw_bar(0x00999900u,.1f);
     read_log();CHECK(strstr(log_text,"0x00999900")==NULL);
+    WORD_AT(0x0079094Cu)=0;
+
+    /* Flag 8: menu layouts and clicks in scene 100 only, read-only. */
+    set_probe("8");
+    WORD_AT(0x00300000u+4)=0x004E1234u;WORD_AT(0x00300000u+0x1b0)=3;
+    FLOAT_AT(0x00300000u+0xe4)=10.f;FLOAT_AT(0x00300000u+0xe8)=20.f;
+    FLOAT_AT(0x00300000u+0xec)=300.f;FLOAT_AT(0x00300000u+0xf0)=60.f;
+    WORD_AT(0x00300000u+0x178)=0x00301000u;
+    WORD_AT(0x00301000u)=4;WORD_AT(0x00301000u+4)=0x00302000u;WORD_AT(0x00301000u+0x38)=0x0007DA20u;
+    FLOAT_AT(0x00301000u+0x78)=12.f;FLOAT_AT(0x00301000u+0x7c)=22.f;
+    FLOAT_AT(0x00301000u+0x80)=40.f;FLOAT_AT(0x00301000u+0x84)=50.f;
+    WORD_AT(0x00302000u)=9;WORD_AT(0x00302000u+4)=0;WORD_AT(0x00302000u+0x14)=3;
+    WORD_AT(0x0079094Cu)=5;
+    mapmaker_probe_menu(0x00300000u,0x00012345u);
+    read_log();CHECK(strstr(log_text,"menu-layout")==NULL);
+    WORD_AT(0x0079094Cu)=100;
+    before=checksum();
+    mapmaker_probe_menu(0x00300000u,0x00012345u);
+    mapmaker_probe_menu(0x00300000u,0x00012345u);
+    call_meter(); /* flag 8 alone does not log the meter */
+    mapmaker_probe_click(0x00300000u,25.5f,30.f,0x00301000u,1u); /* hover only */
+    mapmaker_probe_click(0x00300000u,25.5f,30.f,0x00301000u,2u);
+    mapmaker_probe_click(0x00300000u,150.f,40.f,0u,2u);
+    CHECK(checksum()==before);
+    read_log();
+    CHECK(strstr(log_text,"[mapmaker-probe] v2 flags=8")!=NULL);
+    CHECK(count("menu-layout")==1);
+    CHECK(strstr(log_text,"menu=0x00300000 caller=0x00012345 descriptor=0x004E1234")!=NULL);
+    CHECK(strstr(log_text,"state(+1B0)=3")!=NULL && strstr(log_text,"rect=10.0,20.0,300.0,60.0")!=NULL);
+    CHECK(strstr(log_text,"item[0]=0x00301000 type=4 id=0 flags=00000000 callback=0x0007DA20")!=NULL);
+    CHECK(strstr(log_text,"rect=12.0,22.0,40.0,50.0")!=NULL);
+    CHECK(strstr(log_text,"item[1]=0x00302000 type=9 id=3")!=NULL);
+    CHECK(strstr(log_text,"   raw: 00000004 00302000")!=NULL);
+    CHECK(strstr(log_text,"items=2\n")!=NULL);
+    CHECK(strstr(log_text,"meter call")==NULL);
+    CHECK(count("] t=")==3); /* one layout, two clicks */
+    CHECK(strstr(log_text,"click menu=0x00300000 pointer=25.5,30.0 hit=0x00301000 type=4")!=NULL);
+    CHECK(strstr(log_text,"click menu=0x00300000 pointer=150.0,40.0 hit=0x00000000 type=0")!=NULL);
+    /* A changed layout is logged again once its interval has passed. */
+    FLOAT_AT(0x00301000u+0x80)=41.f;
+    mapmaker_probe_menu(0x00300000u,0x00012345u);
+    read_log();CHECK(count("menu-layout")==1);
+    tick+=MAPMAKER_PROBE_MENU_INTERVAL;
+    mapmaker_probe_menu(0x00300000u,0x00012345u);
+    read_log();CHECK(count("menu-layout")==2 && strstr(log_text,"menu-layout repeats=2")!=NULL);
+    CHECK(strchr(log_text,'\r')==NULL); /* binary log on every host */
     WORD_AT(0x0079094Cu)=0;
 
     /* Output is capped. */

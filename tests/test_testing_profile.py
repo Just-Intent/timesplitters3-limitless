@@ -98,6 +98,7 @@ def test_mapmaker_probe_environment(tmp_path):
     assert profile.mapmaker_probe_environment(tmp_path,run,0)=={}
     env=profile.mapmaker_probe_environment(tmp_path,run,3)
     assert env=={'TSFP_MAPMAKER_PROBE':'3','TSFP_MAPMAKER_PROBE_LOG':str((run/'mapmaker-probe.log').resolve())}
-    for flags in (-1,8):
-        with pytest.raises(ValueError,match='between 1 and 7'):profile.mapmaker_probe_environment(tmp_path,run,flags)
+    assert profile.mapmaker_probe_environment(tmp_path,run,11)['TSFP_MAPMAKER_PROBE']=='11'
+    for flags in (-1,16):
+        with pytest.raises(ValueError,match='between 1 and 15'):profile.mapmaker_probe_environment(tmp_path,run,flags)
     with pytest.raises(ValueError):profile.mapmaker_probe_environment(tmp_path,tmp_path/'private/saves',1)

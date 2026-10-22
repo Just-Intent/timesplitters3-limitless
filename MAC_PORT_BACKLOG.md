@@ -3132,9 +3132,10 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   `src/pc_menu_sliders.inc`, wrapper `patches/*-mapmaker-meter-probe.patch`, runner
   option in `tools/testing_profile.py`; fixture `tests/mapmaker_probe.c`.
 - **PC validation:** Asset-free fixture and patch-stack tests pass on Linux (gcc).
-  The Windows build compiled. On Windows/MSVC the fixture fails two checks
-  (`repeats=11`, `MAPMAKER_PROBE_CAP`); the likely cause is text-mode CRLF
-  translation of the log (roadmap MM-1, not yet fixed). No in-game MapMaker run yet.
+  The Windows build compiled and the game runs. The Windows/MSVC fixture failed
+  two checks because the log was written in text mode (CRLF; roadmap MM-1). The log
+  is now binary; the Windows recheck is pending. Flag 8 (menu layout and click
+  capture) was added through the existing menu hook. No probe log captured yet.
 - **Existing Mac support:** The wrapper is enabled for `TSFP_NATIVE_DISPLAY` and the
   probe compiles in the shared menu adapter; `tools/test-native-mac.py` accepts
   `--mapmaker-probe`. Not compiled or run on a Mac.

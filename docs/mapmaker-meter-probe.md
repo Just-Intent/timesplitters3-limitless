@@ -33,15 +33,44 @@ probe must be requested on its command line:
 .venv\Scripts\python.exe tools\testing_profile.py --play --seconds 600 --mapmaker-probe 3
 ```
 
-| Flags | Records |
+Flags add together (for example `11` = 1 + 2 + 8):
+
+| Flag | Records |
 | --- | --- |
 | `1` | Each meter call: caller return address, scene, `ecx`, six stack words; each bar's fill fraction, rectangle and colours |
-| `3` | Also 64-byte snapshots of `ecx` and the first four stack words when they point into guest RAM (candidate budget structures) |
-| `7` | Also bars drawn outside the meter painter while scene 100 is active (use if the meter shows nothing) |
+| `2` | 64-byte snapshots of `ecx` and the first four stack words when they point into guest RAM (candidate budget structures); use with `1` |
+| `4` | Bars drawn outside the meter painter while scene 100 is active (use if the meter shows nothing) |
+| `8` | While MapMaker runs: each menu the game lays out (`sub_00073750`): its caller, descriptor, state, rectangle and every item's type, flags, callback, rectangle and 64 raw bytes, plus each left click's pointer position in game-UI coordinates and the item it hit (`hit=0` means none). Use this for the toolbar click investigation (MM-4) |
 
 The log is `private\test-saves\quick-test\mapmaker-probe.log`. It is truncated
 when the game starts, so copy it before the next run. The runner recycles only
 the `Partition*.img` files and never removes the log.
+
+### Direct launch (complete block)
+
+Paste into a **new** PowerShell window. It uses an isolated save folder,
+turns generated-function tracing off (otherwise startup can stall; MM-2),
+waits for you to quit, then lists the probe log:
+
+```powershell
+$root = 'C:\Dev\timesplitters-limitless'
+$run  = "$root\private\test-saves\mapmaker-probe"
+New-Item -ItemType Directory -Force "$run\saves" | Out-Null
+if (!(Test-Path "$run\controls.json")) { Copy-Item "$root\tests\fixtures\pc-controls.json" "$run\controls.json" }
+if (!(Test-Path "$run\display.ini")) { Set-Content "$run\display.ini" 'TSFP_DISPLAY_V1 0 0' }
+if (!(Test-Path "$run\runtime.ini")) { Set-Content "$run\runtime.ini" '# Isolated test runtime' }
+$env:RECOMP_GAME_DIR = "$root\private\game";  $env:RECOMP_SAVE_DIR = "$run\saves"
+$env:RECOMP_TRACE_BUDGET = '0';                $env:RECOMP_INPUT_CONFIG = "$run\controls.json"
+$env:TSFP_DISPLAY_CONFIG = "$run\display.ini"; $env:RECOMP_DISPLAY_CONFIG = "$run\runtime.ini"
+$env:TSFP_MAPMAKER_PROBE = '11';               $env:TSFP_MAPMAKER_PROBE_LOG = "$run\mapmaker-probe.log"
+$exe = "$root\build\windows\Release\futureperfect_recomp.exe"
+Start-Process $exe -WorkingDirectory (Split-Path $exe) -Wait `
+  -RedirectStandardOutput "$run\game.out" -RedirectStandardError "$run\game.err"
+Get-Item "$run\mapmaker-probe.log" | Select-Object FullName, Length, LastWriteTime
+```
+
+The save folder persists between runs, so the profile created on the first
+run is reused; the log is overwritten each run.
 
 Manual use outside the runner (still with isolated paths) is the pair
 `TSFP_MAPMAKER_PROBE=<flags>` and `TSFP_MAPMAKER_PROBE_LOG=<file>`; without a
@@ -50,7 +79,7 @@ log path, output goes to stderr (`game.err` under the runner).
 ## Reading the log
 
 ```
-[mapmaker-probe] v1 flags=3 read-only; meter sub_0030C210, bar sub_000814B0; output …
+[mapmaker-probe] v2 flags=3 read-only; meter sub_0030C210, bar sub_000814B0; output …
 [mapmaker-probe] t=123456 meter call=812 repeats=37
  caller=0x0030xxxx scene=100 ecx=0x…… args=0x…… 0x…… …
   dump ecx@0x……: 16 dwords
@@ -86,6 +115,26 @@ notebook so log records can be matched to actions.
 
 Exit without saving unless the step asks for it. Keep all tests in the
 disposable Test Lab copy; never use `private\saves`.
+
+### Toolbar click capture (flag 8, MM-4)
+
+In the same session, after the meter steps:
+
+1. With the editor open and the pointer visible, click once on each toolbar
+   icon (tile, item, light, AI, logic, settings) and on the left and right
+   arrows, about one second apart, in that order. Note the order.
+2. Click once on something that *does* respond, for comparison.
+3. Open and close one category's item list, so its layout is captured too.
+
+The log then shows which menus exist on the editing screen, whether the icons
+are items of that menu (and of which type), and where each click landed. If a
+click line shows `hit=0x00000000` while a `menu-layout` record lists an item
+whose rectangle contains that pointer position, the icons are items the PC
+layer does not yet treat as clickable. If no record contains the icons, they
+are drawn outside the menu engine and need a different hook.
+
+The log does not contain personal data, but it does contain guest memory
+values; share it with the project only, and do not commit it.
 
 ## Recording results
 

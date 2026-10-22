@@ -141,8 +141,11 @@ slider code) is read-only debug instrumentation. `pc_display_mapmaker_meter`
 scopes `sub_0030C210`; `mapmaker_probe_bar()` at the top of
 `pc_display_menu_slider_bar` attributes bars drawn inside that scope (and,
 with flag 4, other scene-100 bars). Flags come from `TSFP_MAPMAKER_PROBE`
-(1 meter, 2 pointer snapshots, 4 other bars), output from
-`TSFP_MAPMAKER_PROBE_LOG` or stderr; records are deduplicated, limited to four
-per second and capped at 4 MiB. It must never write guest memory or registers;
+(1 meter, 2 pointer snapshots, 4 other bars, 8 menu layouts and clicks), output
+from `TSFP_MAPMAKER_PROBE_LOG` (opened in binary mode) or stderr; records are
+deduplicated, rate-limited and capped at 4 MiB. Flag 8 is fed by two read-only
+calls in the existing `pc_display_menu_mouse` (`sub_00073750`) wrapper: the
+layout after the original runs (before its context checks, so rejected menus
+are logged too), and the click after hit testing. No guest regeneration. It must never write guest memory or registers;
 `tests/test_mapmaker_probe.py` enforces this with mutations. Usage and the
 experiment protocol: `docs/mapmaker-meter-probe.md`. Mac: MAC-060.

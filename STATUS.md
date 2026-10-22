@@ -1,3 +1,27 @@
+## MapMaker probe: menu/click capture and binary log (2026-10-22)
+
+Branch `mapmaker-recon`. In the first Windows play session, the game ran with
+the full isolated launch settings (`RECOMP_TRACE_BUDGET=0`, redirected output,
+isolated saves, `RECOMP_INPUT_CONFIG`). Movement, firing and the
+keyboard-driven MapMaker cursor worked. The MapMaker category-toolbar icons
+did not respond to clicks (MM-4).
+
+- Added probe flag `8` (read-only, default off): while scene 100 is active it
+  logs each menu laid out by `sub_00073750` (caller, descriptor, state,
+  rectangle, and each item's type, flags, callback, rectangle and raw bytes)
+  and each left click's game-UI pointer position and hit item. It uses the
+  already-wrapped menu hook, so no regeneration is needed. Menu-mouse
+  behaviour is unchanged.
+- MM-1: the probe log is now opened in binary mode. The fixture now checks for
+  `\r`.
+- Runner `--mapmaker-probe` accepts 1–15.
+
+Linux validation: `tests/test_mapmaker_probe.py` (fixed case and five
+mutations) and `tests/test_menu_mouse.py` pass. Full CI native list on Ubuntu
+24.04: 393 passed, 55 skipped, and the same 24 pre-existing renderer/timing
+failures and errors as the baseline. Pending on Windows: rebuild, the fixture
+recheck and a probe log from MapMaker.
+
 ## Windows instrumented-build first launch (2026-10-22, reported)
 
 Lenovo Legion, Windows 11 Pro, MSVC v143, branch `mapmaker-recon` at `c6f4fb8`,

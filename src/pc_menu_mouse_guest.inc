@@ -440,7 +440,9 @@ void pc_display_menu_mouse(void (*original)(void))
     unsigned actions,sw,sh,choice_direction;
     GuestRegisters r;
     PcMenuPointer pointer;
+    uint32_t caller=WORD_AT(g_esp);
     original();
+    mapmaker_probe_menu(menu,caller); /* read-only; inert unless TSFP_MAPMAKER_PROBE has flag 8 */
     if(!menu_mouse_context() || !guest_writable(menu,0x23c) ||
        WORD_AT(menu+0x38)!=0 || WORD_AT(menu+0x1b0)!=3) {
         if(menu_slider_owner.menu==menu) menu_slider_drag=0;
@@ -485,6 +487,7 @@ void pc_display_menu_mouse(void (*original)(void))
         }
     }
     choice_direction=menu_choice_hit(menu,x,y,sw,sh,&hit);
+    mapmaker_probe_click(menu,x,y,hit,actions); /* read-only diagnostic */
     /* The original dispatcher applies directional repeats after this hook.
      * Do not let a previously held direction fight an actively chosen mouse
      * row. A fresh keyboard/controller direction immediately takes ownership
