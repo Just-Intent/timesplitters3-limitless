@@ -1,3 +1,23 @@
+## Windows instrumented-build first launch (2026-10-22, reported)
+
+Lenovo Legion, Windows 11 Pro, MSVC v143, branch `mapmaker-recon` at `c6f4fb8`,
+compile-only build. Smart App Control allowed `futureperfect_recomp.exe` to run.
+
+- **Black screen (MM-2, under investigation):** launched directly with
+  `RECOMP_GAME_DIR` set. The PC Settings menu and version text render, but the
+  main menu never appears. The process is responsive, with no WER or
+  Application Error events. The console shows continuous `[TRACE]` output,
+  repeatedly from `sub_0002D480`, `sub_003C848C`, `sub_003DC0D0`, `sub_003DC0E0`
+  and `sub_003DC200`. A native stack showed `shadow_wndproc`, USER32 and the
+  Bitdefender hook DLL `bdhkm64.dll`.
+- **Direct launch versus the official path:** the direct launch did not use
+  `RECOMP_TRACE_BUDGET=0`, file-redirected output or the project save path
+  that the official path sets. No source change has been made.
+- **Probe fixture (MM-1):** `tests/test_mapmaker_probe.py` failed its
+  `repeats=11` and cap checks under MSVC. This is unrelated to MM-2.
+
+Gameplay, MapMaker and probe output remain unverified on Windows.
+
 ## Compile-only Windows build mode (2026-10-22)
 
 Branch `mapmaker-recon`. On the Windows 11 Lenovo Legion, `tsfp.ps1 -Action Build`

@@ -103,3 +103,38 @@ step. If the meter is not drawn through `sub_000814B0` on the editing screen,
 that is itself a finding and costs one run.
 
 Rollback: delete the branch; no save, setting or format is touched.
+
+## 4. Open issues
+
+Tracked separately; do not merge their diagnosis.
+
+### MM-1: MapMaker probe fixture fails on Windows (open)
+
+- **Observed (2026-10-22, Windows 11, MSVC):** `tests/test_mapmaker_probe.py`
+  failed the `repeats=11\n` check (`tests/mapmaker_probe.c:148`) and the
+  `n<=MAPMAKER_PROBE_CAP+128` check (`:189`). Linux/gcc passes.
+- **Likely cause (not yet confirmed):** `src/pc_mapmaker_probe.inc:95` opens the log
+  with `fopen(path,"w")`. On Windows that is text mode, so each `\n` is
+  written as `\r\n`. The fixture reads the file in binary (`"rb"`), so
+  `"repeats=11\n"` is not found. The cap counts bytes before the newline
+  translation, so the file exceeds the 4 MiB cap by about one byte per line.
+  This also affects real Windows logs, which use CRLF and run slightly past
+  the cap.
+- **Proposed fix (not applied):** open the log in binary mode (`"wb"`), then rerun
+  the fixture on Windows. Until then, treat the fixture as failing on Windows.
+- **Independent of** the black-screen startup report (MM-2).
+
+### MM-2: black screen after direct launch of the Windows build (investigating)
+
+- **Observed:** a directly launched `futureperfect_recomp.exe` (with
+  `RECOMP_GAME_DIR` set) shows the PC Settings menu and the version text but
+  never reaches the main menu. The process stays responsive, and the console
+  fills with `[TRACE]` lines.
+- **Leading explanation (unverified):** this build is lifted with
+  `--trace-all-entries`. Without `RECOMP_TRACE_BUDGET=0`, each guest function
+  entry writes and flushes a line to the attached console, up to 400,000
+  lines. The official `tsfp.ps1 Run` sets the budget to 0 and sends output to
+  files for exactly this reason.
+- **Next step:** relaunch through the bounded Test Lab runner, or directly with
+  the budget at 0 and output redirected to files, before changing any source.
+
