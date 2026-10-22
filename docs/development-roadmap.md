@@ -124,7 +124,11 @@ Tracked separately; do not merge their diagnosis.
   the fixture on Windows. Until then, treat the fixture as failing on Windows.
 - **Independent of** the black-screen startup report (MM-2).
 
-### MM-2: black screen after direct launch of the Windows build (investigating)
+### MM-2: black screen after direct launch of the Windows build (resolved by launch settings)
+
+- **2026-10-22 update:** with `RECOMP_TRACE_BUDGET=0`, output redirected to
+  files and the other isolated settings, the game reaches its menus and
+  gameplay. No source change was needed.
 
 - **Observed:** a directly launched `futureperfect_recomp.exe` (with
   `RECOMP_GAME_DIR` set) shows the PC Settings menu and the version text but
@@ -137,4 +141,39 @@ Tracked separately; do not merge their diagnosis.
   files for exactly this reason.
 - **Next step:** relaunch through the bounded Test Lab runner, or directly with
   the budget at 0 and output redirected to files, before changing any source.
+
+### MM-3: no movement or firing in earlier direct launches (cause unconfirmed)
+
+- **Observed:** in earlier launches started some other way, mouse look and
+  wheel weapon switching worked, but W/A/S/D movement, firing and the
+  MapMaker cursor did not. Starting the game with the full isolated settings
+  (including `RECOMP_INPUT_CONFIG` pointing at a copy of
+  `tests/fixtures/pc-controls.json`) fixed all three.
+- **Ruled out:** a profile-name typing-mode latch. Creating the profile
+  differently did not change the behaviour.
+- **Candidate (unverified):** without `RECOMP_INPUT_CONFIG`, the runtime
+  loads `%APPDATA%\xboxrecomp\input_bindings.json`, then an
+  `input_bindings.json` in the current folder (`input_bindings.c:627-661`).
+  A stale file in either place would replace the project's bindings.
+
+### MM-4: MapMaker category toolbar ignores mouse clicks (open)
+
+- **Observed:** with the full launch settings, the pointer appears in
+  MapMaker and some elements accept clicks. The category icons (tile, item,
+  light, AI, logic, settings) and their left/right arrows do not, even when the
+  pointer is placed exactly on them.
+- **Likely reason (inference from code):** the shared mouse layer clicks only
+  generic menu rows of item types 4, 7 and 8 with stored rectangles
+  (`src/pc_menu_mouse_guest.inc:481-483`). Custom widgets such as the
+  character, team and choice-arrow carousels each needed their own handler,
+  and this toolbar appears to be another one. Its item type, rectangles and
+  selection routine are unknown.
+- **Next step:** a read-only, default-off capture of the active MapMaker
+  menu's descriptor and item list, run together with the meter probe.
+
+### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
+
+- Moving the editor cursor with W/A/S/D works, but is slow and awkward.
+  Pointer-driven cursor movement needs the editor's cursor/grid state address
+  (H-IN4); this is the main phase 2b controls work.
 
