@@ -1,0 +1,21 @@
+--- a/titles/futureperfect/src/recomp_manual.c
++++ b/titles/futureperfect/src/recomp_manual.c
+@@ -787,6 +787,18 @@
+ #endif
+ }
+ 
++/* MapMaker capacity meter painter (US audit, STATUS.md #114). Read-only probe
++ * scope for bars it draws; inert unless TSFP_MAPMAKER_PROBE is set. */
++extern void sub_0030C210_gen(void);
++void sub_0030C210(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_display_mapmaker_meter(sub_0030C210_gen);
++#else
++    sub_0030C210_gen();
++#endif
++}
++
+ extern void sub_002C3500_gen(void);
+ void sub_002C3500(void)
+ {

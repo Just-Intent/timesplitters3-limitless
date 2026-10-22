@@ -67,6 +67,13 @@ nothing changed), Mac adapter validation, documentation and `STATUS.md` entries.
 
 ## 3. Smallest safe first experiment (E1: read-only meter probe)
 
+**Status (2026-10-22): implemented on `mapmaker-recon`, awaiting the first
+Windows run.** Usage and protocol: `docs/mapmaker-meter-probe.md`. The
+implementation differs from the sketch below in one respect: instead of
+guessing the painter's internal return address, it also wraps `sub_0030C210`
+as a scope marker. That costs one guest regeneration but attributes bars to the
+meter without any unverified address.
+
 Why it is smallest: `sub_000814B0` is **already wrapped** on Windows and Mac
 (`patches/*-menu-setting-sliders.patch` → `pc_display_menu_slider_bar` in
 `src/pc_menu_sliders.inc:58-69`). That wrapper already reads the caller's return

@@ -194,6 +194,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-057 | Optional texture pack delivery through the launcher | Awaiting validation |
 | MAC-058 | Crane and remote-view vignette sizing (issue #221) | Awaiting validation |
 | MAC-059 | Physical keyboard entry in original text dialogs (issue #136) | Awaiting validation |
+| MAC-060 | MapMaker capacity meter probe (debug instrumentation) | Awaiting validation |
 
 ### MAC-048 - Companion vehicle zero-flag joins (#100)
 
@@ -3118,6 +3119,28 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   placement restores. Check remote views and split-screen viewport boundaries.
   The separate desert shattered-glass report is not yet reproduced or claimed
   fixed by this vignette change.
+
+### MAC-060 — MapMaker capacity meter probe (debug instrumentation)
+
+- **Status:** Awaiting validation
+- **PC behavior:** Off by default. With `TSFP_MAPMAKER_PROBE` flags (runner option
+  `--mapmaker-probe`), the read-only probe logs MapMaker meter calls
+  (`sub_0030C210`) and the bars they draw through `sub_000814B0` to
+  `TSFP_MAPMAKER_PROBE_LOG`. It changes no game state. See `docs/mapmaker-meter-probe.md`.
+- **PC source:** Branch `mapmaker-recon`; shared `src/pc_mapmaker_probe.inc`, hook in
+  `src/pc_menu_sliders.inc`, wrapper `patches/*-mapmaker-meter-probe.patch`, runner
+  option in `tools/testing_profile.py`; fixture `tests/mapmaker_probe.c`.
+- **PC validation:** Asset-free fixture and patch-stack tests pass on Linux (gcc).
+  Windows build/regeneration and an in-game MapMaker run are pending.
+- **Existing Mac support:** The wrapper is enabled for `TSFP_NATIVE_DISPLAY` and the
+  probe compiles in the shared menu adapter; `tools/test-native-mac.py` accepts
+  `--mapmaker-probe`. Not compiled or run on a Mac.
+- **Mac adaptation needed:** None identified (standard C file I/O, no OS adapter).
+- **Mac acceptance checks:** Build native Mac (regeneration expected), run
+  `tools/test-native-mac.py --unlocked-profile --mapmaker-probe 3`, open MapMaker,
+  place a tile and confirm a record with a changed fraction appears in
+  `private/test-saves/native-mac/mapmaker-probe.log`; confirm no log without the option.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
 ## Shared uncertainties, not confirmed Mac-only omissions
 

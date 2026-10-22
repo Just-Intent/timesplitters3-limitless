@@ -133,3 +133,16 @@ STRETCH tag `0x00137010`. Shared RHI `d3d8_GetScissor` and legacy GL
 `native_apply_scissor` apply this policy before output scaling. Stored guest
 clips, other tags and partial rectangles remain unchanged. The title helper
 scope supplies the tag only for complete single-player non-4:3 views.
+
+## MapMaker meter probe
+
+`src/pc_mapmaker_probe.inc` (included by `pc_menu_mouse_guest.inc` before the
+slider code) is read-only debug instrumentation. `pc_display_mapmaker_meter`
+scopes `sub_0030C210`; `mapmaker_probe_bar()` at the top of
+`pc_display_menu_slider_bar` attributes bars drawn inside that scope (and,
+with flag 4, other scene-100 bars). Flags come from `TSFP_MAPMAKER_PROBE`
+(1 meter, 2 pointer snapshots, 4 other bars), output from
+`TSFP_MAPMAKER_PROBE_LOG` or stderr; records are deduplicated, limited to four
+per second and capped at 4 MiB. It must never write guest memory or registers;
+`tests/test_mapmaker_probe.py` enforces this with mutations. Usage and the
+experiment protocol: `docs/mapmaker-meter-probe.md`. Mac: MAC-060.

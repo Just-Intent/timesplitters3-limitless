@@ -1,3 +1,29 @@
+## MapMaker capacity meter probe (E1 instrumentation, 2026-10-22)
+
+Branch `mapmaker-recon` (from main `141f440`). Added read-only, default-off
+logging of the MapMaker meter: a pass-through wrapper for the meter painter
+`sub_0030C210` (new `*-mapmaker-meter-probe.patch`) scopes the bars it draws
+through the already-wrapped `sub_000814B0`. Shared source
+`src/pc_mapmaker_probe.inc`; runner option `--mapmaker-probe` in
+`tools/testing_profile.py` and `tools/test-native-mac.py`. No capacity limit,
+save, setting or guest state is changed. Usage: `docs/mapmaker-meter-probe.md`.
+
+Validation on Ubuntu 24.04 x86-64, GCC 13.3, Python 3.12.3, pinned runtime
+`d90c929`, no game data:
+
+- Full patch stack including the new patch applies (`tools/apply-patches.py`);
+  upstream `manual_scan` lists `sub_0030C210` as defined and wrapped.
+- `tests/test_mapmaker_probe.py`: fixed case and four mutations (guest write,
+  missing scope, on by default, uncapped log) behave as expected.
+- Same CI native list as the reconnaissance baseline: 384 passed, 53 skipped,
+  19 failed, 5 errors. The 24 failures/errors are identical to the baseline on
+  unmodified main (renderer/RHI/timing fixtures that CI builds only on Windows
+  and macOS); no new failures.
+
+Not yet done: Windows build with guest regeneration, MSVC compilation of the
+fixture, and any in-game MapMaker run. Mac compilation and runs are pending
+(MAC-060). Fixture results are not evidence of in-game meter behaviour.
+
 ## Launcher v1.2.23 release preparation - 2026-10-21
 
 Source `d35e1df9ab920e176ba0ca87d4e922a4ad3fe55a`, based on main

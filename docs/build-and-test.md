@@ -79,6 +79,9 @@ Exact command (from the checkout):
 | Bounded gameplay run with the disposable unlocked profile: `.venv/Scripts/python.exe tools/testing_profile.py --play --seconds 120` (Mac: `tools/test-native-mac.py --unlocked-profile --seconds 120`) | No | Windows / Mac |
 | Scripted input: `TSFP_PC_INPUT_REPLAY` (Windows), `RECOMP_FAKE_INPUT`/`RECOMP_INPUT_SEQ` (runtime), `--test-keys` (Mac, synthetic SDL) | No | As noted |
 
+MapMaker meter probe: `tools/testing_profile.py --play --mapmaker-probe 3`;
+see `docs/mapmaker-meter-probe.md`.
+
 Runtime diagnostics useful for MapMaker reverse engineering (Windows; they rely
 on the fault handler, which is a stub on POSIX):
 

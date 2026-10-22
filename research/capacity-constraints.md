@@ -67,8 +67,8 @@ describes what could break.
 
 ## 5. Next measurements (in order)
 
-1. E1 (read-only meter probe, see `docs/development-roadmap.md`): record the
-   meter fraction while placing one tile, one item, one light, etc. in an empty
+1. E1 (read-only meter probe, implemented; run it per
+   `docs/mapmaker-meter-probe.md`): record the meter fraction while placing one tile, one item, one light, etc. in an empty
    map. Each category's cost and whether costs depend on type variety follow
    directly.
 2. Trace the fraction to its counters and capacity constants (offline, local

@@ -235,3 +235,14 @@ until the complete stack installs the display/viewport prerequisites. The
 post-upgrade assertions require both the crane wrapper and renderer clip hook,
 alongside preservation of local edits and idempotent reapplication. This does
 not omit the patch from fresh/current-stack or renderer regression tests.
+
+## MapMaker probe runs and tests
+
+`tools/testing_profile.py --play --mapmaker-probe FLAGS` (Windows) and
+`tools/test-native-mac.py --mapmaker-probe FLAGS` (Mac) share
+`mapmaker_probe_environment`, which writes `mapmaker-probe.log` inside the
+disposable test root. `prepare_run` still strips inherited `TSFP_*`, so a
+personal environment cannot enable it. Asset-free coverage:
+`tests/test_mapmaker_probe.py` (registered in the native CI list; fixed case,
+four mutations and patch shape) and `tests/test_testing_profile.py`.
+Fixture success is not evidence of in-game meter behaviour.

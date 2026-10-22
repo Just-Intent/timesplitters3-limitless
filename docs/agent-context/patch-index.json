@@ -660,6 +660,13 @@
       ]
     },
     {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-probe.patch",
+      "sha256": "786faaa5d3cd5ec9c01b97d1a1ec7f20145029b54838809c88409e62f4284bdd",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
       "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-menu-choice-arrows.patch",
       "sha256": "0c9e7f400aee1e648e5550bbd44b163d1179fda9e5cdc253742d1deea352902c",
       "targets": [

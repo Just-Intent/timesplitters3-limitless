@@ -22,6 +22,7 @@ void pc_display_menu_mouse_dispatch(void (*original)(void));
 void pc_display_menu_audio_draw(void (*original)(void),int compact);
 void pc_display_menu_sensitivity_draw(void (*original)(void));
 void pc_display_menu_slider_bar(void (*original)(void));
+void pc_display_mapmaker_meter(void (*original)(void));
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));
 void pc_display_menu_choice_draw(void (*original)(void));

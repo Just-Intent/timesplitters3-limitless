@@ -64,6 +64,7 @@ void pc_display_menu_sensitivity_draw(void (*original)(void))
 }
 void pc_display_menu_slider_bar(void (*original)(void))
 {
+    mapmaker_probe_bar(); /* read-only; inert unless TSFP_MAPMAKER_PROBE */
     if(menu_slider_draw_menu && WORD_AT(g_esp)==0x002EA3E0u &&
        guest_writable(menu_slider_draw_item,0x10c) &&
        WORD_AT(menu_slider_draw_item+0x14)==9 && WORD_AT(0x007BA9E0u)<4)

@@ -152,3 +152,13 @@ The captured crane also uses an inclusive 639x479 last-pixel scissor. The
 crane patch's RHI hunk applies shared `pc_ui_vignette_clip` to a temporary
 rectangle before scaling; it never changes the guest-readable scissor state.
 Legacy GL uses the same helper. This prevents the amplified right/bottom gap.
+
+## MapMaker meter probe wrapper
+
+`*-mapmaker-meter-probe.patch` adds a pass-through `sub_0030C210` wrapper
+(MapMaker capacity meter painter) beside the existing `sub_000814B0` bar wrapper
+from `*-menu-setting-sliders.patch`, on whose context it depends; it therefore
+sorts after it and is skipped with it in the historical-upgrade fixture in
+`tests/test_patch_updates.py`. A new wrapper changes the generation fingerprint,
+so the first build regenerates guest C. Behavior is unchanged unless
+`TSFP_MAPMAKER_PROBE` is set; see `docs/mapmaker-meter-probe.md`.
