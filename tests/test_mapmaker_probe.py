@@ -15,8 +15,10 @@ MUTATIONS = {
     'unscoped': ('    mapmaker_probe.depth++;\n', '\n'),
     'default-on': ('mapmaker_probe.flags=(text && end!=text && !*end)?(unsigned)(value&MAPMAKER_PROBE_ALL):0;',
                    'mapmaker_probe.flags=(text && end!=text && !*end)?(unsigned)(value&MAPMAKER_PROBE_ALL):1;'),
-    'menus-any-scene': ("if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS) || mapmaker_probe_scene()!=MAPMAKER_PROBE_SCENE)return;",
+    'menus-any-scene': ("if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS) || !mapmaker_probe_active())return;",
                         "if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS))return;"),
+    'editor-scene-missing': ('return scene==MAPMAKER_PROBE_SCENE_EDITOR || scene==MAPMAKER_PROBE_SCENE_PLAY;',
+                             'return scene==MAPMAKER_PROBE_SCENE_PLAY;'),
     'uncapped': ('if(mapmaker_probe.written+length>MAPMAKER_PROBE_CAP) {', 'if(0) {'),
 }
 

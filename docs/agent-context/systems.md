@@ -34,7 +34,7 @@ Consult `docs/shared-platform.md` for shared versus adapter responsibilities.
 | Saves and profiles | Runtime save-routing patch; `tools/testing_profile.py`, `tools/test-native-mac.py` | `docs/testing-profile.md`, `tests/test_testing_profile.py` |
 | Crash/hang diagnostics | `src/pc_crash.c`, `pc_hang_policy.h`, `tools/crash-symbols.py` | `tests/test_crash_capture.py`, `test_native_crash.py`, `test_crash_symbols.py` |
 | Guest lift/runtime correctness | Runtime `tools/recomp/`, manual hooks, `tools/recomp-generation.py` | `tests/test_recomp_float_joins.py`, `test_recomp_vehicle_joins.py` |
-| MapMaker (reconnaissance only; no MapMaker code yet) | `research/mapmaker-investigation.md`, `research/capacity-constraints.md`; known anchors: scene 100, meter `sub_0030C210` → `sub_000814B0` | `docs/development-roadmap.md` |
+| MapMaker (reconnaissance only; no MapMaker code yet) | `research/mapmaker-investigation.md`, `research/capacity-constraints.md`; known anchors: editor scene 102 (map play likely 100), meter `sub_0030C210` → `sub_000814B0` | `docs/development-roadmap.md` |
 | Audio/movie startup | Runtime `src/hle/` sound and XMV files | `tests/test_audio_timing.py`, `test_xmv_stop.py` |
 
 Names in this table are entry points, not a complete call graph. Read the

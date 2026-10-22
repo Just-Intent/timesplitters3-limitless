@@ -10,13 +10,16 @@
  *      rectangle and colours
  *   2  also 64-byte snapshots of ecx and the first four stack words when they
  *      point into guest RAM (candidate budget/editor structures)
- *   4  also bars drawn outside the meter scope while scene 100 is active
- *   8  also, while scene 100 is active, each menu laid out by sub_00073750
+ *   4  also bars drawn outside the meter scope while MapMaker is active
+ *   8  also, while MapMaker is active, each menu laid out by sub_00073750
  *      (header, item list with type/flags/callback/rectangle and 64 raw
  *      bytes) and every left click's guest-UI pointer position and hit item
  * Output: TSFP_MAPMAKER_PROBE_LOG (binary, truncated per process), else stderr.
  * Records are emitted when their content changes, at most four per second,
  * with the number of unchanged repeats; the file is capped at 4 MiB.
+ *
+ * "MapMaker is active" means scene 102 (the editor: every meter record of the
+ * first Windows run, 2026-10-22, reported it) or scene 100 (kept for map play).
  *
  * Never writes guest memory, guest registers or the guest stack. Requires the
  * includer's WORD_AT, FLOAT_AT, guest_writable, g_esp, g_ecx and GetTickCount64. */
@@ -33,7 +36,8 @@
 #define MAPMAKER_PROBE_MENU_SLOTS 16u
 #define MAPMAKER_PROBE_MENU_ITEMS 64u
 #define MAPMAKER_PROBE_MENU_INTERVAL 1000u
-#define MAPMAKER_PROBE_SCENE 100
+#define MAPMAKER_PROBE_SCENE_PLAY 100
+#define MAPMAKER_PROBE_SCENE_EDITOR 102
 #define MAPMAKER_PROBE_CAP (4u*1024u*1024u)
 #define MAPMAKER_PROBE_INTERVAL 250u
 #define MAPMAKER_PROBE_BARS 8u
@@ -120,6 +124,11 @@ static int32_t mapmaker_probe_scene(void)
 {
     return guest_writable(0x0079094Cu,4)?(int32_t)WORD_AT(0x0079094Cu):-1;
 }
+static int mapmaker_probe_active(void)
+{
+    int32_t scene=mapmaker_probe_scene();
+    return scene==MAPMAKER_PROBE_SCENE_EDITOR || scene==MAPMAKER_PROBE_SCENE_PLAY;
+}
 
 /* Bar arguments: fraction (float), x, y, w, h, four colour words. */
 static void mapmaker_probe_bar_text(MapMakerProbeText *t,uint32_t sp)
@@ -155,7 +164,7 @@ static void mapmaker_probe_bar(void)
         mapmaker_probe.bars++;
         return;
     }
-    if((flags&MAPMAKER_PROBE_OTHER) && mapmaker_probe_scene()==MAPMAKER_PROBE_SCENE &&
+    if((flags&MAPMAKER_PROBE_OTHER) && mapmaker_probe_active() &&
        guest_writable(g_esp,4)) {
         MapMakerProbeText text;MapMakerProbeOther *slot=NULL;
         uint32_t ret=WORD_AT(g_esp);unsigned i;
@@ -167,8 +176,8 @@ static void mapmaker_probe_bar(void)
         if(!slot)return;
         if(slot->ret==ret && !strcmp(slot->key,text.text)) { slot->repeats++;return; }
         if(slot->ret==ret && now-slot->last<MAPMAKER_PROBE_INTERVAL) { slot->repeats++;return; }
-        mapmaker_probe_write("[mapmaker-probe] t=%llu other-bar scene=100%s repeats=%llu\n",
-            now,text.text,slot->repeats);
+        mapmaker_probe_write("[mapmaker-probe] t=%llu other-bar scene=%d%s repeats=%llu\n",
+            now,(int)mapmaker_probe_scene(),text.text,slot->repeats);
         slot->ret=ret;slot->last=now;slot->repeats=0;
         snprintf(slot->key,sizeof slot->key,"%s",text.text);
     }
@@ -233,7 +242,7 @@ static void mapmaker_probe_menu(uint32_t menu,uint32_t caller)
 {
     size_t used=0;unsigned i,n,slot=MAPMAKER_PROBE_MENU_SLOTS;
     uint32_t item,hash;unsigned long long now;
-    if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS) || mapmaker_probe_scene()!=MAPMAKER_PROBE_SCENE)return;
+    if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS) || !mapmaker_probe_active())return;
     if(!guest_writable(menu,0x23c))return;
 #define MENU_APPEND(...) do { int c_=snprintf(mapmaker_probe_menu_text+used,sizeof mapmaker_probe_menu_text-used,__VA_ARGS__); \
     if(c_>0)used+=(size_t)c_<sizeof mapmaker_probe_menu_text-used?(size_t)c_:sizeof mapmaker_probe_menu_text-1-used; } while(0)
@@ -275,7 +284,7 @@ static void mapmaker_probe_menu(uint32_t menu,uint32_t caller)
 static void mapmaker_probe_click(uint32_t menu,float x,float y,uint32_t hit,unsigned actions)
 {
     if(!(actions&2u) || !(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS) ||
-       mapmaker_probe_scene()!=MAPMAKER_PROBE_SCENE)return;
+       !mapmaker_probe_active())return;
     mapmaker_probe_write("[mapmaker-probe] t=%llu click menu=0x%08X pointer=%.1f,%.1f hit=0x%08X type=%u\n",
         GetTickCount64(),menu,(double)x,(double)y,hit,hit && guest_writable(hit,4)?WORD_AT(hit):0u);
 }

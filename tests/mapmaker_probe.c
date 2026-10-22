@@ -165,7 +165,7 @@ int main(int argc,char **argv)
     CHECK(strstr(log_text,"dump arg0@")!=NULL); /* 0x00310000 is in fixture RAM */
     CHECK(strstr(log_text,"dump arg3@")==NULL); /* 7 is not a pointer */
 
-    /* Other bars in scene 100 only. */
+    /* Other bars in MapMaker scenes (100, 102) only. */
     set_probe("5");
     WORD_AT(0x0079094Cu)=100;
     before=checksum();
@@ -175,12 +175,17 @@ int main(int argc,char **argv)
     read_log();
     CHECK(count("other-bar")==1);
     CHECK(strstr(log_text,"other-bar scene=100 ret=0x00123400 fraction=0.750000")!=NULL);
+    WORD_AT(0x0079094Cu)=102; /* the editor scene reports its own number */
+    draw_bar(0x00123500u,.25f);
+    read_log();CHECK(strstr(log_text,"other-bar scene=102 ret=0x00123500 fraction=0.250000")!=NULL);
     WORD_AT(0x0079094Cu)=5;
+    draw_bar(0x00999900u,.1f);
+    WORD_AT(0x0079094Cu)=101; /* main menu */
     draw_bar(0x00999900u,.1f);
     read_log();CHECK(strstr(log_text,"0x00999900")==NULL);
     WORD_AT(0x0079094Cu)=0;
 
-    /* Flag 8: menu layouts and clicks in scene 100 only, read-only. */
+    /* Flag 8: menu layouts and clicks in MapMaker scenes only, read-only. */
     set_probe("8");
     WORD_AT(0x00300000u+4)=0x004E1234u;WORD_AT(0x00300000u+0x1b0)=3;
     FLOAT_AT(0x00300000u+0xe4)=10.f;FLOAT_AT(0x00300000u+0xe8)=20.f;
@@ -192,8 +197,12 @@ int main(int argc,char **argv)
     WORD_AT(0x00302000u)=9;WORD_AT(0x00302000u+4)=0;WORD_AT(0x00302000u+0x14)=3;
     WORD_AT(0x0079094Cu)=5;
     mapmaker_probe_menu(0x00300000u,0x00012345u);
-    read_log();CHECK(strstr(log_text,"menu-layout")==NULL);
-    WORD_AT(0x0079094Cu)=100;
+    mapmaker_probe_click(0x00300000u,25.5f,30.f,0x00301000u,2u);
+    WORD_AT(0x0079094Cu)=101; /* main menu */
+    mapmaker_probe_menu(0x00300000u,0x00012345u);
+    mapmaker_probe_click(0x00300000u,25.5f,30.f,0x00301000u,2u);
+    read_log();CHECK(strstr(log_text,"menu-layout")==NULL && strstr(log_text,"click")==NULL);
+    WORD_AT(0x0079094Cu)=102; /* the editor */
     before=checksum();
     mapmaker_probe_menu(0x00300000u,0x00012345u);
     mapmaker_probe_menu(0x00300000u,0x00012345u);

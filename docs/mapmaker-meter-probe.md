@@ -39,8 +39,8 @@ Flags add together (for example `11` = 1 + 2 + 8):
 | --- | --- |
 | `1` | Each meter call: caller return address, scene, `ecx`, six stack words; each bar's fill fraction, rectangle and colours |
 | `2` | 64-byte snapshots of `ecx` and the first four stack words when they point into guest RAM (candidate budget structures); use with `1` |
-| `4` | Bars drawn outside the meter painter while scene 100 is active (use if the meter shows nothing) |
-| `8` | While MapMaker runs: each menu the game lays out (`sub_00073750`): its caller, descriptor, state, rectangle and every item's type, flags, callback, rectangle and 64 raw bytes, plus each left click's pointer position in game-UI coordinates and the item it hit (`hit=0` means none). Use this for the toolbar click investigation (MM-4) |
+| `4` | Bars drawn outside the meter painter while MapMaker (scene 100 or 102) is active (use if the meter shows nothing) |
+| `8` | While MapMaker (scene 100 or 102) runs: each menu the game lays out (`sub_00073750`): its caller, descriptor, state, rectangle and every item's type, flags, callback, rectangle and 64 raw bytes, plus each left click's pointer position in game-UI coordinates and the item it hit (`hit=0` means none). Use this for the toolbar click investigation (MM-4) |
 
 The log is `private\test-saves\quick-test\mapmaker-probe.log`. It is truncated
 when the game starts, so copy it before the next run. The runner recycles only

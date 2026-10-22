@@ -23,6 +23,28 @@ yet; this file lists what is known, the candidate limits, and how to test each.
 - No developer statement says whether the meter measures real console memory or
   a designer cap.
 
+## 1a. Meter formula (static analysis of local disassembly, 2026-10-22)
+
+Read from the local XBE disassembly (`private/pipeline/disasm`, never
+committed); constants read from the local `default.xbe`.
+
+- CONFIRMED (code): the editor object pointer is the global `0x007844A8`.
+  `sub_0030C210` passes `1.0 - max(sub_0030C180(), editor[+0x270])` as the
+  bar fraction. After drawing, it tints the bar red when
+  `editor[+0x270] + editor[+0x274] > 1.0`; `+0x274` is probably the cost of
+  the piece about to be placed (HYPOTHESIS).
+- CONFIRMED (code): `sub_0030C180` combines two integers, each multiplied by
+  the float at `0x0049F7AC` = 3.0547e-5 = **1/32736** (`0x7FE0`):
+  `sub_002FDF10()` (a constant `0x514` = 1300) and
+  `sub_002FE0C0(*0x00784014)`, which returns field `+0x248` of the object
+  found by `sub_0032A5B0(obj, 0x00C77668)`.
+- HYPOTHESIS (strong): the meter measures **bytes of map data against a
+  ~32 KiB budget** (1300 bytes fixed overhead), not object counts. That links
+  C1 directly to C3/C6. Next: `RECOMP_WATCH_WRITE` on that `+0x248` field
+  while placing pieces, and compare with saved map file sizes (H-SV2).
+- First run (flags 11, scene 102): fractions 1.000, 0.984, 0.993, 0.984,
+  0.973, 0.953, 0.940 as pieces were placed; the step list was not recorded.
+
 ## 2. Host memory is not the obvious constraint
 
 CONFIRMED (runtime source):

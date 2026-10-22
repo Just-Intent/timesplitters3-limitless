@@ -18,7 +18,8 @@ Evidence labels:
 
 | Fact | Evidence | Label |
 | --- | --- | --- |
-| MapMaker runs as **scene 100**. The current scene is the int32 at `0x0079094C`; scenes 0..100 are active play, >100 is frontend. | `src/pc_discord_guest.h:49-53, 128`; `src/pc_menu_mouse_guest.inc:51-53` | CONFIRMED (Discord presence verified live, `STATUS.md` ~11430-11460) |
+| MapMaker's Arcade table entry uses **scene 100** (most likely playing a map; unverified). The current scene is the int32 at `0x0079094C`; scenes 0..100 are active play, >100 is frontend. | `src/pc_discord_guest.h:49-53, 128`; `src/pc_menu_mouse_guest.inc:51-53` | CONFIRMED (Discord presence verified live, `STATUS.md` ~11430-11460) |
+| The MapMaker **editor** runs as **scene 102**. | First Windows meter-probe run (2026-10-22): all 634 meter draws reported `scene=102` | CONFIRMED (one run) |
 | MapMaker is a row in the 17-row Arcade map table at `0x004D2390` (stride 0x3C, scene id at +0, name id at −8, network capacity at +0xC+col*4). | `src/pc_discord_guest.h:119-133` | CONFIRMED |
 | `sub_0030C210` draws the noninteractive **MapMaker capacity meter** using the shared bar primitive `sub_000814B0`. | `STATUS.md:2552-2556` (US audit of the four original callers of `sub_000814B0`); `src/pc_menu_sliders.inc:55` | CONFIRMED |
 | `sub_000814B0` takes 9 stack arguments: fill fraction (float), x, y, w, h, colours. It is already wrapped by `pc_display_menu_slider_bar`, which acts only for return address `0x002EA3E0` (sensitivity). | `patches/*-menu-setting-sliders.patch:17-23`; `src/pc_menu_sliders.inc:58-69`; `src/pc_display_menu.c:547`; `tests/fov_settings.c:98` | CONFIRMED |
@@ -60,6 +61,10 @@ authoritative source for the mapping.
 
 CONFIRMED by code:
 
+- **Superseded 2026-10-22:** the editor is scene 102, so `menu_mouse_context()`
+  is true there and the PC layer is in frontend menu mode while editing (pointer
+  shown; only generic menu rows clickable). The original analysis below
+  applies to scene 100 only.
 - `menu_mouse_context()` is false for scene 100 unless the player-1 pause flag
   (`*0x00761C48` bit 0) is set (`src/pc_menu_mouse_guest.inc:49-54`). So while
   editing, the PC layer is in **gameplay mode**: the mouse is captured, left

@@ -36,7 +36,7 @@ placement checks, cursor position and the map save path.
 
 ### Phase 2b: mouse and keyboard controls
 
-1. Context: a shared `mapmaker_context()` (scene 100 plus an editor-state check)
+1. Context: a shared `mapmaker_context()` (editor scene 102 plus an editor-state check)
    in a new testable `src/pc_mapmaker*.inc`, following `pc_menu_mouse_guest.inc`.
 2. Let editor menus use the existing menu-mouse engine if H-IN3 holds.
 3. Cursor: release mouse capture in the editor and convert the pointer to
@@ -174,6 +174,14 @@ Tracked separately; do not merge their diagnosis.
 - **Next step (implemented, awaiting a run):** probe flag `8` logs each menu
   laid out while scene 100 is active and every left click's pointer position
   and hit item. See the toolbar steps in `docs/mapmaker-meter-probe.md`.
+- **2026-10-22 run:** the meter log (flags 11) recorded 634 meter draws, all
+  with `scene=102`, and no menu or click records: flag 8 was gated on scene
+  100, so the capture never ran. The gate now accepts scene 102 (editor) and
+  100; rerun the toolbar steps.
+- **Consequence:** scene 102 is above 100, so `menu_mouse_context()` already
+  treats the editor as a frontend menu (pointer shown, generic rows of types
+  4/7/8 clickable). Toolbar and grid clicks fail because they are not such
+  rows, not because the editor is in gameplay mode.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 
