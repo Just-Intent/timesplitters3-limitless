@@ -20,6 +20,10 @@ from the generator fingerprint; expect a longer build once.
 powershell -NoProfile -File tsfp.ps1 -Action Build
 ```
 
+If Smart App Control blocks the build's test programs, add `-CompileOnly`
+(see `docs/building.md`). That executable is untested, and Smart App Control
+may block it as well; run the experiment on an unrestricted Windows test machine.
+
 ## Enable it
 
 Use the bounded Test Lab runner. It strips inherited `TSFP_*` variables, so the

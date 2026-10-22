@@ -31,6 +31,36 @@ The extracted files in `private/game` must remain; the ISO is no longer needed.
 Use `-Configuration Debug` or `-Configuration RelWithDebInfo` for another build
 configuration, and pass the same configuration to `tsfp.ps1 Run` to launch it.
 
+### Compile-only builds (application control)
+
+`Build` normally runs about a dozen locally compiled test programs and a GPU
+replay check after compiling. On a workstation whose application control (for
+example Smart App Control in enforced mode) blocks unsigned local executables,
+use:
+
+```powershell
+powershell -NoProfile -File tsfp.ps1 -Action Build -CompileOnly
+```
+
+It performs the same game-executable check, texture audit (unless
+`-SkipTextures`), patch verification, guest-code regeneration when needed,
+network identity header, icon resource, CMake configure and compilation of every
+normal target. Only *running* the built programs is skipped: `ghost_targets.py`
+with `d3d8_replay.exe`, the twelve `tsfp_*_test.exe` checks, and the
+System Link/packaging seal (`network-identity.py --seal-executable`). Each is
+printed as `SKIPPED (not run)` with a warning, and recorded with the executable's
+SHA-256 in `build/windows/compile-only-build.json`. A later full `Build` that
+passes its tests removes that record. Crash symbols are still archived.
+
+A compile-only executable is untested and unsealed: launches with System Link
+enabled (`tools/play.py`, `Test-SystemLink.ps1`) and release packaging verify the
+seal and refuse it, and it must not be described as a validated
+build. Application control may also block the game itself; run it on an
+unrestricted test machine. Do not weaken security policy to run it. If guest
+regeneration is needed, it runs the locally built `XbSymbolDatabaseCLI`
+(`tools.xdk_symbols`); if that is blocked the build stops rather than skipping
+generation. `-CompileOnly` is rejected for actions other than `Build`.
+
 The equivalent individual steps are still available for troubleshooting:
 
 ```powershell

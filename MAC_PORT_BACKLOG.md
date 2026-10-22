@@ -195,6 +195,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-058 | Crane and remote-view vignette sizing (issue #221) | Awaiting validation |
 | MAC-059 | Physical keyboard entry in original text dialogs (issue #136) | Awaiting validation |
 | MAC-060 | MapMaker capacity meter probe (debug instrumentation) | Awaiting validation |
+| MAC-061 | Compile-only Windows build mode | Not applicable |
 
 ### MAC-048 - Companion vehicle zero-flag joins (#100)
 
@@ -3141,6 +3142,24 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   place a tile and confirm a record with a changed fraction appears in
   `private/test-saves/native-mac/mapmaker-probe.log`; confirm no log without the option.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-061 — Compile-only Windows build mode
+
+- **Status:** Not applicable
+- **PC behavior:** `tsfp.ps1 -Action Build -CompileOnly` compiles every target but
+  does not run locally built test programs, for Windows hosts where Smart App
+  Control blocks unsigned executables. Skipped checks are reported and recorded;
+  the executable is not sealed as a tested build.
+- **PC source:** Branch `mapmaker-recon`; `tsfp.ps1`, `tests/test_compile_only_build.py`,
+  `docs/building.md`.
+- **PC validation:** Static script checks pass on Linux; Windows PowerShell checks
+  and a real compile-only build on the Legion are pending.
+- **Existing Mac support:** `tools/build-native-mac.py` is a separate builder and is
+  unchanged; locally compiled binaries are not quarantined by Gatekeeper.
+- **Mac adaptation needed:** None. This works around a Windows application-control
+  policy in the Windows-only build script; no shared game behavior changes.
+- **Mac acceptance checks:** None beyond existing native build checks.
+- **Mac implementation and evidence:** Not applicable.
 
 ## Shared uncertainties, not confirmed Mac-only omissions
 

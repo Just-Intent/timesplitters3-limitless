@@ -1,3 +1,28 @@
+## Compile-only Windows build mode (2026-10-22)
+
+Branch `mapmaker-recon`. On the Windows 11 Lenovo Legion, `tsfp.ps1 -Action Build`
+compiled successfully but stopped when it ran `tsfp_pc_network_test.exe`: Smart
+App Control (enforced `VerifiedAndReputableDesktop`, Code Integrity event 3077)
+blocks locally built unsigned programs. Security policy is unchanged.
+
+Added `tsfp.ps1 -Action Build -CompileOnly`. Game validation, texture audit,
+patching, regeneration, configure and the unchanged `cmake --build` target list
+still run and fail on error. Only executing built programs is skipped
+(`ghost_targets.py`/`d3d8_replay.exe`, twelve `tsfp_*_test.exe`, and the network
+seal). These are listed as `SKIPPED (not run)` and recorded in
+`build/windows/compile-only-build.json`. The default build is unchanged apart
+from removing that record after its tests pass. No CMake custom or post-build
+command runs generated programs. Regeneration, when needed, still runs the
+Setup-built `XbSymbolDatabaseCLI`.
+
+Validation (Ubuntu 24.04, Python 3.12.3): `tests/test_compile_only_build.py`
+8 passed, with 2 Windows PowerShell cases skipped; three script mutations were
+each caught. The CI native list gave 392 passed, 55 skipped, 19 failed and
+5 errors; the 24 failures and errors are identical to the established baseline.
+Not yet done: the Windows PowerShell tests and a real compile-only build on the
+Legion. A compile-only executable is untested, and Smart App Control may also
+block it.
+
 ## MapMaker capacity meter probe (E1 instrumentation, 2026-10-22)
 
 Branch `mapmaker-recon` (from main `141f440`). Added read-only, default-off

@@ -246,3 +246,16 @@ personal environment cannot enable it. Asset-free coverage:
 `tests/test_mapmaker_probe.py` (registered in the native CI list; fixed case,
 four mutations and patch shape) and `tests/test_testing_profile.py`.
 Fixture success is not evidence of in-game meter behaviour.
+
+## Compile-only Windows builds
+
+`tsfp.ps1 -Action Build -CompileOnly` exists for hosts whose application control
+blocks unsigned local executables. Everything up to and including the shared
+`cmake --build` target list is unchanged; the post-build branch only reports
+the skipped `ghost_targets.py`/`d3d8_replay.exe`, `tsfp_*_test.exe` runs and
+the network seal, writing `build/windows/compile-only-build.json`. The full
+branch removes that record after its tests pass. Adding a new executed build
+test requires listing it in the compile-only skipped list;
+`tests/test_compile_only_build.py` fails otherwise (static checks on every
+host, PowerShell checks on Windows). A compile-only build is never a passing
+build and is not sealed for System Link or packaging.

@@ -69,6 +69,10 @@ Exact command (from the checkout):
   tests/test_patch_tracking.py tests/test_patch_updates.py -q
 ```
 
+On Windows hosts where application control blocks locally built programs, use
+`tsfp.ps1 -Action Build -CompileOnly` (see `docs/building.md`): it compiles
+everything but runs none of the built tests; the result is untested.
+
 ## 4. Test routes for MapMaker work
 
 | Check | Asset-free? | Host |
