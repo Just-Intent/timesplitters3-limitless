@@ -492,9 +492,8 @@ void pc_display_menu_mouse(void (*original)(void))
     }
     choice_direction=menu_choice_hit(menu,x,y,sw,sh,&hit);
     mapmaker_probe_click(menu,x,y,hit,actions); /* read-only diagnostic */
-    if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y) &&
-       !mapmaker_pointer_scroll_press(menu,x,y)) /* MapMaker prototype */
-        mapmaker_pointer_switch_press(menu,x,y);
+    if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y))
+        mapmaker_pointer_scroll_press(menu,x,y); /* MapMaker prototype */
     /* The original dispatcher applies directional repeats after this hook.
      * Do not let a previously held direction fight an actively chosen mouse
      * row. A fresh keyboard/controller direction immediately takes ownership

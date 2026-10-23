@@ -265,6 +265,9 @@ Tracked separately; do not merge their diagnosis.
   `0x00765BA8`, 5 icons in advanced / 3 in beginner mode via `editor+0x200`)
   to leave the list open when the click is on the current category
   (`editor+0x254`).
+- **Twelfth run (2026-10-23):** still no reliable click switch. Decision:
+  with a list open, toolbar clicks do nothing and A/D switch categories; the
+  switch code (generated B/A presses, icon hit test) was removed.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

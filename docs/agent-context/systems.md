@@ -176,10 +176,10 @@ the bar did not scroll the Story AI list: arrows step the target
 there and the thumb follows the mouse, clamped like `sub_00073560`; the
 engine animates the scroll. The wheel scrolls those menus the same way
 (three steps per notch) and, on the editor screen, zooms by briefly holding
-White (up) or Black (down) (`pc_mapmaker_zoom_*`). A click on the toolbar
-strip while a menu is open sends short B presses (only to a fully open menu
-in front) until the editor screen is back, then a short A (`mapmaker_pointer_switch_*`,
-`pc_controls_mapmaker_pulse`). Prompts show T for the right trigger in the
+White (up) or Black (down) (`pc_mapmaker_zoom_*`). While a menu is open,
+toolbar clicks do nothing and A/D switch categories; a click switch made of
+generated B and A presses was tried and removed (it never opened the clicked
+category reliably). Prompts show T for the right trigger in the
 editor (`pc_controls_mapmaker_editor_active`). On the editor screen right-drag and the window edge pan the view the
 way `sub_00309160` + `sub_002F9F70` do (skipped when `editor+0x25C &
 0x0C044088`), and the right button no longer sends the menu Back action

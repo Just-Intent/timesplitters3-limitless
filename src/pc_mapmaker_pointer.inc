@@ -37,7 +37,9 @@
  * d3d8_display_output_shape, pc_menu_mouse_position,
  * pc_controls_menu_hover_pointer, pc_controls_mapmaker_pointer and
  * pc_controls_mapmaker_row_press, pc_controls_mapmaker_editor,
- * pc_controls_mapmaker_zoom and pc_controls_mapmaker_pulse. */
+ * pc_controls_mapmaker_zoom and pc_controls_mapmaker_pulse. While a menu is
+ * open, toolbar clicks do nothing (A/D switch categories); generating the
+ * presses for a click switch proved unreliable in game. */
 #include <math.h>
 #include <stdlib.h>
 #include "pc_mapmaker_pointer.h"
@@ -52,15 +54,6 @@
 #define MAPMAKER_GRID 40.f
 #define MAPMAKER_SCROLL_DELAY 300u   /* ms before an arrow repeats */
 #define MAPMAKER_SCROLL_REPEAT 80u   /* ms between repeats */
-/* Toolbar strip (category icons and arrows), UI canvas; from the recorded clicks. */
-#define MAPMAKER_TOOLBAR_X0 370.f
-#define MAPMAKER_TOOLBAR_X1 620.f
-#define MAPMAKER_TOOLBAR_Y0 35.f
-#define MAPMAKER_TOOLBAR_Y1 70.f
-#define MAPMAKER_SWITCH_BACKS 3      /* menus closed at most */
-#define MAPMAKER_SWITCH_GAP 250u     /* ms between Back presses */
-#define MAPMAKER_SWITCH_TIMEOUT 1500u
-#define MAPMAKER_SWITCH_HOVER 300u   /* ms after the list closes before A (hover, settle) */
 
 static struct {
     int initialized, enabled;
@@ -70,10 +63,6 @@ static struct {
     int grab_mode;       /* 1 up arrow, 2 down arrow, 3 thumb */
     float grab;          /* pointer y minus thumb top at the press */
     unsigned long long grab_next; /* next arrow repeat */
-    int switching;       /* toolbar click while a menu was open: close it, then A */
-    int switch_backs, switch_hover;
-    float switch_x, switch_y;
-    unsigned long long switch_at, switch_next;
     float right_travel;  /* UI pixels moved while the right button is held */
 } mapmaker_pointer;
 #define MAPMAKER_RIGHT_CLICK 4.f /* less travel than this is a click, not a drag */
@@ -232,75 +221,6 @@ static int mapmaker_pointer_scroll_press(uint32_t menu,float x,float y)
     } else mapmaker_pointer.grab=y-s.thumb0;
     mapmaker_pointer.grab_mode=3;
     return 1;
-}
-
-/* A left press on the toolbar while an editor menu is open (it hit nothing in
- * that menu): the editor only acts on the toolbar from its own screen, and on
- * real buttons. Close the menu with short B presses (Back is the 3D view),
- * then press A once the editor screen is back; the game pointer is still over
- * the clicked icon. */
-/* sub_00335890: the toolbar category icon under (x, y), or -1. Its rectangles
- * {x0,y0,x1,y1} are at 0x00765BA8 (16 bytes each), five in advanced mode
- * (editor+0x200) and three in beginner mode, valid while [0x00765C0C] is set.
- * The arrows are not icons. */
-static int mapmaker_toolbar_icon(float x,float y)
-{
-    uint32_t editor;
-    int count,i;
-    if(!guest_writable(MAPMAKER_EDITOR,4) || !guest_writable(0x00765C0Cu,4) ||
-       !guest_writable(0x00765BA8u,5*16) || !WORD_AT(0x00765C0Cu)) return -1;
-    editor=WORD_AT(MAPMAKER_EDITOR);
-    if(!guest_writable(editor,0x260)) return -1;
-    count=WORD_AT(editor+0x200)?5:3;
-    for(i=0;i<count;i++) {
-        uint32_t r=0x00765BA8u+(uint32_t)i*16u;
-        if(x>=FLOAT_AT(r) && x<=FLOAT_AT(r+8) && y>=FLOAT_AT(r+4) && y<=FLOAT_AT(r+12)) return i;
-    }
-    return -1;
-}
-
-static void mapmaker_pointer_switch_press(uint32_t menu,float x,float y)
-{
-    int icon;
-    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu)) return;
-    icon=mapmaker_toolbar_icon(x,y);
-    if(icon<0 && (x<MAPMAKER_TOOLBAR_X0 || x>=MAPMAKER_TOOLBAR_X1 ||
-                  y<MAPMAKER_TOOLBAR_Y0 || y>=MAPMAKER_TOOLBAR_Y1)) return;
-    /* The icon of the category whose list is open (editor+0x254): keep it open. */
-    if(icon>=0 && icon==(int)WORD_AT(WORD_AT(MAPMAKER_EDITOR)+0x254)) return;
-    mapmaker_pointer.switching=1;mapmaker_pointer.switch_backs=0;mapmaker_pointer.switch_hover=0;
-    mapmaker_pointer.switch_x=x;mapmaker_pointer.switch_y=y;
-    mapmaker_pointer.switch_at=GetTickCount64();mapmaker_pointer.switch_next=0;
-}
-static void mapmaker_pointer_switch_step(uint32_t menu,int root)
-{
-    unsigned long long now=GetTickCount64();
-    if(!mapmaker_pointer.switching) return;
-    if(now-mapmaker_pointer.switch_at>MAPMAKER_SWITCH_TIMEOUT) { mapmaker_pointer.switching=0;return; }
-    if(now<mapmaker_pointer.switch_next) return;
-    if(root) {
-        /* Back on the editor screen. A right away would act on the category
-         * that was highlighted before (the list reopened): move the pointer
-         * off and back onto the clicked icon, give the toolbar time to take
-         * the hover, then press A. */
-        if(!mapmaker_pointer.switch_hover) {
-            mapmaker_pointer_place(mapmaker_pointer.switch_x+1.f,mapmaker_pointer.switch_y);
-            mapmaker_pointer.switch_hover=1;
-            mapmaker_pointer.switch_next=now+MAPMAKER_SWITCH_HOVER;
-            return;
-        }
-        mapmaker_pointer_place(mapmaker_pointer.switch_x,mapmaker_pointer.switch_y);
-        pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_A);
-        mapmaker_pointer.switching=0;
-        return;
-    }
-    /* B only to a menu that is fully open and in front: a closing menu
-     * (state 4/5) or one under an open child would pass it on. */
-    if(!guest_writable(menu,0x23c) || WORD_AT(menu+0x1b0)!=3 || WORD_AT(menu+0x170)) return;
-    if(mapmaker_pointer.switch_backs>=MAPMAKER_SWITCH_BACKS) { mapmaker_pointer.switching=0;return; }
-    pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_CANCEL);
-    mapmaker_pointer.switch_backs++;
-    mapmaker_pointer.switch_next=now+MAPMAKER_SWITCH_GAP;
 }
 
 /* Wheel notches (positive up) in the editor: zoom on the editor screen, or
@@ -475,7 +395,6 @@ static void mapmaker_pointer_input(uint32_t menu)
     pressed=(p.left && !mapmaker_pointer.last_left) || (p.right && !mapmaker_pointer.last_right);
     if(moved || pressed) mapmaker_pointer_place(x,y);
     mapmaker_pointer_scroll_drag(menu,y,p.left);
-    mapmaker_pointer_switch_step(menu,root);
     if(root) mapmaker_pointer_navigate(menu,x,y,gw,gh,p.right);
     mapmaker_pointer.have_last=1;
     mapmaker_pointer.last_x=p.x;mapmaker_pointer.last_y=p.y;

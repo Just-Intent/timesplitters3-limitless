@@ -29,9 +29,8 @@ static int editor_last=-1;
 static void pc_controls_mapmaker_editor(int active) { editor_last=active; }
 static int zoom_notches;
 static void pc_controls_mapmaker_zoom(int notches) { zoom_notches+=notches; }
-static int pulses_a, pulses_back;
 static int pulses_y;
-static void pc_controls_mapmaker_pulse(int button) { if(button==0) pulses_a++; else if(button==1) pulses_back++; else if(button==2) pulses_y++; }
+static void pc_controls_mapmaker_pulse(int button) { if(button==0) pulses_y++; }
 static void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh) { *sw=w;*sh=h; }
 /* sub_00076EF0(menu,item) highlights a row; record the call instead. */
 static void sub_00076EF0(void) {}
@@ -246,62 +245,6 @@ int main(void)
     WORD_AT(STYLE)=0x40u;
     WORD_AT(0x0079094Cu)=101;
     CHECK(!mapmaker_pointer_wheel(SM,1));                  /* other scenes: generic wheel */
-    WORD_AT(0x0079094Cu)=102;
-    /* Toolbar click while a list is open: Back (up to 3, 250 ms apart), then A. */
-    pulses_a=pulses_back=0;WORD_AT(SM+0x1b0)=3;
-    /* Toolbar icons as sub_00335890 sees them: five 30x24 icons from x 410. */
-    WORD_AT(0x007844A8u)=0x00320000u;WORD_AT(0x00765C0Cu)=1;WORD_AT(0x00320000u+0x200)=1;WORD_AT(0x00320000u+0x254)=2;
-    for(int i=0;i<5;i++) {
-        FLOAT_AT(0x00765BA8u+i*16)=410.f+i*36.f;FLOAT_AT(0x00765BACu+i*16)=40.f;
-        FLOAT_AT(0x00765BB0u+i*16)=440.f+i*36.f;FLOAT_AT(0x00765BB4u+i*16)=64.f;
-    }
-    CHECK(mapmaker_toolbar_icon(420.f,50.f)==0 && mapmaker_toolbar_icon(495.f,50.f)==2);
-    CHECK(mapmaker_toolbar_icon(560.f,50.f)==4 && mapmaker_toolbar_icon(400.f,50.f)==-1);
-    WORD_AT(0x00320000u+0x200)=0;                            /* beginner mode: three icons */
-    CHECK(mapmaker_toolbar_icon(560.f,50.f)==-1 && mapmaker_toolbar_icon(495.f,50.f)==2);
-    WORD_AT(0x00320000u+0x200)=1;
-    mapmaker_pointer_switch_press(SM,495.f,50.f);           /* the open list's own icon: keep it */
-    CHECK(!mapmaker_pointer.switching);
-    mapmaker_pointer_switch_press(SM,385.f,50.f);           /* an arrow (not an icon): switch */
-    CHECK(mapmaker_pointer.switching);
-    mapmaker_pointer.switching=0;
-    FLOAT_AT(0x007BA038u)=320.f;FLOAT_AT(0x007BA188u)=240.f; /* pointer scale for the hover checks */
-    CHECK(!mapmaker_pointer_scroll_press(SM,450.f,50.f));
-    mapmaker_pointer_switch_press(SM,450.f,50.f);
-    CHECK(mapmaker_pointer.switching);
-    mapmaker_pointer_switch_step(SM,0);
-    CHECK(pulses_back==1 && pulses_a==0);
-    tick+=100;mapmaker_pointer_switch_step(SM,0);           /* waits between presses */
-    CHECK(pulses_back==1);
-    tick+=200;WORD_AT(SM+0x1b0)=4;mapmaker_pointer_switch_step(SM,0); /* closing: no Back */
-    CHECK(pulses_back==1);
-    WORD_AT(SM+0x1b0)=3;WORD_AT(SM+0x170)=0x006FF060u;mapmaker_pointer_switch_step(SM,0); /* has a child */
-    CHECK(pulses_back==1);
-    WORD_AT(SM+0x170)=0;mapmaker_pointer_switch_step(SM,0); /* a nested menu, open: one more Back */
-    CHECK(pulses_back==2);
-    tick+=100;mapmaker_pointer_switch_step(MENU,1);         /* editor screen, too soon */
-    CHECK(pulses_a==0);
-    tick+=200;mapmaker_pointer_switch_step(MENU,1);         /* editor screen: hover first */
-    CHECK(pulses_a==0 && mapmaker_pointer.switching && NEAR(FLOAT_AT(B+0x20),451.f) && NEAR(FLOAT_AT(B+0x24),50.f));
-    tick+=200;mapmaker_pointer_switch_step(MENU,1);         /* settle time not over */
-    CHECK(pulses_a==0);
-    tick+=120;mapmaker_pointer_switch_step(MENU,1);         /* back on the icon, then A */
-    CHECK(pulses_a==1 && !mapmaker_pointer.switching && NEAR(FLOAT_AT(B+0x20),450.f));
-    mapmaker_pointer_switch_step(MENU,1);
-    CHECK(pulses_a==1);
-    mapmaker_pointer_switch_press(SM,450.f,200.f);          /* not the toolbar */
-    CHECK(!mapmaker_pointer.switching);
-    mapmaker_pointer_switch_press(MENU,450.f,50.f);         /* already on the editor screen */
-    CHECK(!mapmaker_pointer.switching);
-    mapmaker_pointer_switch_press(SM,450.f,50.f);           /* gives up after 3 Backs ... */
-    for(int i=0;i<5;i++) { mapmaker_pointer_switch_step(SM,0);tick+=260; }
-    CHECK(pulses_back==5 && !mapmaker_pointer.switching);
-    mapmaker_pointer_switch_press(SM,450.f,50.f);           /* ... or after 1.5 s */
-    mapmaker_pointer_switch_step(SM,0);tick+=1600;mapmaker_pointer_switch_step(MENU,1);
-    CHECK(pulses_a==1 && !mapmaker_pointer.switching);
-    WORD_AT(0x0079094Cu)=101;
-    mapmaker_pointer_switch_press(SM,450.f,50.f);           /* other scenes: never */
-    CHECK(!mapmaker_pointer.switching);
     WORD_AT(0x0079094Cu)=102;
     row_presses=0;
     FLOAT_AT(0x007BA038u)=320.f;FLOAT_AT(0x007BA188u)=240.f;

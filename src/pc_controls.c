@@ -33,7 +33,7 @@ static int menu_mode, menu_button_block;
 static int mapmaker_pointer_active, mapmaker_editor, mapmaker_cancel_key, mapmaker_trigger_key;
 static int mapmaker_zoom_up_key, mapmaker_zoom_down_key, mapmaker_move_keys[4], mapmaker_y_key;
 static PcMapMakerZoom mapmaker_zoom;
-static ULONGLONG mapmaker_pulse_until[3];
+static ULONGLONG mapmaker_pulse_until[1];
 static PcMapMakerClick mapmaker_click;
 static PcMapMakerEscape mapmaker_escape;
 static PcTextInput text_input;
@@ -474,9 +474,6 @@ int pc_controls_key_down(int key)
     down=pc_mapmaker_trigger_key(menu_mode && mapmaker_editor,key,mapmaker_trigger_key,down,
                                  pc_input_down(&input,PC_MAPMAKER_FLOOR_UP_KEY,GetTickCount64()) &&
                                  (replaying || GetForegroundWindow()==window_handle));
-    if(menu_mode && mapmaker_editor && mapmaker_cancel_key && key==mapmaker_cancel_key &&
-       GetTickCount64()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_CANCEL] &&
-       (replaying || GetForegroundWindow()==window_handle)) down=1;
     if(menu_mode && mapmaker_editor && mapmaker_y_key && key==mapmaker_y_key &&
        GetTickCount64()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_Y] &&
        (replaying || GetForegroundWindow()==window_handle)) down=1;
@@ -562,8 +559,7 @@ void pc_controls_mapmaker_editor(int active)
 
 void pc_controls_mapmaker_pulse(int button)
 {
-    if (button != PC_MAPMAKER_PULSE_A && button != PC_MAPMAKER_PULSE_CANCEL &&
-        button != PC_MAPMAKER_PULSE_Y) return;
+    if (button != PC_MAPMAKER_PULSE_Y) return;
     AcquireSRWLockExclusive(&lock);
     mapmaker_pulse_until[button] = GetTickCount64() + PC_MAPMAKER_PULSE_MS;
     ReleaseSRWLockExclusive(&lock);
@@ -600,8 +596,7 @@ int pc_controls_terminal_click(void)
     replay_tick();
     /* Always evaluated so its held-button block tracks every poll. */
     mapmaker = pc_mapmaker_click(&mapmaker_click, menu_mode && mapmaker_pointer_active,
-                                 input.keys[VK_LBUTTON]) ||
-               (menu_mode && mapmaker_editor && GetTickCount64() < mapmaker_pulse_until[PC_MAPMAKER_PULSE_A]);
+                                 input.keys[VK_LBUTTON]);
     down = (replaying || GetForegroundWindow() == window_handle) &&
            (pc_input_terminal_click(&input, input.keys[VK_LBUTTON]) || mapmaker);
     ReleaseSRWLockExclusive(&lock);
