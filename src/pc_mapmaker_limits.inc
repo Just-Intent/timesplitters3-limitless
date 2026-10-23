@@ -37,9 +37,12 @@
  * Per-category maxima (writable .data table 0x00524BE0, 37 x 24 B, max at +4,
  * read by sub_00303460 place and sub_00303E10 paste) are raised while the
  * limits are on: pickups x4 (weapons, ammo, keycards, health, armour,
- * power-ups, special pickups), movers and props x4 and turrets x2. Objects
- * come from a 550-slot engine pool taken without a bound check (203 in use
- * with 30+ movers on a 110-tile map). Teleporters stay at 2 per colour (sub_0023FD10 stores them in
+ * power-ups, special pickups) and movers and props x4. Objects come from a
+ * 550-slot engine pool taken without a bound check (203 in use with 30+ movers
+ * on a 110-tile map). Turrets (categories 27-29, 8 each) stay at stock: each
+ * live turret takes a gun and an owner struct from two 32-slot pools whose
+ * allocator returns 0 when empty (sub_00245990, sub_000B3BE0), and joins a
+ * 30-entry object list with no bound (sub_0009E650, 0x00716148). Teleporters stay at 2 per colour (sub_0023FD10 stores them in
  * two 10-slot stack arrays without a bound), and flags, start points and cover
  * props (category 33) are unchanged.
  *
@@ -76,9 +79,6 @@ static const struct { uint32_t address, stock, raised; } mapmaker_categories[]={
     {0x00524E3Cu,20u,80u},   /* 25 mover (object) */
     {0x00524E54u,20u,80u},   /* 26 props (objects) */
     {0x00524EE4u,20u,80u},   /* 32 marker */
-    {0x00524E6Cu,8u,16u},    /* 27 turrets (objects) */
-    {0x00524E84u,8u,16u},    /* 28 */
-    {0x00524E9Cu,8u,16u},    /* 29 */
     {0x00524F2Cu,4u,8u},     /* 35 */
     {0x00524F44u,4u,8u},     /* 36 */
 };

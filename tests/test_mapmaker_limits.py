@@ -22,6 +22,8 @@ MUTATIONS = {
     'categories-always': ('    if(!mapmaker_limits.limits) return;\n    mapmaker_categories_apply();',
                           '    mapmaker_categories_apply();\n    if(!mapmaker_limits.limits) return;'),
     'categories-overwrite': (' && WORD_AT(a)==mapmaker_categories[i].stock)', ')'),
+    'turrets-raised': ('    {0x00524F2Cu,4u,8u},     /* 35 */',
+                       '    {0x00524F2Cu,4u,8u},{0x00524E6Cu,8u,16u},'),
     'teleporters-raised': ('    {0x00524D1Cu,2u,8u},     /* 13 keycard green */',
                            '    {0x00524D1Cu,2u,8u},{0x00524D34u,2u,8u},'),
     'flags-clobbered': ('WORD_AT(editor+0x25c)=refuse?(flags|0x400000u):(flags&~0x400000u);',

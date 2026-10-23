@@ -207,7 +207,7 @@ int main(void)
     CHECK(WORD_AT(0x00524CD4u)==99);
     CHECK(WORD_AT(0x00524CECu)==8 && WORD_AT(0x00524D04u)==8 && WORD_AT(0x00524D1Cu)==8);
     CHECK(WORD_AT(0x00524E3Cu)==80 && WORD_AT(0x00524E54u)==80 && WORD_AT(0x00524CA4u)==128);
-    CHECK(WORD_AT(0x00524E6Cu)==16);                                   /* turrets x2 */
+    CHECK(WORD_AT(0x00524E6Cu)==8 && WORD_AT(0x00524E84u)==8 && WORD_AT(0x00524E9Cu)==8); /* turrets stock */
     CHECK(WORD_AT(0x00524D34u)==2 && WORD_AT(0x00524D94u)==2);          /* teleporters unchanged */
     CHECK(WORD_AT(0x00524EFCu)==66);                                   /* cover props unchanged */
 

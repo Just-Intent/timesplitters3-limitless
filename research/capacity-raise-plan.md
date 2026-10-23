@@ -28,8 +28,11 @@ overrides at lift time) plus function wrappers.
 - Stage 1 implemented 2026-10-23: items 200 (opt-in
   `TSFP_MAPMAKER_LIMITS=1`), editor item node pool 2120 (guest-code patch),
   category maxima x4 for pickups (weapons, ammo, keycards 8 per colour,
-  health, armour, power-ups, special), movers/props 80 (x4), turrets 16 and
-  categories 35/36 8 (x2). Not raised: teleporters, cover props (category 33),
+  health, armour, power-ups, special), movers/props 80 (x4) and categories
+  35/36 8 (x2). Not raised: turrets (8 each: two 32-slot gun/owner pools with
+  an unchecked allocator and a 30-entry unbounded object list, see
+  `logs/limits/turrets.md`; build 08809be allowed 16 each and is unsafe with
+  more than 32 turrets), teleporters, cover props (category 33),
   free-standing objects (editor arrays of 170), flags, start points.
 - CONFIRMED in play (2026-10-23, Windows, compile-only build 08809be, map
   `bigmap3`): 110 tiles, 67 items incl. 8 red keycards and 30+ movers; team
