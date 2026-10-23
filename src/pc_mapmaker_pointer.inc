@@ -60,6 +60,7 @@
 #define MAPMAKER_SWITCH_BACKS 3      /* menus closed at most */
 #define MAPMAKER_SWITCH_GAP 250u     /* ms between Back presses */
 #define MAPMAKER_SWITCH_TIMEOUT 1500u
+#define MAPMAKER_SWITCH_HOVER 120u   /* ms for the toolbar to take the hover before A */
 
 static struct {
     int initialized, enabled;
@@ -70,7 +71,8 @@ static struct {
     float grab;          /* pointer y minus thumb top at the press */
     unsigned long long grab_next; /* next arrow repeat */
     int switching;       /* toolbar click while a menu was open: close it, then A */
-    int switch_backs;
+    int switch_backs, switch_hover;
+    float switch_x, switch_y;
     unsigned long long switch_at, switch_next;
     float right_travel;  /* UI pixels moved while the right button is held */
 } mapmaker_pointer;
@@ -241,7 +243,8 @@ static void mapmaker_pointer_switch_press(uint32_t menu,float x,float y)
 {
     if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu) ||
        x<MAPMAKER_TOOLBAR_X0 || x>=MAPMAKER_TOOLBAR_X1 || y<MAPMAKER_TOOLBAR_Y0 || y>=MAPMAKER_TOOLBAR_Y1) return;
-    mapmaker_pointer.switching=1;mapmaker_pointer.switch_backs=0;
+    mapmaker_pointer.switching=1;mapmaker_pointer.switch_backs=0;mapmaker_pointer.switch_hover=0;
+    mapmaker_pointer.switch_x=x;mapmaker_pointer.switch_y=y;
     mapmaker_pointer.switch_at=GetTickCount64();mapmaker_pointer.switch_next=0;
 }
 static void mapmaker_pointer_switch_step(uint32_t menu,int root)
@@ -251,6 +254,17 @@ static void mapmaker_pointer_switch_step(uint32_t menu,int root)
     if(now-mapmaker_pointer.switch_at>MAPMAKER_SWITCH_TIMEOUT) { mapmaker_pointer.switching=0;return; }
     if(now<mapmaker_pointer.switch_next) return;
     if(root) {
+        /* Back on the editor screen. A right away would act on the category
+         * that was highlighted before (the list reopened): move the pointer
+         * off and back onto the clicked icon, give the toolbar time to take
+         * the hover, then press A. */
+        if(!mapmaker_pointer.switch_hover) {
+            mapmaker_pointer_place(mapmaker_pointer.switch_x+1.f,mapmaker_pointer.switch_y);
+            mapmaker_pointer.switch_hover=1;
+            mapmaker_pointer.switch_next=now+MAPMAKER_SWITCH_HOVER;
+            return;
+        }
+        mapmaker_pointer_place(mapmaker_pointer.switch_x,mapmaker_pointer.switch_y);
         pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_A);
         mapmaker_pointer.switching=0;
         return;

@@ -52,6 +52,7 @@ MUTATIONS = {
     'switch-back-to-closing': (ADAPTER, '    if(!guest_writable(menu,0x23c) || WORD_AT(menu+0x1b0)!=3 || WORD_AT(menu+0x170)) return;\n', ''),
     'right-never-clears': (ADAPTER, 'if(mapmaker_pointer_right_clears()) pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_Y);\n            else ', ''),
     'right-clears-held': (ADAPTER, '!WORD_AT(editor+0x2f7c) && ', ''),
+    'switch-no-hover': (ADAPTER, '        if(!mapmaker_pointer.switch_hover) {', '        if(0) {'),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 

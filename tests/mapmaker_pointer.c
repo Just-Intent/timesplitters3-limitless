@@ -249,6 +249,7 @@ int main(void)
     WORD_AT(0x0079094Cu)=102;
     /* Toolbar click while a list is open: Back (up to 3, 250 ms apart), then A. */
     pulses_a=pulses_back=0;WORD_AT(SM+0x1b0)=3;
+    FLOAT_AT(0x007BA038u)=320.f;FLOAT_AT(0x007BA188u)=240.f; /* pointer scale for the hover checks */
     CHECK(!mapmaker_pointer_scroll_press(SM,450.f,50.f));
     mapmaker_pointer_switch_press(SM,450.f,50.f);
     CHECK(mapmaker_pointer.switching);
@@ -264,8 +265,12 @@ int main(void)
     CHECK(pulses_back==2);
     tick+=100;mapmaker_pointer_switch_step(MENU,1);         /* editor screen, too soon */
     CHECK(pulses_a==0);
-    tick+=200;mapmaker_pointer_switch_step(MENU,1);         /* editor screen: A */
-    CHECK(pulses_a==1 && !mapmaker_pointer.switching);
+    tick+=200;mapmaker_pointer_switch_step(MENU,1);         /* editor screen: hover first */
+    CHECK(pulses_a==0 && mapmaker_pointer.switching && NEAR(FLOAT_AT(B+0x20),451.f) && NEAR(FLOAT_AT(B+0x24),50.f));
+    tick+=60;mapmaker_pointer_switch_step(MENU,1);          /* hover time not over */
+    CHECK(pulses_a==0);
+    tick+=80;mapmaker_pointer_switch_step(MENU,1);          /* back on the icon, then A */
+    CHECK(pulses_a==1 && !mapmaker_pointer.switching && NEAR(FLOAT_AT(B+0x20),450.f));
     mapmaker_pointer_switch_step(MENU,1);
     CHECK(pulses_a==1);
     mapmaker_pointer_switch_press(SM,450.f,200.f);          /* not the toolbar */

@@ -253,6 +253,11 @@ Tracked separately; do not merge their diagnosis.
   (Back is the 3D view), so the switch and Escape-in-menus now use B. The
   movement keys no longer move the pointer; A/D step the toolbar. A right
   click on an empty cell with nothing held clears the selection (Y).
+- **Tenth run (2026-10-23):** Escape, A/D toolbar stepping, right-click
+  deselect and rotate all work. The toolbar switch closed the list and then
+  reopened the same one: A arrived before the toolbar took the hover of the
+  clicked icon. On the editor screen the switch now moves the pointer one
+  pixel off and back onto the icon and waits 120 ms before A.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 
