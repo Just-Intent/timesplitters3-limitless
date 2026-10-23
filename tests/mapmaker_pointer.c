@@ -260,6 +260,18 @@ int main(void)
     WORD_AT(0x0079094Cu)=101;
     CHECK(!mapmaker_pointer_parent_press(PANEL,100.f,120.f) && row_presses==1);
     WORD_AT(0x0079094Cu)=102;
+    /* The panel's own entry list (one non-selectable type-8 item): A only. */
+#define LIST 0x00333000u
+    WORD_AT(PANEL+4)=0x0052E9D8u;WORD_AT(PANEL+0x178)=LIST;
+    WORD_AT(LIST)=8;WORD_AT(LIST+4)=0;WORD_AT(LIST+0x28)=0x000C0044u;
+    FLOAT_AT(LIST+0x78)=236.8f;FLOAT_AT(LIST+0x7c)=84.5f;FLOAT_AT(LIST+0x80)=614.4f;FLOAT_AT(LIST+0x84)=200.9f;
+    highlight_menu=0;
+    CHECK(mapmaker_pointer_parent_press(PANEL,330.f,110.f)==LIST && row_presses==2 && highlight_menu==0);
+    CHECK(mapmaker_pointer_parent_press(PANEL,100.f,120.f)==ROW && row_presses==3);  /* parent rows still */
+    CHECK(!mapmaker_pointer_parent_press(PANEL,620.f,110.f) && row_presses==3);
+    WORD_AT(PANEL+4)=0x0052E078u;                                                   /* other menus: no */
+    CHECK(mapmaker_pointer_parent_press(PANEL,330.f,110.f)!=LIST);
+    WORD_AT(PANEL+4)=0;WORD_AT(PANEL+0x178)=0;
     row_presses=0;
 
     /* Editor menu rows: a real A press instead of the menu confirm, scene 102 only. */
@@ -271,9 +283,21 @@ int main(void)
     WORD_AT(0x0079094Cu)=102;
     CHECK(mapmaker_pointer_row_click() && row_presses==1);
 
-    /* Escape acts as the first Back key in the editor only. */
+    /* Escape acts as Back while an editor menu is open, latched per press. */
+    {
+        PcMapMakerEscape esc={0};
+        CHECK(!pc_mapmaker_escape_back(&esc,1,0));   /* editor screen: stays Start */
+        CHECK(!pc_mapmaker_escape_back(&esc,1,1));   /* pause opened under the same press */
+        CHECK(!pc_mapmaker_escape_back(&esc,0,1));
+        CHECK(pc_mapmaker_escape_back(&esc,1,1));    /* in a menu: Back */
+        CHECK(pc_mapmaker_escape_back(&esc,1,0));    /* menu closed under the press: still Back */
+        CHECK(!pc_mapmaker_escape_back(&esc,0,0));
+        CHECK(!pc_mapmaker_escape_back(&esc,1,0));
+    }
     CHECK(pc_mapmaker_key(0,0x1B,0x09,1,1)==1);  /* outside the editor: Start as bound */
-    CHECK(pc_mapmaker_key(1,0x1B,0x09,1,1)==0);  /* editor: Escape no longer Start */
+    CHECK(pc_mapmaker_key(1,0x1B,0x09,1,0)==1);  /* editor screen: Escape still Start */
+    CHECK(pc_mapmaker_key(1,0x09,0x09,0,0)==0);
+    CHECK(pc_mapmaker_key(1,0x1B,0x09,1,1)==0);  /* menu open: Escape no longer Start */
     CHECK(pc_mapmaker_key(1,0x09,0x09,0,1)==1);  /* ... but Back */
     CHECK(pc_mapmaker_key(1,0x09,0x09,1,0)==1);  /* Tab still Back */
     CHECK(pc_mapmaker_key(1,0x09,0x09,0,0)==0);

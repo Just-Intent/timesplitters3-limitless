@@ -32,6 +32,7 @@ static volatile LONG editing;
 static int menu_mode, menu_button_block;
 static int mapmaker_pointer_active, mapmaker_editor, mapmaker_back_key, mapmaker_trigger_key;
 static PcMapMakerClick mapmaker_click;
+static PcMapMakerEscape mapmaker_escape;
 static PcTextInput text_input;
 
 void pc_controls_text_mode(uint32_t owner) {
@@ -449,8 +450,11 @@ int pc_controls_key_down(int key)
                        key==VK_UP?'W':key==VK_DOWN?'S':0;
         if(alias) down|=pc_input_down(&input,alias,GetTickCount64());
     }
+    /* A menu is open when the editor screen does not own the pointer. */
     down=pc_mapmaker_key(menu_mode && mapmaker_editor,key,mapmaker_back_key,down,
-                         pc_input_down(&input,VK_ESCAPE,GetTickCount64()));
+                         pc_mapmaker_escape_back(&mapmaker_escape,
+                             pc_input_down(&input,VK_ESCAPE,GetTickCount64()),
+                             !mapmaker_pointer_active));
     if(text_input.owner && pc_text_key((unsigned)key))down=0;
     down=down && (replaying || GetForegroundWindow()==window_handle);
     if(!input.keys[VK_LBUTTON]) menu_button_block &= ~1;

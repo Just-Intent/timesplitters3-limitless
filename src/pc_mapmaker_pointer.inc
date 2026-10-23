@@ -149,13 +149,37 @@ static int mapmaker_scroll_geometry(uint32_t menu,MapMakerScroll *s)
 
 /* A fresh left press that hit no row: on an editor menu's scrollbar, hold A
  * for the press (arrows, track and thumb are the engine's own A actions). */
+/* Read-only: what the scrollbar test saw, when the probe logs menus (flag 8). */
+static void mapmaker_pointer_scroll_log(uint32_t menu,float x,float y,int ok,const MapMakerScroll *s)
+{
+#ifdef MAPMAKER_PROBE_MENUS
+    uint32_t style=guest_writable(menu,0x23c)?WORD_AT(menu+0x1c):0u;
+    int known=guest_writable(menu,0x23c) && guest_writable(style,0x80) &&
+        guest_writable(0x007BA038u,4) && guest_writable(0x007BA188u,4);
+    if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS)) return;
+    mapmaker_probe_write("[mapmaker-probe] t=%llu scroll-press menu=0x%08X at=%.1f,%.1f geometry=%d"
+        " bar=%.1f,%.1f,%.1f,%.1f track=%.1f..%.1f thumb=%.1f..%.1f"
+        " style+70=%08X +74=%.3f +78=%.3f menu+E4=%.1f +EC=%.1f +AC=%.1f k=%.3f,%.3f\n",
+        GetTickCount64(),menu,(double)x,(double)y,ok,
+        ok?(double)s->x0:0.,ok?(double)s->y0:0.,ok?(double)s->x1:0.,ok?(double)s->y1:0.,
+        ok?(double)s->track0:0.,ok?(double)s->track1:0.,ok?(double)s->thumb0:0.,ok?(double)s->thumb1:0.,
+        known?WORD_AT(style+0x70):0u,known?(double)FLOAT_AT(style+0x74):0.,known?(double)FLOAT_AT(style+0x78):0.,
+        known?(double)FLOAT_AT(menu+0xe4):0.,known?(double)FLOAT_AT(menu+0xec):0.,known?(double)FLOAT_AT(menu+0xac):0.,
+        known?(double)FLOAT_AT(0x007BA038u):0.,known?(double)FLOAT_AT(0x007BA188u):0.);
+#else
+    (void)menu;(void)x;(void)y;(void)ok;(void)s;
+#endif
+}
+
 static void mapmaker_pointer_scroll_press(uint32_t menu,float x,float y)
 {
     MapMakerScroll s;
+    int ok;
     mapmaker_pointer.grab_menu=0;
-    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) ||
-       !mapmaker_scroll_geometry(menu,&s) ||
-       x<s.x0 || x>=s.x1 || y<s.y0 || y>=s.y1) return;
+    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return;
+    ok=mapmaker_scroll_geometry(menu,&s);
+    mapmaker_pointer_scroll_log(menu,x,y,ok,&s);
+    if(!ok || x<s.x0 || x>=s.x1 || y<s.y0 || y>=s.y1) return;
     pc_controls_mapmaker_row_press();
     if(y>=s.thumb0 && y<s.thumb1) { mapmaker_pointer.grab_menu=menu;mapmaker_pointer.grab=y-s.thumb0; }
 }
@@ -229,13 +253,28 @@ static void mapmaker_pointer_navigate(uint32_t menu,float x,float y,float gw,flo
 
 /* The logic list keeps a passive description panel open as its child, so
  * the engine (sub_00074760) treats the panel as the active menu and the PC
- * hook only hit-tests the panel. A left press that hit nothing there tries the
- * parent's rows: highlight the row (sub_00076EF0) and press A for it. */
+ * hook only hit-tests the panel. A left press that hit nothing there presses A
+ * over the panel's own entry list, or else tries the parent's rows: highlight
+ * the row (sub_00076EF0) and press A for it. */
 static uint32_t mapmaker_pointer_parent_press(uint32_t menu,float x,float y)
 {
     uint32_t parent,item;
     unsigned n;
     if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return 0;
+    /* The panel itself lists the existing entries inside one non-selectable
+     * type-8 item drawn by sub_00327520. Its draw code (sub_00323C30) tests
+     * each entry against the game pointer and acts on A (+0xC4 & 0x10), so
+     * a click there only needs A. */
+    if(WORD_AT(menu+4)==0x0052E9D8u || WORD_AT(menu+4)==0x0052E9E8u) {
+        item=WORD_AT(menu+0x178);
+        for(n=0;item && n<64 && guest_writable(item,0x10c);n++,item=WORD_AT(item+4))
+            if(WORD_AT(item)==8 &&
+               x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&
+               y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {
+                pc_controls_mapmaker_row_press();
+                return item;
+            }
+    }
     parent=WORD_AT(menu+0x2c);
     if(!guest_writable(parent,0x23c) || WORD_AT(parent+0x170)!=menu) return 0;
     item=WORD_AT(parent+0x178);

@@ -25,15 +25,28 @@ static inline int pc_mapmaker_click(PcMapMakerClick *s, int active, int left_dow
     /* A row press never carries onto the editor screen (list closed under it). */
     return (active && !s->blocked && left_down) || (s->row && !active && left_down);
 }
-/* In the editor (scene 102) the game uses Back for pause and to leave menus,
- * so Escape acts as the player's first Back key and no longer as its own
- * binding (Start). Returns the adjusted down state for one polled key. */
-static inline int pc_mapmaker_key(int editor, int key, int back_key, int down, int escape_down)
+/* In the editor, Start (Escape) opens the pause menu from the editor screen,
+ * Back (Tab) toggles the 3D view there, and Back leaves an open menu. So
+ * Escape acts as Back while a menu is open and keeps its own binding (Start)
+ * on the editor screen. The choice is made when Escape goes down and kept
+ * until it is released, so the press that opens the pause menu cannot then
+ * close it. Returns 1 while Escape currently acts as Back. */
+typedef struct PcMapMakerEscape { int was, back; } PcMapMakerEscape;
+static inline int pc_mapmaker_escape_back(PcMapMakerEscape *s, int escape_down, int menu_open)
+{
+    escape_down = !!escape_down;
+    if (escape_down && !s->was) s->back = !!menu_open;
+    s->was = escape_down;
+    return escape_down && s->back;
+}
+
+/* Adjusted down state for one polled key while Escape acts as Back. */
+static inline int pc_mapmaker_key(int editor, int key, int back_key, int down, int escape_back)
 {
     enum { ESCAPE = 0x1B };
     if (!editor || !back_key || back_key == ESCAPE) return down;
-    if (key == ESCAPE) return 0;
-    if (key == back_key) return down || escape_down;
+    if (key == ESCAPE) return escape_back ? 0 : down;
+    if (key == back_key) return down || escape_back;
     return down;
 }
 

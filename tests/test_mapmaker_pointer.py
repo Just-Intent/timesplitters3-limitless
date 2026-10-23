@@ -21,19 +21,23 @@ MUTATIONS = {
     'held-click-leaks': (POLICY, 'if (active != s->active) s->blocked = left_down;', ''),
     'row-carries-to-editor': (POLICY, '(s->row && !active && left_down)', '(s->row && left_down)'),
     'row-latch-sticks': (POLICY, 'if (!left_down) s->blocked = s->row = 0;', 'if (!left_down) s->blocked = 0;'),
-    'escape-still-start': (POLICY, 'if (key == ESCAPE) return 0;', ''),
-    'escape-not-back': (POLICY, 'if (key == back_key) return down || escape_down;', 'if (key == back_key) return down;'),
+    'escape-still-start': (POLICY, 'if (key == ESCAPE) return escape_back ? 0 : down;', ''),
+    'escape-not-latched': (POLICY, 'if (escape_down && !s->was) s->back = !!menu_open;', 's->back = !!menu_open;'),
+    'escape-back-on-screen': (POLICY, 'if (escape_down && !s->was) s->back = !!menu_open;', 'if (escape_down && !s->was) s->back = 1;'),
+    'escape-not-back': (POLICY, 'if (key == back_key) return down || escape_back;', 'if (key == back_key) return down;'),
     'escape-everywhere': (POLICY, 'if (!editor || !back_key', 'if (!back_key'),
     'pan-any-state': (ADAPTER, '(WORD_AT(editor+0x25c)&0x0C044088u) ||', ''),
     'pan-no-clamp': (ADAPTER, 'c=left+w*.5f; if(c<0) left-=c; else if(c>MAPMAKER_GRID) left-=c-MAPMAKER_GRID;', ''),
     'pan-in-menus': (ADAPTER, 'if(root) mapmaker_pointer_navigate(', 'if(1) mapmaker_pointer_navigate('),
     'drag-wrong-speed': (ADAPTER, 'FLOAT_AT(b+0x34)=(target-FLOAT_AT(menu+0x84))/3.f;', 'FLOAT_AT(b+0x34)=target-FLOAT_AT(menu+0x84);'),
-    'scroll-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) ||\n       !mapmaker_scroll_geometry', 'if(!mapmaker_pointer_enabled() ||\n       !mapmaker_scroll_geometry'),
+    'scroll-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return;\n    ok=', 'if(!mapmaker_pointer_enabled()) return;\n    ok='),
     'rotate-lost': (ADAPTER, '            WORD_AT(menu+0xc4)|=0x20u; /* as the shared hook', '            (void)0; /* as the shared hook'),
     'drag-rotates': (ADAPTER, 'if(mapmaker_pointer.right_travel<MAPMAKER_RIGHT_CLICK && guest_writable(menu,0x23c))', 'if(guest_writable(menu,0x23c))'),
     'parent-any-menu': (ADAPTER, ' || WORD_AT(parent+0x170)!=menu) return 0;', ') return 0;'),
     'parent-disabled-rows': (ADAPTER, "if((type==4 || type==7 || type==8) && !(flags&5) &&\n           x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&\n           y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {\n            if(WORD_AT(parent", "if((type==4 || type==7 || type==8) &&\n           x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&\n           y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {\n            if(WORD_AT(parent"),
     'trigger-everywhere': (POLICY, 'if (!editor || !trigger_key || key != trigger_key) return down;', 'if (!trigger_key || key != trigger_key) return down;'),
+    'panel-any-menu': (ADAPTER, 'if(WORD_AT(menu+4)==0x0052E9D8u || WORD_AT(menu+4)==0x0052E9E8u) {', 'if(1) {'),
+    'panel-no-a': (ADAPTER, '                pc_controls_mapmaker_row_press();\n                return item;\n            }\n    }', '                return item;\n            }\n    }'),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 
@@ -96,6 +100,7 @@ def test_escape_wiring():
     key = controls.split('int pc_controls_key_down(int key)', 1)[1].split('return down;', 1)[0]
     # Applied before typing and focus checks, so text entry still wins.
     assert key.index('down=pc_mapmaker_key(') < key.index('if(text_input.owner && pc_text_key')
+    assert '!mapmaker_pointer_active));' in key  # menu open = editor screen does not own the pointer
     # Back is the runtime's eighth control ("back"); the prompt table follows that order.
     bindings = (ROOT / 'src/pc_bindings.inc').read_text(encoding='utf-8')
     assert '"Pause / Start", "Objectives / Back"' in bindings

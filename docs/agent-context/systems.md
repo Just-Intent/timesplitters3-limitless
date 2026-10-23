@@ -166,8 +166,10 @@ when ownership changes). Editor menus (pause menu, category lists) are normal
 rows that the shared hook hit-tests and highlights, but the editor acts on A
 itself, so in scene 102 a row click calls `mapmaker_pointer_row_click()`, which
 holds A for that press (`pc_controls_mapmaker_row_press`) instead of the
-menu-engine confirm. Also in scene 102: Escape reports as the first Back key
-and no longer as Start (`pc_mapmaker_key`, Windows only); a left press on a
+menu-engine confirm. Also in scene 102: while a menu is open, Escape reports
+as the first Back key and not as Start; on the editor screen it stays Start
+(pause), since Back there toggles the 3D view. The choice is latched per press
+(`pc_mapmaker_escape_back`, `pc_mapmaker_key`; Windows only). A left press on a
 menu scrollbar (geometry as `sub_00071400`) holds A, and during the engine's
 thumb drag (`menu+0x194 == -2`) `player+0x34` is set so the thumb follows the
 mouse; on the editor screen right-drag and the window edge pan the view the
@@ -176,7 +178,10 @@ way `sub_00309160` + `sub_002F9F70` do (skipped when `editor+0x25C &
 there (a right click without a drag sends it on release, which the editor
 uses to rotate). The logic list keeps a passive description panel open as
 its child (`sub_00078E50(..., 0x0052E9D8, 2)` in `sub_003278D0`), so a click
-that misses that active panel tries the parent's rows
+inside the panel's own entry list (one non-selectable type-8 item drawn by
+`sub_00327520`, whose rows `sub_00323C30` tests against the game pointer and
+activates on A) presses A; otherwise a click that misses the panel tries the
+parent's rows
 (`mapmaker_pointer_parent_press`: highlight with `sub_00076EF0`, then A). In
 the editor T acts as the first "Fire" key (right trigger, floor up;
 `pc_mapmaker_trigger_key`) because that key is usually the left mouse button,

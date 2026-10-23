@@ -222,6 +222,13 @@ Tracked separately; do not merge their diagnosis.
   mouse button); A/D/W/S no longer act as the D-pad in the editor. Story AI
   list scrolling fails; the click record now also logs the menu's scrollbar
   fields. Zoom: the editor's Controls readout should name the zoom buttons.
+- **Fifth run (2026-10-23):** rotate and the logic list's left rows work. The
+  logic panel's right-hand entries are drawn inside one non-selectable type-8
+  item and hit-tested by the game's own pointer code, so a click there now
+  presses A. Escape-as-Back had made the pause menu unreachable (Start opens
+  it from the editor screen; Back there is the 3D view): Escape is now Back
+  only while a menu is open. Scroll-press logging (probe flag 8) records the
+  computed scrollbar geometry for the Story AI investigation.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 
