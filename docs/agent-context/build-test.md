@@ -253,6 +253,14 @@ pointer, memory budget and stage A limits fixtures
 include `pc_display_menu.c` or `pc_menu_mouse_guest.inc` (`menu_mouse.c`,
 `fov_settings.c`) need a `sub_0003DFA0` stub for the stage A allocator.
 
+## Guest-code patch table
+
+`config/guest-code-patches.json` is applied by every lift (Windows Generate and
+Build's regeneration, Mac `--generate`); its hash is part of the generation
+fingerprint, so editing it forces regeneration on the next build. An entry that
+fails verification stops the build with the entry id. See
+`docs/agent-context/runtime.md` (Verified guest-code patches).
+
 ## Compile-only Windows builds
 
 `tsfp.ps1 -Action Build -CompileOnly` exists for hosts whose application control

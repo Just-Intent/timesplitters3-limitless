@@ -35,3 +35,31 @@ def test_runtime_declarations_invalidate_generated_wrappers(tmp_path):
     generation.record(tmp_path)
     symbols.write_text('{"symbols": [{"name": "XMVPlaybackStop"}]}')
     assert not generation.current(tmp_path)
+
+
+def test_guest_code_patch_table_invalidates_generated_code(tmp_path):
+    runtime = tmp_path / 'external/ts3FPrecomp'
+    for name in ('scripts/recompile.py', 'templates/runtime/recomp_types.h',
+                 'titles/futureperfect/src/recomp_manual.c',
+                 'titles/futureperfect/src/recomp/gen/recomp_funcs.h'):
+        (runtime / name).parent.mkdir(parents=True, exist_ok=True)
+        (runtime / name).write_text('/* original */')
+    table = tmp_path / 'config/guest-code-patches.json'
+    assert generation.guest_patch_table(runtime) == table.resolve()
+    generation.record(runtime)
+    assert generation.current(runtime)
+    table.parent.mkdir()
+    table.write_text('{"patches": []}')
+    assert not generation.current(runtime)
+    generation.record(runtime)
+    table.write_text('{"patches": [{"id": "x"}]}')
+    assert not generation.current(runtime)
+
+
+def test_builds_pass_the_project_guest_patch_table():
+    import json
+    for script, count in (('tsfp.ps1', 2), ('tools/build-native-mac.py', 1)):
+        assert (ROOT / script).read_text(encoding='utf-8').count('--guest-patches') == count, script
+    table = json.loads((ROOT / 'config/guest-code-patches.json').read_text(encoding='utf-8'))
+    assert table['title_id'] == '45410066'
+    assert table['xbe_sha256'] == '3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc'

@@ -173,3 +173,18 @@ and `sub_002FA720` (editor limits, recomputed after the original only with
 `TSFP_MAPMAKER_LIMITS=1`). Both are skipped in the historical-upgrade fixture
 and force one guest regeneration. Policy: `src/pc_mapmaker_budget.inc`,
 `src/pc_mapmaker_limits.inc`; see `docs/agent-context/systems.md`.
+
+## Verified guest-code patches
+
+`*-guest-code-patches.patch` adds a guest-patch checker to the lift (`tools/recomp/disasm.py`):
+`config/guest-code-patches.json` (project-tracked) lists `code` entries (same-length
+byte rewrites of the in-memory XBE copy the lifter decodes) and `operand` entries
+(a decoded immediate or displacement replaced, so an imm8 compare can take any
+32-bit value). The lift stops unless the XBE SHA-256, each entry's original bytes,
+its function, whole-instruction coverage and the function's instruction boundaries,
+mnemonics and branch targets all check out; entries in hand-written or HLE-replaced
+functions are refused. The XBE on disk is never written, and the disassembly stage
+is unaffected. Both builds pass the table (`tsfp.ps1` Generate and Build's lift,
+`tools/build-native-mac.py`), and `tools/recomp-generation.py` hashes it, so an edit
+regenerates guest C. Data-section and relocation entries are not implemented.
+Tests: `tests/test_guest_code_patches.py`, `tests/test_recomp_generation.py`.

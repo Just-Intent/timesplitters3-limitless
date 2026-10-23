@@ -171,7 +171,8 @@ try {
                     Invoke-Checked $envPython @('-m', 'tools.xdk_symbols', $xbe)
                     Invoke-Checked $envPython @('scripts/recompile.py', $xbe,
                         '--work-dir', (Join-Path $privateRoot 'pipeline'), '--project', 'titles/futureperfect',
-                        '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries')
+                        '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries',
+                        '--guest-patches', (Join-Path $projectRoot 'config\guest-code-patches.json'))
                     Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\recomp-generation.py'), $toolRoot, '--record')
                 }
                 'Build' {
@@ -202,7 +203,8 @@ try {
                         Invoke-Checked $envPython @('-m', 'tools.xdk_symbols', (Join-Path $gameRoot 'default.xbe'))
                         Invoke-Checked $envPython @('scripts/recompile.py', (Join-Path $gameRoot 'default.xbe'),
                             '--work-dir', (Join-Path $privateRoot 'pipeline'), '--project', 'titles/futureperfect',
-                            '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries', '--only', 'lift')
+                            '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries', '--only', 'lift',
+                            '--guest-patches', (Join-Path $projectRoot 'config\guest-code-patches.json'))
                         Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\recomp-generation.py'), $toolRoot, '--record')
                     }
                     Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\network-identity.py'))

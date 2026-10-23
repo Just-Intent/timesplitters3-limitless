@@ -25,7 +25,17 @@ def fingerprint(runtime):
         declarations.update(pattern.findall(source.read_text(encoding='utf-8')))
     result['hle-declarations'] = hashlib.sha256(
         json.dumps(sorted(declarations)).encode('utf-8')).hexdigest()
+    # Verified guest-code patches are applied by the lift, so editing the
+    # project's table must regenerate the guest C.
+    table = guest_patch_table(runtime)
+    result['guest-code-patches'] = (hashlib.sha256(table.read_bytes()).hexdigest()
+                                    if table.is_file() else 'absent')
     return result
+
+
+def guest_patch_table(runtime):
+    """The project's table, two levels above the runtime checkout (external/<runtime>)."""
+    return Path(runtime).resolve().parents[1] / 'config/guest-code-patches.json'
 
 
 def marker(runtime):

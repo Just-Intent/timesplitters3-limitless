@@ -697,6 +697,16 @@
       ]
     },
     {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-guest-code-patches.patch",
+      "sha256": "43875aec58094b841154e03e01fe8b6720740da5141d8fcf5e7759677ce56897",
+      "targets": [
+        "scripts/recompile.py",
+        "tools/recomp/__main__.py",
+        "tools/recomp/disasm.py",
+        "tools/recomp/translator.py"
+      ]
+    },
+    {
       "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-menu-custom-choice-arrows.patch",
       "sha256": "07eac43cf604d7bf804ab2c9a027457fe94cc04706268e9abedf036db8b415d2",
       "targets": [

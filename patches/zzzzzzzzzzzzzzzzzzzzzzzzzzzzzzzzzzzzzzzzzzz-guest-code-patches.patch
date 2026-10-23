@@ -1,0 +1,377 @@
+diff --git a/scripts/recompile.py b/scripts/recompile.py
+--- a/scripts/recompile.py
++++ b/scripts/recompile.py
+@@ -139,6 +139,10 @@ def build_commands(args, xbe: Path, analysis_json: Path):
+         lift += ["--game-name", args.game_name]
+     if args.trace_all_entries:
+         lift.append("--trace-all-entries")
++    # Verified guest-code patches (tools/recomp/guest_patches.py). Lift only:
++    # they keep instruction boundaries, so the disassembly stays valid.
++    if getattr(args, "guest_patches", None):
++        lift += ["--guest-patches", str(Path(args.guest_patches).resolve())]
+     # XDK functions with a name-keyed replacement (tools/recomp/hle.py), used
+     # whenever tools.xdk_symbols has been run for this XBE.
+     hle_symbols = xbe.with_name(xbe.stem + "_xdk_symbols.json")
+@@ -230,6 +234,9 @@ def main() -> int:
+                     help=f"Start from this stage: {', '.join(STAGES)}")
+     ap.add_argument("--only", choices=STAGES, metavar="STAGE",
+                     help="Run only this stage")
++    ap.add_argument("--guest-patches", metavar="FILE",
++                    help="JSON table of verified guest-code patches, applied "
++                         "by the lift stage (tools/recomp/guest_patches.py)")
+     ap.add_argument("--dry-run", action="store_true",
+                     help="Print the commands without running them")
+     ap.add_argument("--verbose", "-v", action="store_true")
+diff --git a/tools/recomp/__main__.py b/tools/recomp/__main__.py
+--- a/tools/recomp/__main__.py
++++ b/tools/recomp/__main__.py
+@@ -315,6 +315,12 @@ def main():
+                              "not implement yet: the body still runs, only "
+                              "the answer changes, and the emitted code is "
+                              "inert unless RECOMP_FORCE_RETURN is set")
++    parser.add_argument("--guest-patches", metavar="FILE",
++                        help="JSON table of verified guest-code patches "
++                             "(tools/recomp/guest_patches.py): byte rewrites "
++                             "and operand overrides applied to the decoded "
++                             "copy before lifting. Any entry that does not "
++                             "verify stops the lift")
+     parser.add_argument("--seh-prolog", metavar="ADDR",
+                         help="Address of __SEH_prolog (hex). Auto-detected if omitted")
+     parser.add_argument("--seh-epilog", metavar="ADDR",
+@@ -373,6 +379,7 @@ def main():
+         trace_functions=_load_addrs(args.trace_functions),
+         trace_all_entries=args.trace_all_entries,
+         force_returns=_parse_force_returns(args.force_return),
++        guest_patches_path=args.guest_patches,
+         seh_prolog=int(args.seh_prolog, 16) if args.seh_prolog else None,
+         seh_epilog=int(args.seh_epilog, 16) if args.seh_epilog else None,
+         # Per title, never the shared tools output: two titles lifted side
+@@ -599,6 +606,14 @@ def main():
+             for note in hle_notes:
+                 print(f"  hle: {note}", file=sys.stderr)
+ 
++        # A guest patch in a function that is not lifted would do nothing.
++        inert = sorted(translator.guest_patch_functions & manual)
++        if inert:
++            print("ERROR: guest patches target functions that are not lifted "
++                  "(hand-written or replaced): "
++                  + ", ".join(f"0x{a:08X}" for a in inert), file=sys.stderr)
++            sys.exit(1)
++
+         # Replacements that run the title's own body first (HLE_ORIGINAL):
+         # those bodies are still lifted, under their own name. Scanned whether
+         # or not there is a symbols file, like the imported variables, because
+diff --git a/tools/recomp/disasm.py b/tools/recomp/disasm.py
+--- a/tools/recomp/disasm.py
++++ b/tools/recomp/disasm.py
+@@ -148,10 +148,12 @@ def _parse_operand(cs, cs_op, insn_obj):
+ class Disassembler:
+     """Capstone-based x86-32 disassembler."""
+ 
+-    def __init__(self):
++    def __init__(self, operand_overrides=None):
+         self._cs = Cs(CS_ARCH_X86, CS_MODE_32)
+         self._cs.detail = True
+         _init_reg_names(self._cs)
++        # {address: [(operand index, value)]} from tools.recomp.guest_patches
++        self._overrides = dict(operand_overrides or {})
+ 
+     def _decode_instruction(self, cs_insn):
+         """Convert one Capstone instruction into the translator model."""
+@@ -183,6 +185,8 @@ class Disassembler:
+                         and cs_op.mem.disp != 0):
+                     insn.memory_refs.append(cs_op.mem.disp & 0xFFFFFFFF)
+ 
++        if insn.address in self._overrides:
++            override_operands(insn, self._overrides)
+         return insn
+ 
+     def disassemble_function(self, raw_bytes, start_va, end_va, resync=None):
+@@ -357,3 +361,218 @@ class Disassembler:
+             blocks.append(bb)
+ 
+         return blocks
++
++
++# ---- Verified guest-code patches applied before lifting ----------------
++"""Verified guest-code patches applied before lifting.
++
++A title project can change constants in the guest code it recompiles -- a
++limit compared against, an allocation size -- without touching the user's
++XBE and without hand edits to generated C. The table is JSON:
++
++    {"title_id": "45410066",
++     "xbe_sha256": "<sha256 of the unmodified XBE>",
++     "patches": [
++       {"id": "...", "kind": "code", "function": "0x002FA720",
++        "address": "0x002FAEF2", "original_hex": "3d00401f00",
++        "new_hex": "3d00007d00", "reason": "..."},
++       {"id": "...", "kind": "operand", "function": "0x002FA720",
++        "address": "0x002FAF2E", "original_hex": "83fe32",
++        "operand": 1, "value": "0x190", "reason": "..."}]}
++
++`code` rewrites bytes in the in-memory copy the lifter decodes. It must keep
++every instruction boundary, mnemonic and branch/call target of the function,
++so the disassembly stage's outputs (function bounds, xrefs) stay valid.
++
++`operand` keeps the bytes and changes one decoded operand's value (an
++immediate, or a memory displacement). The lifter emits C from the decoded
++operand model, so `cmp esi, imm8` can be given a value an imm8 cannot hold.
++The value must fit the operation width; branches, calls and `ret n` are
++refused.
++
++Anything that does not verify stops the lift naming the entry: a patch that
++silently failed to apply would leave a limit at its stock value while the
++policy around it assumes the new one.
++"""
++
++_REG_WIDTH = {}
++for _names, _w in (("al cl dl bl ah ch dh bh", 1),
++                   ("ax cx dx bx sp bp si di", 2),
++                   ("eax ecx edx ebx esp ebp esi edi", 4)):
++    for _n in _names.split():
++        _REG_WIDTH[_n] = _w
++
++
++class GuestPatchError(Exception):
++    pass
++
++
++def _int(value, what, entry_id):
++    try:
++        return int(value, 0) if isinstance(value, str) else int(value)
++    except (TypeError, ValueError):
++        raise GuestPatchError(f"guest patch {entry_id}: bad {what} {value!r}")
++
++
++def load_guest_patches(path):
++    import json
++    with open(path, "r", encoding="utf-8") as fh:
++        table = json.load(fh)
++    if not isinstance(table, dict) or not isinstance(table.get("patches"), list):
++        raise GuestPatchError(f"{path}: expected an object with a 'patches' list")
++    seen_ids, spans = set(), []
++    entries = []
++    for raw in table["patches"]:
++        eid = raw.get("id")
++        if not eid or eid in seen_ids:
++            raise GuestPatchError(f"{path}: missing or duplicate patch id {eid!r}")
++        seen_ids.add(eid)
++        kind = raw.get("kind")
++        if kind not in ("code", "operand"):
++            raise GuestPatchError(f"guest patch {eid}: unknown kind {kind!r}")
++        e = {"id": eid, "kind": kind,
++             "address": _int(raw.get("address"), "address", eid),
++             "function": _int(raw.get("function"), "function", eid),
++             "original": bytes.fromhex(raw.get("original_hex", "")),
++             "reason": raw.get("reason", "")}
++        if not e["original"]:
++            raise GuestPatchError(f"guest patch {eid}: original_hex is required")
++        if kind == "code":
++            e["new"] = bytes.fromhex(raw.get("new_hex", ""))
++            if len(e["new"]) != len(e["original"]) or e["new"] == e["original"]:
++                raise GuestPatchError(
++                    f"guest patch {eid}: new_hex must differ and have the same length")
++        else:
++            e["operand"] = _int(raw.get("operand"), "operand", eid)
++            e["value"] = _int(raw.get("value"), "value", eid) & 0xFFFFFFFF
++        span = (e["address"], e["address"] + len(e["original"]))
++        for other in spans:
++            if span[0] < other[1] and other[0] < span[1]:
++                raise GuestPatchError(f"guest patch {eid}: overlaps another entry")
++        spans.append(span)
++        entries.append(e)
++    return {"title_id": table.get("title_id"), "xbe_sha256": table.get("xbe_sha256"),
++            "patches": entries}
++
++
++def _function_bytes(data, func):
++    from . import config
++    start, end = func["_addr"], func.get("end")
++    off = config.va_to_file_offset(start)
++    if not end or end <= start or off is None:
++        return None
++    return data[off:off + (end - start)]
++
++
++def _decode(dis, data, func):
++    raw = _function_bytes(data, func)
++    if raw is None:
++        return []
++    return dis.disassemble_function(raw, func["_addr"], func["end"])
++
++
++def _shape(insns):
++    return [(i.address, i.size, i.mnemonic, i.call_target, i.jump_target) for i in insns]
++
++
++def _config():
++    from . import config
++    return config
++
++
++def _width(insn, index):
++    """Operation width in bytes for an operand override, from the other operand."""
++    for i, op in enumerate(insn.operands):
++        if i == index:
++            continue
++        if op.type == "reg" and op.reg in _REG_WIDTH:
++            return _REG_WIDTH[op.reg]
++        if op.type == "mem" and op.mem_size:
++            return op.mem_size
++    op = insn.operands[index]
++    return op.mem_size if op.type == "mem" and op.mem_size else 4
++
++
++def apply_guest_patches(table, xbe_data, func_db):
++    """Verify every entry; return (patched bytes, operand overrides, functions)."""
++    import hashlib
++    digest = hashlib.sha256(xbe_data).hexdigest()
++    if (table.get("xbe_sha256") or "").lower() != digest:
++        raise GuestPatchError(
++            f"guest patches were written for XBE {table.get('xbe_sha256')}, "
++            f"not {digest}")
++    data = bytearray(xbe_data)
++    overrides, functions = {}, set()
++    dis = Disassembler()
++    by_function = {}
++    for e in table["patches"]:
++        func = func_db.get(e["function"])
++        eid = e["id"]
++        if func is None or not func.get("end"):
++            raise GuestPatchError(f"guest patch {eid}: 0x{e['function']:08X} is not a known function")
++        if not (func["_addr"] <= e["address"] < func["end"]
++                and e["address"] + len(e["original"]) <= func["end"]):
++            raise GuestPatchError(f"guest patch {eid}: address is outside its function")
++        off = _config().va_to_file_offset(e["address"])
++        if off is None or bytes(xbe_data[off:off + len(e["original"])]) != e["original"]:
++            found = bytes(xbe_data[off:off + len(e["original"])]).hex() if off is not None else None
++            raise GuestPatchError(
++                f"guest patch {eid}: bytes at 0x{e['address']:08X} are {found}, "
++                f"expected {e['original'].hex()}")
++        by_function.setdefault(e["function"], []).append(e)
++        functions.add(e["function"])
++
++    for fn, entries in by_function.items():
++        func = func_db[fn]
++        before = _decode(dis, xbe_data, func)
++        starts = {i.address: i for i in before}
++        for e in entries:
++            end = e["address"] + len(e["original"])
++            insn = starts.get(e["address"])
++            if insn is None:
++                raise GuestPatchError(f"guest patch {e['id']}: does not start on an instruction")
++            covered = e["address"]
++            while covered < end:
++                if covered not in starts:
++                    raise GuestPatchError(f"guest patch {e['id']}: ends inside an instruction")
++                covered += starts[covered].size
++            if covered != end:
++                raise GuestPatchError(f"guest patch {e['id']}: ends inside an instruction")
++            if e["kind"] == "code":
++                off = _config().va_to_file_offset(e["address"])
++                data[off:off + len(e["new"])] = e["new"]
++            else:
++                if insn.size != len(e["original"]):
++                    raise GuestPatchError(f"guest patch {e['id']}: an operand entry covers one instruction")
++                if insn.is_branch or insn.is_call or insn.is_ret:
++                    raise GuestPatchError(f"guest patch {e['id']}: branches, calls and ret are not patchable")
++                if not (0 <= e["operand"] < len(insn.operands)):
++                    raise GuestPatchError(f"guest patch {e['id']}: no operand {e['operand']}")
++                op = insn.operands[e["operand"]]
++                if op.type == "imm":
++                    bits = 8 * _width(insn, e["operand"])
++                    if bits < 32 and e["value"] >= (1 << bits):
++                        raise GuestPatchError(
++                            f"guest patch {e['id']}: 0x{e['value']:X} does not fit {bits} bits")
++                elif op.type != "mem":
++                    raise GuestPatchError(f"guest patch {e['id']}: operand {e['operand']} is a register")
++                overrides.setdefault(e["address"], []).append((e["operand"], e["value"]))
++        after = _decode(dis, bytes(data), func)
++        if _shape(after) != _shape(before):
++            raise GuestPatchError(
++                f"guest patches in 0x{fn:08X} change its instruction boundaries, "
++                f"mnemonics or branch targets")
++    return bytes(data), overrides, functions
++
++
++def override_operands(insn, overrides):
++    """Apply operand overrides to one decoded instruction (in place)."""
++    for index, value in overrides.get(insn.address, ()):
++        op = insn.operands[index]
++        if op.type == "imm":
++            op.imm = value
++        else:
++            op.mem_disp = value
++            if not op.mem_base and not op.mem_index:
++                insn.memory_refs = [value]
++    insn.imm_values = [op.imm for op in insn.operands if op.type == "imm"]
+diff --git a/tools/recomp/translator.py b/tools/recomp/translator.py
+--- a/tools/recomp/translator.py
++++ b/tools/recomp/translator.py
+@@ -16,6 +16,7 @@ import json
+ import glob
+ import os
+ import struct
++import sys
+ 
+ # Import the functions, not the VA constants: configure_from_xbe() rebinds those
+ # at startup, so a by-value import would freeze the fallback layout.
+@@ -386,7 +387,8 @@ class FunctionTranslator:
+                  setjmp_fn=None, longjmp_fn=None,
+                  trace_functions=None, trace_all_entries=False,
+                  icall_sites=None,
+-                 force_returns=None):
++                 force_returns=None,
++                 operand_overrides=None):
+         """
+         xbe_data: bytes - raw XBE file contents
+         icall_sites: dict - call-site VA -> [target VAs] a recorded run saw
+@@ -411,7 +413,7 @@ class FunctionTranslator:
+         # inflated by whichever loop happens to be spinning.
+         self.trace_all_entries = bool(trace_all_entries)
+         self.force_returns = dict(force_returns or {})
+-        self.disasm = Disassembler()
++        self.disasm = Disassembler(operand_overrides)
+         self.lifter = Lifter(func_db=func_db, label_db=label_db, abi_db=abi_db,
+                              xbe_data=xbe_data, seh_prolog=seh_prolog,
+                              setjmp_fn=setjmp_fn, longjmp_fn=longjmp_fn,
+@@ -1629,7 +1631,8 @@ class BatchTranslator:
+                  output_dir=None, seh_prolog=None, seh_epilog=None,
+                  trace_functions=None, trace_all_entries=False,
+                  icall_sites_json_path=None,
+-                 force_returns=None):
++                 force_returns=None,
++                 guest_patches_path=None):
+         self.xbe_path = xbe_path
+         # Per-site indirect-call targets. A saturated site reached more
+         # targets than the runtime records, so it is never guarded.
+@@ -1689,6 +1692,18 @@ class BatchTranslator:
+                 addr = int(entry["address"], 16)
+                 self.abi_db[addr] = entry
+ 
++        # Verified guest-code patches (tools/recomp/guest_patches.py): the
++        # lifter decodes this patched copy; the XBE on disk is never written.
++        operand_overrides = {}
++        self.guest_patch_functions = set()
++        if guest_patches_path:
++            from .disasm import load_guest_patches, apply_guest_patches
++            table = load_guest_patches(guest_patches_path)
++            self.xbe_data, operand_overrides, self.guest_patch_functions =                 apply_guest_patches(table, self.xbe_data, self.func_db)
++            print(f"Guest patches: {len(table['patches'])} verified in "
++                  f"{len(self.guest_patch_functions)} functions "
++                  f"({os.path.basename(guest_patches_path)})", file=sys.stderr)
++
+         # Detect the SEH helpers once here rather than per-Lifter, so the
+         # result can be reported and overridden from the command line.
+         if seh_prolog is None or seh_epilog is None:
+@@ -1711,7 +1726,8 @@ class BatchTranslator:
+             trace_functions=trace_functions,
+             trace_all_entries=trace_all_entries,
+             icall_sites=self.icall_sites,
+-            force_returns=force_returns)
++            force_returns=force_returns,
++            operand_overrides=operand_overrides)
+         self.translator.discover_static_indirect_targets()
+         self.translator.discover_cfg_ownership()
+         self.translator.discover_jump_table_entries()
