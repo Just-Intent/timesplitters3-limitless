@@ -29,6 +29,7 @@
  *    refuses at 50; opted in, 255. Same container-space test and messages
  *    (the "limit reached" text gets the limit in force). Entries past the 50
  *    editor colours get colour (index mod 50) instead of the stock 50.
+ *    Opted in, the list no longer jumps to the bottom after each add.
  *  - pc_mapmaker_editor_logic_room (WRAP sub_00300670): the container-space
  *    test every logic editing action calls first. For those callers it also
  *    answers "no room" when ops, nodes or records are within
@@ -223,6 +224,12 @@ void pc_mapmaker_editor_sai_add(void (*original)(void))
     room=guest_call(sub_00300670,1,0x58u)!=0;          /* container space for one more */
     if((int32_t)count<(int32_t)limit && room) {
         result=guest_call(sub_0031BB60,2,0u,arg);
+        /* sub_0031BB60 sets editor+0x238 bit 0x40 after an add; the list's
+         * update callback sub_0031C9E0 then scrolls the Story AI list to the
+         * bottom (sub_000736F0(menu, 1.0)) and clears it. Opted in, clear it
+         * here so the list stays where it was. */
+        if(mapmaker_limits.limits && WORD_AT(editor+0x280u)!=count)
+            WORD_AT(editor+0x238u)&=~0x40u;
         count=WORD_AT(editor+0x280u);
         if(count>MAPMAKER_EDITOR_SAI_STOCK && count<=MAPMAKER_EDITOR_SAI_CAP) {
             uint32_t entry=editor+MAPMAKER_EDITOR_SAI+(count-1u)*0xE4u;
