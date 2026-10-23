@@ -70,6 +70,7 @@ static int menu_mouse_can_close_pause(uint32_t menu)
 void pc_display_menu_mouse_mode(void)
 {
     int enabled=menu_mouse_context();
+    mapmaker_probe_heap(); /* read-only; inert unless TSFP_MAPMAKER_PROBE has flag 32 */
     pc_controls_menu_mode(enabled);
     if(!enabled)pc_controls_text_mode(0);
     if(!enabled) {

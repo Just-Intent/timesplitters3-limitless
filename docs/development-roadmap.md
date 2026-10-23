@@ -284,6 +284,10 @@ is the level memory estimate (`sub_002FA060`, 2,048,000 bytes), not the
 container (13788 bytes at the limit). Next: find the play-time pool behind
 it, then test a raised estimate in memory up to the 200-piece cap, with the
 original save format (no format change needed below about 280 tiles).
+Static analysis: the 2 MB is a designer budget over the shared ~43 MB Level
+heap; overflow corrupts silently. Probe flag 32 logs heap state and the
+minimum free during a match; next run: a full MapMaker map versus a large
+arcade map.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

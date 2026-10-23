@@ -94,6 +94,28 @@ the first time its id is seen (ids above 9 except 0x45; table
 an estimate of the level's play-time memory with a 2,048,000-byte budget
 (HYPOTHESIS: the matching runtime pool and its real size are not found yet).
 
+**Play-time memory (static analysis, 2026-10-23).** CONFIRMED code,
+sizes HYPOTHESIS until measured:
+- No pool of about 2 MB exists; the 2,048,000 limit appears only in the
+  editor (`cmp eax,0x1F4000` at `0x002FAEF2`): a designer budget.
+- `sub_0003DFA0(size, heap)` is a bump allocator over one arena of
+  47,104,000 bytes (`[0x004C0450]`; base/size `[0x007E72D4]`/`[0x007E72D8]`):
+  heap 2 "Eternal" (first 0x9DC00 bytes, holds the map container), heap 1
+  "Level" bottom-up and heap 0 top-down, sharing the free count
+  `[0x006B8384]`. Per level `sub_0003E650` resets Level space (about
+  43.9 MB after the 0x266000 reserve, 42.7 MB if `[0x007DE398]&0x40`).
+- A MapMaker match (scene 100) loads its tileset assets
+  (`tileset%d/tile%d_%d`, pads `pad/data/tile%d_%d.raw`, via `sub_00085920`
+  and `sub_00063390`) into that same Level heap, shared with characters,
+  weapons, bots and per-frame buffers (display 2x0xBB800 in scene 100).
+- On exhaustion the allocator only calls an assert stub that is empty in
+  retail: heaps overlap silently (corruption, no message).
+- Arcade level paks are 5-8.4 MB versus 3.0-3.2 MB for the MapMaker base, so
+  there is plausibly room for several MB more tiles. Measure with probe
+  flag 32 (minimum free during a full match) before raising anything.
+- The 200-piece limit matches fixed 200-entry play-time tables
+  (`sub_0008A780`) and must stay.
+
 After it, in this tile-only map: the piece count (200) at about 200 tiles,
 then the container at roughly 280 tiles (about 111 bytes per tile). So the
 memory estimate could rise about 1.8x before the save format must change.

@@ -18,6 +18,11 @@
  *      the map container's used bytes (chunk 0x00C77668 +0x248 of
  *      [0x00784014]) and the categories sub_002FA720 folds into editor+0x270,
  *      recomputed from the placed-piece list, plus editor+0x270/+0x274
+ *  32  in every scene, the game's heap state once a second when it changed:
+ *      arena base/size, Level heap low/top/end pointers, shared free count
+ *      (signed) and its minimum since the scene started, Eternal heap pointer
+ *      and free, per-frame display buffer size and peak, and the two reserve
+ *      flags (research/capacity-constraints.md, play-time memory)
  * Output: TSFP_MAPMAKER_PROBE_LOG (binary, truncated per process), else stderr.
  * Records are emitted when their content changes, at most four per second,
  * with the number of unchanged repeats; the file is capped at 4 MiB.
@@ -37,7 +42,9 @@
 #define MAPMAKER_PROBE_OTHER 4u
 #define MAPMAKER_PROBE_MENUS 8u
 #define MAPMAKER_PROBE_BUDGETS 16u
-#define MAPMAKER_PROBE_ALL 31u
+#define MAPMAKER_PROBE_HEAP 32u
+#define MAPMAKER_PROBE_ALL 63u
+#define MAPMAKER_PROBE_HEAP_INTERVAL 1000u
 #define MAPMAKER_PROBE_MENU_SLOTS 16u
 #define MAPMAKER_PROBE_MENU_ITEMS 64u
 #define MAPMAKER_PROBE_MENU_INTERVAL 1000u
@@ -236,6 +243,52 @@ static void mapmaker_probe_budgets(MapMakerProbeText *k)
         " global=%d/300 pieces=%u/200 deep=%u+%u/50 e270=%.4f e274=%.4f\n",
         mapmaker_probe_container_used(),sum[0],sum[1],sum[2],(int)global,pieces,deep,extra,
         (double)e270,(double)e274);
+}
+
+/* Flag 32, read-only, called every frame. sub_0003DFA0 heaps: arena at
+ * [0x007E72D4]/[0x007E72D8]; Level heap (1, bottom-up) [0x006B837C] and
+ * heap 0 (top-down) [0x006B8388] share the end [0x006B8380] and the free
+ * count [0x006B8384], which goes negative when they overlap (the retail
+ * allocator does not stop); Eternal heap (2) [0x006B8370], free
+ * [0x006B8378]; display buffer size [0x006B83AC], peak [0x006B83B0];
+ * reserves [0x004C81B4] (0x266000) and [0x007DE398]&0x40 (0x131800). */
+static struct {
+    int32_t scene, min_free;
+    int have;
+    unsigned long long last;
+    uint32_t key[12];
+} mapmaker_probe_heap_state;
+static uint32_t mapmaker_probe_word(uint32_t a) { return guest_writable(a,4)?WORD_AT(a):0u; }
+static void mapmaker_probe_heap(void)
+{
+    uint32_t key[12];
+    int32_t scene,free_now;
+    unsigned long long now;
+    if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_HEAP)) return;
+    scene=mapmaker_probe_scene();
+    free_now=(int32_t)mapmaker_probe_word(0x006B8384u);
+    if(!mapmaker_probe_heap_state.have || scene!=mapmaker_probe_heap_state.scene) {
+        mapmaker_probe_heap_state.have=1;mapmaker_probe_heap_state.scene=scene;
+        mapmaker_probe_heap_state.min_free=free_now;mapmaker_probe_heap_state.last=0;
+        memset(mapmaker_probe_heap_state.key,0xff,sizeof mapmaker_probe_heap_state.key);
+    }
+    if(free_now<mapmaker_probe_heap_state.min_free) mapmaker_probe_heap_state.min_free=free_now;
+    key[0]=mapmaker_probe_word(0x007E72D4u);key[1]=mapmaker_probe_word(0x007E72D8u);
+    key[2]=mapmaker_probe_word(0x006B837Cu);key[3]=mapmaker_probe_word(0x006B8388u);
+    key[4]=mapmaker_probe_word(0x006B8380u);key[5]=(uint32_t)free_now;
+    key[6]=(uint32_t)mapmaker_probe_heap_state.min_free;
+    key[7]=mapmaker_probe_word(0x006B8370u);key[8]=mapmaker_probe_word(0x006B8378u);
+    key[9]=mapmaker_probe_word(0x006B83ACu);key[10]=mapmaker_probe_word(0x006B83B0u);
+    key[11]=(mapmaker_probe_word(0x004C81B4u)?1u:0u)|((mapmaker_probe_word(0x007DE398u)&0x40u)?2u:0u);
+    now=GetTickCount64();
+    if(!memcmp(key,mapmaker_probe_heap_state.key,sizeof key)) return;
+    if(mapmaker_probe_heap_state.last && now-mapmaker_probe_heap_state.last<MAPMAKER_PROBE_HEAP_INTERVAL) return;
+    mapmaker_probe_write("[mapmaker-probe] t=%llu heap scene=%d arena=0x%08X+%u level=0x%08X..0x%08X end=0x%08X"
+        " free=%d min_free=%d eternal=0x%08X free=%u display=%u peak=%u reserves=%u\n",
+        now,(int)scene,key[0],key[1],key[2],key[3],key[4],(int32_t)key[5],(int32_t)key[6],
+        key[7],key[8],key[9],key[10],key[11]);
+    memcpy(mapmaker_probe_heap_state.key,key,sizeof key);
+    mapmaker_probe_heap_state.last=now;
 }
 
 void pc_display_mapmaker_meter(void (*original)(void))

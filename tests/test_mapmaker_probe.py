@@ -21,6 +21,9 @@ MUTATIONS = {
                              'return scene==MAPMAKER_PROBE_SCENE_PLAY;'),
     'budgets-without-flag': ('        if(mapmaker_probe_flags()&MAPMAKER_PROBE_BUDGETS) mapmaker_probe_budgets(k);', '        mapmaker_probe_budgets(k);'),
     'container-any-version': ("|| WORD_AT(c+4)!=0x12Du) return 0;", ') return 0;'),
+    'heap-without-flag': ('    if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_HEAP)) return;\n', ''),
+    'heap-no-minimum': ('    if(free_now<mapmaker_probe_heap_state.min_free) mapmaker_probe_heap_state.min_free=free_now;\n', ''),
+    'heap-unthrottled': ('    if(mapmaker_probe_heap_state.last && now-mapmaker_probe_heap_state.last<MAPMAKER_PROBE_HEAP_INTERVAL) return;\n', ''),
     'uncapped': ('if(mapmaker_probe.written+length>MAPMAKER_PROBE_CAP) {', 'if(0) {'),
 }
 

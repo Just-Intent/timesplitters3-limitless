@@ -21,6 +21,7 @@ static int failures;
 static const char *log_path;
 static void set_probe(const char *flags)
 {
+    memset(&mapmaker_probe_heap_state,0,sizeof mapmaker_probe_heap_state);
 #ifdef _WIN32
     _putenv_s("TSFP_MAPMAKER_PROBE",flags?flags:"");
     _putenv_s("TSFP_MAPMAKER_PROBE_LOG",log_path);
@@ -270,6 +271,40 @@ int main(int argc,char **argv)
         WORD_AT(c+4)=0x12Du;
         WORD_AT(0x00784014u)=0;WORD_AT(0x0078400Cu)=0;WORD_AT(0x007844A8u)=0;
     }
+
+    /* Flag 32: heap state, read-only, once a second when it changed. */
+    WORD_AT(0x007E72D4u)=0x00500000u;WORD_AT(0x007E72D8u)=47104000u;
+    WORD_AT(0x006B837Cu)=0x00600000u;WORD_AT(0x006B8388u)=0x00700000u;WORD_AT(0x006B8380u)=0x00710000u;
+    WORD_AT(0x006B8384u)=1000000u;WORD_AT(0x006B8370u)=0x00510000u;WORD_AT(0x006B8378u)=4096u;
+    WORD_AT(0x006B83ACu)=768000u;WORD_AT(0x006B83B0u)=500000u;WORD_AT(0x004C81B4u)=1;WORD_AT(0x007DE398u)=0x40u;
+    WORD_AT(0x0079094Cu)=100;
+    set_probe("32");
+    before=checksum();
+    mapmaker_probe_heap();
+    CHECK(checksum()==before);
+    read_log();
+    CHECK(strstr(log_text,"heap scene=100 arena=0x00500000+47104000 level=0x00600000..0x00700000 end=0x00710000"
+                          " free=1000000 min_free=1000000 eternal=0x00510000 free=4096 display=768000 peak=500000 reserves=3\n")!=NULL);
+    WORD_AT(0x006B8384u)=(uint32_t)-5000;                 /* overlap: free goes negative */
+    mapmaker_probe_heap();                               /* within the second: not written, but tracked */
+    WORD_AT(0x006B8384u)=200000u;
+    tick+=MAPMAKER_PROBE_HEAP_INTERVAL;
+    mapmaker_probe_heap();
+    read_log();
+    CHECK(count("] t=")==2 && strstr(log_text,"free=200000 min_free=-5000")!=NULL);
+    tick+=MAPMAKER_PROBE_HEAP_INTERVAL;
+    mapmaker_probe_heap();                               /* unchanged: nothing new */
+    read_log();
+    CHECK(count("] t=")==2);
+    WORD_AT(0x0079094Cu)=5;                              /* a new scene restarts the minimum */
+    mapmaker_probe_heap();
+    read_log();
+    CHECK(strstr(log_text,"heap scene=5 ")!=NULL && strstr(log_text,"free=200000 min_free=200000")!=NULL);
+    set_probe("17");
+    mapmaker_probe_heap();                               /* without flag 32: nothing */
+    read_log();
+    CHECK(strstr(log_text,"heap scene")==NULL);
+    WORD_AT(0x0079094Cu)=0;
 
     /* Output is capped. */
     set_probe("1");
