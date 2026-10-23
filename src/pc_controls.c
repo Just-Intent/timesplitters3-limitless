@@ -30,7 +30,7 @@ static int wheel_remainder;
 static unsigned long applied;
 static volatile LONG editing;
 static int menu_mode, menu_button_block;
-static int mapmaker_pointer_active;
+static int mapmaker_pointer_active, mapmaker_editor, mapmaker_back_key;
 static PcMapMakerClick mapmaker_click;
 static PcTextInput text_input;
 
@@ -448,6 +448,8 @@ int pc_controls_key_down(int key)
                        key==VK_UP?'W':key==VK_DOWN?'S':0;
         if(alias) down|=pc_input_down(&input,alias,GetTickCount64());
     }
+    down=pc_mapmaker_key(menu_mode && mapmaker_editor,key,mapmaker_back_key,down,
+                         pc_input_down(&input,VK_ESCAPE,GetTickCount64()));
     if(text_input.owner && pc_text_key((unsigned)key))down=0;
     down=down && (replaying || GetForegroundWindow()==window_handle);
     if(!input.keys[VK_LBUTTON]) menu_button_block &= ~1;
@@ -467,7 +469,7 @@ void pc_controls_menu_mode(int active)
     if(changed) {
         menu_button_block=(input.keys[VK_LBUTTON]?1:0)|(input.keys[VK_RBUTTON]?2:0);
         menu_mode=!!active;
-        if(!menu_mode) mapmaker_pointer_active=0;
+        if(!menu_mode) mapmaker_pointer_active=mapmaker_editor=0;
         menu_wheel=0; wheel_remainder=0;
         input.dx=input.dy=0;
     }
@@ -505,6 +507,18 @@ void pc_controls_mapmaker_pointer(int active)
 {
     AcquireSRWLockExclusive(&lock);
     mapmaker_pointer_active = !!active;
+    ReleaseSRWLockExclusive(&lock);
+}
+
+/* Called from the guest menu hook, never while the bindings are evaluated,
+ * so reading the Back binding here cannot re-enter the bindings lock. */
+void pc_controls_mapmaker_editor(int active)
+{
+    int keys[PC_ACTION_COUNT], back = 0;
+    if (active && pc_settings_prompt_keys(keys)) back = keys[7]; /* "Objectives / Back" */
+    AcquireSRWLockExclusive(&lock);
+    mapmaker_editor = !!active;
+    mapmaker_back_key = back;
     ReleaseSRWLockExclusive(&lock);
 }
 

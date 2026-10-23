@@ -21,6 +21,14 @@ MUTATIONS = {
     'held-click-leaks': (POLICY, 'if (active != s->active) s->blocked = left_down;', ''),
     'row-carries-to-editor': (POLICY, '(s->row && !active && left_down)', '(s->row && left_down)'),
     'row-latch-sticks': (POLICY, 'if (!left_down) s->blocked = s->row = 0;', 'if (!left_down) s->blocked = 0;'),
+    'escape-still-start': (POLICY, 'if (key == ESCAPE) return 0;', ''),
+    'escape-not-back': (POLICY, 'if (key == back_key) return down || escape_down;', 'if (key == back_key) return down;'),
+    'escape-everywhere': (POLICY, 'if (!editor || !back_key', 'if (!back_key'),
+    'pan-any-state': (ADAPTER, '(WORD_AT(editor+0x25c)&0x0C044088u) ||', ''),
+    'pan-no-clamp': (ADAPTER, 'c=left+w*.5f; if(c<0) left-=c; else if(c>MAPMAKER_GRID) left-=c-MAPMAKER_GRID;', ''),
+    'pan-in-menus': (ADAPTER, 'if(root) mapmaker_pointer_navigate(', 'if(1) mapmaker_pointer_navigate('),
+    'drag-wrong-speed': (ADAPTER, 'FLOAT_AT(b+0x34)=(target-FLOAT_AT(menu+0x84))/3.f;', 'FLOAT_AT(b+0x34)=target-FLOAT_AT(menu+0x84);'),
+    'scroll-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) ||\n       !mapmaker_scroll_geometry', 'if(!mapmaker_pointer_enabled() ||\n       !mapmaker_scroll_geometry'),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 
@@ -67,9 +75,23 @@ def test_pointer_wiring():
     confirm = guest.split('void pc_display_menu_mouse(void (*original)(void))', 1)[1]
     gate = confirm.index('if(!mapmaker_pointer_row_click()) {')
     assert gate < confirm.index('menu_mouse_press(menu_mouse_dispatch,0x80u);') < confirm.index('WORD_AT(menu+0xc4)|=0x100010u;')
+    assert 'if(!hit && (actions&2)) mapmaker_pointer_scroll_press(menu,x,y);' in confirm
+    assert '(actions&4) && !(mapmaker_pointer_enabled() && mapmaker_pointer_context(menu))' in confirm
     for host in ('src/pc_controls.c', 'src/native/input_sdl.c'):
         text = (ROOT / host).read_text(encoding='utf-8')
         assert 'void pc_controls_mapmaker_pointer(int active)' in text
         assert 'pc_mapmaker_row_press(&mapmaker_click);' in text
+        assert 'void pc_controls_mapmaker_editor(int active)' in text
         click = text.split('int pc_controls_terminal_click(void)', 1)[1].split('return down;', 1)[0]
         assert 'pc_mapmaker_click(&mapmaker_click,' in click
+
+
+def test_escape_wiring():
+    controls = (ROOT / 'src/pc_controls.c').read_text(encoding='utf-8')
+    key = controls.split('int pc_controls_key_down(int key)', 1)[1].split('return down;', 1)[0]
+    # Applied before typing and focus checks, so text entry still wins.
+    assert key.index('down=pc_mapmaker_key(') < key.index('if(text_input.owner && pc_text_key')
+    # Back is the runtime's eighth control ("back"); the prompt table follows that order.
+    bindings = (ROOT / 'src/pc_bindings.inc').read_text(encoding='utf-8')
+    assert '"Pause / Start", "Objectives / Back"' in bindings
+    assert 'back = keys[7];' in controls

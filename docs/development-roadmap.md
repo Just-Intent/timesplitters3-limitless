@@ -205,6 +205,14 @@ Tracked separately; do not merge their diagnosis.
   was over the row. Editor menus (flag `0x8000` in `+0x40`) select the row under
   the game pointer, so the pointer now follows the mouse in every scene-102
   menu; only the editor screen owns held A.
+- **Third run (2026-10-23):** toolbar, dialogs, pause menu and lists respond.
+  Added (prototype, untested in game): Escape as Back in the editor; scrollbar
+  arrows/track (A on the bar) and thumb drag (engine drag speed at
+  `player+0x34`); right-drag and window-edge panning. The game already maps
+  the pointer to the grid cell (`editor+0x2F2E/+0x2F30`), so no screen-to-grid
+  code is needed. Logic-menu rows still fail; the probe click record now also
+  logs the menu descriptor, the game pointer and the engine selection to find
+  out why. Mouse-wheel zoom (held-button bits 0x8000/0x4000) is not done.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

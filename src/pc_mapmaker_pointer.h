@@ -25,4 +25,15 @@ static inline int pc_mapmaker_click(PcMapMakerClick *s, int active, int left_dow
     /* A row press never carries onto the editor screen (list closed under it). */
     return (active && !s->blocked && left_down) || (s->row && !active && left_down);
 }
+/* In the editor (scene 102) the game uses Back for pause and to leave menus,
+ * so Escape acts as the player's first Back key and no longer as its own
+ * binding (Start). Returns the adjusted down state for one polled key. */
+static inline int pc_mapmaker_key(int editor, int key, int back_key, int down, int escape_down)
+{
+    enum { ESCAPE = 0x1B };
+    if (!editor || !back_key || back_key == ESCAPE) return down;
+    if (key == ESCAPE) return 0;
+    if (key == back_key) return down || escape_down;
+    return down;
+}
 #endif

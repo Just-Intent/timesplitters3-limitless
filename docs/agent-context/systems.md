@@ -166,5 +166,12 @@ when ownership changes). Editor menus (pause menu, category lists) are normal
 rows that the shared hook hit-tests and highlights, but the editor acts on A
 itself, so in scene 102 a row click calls `mapmaker_pointer_row_click()`, which
 holds A for that press (`pc_controls_mapmaker_row_press`) instead of the
-menu-engine confirm. No guest regeneration. Fixture:
+menu-engine confirm. Also in scene 102: Escape reports as the first Back key
+and no longer as Start (`pc_mapmaker_key`, Windows only); a left press on a
+menu scrollbar (geometry as `sub_00071400`) holds A, and during the engine's
+thumb drag (`menu+0x194 == -2`) `player+0x34` is set so the thumb follows the
+mouse; on the editor screen right-drag and the window edge pan the view the
+way `sub_00309160` + `sub_002F9F70` do (skipped when `editor+0x25C &
+0x0C044088`), and the right button no longer sends the menu Back action
+there. No guest regeneration. Fixture:
 `tests/test_mapmaker_pointer.py`. Mac: MAC-062.

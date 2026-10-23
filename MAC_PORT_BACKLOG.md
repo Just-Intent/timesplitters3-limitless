@@ -3180,7 +3180,9 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
 - **Existing Mac support:** `src/native/input_sdl.c` implements
   `pc_controls_mapmaker_pointer` and adds the held-A path to its
   `pc_controls_terminal_click`. Not compiled or run on a Mac.
-- **Mac adaptation needed:** None identified beyond the input_sdl.c change.
+- **Mac adaptation needed:** Escape-as-Back in the editor is Windows-only
+  (`pc_controls_mapmaker_editor` is a no-op in input_sdl.c); port it through
+  `tsfp_native_key_down`. Scrollbar and panning are shared guest-side code.
 - **Mac acceptance checks:** Native Mac build; with `TSFP_MAPMAKER_POINTER=1`,
   open the editor, hover and click a toolbar icon and a grid cell; confirm the
   controller still moves the pointer when the mouse is still.

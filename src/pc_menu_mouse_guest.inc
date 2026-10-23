@@ -490,6 +490,7 @@ void pc_display_menu_mouse(void (*original)(void))
     }
     choice_direction=menu_choice_hit(menu,x,y,sw,sh,&hit);
     mapmaker_probe_click(menu,x,y,hit,actions); /* read-only diagnostic */
+    if(!hit && (actions&2)) mapmaker_pointer_scroll_press(menu,x,y); /* prototype */
     /* The original dispatcher applies directional repeats after this hook.
      * Do not let a previously held direction fight an actively chosen mouse
      * row. A fresh keyboard/controller direction immediately takes ownership
@@ -526,7 +527,8 @@ void pc_display_menu_mouse(void (*original)(void))
             }
         }
     }
-    if(actions&4) {
+    /* The MapMaker editor screen uses the right button to pan (prototype). */
+    if((actions&4) && !(mapmaker_pointer_enabled() && mapmaker_pointer_context(menu))) {
         if(menu_mouse_dispatch && menu_mouse_dispatch->menu==menu &&
            menu_mouse_can_close_pause(menu)) menu_mouse_dispatch->close_pause=menu;
         else WORD_AT(menu+0xc4)|=0x20u; /* original submenu Back action */
