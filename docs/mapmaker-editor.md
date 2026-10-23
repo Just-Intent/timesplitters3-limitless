@@ -206,7 +206,21 @@ only those four clipboard count words move.
 
 ## Spawning (story AI past 50)
 
-See the final report; INFERRED from `sub_00164010`.
+CONFIRMED structure: `sub_00164010` runs every frame over all
+`desc+0x78` spawn records (one per story AI chunk, built by `sub_00240C50`;
+loop bound is the count, no fixed table) with per-record state in
+`[0x007A2820]` (n x 0x18, heap). A record spawns while its spawned total
+(`state+0`) is below record+0x60, its live count (`state+4`) below
+record+0x5C, its trigger (`sub_0006C890`) and timer (`state+0xC`) allow it,
+and (scene 100) fewer than 20 AI are alive (`0x001640EC`,
+`0x00164199`). So story AI past 50 are spawned exactly like the first 50,
+as live slots free up; whether one respawns is its own +0x60 setting.
+INFERRED (not played): with many placed AI the map fills to ~20 live and
+refills as they die. Simultaneous AI are not raised.
+
+The extension sub-range 0x00900000..0x0091FFFF is not used: every table
+here is per map (editor object, Level heap) and the play-time 45-slot
+table is guarded rather than relocated.
 
 ## Validation
 
