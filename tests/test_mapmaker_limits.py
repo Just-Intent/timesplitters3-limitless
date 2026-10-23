@@ -20,6 +20,8 @@ MUTATIONS = {
     'link-pool-no-stitch': ('(MAPMAKER_LIMIT_LINKS+16u*MAPMAKER_LIMIT_PIECES+256u)*20u', 'MAPMAKER_LIMIT_LINKS*20u'),
     'no-held-pieces': ('p.pieces+h.pieces>MAPMAKER_LIMIT_PIECES', 'p.pieces>MAPMAKER_LIMIT_PIECES'),
     'sub-raised': ('#define MAPMAKER_LIMIT_SUB 200u', '#define MAPMAKER_LIMIT_SUB 400u'),
+    'pieces-stock': ('#define MAPMAKER_LIMIT_PIECES 241u', '#define MAPMAKER_LIMIT_PIECES 200u'),
+    'pieces-past-rooms': ('#define MAPMAKER_LIMIT_PIECES 241u', '#define MAPMAKER_LIMIT_PIECES 242u'),
     'categories-always': ('    if(!mapmaker_limits.limits) return;\n    mapmaker_categories_apply();',
                           '    mapmaker_categories_apply();\n    if(!mapmaker_limits.limits) return;'),
     'categories-overwrite': (' && WORD_AT(a)==mapmaker_categories[i].stock)', ')'),

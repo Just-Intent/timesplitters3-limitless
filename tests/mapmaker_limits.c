@@ -153,10 +153,10 @@ int main(void)
     WORD_AT(ED+0x25c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u) && (WORD_AT(ED+0x25c)&2u));  /* allowed; other flags kept */
-    /* meter: max(900/4800, 900/9984, 2700/8800, 400/600, 90/200, 0, 900000/2048000) */
+    /* meter: max(900/4800, 900/9984, 2700/8800, 400/600, 90/241, 0, 900000/2048000) */
     CHECK(NEAR(FLOAT_AT(ED+0x270),400.f/600.f));
-    /* held preview: max(2/4800, 9/9984, 20/8800, 1/200, 0, 1000/2048000) */
-    CHECK(NEAR(FLOAT_AT(ED+0x274),1.f/200.f));
+    /* held preview: max(2/4800, 9/9984, 20/8800, 1/241, 0, 1000/2048000) */
+    CHECK(NEAR(FLOAT_AT(ED+0x274),1.f/241.f));
 
     WORD_AT(0x00762CB8u)=601;                                          /* groups over 600 */
     pc_display_mapmaker_limits(fake_limits);
@@ -197,7 +197,7 @@ int main(void)
     WORD_AT(ED+0x2f34)=(uint32_t)-1;WORD_AT(ED+0x306c)=0;
     WORD_AT(0x0078400Cu)=pieces;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
-    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,200);             /* 200 cost-free placed */
+    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,241);             /* 241 cost-free placed */
     WORD_AT(ED+0x2f7c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
