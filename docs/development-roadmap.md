@@ -297,8 +297,14 @@ divides the editor's level memory estimate (wrappers of `sub_002FA060` and
 `sub_002FA0D0`, patch `*-mapmaker-meter-raise.patch`, policy
 `src/pc_mapmaker_budget.inc`), so the budget becomes N x 2,048,000 bytes and
 the meter stays consistent. Other limits and the container check are
-unchanged. Validation pending: build a map past the old limit, play it with
-probe flag 32 (minimum free), save, reload in the original game build.
+unchanged. First run: `bigmap` reached 113 pieces with 12.36 MB free in
+play; the next binding budget was cost1 (1017/1024).
+
+Limit inventory and targets: `research/capacity-constraints.md` §1c.
+Proposed stages: (A) raise the pools and designer budgets that need no
+format change (cost0 x2, cost1 to 1280, cost2 x2, global 600, sub-entries
+100); (B) size-gated 64 KB container; (C) relocate Story AI and logic
+editor arrays; (D) only if needed, the engine-wide 200-room limit.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

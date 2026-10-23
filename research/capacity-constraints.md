@@ -161,6 +161,38 @@ size-gated save format (stock 32756-byte files must still load). Bypassing
 `sub_00300670` or hiding the meter without (2) would let the compiler write
 past the 0x8000 buffer: heap corruption.
 
+## 1c. Limit inventory (static analysis, 2026-10-23)
+
+Four parallel read-only passes over the disassembly. "Designer" = an editor
+estimate with dynamically sized play-time data; "hard" = a fixed table or
+pool that overflows silently (no retail error path). All UNVERIFIED in play
+unless noted.
+
+| Limit (editor check) | Guards at play time | Kind | Raise cost | Target |
+| --- | --- | --- | --- | --- |
+| Memory estimate 2,048,000 (`0x002FAEF2`) | Level heap (~12 MB free, measured) | Designer (measured) | Done: `TSFP_MAPMAKER_MEMORY_SCALE` | x3 |
+| cost0 2400 (`cmp 0x960` at `0x002FAE0A`) | Regular AI nav pads, pool `[0x715F2C]` 2400x32 B + AI data `[0x715F3C]` 2400x44 B (`sub_0009A140`) | Hard pool | Pool size immediates + editor compare; ids must stay < 8000 | x2 (4800) |
+| cost1 1024 (`cmp 0x400` at `0x002FAE5C`) | Secondary (cover) pads `[0x715F34]`: 1280x32 B in scene 100 | Hard pool | Editor compare only up to 1280; beyond needs the handle range 0x1F40..0x209E remapped (~75 sites) | 1280 |
+| cost2 4400 (`cmp 0x1130` at `0x002FAEAE`) | Pad links `[0x715F30]` 4400x20 B, plus cross-tile/object links | Hard pool | Pool size immediates + editor compare | x2 (8800) |
+| Pieces 200 (`cmp 0xC8` at `0x002FAEE0`) | Engine-wide 200 visibility rooms: per-room arrays inside the 0xFFC character struct (+0x3C8, +0xD2C, +0xE08), `0x7042B8` [80][200], a 0xE0-byte per-room alloc, byte room ids | Hard, engine-wide | Rework of the visibility system (30+ per-frame functions) | Keep 200 (or count rooms instead of pieces) |
+| MapMaker room tables (`0x702E20`..`0x7038F8`, `0x708138`, 200 each) | Per-room tile transforms | Hard, local | 4 functions | Only with the room limit |
+| 45-entry model/pad tables (`sub_00085920`) | Unique tile models per map (`0x785000` maybe 32) | Per catalogue | None needed | n/a |
+| Global 300 (`0x002FAEF9`) | AI nav pad groups; N x N distance matrix on the heap (`sub_00275F70`) | Designer (N^2 load cost) | Editor compare | 500-600 after timing load |
+| Sub-entries 50 (`0x002FAF2E`) | Attached items/objects, heap by count (`sub_00240590`) | Designer | Editor compare | ~100 |
+| Story AI 50 (`editor+0x280`, `0x0031BE8B`) | Editor array 50x0xE4 (full) and an unchecked 50-slot stack array in `sub_00240590` | Hard | Relocate editor array, reimplement `sub_00240590` | Keep 50 |
+| Logic operations 30 (`+0x41E0`), objectives 10 (`+0x41D8`) | Editor arrays sized exactly 30 (and nodes 130, records 100); heap at play time | Hard in editor only | Relocate editor arrays (~40-50 sites each) | Keep until relocated |
+| Map container 0x7FE0 | Save/load, undo, play-time walkers, System Link transfer (fixed 0x8000) | Hard format | ~33 functions, mostly constant swaps; 16-bit size fields cap at 64 KB | 64 KB (size-gated) |
+| Header byte +9 (`sub_00300630`) | Spawn points required | Validity check | Not a budget | n/a |
+
+Other: the save signature is HMAC-SHA1 with a zero key over the body (same
+as `tools/testing_profile.py`) and the body ends with a zlib CRC-32 at
+`used`; System Link sends the map in 239-byte fragments with byte indices
+(max 60,945 bytes) and no receive bound check.
+
+Tooling: the generator has no address-keyed constant override; raising a
+compare or pool-size immediate needs either that feature or a wrapper that
+reimplements the function (practical for `sub_0009A140` and `sub_002FA720`).
+
 ## 2. Host memory is not the obvious constraint
 
 CONFIRMED (runtime source):
