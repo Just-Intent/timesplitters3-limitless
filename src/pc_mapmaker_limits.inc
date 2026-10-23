@@ -76,6 +76,14 @@ static struct { int initialized, pools, limits; } mapmaker_limits;
  * function ends in a plain `ret` (checked in text.asm), so pop 4. */
 #define MAPMAKER_GUEST_RET() (g_esp+=4u)
 
+/* The editor's limit check runs every frame over every piece and item, so
+ * its pointer checks must be cheap: guest RAM (0x00010000..0x03FFFFFF) or the
+ * contiguous window (0x80000000..0x83FFFFFF), the only places the game keeps
+ * these structures. guest_writable asks Windows (VirtualQuery) every time,
+ * which made a 186-piece map's editor visibly slow. */
+#define MAPMAKER_PTR_OK(p,n) ((((uint32_t)(p))>=0x00010000u && ((uint32_t)(p))<0x04000000u-(uint32_t)(n)) || \
+                              (((uint32_t)(p))>=0x80000000u && ((uint32_t)(p))<0x84000000u-(uint32_t)(n)))
+
 /* Category maxima: stock values read from the US XBE; see research/capacity-raise-plan.md. */
 static const struct { uint32_t address, stock, raised; } mapmaker_categories[]={
     {0x00524CA4u,32u,128u},  /* 8  weapon pickups */
@@ -108,7 +116,7 @@ static void mapmaker_categories_apply(void)
     unsigned i;
     for(i=0;i<sizeof mapmaker_categories/sizeof mapmaker_categories[0];i++) {
         uint32_t a=mapmaker_categories[i].address;
-        if(guest_writable(a,4) && WORD_AT(a)==mapmaker_categories[i].stock)
+        if(MAPMAKER_PTR_OK(a,4) && WORD_AT(a)==mapmaker_categories[i].stock)
             WORD_AT(a)=mapmaker_categories[i].raised;
     }
 }
@@ -161,15 +169,15 @@ static void mapmaker_list_totals(uint32_t piece,MapMakerTotals *t)
 {
     unsigned i,j;
     memset(t,0,sizeof *t);
-    for(i=0;piece && i<4096 && guest_writable(piece,0x44);i++,piece=WORD_AT(piece+0x40)) {
+    for(i=0;piece && i<4096 && MAPMAKER_PTR_OK(piece,0x44);i++,piece=WORD_AT(piece+0x40)) {
         uint32_t tp=WORD_AT(piece+0x2c),sub;
         t->pieces++;
-        if(guest_writable(tp,4) && WORD_AT(tp)<1024u) {
+        if(MAPMAKER_PTR_OK(tp,4) && WORD_AT(tp)<1024u) {
             uint32_t row=0x00529400u+WORD_AT(tp)*0x140u;
-            if(guest_writable(row,12)) { t->cost[0]+=WORD_AT(row);t->cost[1]+=WORD_AT(row+4);t->cost[2]+=WORD_AT(row+8); }
+            if(MAPMAKER_PTR_OK(row,12)) { t->cost[0]+=WORD_AT(row);t->cost[1]+=WORD_AT(row+4);t->cost[2]+=WORD_AT(row+8); }
         }
         sub=WORD_AT(piece+0x3c);
-        for(j=0;sub && j<4096 && guest_writable(sub,0x18);j++,sub=WORD_AT(sub+0x14))
+        for(j=0;sub && j<4096 && MAPMAKER_PTR_OK(sub,0x18);j++,sub=WORD_AT(sub+0x14))
             if((int32_t)WORD_AT(sub)>9) t->sub++;
     }
 }
@@ -181,12 +189,12 @@ static uint32_t mapmaker_placed_memory(uint32_t piece)
     uint32_t total=0;
     unsigned i,j;
     memset(seen,0,sizeof seen);
-    for(i=0;piece && i<4096 && guest_writable(piece,0x44);i++,piece=WORD_AT(piece+0x40)) {
+    for(i=0;piece && i<4096 && MAPMAKER_PTR_OK(piece,0x44);i++,piece=WORD_AT(piece+0x40)) {
         uint32_t tp=WORD_AT(piece+0x2c),sub;
-        if(guest_writable(tp,4) && WORD_AT(tp)<1024u && guest_writable(0x00529410u+WORD_AT(tp)*0x140u,4))
+        if(MAPMAKER_PTR_OK(tp,4) && WORD_AT(tp)<1024u && MAPMAKER_PTR_OK(0x00529410u+WORD_AT(tp)*0x140u,4))
             total+=WORD_AT(0x00529410u+WORD_AT(tp)*0x140u);
         sub=WORD_AT(piece+0x3c);
-        for(j=0;sub && j<4096 && guest_writable(sub,0x18);j++,sub=WORD_AT(sub+0x14)) {
+        for(j=0;sub && j<4096 && MAPMAKER_PTR_OK(sub,0x18);j++,sub=WORD_AT(sub+0x14)) {
             uint32_t id=WORD_AT(sub);
             if(id<80u && seen[id] && id!=0x45u) total+=0x400u;
             else {
@@ -215,10 +223,10 @@ void pc_display_mapmaker_limits(void (*original)(void))
     mapmaker_limits_read();
     if(!mapmaker_limits.limits) return;
     mapmaker_categories_apply();
-    if(!guest_writable(0x007844A8u,4) || !guest_writable(0x0078400Cu,4) ||
-       !guest_writable(0x00762CB8u,4)) return;
+    if(!MAPMAKER_PTR_OK(0x007844A8u,4) || !MAPMAKER_PTR_OK(0x0078400Cu,4) ||
+       !MAPMAKER_PTR_OK(0x00762CB8u,4)) return;
     editor=WORD_AT(0x007844A8u);
-    if(!guest_writable(editor,0x3074)) return;
+    if(!MAPMAKER_PTR_OK(editor,0x3074)) return;
     placed_head=WORD_AT(0x0078400Cu);held_head=WORD_AT(editor+0x2f7c);
     mapmaker_list_totals(placed_head,&p);mapmaker_list_totals(held_head,&h);
     groups=(int32_t)WORD_AT(0x00762CB8u);
