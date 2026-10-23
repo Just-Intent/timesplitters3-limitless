@@ -47,7 +47,11 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 #include "pc_mapmaker_limits.inc"
 #include "pc_mapmaker_editor.inc"
 
-static int failures;
+static int failures, esp_errors;
+#define ESP0 0x00600000u
+/* Every hook (replacing or calling its original) must leave esp as the
+ * original's plain `ret` does: return address popped. */
+#define HOOK(fn,orig) do { g_esp=ESP0; fn(orig); if(g_esp!=ESP0+4u) { fprintf(stderr,"%s:%d: esp %+d after %s\n",__FILE__,__LINE__,(int)(g_esp-ESP0),#fn);esp_errors++; } g_esp=ESP0; } while(0)
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
 static void set_env(const char *name,const char *value)
 {
@@ -81,9 +85,35 @@ static void count_chunks(void)
         c+=8u+WORD_AT(c+4);
     }
     g_eax=1;
+    g_esp+=4u;
 }
-static void fake_original_sai(void) { original_calls++; g_eax=0x55u; }
-static void fake_room(void) { g_eax=(uint32_t)has_room; }
+static void fake_original_sai(void) { original_calls++; g_eax=0x55u; g_esp+=4u; }
+static void fake_room(void) { g_eax=(uint32_t)has_room; g_esp+=4u; }
+/* sub_00304330 stand-in: reads the per-type count of the held id and
+ * increments it when below the stock cap it compares against (40/30). */
+static uint32_t place_seen;
+static int place_refuse;
+static void fake_place(void)
+{
+    uint32_t e=WORD_AT(0x007844A8u),id=WORD_AT(e+0x2F34u);
+    uint32_t a=id==0x46u?e+0x3068u:id==0x47u?e+0x306Au:0,cap=id==0x46u?40u:30u;
+    g_esp+=4u;
+    if(!a) { place_seen=WORD_AT(e+0x3068u)&0xFFFFu;return; }
+    place_seen=(a&2u)?WORD_AT(a&~3u)>>16:WORD_AT(a)&0xFFFFu;
+    if(place_seen<cap && !place_refuse) { if(a&2u) WORD_AT(a&~3u)+=1u<<16; else WORD_AT(a)+=1u; }
+}
+/* sub_002F7F30 stand-in: dst count of the source type vs stock cap. */
+static uint32_t move_seen,move_type;
+static void fake_move(void)
+{
+    static const uint32_t cap[3]={40u,30u,100u};
+    uint32_t e=g_edx+8u+(0x543D0u-0x3070u)+g_eax*12u,a;
+    move_type=WORD_AT(e+4u)>>24;a=g_ecx+move_type*2u;
+    move_seen=(a&2u)?WORD_AT(a&~3u)>>16:WORD_AT(a)&0xFFFFu;
+    if(move_seen<cap[move_type]) { if(a&2u) WORD_AT(a&~3u)+=1u<<16; else WORD_AT(a)+=1u; }
+    g_eax=0x66u;
+    g_esp+=4u;
+}
 static unsigned count_tag(uint32_t c,uint32_t tag)
 {
     unsigned n=0,guard=0;
@@ -103,28 +133,28 @@ int main(void)
     set_env("TSFP_MAPMAKER_POOLS",NULL);set_env("TSFP_MAPMAKER_LIMITS",NULL);
     WORD_AT(g_esp+4u)=0x4242u;
     WORD_AT(ED+0x280u)=49;
-    pc_mapmaker_editor_sai_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(adds==1 && WORD_AT(ED+0x280u)==50 && g_eax==0x1234u && original_calls==0);
-    pc_mapmaker_editor_sai_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(adds==1 && WORD_AT(ED+0x280u)==50 && messages==1 && last_sprintf_value==50u &&
           last_message_text==ED && g_eax==0x77u);
     has_room=0;WORD_AT(ED+0x280u)=10;
-    pc_mapmaker_editor_sai_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(adds==1 && messages==2 && last_text==0x9B6u && last_message_text==0x00700000u+0x9B6u);
     has_room=1;
 
     /* ---- opted in: up to 255 ---- */
     set_env("TSFP_MAPMAKER_LIMITS","1");
     WORD_AT(ED+0x280u)=50;
-    for(i=0;i<205;i++) pc_mapmaker_editor_sai_add(fake_original_sai);
+    for(i=0;i<205;i++) HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(WORD_AT(ED+0x280u)==255 && adds==206);
     /* colours: entries past 50 get index mod 50 instead of the stock 50 */
     CHECK(WORD_AT(ED+0x11950u+50u*0xE4u+0x60u)==0u && WORD_AT(ED+0x11950u+123u*0xE4u+0x60u)==123u%50u);
     CHECK(WORD_AT(ED+0x11950u+254u*0xE4u+0x60u)==254u%50u);
-    pc_mapmaker_editor_sai_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(WORD_AT(ED+0x280u)==255 && adds==206 && last_sprintf_value==255u);
     has_room=0;WORD_AT(ED+0x280u)=255;
-    pc_mapmaker_editor_sai_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(last_text==0x9B6u);
     has_room=1;
 
@@ -133,7 +163,7 @@ int main(void)
     WORD_AT(c)=0x00C77667u;WORD_AT(c+4)=0x12Du;
     end=put_chunks(c+8u,0x00C77669u,5,0x40u);
     end=put_chunks(end,0x00C7766Cu,300,0x50u);   /* SAI: 255 fit */
-    end=put_chunks(end,0x00C7766Bu,200,0x0Cu);   /* free objects: 170 (stock array) */
+    end=put_chunks(end,0x00C7766Bu,700,0x0Cu);   /* free objects 680 */
     end=put_chunks(end,0x00C7766Du,600,0xC0u);   /* nodes 520 */
     for(i=0;i<20;i++) {                          /* ops: 20 kind-1 (8 fit) then 110 kind-0 */
         WORD_AT(end)=0x00C7766Eu;WORD_AT(end+4)=0x220u;WORD_AT(end+8)=i;WORD_AT(end+12)=1u;end+=8u+0x220u;
@@ -144,32 +174,32 @@ int main(void)
     walk_from=c+8u;
     WORD_AT(g_esp+4u)=c;
     original_calls=0;
-    pc_mapmaker_editor_load(count_chunks);
+    HOOK(pc_mapmaker_editor_load,count_chunks);
     CHECK(original_calls==1 && g_eax==1);
-    CHECK(seen_by_original[1]==255 && seen_by_original[0]==170 && seen_by_original[2]==520 &&
+    CHECK(seen_by_original[1]==255 && seen_by_original[0]==680 && seen_by_original[2]==520 &&
           seen_by_original[3]==118 && seen_by_original[4]==400 && seen_by_original[5]==5);
-    CHECK(hidden_by_original==45u+30u+80u+12u+50u);
-    CHECK(count_tag(c+8u,0x00C7766Cu)==300 && count_tag(c+8u,0x00C7766Bu)==200 &&
+    CHECK(hidden_by_original==45u+20u+80u+12u+50u);
+    CHECK(count_tag(c+8u,0x00C7766Cu)==300 && count_tag(c+8u,0x00C7766Bu)==700 &&
           count_tag(c+8u,0x00C7766Eu)==130 && count_tag(c+8u,0x00C7766Fu)==450 && count_tag(c+8u,0)==0);
     /* more than 120 ops of kind 0: the total applies */
     end=put_chunks(c+8u,0x00C7766Eu,125,0x220u);WORD_AT(end)=0x00C7766Au;
-    pc_mapmaker_editor_load(count_chunks);
+    HOOK(pc_mapmaker_editor_load,count_chunks);
     CHECK(seen_by_original[3]==120 && hidden_by_original==5);
     /* a map within capacity is passed through untouched */
     end=put_chunks(c+8u,0x00C7766Cu,10,0x50u);WORD_AT(end)=0x00C7766Au;
-    pc_mapmaker_editor_load(count_chunks);
+    HOOK(pc_mapmaker_editor_load,count_chunks);
     CHECK(seen_by_original[1]==10 && hidden_by_original==0);
     /* malformed (a chunk size past the scan bound): nothing hidden */
     end=put_chunks(c+8u,0x00C7766Cu,300,0x50u);
     WORD_AT(end)=0x00C7766Cu;WORD_AT(end+4)=0x7FFFFFF0u;
     original_calls=0;
-    pc_mapmaker_editor_load(count_chunks);           /* stops at the oversized chunk */
+    HOOK(pc_mapmaker_editor_load,count_chunks);           /* stops at the oversized chunk */
     CHECK(original_calls==1 && hidden_by_original==0 && seen_by_original[1]==300);
     WORD_AT(end)=0x00C7766Au;
     CHECK(count_tag(c+8u,0)==0 && count_tag(c+8u,0x00C7766Cu)==300);
     /* wrong header: original only */
     WORD_AT(c)=0;original_calls=0;
-    pc_mapmaker_editor_load(fake_original_sai);
+    HOOK(pc_mapmaker_editor_load,fake_original_sai);
     CHECK(original_calls==1);
     WORD_AT(c)=0x00C77667u;
 
@@ -180,7 +210,7 @@ int main(void)
     end=put_chunks(end,0x00C7766Du,600,0xC0u);  /* not capped at play time (heap by count) */
     WORD_AT(end)=0x00C7766Au;
     walk_from=c+8u;
-    pc_mapmaker_editor_level_load(count_chunks);
+    HOOK(pc_mapmaker_editor_level_load,count_chunks);
     CHECK(seen_by_original[1]==1024 && seen_by_original[2]==600 && hidden_by_original==76);
     CHECK(count_tag(c+8u,0x00C7766Cu)==1100 && count_tag(c+8u,0)==0);
 
@@ -188,59 +218,59 @@ int main(void)
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
     WORD_AT(0x0052E8E8u)=30u;
     WORD_AT(ED+0x41D8u)=9;WORD_AT(ED+0x41E0u)=29;
-    pc_mapmaker_editor_logic_can_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_can_add,fake_original_sai);
     CHECK(g_eax==1);
     WORD_AT(ED+0x41E0u)=30;
-    pc_mapmaker_editor_logic_can_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_can_add,fake_original_sai);
     CHECK(g_eax==0);
     WORD_AT(ED+0x41D8u)=10;WORD_AT(ED+0x41E0u)=12;
-    pc_mapmaker_editor_logic_can_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_can_add,fake_original_sai);
     CHECK(g_eax==0 && WORD_AT(0x0052E8E8u)==30u);          /* off: kind table stock */
     set_env("TSFP_MAPMAKER_LIMITS","1");
-    pc_mapmaker_editor_logic_can_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_can_add,fake_original_sai);
     CHECK(g_eax==1 && WORD_AT(0x0052E8E8u)==120u);
     WORD_AT(ED+0x41D8u)=39;WORD_AT(ED+0x41E0u)=119;
-    pc_mapmaker_editor_logic_can_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_can_add,fake_original_sai);
     CHECK(g_eax==1);
     WORD_AT(ED+0x41E0u)=120;
-    pc_mapmaker_editor_logic_can_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_can_add,fake_original_sai);
     CHECK(g_eax==0);
     WORD_AT(ED+0x41E0u)=50;WORD_AT(ED+0x41D8u)=40;
-    pc_mapmaker_editor_logic_can_add(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_can_add,fake_original_sai);
     CHECK(g_eax==0);
     /* full message */
     WORD_AT(g_esp+4u)=0x4343u;last_sprintf_value=0;
-    pc_mapmaker_editor_logic_full(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_full,fake_original_sai);
     CHECK(last_sprintf_value==40u && last_text==0xBB1u && last_message_text==ED && g_eax==0x77u);
     WORD_AT(ED+0x41D8u)=7;WORD_AT(ED+0x41E0u)=120;
-    pc_mapmaker_editor_logic_full(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_full,fake_original_sai);
     CHECK(last_sprintf_value==6u);
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
     WORD_AT(ED+0x41D8u)=10;
-    pc_mapmaker_editor_logic_full(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_full,fake_original_sai);
     CHECK(last_sprintf_value==10u);
     /* objective: stock 10 when off, 40 when on, never past the ops capacity */
     original_calls=0;WORD_AT(ED+0x41D8u)=10;WORD_AT(ED+0x41E0u)=20;WORD_AT(ED+0x81A4u)=0;WORD_AT(ED+0xDD10u)=0;
-    pc_mapmaker_editor_objective(fake_original_sai);
+    HOOK(pc_mapmaker_editor_objective,fake_original_sai);
     CHECK(original_calls==0 && g_eax==ED);
     WORD_AT(ED+0x41D8u)=9;
-    pc_mapmaker_editor_objective(fake_original_sai);
+    HOOK(pc_mapmaker_editor_objective,fake_original_sai);
     CHECK(original_calls==1);
     set_env("TSFP_MAPMAKER_LIMITS","1");
     WORD_AT(ED+0x41D8u)=39;
-    pc_mapmaker_editor_objective(fake_original_sai);
+    HOOK(pc_mapmaker_editor_objective,fake_original_sai);
     CHECK(original_calls==2);
     WORD_AT(ED+0x41D8u)=40;
-    pc_mapmaker_editor_objective(fake_original_sai);
+    HOOK(pc_mapmaker_editor_objective,fake_original_sai);
     CHECK(original_calls==2);
     WORD_AT(ED+0x41D8u)=5;WORD_AT(ED+0x41E0u)=120;
-    pc_mapmaker_editor_objective(fake_original_sai);
+    HOOK(pc_mapmaker_editor_objective,fake_original_sai);
     CHECK(original_calls==2);
     WORD_AT(ED+0x41E0u)=5;WORD_AT(ED+0xDD10u)=393;
-    pc_mapmaker_editor_objective(fake_original_sai);
+    HOOK(pc_mapmaker_editor_objective,fake_original_sai);
     CHECK(original_calls==2);
     WORD_AT(ED+0xDD10u)=392;
-    pc_mapmaker_editor_objective(fake_original_sai);
+    HOOK(pc_mapmaker_editor_objective,fake_original_sai);
     CHECK(original_calls==3);
     WORD_AT(ED+0xDD10u)=0;
     /* nodes per type, counted in the enlarged node array */
@@ -248,37 +278,37 @@ int main(void)
     for(i=0;i<130;i++) WORD_AT(ED+0x2FB70u+i*0xB4u)=i<30?0u:i<80?1u:2u;
     WORD_AT(ED+0x81A8u)=7;                                    /* old array: ignored */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
-    WORD_AT(g_esp+4u)=0;pc_mapmaker_editor_node_room(fake_original_sai);CHECK(g_eax==0);
-    WORD_AT(g_esp+4u)=1;pc_mapmaker_editor_node_room(fake_original_sai);CHECK(g_eax==0);
-    WORD_AT(g_esp+4u)=3;pc_mapmaker_editor_node_room(fake_original_sai);CHECK(g_eax==0);
+    WORD_AT(g_esp+4u)=0;HOOK(pc_mapmaker_editor_node_room,fake_original_sai);CHECK(g_eax==0);
+    WORD_AT(g_esp+4u)=1;HOOK(pc_mapmaker_editor_node_room,fake_original_sai);CHECK(g_eax==0);
+    WORD_AT(g_esp+4u)=3;HOOK(pc_mapmaker_editor_node_room,fake_original_sai);CHECK(g_eax==0);
     set_env("TSFP_MAPMAKER_LIMITS","1");
-    WORD_AT(g_esp+4u)=0;pc_mapmaker_editor_node_room(fake_original_sai);CHECK(g_eax==1);
-    WORD_AT(g_esp+4u)=2;pc_mapmaker_editor_node_room(fake_original_sai);CHECK(g_eax==1);
+    WORD_AT(g_esp+4u)=0;HOOK(pc_mapmaker_editor_node_room,fake_original_sai);CHECK(g_eax==1);
+    WORD_AT(g_esp+4u)=2;HOOK(pc_mapmaker_editor_node_room,fake_original_sai);CHECK(g_eax==1);
     WORD_AT(ED+0x81A4u)=320;
     for(i=0;i<320;i++) WORD_AT(ED+0x2FB70u+i*0xB4u)=i<120?0u:1u;
-    WORD_AT(g_esp+4u)=0;pc_mapmaker_editor_node_room(fake_original_sai);CHECK(g_eax==0);
-    WORD_AT(g_esp+4u)=1;pc_mapmaker_editor_node_room(fake_original_sai);CHECK(g_eax==0);
-    WORD_AT(g_esp+4u)=2;pc_mapmaker_editor_node_room(fake_original_sai);CHECK(g_eax==1);
+    WORD_AT(g_esp+4u)=0;HOOK(pc_mapmaker_editor_node_room,fake_original_sai);CHECK(g_eax==0);
+    WORD_AT(g_esp+4u)=1;HOOK(pc_mapmaker_editor_node_room,fake_original_sai);CHECK(g_eax==0);
+    WORD_AT(g_esp+4u)=2;HOOK(pc_mapmaker_editor_node_room,fake_original_sai);CHECK(g_eax==1);
     /* container-space test: logic callers also see the array capacities */
     has_room=1;
     WORD_AT(g_esp+4u)=0x58u;WORD_AT(g_esp)=0x00324F70u;
     WORD_AT(ED+0x41E0u)=10;WORD_AT(ED+0x81A4u)=512;WORD_AT(ED+0xDD10u)=0;
-    pc_mapmaker_editor_logic_room(fake_room);
+    HOOK(pc_mapmaker_editor_logic_room,fake_room);
     CHECK(g_eax==1);
     WORD_AT(ED+0x81A4u)=513;
-    pc_mapmaker_editor_logic_room(fake_room);
+    HOOK(pc_mapmaker_editor_logic_room,fake_room);
     CHECK(g_eax==0);
     WORD_AT(g_esp)=0x00303A8Du;                               /* item placement: unaffected */
-    pc_mapmaker_editor_logic_room(fake_room);
+    HOOK(pc_mapmaker_editor_logic_room,fake_room);
     CHECK(g_eax==1);
     WORD_AT(g_esp)=0x003287D0u;WORD_AT(ED+0x81A4u)=0;WORD_AT(ED+0xDD10u)=393;
-    pc_mapmaker_editor_logic_room(fake_room);
+    HOOK(pc_mapmaker_editor_logic_room,fake_room);
     CHECK(g_eax==0);
     WORD_AT(ED+0xDD10u)=0;WORD_AT(ED+0x41E0u)=120;
-    pc_mapmaker_editor_logic_room(fake_room);
+    HOOK(pc_mapmaker_editor_logic_room,fake_room);
     CHECK(g_eax==0);
     WORD_AT(ED+0x41E0u)=0;has_room=0;
-    pc_mapmaker_editor_logic_room(fake_room);
+    HOOK(pc_mapmaker_editor_logic_room,fake_room);
     CHECK(g_eax==0);
     has_room=1;
 
@@ -288,15 +318,62 @@ int main(void)
     for(i=0;i<45;i++) WORD_AT(0x00300000u+0x13Cu+i*0x8Cu)=100u+i;
     WORD_AT(g_esp+4u)=0x00310000u;WORD_AT(0x00310000u+0xCu)=0x0000FFF0u;   /* record -16 */
     original_calls=0;
-    pc_mapmaker_editor_logic_slot(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_slot,fake_original_sai);
     CHECK(original_calls==1);
     WORD_AT(0x00300000u+0x1950u)=45;
-    pc_mapmaker_editor_logic_slot(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_slot,fake_original_sai);
     CHECK(original_calls==1 && g_eax==0);                     /* new record, table full: skipped */
     WORD_AT(0x00310000u+0xCu)=100u+44u;
-    pc_mapmaker_editor_logic_slot(fake_original_sai);
+    HOOK(pc_mapmaker_editor_logic_slot,fake_original_sai);
     CHECK(original_calls==2);                                 /* already has a slot */
 
+    /* ---- free-standing objects ---- */
+    {
+        uint32_t clip=ED+0x5048u,main=ED+0x3068u,e;
+        unsigned t;
+        set_env("TSFP_MAPMAKER_LIMITS",NULL);
+        /* placement: type 0 (id 0x46) at the stock 40 is left to the original */
+        WORD_AT(ED+0x2F34u)=0x46u;WORD_AT(main)=40u|(3u<<16);WORD_AT(main+4)=0u|(43u<<16);
+        place_seen=0xFFFFu;HOOK(pc_mapmaker_editor_free_place,fake_place);
+        CHECK(place_seen==40u && (WORD_AT(main)&0xFFFFu)==40u && (WORD_AT(main)>>16)==3u); /* stock refusal */
+        set_env("TSFP_MAPMAKER_LIMITS","1");
+        WORD_AT(main)=40u|(3u<<16);
+        HOOK(pc_mapmaker_editor_free_place,fake_place);                  /* shown 39, placed: 41 */
+        CHECK(place_seen==39u && (WORD_AT(main)&0xFFFFu)==41u && (WORD_AT(main)>>16)==3u);
+        WORD_AT(main)=159u;
+        HOOK(pc_mapmaker_editor_free_place,fake_place);
+        CHECK(place_seen==39u && (WORD_AT(main)&0xFFFFu)==160u);
+        HOOK(pc_mapmaker_editor_free_place,fake_place);                  /* at 160: original sees 160 */
+        CHECK(place_seen==160u);
+        WORD_AT(ED+0x2F34u)=0x47u;WORD_AT(main)=5u|(30u<<16);   /* type 1: high half */
+        place_refuse=1;HOOK(pc_mapmaker_editor_free_place,fake_place);   /* refused: count unchanged */
+        CHECK(place_seen==29u && (WORD_AT(main)>>16)==30u && (WORD_AT(main)&0xFFFFu)==5u);
+        place_refuse=0;
+        WORD_AT(ED+0x2F34u)=0x30u;place_seen=7;
+        HOOK(pc_mapmaker_editor_free_place,fake_place);                  /* other items: untouched */
+        CHECK(place_seen==5u);
+        /* move between sets: type from the source entry in the enlarged array */
+        for(t=0;t<3;t++) {
+            WORD_AT(clip)=0;WORD_AT(clip+4)=0;
+            e=clip+8u+(ED+0x543D0u-0x3070u-ED)+2u*12u;          /* clipboard entry 2 */
+            WORD_AT(e+4u)=(WORD_AT(e+4u)&0x00FFFFFFu)|(t<<24);
+            WORD_AT(main)=0;WORD_AT(main+4)=0;
+            if(t==0) WORD_AT(main)=40u;
+            if(t==1) WORD_AT(main)=30u<<16;
+            if(t==2) WORD_AT(main+4)=100u;
+            g_eax=2;g_ecx=main;g_edx=clip;
+            HOOK(pc_mapmaker_editor_free_move,fake_move);
+            CHECK(move_type==t && move_seen==(t==0?39u:t==1?29u:99u));
+            CHECK((t==0?WORD_AT(main)&0xFFFFu:t==1?WORD_AT(main)>>16:WORD_AT(main+4)&0xFFFFu)==(t==0?41u:t==1?31u:101u));
+            CHECK(g_eax==0x66u);
+        }
+        set_env("TSFP_MAPMAKER_LIMITS",NULL);
+        WORD_AT(main+4)=100u;g_eax=2;g_ecx=main;g_edx=clip;
+        HOOK(pc_mapmaker_editor_free_move,fake_move);
+        CHECK(move_seen==100u);                                      /* stock: original decides */
+    }
+
+    CHECK(esp_errors==0);
     if(failures) return 1;
     puts("mapmaker editor ok");
     return 0;

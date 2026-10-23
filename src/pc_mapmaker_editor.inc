@@ -12,7 +12,13 @@
  *   logic ops      +0x41E4  30 x 0x220  +0x1FC70  120                +0x41E0
  *   logic nodes    +0x81A8 130 x 0xB4   +0x2FB70  520                +0x81A4
  *   logic records  +0xDD14 100 x 0x8C   +0x46910  400                +0xDD10
- *   (free objects: later stage, see the doc)
+ *   free objects   +0x3070 170 x 12     +0x543D0  680                +0x3068..+0x306E
+ *   clipboard      +0x3870 170 x 12     +0x563B0  680                +0x5048..+0x504E (moved)
+ *
+ * The free-object sets are {u16 count[3], u16 total; entry[]} and the set
+ * functions address entries as set + 8 + 12*i for either set, so both
+ * arrays move by the same delta from their counts: the main counts stay,
+ * the clipboard counts move into the vacated old ops array (+0x5048).
  *
  * Counts stay where they were. This file holds the C policy around the
  * enlarged arrays. Editor limits (what the player may place) follow
@@ -46,6 +52,11 @@
  *    chunk with no bound; editor.json grows that frame to
  *    MAPMAKER_LEVEL_SAI_SLOTS slots and chunks past that are hidden for the
  *    whole load the same way.
+ *  - pc_mapmaker_editor_free_place / _free_move (WRAP sub_00304330,
+ *    sub_002F7F30): free-standing objects per type 40/30/100 -> 160/120/400
+ *    (sum = capacity 680) while the limits are on. The originals keep their
+ *    stock compares; the per-type count is shown to them as stock-1 for the
+ *    call and corrected by what they added.
  *  - pc_mapmaker_editor_logic_slot (WRAP sub_0033F480, play time): the
  *    45-slot table at [0x00765E44]+0xB4 takes one slot per distinct record
  *    with no bound. Its index is also the HUD marker id, and sub_002287E0
@@ -75,6 +86,11 @@
 #define MAPMAKER_KIND1_OPS 8u
 #define MAPMAKER_LOGIC_HEADROOM 8u
 #define MAPMAKER_LOGIC_SLOTS 45u
+#define MAPMAKER_EDITOR_FREE 0x543D0u           /* 680 x 12 */
+#define MAPMAKER_EDITOR_CLIP 0x563B0u           /* 680 x 12 */
+#define MAPMAKER_EDITOR_CLIP_COUNTS 0x5048u
+#define MAPMAKER_EDITOR_FREE_CAP 680u
+#define MAPMAKER_FREE_DELTA (MAPMAKER_EDITOR_FREE-0x3070u) /* set + 8 + DELTA + 12*i */
 
 #define MAPMAKER_TAG_FREE 0x00C7766Bu
 #define MAPMAKER_TAG_SAI 0x00C7766Cu
@@ -89,7 +105,7 @@
 typedef struct MapMakerCap { uint32_t tag, capacity, kind, kind_value; } MapMakerCap;
 static const MapMakerCap mapmaker_editor_caps[]={
     {MAPMAKER_TAG_SAI,MAPMAKER_EDITOR_SAI_CAP,0,0},
-    {MAPMAKER_TAG_FREE,170u,0,0},   /* stock array */
+    {MAPMAKER_TAG_FREE,MAPMAKER_EDITOR_FREE_CAP,0,0},
     {MAPMAKER_TAG_NODE,MAPMAKER_EDITOR_NODES_CAP,0,0},
     {MAPMAKER_TAG_OP,MAPMAKER_KIND1_OPS,1,1},  /* before the total: a hidden chunk counts once */
     {MAPMAKER_TAG_OP,MAPMAKER_EDITOR_OPS_CAP,0,0},
@@ -98,6 +114,10 @@ static const MapMakerCap mapmaker_editor_caps[]={
 #define MAPMAKER_EDITOR_CAPS (sizeof mapmaker_editor_caps/sizeof mapmaker_editor_caps[0])
 
 extern void sub_00300670(void),sub_0031BB60(void),sub_0003D7B0(void),sub_0007A270(void),sub_003C85D4(void);
+
+/* A hook that replaces its original must also do the original's `ret n`:
+ * the lifted caller pushed a return address and checks esp afterwards. */
+static void mapmaker_ret(uint32_t n) { g_esp+=4u+n; }
 
 static uint32_t mapmaker_editor(void)
 {
@@ -210,6 +230,7 @@ void pc_mapmaker_editor_sai_add(void (*original)(void))
         result=guest_call(sub_0007A270,3,arg,editor,0u);
     }
     g_eax=result;
+    mapmaker_ret(0);                                   /* sub_0031BE70: ret */
 }
 
 /* ---- logic: editor limits --------------------------------------------- */
@@ -240,6 +261,7 @@ void pc_mapmaker_editor_logic_can_add(void (*original)(void))
     mapmaker_logic_kinds_apply();
     g_eax=(int32_t)WORD_AT(editor+0x41D8u)<(int32_t)mapmaker_objectives_limit() &&
           (int32_t)WORD_AT(editor+0x41E0u)<(int32_t)mapmaker_ops_limit();
+    mapmaker_ret(0);                                   /* sub_00321E60: ret */
 }
 /* sub_00321E80(arg): the "logic full" message, with the limits in force.
  * Stock formats the objective limit, or objectives-1 when ops are full. */
@@ -254,6 +276,7 @@ void pc_mapmaker_editor_logic_full(void (*original)(void))
     else if((int32_t)WORD_AT(editor+0x41E0u)>=(int32_t)mapmaker_ops_limit())
         guest_call(sub_003C85D4,3,editor,guest_call(sub_0003D7B0,1,0xBB1u),objectives-1u);
     g_eax=guest_call(sub_0007A270,3,arg,editor,0u);
+    mapmaker_ret(0);                                   /* sub_00321E80: ret */
 }
 /* sub_00325F60: turn the selected mover into an objective (creates an op
  * and nodes). Its own test is raised to 40 by editor.json; refuse here at
@@ -268,6 +291,7 @@ void pc_mapmaker_editor_objective(void (*original)(void))
        WORD_AT(editor+0x81A4u)+MAPMAKER_LOGIC_HEADROOM>MAPMAKER_EDITOR_NODES_CAP ||
        WORD_AT(editor+0xDD10u)+MAPMAKER_LOGIC_HEADROOM>MAPMAKER_EDITOR_RECORDS_CAP) {
         g_eax=editor;
+        mapmaker_ret(0);                               /* sub_00325F60: ret at 0x0032609D */
         return;
     }
     original();
@@ -286,6 +310,7 @@ void pc_mapmaker_editor_node_room(void (*original)(void))
     cap=type==0u?30u:(type==1u || type==2u)?50u:0u;
     if(mapmaker_limits.limits) cap*=4u;
     g_eax=n<cap;
+    mapmaker_ret(0);                                   /* sub_0031DB00: ret */
 }
 
 /* ---- logic: capacity backstop in the container-space test ------------- */
@@ -298,12 +323,11 @@ static const uint32_t mapmaker_logic_room_callers[]={
 };
 void pc_mapmaker_editor_logic_room(void (*original)(void))
 {
-    uint32_t editor,ret;
+    uint32_t editor,ret=guest_writable(g_esp,4)?WORD_AT(g_esp):0u;  /* before the original pops it */
     unsigned i;
     original();
-    if(!g_eax || !guest_writable(g_esp,4) || !(editor=mapmaker_editor())) return;
+    if(!g_eax || !(editor=mapmaker_editor())) return;
     mapmaker_logic_kinds_apply();
-    ret=WORD_AT(g_esp);
     for(i=0;i<sizeof mapmaker_logic_room_callers/sizeof mapmaker_logic_room_callers[0];i++)
         if(ret==mapmaker_logic_room_callers[i]) break;
     if(i==sizeof mapmaker_logic_room_callers/sizeof mapmaker_logic_room_callers[0]) return;
@@ -331,4 +355,49 @@ void pc_mapmaker_editor_logic_slot(void (*original)(void))
         if(!reported++) fprintf(stderr,"[mapmaker] logic table full (%u slots): action skipped\n",MAPMAKER_LOGIC_SLOTS);
     }
     g_eax=0;
+    mapmaker_ret(0);                                   /* sub_0033F480: ret */
+}
+
+/* ---- free-standing objects -------------------------------------------- */
+static const uint32_t mapmaker_free_stock[3]={40u,30u,100u};
+
+/* Run original with the per-type count at count_addr shown as stock-1 when
+ * the opted-in limit allows more; then put back the real count plus what
+ * the original added (it only compares and increments this word). */
+static void mapmaker_free_shim(uint32_t count_addr,unsigned type,void (*original)(void))
+{
+    uint32_t word,count,shown;
+    mapmaker_limits_read();
+    if(type>2u || !mapmaker_limits.limits || !guest_writable(count_addr&~3u,4)) { original();return; }
+    word=WORD_AT(count_addr&~3u);
+    count=(count_addr&2u)?word>>16:word&0xFFFFu;
+    if(count<mapmaker_free_stock[type] || count>=4u*mapmaker_free_stock[type]) { original();return; }
+    shown=mapmaker_free_stock[type]-1u;
+#define MAPMAKER_PUT16(a,v) (WORD_AT((a)&~3u)=((a)&2u)?(WORD_AT((a)&~3u)&0xFFFFu)|((uint32_t)(v)<<16):(WORD_AT((a)&~3u)&0xFFFF0000u)|((uint32_t)(v)&0xFFFFu))
+    MAPMAKER_PUT16(count_addr,shown);
+    original();
+    word=WORD_AT(count_addr&~3u);
+    word=(count_addr&2u)?word>>16:word&0xFFFFu;
+    MAPMAKER_PUT16(count_addr,count+(word-shown));
+#undef MAPMAKER_PUT16
+}
+/* sub_00304330: place the held item; free objects are ids 0x46 (type 0,
+ * count +0x3068) and 0x47 (type 1, count +0x306A). */
+void pc_mapmaker_editor_free_place(void (*original)(void))
+{
+    uint32_t editor=mapmaker_editor(),id;
+    if(!editor) { original();return; }
+    id=WORD_AT(editor+0x2F34u);
+    if(id==0x46u) mapmaker_free_shim(editor+0x3068u,0,original);
+    else if(id==0x47u) mapmaker_free_shim(editor+0x306Au,1,original);
+    else original();
+}
+/* sub_002F7F30(eax=index, ecx=destination set, edx=source set): copy one
+ * object between the main set and the clipboard; type byte at entry +7. */
+void pc_mapmaker_editor_free_move(void (*original)(void))
+{
+    uint32_t entry=g_edx+8u+MAPMAKER_FREE_DELTA+g_eax*12u,type;
+    if(!guest_writable(entry,12) || !guest_writable(g_ecx,8)) { original();return; }
+    type=WORD_AT(entry+4u)>>24&0xFFu;
+    mapmaker_free_shim(g_ecx+type*2u,type,original);
 }

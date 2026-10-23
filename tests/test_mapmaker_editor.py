@@ -45,6 +45,14 @@ MUTATIONS = {
     'room-any-caller': ('    if(i==sizeof mapmaker_logic_room_callers/sizeof mapmaker_logic_room_callers[0]) return;\n', ''),
     'room-no-headroom': ('#define MAPMAKER_LOGIC_HEADROOM 8u', '#define MAPMAKER_LOGIC_HEADROOM 0u'),
     'slot-no-guard': ('    if(count<MAPMAKER_LOGIC_SLOTS) { original();return; }', '    original();return;'),
+    'free-shim-always': ('if(type>2u || !mapmaker_limits.limits ||', 'if(type>2u ||'),
+    'free-shim-no-restore': ('    MAPMAKER_PUT16(count_addr,count+(word-shown));', ''),
+    'free-move-old-array': ('uint32_t entry=g_edx+8u+MAPMAKER_FREE_DELTA+g_eax*12u,type;', 'uint32_t entry=g_edx+8u+g_eax*12u,type;'),
+    'free-cap-x2': ('count>=4u*mapmaker_free_stock[type]', 'count>=2u*mapmaker_free_stock[type]'),
+    'load-free-stock': ('{MAPMAKER_TAG_FREE,MAPMAKER_EDITOR_FREE_CAP,0,0},', '{MAPMAKER_TAG_FREE,170u,0,0},'),
+    'replacing-hook-no-ret': ('static void mapmaker_ret(uint32_t n) { g_esp+=4u+n; }', 'static void mapmaker_ret(uint32_t n) { (void)n; }'),
+    'replacing-hook-ret-8': ('static void mapmaker_ret(uint32_t n) { g_esp+=4u+n; }', 'static void mapmaker_ret(uint32_t n) { g_esp+=8u+n; }'),
+    'room-ret-after-original': ('ret=guest_writable(g_esp,4)?WORD_AT(g_esp):0u;  /* before the original pops it */', 'ret=0u;'),
     'slot-no-dedup': ('        if((int32_t)WORD_AT(obj+0x13Cu+i*0x8Cu)==record) { original();return; } /* already has a slot */', ''),
 }
 
@@ -89,10 +97,13 @@ LAYOUT = {
     'ops': (0x41E4, 0x220, 30, 0x1FC70, 120),
     'nodes': (0x81A8, 0xB4, 130, 0x2FB70, 520),
     'recs': (0xDD14, 0x8C, 100, 0x46910, 400),
+    'free': (0x3070, 12, 170, 0x543D0, 680),
+    'clip': (0x3870, 12, 170, 0x563B0, 680),
 }
+CLIP_COUNTS = (0x3868, 0x5048)   # clipboard counts move so set+8+delta works for both sets
 SIZE = 0x58390
 # array references incl. folded ones; see docs/mapmaker-editor.md for the cross-checks
-EXPECTED_SITES = {'sai': 136, 'ops': 96, 'nodes': 154, 'recs': 137}
+EXPECTED_SITES = {'sai': 136, 'ops': 96, 'nodes': 154, 'recs': 137, 'free': 95, 'clip': 5, 'clip-counts': 19}
 
 
 def table():
@@ -129,25 +140,52 @@ def test_allocation_matches_layout():
     assert by_id['ed-alloc-zero']['original_hex'] == 'b952460000'          # mov ecx, 0x4652
 
 
+def delta(name):
+    if name == 'clip-counts':
+        return CLIP_COUNTS[1] - CLIP_COUNTS[0]
+    return LAYOUT[name][3] - LAYOUT[name][0]
+
+
+def test_free_sets_share_one_delta():
+    # set functions reach entries as set + 8 + 12*i for both sets
+    assert LAYOUT['free'][3] - 0x3070 == LAYOUT['clip'][3] - (CLIP_COUNTS[1] + 8)
+    old_ops = (LAYOUT['ops'][0], LAYOUT['ops'][0] + LAYOUT['ops'][1] * LAYOUT['ops'][2])
+    assert old_ops[0] <= CLIP_COUNTS[1] and CLIP_COUNTS[1] + 8 <= old_ops[1]   # vacated
+    text = EDITOR.read_text(encoding='utf-8')
+    assert f'#define MAPMAKER_EDITOR_FREE 0x{LAYOUT["free"][3]:X}u' in text
+    assert f'#define MAPMAKER_EDITOR_CLIP 0x{LAYOUT["clip"][3]:X}u' in text
+    assert f'#define MAPMAKER_EDITOR_CLIP_COUNTS 0x{CLIP_COUNTS[1]:X}u' in text
+    rel = [e for e in table() if e.get('set_relative')]
+    assert len(rel) == 4 and all(int(e['value'], 16) - int(e['old'], 16) == delta('free') for e in rel)
+
+
 def test_array_rewrites_follow_the_layout():
     """Each rewrite moves its value by exactly its array's delta, the old value
     lies in (or a few elements below, for biased indices) the old array, and
     the old value is in the instruction bytes unless the access was folded."""
-    counted = dict.fromkeys(LAYOUT, 0)
+    counted = dict.fromkeys(EXPECTED_SITES, 0)
     for e in table():
         if 'array' not in e:
             continue
         name = e['array']
-        old_lo, stride, old_count, new_lo, _ = LAYOUT[name]
         old = int(e['old'], 16) if not e['old'].startswith('-') else -int(e['old'][1:], 16)
         new = int(e['value'], 16)
-        delta = new_lo - old_lo
+        d = delta(name)
+        if name == 'clip-counts':
+            lo, hi, stride = CLIP_COUNTS[0], CLIP_COUNTS[0] + 8, 1
+        else:
+            old_lo, stride, old_count, _, _ = LAYOUT[name]
+            lo, hi = old_lo - 4 * stride, old_lo + stride * old_count
         if e.get('folded'):
-            assert old == 0 and new == delta, e['id']
+            assert old == 0 and new == d, e['id']
+        elif e.get('folded_scale'):
+            assert (new - old) * e['folded_scale'] == d, e['id']
+        elif e.get('set_relative'):
+            assert new - old == d and old in (0, 8), e['id']
         else:
             sign = -1 if old < 0 else 1
-            assert (old + sign * delta) & 0xFFFFFFFF == new, e['id']
-            assert old_lo - 4 * stride <= abs(old) < old_lo + stride * old_count, e['id']
+            assert (old + sign * d) & 0xFFFFFFFF == new, e['id']
+            assert lo <= abs(old) < hi, e['id']
             assert le32(old) in e['original_hex'], e['id']
         assert e['kind'] == 'operand'
         counted[name] += 1

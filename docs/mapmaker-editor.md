@@ -20,6 +20,17 @@ rewrites), `src/pc_mapmaker_editor.inc` (C policy, wrappers),
     WRAP sub_0031DB00 -> pc_mapmaker_editor_node_room
     WRAP sub_00300670 -> pc_mapmaker_editor_logic_room
     WRAP sub_0033F480 -> pc_mapmaker_editor_logic_slot
+    WRAP sub_00304330 -> pc_mapmaker_editor_free_place
+    WRAP sub_002F7F30 -> pc_mapmaker_editor_free_move
+
+Hooks that replace their original (`sai_add`, `logic_can_add`,
+`logic_full`, `node_room`, and the refusal paths of `objective` and
+`logic_slot`) finish with the original's `ret` (`g_esp += 4`; all six
+originals end in a plain `ret`, CONFIRMED at `0x0031BEFE`, `0x00321E7F`,
+`0x00321EE7`, `0x0031DB67`, `0x0032609D`, `0x0033F721`). The fixture runs every
+hook from a fixed esp with originals that pop their return address and
+checks esp + 4 afterwards. `logic_room` reads its caller's return address
+before calling the original, which pops it.
 
 Include `pc_mapmaker_editor.inc` after `pc_mapmaker_limits.inc` (it uses
 `mapmaker_limits` / `mapmaker_limits_read`).
@@ -39,7 +50,11 @@ Count fields stay where they were.
 | Logic nodes | +0x81A8, 130 x 0xB4 | +0x2FB70, 520 | +0x279C8 |
 | Logic records | +0xDD14, 100 x 0x8C | +0x46910, 400 | +0x38BFC |
 
-(Free objects: stage 3, below.) The chunk writers read 0xC0 per node and 0x90
+| Free objects | +0x3070, 170 x 12 | +0x543D0, 680 | +0x51360 |
+| Clipboard objects | +0x3870, 170 x 12 | +0x563B0, 680 | +0x52B40 |
+| Clipboard counts | +0x3868..+0x386E | +0x5048..+0x504E | +0x17E0 |
+
+The chunk writers read 0xC0 per node and 0x90
 per record (12 / 4 bytes past the element, `0x00301624`, `0x003017C5`); with
 these offsets the last node's over-read reads the first record and the last
 record's reads the free-object array: reads only, inside the object (both
@@ -152,6 +167,46 @@ override may set a displacement the encoding does not have).
   distinct record's action is skipped (logged once). INFERRED: actions that
   reach it are objective/marker actions; more than 45 distinct ones at once
   is the remaining limit.
+
+## Free-standing objects (stage 3)
+
+The objects live in two set structs, {u16 count[type 0..2], u16 total;
+entry[170] of 12 B}: the map at +0x3068 and the clipboard at +0x3868.
+`sub_002F7DE0` (remove), `sub_002F7F30` (copy between sets) and
+`sub_002F9440` take a set pointer and reach entries as set + 8 + 12*i for
+either set (CONFIRMED, register arguments). Moving the entries but not the
+counts therefore needs the same delta for both sets: the brief's offsets
+are kept for both arrays, and the clipboard COUNTS move instead, to
++0x5048 (inside the vacated old ops array) so that +0x5048 + 8 + 0x51360 =
++0x563B0. The map's counts (+0x3068..+0x306E, read by
+`pc_mapmaker_limits.inc` and the items area) stay. Conflict with the brief:
+only those four clipboard count words move.
+
+- 119 rewrites: 95 map-entry references, 5 clipboard-entry references, 19
+  clipboard-count references (including the three clipboard set-base
+  formations `0x002F9842`, `0x002F9E00`, `0x002FB7F7`), the four
+  set-relative entry formations (`0x002F7DEC`, `0x002F7F37`, `0x002F7F83`,
+  `0x002F9462`: +0x51360), and five folded index constants
+  (`lea [i+i*2+0xC1E]` then `[ed+x*4]` at `0x002F80B6`/`0x0030473B`;
+  `add eax,0x40A` then `[ed+(x*3)*4]` at `0x003020E5`/`0x00304B97`;
+  `lea [i+i*2+0xE1C]` at `0x002F98A6` for the clipboard), whose constants
+  move by delta/4 or delta/12. Kept: the map set base and counts, the
+  dword array at +0x4068 (and `[x*4+0x4064]`, its index-1 form).
+- Limits (opt-in): per type 40/30/100 -> 160/120/400 (sum 680 = capacity).
+  `sub_00304330` (place, `mov ebx,0x28` / `0x1E`) and `sub_002F7F30`
+  (copy, `mov edx,0x28/0x1E/0x64`) keep their stock compares; the wrappers
+  show the per-type count as stock-1 for the call and put back the real
+  count plus what the original added (CONFIRMED that both only compare and
+  increment that word, and call nothing that reads it). Cosmetic: at the
+  raised limit the refusal text still names the stock number.
+- Loader: 680 free-object chunks.
+- Note: with `TSFP_MAPMAKER_LIMITS=1` the item total (200, `pc_mapmaker_limits.inc`)
+  counts free objects too (+0x306E), so that total binds first.
+- Play time: heap by count (`desc+0x1C`, 0x6C each); no fixed table.
+
+## Spawning (story AI past 50)
+
+See the final report; INFERRED from `sub_00164010`.
 
 ## Validation
 
