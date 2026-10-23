@@ -47,8 +47,8 @@
 #define MAPMAKER_POINTER_BLOCK 0x007BA260u
 #define MAPMAKER_POINTER_STRIDE 0x1E0u
 #define MAPMAKER_EDITOR 0x007844A8u
-#define MAPMAKER_EDGE 8.f            /* UI pixels from the canvas edge */
-#define MAPMAKER_EDGE_SPEED 0.15f    /* cells per frame at the very edge */
+#define MAPMAKER_EDGE 24.f           /* UI pixels from the canvas edge (of 640x480) */
+#define MAPMAKER_EDGE_SPEED 0.25f    /* cells per frame at the very edge */
 #define MAPMAKER_GRID 40.f
 #define MAPMAKER_SCROLL_DELAY 300u   /* ms before an arrow repeats */
 #define MAPMAKER_SCROLL_REPEAT 80u   /* ms between repeats */
@@ -254,7 +254,10 @@ static void mapmaker_pointer_switch_step(uint32_t menu,int root)
         mapmaker_pointer.switching=0;
         return;
     }
-    (void)menu;
+    /* Back only to a menu that is fully open and in front: a closing menu
+     * (state 4/5) or one under an open child would pass it to the editor
+     * screen, where Back opens the 3D view. */
+    if(!guest_writable(menu,0x23c) || WORD_AT(menu+0x1b0)!=3 || WORD_AT(menu+0x170)) return;
     if(mapmaker_pointer.switch_backs>=MAPMAKER_SWITCH_BACKS) { mapmaker_pointer.switching=0;return; }
     pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_BACK);
     mapmaker_pointer.switch_backs++;

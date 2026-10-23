@@ -47,6 +47,7 @@ MUTATIONS = {
     'switch-anywhere': (ADAPTER, ' ||\n       x<MAPMAKER_TOOLBAR_X0 || x>=MAPMAKER_TOOLBAR_X1 || y<MAPMAKER_TOOLBAR_Y0 || y>=MAPMAKER_TOOLBAR_Y1) return;', ') return;'),
     'switch-no-gap': (ADAPTER, '    mapmaker_pointer.switch_next=now+MAPMAKER_SWITCH_GAP;', ''),
     'switch-unbounded': (ADAPTER, 'if(mapmaker_pointer.switch_backs>=MAPMAKER_SWITCH_BACKS) { mapmaker_pointer.switching=0;return; }', ''),
+    'switch-back-to-closing': (ADAPTER, '    if(!guest_writable(menu,0x23c) || WORD_AT(menu+0x1b0)!=3 || WORD_AT(menu+0x170)) return;\n', ''),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 

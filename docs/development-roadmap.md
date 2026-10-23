@@ -243,6 +243,11 @@ Tracked separately; do not merge their diagnosis.
   zooms on the editor screen. Toolbar clicks while a menu is open close the
   menu (Back) and then press A. Wheel zoom direction and the toolbar strip
   bounds (x 370-620, y 35-70, from recorded clicks) need in-game checks.
+- **Eighth run (2026-10-23):** wheel zoom and wheel scrolling work. A toolbar
+  click with a list open opened the 3D view: a second Back reached the editor
+  screen while the list was still closing. Back now goes only to a menu that
+  is fully open (state 3) with no open child. Edge panning needed the mouse
+  at the very edge: the zone is now 24 UI pixels with up to 0.25 cells/frame.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

@@ -247,7 +247,7 @@ int main(void)
     CHECK(!mapmaker_pointer_wheel(SM,1));                  /* other scenes: generic wheel */
     WORD_AT(0x0079094Cu)=102;
     /* Toolbar click while a list is open: Back (up to 3, 250 ms apart), then A. */
-    pulses_a=pulses_back=0;
+    pulses_a=pulses_back=0;WORD_AT(SM+0x1b0)=3;
     CHECK(!mapmaker_pointer_scroll_press(SM,450.f,50.f));
     mapmaker_pointer_switch_press(SM,450.f,50.f);
     CHECK(mapmaker_pointer.switching);
@@ -255,7 +255,11 @@ int main(void)
     CHECK(pulses_back==1 && pulses_a==0);
     tick+=100;mapmaker_pointer_switch_step(SM,0);           /* waits between presses */
     CHECK(pulses_back==1);
-    tick+=200;mapmaker_pointer_switch_step(SM,0);           /* a nested menu: one more Back */
+    tick+=200;WORD_AT(SM+0x1b0)=4;mapmaker_pointer_switch_step(SM,0); /* closing: no Back */
+    CHECK(pulses_back==1);
+    WORD_AT(SM+0x1b0)=3;WORD_AT(SM+0x170)=0x006FF060u;mapmaker_pointer_switch_step(SM,0); /* has a child */
+    CHECK(pulses_back==1);
+    WORD_AT(SM+0x170)=0;mapmaker_pointer_switch_step(SM,0); /* a nested menu, open: one more Back */
     CHECK(pulses_back==2);
     tick+=100;mapmaker_pointer_switch_step(MENU,1);         /* editor screen, too soon */
     CHECK(pulses_a==0);
@@ -316,7 +320,13 @@ int main(void)
     CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f) && WORD_AT(MENU+0xc4)==0); /* released: no pan, no rotate */
     /* Mouse at the left edge pans left; in a menu it never pans. */
     move(2.f,200.f);game_frame();
-    CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f-.75f*.15f));
+    CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f-(MAPMAKER_EDGE-2.f)/MAPMAKER_EDGE*MAPMAKER_EDGE_SPEED));
+    FLOAT_AT(0x00783DD8u)=9.f;
+    move(MAPMAKER_EDGE+1.f,200.f);game_frame();             /* just inside the zone edge: no pan */
+    CHECK(FLOAT_AT(0x00783DD8u)==9.f);
+    move(630.f,200.f);game_frame();                         /* right edge pans right */
+    CHECK(FLOAT_AT(0x00783DD8u)>9.f);
+    FLOAT_AT(0x00783DD8u)=9.f;move(2.f,200.f);
     WORD_AT(MENU+0x178)=0x00301000u;FLOAT_AT(0x00783DD8u)=9.f;
     game_frame();
     CHECK(FLOAT_AT(0x00783DD8u)==9.f);
