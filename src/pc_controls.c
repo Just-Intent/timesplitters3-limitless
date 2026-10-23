@@ -508,6 +508,13 @@ void pc_controls_mapmaker_pointer(int active)
     ReleaseSRWLockExclusive(&lock);
 }
 
+void pc_controls_mapmaker_row_press(void)
+{
+    AcquireSRWLockExclusive(&lock);
+    pc_mapmaker_row_press(&mapmaker_click);
+    ReleaseSRWLockExclusive(&lock);
+}
+
 int pc_controls_terminal_click(void)
 {
     int down, mapmaker;

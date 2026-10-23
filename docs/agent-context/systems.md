@@ -162,5 +162,9 @@ mouse with the arithmetic of `sub_00071140`/`sub_00071050` (offsets
 It reports ownership through `pc_controls_mapmaker_pointer`; the host then
 reports a held left button as held A via `pc_controls_terminal_click`
 (`pc_mapmaker_click` in `pc_mapmaker_pointer.h` blocks a button already held
-when ownership changes). No guest regeneration. Fixture:
+when ownership changes). Editor menus (pause menu, category lists) are normal
+rows that the shared hook hit-tests and highlights, but the editor acts on A
+itself, so in scene 102 a row click calls `mapmaker_pointer_row_click()`, which
+holds A for that press (`pc_controls_mapmaker_row_press`) instead of the
+menu-engine confirm. No guest regeneration. Fixture:
 `tests/test_mapmaker_pointer.py`. Mac: MAC-062.

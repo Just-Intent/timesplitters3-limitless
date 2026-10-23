@@ -192,6 +192,14 @@ Tracked separately; do not merge their diagnosis.
   the game pointer at the mouse on the editor screen and holds A while the left
   button is held. Fixture passes on Windows/MSVC; in-game run pending. See
   `docs/agent-context/systems.md` (MapMaker editor pointer).
+- **First in-game run (2026-10-23):** toolbar icons and arrows respond to
+  clicks; clicking the grid at the top level opens the highlighted category
+  (A). Pause-menu and category-list rows were hit and highlighted but did not
+  activate: the editor reads A itself and ignores the menu-engine confirm (row
+  callbacks there are highlight callbacks, e.g. `0x00316500`). Row clicks in
+  scene 102 now hold A for that press instead; rerun pending. Floor buttons
+  are not hover-tested (no `sub_000711F0` caller found for them); they likely
+  need a click-to-button mapping once the floor input and state are known.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

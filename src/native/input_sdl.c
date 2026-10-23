@@ -301,6 +301,11 @@ void pc_controls_mapmaker_pointer(int active) {
     mapmaker_pointer_active=!!active;
     pthread_mutex_unlock(&camera_lock);
 }
+void pc_controls_mapmaker_row_press(void) {
+    pthread_mutex_lock(&camera_lock);
+    pc_mapmaker_row_press(&mapmaker_click);
+    pthread_mutex_unlock(&camera_lock);
+}
 int pc_controls_terminal_click(void) {
     pthread_mutex_lock(&camera_lock);
     int menu=atomic_load(&menu_active);

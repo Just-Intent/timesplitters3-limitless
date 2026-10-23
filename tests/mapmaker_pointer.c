@@ -20,6 +20,8 @@ static PcMenuPointer cursor;
 static int owner_calls, owner_last=-1;
 static PcMenuPointer pc_controls_menu_hover_pointer(void) { return cursor; }
 static void pc_controls_mapmaker_pointer(int active) { owner_calls++; owner_last=active; }
+static int row_presses;
+static void pc_controls_mapmaker_row_press(void) { row_presses++; }
 static void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh) { *sw=w;*sh=h; }
 #include "pc_mapmaker_pointer.inc"
 
@@ -136,6 +138,15 @@ int main(void)
     CHECK(checksum()==before);
     WORD_AT(0x007BA9E0u)=PLAYER;
 
+    /* Editor menu rows: a real A press instead of the menu confirm, scene 102 only. */
+    set_enabled(NULL);
+    CHECK(!mapmaker_pointer_row_click() && row_presses==0);
+    set_enabled("1");
+    WORD_AT(0x0079094Cu)=101;
+    CHECK(!mapmaker_pointer_row_click() && row_presses==0);
+    WORD_AT(0x0079094Cu)=102;
+    CHECK(mapmaker_pointer_row_click() && row_presses==1);
+
     /* Host click policy: held left = held A only while the editor owns it. */
     memset(&click,0,sizeof click);
     CHECK(!pc_mapmaker_click(&click,0,1));      /* outside the editor */
@@ -147,6 +158,22 @@ int main(void)
     CHECK(!pc_mapmaker_click(&click,1,1));      /* list closed, still held: blocked */
     CHECK(!pc_mapmaker_click(&click,1,0));
     CHECK(pc_mapmaker_click(&click,1,1));
+    /* Row press in a list: A held for that press only. */
+    memset(&click,0,sizeof click);
+    CHECK(!pc_mapmaker_click(&click,0,1));      /* press lands on a row ... */
+    pc_mapmaker_row_press(&click);
+    CHECK(pc_mapmaker_click(&click,0,1));       /* ... and holds A */
+    CHECK(pc_mapmaker_click(&click,0,1));
+    CHECK(!pc_mapmaker_click(&click,0,0));      /* release ends it */
+    CHECK(!pc_mapmaker_click(&click,0,1));      /* next press elsewhere: no A */
+    CHECK(!pc_mapmaker_click(&click,0,0));
+    pc_mapmaker_row_press(&click);
+    CHECK(!pc_mapmaker_click(&click,0,0));      /* press already released: nothing */
+    CHECK(!pc_mapmaker_click(&click,0,1));
+    pc_mapmaker_row_press(&click);
+    CHECK(pc_mapmaker_click(&click,0,1));
+    CHECK(!pc_mapmaker_click(&click,1,1));      /* list closed under the held click */
+    CHECK(!pc_mapmaker_click(&click,1,1));
 
     if(failures)return 1;
     puts("mapmaker pointer ok");

@@ -515,12 +515,15 @@ void pc_display_menu_mouse(void (*original)(void))
                 menu_mouse.wheel_pending=0;
                 restore_registers(&r);return;
             }
+            /* MapMaker editor menus act on A, not on this confirm (prototype). */
+            if(!mapmaker_pointer_row_click()) {
             if(menu_mouse_dispatch && menu_mouse_dispatch->menu==menu &&
                !menu_mouse_dispatch->injected) {
                 menu_mouse_press(menu_mouse_dispatch,0x80u);
             }
             WORD_AT(menu+0xc4)|=0x100010u; /* confirm press + repeat edge */
             WORD_AT(menu+0xc8)|=0x10u;
+            }
         }
     }
     if(actions&4) {

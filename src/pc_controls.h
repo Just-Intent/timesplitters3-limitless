@@ -16,6 +16,8 @@ int pc_controls_key_down(int key);
 int pc_controls_terminal_click(void);
 /* MapMaker editor screen owns the game pointer: left button acts as A. */
 void pc_controls_mapmaker_pointer(int active);
+/* A click hit a MapMaker editor menu row: hold A for this press. */
+void pc_controls_mapmaker_row_press(void);
 void pc_controls_menu_mode(int active);
 PcMenuPointer pc_controls_menu_pointer(void);
 PcMenuPointer pc_controls_menu_hover_pointer(void);

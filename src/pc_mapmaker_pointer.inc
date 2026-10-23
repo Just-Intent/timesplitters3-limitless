@@ -14,11 +14,13 @@
  * +0x18/+0x1C, position at +0x20/+0x24, clamped to +0x48..+0x54 with bit 2 of
  * +0x00 set when clamped. A still mouse leaves controller movement alone.
  * The left button becomes the A button on the host side
- * (pc_controls_mapmaker_pointer, pc_mapmaker_pointer.h).
+ * (pc_controls_mapmaker_pointer, pc_mapmaker_pointer.h). A click on an editor
+ * menu row becomes a real A press too (mapmaker_pointer_row_click).
  *
  * Requires the includer's WORD_AT, FLOAT_AT, guest_writable,
  * d3d8_display_output_shape, pc_menu_mouse_position,
- * pc_controls_menu_hover_pointer and pc_controls_mapmaker_pointer. */
+ * pc_controls_menu_hover_pointer, pc_controls_mapmaker_pointer and
+ * pc_controls_mapmaker_row_press. */
 #include <math.h>
 #include <stdlib.h>
 
@@ -85,6 +87,18 @@ static int mapmaker_pointer_place(float x,float y)
     if(py>FLOAT_AT(b+0x54)) {
         WORD_AT(b)|=2u;py=FLOAT_AT(b+0x54);FLOAT_AT(b+0x24)=py;FLOAT_AT(b+0x1c)=(py-cy)*iy;
     }
+    return 1;
+}
+
+/* Editor menus (pause menu, category lists) are normal menu rows that the PC
+ * layer already hit-tests and highlights, but the editor acts on the A button
+ * itself, not on the menu engine's confirm. Called for a fresh left click that
+ * hit a row: returns 1 when it requested a real A press instead. */
+static int mapmaker_pointer_row_click(void)
+{
+    if(!mapmaker_pointer_enabled() || !guest_writable(0x0079094Cu,4) ||
+       (int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;
+    pc_controls_mapmaker_row_press();
     return 1;
 }
 

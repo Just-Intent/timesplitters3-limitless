@@ -19,6 +19,9 @@ MUTATIONS = {
     'no-max-clamp': (ADAPTER, 'if(px>FLOAT_AT(b+0x50)) {', 'if(0) {'),
     'wrong-player': (ADAPTER, 'b=MAPMAKER_POINTER_BLOCK+player*MAPMAKER_POINTER_STRIDE;', 'b=MAPMAKER_POINTER_BLOCK;'),
     'held-click-leaks': (POLICY, 'if (active != s->active) s->blocked = left_down;', ''),
+    'row-carries-to-editor': (POLICY, '(s->row && !active && left_down)', '(s->row && left_down)'),
+    'row-latch-sticks': (POLICY, 'if (!left_down) s->blocked = s->row = 0;', 'if (!left_down) s->blocked = 0;'),
+    'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 
 
@@ -60,8 +63,13 @@ def test_pointer_wiring():
     # After the original stick update, before any early return of the menu hook.
     hook = guest.split('void pc_display_menu_mouse_input(void (*original)(void))', 1)[1]
     assert hook.index('original();') < hook.index('mapmaker_pointer_input(menu);') < hook.index('return;')
+    # Editor rows get a real A press instead of the menu-engine confirm.
+    confirm = guest.split('void pc_display_menu_mouse(void (*original)(void))', 1)[1]
+    gate = confirm.index('if(!mapmaker_pointer_row_click()) {')
+    assert gate < confirm.index('menu_mouse_press(menu_mouse_dispatch,0x80u);') < confirm.index('WORD_AT(menu+0xc4)|=0x100010u;')
     for host in ('src/pc_controls.c', 'src/native/input_sdl.c'):
         text = (ROOT / host).read_text(encoding='utf-8')
         assert 'void pc_controls_mapmaker_pointer(int active)' in text
+        assert 'pc_mapmaker_row_press(&mapmaker_click);' in text
         click = text.split('int pc_controls_terminal_click(void)', 1)[1].split('return down;', 1)[0]
         assert 'pc_mapmaker_click(&mapmaker_click,' in click
