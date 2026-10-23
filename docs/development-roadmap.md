@@ -213,6 +213,15 @@ Tracked separately; do not merge their diagnosis.
   code is needed. Logic-menu rows still fail; the probe click record now also
   logs the menu descriptor, the game pointer and the engine selection to find
   out why. Mouse-wheel zoom (held-button bits 0x8000/0x4000) is not done.
+- **Fourth run (2026-10-23):** logic rows still failed. The new click fields
+  showed the active menu was the logic list's description panel (descriptor
+  `0x0052E9D8`, one type-8 item), a mode-2 child of the list (`0x0052E9F8`);
+  the clicks were on the parent's rows. Fixed through the parent (prototype).
+  Right-click rotate was lost by the pan change and is restored for clicks
+  without a drag. T raises the floor (the right trigger's key is the left
+  mouse button); A/D/W/S no longer act as the D-pad in the editor. Story AI
+  list scrolling fails; the click record now also logs the menu's scrollbar
+  fields. Zoom: the editor's Controls readout should name the zoom buttons.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

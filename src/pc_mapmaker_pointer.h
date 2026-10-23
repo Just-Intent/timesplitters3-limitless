@@ -36,4 +36,14 @@ static inline int pc_mapmaker_key(int editor, int key, int back_key, int down, i
     if (key == back_key) return down || escape_down;
     return down;
 }
+
+/* In the editor the right trigger raises the floor, but its usual key is the
+ * left mouse button, which the editor uses as A. T acts as that trigger's
+ * first key there instead (the left trigger, G by default, lowers it). */
+#define PC_MAPMAKER_FLOOR_UP_KEY 'T'
+static inline int pc_mapmaker_trigger_key(int editor, int key, int trigger_key, int down, int t_down)
+{
+    if (!editor || !trigger_key || key != trigger_key) return down;
+    return down || t_down;
+}
 #endif

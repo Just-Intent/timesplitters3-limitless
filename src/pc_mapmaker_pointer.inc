@@ -54,7 +54,9 @@ static struct {
     float last_x, last_y, last_ux, last_uy;
     uint32_t grab_menu;  /* menu whose scrollbar thumb the left press grabbed */
     float grab;          /* pointer y minus thumb top at the press */
+    float right_travel;  /* UI pixels moved while the right button is held */
 } mapmaker_pointer;
+#define MAPMAKER_RIGHT_CLICK 4.f /* less travel than this is a click, not a drag */
 
 static int mapmaker_pointer_enabled(void)
 {
@@ -194,12 +196,23 @@ static int mapmaker_pointer_pan(float dx,float dy)
     return 1;
 }
 
-/* Editor screen: right-drag grabs the map; the window edge pans. */
-static void mapmaker_pointer_navigate(float x,float y,float gw,float gh,int right)
+/* Editor screen: right-drag grabs the map; the window edge pans. A right
+ * click without a drag keeps its original meaning (the menu Back action, which
+ * the editor uses to rotate the held piece), sent on release. */
+static void mapmaker_pointer_navigate(uint32_t menu,float x,float y,float gw,float gh,int right)
 {
     float sx,sy,ex=0,ey=0;
+    if(right && !mapmaker_pointer.last_right) mapmaker_pointer.right_travel=0;
+    if(!right && mapmaker_pointer.last_right && mapmaker_pointer.have_last) {
+        if(mapmaker_pointer.right_travel<MAPMAKER_RIGHT_CLICK && guest_writable(menu,0x23c))
+            WORD_AT(menu+0xc4)|=0x20u; /* as the shared hook's right click */
+        mapmaker_pointer.right_travel=MAPMAKER_RIGHT_CLICK;
+    }
     if(right) {
+        if(mapmaker_pointer.have_last && mapmaker_pointer.last_right)
+            mapmaker_pointer.right_travel+=fabsf(x-mapmaker_pointer.last_ux)+fabsf(y-mapmaker_pointer.last_uy);
         if(mapmaker_pointer.have_last && mapmaker_pointer.last_right &&
+           mapmaker_pointer.right_travel>=MAPMAKER_RIGHT_CLICK &&
            guest_writable(0x00783DD4u,4) && guest_writable(0x00783F20u,4)) {
             sx=FLOAT_AT(0x00783DD4u);sy=FLOAT_AT(0x00783F20u); /* cells per pixel */
             if((x!=mapmaker_pointer.last_ux || y!=mapmaker_pointer.last_uy) && isfinite(sx) && isfinite(sy))
@@ -212,6 +225,31 @@ static void mapmaker_pointer_navigate(float x,float y,float gw,float gh,int righ
     if(y<MAPMAKER_EDGE) ey=-(MAPMAKER_EDGE-y)/MAPMAKER_EDGE;
     else if(y>gh-MAPMAKER_EDGE) ey=(y-(gh-MAPMAKER_EDGE))/MAPMAKER_EDGE;
     if(ex || ey) mapmaker_pointer_pan(fminf(1.f,ex)*MAPMAKER_EDGE_SPEED,fminf(1.f,ey)*MAPMAKER_EDGE_SPEED);
+}
+
+/* The logic list keeps a passive description panel open as its child, so
+ * the engine (sub_00074760) treats the panel as the active menu and the PC
+ * hook only hit-tests the panel. A left press that hit nothing there tries the
+ * parent's rows: highlight the row (sub_00076EF0) and press A for it. */
+static uint32_t mapmaker_pointer_parent_press(uint32_t menu,float x,float y)
+{
+    uint32_t parent,item;
+    unsigned n;
+    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return 0;
+    parent=WORD_AT(menu+0x2c);
+    if(!guest_writable(parent,0x23c) || WORD_AT(parent+0x170)!=menu) return 0;
+    item=WORD_AT(parent+0x178);
+    for(n=0;item && n<256 && guest_writable(item,0x10c);n++,item=WORD_AT(item+4)) {
+        uint32_t type=WORD_AT(item),flags=WORD_AT(item+0x28);
+        if((type==4 || type==7 || type==8) && !(flags&5) &&
+           x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&
+           y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {
+            if(WORD_AT(parent+0x198)!=item) guest_call(sub_00076EF0,2,parent,item);
+            pc_controls_mapmaker_row_press();
+            return item;
+        }
+    }
+    return 0;
 }
 
 /* Editor menus (pause menu, category lists) are normal menu rows that the PC
@@ -252,7 +290,7 @@ static void mapmaker_pointer_input(uint32_t menu)
     pressed=(p.left && !mapmaker_pointer.last_left) || (p.right && !mapmaker_pointer.last_right);
     if(moved || pressed) mapmaker_pointer_place(x,y);
     mapmaker_pointer_scroll_drag(menu,y,p.left);
-    if(root) mapmaker_pointer_navigate(x,y,gw,gh,p.right);
+    if(root) mapmaker_pointer_navigate(menu,x,y,gw,gh,p.right);
     mapmaker_pointer.have_last=1;
     mapmaker_pointer.last_x=p.x;mapmaker_pointer.last_y=p.y;
     mapmaker_pointer.last_ux=x;mapmaker_pointer.last_uy=y;

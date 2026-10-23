@@ -173,5 +173,12 @@ thumb drag (`menu+0x194 == -2`) `player+0x34` is set so the thumb follows the
 mouse; on the editor screen right-drag and the window edge pan the view the
 way `sub_00309160` + `sub_002F9F70` do (skipped when `editor+0x25C &
 0x0C044088`), and the right button no longer sends the menu Back action
-there. No guest regeneration. Fixture:
+there (a right click without a drag sends it on release, which the editor
+uses to rotate). The logic list keeps a passive description panel open as
+its child (`sub_00078E50(..., 0x0052E9D8, 2)` in `sub_003278D0`), so a click
+that misses that active panel tries the parent's rows
+(`mapmaker_pointer_parent_press`: highlight with `sub_00076EF0`, then A). In
+the editor T acts as the first "Fire" key (right trigger, floor up;
+`pc_mapmaker_trigger_key`) because that key is usually the left mouse button,
+and WASD is no longer aliased to the D-pad. No guest regeneration. Fixture:
 `tests/test_mapmaker_pointer.py`. Mac: MAC-062.

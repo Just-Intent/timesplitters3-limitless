@@ -30,7 +30,7 @@ static int wheel_remainder;
 static unsigned long applied;
 static volatile LONG editing;
 static int menu_mode, menu_button_block;
-static int mapmaker_pointer_active, mapmaker_editor, mapmaker_back_key;
+static int mapmaker_pointer_active, mapmaker_editor, mapmaker_back_key, mapmaker_trigger_key;
 static PcMapMakerClick mapmaker_click;
 static PcTextInput text_input;
 
@@ -443,7 +443,8 @@ int pc_controls_key_down(int key)
     replay_tick();
     down = pc_input_down(&input, (unsigned)key, GetTickCount64());
     /* Custom menus may read D-pad edges instead of the WASD analogue stick. */
-    if(menu_mode) {
+    /* Not in the MapMaker editor: there WASD moves the game pointer only. */
+    if(menu_mode && !mapmaker_editor) {
         unsigned alias=key==VK_LEFT?'A':key==VK_RIGHT?'D':
                        key==VK_UP?'W':key==VK_DOWN?'S':0;
         if(alias) down|=pc_input_down(&input,alias,GetTickCount64());
@@ -457,6 +458,9 @@ int pc_controls_key_down(int key)
     if((key==VK_LBUTTON && (menu_mode || (menu_button_block&1))) ||
        (key==VK_RBUTTON && (menu_mode || (menu_button_block&2)))) down=0;
     if (key == VK_LBUTTON && pc_input_terminal_suppresses_left(&input, input.keys[VK_LBUTTON])) down = 0;
+    down=pc_mapmaker_trigger_key(menu_mode && mapmaker_editor,key,mapmaker_trigger_key,down,
+                                 pc_input_down(&input,PC_MAPMAKER_FLOOR_UP_KEY,GetTickCount64()) &&
+                                 (replaying || GetForegroundWindow()==window_handle));
     ReleaseSRWLockExclusive(&lock);
     return down;
 }
@@ -514,11 +518,15 @@ void pc_controls_mapmaker_pointer(int active)
  * so reading the Back binding here cannot re-enter the bindings lock. */
 void pc_controls_mapmaker_editor(int active)
 {
-    int keys[PC_ACTION_COUNT], back = 0;
-    if (active && pc_settings_prompt_keys(keys)) back = keys[7]; /* "Objectives / Back" */
+    int keys[PC_ACTION_COUNT], back = 0, trigger = 0;
+    if (active && pc_settings_prompt_keys(keys)) {
+        back = keys[7];    /* "Objectives / Back" */
+        trigger = keys[9]; /* "Fire": right trigger, floor up in the editor */
+    }
     AcquireSRWLockExclusive(&lock);
     mapmaker_editor = !!active;
     mapmaker_back_key = back;
+    mapmaker_trigger_key = trigger;
     ReleaseSRWLockExclusive(&lock);
 }
 

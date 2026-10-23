@@ -3,6 +3,7 @@
  * sub_00071140/sub_00071050 do, leaves a still mouse to the controller, and
  * never carries a held button into or out of the editor as A. */
 #include <math.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,6 +26,18 @@ static void pc_controls_mapmaker_row_press(void) { row_presses++; }
 static int editor_last=-1;
 static void pc_controls_mapmaker_editor(int active) { editor_last=active; }
 static void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh) { *sw=w;*sh=h; }
+/* sub_00076EF0(menu,item) highlights a row; record the call instead. */
+static void sub_00076EF0(void) {}
+static uint32_t highlight_menu, highlight_item;
+static uint32_t guest_call(void (*f)(void),int n,...)
+{
+    va_list a;
+    va_start(a,n);
+    if(f==sub_00076EF0 && n==2) { highlight_menu=va_arg(a,uint32_t);highlight_item=va_arg(a,uint32_t);
+        WORD_AT(highlight_menu+0x198)=highlight_item; }
+    va_end(a);
+    return 0;
+}
 #include "pc_mapmaker_pointer.inc"
 
 static int failures;
@@ -202,12 +215,21 @@ int main(void)
     WORD_AT(ED+0x25c)=0x00004000u;                           /* a state the editor does not pan in */
     CHECK(!mapmaker_pointer_pan(1.f,1.f) && FLOAT_AT(0x00783DD8u)==10.f);
     WORD_AT(ED+0x25c)=0;
-    /* Right-drag on the editor screen grabs the map. */
+    /* Right click without a drag: the menu Back action (rotate), on release. */
+    WORD_AT(MENU+0xc4)=0;
+    move(300.f,200.f);game_frame();
+    cursor.right=1;game_frame();
+    CHECK(WORD_AT(MENU+0xc4)==0);                            /* not on press */
+    move(301.f,201.f);game_frame();                          /* within the click slop */
+    cursor.right=0;game_frame();
+    CHECK(WORD_AT(MENU+0xc4)==0x20u && NEAR(FLOAT_AT(0x00783DD8u),10.f));
+    WORD_AT(MENU+0xc4)=0;
+    /* Right-drag on the editor screen grabs the map, and does not rotate. */
     move(300.f,200.f);cursor.right=1;game_frame();
     move(320.f,190.f);game_frame();                          /* +20 px right, -10 px up */
     CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f) && NEAR(FLOAT_AT(0x00783CC0u),10.5f));
     cursor.right=0;game_frame();
-    CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f));                  /* released, mid-screen: no pan */
+    CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f) && WORD_AT(MENU+0xc4)==0); /* released: no pan, no rotate */
     /* Mouse at the left edge pans left; in a menu it never pans. */
     move(2.f,200.f);game_frame();
     CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f-.75f*.15f));
@@ -216,6 +238,29 @@ int main(void)
     CHECK(FLOAT_AT(0x00783DD8u)==9.f);
     WORD_AT(MENU+0x178)=0;
     move(320.f,240.f);game_frame();
+
+    /* Logic list: the active menu is its passive description panel; a click
+     * that missed the panel uses the parent's rows. */
+#define PARENT 0x00330000u
+#define PANEL 0x00331000u
+#define ROW 0x00332000u
+    WORD_AT(PANEL+0x2c)=PARENT;WORD_AT(PARENT+0x170)=PANEL;WORD_AT(PARENT+0x178)=ROW;
+    WORD_AT(ROW)=7;WORD_AT(ROW+4)=0;WORD_AT(ROW+0x28)=0x040E0600u;
+    FLOAT_AT(ROW+0x78)=25.6f;FLOAT_AT(ROW+0x7c)=107.2f;FLOAT_AT(ROW+0x80)=176.f;FLOAT_AT(ROW+0x84)=130.f;
+    row_presses=0;
+    CHECK(mapmaker_pointer_parent_press(PANEL,100.f,120.f)==ROW && row_presses==1 &&
+          highlight_menu==PARENT && highlight_item==ROW);
+    CHECK(!mapmaker_pointer_parent_press(PANEL,100.f,150.f) && row_presses==1);   /* between rows */
+    WORD_AT(ROW+0x28)|=1u;                                                          /* disabled row */
+    CHECK(!mapmaker_pointer_parent_press(PANEL,100.f,120.f) && row_presses==1);
+    WORD_AT(ROW+0x28)&=~1u;
+    WORD_AT(PARENT+0x170)=0;                                                        /* not its child */
+    CHECK(!mapmaker_pointer_parent_press(PANEL,100.f,120.f) && row_presses==1);
+    WORD_AT(PARENT+0x170)=PANEL;
+    WORD_AT(0x0079094Cu)=101;
+    CHECK(!mapmaker_pointer_parent_press(PANEL,100.f,120.f) && row_presses==1);
+    WORD_AT(0x0079094Cu)=102;
+    row_presses=0;
 
     /* Editor menu rows: a real A press instead of the menu confirm, scene 102 only. */
     set_enabled(NULL);
@@ -235,6 +280,12 @@ int main(void)
     CHECK(pc_mapmaker_key(1,'W',0x09,1,1)==1);   /* other keys untouched */
     CHECK(pc_mapmaker_key(1,0x1B,0,1,1)==1);     /* no Back key: leave Escape alone */
     CHECK(pc_mapmaker_key(1,0x1B,0x1B,1,1)==1);  /* Escape is Back already */
+    /* T raises the floor (right trigger) in the editor only. */
+    CHECK(pc_mapmaker_trigger_key(1,0x01,0x01,0,1)==1);   /* fire key (left mouse) reports T */
+    CHECK(pc_mapmaker_trigger_key(1,0x01,0x01,0,0)==0);
+    CHECK(pc_mapmaker_trigger_key(0,0x01,0x01,0,1)==0);   /* outside the editor: Fire as bound */
+    CHECK(pc_mapmaker_trigger_key(1,'G',0x01,1,1)==1);    /* other keys untouched */
+    CHECK(pc_mapmaker_trigger_key(1,'G',0x01,0,1)==0);
 
     /* Host click policy: held left = held A only while the editor owns it. */
     memset(&click,0,sizeof click);

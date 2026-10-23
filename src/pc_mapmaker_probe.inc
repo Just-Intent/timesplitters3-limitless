@@ -291,10 +291,16 @@ static void mapmaker_probe_click(uint32_t menu,float x,float y,uint32_t hit,unsi
     /* After hit testing: which menu, where the game's own pointer is, and the
      * engine's selection, to tell PC hit failures from game-side ones. */
     mapmaker_probe_write("[mapmaker-probe] t=%llu click menu=0x%08X pointer=%.1f,%.1f hit=0x%08X type=%u"
-        " descriptor=0x%08X game=%.1f,%.1f mode(+10)=%u selected=%d highlighted=0x%08X\n",
+        " descriptor=0x%08X game=%.1f,%.1f mode(+10)=%u selected=%d highlighted=0x%08X"
+        " parent(+2C)=0x%08X style=0x%08X/%08X scroll(+5C,+6C,+70,+84,+194)=%.1f,%.1f,%.1f,%.1f,%d\n",
         GetTickCount64(),menu,(double)x,(double)y,hit,hit && guest_writable(hit,4)?WORD_AT(hit):0u,
         known?WORD_AT(menu+4):0u,known?(double)FLOAT_AT(block+0x20):0.,known?(double)FLOAT_AT(block+0x24):0.,
-        known?WORD_AT(block+0x10):0u,known?(int)WORD_AT(menu+0x18c):-1,known?WORD_AT(menu+0x198):0u);
+        known?WORD_AT(block+0x10):0u,known?(int)WORD_AT(menu+0x18c):-1,known?WORD_AT(menu+0x198):0u,
+        known?WORD_AT(menu+0x2c):0u,known?WORD_AT(menu+0x1c):0u,
+        known && guest_writable(WORD_AT(menu+0x1c),4)?WORD_AT(WORD_AT(menu+0x1c)):0u,
+        known?(double)FLOAT_AT(menu+0x5c):0.,known?(double)FLOAT_AT(menu+0x6c):0.,
+        known?(double)FLOAT_AT(menu+0x70):0.,known?(double)FLOAT_AT(menu+0x84):0.,
+        known?(int)WORD_AT(menu+0x194):0);
 }
 
 #ifdef TSFP_MAPMAKER_PROBE_TEST

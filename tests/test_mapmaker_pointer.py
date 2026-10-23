@@ -29,6 +29,11 @@ MUTATIONS = {
     'pan-in-menus': (ADAPTER, 'if(root) mapmaker_pointer_navigate(', 'if(1) mapmaker_pointer_navigate('),
     'drag-wrong-speed': (ADAPTER, 'FLOAT_AT(b+0x34)=(target-FLOAT_AT(menu+0x84))/3.f;', 'FLOAT_AT(b+0x34)=target-FLOAT_AT(menu+0x84);'),
     'scroll-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) ||\n       !mapmaker_scroll_geometry', 'if(!mapmaker_pointer_enabled() ||\n       !mapmaker_scroll_geometry'),
+    'rotate-lost': (ADAPTER, '            WORD_AT(menu+0xc4)|=0x20u; /* as the shared hook', '            (void)0; /* as the shared hook'),
+    'drag-rotates': (ADAPTER, 'if(mapmaker_pointer.right_travel<MAPMAKER_RIGHT_CLICK && guest_writable(menu,0x23c))', 'if(guest_writable(menu,0x23c))'),
+    'parent-any-menu': (ADAPTER, ' || WORD_AT(parent+0x170)!=menu) return 0;', ') return 0;'),
+    'parent-disabled-rows': (ADAPTER, "if((type==4 || type==7 || type==8) && !(flags&5) &&\n           x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&\n           y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {\n            if(WORD_AT(parent", "if((type==4 || type==7 || type==8) &&\n           x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&\n           y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {\n            if(WORD_AT(parent"),
+    'trigger-everywhere': (POLICY, 'if (!editor || !trigger_key || key != trigger_key) return down;', 'if (!trigger_key || key != trigger_key) return down;'),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 
@@ -75,7 +80,7 @@ def test_pointer_wiring():
     confirm = guest.split('void pc_display_menu_mouse(void (*original)(void))', 1)[1]
     gate = confirm.index('if(!mapmaker_pointer_row_click()) {')
     assert gate < confirm.index('menu_mouse_press(menu_mouse_dispatch,0x80u);') < confirm.index('WORD_AT(menu+0xc4)|=0x100010u;')
-    assert 'if(!hit && (actions&2)) mapmaker_pointer_scroll_press(menu,x,y);' in confirm
+    assert 'if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y))' in confirm
     assert '(actions&4) && !(mapmaker_pointer_enabled() && mapmaker_pointer_context(menu))' in confirm
     for host in ('src/pc_controls.c', 'src/native/input_sdl.c'):
         text = (ROOT / host).read_text(encoding='utf-8')
@@ -95,3 +100,14 @@ def test_escape_wiring():
     bindings = (ROOT / 'src/pc_bindings.inc').read_text(encoding='utf-8')
     assert '"Pause / Start", "Objectives / Back"' in bindings
     assert 'back = keys[7];' in controls
+
+
+def test_editor_keys_wiring():
+    controls = (ROOT / 'src/pc_controls.c').read_text(encoding='utf-8')
+    key = controls.split('int pc_controls_key_down(int key)', 1)[1].split('return down;', 1)[0]
+    # WASD is not the D-pad in the editor; T applies after the mouse-button blocks.
+    assert 'if(menu_mode && !mapmaker_editor) {' in key
+    assert key.index("(key==VK_RBUTTON && (menu_mode") < key.index('down=pc_mapmaker_trigger_key(')
+    assert 'trigger = keys[9];' in controls  # "Fire" is the runtime's rtrigger
+    bindings = (ROOT / 'src/pc_bindings.inc').read_text(encoding='utf-8')
+    assert '"Objectives / Back",\n    "Throw grenade", "Fire"' in bindings
