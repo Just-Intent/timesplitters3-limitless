@@ -5,7 +5,7 @@
 #include <stdarg.h>
 #include <string.h>
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x);exit(1); } } while(0)
-static uint32_t memory[0x800000/4],g_esp,g_ebx,g_esi,g_ebp,g_edi,g_ecx,g_edx;
+static uint32_t memory[0x800000/4],g_esp,g_ebx,g_esi,g_ebp,g_edi,g_ecx,g_edx,g_eax;
 static intptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(a)+g_xbox_mem_offset))
 typedef struct GuestRegisters { uint32_t sp,c,d,di; } GuestRegisters;

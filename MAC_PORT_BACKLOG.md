@@ -197,6 +197,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-060 | MapMaker capacity meter probe (debug instrumentation) | Awaiting validation |
 | MAC-061 | Compile-only Windows build mode | Not applicable |
 | MAC-062 | MapMaker editor mouse controls (on by default) | Awaiting validation |
+| MAC-063 | MapMaker raised level memory budget (opt-in) | Awaiting validation |
 
 ### MAC-048 - Companion vehicle zero-flag joins (#100)
 
@@ -3187,6 +3188,24 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
 - **Mac acceptance checks:** Native Mac build (controls on by default);
   open the editor, hover and click a toolbar icon and a grid cell; confirm the
   controller still moves the pointer when the mouse is still.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-063 — MapMaker raised level memory budget (opt-in)
+
+- **Status:** Awaiting validation
+- **PC behavior:** With `TSFP_MAPMAKER_MEMORY_SCALE=N` (2..8) the MapMaker
+  editor's level memory estimate is divided by N, so N times as much fits
+  before the meter fills; other limits unchanged. Off by default.
+- **PC source:** Branch `mapmaker-recon`; `patches/*-mapmaker-meter-raise.patch`
+  (wrappers of `sub_002FA060`/`sub_002FA0D0`, enabled for `TSFP_NATIVE_DISPLAY`
+  too), `src/pc_mapmaker_budget.inc`; fixture `tests/mapmaker_budget.c`.
+- **PC validation:** Fixture and mutations pass on Windows/MSVC; in-game
+  validation pending.
+- **Existing Mac support:** Shared guest-side code; nothing Mac-specific.
+- **Mac adaptation needed:** None identified (guest regeneration on first build).
+- **Mac acceptance checks:** Native Mac build; with the variable set to 2,
+  place past the old limit; play the map with probe flag 32 and check the
+  minimum free memory stays positive.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
 ## Shared uncertainties, not confirmed Mac-only omissions

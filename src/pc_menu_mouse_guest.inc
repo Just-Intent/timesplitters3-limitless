@@ -42,6 +42,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 
 #include "pc_mapmaker_probe.inc"
 #include "pc_mapmaker_pointer.inc"
+#include "pc_mapmaker_budget.inc"
 #include "pc_menu_sliders.inc"
 static void menu_team_arrow(unsigned direction);
 #include "pc_menu_choices.inc"
@@ -550,6 +551,7 @@ void pc_display_menu_audio_draw(void (*original)(void),int compact) { (void)comp
 void pc_display_menu_sensitivity_draw(void (*original)(void)) { original(); }
 void pc_display_menu_slider_bar(void (*original)(void)) { original(); }
 void pc_display_mapmaker_meter(void (*original)(void)) { original(); }
+void pc_display_mapmaker_memory(void (*original)(void)) { original(); }
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
 static int menu_mouse_footer_text(void) { return 0; }

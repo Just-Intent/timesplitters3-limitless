@@ -292,6 +292,14 @@ its tiles really use 0.95 MB of the 2.0 MB estimate; the projection at the
 budget, validated in play with flag 32 and through save/reload in the
 original format.
 
+Implemented, opt-in: `TSFP_MAPMAKER_MEMORY_SCALE=N` (2..8; unset = original)
+divides the editor's level memory estimate (wrappers of `sub_002FA060` and
+`sub_002FA0D0`, patch `*-mapmaker-meter-raise.patch`, policy
+`src/pc_mapmaker_budget.inc`), so the budget becomes N x 2,048,000 bytes and
+the meter stays consistent. Other limits and the container check are
+unchanged. Validation pending: build a map past the old limit, play it with
+probe flag 32 (minimum free), save, reload in the original game build.
+
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 
 - Moving the editor cursor with W/A/S/D works, but is slow and awkward.

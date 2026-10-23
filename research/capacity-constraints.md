@@ -137,6 +137,14 @@ these runs (team deathmatch with bots; bot sets not identical):
   raised map must still be checked in play with flag 32 (minimum free must
   stay well above zero; negative means corruption).
 
+**Raised budget (opt-in, 2026-10-23).** `TSFP_MAPMAKER_MEMORY_SCALE=N`
+(2..8) divides both estimate functions' results (rounded up), so placement
+and the meter allow N x 2,048,000 bytes of estimate. With the measured ratio
+N=3 covers 200 pieces of the heaviest tile type (projected free about
+10.7 MB). Maps made this way stay in the original container format while
+under 0x7FE0 bytes; the stock editor will still load them but would refuse
+further placement and show a full (or overfull) meter. Unvalidated in play.
+
 After it, in this tile-only map: the piece count (200) at about 200 tiles,
 then the container at roughly 280 tiles (about 111 bytes per tile). So the
 memory estimate could rise about 1.8x before the save format must change.

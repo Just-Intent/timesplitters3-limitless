@@ -150,6 +150,17 @@ are logged too), and the click after hit testing. No guest regeneration. It must
 `tests/test_mapmaker_probe.py` enforces this with mutations. Usage and the
 experiment protocol: `docs/mapmaker-meter-probe.md`. Mac: MAC-060.
 
+## MapMaker level memory budget (opt-in)
+
+`TSFP_MAPMAKER_MEMORY_SCALE=N` (2..8; anything else = off) divides the
+results of `sub_002FA060` (placed pieces) and `sub_002FA0D0` (held piece),
+the editor's play-time memory estimate checked against 2,048,000 bytes in
+`sub_002FA720` and shown by the meter. Wrappers in
+`patches/*-mapmaker-meter-raise.patch` (needs guest regeneration once);
+policy `src/pc_mapmaker_budget.inc` changes only `g_eax`. Tests:
+`tests/test_mapmaker_budget.py`. Basis and limits:
+`research/capacity-constraints.md` §1b.
+
 ## MapMaker editor mouse controls
 
 On by default since 2026-10-23 (milestone confirmed in game);
