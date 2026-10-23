@@ -46,13 +46,15 @@ MUTATIONS = {
     'wheel-zoom-in-menus': (ADAPTER, 'if(mapmaker_pointer_context(menu)) { pc_controls_mapmaker_zoom(notches);return 1; }', 'pc_controls_mapmaker_zoom(notches);'),
     'zoom-no-cap': (POLICY, 'if (z->until > now + 1000u) z->until = now + 1000u;', ''),
     'zoom-no-reset': (POLICY, 'if (dir != z->dir || now >= z->until) { z->dir = dir; z->until = now; }', 'z->dir = dir; if (now >= z->until) z->until = now;'),
-    'switch-anywhere': (ADAPTER, ' ||\n       x<MAPMAKER_TOOLBAR_X0 || x>=MAPMAKER_TOOLBAR_X1 || y<MAPMAKER_TOOLBAR_Y0 || y>=MAPMAKER_TOOLBAR_Y1) return;', ') return;'),
+    'switch-anywhere': (ADAPTER, 'if(icon<0 && (x<MAPMAKER_TOOLBAR_X0', 'if(0 && (x<MAPMAKER_TOOLBAR_X0'),
     'switch-no-gap': (ADAPTER, '    mapmaker_pointer.switch_next=now+MAPMAKER_SWITCH_GAP;', ''),
     'switch-unbounded': (ADAPTER, 'if(mapmaker_pointer.switch_backs>=MAPMAKER_SWITCH_BACKS) { mapmaker_pointer.switching=0;return; }', ''),
     'switch-back-to-closing': (ADAPTER, '    if(!guest_writable(menu,0x23c) || WORD_AT(menu+0x1b0)!=3 || WORD_AT(menu+0x170)) return;\n', ''),
     'right-never-clears': (ADAPTER, 'if(mapmaker_pointer_right_clears()) pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_Y);\n            else ', ''),
     'right-clears-held': (ADAPTER, '!WORD_AT(editor+0x2f7c) && ', ''),
     'switch-no-hover': (ADAPTER, '        if(!mapmaker_pointer.switch_hover) {', '        if(0) {'),
+    'switch-closes-own-list': (ADAPTER, '    if(icon>=0 && icon==(int)WORD_AT(WORD_AT(MAPMAKER_EDITOR)+0x254)) return;\n', ''),
+    'toolbar-beginner-five': (ADAPTER, 'count=WORD_AT(editor+0x200)?5:3;', 'count=5;'),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 

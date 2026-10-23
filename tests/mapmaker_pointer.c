@@ -249,6 +249,22 @@ int main(void)
     WORD_AT(0x0079094Cu)=102;
     /* Toolbar click while a list is open: Back (up to 3, 250 ms apart), then A. */
     pulses_a=pulses_back=0;WORD_AT(SM+0x1b0)=3;
+    /* Toolbar icons as sub_00335890 sees them: five 30x24 icons from x 410. */
+    WORD_AT(0x007844A8u)=0x00320000u;WORD_AT(0x00765C0Cu)=1;WORD_AT(0x00320000u+0x200)=1;WORD_AT(0x00320000u+0x254)=2;
+    for(int i=0;i<5;i++) {
+        FLOAT_AT(0x00765BA8u+i*16)=410.f+i*36.f;FLOAT_AT(0x00765BACu+i*16)=40.f;
+        FLOAT_AT(0x00765BB0u+i*16)=440.f+i*36.f;FLOAT_AT(0x00765BB4u+i*16)=64.f;
+    }
+    CHECK(mapmaker_toolbar_icon(420.f,50.f)==0 && mapmaker_toolbar_icon(495.f,50.f)==2);
+    CHECK(mapmaker_toolbar_icon(560.f,50.f)==4 && mapmaker_toolbar_icon(400.f,50.f)==-1);
+    WORD_AT(0x00320000u+0x200)=0;                            /* beginner mode: three icons */
+    CHECK(mapmaker_toolbar_icon(560.f,50.f)==-1 && mapmaker_toolbar_icon(495.f,50.f)==2);
+    WORD_AT(0x00320000u+0x200)=1;
+    mapmaker_pointer_switch_press(SM,495.f,50.f);           /* the open list's own icon: keep it */
+    CHECK(!mapmaker_pointer.switching);
+    mapmaker_pointer_switch_press(SM,385.f,50.f);           /* an arrow (not an icon): switch */
+    CHECK(mapmaker_pointer.switching);
+    mapmaker_pointer.switching=0;
     FLOAT_AT(0x007BA038u)=320.f;FLOAT_AT(0x007BA188u)=240.f; /* pointer scale for the hover checks */
     CHECK(!mapmaker_pointer_scroll_press(SM,450.f,50.f));
     mapmaker_pointer_switch_press(SM,450.f,50.f);
@@ -267,9 +283,9 @@ int main(void)
     CHECK(pulses_a==0);
     tick+=200;mapmaker_pointer_switch_step(MENU,1);         /* editor screen: hover first */
     CHECK(pulses_a==0 && mapmaker_pointer.switching && NEAR(FLOAT_AT(B+0x20),451.f) && NEAR(FLOAT_AT(B+0x24),50.f));
-    tick+=60;mapmaker_pointer_switch_step(MENU,1);          /* hover time not over */
+    tick+=200;mapmaker_pointer_switch_step(MENU,1);         /* settle time not over */
     CHECK(pulses_a==0);
-    tick+=80;mapmaker_pointer_switch_step(MENU,1);          /* back on the icon, then A */
+    tick+=120;mapmaker_pointer_switch_step(MENU,1);         /* back on the icon, then A */
     CHECK(pulses_a==1 && !mapmaker_pointer.switching && NEAR(FLOAT_AT(B+0x20),450.f));
     mapmaker_pointer_switch_step(MENU,1);
     CHECK(pulses_a==1);

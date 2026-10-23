@@ -60,7 +60,7 @@
 #define MAPMAKER_SWITCH_BACKS 3      /* menus closed at most */
 #define MAPMAKER_SWITCH_GAP 250u     /* ms between Back presses */
 #define MAPMAKER_SWITCH_TIMEOUT 1500u
-#define MAPMAKER_SWITCH_HOVER 120u   /* ms for the toolbar to take the hover before A */
+#define MAPMAKER_SWITCH_HOVER 300u   /* ms after the list closes before A (hover, settle) */
 
 static struct {
     int initialized, enabled;
@@ -239,10 +239,35 @@ static int mapmaker_pointer_scroll_press(uint32_t menu,float x,float y)
  * real buttons. Close the menu with short B presses (Back is the 3D view),
  * then press A once the editor screen is back; the game pointer is still over
  * the clicked icon. */
+/* sub_00335890: the toolbar category icon under (x, y), or -1. Its rectangles
+ * {x0,y0,x1,y1} are at 0x00765BA8 (16 bytes each), five in advanced mode
+ * (editor+0x200) and three in beginner mode, valid while [0x00765C0C] is set.
+ * The arrows are not icons. */
+static int mapmaker_toolbar_icon(float x,float y)
+{
+    uint32_t editor;
+    int count,i;
+    if(!guest_writable(MAPMAKER_EDITOR,4) || !guest_writable(0x00765C0Cu,4) ||
+       !guest_writable(0x00765BA8u,5*16) || !WORD_AT(0x00765C0Cu)) return -1;
+    editor=WORD_AT(MAPMAKER_EDITOR);
+    if(!guest_writable(editor,0x260)) return -1;
+    count=WORD_AT(editor+0x200)?5:3;
+    for(i=0;i<count;i++) {
+        uint32_t r=0x00765BA8u+(uint32_t)i*16u;
+        if(x>=FLOAT_AT(r) && x<=FLOAT_AT(r+8) && y>=FLOAT_AT(r+4) && y<=FLOAT_AT(r+12)) return i;
+    }
+    return -1;
+}
+
 static void mapmaker_pointer_switch_press(uint32_t menu,float x,float y)
 {
-    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu) ||
-       x<MAPMAKER_TOOLBAR_X0 || x>=MAPMAKER_TOOLBAR_X1 || y<MAPMAKER_TOOLBAR_Y0 || y>=MAPMAKER_TOOLBAR_Y1) return;
+    int icon;
+    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu)) return;
+    icon=mapmaker_toolbar_icon(x,y);
+    if(icon<0 && (x<MAPMAKER_TOOLBAR_X0 || x>=MAPMAKER_TOOLBAR_X1 ||
+                  y<MAPMAKER_TOOLBAR_Y0 || y>=MAPMAKER_TOOLBAR_Y1)) return;
+    /* The icon of the category whose list is open (editor+0x254): keep it open. */
+    if(icon>=0 && icon==(int)WORD_AT(WORD_AT(MAPMAKER_EDITOR)+0x254)) return;
     mapmaker_pointer.switching=1;mapmaker_pointer.switch_backs=0;mapmaker_pointer.switch_hover=0;
     mapmaker_pointer.switch_x=x;mapmaker_pointer.switch_y=y;
     mapmaker_pointer.switch_at=GetTickCount64();mapmaker_pointer.switch_next=0;

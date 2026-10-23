@@ -258,6 +258,13 @@ Tracked separately; do not merge their diagnosis.
   reopened the same one: A arrived before the toolbar took the hover of the
   clicked icon. On the editor screen the switch now moves the pointer one
   pixel off and back onto the icon and waits 120 ms before A.
+- **Eleventh run (2026-10-23):** the clicked icon now gets the highlight but
+  its list did not open, and clicking the open list's own icon closed it.
+  The switch now waits 300 ms on the editor screen and presses A for 120 ms,
+  and uses the toolbar's own icon hit test (`sub_00335890`: rectangles at
+  `0x00765BA8`, 5 icons in advanced / 3 in beginner mode via `editor+0x200`)
+  to leave the list open when the click is on the current category
+  (`editor+0x254`).
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 
