@@ -81,6 +81,23 @@ the half-way point to empty while the container stayed under 6 KiB: the
 category budget, not the 32 KiB container, is what stopped placement.
 Which of the seven categories bound is not yet known.
 
+**What binds first: the level memory estimate.** CONFIRMED (probe flag 16,
+2026-10-23, tiles only, placed one by one until refused at 112 pieces):
+the six recomputed categories peaked at 0.65 (cost1 642/1024; pieces
+112/200; global 171/300) while `editor+0x270` reached 1.0, and the
+container held 13788/32736 bytes. The binding category is the seventh,
+`sub_002FA060() / 2048000` (factor at `0x0049F770`): per placed piece the
+row field `+0x10` of `0x00529400` (3 to 32 KB per tile type; these 112
+tiles averaged about 18 KB), plus per attached sub-entry 40 KB (`0xA000`)
+the first time its id is seen (ids above 9 except 0x45; table
+`0x00762AE0`, 80 entries) and 1 KB (`0x400`) for each repeat. It reads as
+an estimate of the level's play-time memory with a 2,048,000-byte budget
+(HYPOTHESIS: the matching runtime pool and its real size are not found yet).
+
+After it, in this tile-only map: the piece count (200) at about 200 tiles,
+then the container at roughly 280 tiles (about 111 bytes per tile). So the
+memory estimate could rise about 1.8x before the save format must change.
+
 Other fixed limits seen: `editor+0x280 < 50`, `+0x41D8 < 10`, `+0x41E0 < 30`,
 play-time tables of 45 and 200 entries (`sub_00085920`, `sub_0008A780`), and
 50 saved maps.
