@@ -16,6 +16,8 @@ static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
+static unsigned long long tick=1000;
+static unsigned long long GetTickCount64(void) { return tick; }
 
 static PcMenuPointer cursor;
 static int owner_calls, owner_last=-1;
@@ -169,34 +171,64 @@ int main(void)
         CHECK(mapmaker_scroll_geometry(SM,&s) && NEAR(s.x0,280.f) && NEAR(s.x1,296.f) &&
               NEAR(s.track0,96.f) && NEAR(s.track1,384.f) && NEAR(s.thumb0,96.f) && NEAR(s.thumb1,240.f));
     }
-    row_presses=0;
-    mapmaker_pointer_scroll_press(SM,288.f,150.f);           /* on the thumb */
-    CHECK(row_presses==1 && mapmaker_pointer.grab_menu==SM && NEAR(mapmaker_pointer.grab,54.f));
-    mapmaker_pointer_scroll_press(SM,100.f,150.f);           /* beside the bar */
-    CHECK(row_presses==1 && mapmaker_pointer.grab_menu==0);
-    mapmaker_pointer_scroll_press(SM,288.f,390.f);           /* down arrow */
-    CHECK(row_presses==2 && mapmaker_pointer.grab_menu==0);
+    /* Driven directly through the scroll target (+0x88), never through A. */
+    row_presses=0;FLOAT_AT(SM+0x88)=0.f;FLOAT_AT(SM+0x98)=32.f;
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);           /* down arrow: one step */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),32.f) && mapmaker_pointer.grab_menu==SM && mapmaker_pointer.grab_mode==2);
+    tick+=100;mapmaker_pointer_scroll_drag(SM,390.f,1);      /* held, before the repeat delay */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),32.f));
+    tick+=200;mapmaker_pointer_scroll_drag(SM,390.f,1);      /* repeats */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),64.f));
+    tick+=40;mapmaker_pointer_scroll_drag(SM,390.f,1);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),64.f));
+    tick+=40;mapmaker_pointer_scroll_drag(SM,390.f,1);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),96.f));
+    mapmaker_pointer_scroll_drag(SM,390.f,0);                /* released */
+    tick+=500;mapmaker_pointer_scroll_drag(SM,390.f,1);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),96.f) && mapmaker_pointer.grab_menu==0);
+    mapmaker_pointer_scroll_press(SM,288.f,90.f);            /* up arrow */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),64.f) && mapmaker_pointer.grab_mode==1);
+    mapmaker_pointer_scroll_drag(SM,90.f,0);
+    FLOAT_AT(SM+0x88)=310.f;
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);           /* clamped to content - view */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),320.f));
+    mapmaker_pointer_scroll_drag(SM,390.f,0);
+    FLOAT_AT(SM+0x88)=10.f;
+    mapmaker_pointer_scroll_press(SM,288.f,90.f);            /* clamped to 0 */
+    CHECK(FLOAT_AT(SM+0x88)==0.f);
+    mapmaker_pointer_scroll_drag(SM,90.f,0);
+    FLOAT_AT(SM+0x98)=1000.f;                                /* no sensible step: a tenth of the view */
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),32.f));
+    mapmaker_pointer_scroll_drag(SM,390.f,0);
+    /* Track: centre the view there, then drag from the thumb's middle. */
+    FLOAT_AT(SM+0x88)=0.f;
+    mapmaker_pointer_scroll_press(SM,288.f,300.f);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),(300.f-96.f)/288.f*640.f-160.f) && mapmaker_pointer.grab_mode==3 &&
+          NEAR(mapmaker_pointer.grab,72.f));
+    mapmaker_pointer_scroll_drag(SM,300.f,1);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),(300.f-72.f-96.f)/288.f*640.f));
+    mapmaker_pointer_scroll_drag(SM,300.f,0);
+    /* Thumb: grabbed where pressed; follows the mouse. */
+    FLOAT_AT(SM+0x88)=0.f;
+    mapmaker_pointer_scroll_press(SM,288.f,150.f);
+    CHECK(FLOAT_AT(SM+0x88)==0.f && NEAR(mapmaker_pointer.grab,54.f));
+    mapmaker_pointer_scroll_drag(SM,222.f,1);                /* thumb top 168 -> scroll 160 */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),160.f));
+    mapmaker_pointer_scroll_drag(SM,222.f,0);
+    /* Beside the bar, other scenes, or a style without a bar: nothing. */
+    FLOAT_AT(SM+0x88)=0.f;
+    mapmaker_pointer_scroll_press(SM,100.f,150.f);
+    CHECK(FLOAT_AT(SM+0x88)==0.f && mapmaker_pointer.grab_menu==0);
     WORD_AT(0x0079094Cu)=101;
-    mapmaker_pointer_scroll_press(SM,288.f,150.f);           /* other scenes: never */
-    CHECK(row_presses==2);
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);
+    CHECK(FLOAT_AT(SM+0x88)==0.f);
     WORD_AT(0x0079094Cu)=102;
     WORD_AT(STYLE)=0;
-    mapmaker_pointer_scroll_press(SM,288.f,150.f);           /* style without a bar */
-    CHECK(row_presses==2);
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);
+    CHECK(FLOAT_AT(SM+0x88)==0.f);
     WORD_AT(STYLE)=0x40u;
-    /* Thumb drag: the engine's speed field makes the thumb follow the mouse. */
-    mapmaker_pointer_scroll_press(SM,288.f,150.f);
-    FLOAT_AT(B+0x34)=0.f;
-    mapmaker_pointer_scroll_drag(SM,222.f,1);                /* engine not dragging yet */
-    CHECK(FLOAT_AT(B+0x34)==0.f);
-    WORD_AT(SM+0x194)=0xFFFFFFFEu;
-    mapmaker_pointer_scroll_drag(SM,222.f,1);                /* thumb top 168 -> scroll 160 */
-    CHECK(NEAR(FLOAT_AT(B+0x34),160.f/3.f));
-    FLOAT_AT(B+0x34)=0.f;
-    mapmaker_pointer_scroll_drag(SM,222.f,0);                /* released */
-    mapmaker_pointer_scroll_drag(SM,222.f,1);
-    CHECK(FLOAT_AT(B+0x34)==0.f && mapmaker_pointer.grab_menu==0);
-    WORD_AT(SM+0x194)=0;
+    CHECK(row_presses==0);
     row_presses=0;
     FLOAT_AT(0x007BA038u)=320.f;FLOAT_AT(0x007BA188u)=240.f;
 

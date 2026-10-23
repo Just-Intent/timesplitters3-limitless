@@ -20,6 +20,8 @@ void pc_controls_mapmaker_pointer(int active);
 void pc_controls_mapmaker_row_press(void);
 /* In the MapMaker editor: Escape acts as the first Back key. */
 void pc_controls_mapmaker_editor(int active);
+/* 1 while the MapMaker editor prototype remaps keys (prompts show T for floor up). */
+int pc_controls_mapmaker_editor_active(void);
 void pc_controls_menu_mode(int active);
 PcMenuPointer pc_controls_menu_pointer(void);
 PcMenuPointer pc_controls_menu_hover_pointer(void);

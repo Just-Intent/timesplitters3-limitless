@@ -1,5 +1,6 @@
 #include "pc_prompts.h"
 #include "pc_controls.h"
+#include "pc_mapmaker_pointer.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -202,6 +203,8 @@ int pc_prompts_rewrite(const char *source, char *out, size_t capacity)
     if(changed) source=renamed;
     if(strchr(source,'\v') && pc_prompts_keyboard_active() && pc_settings_prompt_keys(keys)) {
         pc_controls_get_mouse(&sensitivity,&enabled,&inverted);
+        /* MapMaker editor: the right trigger (floor up) is on T, not its usual key. */
+        if(pc_controls_mapmaker_editor_active()) keys[9]=PC_MAPMAKER_FLOOR_UP_KEY;
         if(pc_prompts_format(source,out,capacity,keys,enabled)) return 1;
     }
     if(changed && strlen(source)<capacity) {

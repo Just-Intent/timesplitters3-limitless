@@ -169,10 +169,13 @@ holds A for that press (`pc_controls_mapmaker_row_press`) instead of the
 menu-engine confirm. Also in scene 102: while a menu is open, Escape reports
 as the first Back key and not as Start; on the editor screen it stays Start
 (pause), since Back there toggles the 3D view. The choice is latched per press
-(`pc_mapmaker_escape_back`, `pc_mapmaker_key`; Windows only). A left press on a
-menu scrollbar (geometry as `sub_00071400`) holds A, and during the engine's
-thumb drag (`menu+0x194 == -2`) `player+0x34` is set so the thumb follows the
-mouse; on the editor screen right-drag and the window edge pan the view the
+(`pc_mapmaker_escape_back`, `pc_mapmaker_key`; Windows only). Menu
+scrollbars (geometry as `sub_00071400`) are driven directly, because A over
+the bar did not scroll the Story AI list: arrows step the target
+`menu+0x88` (step `+0x98`, repeating while held), the track centres the view
+there and the thumb follows the mouse, clamped like `sub_00073560`; the
+engine animates the scroll. Prompts show T for the right trigger in the
+editor (`pc_controls_mapmaker_editor_active`). On the editor screen right-drag and the window edge pan the view the
 way `sub_00309160` + `sub_002F9F70` do (skipped when `editor+0x25C &
 0x0C044088`), and the right button no longer sends the menu Back action
 there (a right click without a drag sends it on release, which the editor

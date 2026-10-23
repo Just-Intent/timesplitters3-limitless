@@ -26,11 +26,12 @@
  * clamp to the 40x40 grid (sub_002F9F70), and are skipped in the states where
  * the editor itself does not pan (editor+0x25C & 0x0C044088).
  *
- * Menu scrollbars (tile and item lists): the engine already scrolls on A over
- * the arrows and track, and drags the thumb from the stick's vertical speed
- * (player+0x34, x3) while menu+0x194 == -2 (sub_000777E0). A left press on the
- * bar holds A for that press; during a thumb drag +0x34 is set so the thumb
- * follows the mouse.
+ * Menu scrollbars (tile, item and Story AI lists): A over the bar did not
+ * scroll the Story AI list in game, so the scrollbar is driven directly. A
+ * left press on an arrow steps the scroll target (menu+0x88) and repeats while
+ * held, a press on the track jumps there (as sub_000736F0), and a press on the
+ * thumb drags it. The target is clamped like sub_00073560; the engine then
+ * animates the scroll itself (sub_000731B0).
  *
  * Requires the includer's WORD_AT, FLOAT_AT, guest_writable,
  * d3d8_display_output_shape, pc_menu_mouse_position,
@@ -47,13 +48,17 @@
 #define MAPMAKER_EDGE 8.f            /* UI pixels from the canvas edge */
 #define MAPMAKER_EDGE_SPEED 0.15f    /* cells per frame at the very edge */
 #define MAPMAKER_GRID 40.f
+#define MAPMAKER_SCROLL_DELAY 300u   /* ms before an arrow repeats */
+#define MAPMAKER_SCROLL_REPEAT 80u   /* ms between repeats */
 
 static struct {
     int initialized, enabled;
     int have_last, last_left, last_right;
     float last_x, last_y, last_ux, last_uy;
-    uint32_t grab_menu;  /* menu whose scrollbar thumb the left press grabbed */
+    uint32_t grab_menu;  /* menu whose scrollbar the left press is driving */
+    int grab_mode;       /* 1 up arrow, 2 down arrow, 3 thumb */
     float grab;          /* pointer y minus thumb top at the press */
+    unsigned long long grab_next; /* next arrow repeat */
     float right_travel;  /* UI pixels moved while the right button is held */
 } mapmaker_pointer;
 #define MAPMAKER_RIGHT_CLICK 4.f /* less travel than this is a click, not a drag */
@@ -171,6 +176,22 @@ static void mapmaker_pointer_scroll_log(uint32_t menu,float x,float y,int ok,con
 #endif
 }
 
+/* sub_00073560: set the scroll target, clamped to the scrollable range. */
+static void mapmaker_scroll_to(uint32_t menu,const MapMakerScroll *s,float target)
+{
+    float view=FLOAT_AT(menu+0x70)-FLOAT_AT(menu+0x6c),last=s->content-view;
+    if(!isfinite(target)) return;
+    if(target>last) target=last;
+    if(target<0) target=0;
+    FLOAT_AT(menu+0x88)=target;
+}
+/* One arrow step: the menu's own step (+0x98) when sensible, else a tenth of the view. */
+static float mapmaker_scroll_step(uint32_t menu)
+{
+    float view=FLOAT_AT(menu+0x70)-FLOAT_AT(menu+0x6c),step=FLOAT_AT(menu+0x98);
+    return isfinite(step) && step>0 && step<=view ? step : view*.1f;
+}
+
 static void mapmaker_pointer_scroll_press(uint32_t menu,float x,float y)
 {
     MapMakerScroll s;
@@ -180,23 +201,39 @@ static void mapmaker_pointer_scroll_press(uint32_t menu,float x,float y)
     ok=mapmaker_scroll_geometry(menu,&s);
     mapmaker_pointer_scroll_log(menu,x,y,ok,&s);
     if(!ok || x<s.x0 || x>=s.x1 || y<s.y0 || y>=s.y1) return;
-    pc_controls_mapmaker_row_press();
-    if(y>=s.thumb0 && y<s.thumb1) { mapmaker_pointer.grab_menu=menu;mapmaker_pointer.grab=y-s.thumb0; }
+    mapmaker_pointer.grab_menu=menu;
+    if(y<s.track0 || y>=s.track1) {
+        mapmaker_pointer.grab_mode=y<s.track0?1:2;
+        mapmaker_scroll_to(menu,&s,FLOAT_AT(menu+0x88)+
+            (mapmaker_pointer.grab_mode==1?-1.f:1.f)*mapmaker_scroll_step(menu));
+        mapmaker_pointer.grab_next=GetTickCount64()+MAPMAKER_SCROLL_DELAY;
+        return;
+    }
+    if(y<s.thumb0 || y>=s.thumb1) {
+        /* Track: centre the view there (sub_000736F0), then drag from it. */
+        float view=FLOAT_AT(menu+0x70)-FLOAT_AT(menu+0x6c);
+        mapmaker_scroll_to(menu,&s,(y-s.track0)/(s.track1-s.track0)*s.content-view*.5f);
+        mapmaker_pointer.grab=(s.thumb1-s.thumb0)*.5f;
+    } else mapmaker_pointer.grab=y-s.thumb0;
+    mapmaker_pointer.grab_mode=3;
 }
 
-/* While the engine drags the thumb (menu+0x194 == -2), it moves the scroll
- * target by player+0x34 * 3 and then puts the pointer back on the thumb.
- * Supply the speed that brings the thumb under the mouse this frame. */
+/* Every frame of the press: repeat arrows, or keep the thumb under the mouse. */
 static void mapmaker_pointer_scroll_drag(uint32_t menu,float y,int left)
 {
     MapMakerScroll s;
-    uint32_t b;
-    float target;
+    unsigned long long now;
     if(!left) { mapmaker_pointer.grab_menu=0;return; }
-    if(menu!=mapmaker_pointer.grab_menu || WORD_AT(menu+0x194)!=0xFFFFFFFEu ||
-       !mapmaker_scroll_geometry(menu,&s) || !(b=mapmaker_pointer_block())) return;
-    target=(y-mapmaker_pointer.grab-s.track0)/(s.track1-s.track0)*s.content;
-    if(isfinite(target)) FLOAT_AT(b+0x34)=(target-FLOAT_AT(menu+0x84))/3.f;
+    if(menu!=mapmaker_pointer.grab_menu || !mapmaker_scroll_geometry(menu,&s)) return;
+    if(mapmaker_pointer.grab_mode==3) {
+        mapmaker_scroll_to(menu,&s,(y-mapmaker_pointer.grab-s.track0)/(s.track1-s.track0)*s.content);
+        return;
+    }
+    now=GetTickCount64();
+    if(now<mapmaker_pointer.grab_next) return;
+    mapmaker_pointer.grab_next=now+MAPMAKER_SCROLL_REPEAT;
+    mapmaker_scroll_to(menu,&s,FLOAT_AT(menu+0x88)+
+        (mapmaker_pointer.grab_mode==1?-1.f:1.f)*mapmaker_scroll_step(menu));
 }
 
 /* sub_00309160 then the sub_002F9F70 centre clamp; dx/dy in grid cells. */

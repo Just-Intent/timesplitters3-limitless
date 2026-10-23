@@ -229,6 +229,13 @@ Tracked separately; do not merge their diagnosis.
   it from the editor screen; Back there is the 3D view): Escape is now Back
   only while a menu is open. Scroll-press logging (probe flag 8) records the
   computed scrollbar geometry for the Story AI investigation.
+- **Sixth run (2026-10-23):** the whole logic menu works. The Story AI bar
+  geometry matched the clicks (bar x 309.4-330.6, y 77.3-436.8) and A was
+  pressed there, but the engine did not scroll; the PC side now sets the
+  scroll target itself. The floor-up hint showed the left mouse button (the
+  right trigger's key); in the editor it now shows T. R also raises the floor.
+  Zoom uses held bits 0x8000/0x4000; by the menu table's pairing (0x400/0x800
+  are the triggers) these are likely White/Black (keys 1/2), unconfirmed.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

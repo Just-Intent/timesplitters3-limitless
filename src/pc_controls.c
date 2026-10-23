@@ -534,6 +534,15 @@ void pc_controls_mapmaker_editor(int active)
     ReleaseSRWLockExclusive(&lock);
 }
 
+int pc_controls_mapmaker_editor_active(void)
+{
+    int active;
+    AcquireSRWLockShared(&lock);
+    active = menu_mode && mapmaker_editor && mapmaker_trigger_key;
+    ReleaseSRWLockShared(&lock);
+    return active;
+}
+
 void pc_controls_mapmaker_row_press(void)
 {
     AcquireSRWLockExclusive(&lock);
