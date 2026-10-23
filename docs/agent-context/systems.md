@@ -152,7 +152,8 @@ experiment protocol: `docs/mapmaker-meter-probe.md`. Mac: MAC-060.
 
 ## MapMaker level memory budget (opt-in)
 
-`TSFP_MAPMAKER_MEMORY_SCALE=N` (2..8; anything else = off) divides the
+`TSFP_MAPMAKER_MEMORY_SCALE=N` (2..8; anything else = off; 8 when
+`TSFP_MAPMAKER_LIMITS=1` and no scale is set) divides the
 results of `sub_002FA060` (placed pieces) and `sub_002FA0D0` (held piece),
 the editor's play-time memory estimate checked against 2,048,000 bytes in
 `sub_002FA720` and shown by the meter. Wrappers in

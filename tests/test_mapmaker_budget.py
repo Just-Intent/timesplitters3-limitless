@@ -14,6 +14,9 @@ MUTATIONS = {
     'default-on': ("n>=2 && n<=8)?(unsigned)n:1u;", "n>=2 && n<=8)?(unsigned)n:2u;"),
     'unbounded': ('n>=2 && n<=8)', 'n>=2)'),
     'round-down': ('(((uint64_t)bytes+n-1)/n)', '(((uint64_t)bytes)/n)'),
+    'limits-no-default': ('            mapmaker_budget.scale=8u;', '            mapmaker_budget.scale=1u;'),
+    'limits-override-explicit': ("if((!v || !*v) && l", "if(l"),
+    'limits-without-pools': (" && !(p && p[0]=='0' && !p[1]))", ")"),
 }
 
 
@@ -40,7 +43,8 @@ def build(tmp_path, mutation):
 @pytest.mark.parametrize('mutation', ['fixed', *MUTATIONS])
 def test_mapmaker_budget(tmp_path, mutation):
     exe = build(tmp_path, mutation)
-    env = {k: v for k, v in os.environ.items() if k != 'TSFP_MAPMAKER_MEMORY_SCALE'}
+    env = {k: v for k, v in os.environ.items()
+           if k not in ('TSFP_MAPMAKER_MEMORY_SCALE', 'TSFP_MAPMAKER_LIMITS', 'TSFP_MAPMAKER_POOLS')}
     result = subprocess.run([str(exe)], env=env, capture_output=True, text=True, timeout=60)
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr

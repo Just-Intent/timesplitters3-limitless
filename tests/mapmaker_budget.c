@@ -24,6 +24,15 @@ static void set_scale(const char *value)
 #endif
     memset(&mapmaker_budget,0,sizeof mapmaker_budget);
 }
+static void set_env(const char *name,const char *value)
+{
+#ifdef _WIN32
+    _putenv_s(name,value?value:"");
+#else
+    if(value)setenv(name,value,1); else unsetenv(name);
+#endif
+    memset(&mapmaker_budget,0,sizeof mapmaker_budget);
+}
 static uint32_t run(uint32_t bytes)
 {
     estimate=bytes;g_esp=0x1000u;
@@ -51,6 +60,18 @@ int main(void)
     CHECK(run(2048000u)==2048000u);
     set_scale("0");
     CHECK(run(2048000u)==2048000u);
+    /* The raised limits imply scale 8 unless a scale is given. */
+    set_scale(NULL);set_env("TSFP_MAPMAKER_LIMITS","1");
+    CHECK(run(2048000u)==256000u);
+    set_scale("3");
+    CHECK(run(4096000u)==1365334u);
+    set_scale("9");                                       /* invalid explicit: off */
+    CHECK(run(2048000u)==2048000u);
+    set_scale(NULL);set_env("TSFP_MAPMAKER_POOLS","0");   /* limits need the pools */
+    CHECK(run(2048000u)==2048000u);
+    set_env("TSFP_MAPMAKER_POOLS",NULL);set_env("TSFP_MAPMAKER_LIMITS","0");
+    CHECK(run(2048000u)==2048000u);
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);
     if(failures)return 1;
     puts("mapmaker budget ok");
     return 0;
