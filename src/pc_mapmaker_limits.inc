@@ -26,9 +26,11 @@
  * sub-entries, and writes the meter (editor+0x270, placed only) and the held
  * piece preview (editor+0x274) from the same limits. After the original runs,
  * the decision and both values are recomputed with pads 4800, links 8800,
- * pad groups 600 and 200 items ("sub-entries"; cover pads stay 1024); pieces
- * and memory (raised separately by TSFP_MAPMAKER_MEMORY_SCALE) keep their
- * limits. The editor's item node pool is 2120 (config/guest-code-patches/).
+ * pad groups 600, 200 items ("sub-entries"; cover pads stay 1024) and 241
+ * pieces (one visibility room each: the engine's 200-room limit is raised to
+ * 241 by config/guest-code-patches/rooms.json, see src/pc_mapmaker_rooms.inc);
+ * memory (raised separately by TSFP_MAPMAKER_MEMORY_SCALE) keeps its limit.
+ * The editor's item node pool is 2120 (config/guest-code-patches/).
  *
  * Cover pads stay at the stock 1024: the map adds about 60 more when it loads
  * (measured: 60 on a 142-tile, 50-item map and on a 110-tile, 67-item map, so
@@ -58,7 +60,7 @@
 #define MAPMAKER_POOL_COVER 1536u     /* stock 1280, plus a guard */
 #define MAPMAKER_LIMIT_LINKS 8800u
 #define MAPMAKER_LIMIT_GROUPS 600
-#define MAPMAKER_LIMIT_PIECES 200u
+#define MAPMAKER_LIMIT_PIECES 241u    /* = MAPMAKER_ROOMS_MAX */
 #define MAPMAKER_LIMIT_SUB 200u
 #define MAPMAKER_LIMIT_MEMORY 2048000u
 
