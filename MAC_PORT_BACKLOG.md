@@ -196,7 +196,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-059 | Physical keyboard entry in original text dialogs (issue #136) | Awaiting validation |
 | MAC-060 | MapMaker capacity meter probe (debug instrumentation) | Awaiting validation |
 | MAC-061 | Compile-only Windows build mode | Not applicable |
-| MAC-062 | MapMaker editor mouse pointer (prototype, off by default) | Awaiting validation |
+| MAC-062 | MapMaker editor mouse controls (on by default) | Awaiting validation |
 
 ### MAC-048 - Companion vehicle zero-flag joins (#100)
 
@@ -3165,13 +3165,14 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
 - **Mac acceptance checks:** None beyond existing native build checks.
 - **Mac implementation and evidence:** Not applicable.
 
-### MAC-062 — MapMaker editor mouse pointer (prototype, off by default)
+### MAC-062 — MapMaker editor mouse controls (on by default)
 
 - **Status:** Awaiting validation
-- **PC behavior:** With `TSFP_MAPMAKER_POINTER=1`, on the MapMaker editor screen
-  (scene 102, no list or pause menu open) moving the mouse places the game's own
-  pointer under it, and holding the left button holds A. A still mouse leaves
-  controller movement alone. Off by default.
+- **PC behavior:** On the MapMaker editor screen (scene 102) the mouse drives
+  the game's own pointer, left click is A, menus, scrollbars, wheel zoom/scroll,
+  right-drag and edge panning, right-click rotate/deselect work by mouse; a still
+  mouse leaves controller movement alone. On by default; `TSFP_MAPMAKER_POINTER=0`
+  turns it off. Confirmed complete on Windows 2026-10-23.
 - **PC source:** Branch `mapmaker-recon`; shared `src/pc_mapmaker_pointer.inc`
   (called from `pc_display_menu_mouse_input`), host policy
   `src/pc_mapmaker_pointer.h`, `pc_controls_mapmaker_pointer` and the click path
@@ -3183,7 +3184,7 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
 - **Mac adaptation needed:** Escape-as-Back in the editor is Windows-only
   (`pc_controls_mapmaker_editor` is a no-op in input_sdl.c); port it through
   `tsfp_native_key_down`. Scrollbar and panning are shared guest-side code.
-- **Mac acceptance checks:** Native Mac build; with `TSFP_MAPMAKER_POINTER=1`,
+- **Mac acceptance checks:** Native Mac build (controls on by default);
   open the editor, hover and click a toolbar icon and a grid cell; confirm the
   controller still moves the pointer when the mouse is still.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.

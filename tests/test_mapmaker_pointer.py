@@ -12,7 +12,8 @@ POLICY = ROOT / 'src/pc_mapmaker_pointer.h'
 
 # Each mutation breaks one contract the fixture must detect.
 MUTATIONS = {
-    'default-on': (ADAPTER, "mapmaker_pointer.enabled=v && v[0]=='1' && !v[1];", 'mapmaker_pointer.enabled=1;'),
+    'cannot-disable': (ADAPTER, "mapmaker_pointer.enabled=!(v && v[0]=='0' && !v[1]);", 'mapmaker_pointer.enabled=1;'),
+    'default-off': (ADAPTER, "mapmaker_pointer.enabled=!(v && v[0]=='0' && !v[1]);", "mapmaker_pointer.enabled=v && v[0]=='1' && !v[1];"),
     'any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)==MAPMAKER_POINTER_SCENE &&', ''),
     'child-menu': (ADAPTER, ' && !WORD_AT(menu+0x170);', ';'),
     'still-mouse-overrides': (ADAPTER, 'if(moved || pressed) mapmaker_pointer_place(x,y);', 'mapmaker_pointer_place(x,y);'),

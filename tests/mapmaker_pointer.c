@@ -89,14 +89,20 @@ int main(void)
     cursor.width=1280.f;cursor.height=960.f;cursor.valid=1;
     move(320.f,240.f);
 
-    /* Off by default: no guest write, no host ownership change. */
-    set_enabled(NULL);
+    /* TSFP_MAPMAKER_POINTER=0: no guest write, no host ownership change. */
+    set_enabled("0");
     before=checksum();
     game_frame();move(100.f,50.f);game_frame();
-    CHECK(checksum()==before && owner_calls==0);
-    set_enabled("2");
-    game_frame();move(101.f,50.f);game_frame();
     CHECK(checksum()==before && owner_calls==0 && editor_last==-1);
+    /* On by default, and for any other value. */
+    set_enabled(NULL);
+    game_frame();move(101.f,50.f);game_frame();
+    CHECK(owner_calls>0 && editor_last==1 && NEAR(FLOAT_AT(B+0x20),101.f));
+    set_enabled("2");owner_calls=0;
+    game_frame();
+    CHECK(owner_calls>0);
+    owner_calls=0;editor_last=-1;
+    FLOAT_AT(B+0x20)=320.f;FLOAT_AT(B+0x24)=240.f;FLOAT_AT(B+0x18)=0.f;FLOAT_AT(B+0x1c)=0.f;
 
     set_enabled("1");
     /* Other scenes (main menu 101, map play 100) never own the pointer. */
@@ -345,7 +351,7 @@ int main(void)
     row_presses=0;
 
     /* Editor menu rows: a real A press instead of the menu confirm, scene 102 only. */
-    set_enabled(NULL);
+    set_enabled("0");
     CHECK(!mapmaker_pointer_row_click() && row_presses==0);
     set_enabled("1");
     WORD_AT(0x0079094Cu)=101;

@@ -191,7 +191,7 @@ Tracked separately; do not merge their diagnosis.
 - **Prototype (2026-10-22, off by default):** `TSFP_MAPMAKER_POINTER=1` places
   the game pointer at the mouse on the editor screen and holds A while the left
   button is held. Fixture passes on Windows/MSVC; in-game run pending. See
-  `docs/agent-context/systems.md` (MapMaker editor pointer).
+  `docs/agent-context/systems.md` (MapMaker editor mouse controls).
 - **First in-game run (2026-10-23):** toolbar icons and arrows respond to
   clicks; clicking the grid at the top level opens the highlighted category
   (A). Pause-menu and category-list rows were hit and highlighted but did not
@@ -268,6 +268,9 @@ Tracked separately; do not merge their diagnosis.
 - **Twelfth run (2026-10-23):** still no reliable click switch. Decision:
   with a list open, toolbar clicks do nothing and A/D switch categories; the
   switch code (generated B/A presses, icon hit test) was removed.
+- **Milestone (2026-10-23):** the user confirmed the MapMaker UI fully usable
+  with mouse and keyboard (commit `404e113`). The controls are now on by
+  default; `TSFP_MAPMAKER_POINTER=0` turns them off. MM-4 and MM-5 are done.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

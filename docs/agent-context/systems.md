@@ -150,9 +150,11 @@ are logged too), and the click after hit testing. No guest regeneration. It must
 `tests/test_mapmaker_probe.py` enforces this with mutations. Usage and the
 experiment protocol: `docs/mapmaker-meter-probe.md`. Mac: MAC-060.
 
-## MapMaker editor pointer (prototype)
+## MapMaker editor mouse controls
 
-Off unless `TSFP_MAPMAKER_POINTER=1`. `src/pc_mapmaker_pointer.inc` runs right
+On by default since 2026-10-23 (milestone confirmed in game);
+`TSFP_MAPMAKER_POINTER=0` turns them off and restores the original editor
+input. `src/pc_mapmaker_pointer.inc` runs right
 after the original `sub_00073870` inside `pc_display_menu_mouse_input`. When
 scene 102 dispatches a menu with no rows and no open child (the editor screen)
 and the host cursor moved or a button was pressed, it places the game's

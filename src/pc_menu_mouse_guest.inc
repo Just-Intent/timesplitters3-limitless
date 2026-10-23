@@ -365,7 +365,7 @@ void pc_display_menu_mouse_input(void (*original)(void))
     float x,y,gw,gh;
     unsigned sw,sh;
     original();
-    mapmaker_pointer_input(menu); /* off unless TSFP_MAPMAKER_POINTER=1 */
+    mapmaker_pointer_input(menu); /* MapMaker mouse; TSFP_MAPMAKER_POINTER=0 turns it off */
     menu_text_input(menu);
     if(!s || s->sampled || s->menu!=menu || !menu_mouse_context() || !guest_writable(menu,0x23c) ||
        WORD_AT(menu+0x38)!=0 || WORD_AT(menu+0x1b0)!=3) return;

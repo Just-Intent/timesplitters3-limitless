@@ -1,5 +1,5 @@
-/* US 45410066 MapMaker editor pointer (prototype; off unless
- * TSFP_MAPMAKER_POINTER=1).
+/* US 45410066 MapMaker editor mouse controls (on by default;
+ * TSFP_MAPMAKER_POINTER=0 turns them off and restores the original behaviour).
  *
  * The editor screen (scene 102) draws its toolbar, floor buttons and grid
  * itself; they are not menu rows. They hit-test the game's own per-player
@@ -72,7 +72,7 @@ static int mapmaker_pointer_enabled(void)
     if(!mapmaker_pointer.initialized) {
         const char *v=getenv("TSFP_MAPMAKER_POINTER");
         mapmaker_pointer.initialized=1;
-        mapmaker_pointer.enabled=v && v[0]=='1' && !v[1];
+        mapmaker_pointer.enabled=!(v && v[0]=='0' && !v[1]);
     }
     return mapmaker_pointer.enabled;
 }
