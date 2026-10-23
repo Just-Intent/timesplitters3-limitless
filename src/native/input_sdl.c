@@ -304,6 +304,8 @@ void pc_controls_mapmaker_pointer(int active) {
 /* Escape-as-Back in the editor is Windows-only for now (MAC-062). */
 void pc_controls_mapmaker_editor(int active) { (void)active; }
 int pc_controls_mapmaker_editor_active(void) { return 0; }
+void pc_controls_mapmaker_zoom(int notches) { (void)notches; }
+void pc_controls_mapmaker_pulse(int button) { (void)button; }
 void pc_controls_mapmaker_row_press(void) {
     pthread_mutex_lock(&camera_lock);
     pc_mapmaker_row_press(&mapmaker_click);

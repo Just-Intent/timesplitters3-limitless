@@ -31,6 +31,9 @@ static unsigned long applied;
 static volatile LONG editing;
 static int menu_mode, menu_button_block;
 static int mapmaker_pointer_active, mapmaker_editor, mapmaker_back_key, mapmaker_trigger_key;
+static int mapmaker_zoom_up_key, mapmaker_zoom_down_key;
+static PcMapMakerZoom mapmaker_zoom;
+static ULONGLONG mapmaker_pulse_until[2];
 static PcMapMakerClick mapmaker_click;
 static PcMapMakerEscape mapmaker_escape;
 static PcTextInput text_input;
@@ -465,6 +468,12 @@ int pc_controls_key_down(int key)
     down=pc_mapmaker_trigger_key(menu_mode && mapmaker_editor,key,mapmaker_trigger_key,down,
                                  pc_input_down(&input,PC_MAPMAKER_FLOOR_UP_KEY,GetTickCount64()) &&
                                  (replaying || GetForegroundWindow()==window_handle));
+    if(menu_mode && mapmaker_editor && mapmaker_back_key && key==mapmaker_back_key &&
+       GetTickCount64()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_BACK] &&
+       (replaying || GetForegroundWindow()==window_handle)) down=1;
+    down=pc_mapmaker_zoom_key(&mapmaker_zoom,menu_mode && mapmaker_editor &&
+                              (replaying || GetForegroundWindow()==window_handle),
+                              key,mapmaker_zoom_up_key,mapmaker_zoom_down_key,down,GetTickCount64());
     ReleaseSRWLockExclusive(&lock);
     return down;
 }
@@ -522,15 +531,34 @@ void pc_controls_mapmaker_pointer(int active)
  * so reading the Back binding here cannot re-enter the bindings lock. */
 void pc_controls_mapmaker_editor(int active)
 {
-    int keys[PC_ACTION_COUNT], back = 0, trigger = 0;
+    int keys[PC_ACTION_COUNT], back = 0, trigger = 0, white = 0, black = 0;
     if (active && pc_settings_prompt_keys(keys)) {
         back = keys[7];    /* "Objectives / Back" */
         trigger = keys[9]; /* "Fire": right trigger, floor up in the editor */
+        white = keys[5];   /* zoom (held), wheel up */
+        black = keys[4];   /* zoom (held), wheel down */
     }
     AcquireSRWLockExclusive(&lock);
     mapmaker_editor = !!active;
     mapmaker_back_key = back;
     mapmaker_trigger_key = trigger;
+    mapmaker_zoom_up_key = white;
+    mapmaker_zoom_down_key = black;
+    ReleaseSRWLockExclusive(&lock);
+}
+
+void pc_controls_mapmaker_pulse(int button)
+{
+    if (button != PC_MAPMAKER_PULSE_A && button != PC_MAPMAKER_PULSE_BACK) return;
+    AcquireSRWLockExclusive(&lock);
+    mapmaker_pulse_until[button] = GetTickCount64() + PC_MAPMAKER_PULSE_MS;
+    ReleaseSRWLockExclusive(&lock);
+}
+
+void pc_controls_mapmaker_zoom(int notches)
+{
+    AcquireSRWLockExclusive(&lock);
+    pc_mapmaker_zoom_add(&mapmaker_zoom, notches, GetTickCount64());
     ReleaseSRWLockExclusive(&lock);
 }
 
@@ -558,7 +586,8 @@ int pc_controls_terminal_click(void)
     replay_tick();
     /* Always evaluated so its held-button block tracks every poll. */
     mapmaker = pc_mapmaker_click(&mapmaker_click, menu_mode && mapmaker_pointer_active,
-                                 input.keys[VK_LBUTTON]);
+                                 input.keys[VK_LBUTTON]) ||
+               (menu_mode && mapmaker_editor && GetTickCount64() < mapmaker_pulse_until[PC_MAPMAKER_PULSE_A]);
     down = (replaying || GetForegroundWindow() == window_handle) &&
            (pc_input_terminal_click(&input, input.keys[VK_LBUTTON]) || mapmaker);
     ReleaseSRWLockExclusive(&lock);

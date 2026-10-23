@@ -27,6 +27,10 @@ static int row_presses;
 static void pc_controls_mapmaker_row_press(void) { row_presses++; }
 static int editor_last=-1;
 static void pc_controls_mapmaker_editor(int active) { editor_last=active; }
+static int zoom_notches;
+static void pc_controls_mapmaker_zoom(int notches) { zoom_notches+=notches; }
+static int pulses_a, pulses_back;
+static void pc_controls_mapmaker_pulse(int button) { if(button==0) pulses_a++; else if(button==1) pulses_back++; }
 static void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh) { *sw=w;*sh=h; }
 /* sub_00076EF0(menu,item) highlights a row; record the call instead. */
 static void sub_00076EF0(void) {}
@@ -166,6 +170,7 @@ int main(void)
     FLOAT_AT(STYLE+0x74)=280.f;FLOAT_AT(STYLE+0x78)=296.f;FLOAT_AT(SM+0xe4)=0.f;
     FLOAT_AT(SM+0x6c)=80.f;FLOAT_AT(SM+0x70)=400.f;FLOAT_AT(SM+0xac)=0.f;
     FLOAT_AT(SM+0x5c)=640.f;FLOAT_AT(SM+0x84)=0.f;
+    WORD_AT(SM+0x178)=0x00301000u; /* a list has rows: not the editor screen */
     {
         MapMakerScroll s;
         CHECK(mapmaker_scroll_geometry(SM,&s) && NEAR(s.x0,280.f) && NEAR(s.x1,296.f) &&
@@ -229,6 +234,49 @@ int main(void)
     CHECK(FLOAT_AT(SM+0x88)==0.f);
     WORD_AT(STYLE)=0x40u;
     CHECK(row_presses==0);
+    /* Wheel in a menu with a scrollbar: three steps per notch, up is negative. */
+    FLOAT_AT(SM+0x98)=32.f;FLOAT_AT(SM+0x88)=200.f;
+    CHECK(mapmaker_pointer_wheel(SM,-1) && NEAR(FLOAT_AT(SM+0x88),296.f));
+    CHECK(mapmaker_pointer_wheel(SM,2) && NEAR(FLOAT_AT(SM+0x88),104.f));
+    CHECK(mapmaker_pointer_wheel(SM,9) && FLOAT_AT(SM+0x88)==0.f);
+    CHECK(zoom_notches==0);
+    WORD_AT(STYLE)=0;
+    CHECK(!mapmaker_pointer_wheel(SM,1));                  /* no bar: generic wheel keeps it */
+    WORD_AT(STYLE)=0x40u;
+    WORD_AT(0x0079094Cu)=101;
+    CHECK(!mapmaker_pointer_wheel(SM,1));                  /* other scenes: generic wheel */
+    WORD_AT(0x0079094Cu)=102;
+    /* Toolbar click while a list is open: Back (up to 3, 250 ms apart), then A. */
+    pulses_a=pulses_back=0;
+    CHECK(!mapmaker_pointer_scroll_press(SM,450.f,50.f));
+    mapmaker_pointer_switch_press(SM,450.f,50.f);
+    CHECK(mapmaker_pointer.switching);
+    mapmaker_pointer_switch_step(SM,0);
+    CHECK(pulses_back==1 && pulses_a==0);
+    tick+=100;mapmaker_pointer_switch_step(SM,0);           /* waits between presses */
+    CHECK(pulses_back==1);
+    tick+=200;mapmaker_pointer_switch_step(SM,0);           /* a nested menu: one more Back */
+    CHECK(pulses_back==2);
+    tick+=100;mapmaker_pointer_switch_step(MENU,1);         /* editor screen, too soon */
+    CHECK(pulses_a==0);
+    tick+=200;mapmaker_pointer_switch_step(MENU,1);         /* editor screen: A */
+    CHECK(pulses_a==1 && !mapmaker_pointer.switching);
+    mapmaker_pointer_switch_step(MENU,1);
+    CHECK(pulses_a==1);
+    mapmaker_pointer_switch_press(SM,450.f,200.f);          /* not the toolbar */
+    CHECK(!mapmaker_pointer.switching);
+    mapmaker_pointer_switch_press(MENU,450.f,50.f);         /* already on the editor screen */
+    CHECK(!mapmaker_pointer.switching);
+    mapmaker_pointer_switch_press(SM,450.f,50.f);           /* gives up after 3 Backs ... */
+    for(int i=0;i<5;i++) { mapmaker_pointer_switch_step(SM,0);tick+=260; }
+    CHECK(pulses_back==5 && !mapmaker_pointer.switching);
+    mapmaker_pointer_switch_press(SM,450.f,50.f);           /* ... or after 1.5 s */
+    mapmaker_pointer_switch_step(SM,0);tick+=1600;mapmaker_pointer_switch_step(MENU,1);
+    CHECK(pulses_a==1 && !mapmaker_pointer.switching);
+    WORD_AT(0x0079094Cu)=101;
+    mapmaker_pointer_switch_press(SM,450.f,50.f);           /* other scenes: never */
+    CHECK(!mapmaker_pointer.switching);
+    WORD_AT(0x0079094Cu)=102;
     row_presses=0;
     FLOAT_AT(0x007BA038u)=320.f;FLOAT_AT(0x007BA188u)=240.f;
 
@@ -247,6 +295,10 @@ int main(void)
     WORD_AT(ED+0x25c)=0x00004000u;                           /* a state the editor does not pan in */
     CHECK(!mapmaker_pointer_pan(1.f,1.f) && FLOAT_AT(0x00783DD8u)==10.f);
     WORD_AT(ED+0x25c)=0;
+    /* Wheel on the editor screen zooms (a short White/Black hold on the host). */
+    CHECK(mapmaker_pointer_wheel(MENU,2) && zoom_notches==2);
+    CHECK(mapmaker_pointer_wheel(MENU,-1) && zoom_notches==1);
+    zoom_notches=0;
     /* Right click without a drag: the menu Back action (rotate), on release. */
     WORD_AT(MENU+0xc4)=0;
     move(300.f,200.f);game_frame();
@@ -336,6 +388,25 @@ int main(void)
     CHECK(pc_mapmaker_key(1,'W',0x09,1,1)==1);   /* other keys untouched */
     CHECK(pc_mapmaker_key(1,0x1B,0,1,1)==1);     /* no Back key: leave Escape alone */
     CHECK(pc_mapmaker_key(1,0x1B,0x1B,1,1)==1);  /* Escape is Back already */
+    /* Wheel zoom: each notch holds White (up) or Black (down) for 100 ms. */
+    {
+        PcMapMakerZoom z={0};
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'1','1','2',0,1000));
+        pc_mapmaker_zoom_add(&z,1,1000);
+        CHECK(pc_mapmaker_zoom_key(&z,1,'1','1','2',0,1050));     /* White held */
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'2','1','2',0,1050));
+        CHECK(!pc_mapmaker_zoom_key(&z,0,'1','1','2',0,1050));    /* outside the editor */
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'1','1','2',0,1100));    /* expired */
+        pc_mapmaker_zoom_add(&z,2,1100);pc_mapmaker_zoom_add(&z,1,1150);
+        CHECK(pc_mapmaker_zoom_key(&z,1,'1','1','2',0,1390));     /* notches add up */
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'1','1','2',0,1400));
+        pc_mapmaker_zoom_add(&z,3,2000);pc_mapmaker_zoom_add(&z,-1,2050); /* reversal starts over */
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'1','1','2',0,2060) && pc_mapmaker_zoom_key(&z,1,'2','1','2',0,2060));
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'2','1','2',0,2150));
+        pc_mapmaker_zoom_add(&z,40,3000);
+        CHECK(pc_mapmaker_zoom_key(&z,1,'1','1','2',0,3999) && !pc_mapmaker_zoom_key(&z,1,'1','1','2',0,4000));
+        CHECK(pc_mapmaker_zoom_key(&z,1,'W','1','2',1,3500));     /* other keys untouched */
+    }
     /* T raises the floor (right trigger) in the editor only. */
     CHECK(pc_mapmaker_trigger_key(1,0x01,0x01,0,1)==1);   /* fire key (left mouse) reports T */
     CHECK(pc_mapmaker_trigger_key(1,0x01,0x01,0,0)==0);

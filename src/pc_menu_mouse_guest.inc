@@ -373,6 +373,7 @@ void pc_display_menu_mouse_input(void (*original)(void))
     if(!guest_call(sub_00074760,1,menu)) {restore_registers(&r);return;}
     pc_controls_menu_mode(1);
     s->pointer=pc_controls_menu_pointer();
+    if(s->pointer.wheel && mapmaker_pointer_wheel(menu,s->pointer.wheel)) s->pointer.wheel=0; /* prototype */
     if((WORD_AT(menu+0xc4)&0x3Fu) && !s->pointer.wheel) menu_mouse.wheel_pending=0;
     s->actions=pc_menu_mouse_actions(&menu_mouse,menu,s->pointer,GetTickCount64());s->sampled=1;
     /* Text-only pages (including long Objectives) scroll in sub_00073750
@@ -460,6 +461,7 @@ void pc_display_menu_mouse(void (*original)(void))
         pointer=menu_mouse_dispatch->pointer;actions=menu_mouse_dispatch->actions;
     } else {
         pointer=pc_controls_menu_pointer();
+        if(pointer.wheel && mapmaker_pointer_wheel(menu,pointer.wheel)) pointer.wheel=0; /* prototype */
         if((WORD_AT(menu+0xc4)&0x3Fu) && !pointer.wheel) menu_mouse.wheel_pending=0;
         actions=pc_menu_mouse_actions(&menu_mouse,menu,pointer,GetTickCount64());
     }
@@ -490,8 +492,9 @@ void pc_display_menu_mouse(void (*original)(void))
     }
     choice_direction=menu_choice_hit(menu,x,y,sw,sh,&hit);
     mapmaker_probe_click(menu,x,y,hit,actions); /* read-only diagnostic */
-    if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y))
-        mapmaker_pointer_scroll_press(menu,x,y); /* MapMaker prototype */
+    if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y) &&
+       !mapmaker_pointer_scroll_press(menu,x,y)) /* MapMaker prototype */
+        mapmaker_pointer_switch_press(menu,x,y);
     /* The original dispatcher applies directional repeats after this hook.
      * Do not let a previously held direction fight an actively chosen mouse
      * row. A fresh keyboard/controller direction immediately takes ownership

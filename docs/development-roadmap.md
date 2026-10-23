@@ -236,6 +236,13 @@ Tracked separately; do not merge their diagnosis.
   right trigger's key); in the editor it now shows T. R also raises the floor.
   Zoom uses held bits 0x8000/0x4000; by the menu table's pairing (0x400/0x800
   are the triggers) these are likely White/Black (keys 1/2), unconfirmed.
+- **Seventh run (2026-10-23):** keys 1/2 zoom (confirmed); T and its hint
+  work; tile/item lists scroll by arrows, drag and wheel; Story AI and logic
+  submenus by arrows and drag only (their wheel moved the row selection,
+  which they ignore). The wheel now scrolls editor scrollbars directly and
+  zooms on the editor screen. Toolbar clicks while a menu is open close the
+  menu (Back) and then press A. Wheel zoom direction and the toolbar strip
+  bounds (x 370-620, y 35-70, from recorded clicks) need in-game checks.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

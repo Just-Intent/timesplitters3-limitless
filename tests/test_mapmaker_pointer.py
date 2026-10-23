@@ -32,7 +32,7 @@ MUTATIONS = {
     'no-scroll-clamp': (ADAPTER, 'if(target>last) target=last;', ''),
     'arrow-no-repeat-delay': (ADAPTER, 'if(now<mapmaker_pointer.grab_next) return;', ''),
     'thumb-ignores-grab': (ADAPTER, '(y-mapmaker_pointer.grab-s.track0)/(s.track1-s.track0)*s.content);', '(y-s.track0)/(s.track1-s.track0)*s.content);'),
-    'scroll-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return;\n    ok=', 'if(!mapmaker_pointer_enabled()) return;\n    ok='),
+    'scroll-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return 0;\n    ok=', 'if(!mapmaker_pointer_enabled()) return 0;\n    ok='),
     'rotate-lost': (ADAPTER, '            WORD_AT(menu+0xc4)|=0x20u; /* as the shared hook', '            (void)0; /* as the shared hook'),
     'drag-rotates': (ADAPTER, 'if(mapmaker_pointer.right_travel<MAPMAKER_RIGHT_CLICK && guest_writable(menu,0x23c))', 'if(guest_writable(menu,0x23c))'),
     'parent-any-menu': (ADAPTER, ' || WORD_AT(parent+0x170)!=menu) return 0;', ') return 0;'),
@@ -40,6 +40,13 @@ MUTATIONS = {
     'trigger-everywhere': (POLICY, 'if (!editor || !trigger_key || key != trigger_key) return down;', 'if (!trigger_key || key != trigger_key) return down;'),
     'panel-any-menu': (ADAPTER, 'if(WORD_AT(menu+4)==0x0052E9D8u || WORD_AT(menu+4)==0x0052E9E8u) {', 'if(1) {'),
     'panel-no-a': (ADAPTER, '                pc_controls_mapmaker_row_press();\n                return item;\n            }\n    }', '                return item;\n            }\n    }'),
+    'wheel-scroll-down-is-up': (ADAPTER, 'FLOAT_AT(menu+0x88)-(float)notches*3.f', 'FLOAT_AT(menu+0x88)+(float)notches*3.f'),
+    'wheel-zoom-in-menus': (ADAPTER, 'if(mapmaker_pointer_context(menu)) { pc_controls_mapmaker_zoom(notches);return 1; }', 'pc_controls_mapmaker_zoom(notches);'),
+    'zoom-no-cap': (POLICY, 'if (z->until > now + 1000u) z->until = now + 1000u;', ''),
+    'zoom-no-reset': (POLICY, 'if (dir != z->dir || now >= z->until) { z->dir = dir; z->until = now; }', 'z->dir = dir; if (now >= z->until) z->until = now;'),
+    'switch-anywhere': (ADAPTER, ' ||\n       x<MAPMAKER_TOOLBAR_X0 || x>=MAPMAKER_TOOLBAR_X1 || y<MAPMAKER_TOOLBAR_Y0 || y>=MAPMAKER_TOOLBAR_Y1) return;', ') return;'),
+    'switch-no-gap': (ADAPTER, '    mapmaker_pointer.switch_next=now+MAPMAKER_SWITCH_GAP;', ''),
+    'switch-unbounded': (ADAPTER, 'if(mapmaker_pointer.switch_backs>=MAPMAKER_SWITCH_BACKS) { mapmaker_pointer.switching=0;return; }', ''),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 
@@ -86,7 +93,10 @@ def test_pointer_wiring():
     confirm = guest.split('void pc_display_menu_mouse(void (*original)(void))', 1)[1]
     gate = confirm.index('if(!mapmaker_pointer_row_click()) {')
     assert gate < confirm.index('menu_mouse_press(menu_mouse_dispatch,0x80u);') < confirm.index('WORD_AT(menu+0xc4)|=0x100010u;')
-    assert 'if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y))' in confirm
+    assert 'if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y) &&\n       !mapmaker_pointer_scroll_press(menu,x,y))' in confirm
+    assert 'mapmaker_pointer_switch_press(menu,x,y);' in confirm
+    # Both wheel samples (dispatch and layout fallback) go to the editor first.
+    assert guest.count('.wheel && mapmaker_pointer_wheel(menu,') == 2
     assert '(actions&4) && !(mapmaker_pointer_enabled() && mapmaker_pointer_context(menu))' in confirm
     for host in ('src/pc_controls.c', 'src/native/input_sdl.c'):
         text = (ROOT / host).read_text(encoding='utf-8')

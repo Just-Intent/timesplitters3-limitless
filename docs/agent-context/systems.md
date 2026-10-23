@@ -174,7 +174,12 @@ scrollbars (geometry as `sub_00071400`) are driven directly, because A over
 the bar did not scroll the Story AI list: arrows step the target
 `menu+0x88` (step `+0x98`, repeating while held), the track centres the view
 there and the thumb follows the mouse, clamped like `sub_00073560`; the
-engine animates the scroll. Prompts show T for the right trigger in the
+engine animates the scroll. The wheel scrolls those menus the same way
+(three steps per notch) and, on the editor screen, zooms by briefly holding
+White (up) or Black (down) (`pc_mapmaker_zoom_*`). A click on the toolbar
+strip while a menu is open sends short Back presses until the editor screen
+is back, then a short A (`mapmaker_pointer_switch_*`,
+`pc_controls_mapmaker_pulse`). Prompts show T for the right trigger in the
 editor (`pc_controls_mapmaker_editor_active`). On the editor screen right-drag and the window edge pan the view the
 way `sub_00309160` + `sub_002F9F70` do (skipped when `editor+0x25C &
 0x0C044088`), and the right button no longer sends the menu Back action

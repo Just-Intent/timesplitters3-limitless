@@ -36,9 +36,11 @@
  * Requires the includer's WORD_AT, FLOAT_AT, guest_writable,
  * d3d8_display_output_shape, pc_menu_mouse_position,
  * pc_controls_menu_hover_pointer, pc_controls_mapmaker_pointer and
- * pc_controls_mapmaker_row_press and pc_controls_mapmaker_editor. */
+ * pc_controls_mapmaker_row_press, pc_controls_mapmaker_editor,
+ * pc_controls_mapmaker_zoom and pc_controls_mapmaker_pulse. */
 #include <math.h>
 #include <stdlib.h>
+#include "pc_mapmaker_pointer.h"
 
 #define MAPMAKER_POINTER_SCENE 102
 #define MAPMAKER_POINTER_PLAYER 0x007BA9E0u
@@ -50,6 +52,14 @@
 #define MAPMAKER_GRID 40.f
 #define MAPMAKER_SCROLL_DELAY 300u   /* ms before an arrow repeats */
 #define MAPMAKER_SCROLL_REPEAT 80u   /* ms between repeats */
+/* Toolbar strip (category icons and arrows), UI canvas; from the recorded clicks. */
+#define MAPMAKER_TOOLBAR_X0 370.f
+#define MAPMAKER_TOOLBAR_X1 620.f
+#define MAPMAKER_TOOLBAR_Y0 35.f
+#define MAPMAKER_TOOLBAR_Y1 70.f
+#define MAPMAKER_SWITCH_BACKS 3      /* menus closed at most */
+#define MAPMAKER_SWITCH_GAP 250u     /* ms between Back presses */
+#define MAPMAKER_SWITCH_TIMEOUT 1500u
 
 static struct {
     int initialized, enabled;
@@ -59,6 +69,9 @@ static struct {
     int grab_mode;       /* 1 up arrow, 2 down arrow, 3 thumb */
     float grab;          /* pointer y minus thumb top at the press */
     unsigned long long grab_next; /* next arrow repeat */
+    int switching;       /* toolbar click while a menu was open: close it, then A */
+    int switch_backs;
+    unsigned long long switch_at, switch_next;
     float right_travel;  /* UI pixels moved while the right button is held */
 } mapmaker_pointer;
 #define MAPMAKER_RIGHT_CLICK 4.f /* less travel than this is a click, not a drag */
@@ -192,22 +205,22 @@ static float mapmaker_scroll_step(uint32_t menu)
     return isfinite(step) && step>0 && step<=view ? step : view*.1f;
 }
 
-static void mapmaker_pointer_scroll_press(uint32_t menu,float x,float y)
+static int mapmaker_pointer_scroll_press(uint32_t menu,float x,float y)
 {
     MapMakerScroll s;
     int ok;
     mapmaker_pointer.grab_menu=0;
-    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return;
+    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return 0;
     ok=mapmaker_scroll_geometry(menu,&s);
     mapmaker_pointer_scroll_log(menu,x,y,ok,&s);
-    if(!ok || x<s.x0 || x>=s.x1 || y<s.y0 || y>=s.y1) return;
+    if(!ok || x<s.x0 || x>=s.x1 || y<s.y0 || y>=s.y1) return 0;
     mapmaker_pointer.grab_menu=menu;
     if(y<s.track0 || y>=s.track1) {
         mapmaker_pointer.grab_mode=y<s.track0?1:2;
         mapmaker_scroll_to(menu,&s,FLOAT_AT(menu+0x88)+
             (mapmaker_pointer.grab_mode==1?-1.f:1.f)*mapmaker_scroll_step(menu));
         mapmaker_pointer.grab_next=GetTickCount64()+MAPMAKER_SCROLL_DELAY;
-        return;
+        return 1;
     }
     if(y<s.thumb0 || y>=s.thumb1) {
         /* Track: centre the view there (sub_000736F0), then drag from it. */
@@ -216,6 +229,50 @@ static void mapmaker_pointer_scroll_press(uint32_t menu,float x,float y)
         mapmaker_pointer.grab=(s.thumb1-s.thumb0)*.5f;
     } else mapmaker_pointer.grab=y-s.thumb0;
     mapmaker_pointer.grab_mode=3;
+    return 1;
+}
+
+/* A left press on the toolbar while an editor menu is open (it hit nothing in
+ * that menu): the editor only acts on the toolbar from its own screen, and on
+ * real buttons. Close the menu with short Back presses, then press A once the
+ * editor screen is back; the game pointer is still over the clicked icon. */
+static void mapmaker_pointer_switch_press(uint32_t menu,float x,float y)
+{
+    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu) ||
+       x<MAPMAKER_TOOLBAR_X0 || x>=MAPMAKER_TOOLBAR_X1 || y<MAPMAKER_TOOLBAR_Y0 || y>=MAPMAKER_TOOLBAR_Y1) return;
+    mapmaker_pointer.switching=1;mapmaker_pointer.switch_backs=0;
+    mapmaker_pointer.switch_at=GetTickCount64();mapmaker_pointer.switch_next=0;
+}
+static void mapmaker_pointer_switch_step(uint32_t menu,int root)
+{
+    unsigned long long now=GetTickCount64();
+    if(!mapmaker_pointer.switching) return;
+    if(now-mapmaker_pointer.switch_at>MAPMAKER_SWITCH_TIMEOUT) { mapmaker_pointer.switching=0;return; }
+    if(now<mapmaker_pointer.switch_next) return;
+    if(root) {
+        pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_A);
+        mapmaker_pointer.switching=0;
+        return;
+    }
+    (void)menu;
+    if(mapmaker_pointer.switch_backs>=MAPMAKER_SWITCH_BACKS) { mapmaker_pointer.switching=0;return; }
+    pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_BACK);
+    mapmaker_pointer.switch_backs++;
+    mapmaker_pointer.switch_next=now+MAPMAKER_SWITCH_GAP;
+}
+
+/* Wheel notches (positive up) in the editor: zoom on the editor screen, or
+ * scroll a menu with a scrollbar by three steps per notch (the generic wheel
+ * moves the row selection, which the Story AI lists ignore). Returns 1 when
+ * the notches were used, so the generic wheel must not also apply them. */
+static int mapmaker_pointer_wheel(uint32_t menu,int notches)
+{
+    MapMakerScroll s;
+    if(!notches || !mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return 0;
+    if(mapmaker_pointer_context(menu)) { pc_controls_mapmaker_zoom(notches);return 1; }
+    if(!mapmaker_scroll_geometry(menu,&s)) return 0;
+    mapmaker_scroll_to(menu,&s,FLOAT_AT(menu+0x88)-(float)notches*3.f*mapmaker_scroll_step(menu));
+    return 1;
 }
 
 /* Every frame of the press: repeat arrows, or keep the thumb under the mouse. */
@@ -366,6 +423,7 @@ static void mapmaker_pointer_input(uint32_t menu)
     pressed=(p.left && !mapmaker_pointer.last_left) || (p.right && !mapmaker_pointer.last_right);
     if(moved || pressed) mapmaker_pointer_place(x,y);
     mapmaker_pointer_scroll_drag(menu,y,p.left);
+    mapmaker_pointer_switch_step(menu,root);
     if(root) mapmaker_pointer_navigate(menu,x,y,gw,gh,p.right);
     mapmaker_pointer.have_last=1;
     mapmaker_pointer.last_x=p.x;mapmaker_pointer.last_y=p.y;
