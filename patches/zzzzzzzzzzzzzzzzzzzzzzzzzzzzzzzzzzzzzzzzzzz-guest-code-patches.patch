@@ -87,7 +87,7 @@ diff --git a/tools/recomp/disasm.py b/tools/recomp/disasm.py
          return insn
  
      def disassemble_function(self, raw_bytes, start_va, end_va, resync=None):
-@@ -357,3 +361,218 @@ class Disassembler:
+@@ -357,3 +361,368 @@ class Disassembler:
              blocks.append(bb)
  
          return blocks
@@ -120,6 +120,22 @@ diff --git a/tools/recomp/disasm.py b/tools/recomp/disasm.py
 +The value must fit the operation width; branches, calls and `ret n` are
 +refused.
 +
++`relocate` moves a zero-initialised table to a larger one in the title's
++reserved guest block (the table's top-level "extension": {"va", "size"}):
++
++    {"id": "...", "kind": "relocate", "old": "0x00716148", "size": "0x78",
++     "new": "0x008A0000", "new_size": "0x200",
++     "sites": {"0x0009E663": "offset", "0x0009E2B4": "end", ...},
++     "data_ok": []}
++
++Every immediate or displacement in lifted code with a value in
++[old, old + size] must be listed in `sites`, and every listed site must be
++one: "offset" maps old + k to new + k, "end" maps old + size to new +
++new_size, and "keep" leaves a reference to old + size that is another
++variable, not the table end. Initialised data words in that range must be listed in `data_ok`
++(confirmed not to be pointers). So a reference that was missed stops the
++lift instead of reaching the old table.
++
 +Anything that does not verify stops the lift naming the entry: a patch that
 +silently failed to apply would leave a limit at its stock value while the
 +policy around it assumes the new one.
@@ -145,19 +161,49 @@ diff --git a/tools/recomp/disasm.py b/tools/recomp/disasm.py
 +
 +
 +def load_guest_patches(path):
++    """Load one table, or a folder of tables (merged; each file is one area)."""
 +    import json
-+    with open(path, "r", encoding="utf-8") as fh:
-+        table = json.load(fh)
++    import os
++    if os.path.isdir(path):
++        merged, header, files = {"patches": []}, {}, 0
++        for name in sorted(os.listdir(path)):
++            if not name.endswith(".json"):
++                continue
++            files += 1
++            with open(os.path.join(path, name), "r", encoding="utf-8") as fh:
++                part = json.load(fh)
++            for key in ("title_id", "xbe_sha256", "extension"):
++                if part.get(key) is None:
++                    continue
++                if key in header and header[key] != part[key]:
++                    raise GuestPatchError(f"{name}: {key} differs from the other tables")
++                header[key] = part[key]
++            merged["patches"].extend(part.get("patches") or [])
++        if not files:
++            raise GuestPatchError(f"{path}: no tables")
++        merged.update(header)
++        table = merged
++    else:
++        with open(path, "r", encoding="utf-8") as fh:
++            table = json.load(fh)
 +    if not isinstance(table, dict) or not isinstance(table.get("patches"), list):
 +        raise GuestPatchError(f"{path}: expected an object with a 'patches' list")
++    extension = None
++    if table.get("extension") is not None:
++        ext = table["extension"]
++        extension = (_int(ext.get("va"), "extension va", "extension"),
++                     _int(ext.get("size"), "extension size", "extension"))
 +    seen_ids, spans = set(), []
-+    entries = []
++    entries, relocations = [], []
 +    for raw in table["patches"]:
 +        eid = raw.get("id")
 +        if not eid or eid in seen_ids:
 +            raise GuestPatchError(f"{path}: missing or duplicate patch id {eid!r}")
 +        seen_ids.add(eid)
 +        kind = raw.get("kind")
++        if kind == "relocate":
++            relocations.append(_load_relocation(raw, eid, extension, relocations))
++            continue
 +        if kind not in ("code", "operand"):
 +            raise GuestPatchError(f"guest patch {eid}: unknown kind {kind!r}")
 +        e = {"id": eid, "kind": kind,
@@ -182,7 +228,31 @@ diff --git a/tools/recomp/disasm.py b/tools/recomp/disasm.py
 +        spans.append(span)
 +        entries.append(e)
 +    return {"title_id": table.get("title_id"), "xbe_sha256": table.get("xbe_sha256"),
-+            "patches": entries}
++            "patches": entries, "relocations": relocations, "extension": extension}
++
++
++def _load_relocation(raw, eid, extension, others):
++    r = {"id": eid, "kind": "relocate",
++         "old": _int(raw.get("old"), "old", eid), "size": _int(raw.get("size"), "size", eid),
++         "new": _int(raw.get("new"), "new", eid),
++         "new_size": _int(raw.get("new_size"), "new_size", eid),
++         "sites": {}, "data_ok": set()}
++    if r["size"] <= 0 or r["new_size"] < r["size"]:
++        raise GuestPatchError(f"guest patch {eid}: new_size must be at least size")
++    if extension is None or not (extension[0] <= r["new"] and
++                                 r["new"] + r["new_size"] <= extension[0] + extension[1]):
++        raise GuestPatchError(f"guest patch {eid}: new table is outside the reserved extension")
++    for o in others:
++        if r["new"] < o["new"] + o["new_size"] and o["new"] < r["new"] + r["new_size"]:
++            raise GuestPatchError(f"guest patch {eid}: new table overlaps {o['id']}")
++        if r["old"] <= o["old"] + o["size"] and o["old"] <= r["old"] + r["size"]:
++            raise GuestPatchError(f"guest patch {eid}: old table overlaps {o['id']}")
++    for addr, how in (raw.get("sites") or {}).items():
++        if how not in ("offset", "end", "keep"):
++            raise GuestPatchError(f"guest patch {eid}: site {addr} must be offset, end or keep")
++        r["sites"][_int(addr, "site", eid)] = how
++    r["data_ok"] = {_int(a, "data_ok", eid) for a in raw.get("data_ok") or ()}
++    return r
 +
 +
 +def _function_bytes(data, func):
@@ -292,7 +362,87 @@ diff --git a/tools/recomp/disasm.py b/tools/recomp/disasm.py
 +            raise GuestPatchError(
 +                f"guest patches in 0x{fn:08X} change its instruction boundaries, "
 +                f"mnemonics or branch targets")
++    if table.get("relocations"):
++        _apply_relocations(table["relocations"], bytes(data), func_db, dis, overrides, functions)
 +    return bytes(data), overrides, functions
++
++
++def _apply_relocations(relocations, data, func_db, dis, overrides, functions):
++    """Find every reference to each relocated table and redirect it."""
++    config = _config()
++    for r in relocations:
++        lo, hi = r["old"], r["old"] + r["size"]
++        for va in range(lo, hi, 4):
++            off = config.va_to_file_offset(va)
++            if off is not None and any(data[off:off + 4]):
++                raise GuestPatchError(
++                    f"guest patch {r['id']}: 0x{va:08X} is initialised; only "
++                    f"zero-initialised tables can be relocated")
++    found = {}
++    for func in func_db.values():
++        start, end = func.get("_addr"), func.get("end")
++        if start is None or not end or not config.is_code_address(start):
++            continue
++        for insn in _decode(dis, data, func):
++            if insn.is_branch or insn.is_call:
++                continue
++            for index, op in enumerate(insn.operands):
++                if op.type == "imm":
++                    value = op.imm
++                elif op.type == "mem" and isinstance(op.mem_disp, int) and op.mem_disp > 0:
++                    value = op.mem_disp & 0xFFFFFFFF
++                else:
++                    continue
++                for r in relocations:
++                    if r["old"] <= value <= r["old"] + r["size"]:
++                        if insn.address in found:
++                            raise GuestPatchError(
++                                f"guest patch {r['id']}: 0x{insn.address:08X} has two "
++                                f"relocated operands")
++                        found[insn.address] = (r, index, value, func["_addr"])
++    for r in relocations:
++        mine = {a: v for a, v in found.items() if v[0] is r}
++        missing = sorted(set(mine) - set(r["sites"]))
++        extra = sorted(set(r["sites"]) - set(mine))
++        if missing or extra:
++            raise GuestPatchError(
++                f"guest patch {r['id']}: references not listed: "
++                + (", ".join(f"0x{a:08X}" for a in missing) or "none")
++                + "; listed sites that are not references: "
++                + (", ".join(f"0x{a:08X}" for a in extra) or "none"))
++        for address, (_, index, value, fn) in sorted(mine.items()):
++            how = r["sites"][address]
++            if how == "keep":
++                if value != r["old"] + r["size"]:
++                    raise GuestPatchError(
++                        f"guest patch {r['id']}: only a reference to the word after the table can be kept")
++                continue
++            if how == "end":
++                if value != r["old"] + r["size"]:
++                    raise GuestPatchError(
++                        f"guest patch {r['id']}: 0x{address:08X} is not the table end")
++                new_value = r["new"] + r["new_size"]
++            else:
++                if value >= r["old"] + r["size"]:
++                    raise GuestPatchError(
++                        f"guest patch {r['id']}: 0x{address:08X} is the table end, not an offset")
++                new_value = r["new"] + (value - r["old"])
++            if address in overrides:
++                raise GuestPatchError(
++                    f"guest patch {r['id']}: 0x{address:08X} already has an operand patch")
++            overrides[address] = [(index, new_value)]
++            functions.add(fn)
++    for section in config._SECTIONS:
++        if section.is_code:
++            continue
++        for va in range(section.va, section.va + min(section.raw_size, section.va_size) - 3, 4):
++            off = section.raw_addr + (va - section.va)
++            value = int.from_bytes(data[off:off + 4], "little")
++            for r in relocations:
++                if r["old"] <= value <= r["old"] + r["size"] and va not in r["data_ok"]:
++                    raise GuestPatchError(
++                        f"guest patch {r['id']}: data word at 0x{va:08X} holds 0x{value:08X}; "
++                        f"list it in data_ok if it is not a pointer to the table")
 +
 +
 +def override_operands(insn, overrides):

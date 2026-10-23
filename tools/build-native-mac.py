@@ -110,7 +110,7 @@ def main():
         run(PYTHON, '-m', 'tools.xdk_symbols', xbe, cwd=UPSTREAM)
         run(PYTHON, 'scripts/recompile.py', xbe, '--work-dir', runtime_root / 'private/pipeline',
             '--project', 'titles/futureperfect', '--game-name', 'TimeSplitters: Future Perfect',
-            '--trace-all-entries', '--guest-patches', ROOT / 'config/guest-code-patches.json',
+            '--trace-all-entries', '--guest-patches', ROOT / 'config/guest-code-patches',
             cwd=UPSTREAM)
         run(PYTHON, ROOT / 'tools/recomp-generation.py', UPSTREAM, '--record')
     if not generated.exists():

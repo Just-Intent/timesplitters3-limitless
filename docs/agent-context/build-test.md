@@ -255,7 +255,7 @@ include `pc_display_menu.c` or `pc_menu_mouse_guest.inc` (`menu_mouse.c`,
 
 ## Guest-code patch table
 
-`config/guest-code-patches.json` is applied by every lift (Windows Generate and
+`config/guest-code-patches/` (a folder of JSON tables) is applied by every lift (Windows Generate and
 Build's regeneration, Mac `--generate`); its hash is part of the generation
 fingerprint, so editing it forces regeneration on the next build. An entry that
 fails verification stops the build with the entry id. See

@@ -1,6 +1,4 @@
 {
-  "title_id": "45410066",
-  "xbe_sha256": "3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc",
   "patches": [
     {
       "id": "mm-subentry-pool-bytes",

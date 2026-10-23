@@ -1,0 +1,10 @@
+{
+  "title_id": "45410066",
+  "xbe_sha256": "3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc",
+  "extension": {
+    "va": "0x008A0000",
+    "size": "0x00080000",
+    "note": "Reserved by titles/futureperfect/src/main.c (TSFP_GUEST_EXTENSION_VA/SIZE). Areas: 0x008A0000 objects, 0x008B0000 logic/tags, 0x008C0000 rooms, 0x008D0000 editor, 0x008E0000-0x0091FFFF spare."
+  },
+  "patches": []
+}

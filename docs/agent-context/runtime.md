@@ -177,7 +177,7 @@ and force one guest regeneration. Policy: `src/pc_mapmaker_budget.inc`,
 ## Verified guest-code patches
 
 `*-guest-code-patches.patch` adds a guest-patch checker to the lift (`tools/recomp/disasm.py`):
-`config/guest-code-patches.json` (project-tracked) lists `code` entries (same-length
+`config/guest-code-patches/` (project-tracked) lists `code` entries (same-length
 byte rewrites of the in-memory XBE copy the lifter decodes) and `operand` entries
 (a decoded immediate or displacement replaced, so an imm8 compare can take any
 32-bit value). The lift stops unless the XBE SHA-256, each entry's original bytes,
@@ -186,5 +186,24 @@ mnemonics and branch targets all check out; entries in hand-written or HLE-repla
 functions are refused. The XBE on disk is never written, and the disassembly stage
 is unaffected. Both builds pass the table (`tsfp.ps1` Generate and Build's lift,
 `tools/build-native-mac.py`), and `tools/recomp-generation.py` hashes it, so an edit
-regenerates guest C. Data-section and relocation entries are not implemented.
+regenerates guest C. The table is a folder: `00-header.json` holds the title,
+XBE hash and the reserved extension block; every other file is one area's
+`patches` list (merged by name order, ids unique). `relocate` entries move a
+zero-initialised table into the extension block: every immediate or
+displacement in lifted code inside `[old, old+size]` must be listed as an
+`offset`, `end` or `keep` site and initialised data words in range as
+`data_ok`, or the lift stops. `tools/guest-refs.py START SIZE [--data]` prints
+that scan. Data-section (initial value) entries are not implemented; C
+policy writes guest data where needed.
+
+## Guest memory extension block
+
+`*-guest-memory-extension.patch` adds `xbox_SetImageExtension(bytes)` to
+`src/kernel/xbox_memory_layout.c`: before `xbox_MemoryLayoutInit` a title can
+reserve a zeroed block right after its image (end rounded up to 64 KB); the
+runtime's low memory (kernel data, stack, heap) moves up past it, so the heap
+shrinks by its size, and it counts as image for host writers. Future Perfect's
+`main.c` reserves 0x80000 bytes at 0x008A0000 (`TSFP_GUEST_EXTENSION_VA/SIZE`)
+and stops with a message if the block lands elsewhere, because relocated
+tables in the generated code point into it.
 Tests: `tests/test_guest_code_patches.py`, `tests/test_recomp_generation.py`.

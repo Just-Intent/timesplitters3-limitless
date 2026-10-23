@@ -1,0 +1,114 @@
+diff --git a/src/kernel/xbox_memory_layout.c b/src/kernel/xbox_memory_layout.c
+--- a/src/kernel/xbox_memory_layout.c
++++ b/src/kernel/xbox_memory_layout.c
+@@ -124,6 +124,15 @@ void xbox_SetMapSize(size_t bytes)
+     g_xbox_map_size = bytes;
+ }
+ 
++/* See xbox_SetImageExtension in the header. */
++uint32_t g_xbox_image_extension_va = 0;
++uint32_t g_xbox_image_extension_size = 0;
++
++void xbox_SetImageExtension(uint32_t bytes)
++{
++    g_xbox_image_extension_size = (bytes + 0xFFFFu) & ~0xFFFFu;
++}
++
+ /* File mapping handle for the Xbox memory region.
+  * Using CreateFileMapping + MapViewOfFileEx allows mirror views to alias
+  * the same physical pages as the base region, so writes to mirror addresses
+@@ -2179,6 +2188,15 @@ BOOL xbox_MemoryLayoutInit(const void *xbe_data, size_t xbe_size)
+         DWORD image_size = *(const DWORD *)(xbe + 0x010C);
+         uint32_t image_end = (uint32_t)base_addr + (uint32_t)image_size;
+ 
++        /* A reserved extension block sits right after the image and the
++         * runtime's low memory moves past it as it does past the image. */
++        if (g_xbox_image_extension_size) {
++            g_xbox_image_extension_va = (image_end + 0xFFFFu) & ~0xFFFFu;
++            image_end = g_xbox_image_extension_va + g_xbox_image_extension_size;
++            fprintf(stderr, "  Image extension: %u bytes at 0x%08X\n",
++                    g_xbox_image_extension_size, g_xbox_image_extension_va);
++        }
++
+         if (image_end > XBOX_LOW_REGION_START) {
+             g_xbox_low_shift = (image_end - XBOX_LOW_REGION_START + 0xFFFFu)
+                                & ~0xFFFFu;
+@@ -2278,6 +2296,14 @@ BOOL xbox_MemoryLayoutInit(const void *xbe_data, size_t xbe_size)
+                 sections_loaded, num_sections, total_bytes);
+     }
+ 
++    /* The reserved extension block: zeroed, and part of the image for host
++     * writers (see xbox_SetImageExtension). */
++    if (g_xbox_image_extension_va) {
++        memset(XBOX_VA(g_xbox_image_extension_va), 0, g_xbox_image_extension_size);
++        if (g_xbox_image_extension_va + g_xbox_image_extension_size > g_xbox_image_hi)
++            g_xbox_image_hi = g_xbox_image_extension_va + g_xbox_image_extension_size;
++    }
++
+     /*
+      * Parse the kernel thunk table address from the XBE header.
+      * The XBE stores KernelImageThunkAddress at offset 0x0158, XOR-encrypted.
+diff --git a/src/kernel/xbox_memory_layout.h b/src/kernel/xbox_memory_layout.h
+--- a/src/kernel/xbox_memory_layout.h
++++ b/src/kernel/xbox_memory_layout.h
+@@ -101,6 +101,18 @@ extern uint32_t g_xbox_code_lo;
+ extern uint32_t g_xbox_code_hi;
+ void xbox_SetTotalRam(size_t bytes);
+ 
++/* A title may reserve a block of guest memory directly after its image, at a
++ * fixed address known when its code is generated, so that tables the lifted
++ * code addresses absolutely can be relocated there and grown (see the guest
++ * code patch table of a title project). Call before xbox_MemoryLayoutInit.
++ * The block starts at the image end rounded up to 64 KB, is zeroed, counts as
++ * part of the image for host writers, and moves the runtime's low memory
++ * (kernel data, stack, heap) up by its size, so the heap shrinks by that much.
++ * g_xbox_image_extension_va is 0 when no block was reserved. */
++void xbox_SetImageExtension(uint32_t bytes);
++extern uint32_t g_xbox_image_extension_va;
++extern uint32_t g_xbox_image_extension_size;
++
+ /* NOTE: Section addresses (.text, .rdata, .data, etc.) are NOT hardcoded.
+  * They are parsed from the XBE header at runtime in xbox_MemoryLayoutInit().
+  * This allows the toolkit to work with ANY Xbox game without modification. */
+diff --git a/titles/futureperfect/src/main.c b/titles/futureperfect/src/main.c
+--- a/titles/futureperfect/src/main.c
++++ b/titles/futureperfect/src/main.c
+@@ -45,6 +45,12 @@
+ #include <xbox/xboxrecomp.h>
+ #include "xbox_watchpoint.h"
+ 
++/* Guest memory extension for tables relocated by the project's
++ * config/guest-code-patches.json (the lift checks relocation targets against
++ * this range). The image ends at 0x0089CD60, so the block starts at 0x008A0000. */
++#define TSFP_GUEST_EXTENSION_VA   0x008A0000u
++#define TSFP_GUEST_EXTENSION_SIZE 0x00080000u
++
+ /*
+  * If xboxrecomp.h is not an umbrella header in your setup, include
+  * the individual headers directly:
+@@ -598,6 +604,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+ 
+     /* Step 2: Initialize Xbox memory layout */
+     printf("Initializing Xbox memory layout...\n");
++    xbox_SetImageExtension(TSFP_GUEST_EXTENSION_SIZE);
+     if (!xbox_MemoryLayoutInit(xbe_data, xbe_size)) {
+         MessageBoxA(NULL, "Failed to initialize Xbox memory layout.\n"
+                     "The required virtual address range may be unavailable.",
+@@ -608,6 +615,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+ 
+     g_xbox_mem_offset = xbox_GetMemoryOffset();
+     printf("Xbox memory mapped. Offset: 0x%llX\n", (unsigned long long)g_xbox_mem_offset);
++    if (g_xbox_image_extension_va != TSFP_GUEST_EXTENSION_VA ||
++        g_xbox_image_extension_size < TSFP_GUEST_EXTENSION_SIZE) {
++        char message[256];
++        snprintf(message, sizeof message, "The guest memory extension is at 0x%08X "
++                 "(%u bytes), but the game code was generated for 0x%08X.",
++                 g_xbox_image_extension_va, g_xbox_image_extension_size,
++                 (unsigned)TSFP_GUEST_EXTENSION_VA);
++        MessageBoxA(NULL, message, "Timesplitters - Future Perfect", MB_ICONERROR);
++        free(xbe_data);
++        return 1;
++    }
+ 
+     /* Step 3: Initialize Xbox kernel */
+     printf("Initializing Xbox kernel replacement...\n");

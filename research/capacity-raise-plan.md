@@ -5,7 +5,7 @@ AI, movable objects, keycards, logic). Basis: five static-analysis passes over
 the disassembly (reports in the ignored `logs/limits/*.md`; every site there is
 listed with function, address and bytes). Everything here is UNVERIFIED in
 play until a stage's validation run says otherwise. Tool:
-`config/guest-code-patches.json` (verified same-length rewrites and operand
+`config/guest-code-patches/` (verified same-length rewrites and operand
 overrides at lift time) plus function wrappers.
 
 ## What really limits each thing

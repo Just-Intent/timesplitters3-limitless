@@ -27,15 +27,17 @@ def fingerprint(runtime):
         json.dumps(sorted(declarations)).encode('utf-8')).hexdigest()
     # Verified guest-code patches are applied by the lift, so editing the
     # project's table must regenerate the guest C.
-    table = guest_patch_table(runtime)
-    result['guest-code-patches'] = (hashlib.sha256(table.read_bytes()).hexdigest()
-                                    if table.is_file() else 'absent')
+    tables = guest_patch_table(runtime)
+    digest = hashlib.sha256()
+    for table in sorted(tables.glob('*.json')) if tables.is_dir() else ():
+        digest.update(table.name.encode('utf-8') + b'\0' + table.read_bytes() + b'\0')
+    result['guest-code-patches'] = digest.hexdigest() if tables.is_dir() else 'absent'
     return result
 
 
 def guest_patch_table(runtime):
-    """The project's table, two levels above the runtime checkout (external/<runtime>)."""
-    return Path(runtime).resolve().parents[1] / 'config/guest-code-patches.json'
+    """The project's tables folder, two levels above the runtime checkout (external/<runtime>)."""
+    return Path(runtime).resolve().parents[1] / 'config/guest-code-patches'
 
 
 def marker(runtime):

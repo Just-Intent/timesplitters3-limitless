@@ -28,7 +28,7 @@
  * the decision and both values are recomputed with pads 4800, links 8800,
  * pad groups 600 and 200 items ("sub-entries"; cover pads stay 1024); pieces
  * and memory (raised separately by TSFP_MAPMAKER_MEMORY_SCALE) keep their
- * limits. The editor's item node pool is 2120 (config/guest-code-patches.json).
+ * limits. The editor's item node pool is 2120 (config/guest-code-patches/).
  *
  * Cover pads stay at the stock 1024: the map adds about 60 more when it loads
  * (measured: 60 on a 142-tile, 50-item map and on a 110-tile, 67-item map, so

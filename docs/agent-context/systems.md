@@ -171,7 +171,7 @@ are recomputed with pads 4800, links 8800, groups 600 and 200 items (cover stays
 1024; the cover pool is 1536 as a guard), and the category maxima table
 `0x00524BE0` is raised (pickups x4, movers/props x4; turrets and teleporters
 unchanged). The editor's item node
-pool is 2120 through `config/guest-code-patches.json` (always on). Tests:
+pool is 2120 through `config/guest-code-patches/` (always on). Tests:
 `tests/test_mapmaker_limits.py`. Probe flag 64. Basis:
 `research/capacity-constraints.md` §1c.
 

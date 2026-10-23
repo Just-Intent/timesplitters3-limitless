@@ -140,3 +140,98 @@ def test_wrong_xbe_and_bad_tables_are_refused(tmp_path):
                _entry("a", BASE + 3, "3d00401f00", kind="code", new_hex="3d00007d00"))
     with pytest.raises(GuestPatchError, match="same length"):
         _table(tmp_path, _entry("a", BASE + 3, "3d00401f00", kind="code", new_hex="3d00"))
+
+
+# ---- relocations ----------------------------------------------------------
+#   mov eax, [eax*4 + 0x00020000]   8b 04 85 00 00 02 00   -> offset
+#   mov [0x00020010], eax           a3 10 00 02 00          -> end (or keep)
+#   ret                             c3
+RCODE = bytes.fromhex("8b048500000200" "a310000200" "c3")
+TABLE, DATA = 0x00020000, 0x00030000
+EXT = {"va": "0x008A0000", "size": "0x00010000"}
+
+
+def _reloc_image(data_word=0x11111111, initialised=False):
+    data = data_word.to_bytes(4, "little")
+    sections = [config.Section(".text", BASE, len(RCODE), 0, len(RCODE), True),
+                config.Section(".bss", TABLE, 0x100, 0, 0, False),
+                config.Section(".data", DATA, 4, len(RCODE), 4, False)]
+    if initialised:      # the table itself has file bytes
+        sections[1] = config.Section(".tbl", TABLE, 0x100, len(RCODE), 4, False)
+    config._install(sections, entry_point=BASE, kernel_thunk_addr=BASE, origin="reloc-test")
+    image = RCODE + data
+    func = {BASE: {"start": f"0x{BASE:08X}", "end": BASE + len(RCODE), "_addr": BASE,
+                   "size": len(RCODE)}}
+    return image, func
+
+
+def _reloc(tmp_path, image, sites, **kw):
+    entry = {"id": "t", "kind": "relocate", "old": f"0x{TABLE:08X}", "size": "0x10",
+             "new": kw.pop("new", "0x008A0000"), "new_size": "0x40", "sites": sites}
+    entry.update(kw)
+    path = tmp_path / "reloc.json"
+    path.write_text(json.dumps({"title_id": "0", "xbe_sha256": hashlib.sha256(image).hexdigest(),
+                                "extension": EXT, "patches": [entry]}), encoding="utf-8")
+    return guest_patches.load(str(path))
+
+
+def test_relocation_redirects_every_reference(tmp_path):
+    image, func = _reloc_image()
+    table = _reloc(tmp_path, image, {f"0x{BASE:08X}": "offset", f"0x{BASE + 7:08X}": "end"})
+    data, overrides, functions = guest_patches.apply(table, image, func)
+    assert overrides == {BASE: [(1, 0x008A0000)], BASE + 7: [(0, 0x008A0040)]}
+    assert functions == {BASE}
+    c = FunctionTranslator(data, func, operand_overrides=overrides).translate_function(BASE, func[BASE])
+    assert "0x8A0000" in c and "0x8A0040" in c and "0x20000" not in c and "0x20010" not in c, c
+    keep = _reloc(tmp_path, image, {f"0x{BASE:08X}": "offset", f"0x{BASE + 7:08X}": "keep"})
+    assert guest_patches.apply(keep, image, func)[1] == {BASE: [(1, 0x008A0000)]}
+
+
+@pytest.mark.parametrize("sites, kw, message", [
+    ({"0x00010000": "offset"}, {}, "not listed: 0x00010007"),
+    ({"0x00010000": "offset", "0x00010007": "end", "0x0001000C": "offset"}, {}, "not references: 0x0001000C"),
+    ({"0x00010000": "end", "0x00010007": "end"}, {}, "not the table end"),
+    ({"0x00010000": "keep", "0x00010007": "end"}, {}, "can be kept"),
+    ({"0x00010000": "offset", "0x00010007": "offset"}, {}, "table end, not an offset"),
+    ({"0x00010000": "offset", "0x00010007": "end"}, {"new": "0x00900000"}, "outside the reserved"),
+])
+def test_bad_relocations_stop_the_lift(tmp_path, sites, kw, message):
+    image, func = _reloc_image()
+    with pytest.raises(GuestPatchError, match=message):
+        guest_patches.apply(_reloc(tmp_path, image, sites, **kw), image, func)
+
+
+def test_relocation_checks_data_words_and_initialised_tables(tmp_path):
+    sites = {"0x00010000": "offset", "0x00010007": "end"}
+    image, func = _reloc_image(data_word=TABLE + 4)
+    with pytest.raises(GuestPatchError, match="data word at 0x00030000"):
+        guest_patches.apply(_reloc(tmp_path, image, sites), image, func)
+    guest_patches.apply(_reloc(tmp_path, image, sites, data_ok=["0x00030000"]), image, func)
+    image, func = _reloc_image(initialised=True)
+    with pytest.raises(GuestPatchError, match="initialised"):
+        guest_patches.apply(_reloc(tmp_path, image, sites), image, func)
+
+
+def test_a_folder_of_tables_is_merged(tmp_path):
+    _install()
+    folder = tmp_path / "tables"
+    folder.mkdir()
+    sha = hashlib.sha256(IMAGE).hexdigest()
+    (folder / "00-header.json").write_text(json.dumps(
+        {"title_id": "0", "xbe_sha256": sha, "extension": EXT, "patches": []}), encoding="utf-8")
+    (folder / "a.json").write_text(json.dumps({"patches": [
+        _entry("mem", BASE + 3, "3d00401f00", kind="code", new_hex="3d00007d00")]}), encoding="utf-8")
+    (folder / "b.json").write_text(json.dumps({"patches": [
+        _entry("sub", BASE, "83fe32", kind="operand", operand=1, value="0x190")]}), encoding="utf-8")
+    (folder / "notes.txt").write_text("not a table", encoding="utf-8")
+    table = guest_patches.load(str(folder))
+    assert [p["id"] for p in table["patches"]] == ["mem", "sub"]
+    assert table["extension"] == (0x008A0000, 0x10000)
+    guest_patches.apply(table, IMAGE, FUNC)
+    (folder / "c.json").write_text(json.dumps({"xbe_sha256": "00" * 32, "patches": []}), encoding="utf-8")
+    with pytest.raises(GuestPatchError, match="xbe_sha256 differs"):
+        guest_patches.load(str(folder))
+    (folder / "c.json").write_text(json.dumps({"patches": [
+        _entry("mem", BASE + 3, "3d00401f00", kind="code", new_hex="3d00007d00")]}), encoding="utf-8")
+    with pytest.raises(GuestPatchError, match="duplicate"):
+        guest_patches.load(str(folder))

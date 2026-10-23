@@ -698,7 +698,7 @@
     },
     {
       "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-guest-code-patches.patch",
-      "sha256": "43875aec58094b841154e03e01fe8b6720740da5141d8fcf5e7759677ce56897",
+      "sha256": "7dce722f0e2d3ef9e62a51d159c3df4f46e55ed6548057d619bc9ffc7c1fb765",
       "targets": [
         "scripts/recompile.py",
         "tools/recomp/__main__.py",
@@ -920,6 +920,15 @@
       "sha256": "6a28990ade3bf38337f197937c22c939dce8bd63191018520c300f35f79adca3",
       "targets": [
         "src/d3d/CMakeLists.txt"
+      ]
+    },
+    {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-guest-memory-extension.patch",
+      "sha256": "741c56e11747cf479baf3253aab1a8ef15a5bf1313ce2c6cfc43ca5f2db3ab49",
+      "targets": [
+        "src/kernel/xbox_memory_layout.c",
+        "src/kernel/xbox_memory_layout.h",
+        "titles/futureperfect/src/main.c"
       ]
     },
     {

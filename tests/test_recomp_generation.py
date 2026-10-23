@@ -44,22 +44,33 @@ def test_guest_code_patch_table_invalidates_generated_code(tmp_path):
                  'titles/futureperfect/src/recomp/gen/recomp_funcs.h'):
         (runtime / name).parent.mkdir(parents=True, exist_ok=True)
         (runtime / name).write_text('/* original */')
-    table = tmp_path / 'config/guest-code-patches.json'
-    assert generation.guest_patch_table(runtime) == table.resolve()
+    tables = tmp_path / 'config/guest-code-patches'
+    assert generation.guest_patch_table(runtime) == tables.resolve()
     generation.record(runtime)
     assert generation.current(runtime)
-    table.parent.mkdir()
-    table.write_text('{"patches": []}')
+    tables.mkdir(parents=True)
+    (tables / 'a.json').write_text('{"patches": []}')
     assert not generation.current(runtime)
     generation.record(runtime)
-    table.write_text('{"patches": [{"id": "x"}]}')
+    (tables / 'a.json').write_text('{"patches": [{"id": "x"}]}')
     assert not generation.current(runtime)
+    generation.record(runtime)
+    (tables / 'b.json').write_text('{"patches": []}')            # a new area file
+    assert not generation.current(runtime)
+    generation.record(runtime)
+    (tables / 'notes.txt').write_text('ignored')
+    assert generation.current(runtime)
 
 
 def test_builds_pass_the_project_guest_patch_table():
     import json
     for script, count in (('tsfp.ps1', 2), ('tools/build-native-mac.py', 1)):
         assert (ROOT / script).read_text(encoding='utf-8').count('--guest-patches') == count, script
-    table = json.loads((ROOT / 'config/guest-code-patches.json').read_text(encoding='utf-8'))
-    assert table['title_id'] == '45410066'
-    assert table['xbe_sha256'] == '3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc'
+    header = json.loads((ROOT / 'config/guest-code-patches/00-header.json').read_text(encoding='utf-8'))
+    assert header['title_id'] == '45410066'
+    assert header['xbe_sha256'] == '3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc'
+    assert header['extension']['va'] == '0x008A0000' and header['extension']['size'] == '0x00080000'
+    for table in (ROOT / 'config/guest-code-patches').glob('*.json'):
+        if table.name != '00-header.json':
+            part = json.loads(table.read_text(encoding='utf-8'))
+            assert set(part) <= {'patches'}, f'{table.name}: only the header carries title/XBE/extension'

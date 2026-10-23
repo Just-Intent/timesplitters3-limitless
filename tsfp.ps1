@@ -172,7 +172,7 @@ try {
                     Invoke-Checked $envPython @('scripts/recompile.py', $xbe,
                         '--work-dir', (Join-Path $privateRoot 'pipeline'), '--project', 'titles/futureperfect',
                         '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries',
-                        '--guest-patches', (Join-Path $projectRoot 'config\guest-code-patches.json'))
+                        '--guest-patches', (Join-Path $projectRoot 'config\guest-code-patches'))
                     Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\recomp-generation.py'), $toolRoot, '--record')
                 }
                 'Build' {
@@ -204,7 +204,7 @@ try {
                         Invoke-Checked $envPython @('scripts/recompile.py', (Join-Path $gameRoot 'default.xbe'),
                             '--work-dir', (Join-Path $privateRoot 'pipeline'), '--project', 'titles/futureperfect',
                             '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries', '--only', 'lift',
-                            '--guest-patches', (Join-Path $projectRoot 'config\guest-code-patches.json'))
+                            '--guest-patches', (Join-Path $projectRoot 'config\guest-code-patches'))
                         Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\recomp-generation.py'), $toolRoot, '--record')
                     }
                     Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\network-identity.py'))
