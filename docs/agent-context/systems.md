@@ -167,8 +167,8 @@ rows that the shared hook hit-tests and highlights, but the editor acts on A
 itself, so in scene 102 a row click calls `mapmaker_pointer_row_click()`, which
 holds A for that press (`pc_controls_mapmaker_row_press`) instead of the
 menu-engine confirm. Also in scene 102: while a menu is open, Escape reports
-as the first Back key and not as Start; on the editor screen it stays Start
-(pause), since Back there toggles the 3D view. The choice is latched per press
+as the first B key (editor menus close on B; Back toggles the 3D view) and not
+as Start; on the editor screen it stays Start (pause). The choice is latched per press
 (`pc_mapmaker_escape_back`, `pc_mapmaker_key`; Windows only). Menu
 scrollbars (geometry as `sub_00071400`) are driven directly, because A over
 the bar did not scroll the Story AI list: arrows step the target
@@ -177,8 +177,8 @@ there and the thumb follows the mouse, clamped like `sub_00073560`; the
 engine animates the scroll. The wheel scrolls those menus the same way
 (three steps per notch) and, on the editor screen, zooms by briefly holding
 White (up) or Black (down) (`pc_mapmaker_zoom_*`). A click on the toolbar
-strip while a menu is open sends short Back presses until the editor screen
-is back, then a short A (`mapmaker_pointer_switch_*`,
+strip while a menu is open sends short B presses (only to a fully open menu
+in front) until the editor screen is back, then a short A (`mapmaker_pointer_switch_*`,
 `pc_controls_mapmaker_pulse`). Prompts show T for the right trigger in the
 editor (`pc_controls_mapmaker_editor_active`). On the editor screen right-drag and the window edge pan the view the
 way `sub_00309160` + `sub_002F9F70` do (skipped when `editor+0x25C &
@@ -193,5 +193,8 @@ parent's rows
 (`mapmaker_pointer_parent_press`: highlight with `sub_00076EF0`, then A). In
 the editor T acts as the first "Fire" key (right trigger, floor up;
 `pc_mapmaker_trigger_key`) because that key is usually the left mouse button,
-and WASD is no longer aliased to the D-pad. No guest regeneration. Fixture:
+and the movement keys (W/A/S/D by default) no longer move the pointer;
+strafe left/right step the toolbar as the D-pad (`pc_mapmaker_move_key`,
+`pc_mapmaker_dpad_alias`). A right click over an empty cell with no piece held
+presses Y (clears the selection; `editor+0x2F7C`/`+0x2F18`, static analysis). No guest regeneration. Fixture:
 `tests/test_mapmaker_pointer.py`. Mac: MAC-062.

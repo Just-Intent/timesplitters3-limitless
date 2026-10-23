@@ -24,8 +24,10 @@ MUTATIONS = {
     'escape-still-start': (POLICY, 'if (key == ESCAPE) return escape_back ? 0 : down;', ''),
     'escape-not-latched': (POLICY, 'if (escape_down && !s->was) s->back = !!menu_open;', 's->back = !!menu_open;'),
     'escape-back-on-screen': (POLICY, 'if (escape_down && !s->was) s->back = !!menu_open;', 'if (escape_down && !s->was) s->back = 1;'),
-    'escape-not-back': (POLICY, 'if (key == back_key) return down || escape_back;', 'if (key == back_key) return down;'),
-    'escape-everywhere': (POLICY, 'if (!editor || !back_key', 'if (!back_key'),
+    'escape-not-back': (POLICY, 'if (key == cancel_key) return down || escape_back;', 'if (key == cancel_key) return down;'),
+    'wasd-still-moves': (POLICY, 'for (int i = 0; i < 4; i++) if (move[i] && key == move[i]) return 0;', ''),
+    'no-toolbar-alias': (POLICY, 'return key == LEFT ? move[2] : key == RIGHT ? move[3] : 0;', 'return 0;'),
+    'escape-everywhere': (POLICY, 'if (!editor || !cancel_key', 'if (!cancel_key'),
     'pan-any-state': (ADAPTER, '(WORD_AT(editor+0x25c)&0x0C044088u) ||', ''),
     'pan-no-clamp': (ADAPTER, 'c=left+w*.5f; if(c<0) left-=c; else if(c>MAPMAKER_GRID) left-=c-MAPMAKER_GRID;', ''),
     'pan-in-menus': (ADAPTER, 'if(root) mapmaker_pointer_navigate(', 'if(1) mapmaker_pointer_navigate('),
@@ -33,7 +35,7 @@ MUTATIONS = {
     'arrow-no-repeat-delay': (ADAPTER, 'if(now<mapmaker_pointer.grab_next) return;', ''),
     'thumb-ignores-grab': (ADAPTER, '(y-mapmaker_pointer.grab-s.track0)/(s.track1-s.track0)*s.content);', '(y-s.track0)/(s.track1-s.track0)*s.content);'),
     'scroll-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return 0;\n    ok=', 'if(!mapmaker_pointer_enabled()) return 0;\n    ok='),
-    'rotate-lost': (ADAPTER, '            WORD_AT(menu+0xc4)|=0x20u; /* as the shared hook', '            (void)0; /* as the shared hook'),
+    'rotate-lost': (ADAPTER, 'else WORD_AT(menu+0xc4)|=0x20u; /* as the shared hook', 'else (void)0; /* as the shared hook'),
     'drag-rotates': (ADAPTER, 'if(mapmaker_pointer.right_travel<MAPMAKER_RIGHT_CLICK && guest_writable(menu,0x23c))', 'if(guest_writable(menu,0x23c))'),
     'parent-any-menu': (ADAPTER, ' || WORD_AT(parent+0x170)!=menu) return 0;', ') return 0;'),
     'parent-disabled-rows': (ADAPTER, "if((type==4 || type==7 || type==8) && !(flags&5) &&\n           x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&\n           y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {\n            if(WORD_AT(parent", "if((type==4 || type==7 || type==8) &&\n           x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&\n           y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {\n            if(WORD_AT(parent"),
@@ -48,6 +50,8 @@ MUTATIONS = {
     'switch-no-gap': (ADAPTER, '    mapmaker_pointer.switch_next=now+MAPMAKER_SWITCH_GAP;', ''),
     'switch-unbounded': (ADAPTER, 'if(mapmaker_pointer.switch_backs>=MAPMAKER_SWITCH_BACKS) { mapmaker_pointer.switching=0;return; }', ''),
     'switch-back-to-closing': (ADAPTER, '    if(!guest_writable(menu,0x23c) || WORD_AT(menu+0x1b0)!=3 || WORD_AT(menu+0x170)) return;\n', ''),
+    'right-never-clears': (ADAPTER, 'if(mapmaker_pointer_right_clears()) pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_Y);\n            else ', ''),
+    'right-clears-held': (ADAPTER, '!WORD_AT(editor+0x2f7c) && ', ''),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 
@@ -114,17 +118,18 @@ def test_escape_wiring():
     # Applied before typing and focus checks, so text entry still wins.
     assert key.index('down=pc_mapmaker_key(') < key.index('if(text_input.owner && pc_text_key')
     assert '!mapmaker_pointer_active));' in key  # menu open = editor screen does not own the pointer
-    # Back is the runtime's eighth control ("back"); the prompt table follows that order.
+    # B is the runtime's second control ("b"); the prompt table follows that order.
     bindings = (ROOT / 'src/pc_bindings.inc').read_text(encoding='utf-8')
-    assert '"Pause / Start", "Objectives / Back"' in bindings
-    assert 'back = keys[7];' in controls
+    assert '"Interact / confirm (A)", "Melee / back (B)"' in bindings
+    assert 'back = keys[1];' in controls  # B closes editor menus
 
 
 def test_editor_keys_wiring():
     controls = (ROOT / 'src/pc_controls.c').read_text(encoding='utf-8')
     key = controls.split('int pc_controls_key_down(int key)', 1)[1].split('return down;', 1)[0]
     # WASD is not the D-pad in the editor; T applies after the mouse-button blocks.
-    assert 'if(menu_mode && !mapmaker_editor) {' in key
+    assert 'down=pc_mapmaker_move_key(1,key,mapmaker_move_keys,down);' in key
+    assert 'move[i] = keys[14 + i];' in controls  # Move forward..Strafe right
     assert key.index("(key==VK_RBUTTON && (menu_mode") < key.index('down=pc_mapmaker_trigger_key(')
     assert 'trigger = keys[9];' in controls  # "Fire" is the runtime's rtrigger
     bindings = (ROOT / 'src/pc_bindings.inc').read_text(encoding='utf-8')

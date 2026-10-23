@@ -30,7 +30,8 @@ static void pc_controls_mapmaker_editor(int active) { editor_last=active; }
 static int zoom_notches;
 static void pc_controls_mapmaker_zoom(int notches) { zoom_notches+=notches; }
 static int pulses_a, pulses_back;
-static void pc_controls_mapmaker_pulse(int button) { if(button==0) pulses_a++; else if(button==1) pulses_back++; }
+static int pulses_y;
+static void pc_controls_mapmaker_pulse(int button) { if(button==0) pulses_a++; else if(button==1) pulses_back++; else if(button==2) pulses_y++; }
 static void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh) { *sw=w;*sh=h; }
 /* sub_00076EF0(menu,item) highlights a row; record the call instead. */
 static void sub_00076EF0(void) {}
@@ -304,7 +305,7 @@ int main(void)
     CHECK(mapmaker_pointer_wheel(MENU,-1) && zoom_notches==1);
     zoom_notches=0;
     /* Right click without a drag: the menu Back action (rotate), on release. */
-    WORD_AT(MENU+0xc4)=0;
+    WORD_AT(MENU+0xc4)=0;WORD_AT(ED+0x2f7c)=0x00340000u;     /* a piece is held */
     move(300.f,200.f);game_frame();
     cursor.right=1;game_frame();
     CHECK(WORD_AT(MENU+0xc4)==0);                            /* not on press */
@@ -312,6 +313,17 @@ int main(void)
     cursor.right=0;game_frame();
     CHECK(WORD_AT(MENU+0xc4)==0x20u && NEAR(FLOAT_AT(0x00783DD8u),10.f));
     WORD_AT(MENU+0xc4)=0;
+    /* ... over an empty cell with nothing held: Y (clear selection) instead. */
+    WORD_AT(ED+0x2f7c)=0;WORD_AT(ED+0x2f18)=0;pulses_y=0;
+    cursor.right=1;game_frame();cursor.right=0;game_frame();
+    CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0);
+    WORD_AT(ED+0x2f7c)=0x00340000u;                          /* holding a piece: rotate */
+    cursor.right=1;game_frame();cursor.right=0;game_frame();
+    CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0x20u);
+    WORD_AT(MENU+0xc4)=0;WORD_AT(ED+0x2f7c)=0;WORD_AT(ED+0x2f18)=0x00350000u; /* occupied cell */
+    cursor.right=1;game_frame();cursor.right=0;game_frame();
+    CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0x20u);
+    WORD_AT(MENU+0xc4)=0;WORD_AT(ED+0x2f18)=0;WORD_AT(ED+0x2f7c)=0x00340000u;
     /* Right-drag on the editor screen grabs the map, and does not rotate. */
     move(300.f,200.f);cursor.right=1;game_frame();
     move(320.f,190.f);game_frame();                          /* +20 px right, -10 px up */
@@ -398,6 +410,15 @@ int main(void)
     CHECK(pc_mapmaker_key(1,'W',0x09,1,1)==1);   /* other keys untouched */
     CHECK(pc_mapmaker_key(1,0x1B,0,1,1)==1);     /* no Back key: leave Escape alone */
     CHECK(pc_mapmaker_key(1,0x1B,0x1B,1,1)==1);  /* Escape is Back already */
+    /* Movement keys: up in the editor; strafe left/right alias the D-pad. */
+    {
+        const int move[4]={'W','S','A','D'};
+        CHECK(pc_mapmaker_move_key(1,'A',move,1)==0 && pc_mapmaker_move_key(1,'W',move,1)==0);
+        CHECK(pc_mapmaker_move_key(0,'A',move,1)==1);            /* outside the editor */
+        CHECK(pc_mapmaker_move_key(1,'E',move,1)==1);            /* other keys */
+        CHECK(pc_mapmaker_dpad_alias(1,0x25,move)=='A' && pc_mapmaker_dpad_alias(1,0x27,move)=='D');
+        CHECK(!pc_mapmaker_dpad_alias(1,0x26,move) && !pc_mapmaker_dpad_alias(0,0x25,move));
+    }
     /* Wheel zoom: each notch holds White (up) or Black (down) for 100 ms. */
     {
         PcMapMakerZoom z={0};

@@ -248,6 +248,11 @@ Tracked separately; do not merge their diagnosis.
   screen while the list was still closing. Back now goes only to a menu that
   is fully open (state 3) with no open child. Edge panning needed the mouse
   at the very edge: the zone is now 24 UI pixels with up to 0.25 cells/frame.
+- **Ninth run (2026-10-23):** edge and right-drag panning are good. Toolbar
+  switching still opened the 3D view: editor lists close on B, not Back
+  (Back is the 3D view), so the switch and Escape-in-menus now use B. The
+  movement keys no longer move the pointer; A/D step the toolbar. A right
+  click on an empty cell with nothing held clears the selection (Y).
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

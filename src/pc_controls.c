@@ -30,10 +30,10 @@ static int wheel_remainder;
 static unsigned long applied;
 static volatile LONG editing;
 static int menu_mode, menu_button_block;
-static int mapmaker_pointer_active, mapmaker_editor, mapmaker_back_key, mapmaker_trigger_key;
-static int mapmaker_zoom_up_key, mapmaker_zoom_down_key;
+static int mapmaker_pointer_active, mapmaker_editor, mapmaker_cancel_key, mapmaker_trigger_key;
+static int mapmaker_zoom_up_key, mapmaker_zoom_down_key, mapmaker_move_keys[4], mapmaker_y_key;
 static PcMapMakerZoom mapmaker_zoom;
-static ULONGLONG mapmaker_pulse_until[2];
+static ULONGLONG mapmaker_pulse_until[3];
 static PcMapMakerClick mapmaker_click;
 static PcMapMakerEscape mapmaker_escape;
 static PcTextInput text_input;
@@ -447,14 +447,20 @@ int pc_controls_key_down(int key)
     replay_tick();
     down = pc_input_down(&input, (unsigned)key, GetTickCount64());
     /* Custom menus may read D-pad edges instead of the WASD analogue stick. */
-    /* Not in the MapMaker editor: there WASD moves the game pointer only. */
-    if(menu_mode && !mapmaker_editor) {
+    if(menu_mode && mapmaker_editor) {
+        /* MapMaker editor: the mouse moves the pointer, so the movement keys
+         * no longer do; strafe left/right step the toolbar as the D-pad. */
+        int alias;
+        down=pc_mapmaker_move_key(1,key,mapmaker_move_keys,down);
+        alias=pc_mapmaker_dpad_alias(1,key,mapmaker_move_keys);
+        if(alias) down|=pc_input_down(&input,(unsigned)alias,GetTickCount64());
+    } else if(menu_mode) {
         unsigned alias=key==VK_LEFT?'A':key==VK_RIGHT?'D':
                        key==VK_UP?'W':key==VK_DOWN?'S':0;
         if(alias) down|=pc_input_down(&input,alias,GetTickCount64());
     }
     /* A menu is open when the editor screen does not own the pointer. */
-    down=pc_mapmaker_key(menu_mode && mapmaker_editor,key,mapmaker_back_key,down,
+    down=pc_mapmaker_key(menu_mode && mapmaker_editor,key,mapmaker_cancel_key,down,
                          pc_mapmaker_escape_back(&mapmaker_escape,
                              pc_input_down(&input,VK_ESCAPE,GetTickCount64()),
                              !mapmaker_pointer_active));
@@ -468,8 +474,11 @@ int pc_controls_key_down(int key)
     down=pc_mapmaker_trigger_key(menu_mode && mapmaker_editor,key,mapmaker_trigger_key,down,
                                  pc_input_down(&input,PC_MAPMAKER_FLOOR_UP_KEY,GetTickCount64()) &&
                                  (replaying || GetForegroundWindow()==window_handle));
-    if(menu_mode && mapmaker_editor && mapmaker_back_key && key==mapmaker_back_key &&
-       GetTickCount64()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_BACK] &&
+    if(menu_mode && mapmaker_editor && mapmaker_cancel_key && key==mapmaker_cancel_key &&
+       GetTickCount64()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_CANCEL] &&
+       (replaying || GetForegroundWindow()==window_handle)) down=1;
+    if(menu_mode && mapmaker_editor && mapmaker_y_key && key==mapmaker_y_key &&
+       GetTickCount64()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_Y] &&
        (replaying || GetForegroundWindow()==window_handle)) down=1;
     down=pc_mapmaker_zoom_key(&mapmaker_zoom,menu_mode && mapmaker_editor &&
                               (replaying || GetForegroundWindow()==window_handle),
@@ -531,25 +540,30 @@ void pc_controls_mapmaker_pointer(int active)
  * so reading the Back binding here cannot re-enter the bindings lock. */
 void pc_controls_mapmaker_editor(int active)
 {
-    int keys[PC_ACTION_COUNT], back = 0, trigger = 0, white = 0, black = 0;
+    int keys[PC_ACTION_COUNT], back = 0, trigger = 0, white = 0, black = 0, move[4] = {0};
     if (active && pc_settings_prompt_keys(keys)) {
-        back = keys[7];    /* "Objectives / Back" */
+        /* "Melee / back (B)": editor menus close on B; Back is the 3D view. */
+        back = keys[1];
+        for (int i = 0; i < 4; i++) move[i] = keys[14 + i]; /* forward, backward, left, right */
         trigger = keys[9]; /* "Fire": right trigger, floor up in the editor */
         white = keys[5];   /* zoom (held), wheel up */
         black = keys[4];   /* zoom (held), wheel down */
     }
     AcquireSRWLockExclusive(&lock);
     mapmaker_editor = !!active;
-    mapmaker_back_key = back;
+    mapmaker_cancel_key = back;
     mapmaker_trigger_key = trigger;
     mapmaker_zoom_up_key = white;
     mapmaker_zoom_down_key = black;
+    mapmaker_y_key = active ? keys[3] : 0; /* "Y action": clears the tile selection */
+    memcpy(mapmaker_move_keys, move, sizeof mapmaker_move_keys);
     ReleaseSRWLockExclusive(&lock);
 }
 
 void pc_controls_mapmaker_pulse(int button)
 {
-    if (button != PC_MAPMAKER_PULSE_A && button != PC_MAPMAKER_PULSE_BACK) return;
+    if (button != PC_MAPMAKER_PULSE_A && button != PC_MAPMAKER_PULSE_CANCEL &&
+        button != PC_MAPMAKER_PULSE_Y) return;
     AcquireSRWLockExclusive(&lock);
     mapmaker_pulse_until[button] = GetTickCount64() + PC_MAPMAKER_PULSE_MS;
     ReleaseSRWLockExclusive(&lock);
