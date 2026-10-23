@@ -1,0 +1,301 @@
+{
+  "patches": [
+    {
+      "id": "mm-container-body-00300706",
+      "kind": "code",
+      "function": "0x003006C0",
+      "address": "0x00300706",
+      "original_hex": "b9f81f0000",
+      "new_hex": "b9f8ff0100",
+      "reason": "compiler zeroes the target container: 0x1FF8 -> 0x1FFF8 dwords (body 0x7FE0 -> 0x7FFE0 bytes)"
+    },
+    {
+      "id": "mm-container-body-0032a539",
+      "kind": "code",
+      "function": "0x0032A530",
+      "address": "0x0032A539",
+      "original_hex": "b9f81f0000",
+      "new_hex": "b9f8ff0100",
+      "reason": "built-in map load zeroes the container: 0x1FF8 -> 0x1FFF8 dwords (body 0x7FE0 -> 0x7FFE0 bytes)"
+    },
+    {
+      "id": "mm-container-body-0032b50f",
+      "kind": "code",
+      "function": "0x0032B400",
+      "address": "0x0032B50F",
+      "original_hex": "b9f81f0000",
+      "new_hex": "b9f8ff0100",
+      "reason": "failed verify zeroes the container: 0x1FF8 -> 0x1FFF8 dwords (body 0x7FE0 -> 0x7FFE0 bytes)"
+    },
+    {
+      "id": "mm-container-body-0032bc1a",
+      "kind": "code",
+      "function": "0x0032BA90",
+      "address": "0x0032BC1A",
+      "original_hex": "b9f81f0000",
+      "new_hex": "b9f8ff0100",
+      "reason": "failed load zeroes the container: 0x1FF8 -> 0x1FFF8 dwords (body 0x7FE0 -> 0x7FFE0 bytes)"
+    },
+    {
+      "id": "mm-container-body-001cc3e4",
+      "kind": "code",
+      "function": "0x001CC3C0",
+      "address": "0x001CC3E4",
+      "original_hex": "b9f81f0000",
+      "new_hex": "b9f8ff0100",
+      "reason": "front end zeroes the container: 0x1FF8 -> 0x1FFF8 dwords (body 0x7FE0 -> 0x7FFE0 bytes)"
+    },
+    {
+      "id": "mm-container-body-002d6e77",
+      "kind": "code",
+      "function": "0x002D6E10",
+      "address": "0x002D6E77",
+      "original_hex": "b9f81f0000",
+      "new_hex": "b9f8ff0100",
+      "reason": "front end init zeroes the container: 0x1FF8 -> 0x1FFF8 dwords (body 0x7FE0 -> 0x7FFE0 bytes)"
+    },
+    {
+      "id": "mm-container-body-00356bd8",
+      "kind": "code",
+      "function": "0x00356BB0",
+      "address": "0x00356BD8",
+      "original_hex": "b9f81f0000",
+      "new_hex": "b9f8ff0100",
+      "reason": "network session start zeroes the container: 0x1FF8 -> 0x1FFF8 dwords (body 0x7FE0 -> 0x7FFE0 bytes)"
+    },
+    {
+      "id": "mm-container-body-0033774c",
+      "kind": "code",
+      "function": "0x00337600",
+      "address": "0x0033774C",
+      "original_hex": "b9f81f0000",
+      "new_hex": "b9f8ff0100",
+      "reason": "undo apply copies the container to the shadow: 0x1FF8 -> 0x1FFF8 dwords (body 0x7FE0 -> 0x7FFE0 bytes)"
+    },
+    {
+      "id": "mm-container-undo-tail",
+      "kind": "code",
+      "function": "0x00337600",
+      "address": "0x0033772D",
+      "original_hex": "b900800000",
+      "new_hex": "b900000800",
+      "reason": "undo apply zeroes container[used..0x8000): buffer end 0x8000 -> 0x80000"
+    },
+    {
+      "id": "mm-container-undo-reset-shadow",
+      "kind": "code",
+      "function": "0x00336640",
+      "address": "0x00336656",
+      "original_hex": "b900200000",
+      "new_hex": "b900000200",
+      "reason": "undo reset zeroes the shadow container: 0x2000 -> 0x20000 dwords"
+    },
+    {
+      "id": "mm-container-undo-reset-ring",
+      "kind": "code",
+      "function": "0x00336640",
+      "address": "0x0033664F",
+      "original_hex": "b900400000",
+      "new_hex": "b900000400",
+      "reason": "undo reset zeroes the history ring: 0x4000 -> 0x40000 dwords (ring 2N = 0x100000 bytes)"
+    },
+    {
+      "id": "mm-container-shadow-alloc",
+      "kind": "code",
+      "function": "0x003366A0",
+      "address": "0x003366C0",
+      "original_hex": "6800800000",
+      "new_hex": "6800000800",
+      "reason": "undo shadow container (Level heap, editor only): 0x8000 -> 0x80000 bytes"
+    },
+    {
+      "id": "mm-container-shadow-zero",
+      "kind": "code",
+      "function": "0x003366A0",
+      "address": "0x003366D4",
+      "original_hex": "b900200000",
+      "new_hex": "b900000200",
+      "reason": "zero the new shadow: 0x2000 -> 0x20000 dwords"
+    },
+    {
+      "id": "mm-container-diff-alloc",
+      "kind": "code",
+      "function": "0x003366A0",
+      "address": "0x003366A3",
+      "original_hex": "6880ff0100",
+      "new_hex": "6880ff1f00",
+      "reason": "undo diff table (Level heap, editor only) 4 x body: 0x1FF80 -> 0x1FFF80 bytes"
+    },
+    {
+      "id": "mm-container-diff-zero",
+      "kind": "code",
+      "function": "0x00337410",
+      "address": "0x0033741F",
+      "original_hex": "b9e07f0000",
+      "new_hex": "b9e0ff0700",
+      "reason": "zero the whole diff table: 0x7FE0 -> 0x7FFE0 dwords"
+    },
+    {
+      "id": "mm-container-diff-entries",
+      "kind": "code",
+      "function": "0x00337410",
+      "address": "0x00337438",
+      "original_hex": "3df03f0000",
+      "new_hex": "3df0ff0300",
+      "reason": "diff table entries (8 B) initialised to -1: 0x3FF0 -> 0x3FFF0"
+    },
+    {
+      "id": "mm-container-ring-wrap",
+      "kind": "code",
+      "function": "0x00337320",
+      "address": "0x00337352",
+      "original_hex": "3d00000100",
+      "new_hex": "3d00001000",
+      "reason": "undo ring wrap compare: 0x10000 -> 0x100000 (ring allocated by pc_mapmaker_container_undo_ring)"
+    },
+    {
+      "id": "mm-container-walk-00085986",
+      "kind": "code",
+      "function": "0x00085920",
+      "address": "0x00085986",
+      "original_hex": "05e07f0000",
+      "new_hex": "05e0ff0700",
+      "reason": "play tile/model loader: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-00085a6c",
+      "kind": "code",
+      "function": "0x00085920",
+      "address": "0x00085A6C",
+      "original_hex": "05e07f0000",
+      "new_hex": "05e0ff0700",
+      "reason": "play tile/model loader: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-0008a7c7",
+      "kind": "code",
+      "function": "0x0008A780",
+      "address": "0x0008A7C7",
+      "original_hex": "05e07f0000",
+      "new_hex": "05e0ff0700",
+      "reason": "play room tables: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-0008ab2f",
+      "kind": "code",
+      "function": "0x0008A780",
+      "address": "0x0008AB2F",
+      "original_hex": "81c2e07f0000",
+      "new_hex": "81c2e0ff0700",
+      "reason": "play room tables: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-0023f3ae",
+      "kind": "code",
+      "function": "0x0023F390",
+      "address": "0x0023F3AE",
+      "original_hex": "05e07f0000",
+      "new_hex": "05e0ff0700",
+      "reason": "play map walker: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-0023f764",
+      "kind": "code",
+      "function": "0x0023F390",
+      "address": "0x0023F764",
+      "original_hex": "81c1e07f0000",
+      "new_hex": "81c1e0ff0700",
+      "reason": "play map walker: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-0023fd20",
+      "kind": "code",
+      "function": "0x0023FD10",
+      "address": "0x0023FD20",
+      "original_hex": "8d83e07f0000",
+      "new_hex": "8d83e0ff0700",
+      "reason": "play map walker (teleporters): chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-0023fe31",
+      "kind": "code",
+      "function": "0x0023FD10",
+      "address": "0x0023FE31",
+      "original_hex": "8d83e07f0000",
+      "new_hex": "8d83e0ff0700",
+      "reason": "play map walker (teleporters): chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-002405b5",
+      "kind": "code",
+      "function": "0x00240590",
+      "address": "0x002405B5",
+      "original_hex": "05e07f0000",
+      "new_hex": "05e0ff0700",
+      "reason": "play items/AI walker: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-002407fb",
+      "kind": "code",
+      "function": "0x00240590",
+      "address": "0x002407FB",
+      "original_hex": "81c1e07f0000",
+      "new_hex": "81c1e0ff0700",
+      "reason": "play items/AI walker: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-00240d4f",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x00240D4F",
+      "original_hex": "05e07f0000",
+      "new_hex": "05e0ff0700",
+      "reason": "play map walker: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-002423c4",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x002423C4",
+      "original_hex": "81c1e07f0000",
+      "new_hex": "81c1e0ff0700",
+      "reason": "play map walker: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-0032a5ca",
+      "kind": "code",
+      "function": "0x0032A5B0",
+      "address": "0x0032A5CA",
+      "original_hex": "8db9e07f0000",
+      "new_hex": "8db9e0ff0700",
+      "reason": "chunk finder: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-0032a6fc",
+      "kind": "code",
+      "function": "0x0032A6D0",
+      "address": "0x0032A6FC",
+      "original_hex": "8dbbe07f0000",
+      "new_hex": "8dbbe0ff0700",
+      "reason": "tile chunk record finder: chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-walk-00337e1a",
+      "kind": "code",
+      "function": "0x00337D80",
+      "address": "0x00337E1A",
+      "original_hex": "81c5e07f0000",
+      "new_hex": "81c5e0ff0700",
+      "reason": "editor 0xC7766C rename walker (no terminator check): chunk walk bound base + 0x7FE0 -> base + 0x7FFE0"
+    },
+    {
+      "id": "mm-container-list-flag",
+      "kind": "code",
+      "function": "0x00190720",
+      "address": "0x001907A0",
+      "original_hex": "81be4c01000000800000",
+      "new_hex": "81be4c01000000000800",
+      "reason": "save list flag +0x68 (body > 0x8000): keep larger-tier map files (body <= 0x7FFE0) flagged like stock maps"
+    }
+  ]
+}
