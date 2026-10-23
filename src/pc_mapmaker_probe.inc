@@ -26,7 +26,8 @@
  *  64  while a MapMaker map is played (scene 100), the AI navigation counts
  *      once a second when they changed: regular pads [0x007B6664], links
  *      [0x007B6660], cover pads [0x007B65C0], pad groups [0x007B666C] and the
- *      pool pointers (gaps give each pool's size)
+ *      pool pointers (gaps give each pool's size), engine objects taken
+ *      [0x007B4FAC] of the pool capacity [0x0072F5E4], logic tags [0x0075EA90]
  * Output: TSFP_MAPMAKER_PROBE_LOG (binary, truncated per process), else stderr.
  * Records are emitted when their content changes, at most four per second,
  * with the number of unchanged repeats; the file is capped at 4 MiB.
@@ -297,10 +298,10 @@ static void mapmaker_probe_heap(void)
 }
 
 /* Flag 64, read-only, called every frame. */
-static struct { uint32_t key[9]; unsigned long long last; } mapmaker_probe_pools_state;
+static struct { uint32_t key[12]; unsigned long long last; } mapmaker_probe_pools_state;
 static void mapmaker_probe_pools(void)
 {
-    uint32_t key[9];
+    uint32_t key[12];
     unsigned long long now;
     if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_POOLS) || mapmaker_probe_scene()!=100) return;
     key[0]=mapmaker_probe_word(0x007B6664u);key[1]=mapmaker_probe_word(0x007B6660u);
@@ -308,12 +309,16 @@ static void mapmaker_probe_pools(void)
     key[4]=mapmaker_probe_word(0x00715F2Cu);key[5]=mapmaker_probe_word(0x00715F30u);
     key[6]=mapmaker_probe_word(0x00715F3Cu);key[7]=mapmaker_probe_word(0x00715F34u);
     key[8]=mapmaker_probe_word(0x00715F38u);
+    /* Engine objects taken / pool capacity (taken without a bound check) and logic tags. */
+    key[9]=mapmaker_probe_word(0x007B4FACu);key[10]=mapmaker_probe_word(0x0072F5E4u);
+    key[11]=mapmaker_probe_word(0x0075EA90u);
     now=GetTickCount64();
     if(!memcmp(key,mapmaker_probe_pools_state.key,sizeof key)) return;
     if(mapmaker_probe_pools_state.last && now-mapmaker_probe_pools_state.last<MAPMAKER_PROBE_HEAP_INTERVAL) return;
     mapmaker_probe_write("[mapmaker-probe] t=%llu pools pads=%u links=%u cover=%u groups=%u"
-        " pads@0x%08X links@0x%08X aidata@0x%08X cover@0x%08X runtime@0x%08X\n",
-        now,key[0],key[1],key[2],key[3],key[4],key[5],key[6],key[7],key[8]);
+        " pads@0x%08X links@0x%08X aidata@0x%08X cover@0x%08X runtime@0x%08X"
+        " objects=%u/%u tags=%u\n",
+        now,key[0],key[1],key[2],key[3],key[4],key[5],key[6],key[7],key[8],key[9],key[10],key[11]);
     memcpy(mapmaker_probe_pools_state.key,key,sizeof key);
     mapmaker_probe_pools_state.last=now;
 }

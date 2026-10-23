@@ -23,6 +23,19 @@ overrides at lift time) plus function wrappers.
 | Logic ops / nodes / records | 30 / 130 / 100 | Editor arrays; play-time 45-slot logic table (`[0x765E44]`, no bound); 8-slot stack array | Container size | Same editor-object growth (390 rewrites) + 45-slot table relocation |
 | Map file | 32,736 B | Save/load, undo, System Link (bytes counts, 47,800 B max) | 64 KB (16-bit `used` word sites) | 45 rewrites for 64 KB; 32-bit word sites + container outside the Eternal heap for 256 KB+ |
 
+## Status
+
+- Stage 1 implemented 2026-10-23, UNVERIFIED in play: items 200 (opt-in
+  `TSFP_MAPMAKER_LIMITS=1`), editor item node pool 2120 (guest-code patch),
+  category maxima x4 for pickups (weapons, ammo, keycards 8 per colour,
+  health, armour, power-ups, special) and x2 for object-making categories
+  (movers/props 40, turrets 16, categories 35/36 8). Each item past 50 is
+  charged 2 cover pads (estimate from bigmap2: 60 extra cover pads for 50
+  items). Not raised: teleporters, cover props (category 33, they add cover
+  pads), free-standing objects (editor arrays of 170), flags, start points.
+  Probe flag 64 now logs engine objects in use and logic tags; next raise of
+  object-making categories waits for those numbers.
+
 ## Stages (in order)
 
 1. **Item and object quick wins.** Keycards, movers, props and other category

@@ -1,5 +1,42 @@
 {
   "title_id": "45410066",
   "xbe_sha256": "3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc",
-  "patches": []
+  "patches": [
+    {
+      "id": "mm-subentry-pool-bytes",
+      "kind": "code",
+      "function": "0x00302A60",
+      "address": "0x00302FFC",
+      "original_hex": "68407c0000",
+      "new_hex": "68e8f00100",
+      "reason": "MapMaker editor sub-entry (item) pool 530 -> 2120 nodes of 0x3C B: allocation 0x7C40 -> 0x1F0E8"
+    },
+    {
+      "id": "mm-subentry-pool-loop",
+      "kind": "code",
+      "function": "0x00307C20",
+      "address": "0x00307C81",
+      "original_hex": "3dfc7b0000",
+      "new_hex": "3da4f00100",
+      "reason": "free-list init loop end (N-1)*0x3C: 0x7BFC -> 0x1F0A4"
+    },
+    {
+      "id": "mm-subentry-pool-end",
+      "kind": "code",
+      "function": "0x00307C20",
+      "address": "0x00307C8D",
+      "original_hex": "8990107c0000",
+      "new_hex": "8990b8f00100",
+      "reason": "last node's next pointer at (N-1)*0x3C+0x14: 0x7C10 -> 0x1F0B8"
+    },
+    {
+      "id": "mm-subentry-pool-count",
+      "kind": "code",
+      "function": "0x00307C20",
+      "address": "0x00307CAF",
+      "original_hex": "c705c02c760012020000",
+      "new_hex": "c705c02c760048080000",
+      "reason": "free count 0x212 -> 0x848"
+    }
+  ]
 }

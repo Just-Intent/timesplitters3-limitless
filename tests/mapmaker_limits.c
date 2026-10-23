@@ -77,6 +77,19 @@ static uint32_t make_list(uint32_t base,uint32_t type_cell,unsigned n)
     return n?base:0u;
 }
 
+/* Stock category maxima (category table 0x00524BE0, max at +4). */
+static void stock_categories(void)
+{
+    static const uint32_t a[][2]={
+        {0x00524CA4u,32},{0x00524CBCu,32},{0x00524CD4u,2},{0x00524CECu,2},{0x00524D04u,2},
+        {0x00524D1Cu,2},{0x00524D34u,2},{0x00524D94u,2},{0x00524DACu,16},{0x00524DC4u,16},
+        {0x00524DDCu,12},{0x00524ECCu,32},{0x00524E3Cu,20},{0x00524E54u,20},{0x00524EE4u,20},
+        {0x00524E6Cu,8},{0x00524E84u,8},{0x00524E9Cu,8},{0x00524F2Cu,4},{0x00524F44u,4},
+        {0x00524EFCu,66}};
+    unsigned i;
+    for(i=0;i<sizeof a/sizeof a[0];i++) WORD_AT(a[i][0])=a[i][1];
+}
+
 int main(void)
 {
     uint32_t pieces;
@@ -128,10 +141,12 @@ int main(void)
     WORD_AT(ED+0x278)=90u*10000u+1000u;                               /* placed + held memory */
     WORD_AT(ED+0x25c)=0;
 
+    stock_categories();
     set_env("TSFP_MAPMAKER_POOLS",NULL);set_env("TSFP_MAPMAKER_LIMITS",NULL);
     originals=0;
     pc_display_mapmaker_limits(fake_limits);                          /* off by default */
     CHECK(originals==1 && (WORD_AT(ED+0x25c)&0x400000u) && NEAR(FLOAT_AT(ED+0x270),0.99f));
+    CHECK(WORD_AT(0x00524CD4u)==2);                                    /* categories stock */
 
     set_env("TSFP_MAPMAKER_LIMITS","1");
     WORD_AT(ED+0x25c)=0;
@@ -157,13 +172,35 @@ int main(void)
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     WORD_AT(ED+0x278)=90u*10000u+1000u;
-    WORD_AT(ED+0x306c)=50u<<16;                                        /* sub-entries: 50 + held 0 */
+    /* Items past the stock 50 are charged 2 cover pads each: tile cover 909. */
+    WORD_AT(ED+0x306c)=50u<<16;                                        /* 50 items: no charge */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    WORD_AT(ED+0x2f34)=12;                                             /* + held item over 9: 51 */
+    WORD_AT(ED+0x2f34)=12;                                             /* + held item: 51, cover 911 */
+    pc_display_mapmaker_limits(fake_limits);
+    CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
+    WORD_AT(ED+0x2f34)=(uint32_t)-1;
+    WORD_AT(ED+0x306c)=107u<<16;                                       /* 909 + 2*57 = 1023 */
+    pc_display_mapmaker_limits(fake_limits);
+    CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
+    CHECK(NEAR(FLOAT_AT(ED+0x270),(900.f+114.f)/1024.f));             /* meter: placed 900 + charge */
+    WORD_AT(ED+0x306c)=108u<<16;                                       /* 909 + 116 = 1025: refused */
+    pc_display_mapmaker_limits(fake_limits);
+    CHECK(WORD_AT(ED+0x25c)&0x400000u);
+    WORD_AT(ED+0x306c)=0;
+    /* The item limit itself, with cost-free tiles: 200 allowed, 201 refused. */
+    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,10);
+    WORD_AT(ED+0x2f7c)=0;
+    WORD_AT(ED+0x306c)=200u<<16;
+    pc_display_mapmaker_limits(fake_limits);
+    CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
+    CHECK(NEAR(FLOAT_AT(ED+0x270),1.0f));
+    WORD_AT(ED+0x2f34)=12;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     WORD_AT(ED+0x2f34)=(uint32_t)-1;WORD_AT(ED+0x306c)=0;
+    WORD_AT(0x0078400Cu)=pieces;
+    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,200);             /* 200 cost-free placed */
     WORD_AT(ED+0x2f7c)=0;
     pc_display_mapmaker_limits(fake_limits);
@@ -174,10 +211,21 @@ int main(void)
     WORD_AT(0x0078400Cu)=pieces;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
 
+    /* Category maxima: raised while the limits are on, values not at stock kept. */
+    WORD_AT(0x00524CD4u)=99;                                           /* red keycard: not stock */
+    pc_display_mapmaker_limits(fake_limits);
+    CHECK(WORD_AT(0x00524CD4u)==99);
+    CHECK(WORD_AT(0x00524CECu)==8 && WORD_AT(0x00524D04u)==8 && WORD_AT(0x00524D1Cu)==8);
+    CHECK(WORD_AT(0x00524E3Cu)==40 && WORD_AT(0x00524E54u)==40 && WORD_AT(0x00524CA4u)==128);
+    CHECK(WORD_AT(0x00524D34u)==2 && WORD_AT(0x00524D94u)==2);          /* teleporters unchanged */
+    CHECK(WORD_AT(0x00524EFCu)==66);                                   /* cover props unchanged */
+
     set_env("TSFP_MAPMAKER_POOLS","0");set_env("TSFP_MAPMAKER_LIMITS","1"); /* limits need the pools */
+    stock_categories();
     WORD_AT(ED+0x25c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
+    CHECK(WORD_AT(0x00524CECu)==2 && WORD_AT(0x00524E3Cu)==20);       /* untouched when off */
 
     if(failures)return 1;
     puts("mapmaker limits ok");
