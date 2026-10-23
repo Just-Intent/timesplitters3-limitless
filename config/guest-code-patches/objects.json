@@ -1,0 +1,308 @@
+{
+  "patches": [
+    {
+      "id": "obj-turret-gun-bytes",
+      "kind": "code",
+      "function": "0x000B3BE0",
+      "address": "0x000B3BE2",
+      "original_hex": "68803b0000",
+      "new_hex": "68c0940000",
+      "reason": "turret gun instance pool 32 -> 80 x 0x1DC B (Level heap)"
+    },
+    {
+      "id": "obj-turret-owner-bytes",
+      "kind": "code",
+      "function": "0x000B3BE0",
+      "address": "0x000B3BEE",
+      "original_hex": "6800260000",
+      "new_hex": "68005f0000",
+      "reason": "turret gun owner pool 32 -> 80 x 0x130 B"
+    },
+    {
+      "id": "obj-turret-gun-clear",
+      "kind": "code",
+      "function": "0x000B3A50",
+      "address": "0x000B3A63",
+      "original_hex": "b9e00e0000",
+      "new_hex": "b930250000",
+      "reason": "gun pool clear: N*0x77 dwords"
+    },
+    {
+      "id": "obj-turret-owner-clear",
+      "kind": "code",
+      "function": "0x000B3A50",
+      "address": "0x000B3A70",
+      "original_hex": "b980090000",
+      "new_hex": "b9c0170000",
+      "reason": "owner pool clear: N*0x4C dwords"
+    },
+    {
+      "id": "obj-turret-gun-nodes",
+      "kind": "code",
+      "function": "0x000B3A50",
+      "address": "0x000B3A90",
+      "original_hex": "6a20",
+      "new_hex": "6a50",
+      "reason": "gun free-list nodes 32 -> N"
+    },
+    {
+      "id": "obj-turret-owner-nodes",
+      "kind": "code",
+      "function": "0x000B3A50",
+      "address": "0x000B3AA8",
+      "original_hex": "6a20",
+      "new_hex": "6a50",
+      "reason": "owner free-list nodes 32 -> N"
+    },
+    {
+      "id": "obj-turret-sync-slots",
+      "kind": "code",
+      "function": "0x00359550",
+      "address": "0x003596B3",
+      "original_hex": "83fb20",
+      "new_hex": "83fb50",
+      "reason": "System Link turret sync scans all N pool slots (3 B per automatic turret: 9 + 3*80 = 249 <= 0x104 B frame, payload 245 B fits the 0x100 B copy in sub_00353990)"
+    },
+    {
+      "id": "obj-perception-clear",
+      "kind": "code",
+      "function": "0x000D2FD0",
+      "address": "0x000D301C",
+      "original_hex": "69c9e0030000",
+      "new_hex": "69c9000a0000",
+      "reason": "per-player perception array clear: players * 0x3E0 -> players * 0xA00"
+    },
+    {
+      "id": "obj-perception-stride",
+      "kind": "code",
+      "function": "0x000D2FD0",
+      "address": "0x000D3084",
+      "original_hex": "81c2e0030000",
+      "new_hex": "81c2000a0000",
+      "reason": "per-player slice stride (player+0xF74)"
+    },
+    {
+      "id": "obj-perception-reset",
+      "kind": "code",
+      "function": "0x000D2FD0",
+      "address": "0x000D39DE",
+      "original_hex": "3de0030000",
+      "new_hex": "3d000a0000",
+      "reason": "per-player reset loop end"
+    },
+    {
+      "id": "obj-perception-alloc",
+      "kind": "code",
+      "function": "0x000D3B00",
+      "address": "0x000D3B60",
+      "original_hex": "69d2e0030000",
+      "new_hex": "69d2000a0000",
+      "reason": "allocation players * 0xA00 (Level heap)"
+    },
+    {
+      "id": "obj-perception-reset2",
+      "kind": "code",
+      "function": "0x000CF320",
+      "address": "0x000CF33C",
+      "original_hex": "3de0030000",
+      "new_hex": "3d000a0000",
+      "reason": "per-player reset loop end (sub_000CF320)"
+    },
+    {
+      "id": "obj-list9-relocate",
+      "kind": "relocate",
+      "old": "0x00716148",
+      "size": "0x78",
+      "new": "0x008A0000",
+      "new_size": "0x200",
+      "sites": {
+        "0x0009E2B4": "offset",
+        "0x0009E663": "offset",
+        "0x0009E67A": "offset",
+        "0x0009E6A1": "offset",
+        "0x0009E6BD": "offset",
+        "0x0009E6C4": "offset",
+        "0x0009E700": "offset",
+        "0x000A5E00": "offset",
+        "0x000A5E17": "offset",
+        "0x000A6D62": "offset",
+        "0x000A6D7D": "offset",
+        "0x000A6D84": "offset",
+        "0x000A7232": "offset",
+        "0x000A724D": "offset",
+        "0x000A7254": "offset",
+        "0x0009E384": "keep",
+        "0x0009E3AE": "keep",
+        "0x000A05F6": "keep"
+      },
+      "data_ok": [],
+      "reason": "object list 0x00716148 (count [0x007B625C], sub_000A5CE0 slot 9 / sub_0009E650; perception index 0x200 + i*0x10) 30 -> 128 entries; 0x007161C0 is a separate scalar"
+    },
+    {
+      "id": "obj-list8-relocate",
+      "kind": "relocate",
+      "old": "0x007161C8",
+      "size": "0xC8",
+      "new": "0x008A0200",
+      "new_size": "0x320",
+      "sites": {
+        "0x000A4CF0": "offset",
+        "0x000A5D81": "offset",
+        "0x000A5D97": "offset",
+        "0x000A5DBB": "offset",
+        "0x000A5DC2": "offset",
+        "0x000A6D10": "offset",
+        "0x000A6D2E": "offset",
+        "0x000A6D35": "offset",
+        "0x000A71E0": "offset",
+        "0x000A71FE": "offset",
+        "0x000A7205": "offset",
+        "0x0009EEDC": "keep",
+        "0x000A5B6C": "keep",
+        "0x000A5CAB": "keep",
+        "0x000A5CB1": "keep"
+      },
+      "data_ok": [],
+      "reason": "sub_000A5CE0 slot-8 list (count [0x007B4FA8]) 50 -> 200 entries; 0x00716290 is a separate list head"
+    },
+    {
+      "id": "obj-list0-relocate",
+      "kind": "relocate",
+      "old": "0x007B4FC0",
+      "size": "0x1C0",
+      "new": "0x008A0600",
+      "new_size": "0x700",
+      "sites": {
+        "0x000A0EC0": "offset",
+        "0x000A5B4E": "offset",
+        "0x000A5D10": "offset",
+        "0x000A5D26": "offset",
+        "0x000A5D4A": "offset",
+        "0x000A5D51": "offset",
+        "0x000A6CB7": "offset",
+        "0x000A6CD5": "offset",
+        "0x000A6CDC": "offset",
+        "0x000A7180": "offset",
+        "0x000A719E": "offset",
+        "0x000A71A5": "offset",
+        "0x000A79C8": "keep"
+      },
+      "data_ok": [],
+      "reason": "sub_000A5CE0 slot-0 list (count [0x007B6258]) 112 -> 448 entries; 0x007B5180 is the per-room flag array"
+    },
+    {
+      "id": "obj-list0-clear",
+      "kind": "code",
+      "function": "0x000A5AF0",
+      "address": "0x000A5B49",
+      "original_hex": "b970000000",
+      "new_hex": "b9c0010000",
+      "reason": "clear the relocated slot-0 list: 112 -> 448 dwords"
+    },
+    {
+      "id": "obj-bucket-bytes",
+      "kind": "code",
+      "function": "0x000A5C00",
+      "address": "0x000A5C44",
+      "original_hex": "6840530000",
+      "new_hex": "6880a60000",
+      "reason": "room bucket buffer [0x00715FB4] 0x5340 -> 0xA680 B (Level heap, every scene)"
+    },
+    {
+      "id": "obj-bucket-bound",
+      "kind": "code",
+      "function": "0x0009E430",
+      "address": "0x0009E46B",
+      "original_hex": "3dcd140000",
+      "new_hex": "3d9d290000",
+      "reason": "room bucket bound 0x14CD -> 0x299D dwords (buffer/4 - 3, as stock)"
+    },
+    {
+      "id": "obj-tag-links-relocate",
+      "kind": "relocate",
+      "old": "0x0075D320",
+      "size": "0x7CC",
+      "new": "0x008A2400",
+      "new_size": "0x1F40",
+      "sites": {
+        "0x0023FE9F": "offset",
+        "0x00240390": "offset",
+        "0x002403CD": "offset",
+        "0x002403E7": "offset"
+      },
+      "data_ok": [],
+      "reason": "logic tag links 250 -> 1000 x 8 B (declared 0x7CC so the range does not touch the tag table; 0x0075DAEC is never referenced)"
+    },
+    {
+      "id": "obj-tag-entries-relocate",
+      "kind": "relocate",
+      "old": "0x0075DAF0",
+      "size": "0xFA0",
+      "new": "0x008A4400",
+      "new_size": "0x3E80",
+      "sites": {
+        "0x0023FE50": "offset",
+        "0x0023FED5": "offset",
+        "0x0023FEF7": "offset",
+        "0x0023FF94": "offset",
+        "0x002402E0": "offset",
+        "0x002402E9": "offset",
+        "0x00240300": "offset",
+        "0x00240306": "offset",
+        "0x0024032F": "offset",
+        "0x00240335": "offset",
+        "0x00240462": "offset",
+        "0x00240474": "offset",
+        "0x00240486": "offset",
+        "0x0024049D": "offset",
+        "0x002404A7": "offset",
+        "0x002404B0": "offset",
+        "0x002404BA": "offset",
+        "0x0023FEE9": "end",
+        "0x0023FE6F": "keep",
+        "0x0023FEC0": "keep",
+        "0x0023FF12": "keep",
+        "0x00240458": "keep",
+        "0x00240468": "keep"
+      },
+      "data_ok": [],
+      "reason": "logic tag table 250 -> 1000 x 16 B; 0x0075EA90 is the tag count"
+    },
+    {
+      "id": "obj-tag-entries-init",
+      "kind": "code",
+      "function": "0x0023FE50",
+      "address": "0x0023FE62",
+      "original_hex": "3d94ea7500",
+      "new_hex": "3d84828a00",
+      "reason": "tag table init loop end (end + 4)"
+    },
+    {
+      "id": "obj-tag-links-init",
+      "kind": "code",
+      "function": "0x0023FE80",
+      "address": "0x0023FEAC",
+      "original_hex": "3df4da7500",
+      "new_hex": "3d44438a00",
+      "reason": "link table init loop end (end + 4; the stock value lies inside the tag table range)"
+    },
+    {
+      "id": "obj-tag-entries-cap",
+      "kind": "code",
+      "function": "0x0023FEC0",
+      "address": "0x0023FEC6",
+      "original_hex": "81fafa000000",
+      "new_hex": "81fae8030000",
+      "reason": "tag slots 250 -> 1000"
+    },
+    {
+      "id": "obj-tag-links-cap",
+      "kind": "code",
+      "function": "0x00240360",
+      "address": "0x0024039C",
+      "original_hex": "81fafa000000",
+      "new_hex": "81fae8030000",
+      "reason": "link slots 250 -> 1000"
+    }
+  ]
+}

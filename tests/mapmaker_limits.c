@@ -83,7 +83,7 @@ static void stock_categories(void)
 {
     static const uint32_t a[][2]={
         {0x00524CA4u,32},{0x00524CBCu,32},{0x00524CD4u,2},{0x00524CECu,2},{0x00524D04u,2},
-        {0x00524D1Cu,2},{0x00524D34u,2},{0x00524D94u,2},{0x00524DACu,16},{0x00524DC4u,16},
+        {0x00524D1Cu,2},{0x00524D34u,2},{0x00524D4Cu,2},{0x00524D64u,2},{0x00524D7Cu,2},{0x00524D94u,2},{0x00524DACu,16},{0x00524DC4u,16},
         {0x00524DDCu,12},{0x00524ECCu,32},{0x00524E3Cu,20},{0x00524E54u,20},{0x00524EE4u,20},
         {0x00524E6Cu,8},{0x00524E84u,8},{0x00524E9Cu,8},{0x00524F2Cu,4},{0x00524F44u,4},
         {0x00524EFCu,66}};
@@ -213,9 +213,10 @@ int main(void)
     CHECK(WORD_AT(0x00524CD4u)==99);
     CHECK(WORD_AT(0x00524CECu)==8 && WORD_AT(0x00524D04u)==8 && WORD_AT(0x00524D1Cu)==8);
     CHECK(WORD_AT(0x00524E3Cu)==80 && WORD_AT(0x00524E54u)==80 && WORD_AT(0x00524CA4u)==128);
-    CHECK(WORD_AT(0x00524E6Cu)==8 && WORD_AT(0x00524E84u)==8 && WORD_AT(0x00524E9Cu)==8); /* turrets stock */
-    CHECK(WORD_AT(0x00524D34u)==2 && WORD_AT(0x00524D94u)==2);          /* teleporters unchanged */
-    CHECK(WORD_AT(0x00524EFCu)==66);                                   /* cover props unchanged */
+    CHECK(WORD_AT(0x00524E6Cu)==24 && WORD_AT(0x00524E84u)==24 && WORD_AT(0x00524E9Cu)==24); /* turrets: 72 <= 80 */
+    CHECK(WORD_AT(0x00524D34u)==8 && WORD_AT(0x00524D4Cu)==8 && WORD_AT(0x00524D64u)==8 &&
+          WORD_AT(0x00524D7Cu)==8 && WORD_AT(0x00524D94u)==8);          /* teleporters x4 */
+    CHECK(WORD_AT(0x00524EFCu)==132);                                  /* cover props x2 */
 
     set_env("TSFP_MAPMAKER_POOLS","0");set_env("TSFP_MAPMAKER_LIMITS","1"); /* limits need the pools */
     stock_categories();
@@ -223,6 +224,7 @@ int main(void)
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     CHECK(WORD_AT(0x00524CECu)==2 && WORD_AT(0x00524E3Cu)==20);       /* untouched when off */
+    CHECK(WORD_AT(0x00524E6Cu)==8 && WORD_AT(0x00524D64u)==2 && WORD_AT(0x00524EFCu)==66);
 
     if(failures)return 1;
     puts("mapmaker limits ok");
