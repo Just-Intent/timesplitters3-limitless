@@ -54,8 +54,12 @@
 #include <string.h>
 
 #define MAPMAKER_LIMIT_PADS 4800u
-#define MAPMAKER_LIMIT_COVER 1024u    /* stock: see above */
-#define MAPMAKER_POOL_COVER 1536u     /* stock 1280, plus a guard */
+/* Cover pads: the runtime pad handles are moved above a 10,240-entry cover
+ * handle range (config/guest-code-patches/pads.json, docs/mapmaker-pads.md);
+ * the editor keeps 256 spare as stock did (1280 - 1024) for the start-point
+ * pads a map adds at load (measured 60). */
+#define MAPMAKER_LIMIT_COVER 9984u    /* 10240 cover handles - 256 */
+#define MAPMAKER_POOL_COVER 10496u    /* 10240 cover handles + 256 guard */
 #define MAPMAKER_LIMIT_LINKS 8800u
 #define MAPMAKER_LIMIT_GROUPS 600
 #define MAPMAKER_LIMIT_PIECES 200u
@@ -121,7 +125,9 @@ void pc_display_mapmaker_pools(void (*original)(void))
     }
     save_registers(&r);
     WORD_AT(0x00715F2Cu)=mapmaker_pool(MAPMAKER_LIMIT_PADS*32u);
-    WORD_AT(0x00715F30u)=mapmaker_pool(MAPMAKER_LIMIT_LINKS*20u);
+    /* Links: the editor counts template links only; the play-time stitcher
+     * adds one per stitch entry (table of 16 per piece) and objects a few. */
+    WORD_AT(0x00715F30u)=mapmaker_pool((MAPMAKER_LIMIT_LINKS+16u*MAPMAKER_LIMIT_PIECES+256u)*20u);
     if((WORD_AT(0x007DE454u)>>8&0xFFu)!=10u)                 /* byte [0x007DE455] */
         WORD_AT(0x00715F3Cu)=mapmaker_pool(MAPMAKER_LIMIT_PADS*44u);
     WORD_AT(0x00715F34u)=mapmaker_pool(MAPMAKER_POOL_COVER*32u);

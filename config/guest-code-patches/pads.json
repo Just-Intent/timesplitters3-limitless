@@ -1,0 +1,850 @@
+{
+  "patches": [
+    {
+      "id": "pads-layoutb-0009a444",
+      "kind": "code",
+      "function": "0x0009A420",
+      "address": "0x0009A444",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009a45b",
+      "kind": "code",
+      "function": "0x0009A420",
+      "address": "0x0009A45B",
+      "original_hex": "3d40240000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x2440: scene-100 cover range end 0x2440 (1280) -> 0x4740 (10240)"
+    },
+    {
+      "id": "pads-layoutb-0009a462",
+      "kind": "code",
+      "function": "0x0009A420",
+      "address": "0x0009A462",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009a469",
+      "kind": "code",
+      "function": "0x0009A420",
+      "address": "0x0009A469",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0009a470",
+      "kind": "code",
+      "function": "0x0009A420",
+      "address": "0x0009A470",
+      "original_hex": "8db062dfffff",
+      "new_hex": "8db0c0b8ffff",
+      "reason": "lea esi, [eax - 0x209e]: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-0009a4cc",
+      "kind": "code",
+      "function": "0x0009A4C0",
+      "address": "0x0009A4CC",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009a4d3",
+      "kind": "code",
+      "function": "0x0009A4C0",
+      "address": "0x0009A4D3",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0009a4e7",
+      "kind": "code",
+      "function": "0x0009A4C0",
+      "address": "0x0009A4E7",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009a53c",
+      "kind": "code",
+      "function": "0x0009A510",
+      "address": "0x0009A53C",
+      "original_hex": "059e200000",
+      "new_hex": "0540470000",
+      "reason": "add eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009c57a",
+      "kind": "code",
+      "function": "0x0009C570",
+      "address": "0x0009C57A",
+      "original_hex": "2d9e200000",
+      "new_hex": "2d40470000",
+      "reason": "sub eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009d488",
+      "kind": "code",
+      "function": "0x0009D3B0",
+      "address": "0x0009D488",
+      "original_hex": "8d879e200000",
+      "new_hex": "8d8740470000",
+      "reason": "lea eax, [edi + 0x209e]: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009d606",
+      "kind": "code",
+      "function": "0x0009D5E0",
+      "address": "0x0009D606",
+      "original_hex": "81f99e200000",
+      "new_hex": "81f940470000",
+      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009d612",
+      "kind": "code",
+      "function": "0x0009D5E0",
+      "address": "0x0009D612",
+      "original_hex": "81f99e200000",
+      "new_hex": "81f940470000",
+      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009d61a",
+      "kind": "code",
+      "function": "0x0009D5E0",
+      "address": "0x0009D61A",
+      "original_hex": "81f9b2200000",
+      "new_hex": "81f954470000",
+      "reason": "cmp ecx, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0009d62a",
+      "kind": "code",
+      "function": "0x0009D5E0",
+      "address": "0x0009D62A",
+      "original_hex": "81fa9e200000",
+      "new_hex": "81fa40470000",
+      "reason": "cmp edx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009d636",
+      "kind": "code",
+      "function": "0x0009D5E0",
+      "address": "0x0009D636",
+      "original_hex": "81fa9e200000",
+      "new_hex": "81fa40470000",
+      "reason": "cmp edx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0009d63e",
+      "kind": "code",
+      "function": "0x0009D5E0",
+      "address": "0x0009D63E",
+      "original_hex": "81fab2200000",
+      "new_hex": "81fa54470000",
+      "reason": "cmp edx, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-000bdcec",
+      "kind": "code",
+      "function": "0x000BDC90",
+      "address": "0x000BDCEC",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-000bdcf3",
+      "kind": "code",
+      "function": "0x000BDC90",
+      "address": "0x000BDCF3",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-000bdd17",
+      "kind": "code",
+      "function": "0x000BDC90",
+      "address": "0x000BDD17",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-000bdd1e",
+      "kind": "code",
+      "function": "0x000BDC90",
+      "address": "0x000BDD1E",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-000bf4ba",
+      "kind": "code",
+      "function": "0x000BF360",
+      "address": "0x000BF4BA",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-000bf4c1",
+      "kind": "code",
+      "function": "0x000BF360",
+      "address": "0x000BF4C1",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-000bf4ce",
+      "kind": "code",
+      "function": "0x000BF360",
+      "address": "0x000BF4CE",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-000bf4d5",
+      "kind": "code",
+      "function": "0x000BF360",
+      "address": "0x000BF4D5",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-00159719",
+      "kind": "code",
+      "function": "0x001596F0",
+      "address": "0x00159719",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-00159720",
+      "kind": "code",
+      "function": "0x001596F0",
+      "address": "0x00159720",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0015972b",
+      "kind": "code",
+      "function": "0x001596F0",
+      "address": "0x0015972B",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-00159762",
+      "kind": "code",
+      "function": "0x001596F0",
+      "address": "0x00159762",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0015977c",
+      "kind": "code",
+      "function": "0x001596F0",
+      "address": "0x0015977C",
+      "original_hex": "0562dfffff",
+      "new_hex": "05c0b8ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-0015d525",
+      "kind": "code",
+      "function": "0x0015D500",
+      "address": "0x0015D525",
+      "original_hex": "81ff9e200000",
+      "new_hex": "81ff40470000",
+      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0015d52f",
+      "kind": "code",
+      "function": "0x0015D500",
+      "address": "0x0015D52F",
+      "original_hex": "81ff9e200000",
+      "new_hex": "81ff40470000",
+      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0015d537",
+      "kind": "code",
+      "function": "0x0015D500",
+      "address": "0x0015D537",
+      "original_hex": "81ffb2200000",
+      "new_hex": "81ff54470000",
+      "reason": "cmp edi, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0015e4bd",
+      "kind": "code",
+      "function": "0x0015E450",
+      "address": "0x0015E4BD",
+      "original_hex": "81fa9e200000",
+      "new_hex": "81fa40470000",
+      "reason": "cmp edx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-00160be2",
+      "kind": "code",
+      "function": "0x00160BD0",
+      "address": "0x00160BE2",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-001fcedc",
+      "kind": "code",
+      "function": "0x001FCE90",
+      "address": "0x001FCEDC",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-001fcef0",
+      "kind": "code",
+      "function": "0x001FCE90",
+      "address": "0x001FCEF0",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-001fcef7",
+      "kind": "code",
+      "function": "0x001FCE90",
+      "address": "0x001FCEF7",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-001fcefe",
+      "kind": "code",
+      "function": "0x001FCE90",
+      "address": "0x001FCEFE",
+      "original_hex": "0562dfffff",
+      "new_hex": "05c0b8ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-002329e6",
+      "kind": "code",
+      "function": "0x00232270",
+      "address": "0x002329E6",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-00232a00",
+      "kind": "code",
+      "function": "0x00232270",
+      "address": "0x00232A00",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-00232a07",
+      "kind": "code",
+      "function": "0x00232270",
+      "address": "0x00232A07",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-00232a14",
+      "kind": "code",
+      "function": "0x00232270",
+      "address": "0x00232A14",
+      "original_hex": "0562dfffff",
+      "new_hex": "05c0b8ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-00274418",
+      "kind": "code",
+      "function": "0x00274400",
+      "address": "0x00274418",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0027441f",
+      "kind": "code",
+      "function": "0x00274400",
+      "address": "0x0027441F",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-00274426",
+      "kind": "code",
+      "function": "0x00274400",
+      "address": "0x00274426",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-00274471",
+      "kind": "code",
+      "function": "0x00274450",
+      "address": "0x00274471",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-00274478",
+      "kind": "code",
+      "function": "0x00274450",
+      "address": "0x00274478",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0027447f",
+      "kind": "code",
+      "function": "0x00274450",
+      "address": "0x0027447F",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0027c3c7",
+      "kind": "code",
+      "function": "0x0027C3A0",
+      "address": "0x0027C3C7",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-002b0348",
+      "kind": "code",
+      "function": "0x002B0320",
+      "address": "0x002B0348",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-002b0353",
+      "kind": "code",
+      "function": "0x002B0320",
+      "address": "0x002B0353",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-002b0435",
+      "kind": "code",
+      "function": "0x002B0320",
+      "address": "0x002B0435",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-002b0440",
+      "kind": "code",
+      "function": "0x002B0320",
+      "address": "0x002B0440",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-002b0456",
+      "kind": "code",
+      "function": "0x002B0320",
+      "address": "0x002B0456",
+      "original_hex": "f6841144ecfbff01",
+      "new_hex": "f684110418f7ff01",
+      "reason": "test byte ptr [ecx + edx - 0x413bc], 1: folded runtime[h-base].flags (+4): -0x413BC -> -0x8E7FC"
+    },
+    {
+      "id": "pads-layoutb-002b5a0e",
+      "kind": "code",
+      "function": "0x002B55D0",
+      "address": "0x002B5A0E",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-003394ba",
+      "kind": "code",
+      "function": "0x00339480",
+      "address": "0x003394BA",
+      "original_hex": "81f99e200000",
+      "new_hex": "81f940470000",
+      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-003394d0",
+      "kind": "code",
+      "function": "0x00339480",
+      "address": "0x003394D0",
+      "original_hex": "81f99e200000",
+      "new_hex": "81f940470000",
+      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-003394d8",
+      "kind": "code",
+      "function": "0x00339480",
+      "address": "0x003394D8",
+      "original_hex": "81f9b2200000",
+      "new_hex": "81f954470000",
+      "reason": "cmp ecx, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-003394e0",
+      "kind": "code",
+      "function": "0x00339480",
+      "address": "0x003394E0",
+      "original_hex": "81c162dfffff",
+      "new_hex": "81c1c0b8ffff",
+      "reason": "add ecx, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-0033b7ef",
+      "kind": "code",
+      "function": "0x0033B750",
+      "address": "0x0033B7EF",
+      "original_hex": "817c94149e200000",
+      "new_hex": "817c941440470000",
+      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033b825",
+      "kind": "code",
+      "function": "0x0033B750",
+      "address": "0x0033B825",
+      "original_hex": "817c94149e200000",
+      "new_hex": "817c941440470000",
+      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033b838",
+      "kind": "code",
+      "function": "0x0033B750",
+      "address": "0x0033B838",
+      "original_hex": "817c9414b2200000",
+      "new_hex": "817c941454470000",
+      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0033b855",
+      "kind": "code",
+      "function": "0x0033B750",
+      "address": "0x0033B855",
+      "original_hex": "81e99e200000",
+      "new_hex": "81e940470000",
+      "reason": "sub ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033b964",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033B964",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033b97f",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033B97F",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033b986",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033B986",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0033b993",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033B993",
+      "original_hex": "0562dfffff",
+      "new_hex": "05c0b8ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-0033bbdf",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033BBDF",
+      "original_hex": "81ff9e200000",
+      "new_hex": "81ff40470000",
+      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033bbfe",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033BBFE",
+      "original_hex": "81ff9e200000",
+      "new_hex": "81ff40470000",
+      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033bc06",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033BC06",
+      "original_hex": "81ffb2200000",
+      "new_hex": "81ff54470000",
+      "reason": "cmp edi, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0033bc13",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033BC13",
+      "original_hex": "81c762dfffff",
+      "new_hex": "81c7c0b8ffff",
+      "reason": "add edi, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-0033bc7a",
+      "kind": "code",
+      "function": "0x0033BC50",
+      "address": "0x0033BC7A",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033bc8e",
+      "kind": "code",
+      "function": "0x0033BC50",
+      "address": "0x0033BC8E",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033bc95",
+      "kind": "code",
+      "function": "0x0033BC50",
+      "address": "0x0033BC95",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0033bc9c",
+      "kind": "code",
+      "function": "0x0033BC50",
+      "address": "0x0033BC9C",
+      "original_hex": "0562dfffff",
+      "new_hex": "05c0b8ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-0033be0b",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BE0B",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033be25",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BE25",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033be2c",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BE2C",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0033be39",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BE39",
+      "original_hex": "0562dfffff",
+      "new_hex": "05c0b8ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-0033bec5",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BEC5",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033bedf",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BEDF",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033bee6",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BEE6",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0033bef3",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BEF3",
+      "original_hex": "0562dfffff",
+      "new_hex": "05c0b8ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-layoutb-0033efbc",
+      "kind": "code",
+      "function": "0x0033EF90",
+      "address": "0x0033EFBC",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033efda",
+      "kind": "code",
+      "function": "0x0033EF90",
+      "address": "0x0033EFDA",
+      "original_hex": "3d9e200000",
+      "new_hex": "3d40470000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+    },
+    {
+      "id": "pads-layoutb-0033efe1",
+      "kind": "code",
+      "function": "0x0033EF90",
+      "address": "0x0033EFE1",
+      "original_hex": "3db2200000",
+      "new_hex": "3d54470000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+    },
+    {
+      "id": "pads-layoutb-0033efee",
+      "kind": "code",
+      "function": "0x0033EF90",
+      "address": "0x0033EFEE",
+      "original_hex": "0562dfffff",
+      "new_hex": "05c0b8ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+    },
+    {
+      "id": "pads-astar-loop-bound",
+      "kind": "code",
+      "function": "0x000984D0",
+      "address": "0x00098540",
+      "original_hex": "3d40e27000",
+      "new_hex": "3d70e17000",
+      "reason": "loop end of the 60 x 0xE8 table at 0x0070AAF8 (eax steps 0x570 from 0x70ABE0, last value tested 0x70DD30, exit value 0x70E240): any bound in (0x70DD30, 0x70E240] runs the same 10 iterations, so 0x70E170 keeps the loop identical and takes the constant out of the group A* pool range relocated below"
+    },
+    {
+      "id": "pads-astar-group-pool",
+      "kind": "relocate",
+      "old": "0x0070E178",
+      "size": "0x3E80",
+      "new": "0x008E0000",
+      "new_size": "0x20000",
+      "sites": {
+        "0x0009B0A8": "offset",
+        "0x0009B0B9": "keep",
+        "0x0009B0C2": "keep",
+        "0x0009B0CD": "offset",
+        "0x0009B0E7": "offset",
+        "0x0009B10E": "offset",
+        "0x0009B175": "offset",
+        "0x0009B180": "offset",
+        "0x0009B1B5": "offset",
+        "0x0009B1C8": "offset",
+        "0x0009B1DC": "offset",
+        "0x0009B1E4": "offset",
+        "0x0009B209": "offset",
+        "0x0009B229": "offset",
+        "0x0009B232": "offset",
+        "0x0009B23F": "offset",
+        "0x0009B262": "offset",
+        "0x0009B458": "offset",
+        "0x0009B463": "offset",
+        "0x0009B491": "offset",
+        "0x0009B49E": "offset",
+        "0x0009B4CE": "offset",
+        "0x0009B576": "keep",
+        "0x0009B5AC": "offset",
+        "0x0009B607": "offset",
+        "0x0009B612": "offset",
+        "0x0009B666": "keep",
+        "0x0009B69E": "offset",
+        "0x0009B6A9": "offset",
+        "0x0009B709": "offset",
+        "0x0009B714": "offset"
+      },
+      "data_ok": [
+        "0x004A26B8"
+      ],
+      "reason": "group-level A* node pool (16-byte nodes, int16 indices) 1000 -> 8192 nodes; the allocator sub_0009B090 has no bound (guarded by pc_mapmaker_pads_group_node). keep = the bump counter 0x00711FF8 just after the table. data_ok 0x004A26B8: .rdata uint16 ramp table (0x70, 0x71), not a pointer"
+    }
+  ]
+}

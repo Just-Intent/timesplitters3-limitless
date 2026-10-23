@@ -66,6 +66,7 @@ static void set_env(const char *name,const char *value)
 #define TYPEA 0x00330000u
 #define TYPEB 0x00330010u
 #define TYPEC 0x00330020u
+#define TYPED 0x00330030u
 /* Piece list of n pieces of one tile type, starting at base. */
 static uint32_t make_list(uint32_t base,uint32_t type_cell,unsigned n)
 {
@@ -102,17 +103,17 @@ int main(void)
     WORD_AT(0x007B6664u)=7;WORD_AT(0x007B666Cu)=9;
     pc_display_mapmaker_pools(fake_pools);
     CHECK(originals==0 && allocs==5);
-    CHECK(alloc_size[0]==4800u*32u && alloc_size[1]==8800u*20u && alloc_size[2]==4800u*44u &&
-          alloc_size[3]==1536u*32u && alloc_size[4]==0x280u);
+    CHECK(alloc_size[0]==4800u*32u && alloc_size[1]==(8800u+3200u+256u)*20u && alloc_size[2]==4800u*44u &&
+          alloc_size[3]==10496u*32u && alloc_size[4]==0x280u);
     CHECK(alloc_heap[0]==1 && alloc_heap[4]==1);
     CHECK(WORD_AT(0x00715F2Cu)==0x00500000u && WORD_AT(0x00715F30u)==0x00500000u+4800u*32u);
-    CHECK(WORD_AT(WORD_AT(0x00715F2Cu))==0 && WORD_AT(WORD_AT(0x00715F30u)+8800u*20u-4u)==0 &&
+    CHECK(WORD_AT(WORD_AT(0x00715F2Cu))==0 && WORD_AT(WORD_AT(0x00715F30u)+12256u*20u-4u)==0 &&
           WORD_AT(WORD_AT(0x00715F3Cu)+4800u*44u-4u)==0);           /* zeroed */
     CHECK(WORD_AT(0x007B6664u)==0 && WORD_AT(0x007B666Cu)==0);
     allocs=0;
     WORD_AT(0x007DE454u)=0x00000A00u;                                  /* byte 0x007DE455 == 10 */
     pc_display_mapmaker_pools(fake_pools);
-    CHECK(allocs==4 && alloc_size[2]==1536u*32u);                      /* no AI data pool */
+    CHECK(allocs==4 && alloc_size[2]==10496u*32u);                      /* no AI data pool */
     WORD_AT(0x007DE454u)=0;
     allocs=0;
     WORD_AT(0x0079094Cu)=53;                                           /* other levels: original */
@@ -152,21 +153,26 @@ int main(void)
     WORD_AT(ED+0x25c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u) && (WORD_AT(ED+0x25c)&2u));  /* allowed; other flags kept */
-    /* meter: max(900/4800, 900/1024, 2700/8800, 400/600, 90/200, 0, 900000/2048000) */
-    CHECK(NEAR(FLOAT_AT(ED+0x270),900.f/1024.f));
-    /* held preview: max(2/4800, 9/1024, 20/8800, 1/200, 0, 1000/2048000) */
-    CHECK(NEAR(FLOAT_AT(ED+0x274),9.f/1024.f));
+    /* meter: max(900/4800, 900/9984, 2700/8800, 400/600, 90/200, 0, 900000/2048000) */
+    CHECK(NEAR(FLOAT_AT(ED+0x270),400.f/600.f));
+    /* held preview: max(2/4800, 9/9984, 20/8800, 1/200, 0, 1000/2048000) */
+    CHECK(NEAR(FLOAT_AT(ED+0x274),1.f/200.f));
 
     WORD_AT(0x00762CB8u)=601;                                          /* groups over 600 */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     WORD_AT(0x00762CB8u)=400;
-    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,13);                /* cover 900+117 = 1017: allowed */
+    /* Cover limit 9984: 100 placed pieces of 99 cover (type 4) and held type 2 (9 each). */
+    WORD_AT(TYPED)=4;WORD_AT(0x00529404u+4u*0x140u)=99;
+    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPED,100);
+    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,9);                 /* 9900+81 = 9981: allowed */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,14);                /* 1026 > 1024 (stock): refused */
+    CHECK(NEAR(FLOAT_AT(ED+0x270),9900.f/9984.f));
+    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,10);                /* 9990 > 9984: refused */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
+    WORD_AT(0x0078400Cu)=pieces;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     WORD_AT(ED+0x278)=2048001u;                                        /* memory over budget */
     pc_display_mapmaker_limits(fake_limits);
@@ -176,7 +182,7 @@ int main(void)
     WORD_AT(ED+0x306c)=150u<<16;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    CHECK(NEAR(FLOAT_AT(ED+0x270),900.f/1024.f));                     /* meter: cover, not items */
+    CHECK(NEAR(FLOAT_AT(ED+0x270),150.f/200.f));                      /* meter: items, no cover */
     WORD_AT(ED+0x306c)=0;
     /* The item limit itself, with cost-free tiles: 200 allowed, 201 refused. */
     WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,10);
