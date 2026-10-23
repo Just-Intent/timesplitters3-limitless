@@ -25,7 +25,7 @@ static int failures;
 /* ---- runtime heap ---- */
 static uint32_t heap_next=0x00A00000u, heap_sizes[8];
 static unsigned heap_allocs;
-uint32_t xbox_HeapAlloc(uint32_t size,uint32_t alignment)
+uint32_t xbox_ContiguousAlloc(uint32_t size,uint32_t alignment)
 {
     uint32_t p=(heap_next+alignment-1)&~(alignment-1);
     heap_next=p+size;

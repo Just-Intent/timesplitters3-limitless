@@ -28,6 +28,8 @@ void pc_display_mapmaker_memory(void (*original)(void));
 /* MapMaker capacity stage A: AI navigation pools (scene 100) and editor limits. */
 void pc_display_mapmaker_pools(void (*original)(void));
 void pc_display_mapmaker_limits(void (*original)(void));
+/* Gate for every MapMaker capacity area hook (TSFP_MAPMAKER_AREA_OFF/_TRACE). */
+int pc_mapmaker_area_enabled(const char *area,const char *hook);
 /* MapMaker capacity area hooks (begin) */
 void pc_mapmaker_pads_group_node(void (*original)(void));
 void pc_mapmaker_pads_pad_node(void (*original)(void));
@@ -45,6 +47,14 @@ void pc_mapmaker_container_compile(void (*original)(void));
 void pc_mapmaker_container_compiled_size(void (*original)(void));
 void pc_mapmaker_container_find(void (*original)(void));
 void pc_mapmaker_container_net_send(void (*original)(void));
+void pc_mapmaker_objects_turret_create(void (*original)(void));
+void pc_mapmaker_objects_turret_init(void (*original)(void));
+void pc_mapmaker_objects_list_add(void (*original)(void));
+void pc_mapmaker_objects_register(void (*original)(void));
+void pc_mapmaker_objects_pool(void (*original)(void));
+void pc_mapmaker_objects_twin_pool(void (*original)(void));
+void pc_mapmaker_objects_teleporters(void (*original)(void));
+void pc_mapmaker_objects_tag(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));

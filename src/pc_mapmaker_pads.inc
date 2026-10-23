@@ -30,6 +30,9 @@
  * Requires the includer's WORD_AT, guest_writable, g_esp and, from
  * pc_mapmaker_limits.inc, mapmaker_limits, mapmaker_limits_read,
  * MAPMAKER_LIMIT_COVER and MAPMAKER_POOL_COVER. */
+#ifndef MAPMAKER_GUEST_RET
+#define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
+#endif
 
 #define MAPMAKER_PADS_COVER_RANGE 10240u  /* handles 0x1F40..0x473F; runtime 0x4740..0x4753 */
 #define MAPMAKER_PADS_STOCK_COVER 1280u   /* stock scene-100 cover pool (sub_0009A140) */
@@ -58,6 +61,7 @@ void pc_mapmaker_pads_group_node(void (*original)(void))
 {
     if(mapmaker_pads_pool_full(0x0070E170u,0x00711FF8u,MAPMAKER_PADS_GROUP_NODES)) {
         mapmaker_pads.group_refused++;
+        MAPMAKER_GUEST_RET();
         return;
     }
     original();
@@ -68,6 +72,7 @@ void pc_mapmaker_pads_pad_node(void (*original)(void))
 {
     if(mapmaker_pads_pool_full(0x00712044u,0x00715F20u,MAPMAKER_PADS_PAD_NODES)) {
         mapmaker_pads.pad_refused++;
+        MAPMAKER_GUEST_RET();
         return;
     }
     original();
@@ -90,6 +95,7 @@ void pc_mapmaker_pads_cover_topup(void (*original)(void))
     count=WORD_AT(0x007B65C0u);
     if(count>capacity || add>capacity-count) {
         mapmaker_pads.cover_refused++;
+        MAPMAKER_GUEST_RET();
         return;
     }
     original();

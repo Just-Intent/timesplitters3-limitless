@@ -47,7 +47,43 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 /* MapMaker capacity area includes (begin) */
 #include "pc_mapmaker_pads.inc"
 #include "pc_mapmaker_container.inc"
+#include "pc_mapmaker_objects.inc"
 /* MapMaker capacity area includes (end) */
+
+/* Every area hook is reached through this gate (generated wrappers in
+ * patches/*-mapmaker-meter-wrappers.patch). For diagnosis:
+ *   TSFP_MAPMAKER_AREA_OFF=container,pads  run those areas' originals instead
+ *   TSFP_MAPMAKER_AREA_TRACE=1             log each hook's first 4 calls per
+ *                                          return address to stderr */
+int pc_mapmaker_area_enabled(const char *area,const char *hook)
+{
+    static int initialized,trace;
+    static char off[256];
+    static struct { const char *hook; uint32_t ret; unsigned calls; } seen[256];
+    static unsigned seen_n;
+    size_t n=strlen(area);
+    const char *p;
+    int enabled=1;
+    if(!initialized) {
+        const char *o=getenv("TSFP_MAPMAKER_AREA_OFF"),*t=getenv("TSFP_MAPMAKER_AREA_TRACE");
+        initialized=1;
+        if(o) { off[0]=',';strncpy(off+1,o,sizeof off-3);strcat(off,","); }
+        trace=t && t[0]=='1';
+    }
+    for(p=off;off[0] && (p=strstr(p,area))!=NULL;p+=n)
+        if(p[-1]==',' && p[n]==',') { enabled=0;break; }
+    if(trace) {
+        uint32_t ret=guest_writable(g_esp,4)?WORD_AT(g_esp):0u;
+        unsigned i;
+        for(i=0;i<seen_n && !(seen[i].hook==hook && seen[i].ret==ret);i++) {}
+        if(i==seen_n && seen_n<sizeof seen/sizeof seen[0]) { seen[i].hook=hook;seen[i].ret=ret;seen_n++; }
+        if(i<seen_n && seen[i].calls++<4) {
+            fprintf(stderr,"[mapmaker-area] %s %s ret=0x%08X%s\n",area,hook,ret,enabled?"":" (off)");
+            fflush(stderr);
+        }
+    }
+    return enabled;
+}
 #include "pc_menu_sliders.inc"
 static void menu_team_arrow(unsigned direction);
 #include "pc_menu_choices.inc"
@@ -560,6 +596,7 @@ void pc_display_mapmaker_meter(void (*original)(void)) { original(); }
 void pc_display_mapmaker_memory(void (*original)(void)) { original(); }
 void pc_display_mapmaker_pools(void (*original)(void)) { original(); }
 void pc_display_mapmaker_limits(void (*original)(void)) { original(); }
+int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)area;(void)hook;return 1; }
 /* MapMaker capacity area stubs (begin) */
 void pc_mapmaker_pads_group_node(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_pad_node(void (*original)(void)) { original(); }
@@ -577,6 +614,14 @@ void pc_mapmaker_container_compile(void (*original)(void)) { original(); }
 void pc_mapmaker_container_compiled_size(void (*original)(void)) { original(); }
 void pc_mapmaker_container_find(void (*original)(void)) { original(); }
 void pc_mapmaker_container_net_send(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_turret_create(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_turret_init(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_list_add(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_register(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_pool(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_twin_pool(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_teleporters(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_tag(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}

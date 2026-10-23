@@ -25,7 +25,7 @@ static uint32_t guest_call(void (*f)(void),int n,...) { (void)f;(void)n;return 0
 
 static int failures, originals;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
-static void fake_original(void) { originals++; }
+static void fake_original(void) { originals++; g_esp+=4u; }
 static void set_env(const char *name,const char *value)
 {
 #ifdef _WIN32
@@ -39,7 +39,10 @@ static void set_env(const char *name,const char *value)
 static int ran(void (*hook)(void (*)(void)))
 {
     int before=originals;
+    uint32_t esp=g_esp;
     hook(fake_original);
+    CHECK(g_esp==esp+4u);              /* the original's ret, run or replaced */
+    g_esp=esp;
     return originals==before+1;
 }
 

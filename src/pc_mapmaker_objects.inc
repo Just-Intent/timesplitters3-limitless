@@ -45,6 +45,9 @@
  * save_registers/restore_registers, g_esp/g_eax/g_ebx/g_edi,
  * g_xbox_mem_offset and pc_mapmaker_limits.inc (mapmaker_limits,
  * MAPMAKER_LIMIT_LINKS). */
+#ifndef MAPMAKER_GUEST_RET
+#define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
+#endif
 #include <string.h>
 
 #define MAPMAKER_OBJECTS_TURRETS 80u          /* objects.json obj-turret-* */
@@ -63,7 +66,13 @@
 #define MAPMAKER_OBJECTS_TAGS_CAP 1000u
 #define MAPMAKER_OBJECTS_STOCK_LINKS 4400u    /* stock sub_0009A140 link pool */
 #define MAPMAKER_OBJECTS_TELEPORTER_CAP 1200u /* > 0x7FE0 / 0x1C items */
-#define MAPMAKER_OBJECTS_CONTAINER_END 0x7FE0u /* sub_0023FD10 walk bound */
+/* sub_0023FD10 walk bound: the largest map body (src/pc_mapmaker_container.inc,
+ * included first; the stock 0x7FE0 when built without it, e.g. in fixtures). */
+#ifdef MAPMAKER_CONTAINER_B
+#define MAPMAKER_OBJECTS_CONTAINER_END MAPMAKER_CONTAINER_B
+#else
+#define MAPMAKER_OBJECTS_CONTAINER_END 0x7FE0u
+#endif
 
 extern void sub_0003DFA0(void),sub_000B05B0(void),sub_000B3BE0(void),sub_00248970(void),
     sub_000C3540(void),sub_001806B0(void),sub_000AEAC0(void),sub_00242BA0(void),sub_000A5AF0(void),
@@ -89,6 +98,7 @@ void pc_mapmaker_objects_turret_create(void (*original)(void))
 {
     if(guest_writable(g_esp,4) && WORD_AT(g_esp)==0x0006E818u && mapmaker_objects_turret_full()) {
         g_eax=0;      /* sub_0006D7A0 skips a 0 result; esi/edi/ebx untouched */
+        MAPMAKER_GUEST_RET();
         return;
     }
     original();
@@ -115,7 +125,7 @@ void pc_mapmaker_objects_turret_init(void (*original)(void))
 /* ---- object lists ----------------------------------------------------- */
 void pc_mapmaker_objects_list_add(void (*original)(void))
 {
-    if((int32_t)WORD_AT(0x007B625Cu)>=(int32_t)MAPMAKER_OBJECTS_LIST9_CAP) return;
+    if((int32_t)WORD_AT(0x007B625Cu)>=(int32_t)MAPMAKER_OBJECTS_LIST9_CAP) { MAPMAKER_GUEST_RET(); return; }
     original();
 }
 static int mapmaker_objects_listed(uint32_t base,uint32_t count,uint32_t obj)
@@ -139,6 +149,7 @@ void pc_mapmaker_objects_register(void (*original)(void))
        !mapmaker_objects_listed(base,cap,obj)) {
         WORD_AT(obj+0x90)=WORD_AT(0x007DE318u);
         WORD_AT(obj+0x154u+slot*4u)=flag;
+        MAPMAKER_GUEST_RET();
         return;
     }
     original();
@@ -180,6 +191,7 @@ void pc_mapmaker_objects_pool(void (*original)(void))
     if(callback) guest_call(sub_00242BA0,1,0u);
     guest_call(sub_000A5AF0,0);                              /* tail call: clears the pool */
     restore_registers(&r);
+    MAPMAKER_GUEST_RET();
 }
 /* sub_0008DBF0 (the 0x200-byte twin pool) with the same size. */
 void pc_mapmaker_objects_twin_pool(void (*original)(void))
@@ -196,6 +208,7 @@ void pc_mapmaker_objects_twin_pool(void (*original)(void))
     mapmaker_objects_clear(p,bytes);
     WORD_AT(0x004D9700u)=WORD_AT(0x006F73B0u)==0;
     restore_registers(&r);
+    MAPMAKER_GUEST_RET();
 }
 
 /* ---- teleporters ------------------------------------------------------ */
@@ -272,6 +285,7 @@ void pc_mapmaker_objects_teleporters(void (*original)(void))
         }
     }
     restore_registers(&r);
+    MAPMAKER_GUEST_RET();
 }
 
 /* ---- logic tags ------------------------------------------------------- */
@@ -290,6 +304,7 @@ void pc_mapmaker_objects_tag(void (*original)(void))
         WORD_AT(obj+0x60)=tag;
         WORD_AT(obj+0x230)=WORD_AT(0x00519750u);
         WORD_AT(0x00519750u)++;
+        MAPMAKER_GUEST_RET();
         return;
     }
     original();

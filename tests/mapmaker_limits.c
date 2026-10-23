@@ -44,7 +44,7 @@ static int failures;
 #define NEAR(a,b) ((a)-(b)<1e-4f && (b)-(a)<1e-4f)
 
 static int originals;
-static void fake_pools(void) { originals++; }
+static void fake_pools(void) { originals++; g_esp+=4u; }
 static void fake_limits(void)
 {
     uint32_t e=WORD_AT(0x007844A8u);
@@ -101,7 +101,7 @@ int main(void)
     WORD_AT(0x0079094Cu)=100;
     set_env("TSFP_MAPMAKER_POOLS",NULL);
     WORD_AT(0x007B6664u)=7;WORD_AT(0x007B666Cu)=9;
-    pc_display_mapmaker_pools(fake_pools);
+    { uint32_t s_=g_esp; pc_display_mapmaker_pools(fake_pools); CHECK(g_esp==s_+4u); g_esp=s_; }
     CHECK(originals==0 && allocs==5);
     CHECK(alloc_size[0]==4800u*32u && alloc_size[1]==(8800u+3200u+256u)*20u && alloc_size[2]==4800u*44u &&
           alloc_size[3]==10496u*32u && alloc_size[4]==0x280u);
@@ -112,16 +112,16 @@ int main(void)
     CHECK(WORD_AT(0x007B6664u)==0 && WORD_AT(0x007B666Cu)==0);
     allocs=0;
     WORD_AT(0x007DE454u)=0x00000A00u;                                  /* byte 0x007DE455 == 10 */
-    pc_display_mapmaker_pools(fake_pools);
+    { uint32_t s_=g_esp; pc_display_mapmaker_pools(fake_pools); CHECK(g_esp==s_+4u); g_esp=s_; }
     CHECK(allocs==4 && alloc_size[2]==10496u*32u);                      /* no AI data pool */
     WORD_AT(0x007DE454u)=0;
     allocs=0;
     WORD_AT(0x0079094Cu)=53;                                           /* other levels: original */
-    pc_display_mapmaker_pools(fake_pools);
+    { uint32_t s_=g_esp; pc_display_mapmaker_pools(fake_pools); CHECK(g_esp==s_+4u); g_esp=s_; }
     CHECK(originals==1 && allocs==0);
     WORD_AT(0x0079094Cu)=100;
     set_env("TSFP_MAPMAKER_POOLS","0");
-    pc_display_mapmaker_pools(fake_pools);
+    { uint32_t s_=g_esp; pc_display_mapmaker_pools(fake_pools); CHECK(g_esp==s_+4u); g_esp=s_; }
     CHECK(originals==2 && allocs==0);
 
     /* ---- editor limits ---- */

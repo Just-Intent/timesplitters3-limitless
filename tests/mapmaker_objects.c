@@ -99,7 +99,7 @@ static void set_env(const char *name,const char *value)
 }
 
 static int originals;
-static void fake_original(void) { originals++; g_eax=0x1234u; }
+static void fake_original(void) { originals++; g_eax=0x1234u; g_esp+=4u; }
 /* sub_00245990's two pops (sub_000B3AC0 / sub_000B3AF0). */
 static uint32_t popped_gun, popped_owner;
 static uint32_t pop(uint32_t list)
@@ -108,9 +108,12 @@ static uint32_t pop(uint32_t list)
     if(h) { WORD_AT(list+4)=WORD_AT(h);WORD_AT(list+8)--; }
     return h;
 }
-static void fake_turret_init(void) { originals++;popped_gun=pop(0x00732D2Cu);popped_owner=pop(0x00732D1Cu); }
+static void fake_turret_init(void) { originals++;popped_gun=pop(0x00732D2Cu);popped_owner=pop(0x00732D1Cu);g_esp+=4u; }
 
 #define STACK 0x00700000u
+/* Every hook must leave esp as the original's `ret` does (+4): fake
+ * originals pop their return address too. */
+#define HOOK(h,f) do { uint32_t hook_esp_=g_esp; h(f); CHECK(g_esp==hook_esp_+4u); g_esp=hook_esp_; } while(0)
 static void frame(uint32_t ret,uint32_t a,uint32_t b,uint32_t c)
 {
     g_esp=STACK;WORD_AT(STACK)=ret;WORD_AT(STACK+4)=a;WORD_AT(STACK+8)=b;WORD_AT(STACK+12)=c;
@@ -138,16 +141,16 @@ int main(void)
     /* ---- turret creation: skipped only for sub_0006D7A0 when a pool is empty ---- */
     WORD_AT(0x00732D30u)=0x00500000u;WORD_AT(0x00732D20u)=0x00510000u;
     frame(0x0006E818u,0,0,0);originals=0;
-    pc_mapmaker_objects_turret_create(fake_original);
+    HOOK(pc_mapmaker_objects_turret_create,fake_original);
     CHECK(originals==1 && g_eax==0x1234u);
     WORD_AT(0x00732D30u)=0;g_eax=77;
-    pc_mapmaker_objects_turret_create(fake_original);
+    HOOK(pc_mapmaker_objects_turret_create,fake_original);
     CHECK(originals==1 && g_eax==0);
     WORD_AT(0x00732D30u)=0x00500000u;WORD_AT(0x00732D20u)=0;
-    pc_mapmaker_objects_turret_create(fake_original);
+    HOOK(pc_mapmaker_objects_turret_create,fake_original);
     CHECK(originals==1 && g_eax==0);
     frame(0x0006D4DAu,0,0,0);                         /* sub_0006D230 needs an object */
-    pc_mapmaker_objects_turret_create(fake_original);
+    HOOK(pc_mapmaker_objects_turret_create,fake_original);
     CHECK(originals==2);
 
     /* ---- turret init: spares instead of guest address 0 ---- */
@@ -155,13 +158,13 @@ int main(void)
     WORD_AT(0x00732D30u)=0x00500000u;WORD_AT(0x00500000u)=0;WORD_AT(0x00732D34u)=1;
     WORD_AT(0x00732D20u)=0x00510000u;WORD_AT(0x00510000u)=0;WORD_AT(0x00732D24u)=1;
     originals=0;
-    pc_mapmaker_objects_turret_init(fake_turret_init);
+    HOOK(pc_mapmaker_objects_turret_init,fake_turret_init);
     CHECK(originals==1 && popped_gun==0x00500000u && popped_owner==0x00510000u && mapmaker_objects_spares_used==0);
     WORD_AT(MAPMAKER_OBJECTS_SPARE_GUNS+0x10)=0xDEADu;
-    pc_mapmaker_objects_turret_init(fake_turret_init);  /* both lists empty now */
+    HOOK(pc_mapmaker_objects_turret_init,fake_turret_init);  /* both lists empty now */
     CHECK(originals==2 && popped_gun==MAPMAKER_OBJECTS_SPARE_GUNS && popped_owner==MAPMAKER_OBJECTS_SPARE_OWNERS);
     CHECK(WORD_AT(MAPMAKER_OBJECTS_SPARE_GUNS+0x10)==0 && WORD_AT(0x00732D34u)==0 && WORD_AT(0x00732D30u)==0);
-    pc_mapmaker_objects_turret_init(fake_turret_init);
+    HOOK(pc_mapmaker_objects_turret_init,fake_turret_init);
     CHECK(popped_gun==MAPMAKER_OBJECTS_SPARE_GUNS+0x1E0u && popped_owner==MAPMAKER_OBJECTS_SPARE_OWNERS+0x130u);
     for(i=0;i<7;i++) pc_mapmaker_objects_turret_init(fake_turret_init);
     CHECK(popped_gun==MAPMAKER_OBJECTS_SPARE_GUNS && popped_gun+0x1E0u*8u<=MAPMAKER_OBJECTS_SPARE_OWNERS);
@@ -169,10 +172,10 @@ int main(void)
 
     /* ---- object list 9 append guard ---- */
     WORD_AT(0x007B625Cu)=127u;originals=0;frame(0x1000u,0x00520000u,0,0);
-    pc_mapmaker_objects_list_add(fake_original);
+    HOOK(pc_mapmaker_objects_list_add,fake_original);
     CHECK(originals==1);
     WORD_AT(0x007B625Cu)=128u;
-    pc_mapmaker_objects_list_add(fake_original);
+    HOOK(pc_mapmaker_objects_list_add,fake_original);
     CHECK(originals==1);
 
     /* ---- sub_000A5CE0 list guards ---- */
@@ -187,22 +190,22 @@ int main(void)
             memset((char *)memory+base[s],0,cap[s]*4u);
             WORD_AT(count[s])=cap[s]-1u;originals=0;
             frame(0x1000u,obj,slot[s],1u);
-            pc_mapmaker_objects_register(fake_original);
+            HOOK(pc_mapmaker_objects_register,fake_original);
             CHECK(originals==1);                          /* room left */
             WORD_AT(count[s])=cap[s];
-            pc_mapmaker_objects_register(fake_original);
+            HOOK(pc_mapmaker_objects_register,fake_original);
             CHECK(originals==1 && WORD_AT(obj+0x90)==0x55u && WORD_AT(obj+0x154+slot[s]*4)==1u);
             CHECK(WORD_AT(obj+0x154+slot[s]*4+4)==0);
             WORD_AT(base[s]+(cap[s]-1u)*4u)=obj;           /* already listed: original (no append) */
-            pc_mapmaker_objects_register(fake_original);
+            HOOK(pc_mapmaker_objects_register,fake_original);
             CHECK(originals==2);
             WORD_AT(base[s]+(cap[s]-1u)*4u)=0;
             frame(0x1000u,obj,slot[s],0);                   /* removal */
-            pc_mapmaker_objects_register(fake_original);
+            HOOK(pc_mapmaker_objects_register,fake_original);
             CHECK(originals==3);
         }
         WORD_AT(0x007B625Cu)=500u;frame(0x1000u,obj,3u,1u);originals=0;  /* other slots: original */
-        pc_mapmaker_objects_register(fake_original);
+        HOOK(pc_mapmaker_objects_register,fake_original);
         CHECK(originals==1);
     }
 
@@ -212,7 +215,7 @@ int main(void)
     WORD_AT(0x007B54E0u)=1;WORD_AT(0x007B5840u+0xD5*4)=1;WORD_AT(0x007B6260u+4)=1;
     WORD_AT(0x00716290u)=0x00540000u;WORD_AT(0x00716294u)=9;WORD_AT(0x0072F5F8u)=9;
     allocs=0;calls[0]=0;originals=0;callback_arg=7;
-    pc_mapmaker_objects_pool(fake_original);
+    HOOK(pc_mapmaker_objects_pool,fake_original);
     CHECK(originals==0 && allocs==3 && WORD_AT(0x0072F5E4u)==1000u);
     CHECK(alloc_size[0]==((1000u*0x2E8u+15u)&~15u) && alloc_size[1]==0x190u && alloc_size[2]==0xA680u);
     CHECK(alloc_heap[0]==1 && alloc_heap[1]==1 && alloc_heap[2]==1);
@@ -221,37 +224,37 @@ int main(void)
     CHECK(WORD_AT(0x00716290u)==0 && WORD_AT(0x00716294u)==0 && WORD_AT(0x0072F5F8u)==0);
     CHECK(!strcmp(calls,"B05B0,B3BE0,248970,C3540,1806B0,AEAC0,242BA0,A5AF0,") && callback_arg==0);
     WORD_AT(0x0079094Cu)=102u;allocs=0;calls[0]=0;    /* editor too */
-    pc_mapmaker_objects_pool(fake_original);
+    HOOK(pc_mapmaker_objects_pool,fake_original);
     CHECK(originals==0 && allocs==3);
     WORD_AT(0x00715FACu)=0;allocs=0;calls[0]=0;       /* no callback registered */
-    pc_mapmaker_objects_pool(fake_original);
+    HOOK(pc_mapmaker_objects_pool,fake_original);
     CHECK(!strcmp(calls,"B05B0,B3BE0,248970,C3540,1806B0,AEAC0,A5AF0,"));
     WORD_AT(0x00715FACu)=0x00111110u;allocs=0;          /* unknown callback: original */
-    pc_mapmaker_objects_pool(fake_original);
+    HOOK(pc_mapmaker_objects_pool,fake_original);
     CHECK(originals==1 && allocs==0);
     WORD_AT(0x00715FACu)=0x00242BA0u;
     WORD_AT(0x0079094Cu)=53u;                          /* story levels: original */
-    pc_mapmaker_objects_pool(fake_original);
+    HOOK(pc_mapmaker_objects_pool,fake_original);
     CHECK(originals==2 && allocs==0);
     WORD_AT(0x0079094Cu)=101u;
-    pc_mapmaker_objects_pool(fake_original);
+    HOOK(pc_mapmaker_objects_pool,fake_original);
     CHECK(originals==3 && allocs==0);
     WORD_AT(0x0079094Cu)=100u;set_env("TSFP_MAPMAKER_POOLS","0");
-    pc_mapmaker_objects_pool(fake_original);
+    HOOK(pc_mapmaker_objects_pool,fake_original);
     CHECK(originals==4 && allocs==0);
     set_env("TSFP_MAPMAKER_POOLS",NULL);
 
     /* twin pool */
     originals=0;allocs=0;WORD_AT(0x007B67D0u)=5;WORD_AT(0x007B6984u)=5;WORD_AT(0x006F73B0u)=0;
-    pc_mapmaker_objects_twin_pool(fake_original);
+    HOOK(pc_mapmaker_objects_twin_pool,fake_original);
     CHECK(originals==0 && allocs==1 && alloc_size[0]==1000u*0x200u && WORD_AT(0x0070AAD8u)==1000u);
     CHECK(WORD_AT(WORD_AT(0x0070AADCu))==0 && WORD_AT(WORD_AT(0x0070AADCu)+1000u*0x200u-4u)==0);
     CHECK(WORD_AT(0x007B67D0u)==0 && WORD_AT(0x007B6984u)==0 && WORD_AT(0x004D9700u)==1);
     WORD_AT(0x006F73B0u)=3;
-    pc_mapmaker_objects_twin_pool(fake_original);
+    HOOK(pc_mapmaker_objects_twin_pool,fake_original);
     CHECK(WORD_AT(0x004D9700u)==0);
     WORD_AT(0x0079094Cu)=101u;allocs=0;
-    pc_mapmaker_objects_twin_pool(fake_original);
+    HOOK(pc_mapmaker_objects_twin_pool,fake_original);
     CHECK(originals==1 && allocs==0);
     WORD_AT(0x0079094Cu)=100u;
 
@@ -278,7 +281,7 @@ int main(void)
     WORD_AT(q)=0x00C7766Au;
     WORD_AT(0x007B6660u)=100;nlinks=0;existing[0]=0x100u+705u;existing[1]=0x100u+8u; /* 705 -> 8 exists */
     originals=0;g_ebx=0xB0B0u;g_edi=0xD0D0u;
-    pc_mapmaker_objects_teleporters(fake_original);
+    HOOK(pc_mapmaker_objects_teleporters,fake_original);
     CHECK(originals==0 && g_ebx==0xB0B0u && g_edi==0xD0D0u);
     /* colour 0x11: pads 1,4,705,8,10,11,13,14,15 -> chain (705->8 already exists); 0x22: 2,7,12; 0x33: 5,9,0x1F40 */
     {
@@ -290,18 +293,18 @@ int main(void)
         CHECK(WORD_AT(0x007B6660u)==111u);
     }
     WORD_AT(0x007B6660u)=MAPMAKER_LIMIT_LINKS-2u;nlinks=0;            /* link pool nearly full */
-    pc_mapmaker_objects_teleporters(fake_original);
+    HOOK(pc_mapmaker_objects_teleporters,fake_original);
     CHECK(nlinks==2 && WORD_AT(0x007B6660u)==MAPMAKER_LIMIT_LINKS);
     set_env("TSFP_MAPMAKER_POOLS","0");WORD_AT(0x007B6660u)=4399u;nlinks=0; /* stock link pool */
-    pc_mapmaker_objects_teleporters(fake_original);
+    HOOK(pc_mapmaker_objects_teleporters,fake_original);
     CHECK(nlinks==1);
     set_env("TSFP_MAPMAKER_POOLS",NULL);
     WORD_AT(0x0079094Cu)=53u;nlinks=0;
-    pc_mapmaker_objects_teleporters(fake_original);
+    HOOK(pc_mapmaker_objects_teleporters,fake_original);
     CHECK(originals==1 && nlinks==0);
     WORD_AT(0x0079094Cu)=100u;
     WORD_AT(0x00784014u)=0;WORD_AT(0x007B6660u)=0;                     /* no container: nothing */
-    pc_mapmaker_objects_teleporters(fake_original);
+    HOOK(pc_mapmaker_objects_teleporters,fake_original);
     CHECK(nlinks==0 && originals==1);
 
     /* ---- logic tag guard ---- */
@@ -310,10 +313,10 @@ int main(void)
         for(i=0;i<1000u;i++) WORD_AT(MAPMAKER_OBJECTS_TAGS+i*16u)=0x00400000u|i;
         WORD_AT(0x00519750u)=40u;originals=0;
         frame(0x1000u,7u,obj,0);
-        pc_mapmaker_objects_tag(fake_original);
+        HOOK(pc_mapmaker_objects_tag,fake_original);
         CHECK(originals==0 && WORD_AT(obj+0x60)==7u && WORD_AT(obj+0x230)==40u && WORD_AT(0x00519750u)==41u);
         WORD_AT(MAPMAKER_OBJECTS_TAGS+999u*16u)=0;                     /* one free slot */
-        pc_mapmaker_objects_tag(fake_original);
+        HOOK(pc_mapmaker_objects_tag,fake_original);
         CHECK(originals==1);
         WORD_AT(MAPMAKER_OBJECTS_TAGS+999u*16u)=1;
         frame(0x1000u,0,obj,0);pc_mapmaker_objects_tag(fake_original);  /* no tag */

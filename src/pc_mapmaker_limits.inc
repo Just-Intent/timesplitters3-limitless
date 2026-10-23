@@ -68,6 +68,12 @@
 
 static struct { int initialized, pools, limits; } mapmaker_limits;
 
+/* A hook that replaces its original (does not call it) must also do the
+ * original's `ret`: the lifted caller pushes the return address and expects
+ * the callee to pop it (RECOMP_ABI_CALL_POP). Every replaced MapMaker
+ * function ends in a plain `ret` (checked in text.asm), so pop 4. */
+#define MAPMAKER_GUEST_RET() (g_esp+=4u)
+
 /* Category maxima: stock values read from the US XBE; see research/capacity-raise-plan.md. */
 static const struct { uint32_t address, stock, raised; } mapmaker_categories[]={
     {0x00524CA4u,32u,128u},  /* 8  weapon pickups */
@@ -144,6 +150,7 @@ void pc_display_mapmaker_pools(void (*original)(void))
     WORD_AT(0x007B6664u)=0;WORD_AT(0x007B6660u)=0;WORD_AT(0x007B65C0u)=0;WORD_AT(0x007B6674u)=0;
     WORD_AT(0x007B6778u)=0;WORD_AT(0x007B65BCu)=0;WORD_AT(0x007B6780u)=0;WORD_AT(0x007B666Cu)=0;
     restore_registers(&r);
+    MAPMAKER_GUEST_RET();
 }
 
 /* ---- editor limits ---------------------------------------------------- */

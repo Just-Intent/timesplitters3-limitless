@@ -6,9 +6,12 @@
  * These hooks do what a same-length rewrite cannot:
  *  - the container (N) and the undo ring (2N) are too big for the Eternal
  *    heap (0x9DC00 bytes in all) and must outlive level loads, which wipe the
- *    Level heap; they come once from the runtime heap (xbox_HeapAlloc, the
- *    allocator behind MmAllocateSystemMemory, outside the game's arena) and
- *    are reused for the whole run;
+ *    Level heap; they come once from the contiguous window
+ *    (xbox_ContiguousAlloc, the allocator behind MmAllocateContiguousMemory,
+ *    where the stock container lives in the Eternal heap) and are reused for
+ *    the whole run. Not the runtime heap: guest code may convert a buffer
+ *    address with (va & 0x0FFFFFFF) | 0x80000000, which is only an identity
+ *    in that window (a runtime-heap container hung the front end);
  *  - files are saved in the smallest size tier that holds the map, so a map
  *    that fits the stock body saves byte-identical to stock; the loader tries
  *    the stock size first and the larger tiers on error 7 (file too large);
@@ -22,6 +25,9 @@
  *    free-space meter constant follows it.
  * Requires the includer's WORD_AT, FLOAT_AT, guest_writable, guest_call,
  * g_eax, g_esp, g_xbox_mem_offset and pc_mapmaker_limits.inc. */
+#ifndef MAPMAKER_GUEST_RET
+#define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +41,7 @@
 #define MMC_HALF(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define MMC_BYTE(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
-extern uint32_t xbox_HeapAlloc(uint32_t size,uint32_t alignment);
+extern uint32_t xbox_ContiguousAlloc(uint32_t size,uint32_t alignment);
 extern void sub_000827B0(void),sub_000827F0(void),sub_0035E960(void),sub_00025280(void),
     sub_00336600(void);
 
@@ -52,7 +58,7 @@ static void mapmaker_container_zero(uint32_t a,uint32_t n)
 }
 static uint32_t mapmaker_container_alloc(uint32_t bytes)
 {
-    uint32_t p=xbox_HeapAlloc(bytes,0x1000u);
+    uint32_t p=xbox_ContiguousAlloc(bytes,0x1000u);
     if(!p) {
         /* Every size constant already assumes the large buffers. */
         fprintf(stderr,"[mapmaker] cannot allocate %u bytes for the map container\n",bytes);
@@ -128,6 +134,7 @@ void pc_mapmaker_container_frontend_init(void (*original)(void))
     mapmaker_container_install();
     r=guest_call(sub_00336600,0);
     g_eax=r;
+    MAPMAKER_GUEST_RET();
 }
 /* sub_002FE230 (editor entry): the original allocates only when
  * [0x00784014] is 0, so provide the buffer first, then run it. */
@@ -155,6 +162,7 @@ void pc_mapmaker_container_undo_ring(void (*original)(void))
     mapmaker_container_zero(mapmaker_container.ring,MAPMAKER_CONTAINER_RING);
     WORD_AT(0x00765C28u)=0;WORD_AT(0x00765C30u)=0;WORD_AT(0x00765C20u)=0;
     g_eax=0;
+    MAPMAKER_GUEST_RET();
 }
 
 /* ---- load --------------------------------------------------------------- */
@@ -175,10 +183,9 @@ static uint32_t mapmaker_container_read(uint32_t entry,uint32_t buf,uint32_t fla
 /* sub_00190530(entry, buffer), reimplemented: the same calls and results,
  * with the buffer zeroed first and the size tiers. Error 7 is the stock
  * "file larger than the body" result, which the caller already reports. */
-void pc_mapmaker_container_load(void (*original)(void))
+static void mapmaker_container_load_body(void)
 {
     uint32_t entry=WORD_AT(g_esp+4),buf=WORD_AT(g_esp+8),flags,r,r2,size=MAPMAKER_CONTAINER_STOCK,info;
-    (void)original;
     guest_call(sub_000827B0,1,1u);
     flags=guest_call(sub_000827F0,0)==0xAu?0xEu:2u;
     if(!guest_call(sub_0035E960,0)) flags&=~4u;
@@ -202,6 +209,12 @@ void pc_mapmaker_container_load(void (*original)(void))
     r2=guest_call(sub_00025280,6,guest_call(sub_000827F0,0),entry+0x20u,0x0047DF80u,buf,size,flags|0x14u);
     if(r2==r) WORD_AT(0x00762CBCu)=r;
     g_eax=r2;
+}
+void pc_mapmaker_container_load(void (*original)(void))
+{
+    (void)original;
+    mapmaker_container_load_body();
+    MAPMAKER_GUEST_RET();
 }
 
 /* ---- save (sub_00190900 passes the stock body 0x7FE0) ------------------ */
