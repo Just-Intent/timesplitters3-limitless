@@ -172,7 +172,7 @@ unless noted.
 | --- | --- | --- | --- | --- |
 | Memory estimate 2,048,000 (`0x002FAEF2`) | Level heap (~12 MB free, measured) | Designer (measured) | Done: `TSFP_MAPMAKER_MEMORY_SCALE` | x3 |
 | cost0 2400 (`cmp 0x960` at `0x002FAE0A`) | Regular AI nav pads, pool `[0x715F2C]` 2400x32 B + AI data `[0x715F3C]` 2400x44 B (`sub_0009A140`) | Hard pool | Pool size immediates + editor compare; ids must stay < 8000 | x2 (4800) |
-| cost1 1024 (`cmp 0x400` at `0x002FAE5C`) | Secondary (cover) pads `[0x715F34]`: 1280x32 B in scene 100 | Hard pool | Editor compare only up to 1280; beyond needs the handle range 0x1F40..0x209E remapped (~75 sites) | 1280 |
+| cost1 1024 (`cmp 0x400` at `0x002FAE5C`) | Secondary (cover) pads `[0x715F34]`: 1280x32 B in scene 100 | Hard pool | Keep 1024: items/objects add cover pads at load (60 on a test map) and `sub_0009A420` decodes only 0x1F40..0x243F as cover in scene 100; more needs the handle range remapped (~75 sites) | 1024 (measured, see Stage A) |
 | cost2 4400 (`cmp 0x1130` at `0x002FAEAE`) | Pad links `[0x715F30]` 4400x20 B, plus cross-tile/object links | Hard pool | Pool size immediates + editor compare | x2 (8800) |
 | Pieces 200 (`cmp 0xC8` at `0x002FAEE0`) | Engine-wide 200 visibility rooms: per-room arrays inside the 0xFFC character struct (+0x3C8, +0xD2C, +0xE08), `0x7042B8` [80][200], a 0xE0-byte per-room alloc, byte room ids | Hard, engine-wide | Rework of the visibility system (30+ per-frame functions) | Keep 200 (or count rooms instead of pieces) |
 | MapMaker room tables (`0x702E20`..`0x7038F8`, `0x708138`, 200 each) | Per-room tile transforms | Hard, local | 4 functions | Only with the room limit |
@@ -197,19 +197,25 @@ reimplements the function (practical for `sub_0009A140` and `sub_002FA720`).
 `patches/*-mapmaker-meter-stagea.patch`, policy `src/pc_mapmaker_limits.inc`:
 
 - `sub_0009A140` in scene 100 (on by default, `TSFP_MAPMAKER_POOLS=0` restores
-  it): pads 4800x32 B, links 8800x20 B, AI data 4800x44 B, cover 1280x32 B,
-  runtime 0x280 B; same heap (1), order, zeroing and counters. About 290 KB
-  more Level heap.
+  it): pads 4800x32 B, links 8800x20 B, AI data 4800x44 B, cover 1536x32 B
+  (stock 1280; the extra is a guard only), runtime 0x280 B; same heap (1),
+  order, zeroing and counters. About 300 KB more Level heap.
 - `sub_002FA720` (opt-in `TSFP_MAPMAKER_LIMITS=1`, only with the pools on):
   after the original, the decision bit (`editor+0x25C` 0x400000), meter
-  (`+0x270`) and held preview (`+0x274`) are recomputed with pads 4800, cover
-  1280, links 8800 and pad groups 600. Pieces 200, sub-entries 50 and the
-  memory estimate (scaled separately) are unchanged.
-- Open questions for play: stability with cover pads above 1024 (cover
-  handles 0x1F40 + index already overlap the runtime pad handles
-  0x209E..0x20B1 at index 350..369 in stock; 1280 is the pool size the game
-  itself allocates in scene 100, so no new handle range is used); load time
-  with 600 pad groups (N^2 matrix). Probe flag 64 logs the counts.
+  (`+0x270`) and held preview (`+0x274`) are recomputed with pads 4800, links
+  8800 and pad groups 600. Cover pads (1024), pieces 200, sub-entries 50 and
+  the memory estimate (scaled separately) are unchanged.
+- CONFIRMED in play (2026-10-23, Windows, first build of stage A, cover limit
+  then 1280): map `bigmap2`, 142 tiles, editor cover 1278, but in play
+  flag 64 logged cover=1338 (items and objects add cover pads at load) with
+  a 1280-slot pool: the overflow wrote over the runtime pads and a team
+  spawned inside a wall. In scene 100 `sub_0009A420` decodes handles
+  0x1F40..0x243F as cover pads and higher ones as regular pads, so more than
+  1280 cover pads cannot work without remapping the handles. The stock
+  editor limit 1024 (256 spare) is restored; the pool is 1536 so an overflow
+  can no longer reach the runtime pads. Same run: pads=1278, links=3478,
+  groups=142, 11.16 MB free in play.
+- Open: load time with 600 pad groups (N^2 matrix).
 
 ## 2. Host memory is not the obvious constraint
 

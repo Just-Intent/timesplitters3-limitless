@@ -90,7 +90,7 @@ int main(void)
     pc_display_mapmaker_pools(fake_pools);
     CHECK(originals==0 && allocs==5);
     CHECK(alloc_size[0]==4800u*32u && alloc_size[1]==8800u*20u && alloc_size[2]==4800u*44u &&
-          alloc_size[3]==1280u*32u && alloc_size[4]==0x280u);
+          alloc_size[3]==1536u*32u && alloc_size[4]==0x280u);
     CHECK(alloc_heap[0]==1 && alloc_heap[4]==1);
     CHECK(WORD_AT(0x00715F2Cu)==0x00500000u && WORD_AT(0x00715F30u)==0x00500000u+4800u*32u);
     CHECK(WORD_AT(WORD_AT(0x00715F2Cu))==0 && WORD_AT(WORD_AT(0x00715F30u)+8800u*20u-4u)==0 &&
@@ -99,7 +99,7 @@ int main(void)
     allocs=0;
     WORD_AT(0x007DE454u)=0x00000A00u;                                  /* byte 0x007DE455 == 10 */
     pc_display_mapmaker_pools(fake_pools);
-    CHECK(allocs==4 && alloc_size[2]==1280u*32u);                      /* no AI data pool */
+    CHECK(allocs==4 && alloc_size[2]==1536u*32u);                      /* no AI data pool */
     WORD_AT(0x007DE454u)=0;
     allocs=0;
     WORD_AT(0x0079094Cu)=53;                                           /* other levels: original */
@@ -119,13 +119,13 @@ int main(void)
     WORD_AT(0x00529410u+1u*0x140u)=10000;
     WORD_AT(0x00529400u+2u*0x140u)=2;WORD_AT(0x00529404u+2u*0x140u)=9;WORD_AT(0x00529408u+2u*0x140u)=20;
     WORD_AT(0x00529410u+2u*0x140u)=1000;
-    /* 110 placed pieces of type 1 (cover 1100 > 1024 but < 1280), one held of type 2 */
-    pieces=make_list(0x00400000u,TYPEA,110);
+    /* 90 placed pieces of type 1 (cover 900), one held of type 2 */
+    pieces=make_list(0x00400000u,TYPEA,90);
     WORD_AT(0x0078400Cu)=pieces;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     WORD_AT(ED+0x2f34)=(uint32_t)-1;WORD_AT(ED+0x306c)=0;
     WORD_AT(0x00762CB8u)=400;                                          /* > 300, < 600 */
-    WORD_AT(ED+0x278)=110u*10000u+1000u;                               /* placed + held memory */
+    WORD_AT(ED+0x278)=90u*10000u+1000u;                               /* placed + held memory */
     WORD_AT(ED+0x25c)=0;
 
     set_env("TSFP_MAPMAKER_POOLS",NULL);set_env("TSFP_MAPMAKER_LIMITS",NULL);
@@ -137,26 +137,26 @@ int main(void)
     WORD_AT(ED+0x25c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u) && (WORD_AT(ED+0x25c)&2u));  /* allowed; other flags kept */
-    /* meter: max(1100/4800, 1100/1280, 3300/8800, 400/600, 110/200, 0, 1100000/2048000) */
-    CHECK(NEAR(FLOAT_AT(ED+0x270),1100.f/1280.f));
-    /* held preview: max(2/4800, 9/1280, 20/8800, 1/200, 0, 1000/2048000) */
-    CHECK(NEAR(FLOAT_AT(ED+0x274),9.f/1280.f));
+    /* meter: max(900/4800, 900/1024, 2700/8800, 400/600, 90/200, 0, 900000/2048000) */
+    CHECK(NEAR(FLOAT_AT(ED+0x270),900.f/1024.f));
+    /* held preview: max(2/4800, 9/1024, 20/8800, 1/200, 0, 1000/2048000) */
+    CHECK(NEAR(FLOAT_AT(ED+0x274),9.f/1024.f));
 
     WORD_AT(0x00762CB8u)=601;                                          /* groups over 600 */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     WORD_AT(0x00762CB8u)=400;
-    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,20);                /* cover 1100+180 = 1280: allowed */
+    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,13);                /* cover 900+117 = 1017: allowed */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,21);                /* 1289 > 1280: refused */
+    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,14);                /* 1026 > 1024 (stock): refused */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     WORD_AT(ED+0x278)=2048001u;                                        /* memory over budget */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
-    WORD_AT(ED+0x278)=110u*10000u+1000u;
+    WORD_AT(ED+0x278)=90u*10000u+1000u;
     WORD_AT(ED+0x306c)=50u<<16;                                        /* sub-entries: 50 + held 0 */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));

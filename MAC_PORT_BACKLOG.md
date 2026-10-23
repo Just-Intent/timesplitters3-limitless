@@ -3214,8 +3214,8 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
 - **Status:** Awaiting validation
 - **PC behavior:** When a MapMaker map is played the AI navigation pools are
   enlarged (on by default; `TSFP_MAPMAKER_POOLS=0` = original). With
-  `TSFP_MAPMAKER_LIMITS=1` the editor allows pads 4800, cover pads 1280, links
-  8800 and pad groups 600; other limits unchanged. Probe flag 64 logs pool counts.
+  `TSFP_MAPMAKER_LIMITS=1` the editor allows pads 4800, links 8800 and pad
+  groups 600; cover pads and other limits unchanged. Probe flag 64 logs pool counts.
 - **PC source:** Branch `mapmaker-recon`; `patches/*-mapmaker-meter-stagea.patch`
   (wrappers of `sub_0009A140`/`sub_002FA720`), `src/pc_mapmaker_limits.inc`;
   fixture `tests/mapmaker_limits.c`.
@@ -3223,8 +3223,8 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   validation pending.
 - **Existing Mac support:** Shared guest-side code; nothing Mac-specific.
 - **Mac adaptation needed:** None identified (guest regeneration on first build).
-- **Mac acceptance checks:** Native Mac build; with limits on, place past 1024
-  cover pads; play with probe flags 96 and check counts and free memory.
+- **Mac acceptance checks:** Native Mac build; with limits on, place past 300
+  pad groups; play with probe flags 96 and check counts and free memory.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
 ## Shared uncertainties, not confirmed Mac-only omissions

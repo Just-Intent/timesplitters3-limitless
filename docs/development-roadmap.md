@@ -308,10 +308,13 @@ editor arrays; (D) only if needed, the engine-wide 200-room limit.
 
 Stage A implemented (unverified in play): enlarged AI pools when a MapMaker
 map is played (on by default, `TSFP_MAPMAKER_POOLS=0` = original) and raised
-editor limits behind `TSFP_MAPMAKER_LIMITS=1`: pads 4800, cover 1280, links
-8800, pad groups 600. Sub-entries stay 50 (unbounded 10-slot stack arrays in
-`sub_0023FD10`). Probe flag 64 logs the pool counts in play. Next: build a
-map past 1024 cover / 300 groups, play it with flags 113 and save/reload.
+editor limits behind `TSFP_MAPMAKER_LIMITS=1`: pads 4800, links 8800, pad
+groups 600. Cover pads stay 1024: a first build raised them to 1280 and in
+play items added 60 more, overflowing the pool onto the spawn points
+(research §1c, Stage A). Tiles are therefore still limited by cover pads
+(about 9 per tile); more tiles need the cover handle range remapped.
+Sub-entries stay 50 (unbounded 10-slot stack arrays in `sub_0023FD10`).
+Probe flag 64 logs the pool counts in play.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

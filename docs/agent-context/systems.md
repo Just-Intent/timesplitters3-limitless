@@ -167,7 +167,8 @@ policy `src/pc_mapmaker_budget.inc` changes only `g_eax`. Tests:
 `sub_0009A140` is reimplemented in scene 100 with enlarged AI navigation
 pools (`TSFP_MAPMAKER_POOLS=0` = original); with `TSFP_MAPMAKER_LIMITS=1`
 (ignored while pools are off) `sub_002FA720`'s decision, meter and preview
-are recomputed with pads 4800, cover 1280, links 8800, groups 600. Tests:
+are recomputed with pads 4800, links 8800, groups 600 (cover stays 1024; the
+cover pool is 1536 as a guard). Tests:
 `tests/test_mapmaker_limits.py`. Probe flag 64. Basis:
 `research/capacity-constraints.md` §1c.
 

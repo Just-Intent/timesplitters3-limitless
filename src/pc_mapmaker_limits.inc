@@ -6,10 +6,18 @@
  * AI navigation pools from the Level heap with fixed sizes and nothing checks
  * them when pads are appended. Reimplemented here with twice the regular
  * pads (4800 x 32 B, plus 4800 x 44 B of per-pad AI data) and links
- * (8800 x 20 B); cover pads stay 1280 x 32 B (the scene-100 size) and the 20
- * runtime pads unchanged. Same heap, order and zeroing as the original; about
- * 290 KB more of the ~12 MB measured free. On by default so that a map built
- * with raised editor limits never overflows the stock pools here.
+ * (8800 x 20 B); the cover pool grows from 1280 to 1536 x 32 B as a guard
+ * only, and the 20 runtime pads are unchanged. Same heap, order and zeroing
+ * as the original; about 300 KB more of the ~12 MB measured free. On by
+ * default so that a map built with raised editor limits never overflows the
+ * stock pools here.
+ *
+ * Cover pads cannot go past 1280 in play: in scene 100 sub_0009A420 decodes
+ * handles 0x1F40..0x243F as cover pads and anything above as a regular pad,
+ * and items and objects add cover pads at load time on top of the tiles'
+ * count (60 on a 1278-cover test map), so the stock editor limit of 1024 is
+ * kept. The larger pool keeps an overflow from writing over the runtime pads
+ * (spawn points); handles above 1280 would still decode wrongly.
  *
  * Editor limits (opt-in, TSFP_MAPMAKER_LIMITS=1, only while the pools are on):
  * sub_002FA720 refuses placement (editor+0x25C bit 0x400000) when placed +
@@ -17,8 +25,8 @@
  * memory estimate (editor+0x278 > 2,048,000), global pad groups 300 or 50
  * sub-entries, and writes the meter (editor+0x270, placed only) and the held
  * piece preview (editor+0x274) from the same limits. After the original runs,
- * the decision and both values are recomputed with pads 4800, cover pads
- * 1280, links 8800 and pad groups 600; pieces, memory (raised separately by
+ * the decision and both values are recomputed with pads 4800, links 8800
+ * and pad groups 600 (cover pads stay 1024); pieces, memory (raised separately by
  * TSFP_MAPMAKER_MEMORY_SCALE) and sub-entries keep their limits. Sub-entries
  * stay at 50: sub_0023FD10 stores objects of kinds 10..14 into two 10-slot
  * stack arrays without a bound.
@@ -31,7 +39,8 @@
 #include <string.h>
 
 #define MAPMAKER_LIMIT_PADS 4800u
-#define MAPMAKER_LIMIT_COVER 1280u
+#define MAPMAKER_LIMIT_COVER 1024u    /* stock: see above */
+#define MAPMAKER_POOL_COVER 1536u     /* stock 1280, plus a guard */
 #define MAPMAKER_LIMIT_LINKS 8800u
 #define MAPMAKER_LIMIT_GROUPS 600
 #define MAPMAKER_LIMIT_PIECES 200u
@@ -72,7 +81,7 @@ void pc_display_mapmaker_pools(void (*original)(void))
     WORD_AT(0x00715F30u)=mapmaker_pool(MAPMAKER_LIMIT_LINKS*20u);
     if((WORD_AT(0x007DE454u)>>8&0xFFu)!=10u)                 /* byte [0x007DE455] */
         WORD_AT(0x00715F3Cu)=mapmaker_pool(MAPMAKER_LIMIT_PADS*44u);
-    WORD_AT(0x00715F34u)=mapmaker_pool(MAPMAKER_LIMIT_COVER*32u);
+    WORD_AT(0x00715F34u)=mapmaker_pool(MAPMAKER_POOL_COVER*32u);
     WORD_AT(0x00715F38u)=mapmaker_pool(0x280u);
     WORD_AT(0x007B6664u)=0;WORD_AT(0x007B6660u)=0;WORD_AT(0x007B65C0u)=0;WORD_AT(0x007B6674u)=0;
     WORD_AT(0x007B6778u)=0;WORD_AT(0x007B65BCu)=0;WORD_AT(0x007B6780u)=0;WORD_AT(0x007B666Cu)=0;
