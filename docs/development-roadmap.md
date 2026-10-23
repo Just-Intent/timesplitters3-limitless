@@ -272,6 +272,14 @@ Tracked separately; do not merge their diagnosis.
   with mouse and keyboard (commit `404e113`). The controls are now on by
   default; `TSFP_MAPMAKER_POINTER=0` turns them off. MM-4 and MM-5 are done.
 
+## 5. Capacity (phase 2c) status, 2026-10-23
+
+See `research/capacity-constraints.md` §1b. The meter combines a 32 KiB
+map-container byte budget and seven per-category budgets; in practice a
+category budget fills first. Next: a read-only probe (flag 16) logging the
+container bytes (`+0x248`), `editor+0x270/+0x274` and each category's count
+per placement, to name the binding category and its play-time pool.
+
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 
 - Moving the editor cursor with W/A/S/D works, but is slow and awkward.

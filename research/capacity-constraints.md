@@ -45,6 +45,54 @@ committed); constants read from the local `default.xbe`.
 - First run (flags 11, scene 102): fractions 1.000, 0.984, 0.993, 0.984,
   0.973, 0.953, 0.940 as pieces were placed; the step list was not recorded.
 
+## 1b. Two budgets behind the meter (2026-10-23: saves, probe run, static analysis)
+
+The meter shows `1 - max(byte budget, category budget)`; either one fills it.
+
+**Byte budget (the map container).** CONFIRMED:
+- Every saved map (`UserData/45410066/<slot>/anicemap.mkr`, name string at
+  `0x0047DF80`) is exactly 32756 bytes: a 0x7FE0 (32736) byte container plus
+  a 20-byte signature (likely HMAC-SHA1 as for profiles; unverified).
+- The container is a tagged-chunk blob: dword `0x00C77667`, version `0x12D`,
+  then `{tag, size, data}` chunks (map info `0x00C77668`, 0x3DC bytes, whose
+  `+0x248` is the bytes used including the terminator; `0x69`, `0x6B`..`0x75`
+  per editor collection), ended by `0x00C7766A`. It lives at `[0x00784014]`
+  in a 0x8000 allocation (`sub_002FE200`/`230`), is rebuilt from the editor
+  object by `sub_003006C0` (no bounds check while writing), saved by
+  `sub_00190900` and loaded by `sub_00190530` (exact size 0x7FE0 required,
+  signature verified), and read at play time by walkers bounded by
+  `+0x7FE0` (`sub_00085920`, `sub_0008A780`, `sub_0023F390`.. and others).
+- Placement is refused when `used + cost >= 0x7FE0` (`sub_00300670`, 13
+  callers; three inline compares). Undo/redo keeps a shadow container
+  (`[0x765E38]`, 0x8000) and a 4x0x7FE0 diff table (`[0x765C2C]`).
+- 0x7FE0 is an immediate in about 25 places; the meter divides by 32736 and
+  adds a fixed 1300-byte base.
+- Measured, one session: empty map 1520 bytes; 5 pieces 1952; about half the
+  meter 4144; "full" 5728. The earlier test maps used 3252 and 16396.
+
+**Category budget (`editor+0x270`, written by `sub_002FA720`).** CONFIRMED
+code, roles HYPOTHESIS: the largest of seven fractions `count / limit`:
+three sums of per-piece-type costs from the table at `0x00529400` (stride
+0x140; fields +0, +4, +8; limits 2400, 1024, 4400), a global count
+`[0x00762CB8]` (limit 300), a list count (limit 200), type-9 entries plus
+`editor+0x306E` (limit 50) and `sub_002FA060()` (limit about 2,048,000).
+In the measured session the meter fell in exact 0.05 steps per piece from
+the half-way point to empty while the container stayed under 6 KiB: the
+category budget, not the 32 KiB container, is what stopped placement.
+Which of the seven categories bound is not yet known.
+
+Other fixed limits seen: `editor+0x280 < 50`, `+0x41D8 < 10`, `+0x41E0 < 30`,
+play-time tables of 45 and 200 entries (`sub_00085920`, `sub_0008A780`), and
+50 saved maps.
+
+**Consequences.** Raising capacity has two parts. (1) The category budgets
+are probably design caps standing in for play-time pools (geometry, lights,
+AI, navigation); raising one safely needs the matching runtime pool checked.
+(2) Bigger containers need every 0x7FE0 site, the buffers above and a
+size-gated save format (stock 32756-byte files must still load). Bypassing
+`sub_00300670` or hiding the meter without (2) would let the compiler write
+past the 0x8000 buffer: heap corruption.
+
 ## 2. Host memory is not the obvious constraint
 
 CONFIRMED (runtime source):
