@@ -28,6 +28,24 @@ void pc_display_mapmaker_memory(void (*original)(void));
 /* MapMaker capacity stage A: AI navigation pools (scene 100) and editor limits. */
 void pc_display_mapmaker_pools(void (*original)(void));
 void pc_display_mapmaker_limits(void (*original)(void));
+/* MapMaker capacity area hooks (begin) */
+void pc_mapmaker_pads_group_node(void (*original)(void));
+void pc_mapmaker_pads_pad_node(void (*original)(void));
+void pc_mapmaker_pads_cover_topup(void (*original)(void));
+void pc_mapmaker_container_frontend_init(void (*original)(void));
+void pc_mapmaker_container_editor_init(void (*original)(void));
+void pc_mapmaker_container_undo_ring(void (*original)(void));
+void pc_mapmaker_container_load(void (*original)(void));
+void pc_mapmaker_container_save_async(void (*original)(void));
+void pc_mapmaker_container_save_sign(void (*original)(void));
+void pc_mapmaker_container_save_sync(void (*original)(void));
+void pc_mapmaker_container_crc(void (*original)(void));
+void pc_mapmaker_container_crc_check(void (*original)(void));
+void pc_mapmaker_container_compile(void (*original)(void));
+void pc_mapmaker_container_compiled_size(void (*original)(void));
+void pc_mapmaker_container_find(void (*original)(void));
+void pc_mapmaker_container_net_send(void (*original)(void));
+/* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));
 void pc_display_menu_choice_draw(void (*original)(void));

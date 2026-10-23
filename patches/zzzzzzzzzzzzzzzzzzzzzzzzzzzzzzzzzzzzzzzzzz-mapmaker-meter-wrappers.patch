@@ -1,0 +1,171 @@
+--- a/titles/futureperfect/src/recomp_manual.c
++++ b/titles/futureperfect/src/recomp_manual.c
+@@ -844,6 +844,168 @@
+     sub_002FA720_gen();
+ #endif
+ }
++
++/* MapMaker capacity areas (src/pc_mapmaker_<area>.inc, research/capacity-raise-plan.md).
++ * Each hook acts only in MapMaker contexts and otherwise runs the original. */
++extern void sub_0009B090_gen(void);
++void sub_0009B090(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_pads_group_node(sub_0009B090_gen);
++#else
++    sub_0009B090_gen();
++#endif
++}
++
++extern void sub_0009B730_gen(void);
++void sub_0009B730(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_pads_pad_node(sub_0009B730_gen);
++#else
++    sub_0009B730_gen();
++#endif
++}
++
++extern void sub_0023F9D0_gen(void);
++void sub_0023F9D0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_pads_cover_topup(sub_0023F9D0_gen);
++#else
++    sub_0023F9D0_gen();
++#endif
++}
++
++extern void sub_002FE200_gen(void);
++void sub_002FE200(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_frontend_init(sub_002FE200_gen);
++#else
++    sub_002FE200_gen();
++#endif
++}
++
++extern void sub_002FE230_gen(void);
++void sub_002FE230(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_editor_init(sub_002FE230_gen);
++#else
++    sub_002FE230_gen();
++#endif
++}
++
++extern void sub_00336600_gen(void);
++void sub_00336600(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_undo_ring(sub_00336600_gen);
++#else
++    sub_00336600_gen();
++#endif
++}
++
++extern void sub_00190530_gen(void);
++void sub_00190530(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_load(sub_00190530_gen);
++#else
++    sub_00190530_gen();
++#endif
++}
++
++extern void sub_00026740_gen(void);
++void sub_00026740(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_save_async(sub_00026740_gen);
++#else
++    sub_00026740_gen();
++#endif
++}
++
++extern void sub_00025710_gen(void);
++void sub_00025710(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_save_sign(sub_00025710_gen);
++#else
++    sub_00025710_gen();
++#endif
++}
++
++extern void sub_000263E0_gen(void);
++void sub_000263E0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_save_sync(sub_000263E0_gen);
++#else
++    sub_000263E0_gen();
++#endif
++}
++
++extern void sub_001504F0_gen(void);
++void sub_001504F0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_crc(sub_001504F0_gen);
++#else
++    sub_001504F0_gen();
++#endif
++}
++
++extern void sub_00150560_gen(void);
++void sub_00150560(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_crc_check(sub_00150560_gen);
++#else
++    sub_00150560_gen();
++#endif
++}
++
++extern void sub_003006C0_gen(void);
++void sub_003006C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_compile(sub_003006C0_gen);
++#else
++    sub_003006C0_gen();
++#endif
++}
++
++extern void sub_002FE0C0_gen(void);
++void sub_002FE0C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_compiled_size(sub_002FE0C0_gen);
++#else
++    sub_002FE0C0_gen();
++#endif
++}
++
++extern void sub_0032A5B0_gen(void);
++void sub_0032A5B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_find(sub_0032A5B0_gen);
++#else
++    sub_0032A5B0_gen();
++#endif
++}
++
++extern void sub_00353FE0_gen(void);
++void sub_00353FE0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_container_net_send(sub_00353FE0_gen);
++#else
++    sub_00353FE0_gen();
++#endif
++}
+ 
+ extern void sub_002C3500_gen(void);
+ void sub_002C3500(void)

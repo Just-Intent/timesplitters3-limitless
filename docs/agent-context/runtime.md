@@ -174,6 +174,11 @@ and `sub_002FA720` (editor limits, recomputed after the original only with
 and force one guest regeneration. Policy: `src/pc_mapmaker_budget.inc`,
 `src/pc_mapmaker_limits.inc`; see `docs/agent-context/systems.md`.
 
+`*-mapmaker-meter-wrappers.patch` (sorting after `-stagea`) holds the wrappers
+of every capacity area (see `docs/agent-context/systems.md`, MapMaker capacity
+areas); it is regenerated whole when an area is added and is skipped with the
+other MapMaker patches in the historical-upgrade fixture.
+
 ## Verified guest-code patches
 
 `*-guest-code-patches.patch` adds a guest-patch checker to the lift (`tools/recomp/disasm.py`):

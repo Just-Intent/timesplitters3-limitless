@@ -19,6 +19,8 @@ void sub_0007C300(void) {} void sub_0007C390(void) {}
 void sub_0007C4F0(void) {} void sub_0007CDE0(void) {}
 void sub_000746D0(void) {} void sub_0007CCA0(void) {}
 void sub_00071940(void) {} void sub_0003DFA0(void) {}
+#include "mapmaker_area_stubs.h"
+uint32_t xbox_HeapAlloc(uint32_t size,uint32_t alignment) { (void)size;(void)alignment;return 0; }
 static PcMenuPointer cursor;
 static int active=1,mode,original_calls,selections;
 static uint32_t navigation;

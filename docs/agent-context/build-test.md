@@ -261,6 +261,11 @@ fingerprint, so editing it forces regeneration on the next build. An entry that
 fails verification stops the build with the entry id. See
 `docs/agent-context/runtime.md` (Verified guest-code patches).
 
+MapMaker capacity area fixtures (`tests/test_mapmaker_pads.py`,
+`tests/test_mapmaker_container.py`, and later areas) are registered in the
+native CI list; `menu_mouse.c` and `fov_settings.c` include
+`tests/mapmaker_area_stubs.h` for the game functions those areas call.
+
 ## Compile-only Windows builds
 
 `tsfp.ps1 -Action Build -CompileOnly` exists for hosts whose application control

@@ -37,3 +37,6 @@ xbox_kernel.log
 
 # Native launcher state in a development checkout.
 /.launcher/
+
+# Agent worktrees (local, one per parallel task)
+/.claude/worktrees/

@@ -175,6 +175,23 @@ pool is 2120 through `config/guest-code-patches/` (always on). Tests:
 `tests/test_mapmaker_limits.py`. Probe flag 64. Basis:
 `research/capacity-constraints.md` §1c.
 
+## MapMaker capacity areas
+
+Each area of the limit raise (research/capacity-raise-plan.md) is a guest-code
+table `config/guest-code-patches/<area>.json`, C policy
+`src/pc_mapmaker_<area>.inc` (included from `pc_menu_mouse_guest.inc` after
+`pc_mapmaker_limits.inc`), a fixture `tests/test_mapmaker_<area>.py` and notes
+`docs/mapmaker-<area>.md`. Wrappers for every area are in
+`patches/*-mapmaker-meter-wrappers.patch`; declarations sit between the
+"capacity area hooks" markers in `src/pc_display_menu.h`, no-op stubs between
+the "capacity area stubs" markers in `pc_menu_mouse_guest.inc`. Fixtures that
+compile the whole include chain take link stubs from
+`tests/mapmaker_area_stubs.h`. Areas: `pads` (cover handle range 10,240,
+runtime pad handles 0x4740.., bounded A* pools, group A* pool relocated to
+0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
+saves stock-identical when small, large maps refused for System Link).
+Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`.
+
 ## MapMaker editor mouse controls
 
 On by default since 2026-10-23 (milestone confirmed in game);

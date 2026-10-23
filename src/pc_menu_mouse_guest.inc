@@ -44,6 +44,10 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_pointer.inc"
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
+/* MapMaker capacity area includes (begin) */
+#include "pc_mapmaker_pads.inc"
+#include "pc_mapmaker_container.inc"
+/* MapMaker capacity area includes (end) */
 #include "pc_menu_sliders.inc"
 static void menu_team_arrow(unsigned direction);
 #include "pc_menu_choices.inc"
@@ -556,6 +560,24 @@ void pc_display_mapmaker_meter(void (*original)(void)) { original(); }
 void pc_display_mapmaker_memory(void (*original)(void)) { original(); }
 void pc_display_mapmaker_pools(void (*original)(void)) { original(); }
 void pc_display_mapmaker_limits(void (*original)(void)) { original(); }
+/* MapMaker capacity area stubs (begin) */
+void pc_mapmaker_pads_group_node(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_pad_node(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_cover_topup(void (*original)(void)) { original(); }
+void pc_mapmaker_container_frontend_init(void (*original)(void)) { original(); }
+void pc_mapmaker_container_editor_init(void (*original)(void)) { original(); }
+void pc_mapmaker_container_undo_ring(void (*original)(void)) { original(); }
+void pc_mapmaker_container_load(void (*original)(void)) { original(); }
+void pc_mapmaker_container_save_async(void (*original)(void)) { original(); }
+void pc_mapmaker_container_save_sign(void (*original)(void)) { original(); }
+void pc_mapmaker_container_save_sync(void (*original)(void)) { original(); }
+void pc_mapmaker_container_crc(void (*original)(void)) { original(); }
+void pc_mapmaker_container_crc_check(void (*original)(void)) { original(); }
+void pc_mapmaker_container_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_container_compiled_size(void (*original)(void)) { original(); }
+void pc_mapmaker_container_find(void (*original)(void)) { original(); }
+void pc_mapmaker_container_net_send(void (*original)(void)) { original(); }
+/* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
 static int menu_mouse_footer_text(void) { return 0; }
