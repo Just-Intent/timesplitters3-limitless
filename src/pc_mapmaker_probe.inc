@@ -14,6 +14,10 @@
  *   8  also, while MapMaker is active, each menu laid out by sub_00073750
  *      (header, item list with type/flags/callback/rectangle and 64 raw
  *      bytes) and every left click's guest-UI pointer position and hit item
+ *  16  with 1: each meter record also lists the budgets behind the meter:
+ *      the map container's used bytes (chunk 0x00C77668 +0x248 of
+ *      [0x00784014]) and the categories sub_002FA720 folds into editor+0x270,
+ *      recomputed from the placed-piece list, plus editor+0x270/+0x274
  * Output: TSFP_MAPMAKER_PROBE_LOG (binary, truncated per process), else stderr.
  * Records are emitted when their content changes, at most four per second,
  * with the number of unchanged repeats; the file is capped at 4 MiB.
@@ -32,7 +36,8 @@
 #define MAPMAKER_PROBE_DUMPS 2u
 #define MAPMAKER_PROBE_OTHER 4u
 #define MAPMAKER_PROBE_MENUS 8u
-#define MAPMAKER_PROBE_ALL 15u
+#define MAPMAKER_PROBE_BUDGETS 16u
+#define MAPMAKER_PROBE_ALL 31u
 #define MAPMAKER_PROBE_MENU_SLOTS 16u
 #define MAPMAKER_PROBE_MENU_ITEMS 64u
 #define MAPMAKER_PROBE_MENU_INTERVAL 1000u
@@ -183,6 +188,56 @@ static void mapmaker_probe_bar(void)
     }
 }
 
+/* Flag 16, read-only. The map container: dword 0x00C77667, version 0x12D,
+ * then {tag, size, data} chunks from offset 8, ended by 0x00C7766A; the
+ * map-info chunk 0x00C77668 holds the used byte count at data +0x248. */
+static uint32_t mapmaker_probe_container_used(void)
+{
+    uint32_t c,off,tag,size;
+    if(!guest_writable(0x00784014u,4)) return 0;
+    c=WORD_AT(0x00784014u);
+    if(!guest_writable(c,0x7FE0) || WORD_AT(c)!=0x00C77667u || WORD_AT(c+4)!=0x12Du) return 0;
+    for(off=8;off+8<=0x7FE0;off+=8+size) {
+        tag=WORD_AT(c+off);size=WORD_AT(c+off+4);
+        if(tag==0x00C7766Au || size>0x7FE0) return 0;
+        if(tag==0x00C77668u) return size>=0x24C ? WORD_AT(c+off+8+0x248) : 0;
+    }
+    return 0;
+}
+/* The categories of sub_002FA720 (limits from its reciprocal constants).
+ * Pieces: list at [0x0078400C] linked by +0x40, type [[piece+0x2C]], costs
+ * in the 0x140-byte rows at 0x00529400 (+0, +4, +8); sub-entries from +0x3C
+ * linked by +0x14, counted when their first dword is above 9. The seventh
+ * category (sub_002FA060) is not recomputed: that would run guest code. */
+static void mapmaker_probe_budgets(MapMakerProbeText *k)
+{
+    uint32_t piece,editor,sum[3]={0,0,0},pieces=0,deep=0,extra=0,i,j;
+    int32_t global=0;
+    float e270=0,e274=0;
+    piece=guest_writable(0x0078400Cu,4)?WORD_AT(0x0078400Cu):0;
+    for(i=0;piece && i<4096 && guest_writable(piece,0x44);i++,piece=WORD_AT(piece+0x40)) {
+        uint32_t tp=WORD_AT(piece+0x2c),sub;
+        pieces++;
+        if(guest_writable(tp,4) && WORD_AT(tp)<1024u) {
+            uint32_t row=0x00529400u+WORD_AT(tp)*0x140u;
+            if(guest_writable(row,12)) { sum[0]+=WORD_AT(row);sum[1]+=WORD_AT(row+4);sum[2]+=WORD_AT(row+8); }
+        }
+        sub=WORD_AT(piece+0x3c);
+        for(j=0;sub && j<4096 && guest_writable(sub,0x18);j++,sub=WORD_AT(sub+0x14))
+            if((int32_t)WORD_AT(sub)>9) deep++;
+    }
+    if(guest_writable(0x00762CB8u,4)) global=(int32_t)WORD_AT(0x00762CB8u);
+    editor=guest_writable(0x007844A8u,4)?WORD_AT(0x007844A8u):0;
+    if(guest_writable(editor,0x3074)) { /* the word at +0x306E is read as a dword */
+        extra=WORD_AT(editor+0x306e)&0xFFFFu;
+        e270=FLOAT_AT(editor+0x270);e274=FLOAT_AT(editor+0x274);
+    }
+    mapmaker_probe_append(k,"  budgets container=%u/32736 cost0=%u/2400 cost1=%u/1024 cost2=%u/4400"
+        " global=%d/300 pieces=%u/200 deep=%u+%u/50 e270=%.4f e274=%.4f\n",
+        mapmaker_probe_container_used(),sum[0],sum[1],sum[2],(int)global,pieces,deep,extra,
+        (double)e270,(double)e274);
+}
+
 void pc_display_mapmaker_meter(void (*original)(void))
 {
     unsigned flags=mapmaker_probe_flags(),i;
@@ -216,6 +271,7 @@ void pc_display_mapmaker_meter(void (*original)(void))
         unsigned long long now=GetTickCount64();
         MapMakerProbeText *k=&mapmaker_probe.key;
         mapmaker_probe_append(k,"  bars=%u\n",mapmaker_probe.bars);
+        if(mapmaker_probe_flags()&MAPMAKER_PROBE_BUDGETS) mapmaker_probe_budgets(k);
         if(mapmaker_probe.emitted && !strcmp(k->text,mapmaker_probe.last)) {
             mapmaker_probe.repeats++;return;
         }

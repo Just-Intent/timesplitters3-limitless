@@ -279,6 +279,7 @@ map-container byte budget and seven per-category budgets; in practice a
 category budget fills first. Next: a read-only probe (flag 16) logging the
 container bytes (`+0x248`), `editor+0x270/+0x274` and each category's count
 per placement, to name the binding category and its play-time pool.
+Implemented (probe flag 16, use 17 or 27); awaiting a run.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

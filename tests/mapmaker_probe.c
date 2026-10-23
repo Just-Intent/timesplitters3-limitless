@@ -235,6 +235,42 @@ int main(int argc,char **argv)
     CHECK(strchr(log_text,'\r')==NULL); /* binary log on every host */
     WORD_AT(0x0079094Cu)=0;
 
+    /* Flag 16 with 1: the budgets behind the meter, read-only. */
+    {
+        uint32_t c=0x00340000u,info=c+8,piece1=0x00341000u,piece2=0x00341100u,t1=0x00342000u,t2=0x00342010u;
+        uint32_t sub1=0x00343000u,sub2=0x00343100u,editor=0x00344000u;
+        WORD_AT(0x00784014u)=c;WORD_AT(c)=0x00C77667u;WORD_AT(c+4)=0x12Du;
+        WORD_AT(info)=0x00C77668u;WORD_AT(info+4)=0x3DCu;WORD_AT(info+8+0x248)=1948u;
+        WORD_AT(info+8+0x3DC)=0x00C7766Au;WORD_AT(info+8+0x3DC+4)=0;
+        WORD_AT(0x0078400Cu)=piece1;
+        WORD_AT(piece1+0x2c)=t1;WORD_AT(t1)=14;WORD_AT(piece1+0x40)=piece2;WORD_AT(piece1+0x3c)=sub1;
+        WORD_AT(piece2+0x2c)=t2;WORD_AT(t2)=2;WORD_AT(piece2+0x40)=0;WORD_AT(piece2+0x3c)=0;
+        WORD_AT(sub1)=12;WORD_AT(sub1+0x14)=sub2;WORD_AT(sub2)=3;WORD_AT(sub2+0x14)=0;
+        WORD_AT(0x00529400u+14u*0x140u)=14;WORD_AT(0x00529404u+14u*0x140u)=13;WORD_AT(0x00529408u+14u*0x140u)=46;
+        WORD_AT(0x00529400u+2u*0x140u)=1;WORD_AT(0x00529404u+2u*0x140u)=1;WORD_AT(0x00529408u+2u*0x140u)=1;
+        WORD_AT(0x00762CB8u)=15;
+        WORD_AT(0x007844A8u)=editor;WORD_AT(editor+0x306c)=0x00070000u; /* word at +0x306E = 7 */
+        FLOAT_AT(editor+0x270)=.25f;FLOAT_AT(editor+0x274)=.05f;
+        set_probe("17");
+        before=checksum();
+        call_meter();
+        CHECK(checksum()==before);
+        read_log();
+        CHECK(strstr(log_text,"  budgets container=1948/32736 cost0=15/2400 cost1=14/1024 cost2=47/4400"
+                               " global=15/300 pieces=2/200 deep=1+7/50 e270=0.2500 e274=0.0500\n")!=NULL);
+        set_probe("1");                                   /* without 16: no budgets line */
+        call_meter();
+        read_log();
+        CHECK(strstr(log_text,"budgets")==NULL);
+        set_probe("17");
+        WORD_AT(c+4)=0x12Eu;                              /* unknown version: container not read */
+        call_meter();
+        read_log();
+        CHECK(strstr(log_text,"budgets container=0/32736")!=NULL);
+        WORD_AT(c+4)=0x12Du;
+        WORD_AT(0x00784014u)=0;WORD_AT(0x0078400Cu)=0;WORD_AT(0x007844A8u)=0;
+    }
+
     /* Output is capped. */
     set_probe("1");
     for(i=0;i<40000 && !mapmaker_probe.capped;i++) {

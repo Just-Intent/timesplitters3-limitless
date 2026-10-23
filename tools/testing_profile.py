@@ -147,7 +147,7 @@ def prepare_run(root,run):
 def mapmaker_probe_environment(root,run,flags):
     """Read-only MapMaker meter logging (src/pc_mapmaker_probe.inc); 0 disables."""
     if flags is None or flags==0:return {}
-    if not 1<=flags<=15:raise ValueError('MapMaker probe flags must be between 1 and 15')
+    if not 1<=flags<=31:raise ValueError('MapMaker probe flags must be between 1 and 31')
     log=contained(root,Path(run)/'mapmaker-probe.log','private/test-saves')
     if log.is_symlink():raise ValueError('Unexpected MapMaker probe log')
     return dict(TSFP_MAPMAKER_PROBE=str(flags),TSFP_MAPMAKER_PROBE_LOG=str(log))
@@ -219,7 +219,7 @@ def main():
     parser.add_argument('--play',action='store_true',help='Run a bounded Windows test with a disposable copy')
     parser.add_argument('--seconds',type=int,default=120,help='Play duration, 1–600 seconds (default 120)')
     parser.add_argument('--mapmaker-probe',type=int,metavar='FLAGS',
-        help='Read-only MapMaker log in the test directory: 1 meter, 2 memory snapshots, 4 other scene-100 bars, 8 menu layouts/clicks (add flags)')
+        help='Read-only MapMaker log in the test directory: 1 meter, 2 memory snapshots, 4 other MapMaker bars, 8 menu layouts/clicks, 16 budgets with 1 (add flags)')
     args=parser.parse_args()
     if args.seed:print('Created',create_fixture(ROOT,args.seed))
     if args.play:

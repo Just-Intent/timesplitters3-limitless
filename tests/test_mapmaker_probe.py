@@ -19,6 +19,8 @@ MUTATIONS = {
                         "if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_MENUS))return;"),
     'editor-scene-missing': ('return scene==MAPMAKER_PROBE_SCENE_EDITOR || scene==MAPMAKER_PROBE_SCENE_PLAY;',
                              'return scene==MAPMAKER_PROBE_SCENE_PLAY;'),
+    'budgets-without-flag': ('        if(mapmaker_probe_flags()&MAPMAKER_PROBE_BUDGETS) mapmaker_probe_budgets(k);', '        mapmaker_probe_budgets(k);'),
+    'container-any-version': ("|| WORD_AT(c+4)!=0x12Du) return 0;", ') return 0;'),
     'uncapped': ('if(mapmaker_probe.written+length>MAPMAKER_PROBE_CAP) {', 'if(0) {'),
 }
 
