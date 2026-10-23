@@ -7,29 +7,50 @@
  * existing field where it is and rewrites every displacement that names an
  * old array so the arrays live after +0x11950:
  *
- *   array          stock               enlarged (offset, entries)
- *   Story AI       +0x288   50 x 0xE4  +0x11950 255
- *   (logic and free objects: later stages, see the doc)
+ *   array          stock                enlarged (offset, entries)   count
+ *   Story AI       +0x288   50 x 0xE4   +0x11950  255                +0x280
+ *   logic ops      +0x41E4  30 x 0x220  +0x1FC70  120                +0x41E0
+ *   logic nodes    +0x81A8 130 x 0xB4   +0x2FB70  520                +0x81A4
+ *   logic records  +0xDD14 100 x 0x8C   +0x46910  400                +0xDD10
+ *   (free objects: later stage, see the doc)
  *
  * Counts stay where they were. This file holds the C policy around the
- * enlarged arrays:
+ * enlarged arrays. Editor limits (what the player may place) follow
+ * TSFP_MAPMAKER_LIMITS=1 (mapmaker_limits.limits); capacity guards are
+ * always on.
  *
- *  - pc_mapmaker_editor_sai_add (WRAP sub_0031BE70): the editor's "add a
- *    story AI" action. Stock refuses at 50; with TSFP_MAPMAKER_LIMITS=1 the
- *    limit is MAPMAKER_EDITOR_SAI_LIMIT. Same placement-memory test, same
- *    messages (the "limit reached" text gets the limit in force). A new
- *    entry past the 50 editor colours gets colour (index mod 50) instead of
- *    the stock out-of-table value 50.
+ *  - pc_mapmaker_editor_sai_add (WRAP sub_0031BE70): add a story AI. Stock
+ *    refuses at 50; opted in, 255. Same container-space test and messages
+ *    (the "limit reached" text gets the limit in force). Entries past the 50
+ *    editor colours get colour (index mod 50) instead of the stock 50.
+ *  - pc_mapmaker_editor_logic_room (WRAP sub_00300670): the container-space
+ *    test every logic editing action calls first. For those callers it also
+ *    answers "no room" when ops, nodes or records are within
+ *    MAPMAKER_LOGIC_HEADROOM of capacity: the node and record allocators
+ *    (sub_00320B20, sub_00320CC0, sub_00325820) have no bound and cannot fail.
+ *  - pc_mapmaker_editor_logic_can_add / _logic_full (WRAP sub_00321E60,
+ *    sub_00321E80): ops 30 -> 120 and objectives 10 -> 40.
+ *  - pc_mapmaker_editor_objective (WRAP sub_00325F60, whose own test
+ *    editor.json raises to 40): stock 10 when the limits are off; never past
+ *    the ops capacity (it creates an op).
+ *  - pc_mapmaker_editor_node_room (WRAP sub_0031DB00): nodes per type
+ *    30/50/50 -> 120/200/200 (sum = node capacity). Kind-0 ops (data table
+ *    0x0052E8C0 + kind*0x44 + 0x28) 30 -> 120 while the limits are on;
+ *    kind-1 ops stay at 8 (sub_003242B0 sizes a heap block for 8).
  *  - pc_mapmaker_editor_load (WRAP sub_00301A90): the editor map loader
  *    appends chunks to the arrays with no bound. Chunks past an array's
- *    capacity are hidden from the loader (tag 0, which its switch skips) and
- *    restored afterwards, so a large or damaged map cannot overflow the
- *    editor object. Capacity, not the opt-in limit, applies here.
+ *    capacity (and kind-1 ops past 8) are hidden from the loader (tag 0,
+ *    which its switch skips) and restored afterwards.
  *  - pc_mapmaker_editor_level_load (WRAP sub_00240C50): a MapMaker map being
  *    started. Its count pass sub_00240590 keeps one stack slot per story AI
- *    chunk with no bound (stock 50 slots). The table grows its frame to
- *    MAPMAKER_LEVEL_SAI_SLOTS slots; chunks past that are hidden for the
+ *    chunk with no bound; editor.json grows that frame to
+ *    MAPMAKER_LEVEL_SAI_SLOTS slots and chunks past that are hidden for the
  *    whole load the same way.
+ *  - pc_mapmaker_editor_logic_slot (WRAP sub_0033F480, play time): the
+ *    45-slot table at [0x00765E44]+0xB4 takes one slot per distinct record
+ *    with no bound. Its index is also the HUD marker id, and sub_002287E0
+ *    reserves exactly 45 logic ids before the object markers, so the table is
+ *    guarded, not enlarged: a 46th distinct record's action is skipped.
  *
  * Requires the includer's WORD_AT, guest_writable, guest_call,
  * g_esp/g_eax and mapmaker_limits (pc_mapmaker_limits.inc). */
@@ -42,9 +63,19 @@
 #define MAPMAKER_EDITOR_SAI_STOCK 50u
 #define MAPMAKER_EDITOR_SAI_LIMIT 255u          /* byte index [0x00762F94] is unsigned */
 #define MAPMAKER_LEVEL_SAI_SLOTS 1024u          /* sub_00240590 frame, editor.json */
+#define MAPMAKER_EDITOR_OPS 0x1FC70u            /* 120 x 0x220 */
+#define MAPMAKER_EDITOR_OPS_CAP 120u
+#define MAPMAKER_EDITOR_NODES 0x2FB70u          /* 520 x 0xB4 */
+#define MAPMAKER_EDITOR_NODES_CAP 520u
+#define MAPMAKER_EDITOR_RECORDS 0x46910u        /* 400 x 0x8C */
+#define MAPMAKER_EDITOR_RECORDS_CAP 400u
+#define MAPMAKER_OBJECTIVES_LIMIT 40u           /* editor.json 0x00325F65 */
+#define MAPMAKER_OBJECTIVES_STOCK 10u
+#define MAPMAKER_OPS_STOCK 30u
+#define MAPMAKER_KIND1_OPS 8u
+#define MAPMAKER_LOGIC_HEADROOM 8u
+#define MAPMAKER_LOGIC_SLOTS 45u
 
-/* Capacities by chunk tag for the editor loader: tag, editor count field
- * (informational) and entries the editor arrays hold. Raised by later stages. */
 #define MAPMAKER_TAG_FREE 0x00C7766Bu
 #define MAPMAKER_TAG_SAI 0x00C7766Cu
 #define MAPMAKER_TAG_NODE 0x00C7766Du
@@ -53,16 +84,26 @@
 #define MAPMAKER_TAG_END 0x00C7766Au
 #define MAPMAKER_CONTAINER_LIMIT 0x00080000u    /* scan bound: 512 KB */
 
-static const struct { uint32_t tag, capacity; } mapmaker_editor_caps[]={
-    {MAPMAKER_TAG_SAI,MAPMAKER_EDITOR_SAI_CAP},
-    {MAPMAKER_TAG_FREE,170u},   /* stock arrays */
-    {MAPMAKER_TAG_NODE,130u},
-    {MAPMAKER_TAG_OP,30u},
-    {MAPMAKER_TAG_RECORD,100u},
+/* Chunk capacities for the editor loader. kind: data byte +4 must equal
+ * kind_value (op kind) for the entry to apply; 0 = any chunk of the tag. */
+typedef struct MapMakerCap { uint32_t tag, capacity, kind, kind_value; } MapMakerCap;
+static const MapMakerCap mapmaker_editor_caps[]={
+    {MAPMAKER_TAG_SAI,MAPMAKER_EDITOR_SAI_CAP,0,0},
+    {MAPMAKER_TAG_FREE,170u,0,0},   /* stock array */
+    {MAPMAKER_TAG_NODE,MAPMAKER_EDITOR_NODES_CAP,0,0},
+    {MAPMAKER_TAG_OP,MAPMAKER_KIND1_OPS,1,1},  /* before the total: a hidden chunk counts once */
+    {MAPMAKER_TAG_OP,MAPMAKER_EDITOR_OPS_CAP,0,0},
+    {MAPMAKER_TAG_RECORD,MAPMAKER_EDITOR_RECORDS_CAP,0,0},
 };
 #define MAPMAKER_EDITOR_CAPS (sizeof mapmaker_editor_caps/sizeof mapmaker_editor_caps[0])
 
 extern void sub_00300670(void),sub_0031BB60(void),sub_0003D7B0(void),sub_0007A270(void),sub_003C85D4(void);
+
+static uint32_t mapmaker_editor(void)
+{
+    uint32_t e=guest_writable(0x007844A8u,4)?WORD_AT(0x007844A8u):0u;
+    return e && guest_writable(e,MAPMAKER_EDITOR_SIZE)?e:0u;
+}
 
 /* ---- hiding chunks past a capacity ----------------------------------- */
 typedef struct MapMakerHidden { uint32_t chunk, tag; } MapMakerHidden;
@@ -72,38 +113,42 @@ static void mapmaker_unhide(MapMakerHidden *h,unsigned n)
     while(n--) WORD_AT(h[n].chunk)=h[n].tag;
 }
 /* Walk the {tag, size, data[size]} chunks from first to the end tag and hide
- * (tag 0, outside both loaders' tag switches, so skipped) every chunk of a
- * capped tag past its capacity; run original; put the tags back. A walk that
- * leaves [first, limit_end) or is malformed hides nothing: the original then
- * sees exactly what it would have seen. */
-static void mapmaker_hide_run(uint32_t first,uint32_t limit_end,const uint32_t *tags,
-                              const uint32_t *caps,unsigned ntags,void (*original)(void))
+ * (tag 0, outside both loaders' tag switches, so skipped) every chunk past
+ * the capacity of an entry it matches; run original; put the tags back. A
+ * walk that leaves [first, limit_end) or is malformed hides nothing: the
+ * original then sees exactly what it would have seen. */
+static void mapmaker_hide_run(uint32_t first,uint32_t limit_end,const MapMakerCap *caps,
+                              unsigned ncaps,void (*original)(void))
 {
     MapMakerHidden *h=NULL;
     unsigned seen[8]={0},n=0,size=0,i,steps;
     uint32_t c=first;
     int ok=0;
-    if(ntags>8) ntags=8;
+    if(ncaps>8) ncaps=8;
     for(steps=0;steps<0x40000u;steps++) {
         uint32_t tag,sz;
+        int hide=0;
         if(c<first || c>=limit_end || limit_end-c<8u || !guest_writable(c,8)) break;
         tag=WORD_AT(c);sz=WORD_AT(c+4);
         if(tag==MAPMAKER_TAG_END) { ok=1;break; }
         if(sz>limit_end-c-8u) break;
-        for(i=0;i<ntags;i++)
-            if(tag==tags[i] && ++seen[i]>caps[i]) {
-                if(n==size) {
-                    unsigned m=size?size*2u:64u;
-                    MapMakerHidden *p=(MapMakerHidden *)realloc(h,m*sizeof *p);
-                    if(!p) { ok=0;goto done; }
-                    h=p;size=m;
-                }
-                h[n].chunk=c;h[n].tag=tag;n++;
-                WORD_AT(c)=0;
+        for(i=0;i<ncaps && !hide;i++) {
+            if(tag!=caps[i].tag) continue;
+            if(caps[i].kind && (sz<5u || (WORD_AT(c+8u+4u)&0xFFu)!=caps[i].kind_value)) continue;
+            if(++seen[i]>caps[i].capacity) hide=1;
+        }
+        if(hide) {
+            if(n==size) {
+                unsigned m=size?size*2u:64u;
+                MapMakerHidden *p=(MapMakerHidden *)realloc(h,m*sizeof *p);
+                if(!p) { ok=0;break; }
+                h=p;size=m;
             }
+            h[n].chunk=c;h[n].tag=tag;n++;
+            WORD_AT(c)=0;
+        }
         c+=8u+sz;
     }
-done:
     if(!ok) {
         mapmaker_unhide(h,n);
         free(h);
@@ -119,27 +164,25 @@ done:
 /* ---- editor map loader ------------------------------------------------ */
 void pc_mapmaker_editor_load(void (*original)(void))
 {
-    uint32_t tags[MAPMAKER_EDITOR_CAPS],caps[MAPMAKER_EDITOR_CAPS],container;
-    unsigned i;
-    container=guest_writable(g_esp+4u,4)?WORD_AT(g_esp+4u):0u;
+    uint32_t container=guest_writable(g_esp+4u,4)?WORD_AT(g_esp+4u):0u;
     if(!container || !guest_writable(container,8) || WORD_AT(container)!=0x00C77667u) {
         original();
         return;
     }
-    for(i=0;i<MAPMAKER_EDITOR_CAPS;i++) { tags[i]=mapmaker_editor_caps[i].tag;caps[i]=mapmaker_editor_caps[i].capacity; }
-    mapmaker_hide_run(container+8u,container+MAPMAKER_CONTAINER_LIMIT,tags,caps,MAPMAKER_EDITOR_CAPS,original);
+    mapmaker_hide_run(container+8u,container+MAPMAKER_CONTAINER_LIMIT,mapmaker_editor_caps,
+                      MAPMAKER_EDITOR_CAPS,original);
 }
 
 /* ---- MapMaker level start (scene 100) --------------------------------- */
 void pc_mapmaker_editor_level_load(void (*original)(void))
 {
-    const uint32_t tag=MAPMAKER_TAG_SAI,cap=MAPMAKER_LEVEL_SAI_SLOTS;
+    static const MapMakerCap sai={MAPMAKER_TAG_SAI,MAPMAKER_LEVEL_SAI_SLOTS,0,0};
     uint32_t container=guest_writable(0x00784014u,4)?WORD_AT(0x00784014u):0u;
     if(!container || !guest_writable(container,8)) {
         original();
         return;
     }
-    mapmaker_hide_run(container+8u,container+MAPMAKER_CONTAINER_LIMIT,&tag,&cap,1,original);
+    mapmaker_hide_run(container+8u,container+MAPMAKER_CONTAINER_LIMIT,&sai,1,original);
 }
 
 /* ---- add a story AI (sub_0031BE70) ------------------------------------ */
@@ -147,9 +190,8 @@ void pc_mapmaker_editor_sai_add(void (*original)(void))
 {
     uint32_t editor,count,arg,limit,room,result;
     mapmaker_limits_read();
-    if(!guest_writable(0x007844A8u,4) || !guest_writable(g_esp+4u,4)) { original();return; }
-    editor=WORD_AT(0x007844A8u);
-    if(!guest_writable(editor,MAPMAKER_EDITOR_SIZE)) { original();return; }
+    editor=mapmaker_editor();
+    if(!editor || !guest_writable(g_esp+4u,4)) { original();return; }
     limit=mapmaker_limits.limits?MAPMAKER_EDITOR_SAI_LIMIT:MAPMAKER_EDITOR_SAI_STOCK;
     arg=WORD_AT(g_esp+4u);
     count=WORD_AT(editor+0x280u);
@@ -168,4 +210,125 @@ void pc_mapmaker_editor_sai_add(void (*original)(void))
         result=guest_call(sub_0007A270,3,arg,editor,0u);
     }
     g_eax=result;
+}
+
+/* ---- logic: editor limits --------------------------------------------- */
+static uint32_t mapmaker_ops_limit(void)
+{
+    mapmaker_limits_read();
+    return mapmaker_limits.limits?MAPMAKER_EDITOR_OPS_CAP:MAPMAKER_OPS_STOCK;
+}
+static uint32_t mapmaker_objectives_limit(void)
+{
+    mapmaker_limits_read();
+    return mapmaker_limits.limits?MAPMAKER_OBJECTIVES_LIMIT:MAPMAKER_OBJECTIVES_STOCK;
+}
+/* Kind-0 op maximum in the per-kind data table (read by sub_00322AC0 and
+ * the message in sub_0031DF80). Raised only from its stock value. */
+static void mapmaker_logic_kinds_apply(void)
+{
+    mapmaker_limits_read();
+    if(mapmaker_limits.limits && guest_writable(0x0052E8E8u,4) && WORD_AT(0x0052E8E8u)==MAPMAKER_OPS_STOCK)
+        WORD_AT(0x0052E8E8u)=MAPMAKER_EDITOR_OPS_CAP;
+}
+
+/* sub_00321E60: 1 when another op (and objective) may be added. */
+void pc_mapmaker_editor_logic_can_add(void (*original)(void))
+{
+    uint32_t editor=mapmaker_editor();
+    if(!editor) { original();return; }
+    mapmaker_logic_kinds_apply();
+    g_eax=(int32_t)WORD_AT(editor+0x41D8u)<(int32_t)mapmaker_objectives_limit() &&
+          (int32_t)WORD_AT(editor+0x41E0u)<(int32_t)mapmaker_ops_limit();
+}
+/* sub_00321E80(arg): the "logic full" message, with the limits in force.
+ * Stock formats the objective limit, or objectives-1 when ops are full. */
+void pc_mapmaker_editor_logic_full(void (*original)(void))
+{
+    uint32_t editor=mapmaker_editor(),arg,objectives;
+    if(!editor || !guest_writable(g_esp+4u,4)) { original();return; }
+    arg=WORD_AT(g_esp+4u);
+    objectives=WORD_AT(editor+0x41D8u);
+    if((int32_t)objectives>=(int32_t)mapmaker_objectives_limit())
+        guest_call(sub_003C85D4,3,editor,guest_call(sub_0003D7B0,1,0xBB1u),mapmaker_objectives_limit());
+    else if((int32_t)WORD_AT(editor+0x41E0u)>=(int32_t)mapmaker_ops_limit())
+        guest_call(sub_003C85D4,3,editor,guest_call(sub_0003D7B0,1,0xBB1u),objectives-1u);
+    g_eax=guest_call(sub_0007A270,3,arg,editor,0u);
+}
+/* sub_00325F60: turn the selected mover into an objective (creates an op
+ * and nodes). Its own test is raised to 40 by editor.json; refuse here at
+ * the stock 10 when the limits are off, and at the ops capacity. The stock
+ * refusal returns with eax = the editor pointer. */
+void pc_mapmaker_editor_objective(void (*original)(void))
+{
+    uint32_t editor=mapmaker_editor();
+    if(!editor) { original();return; }
+    if((int32_t)WORD_AT(editor+0x41D8u)>=(int32_t)mapmaker_objectives_limit() ||
+       WORD_AT(editor+0x41E0u)>=MAPMAKER_EDITOR_OPS_CAP ||
+       WORD_AT(editor+0x81A4u)+MAPMAKER_LOGIC_HEADROOM>MAPMAKER_EDITOR_NODES_CAP ||
+       WORD_AT(editor+0xDD10u)+MAPMAKER_LOGIC_HEADROOM>MAPMAKER_EDITOR_RECORDS_CAP) {
+        g_eax=editor;
+        return;
+    }
+    original();
+}
+/* sub_0031DB00(type): 1 while fewer than the per-type maximum nodes of
+ * that type exist (stock: type 0 -> 30, types 1 and 2 -> 50, others 0). */
+void pc_mapmaker_editor_node_room(void (*original)(void))
+{
+    uint32_t editor=mapmaker_editor(),type,count,n=0,i,cap;
+    if(!editor || !guest_writable(g_esp+4u,4)) { original();return; }
+    mapmaker_logic_kinds_apply();
+    type=WORD_AT(g_esp+4u);
+    count=WORD_AT(editor+0x81A4u);
+    if(count>MAPMAKER_EDITOR_NODES_CAP) count=MAPMAKER_EDITOR_NODES_CAP;
+    for(i=0;i<count;i++) n+=WORD_AT(editor+MAPMAKER_EDITOR_NODES+i*0xB4u)==type;
+    cap=type==0u?30u:(type==1u || type==2u)?50u:0u;
+    if(mapmaker_limits.limits) cap*=4u;
+    g_eax=n<cap;
+}
+
+/* ---- logic: capacity backstop in the container-space test ------------- */
+/* Return addresses of the calls to sub_00300670 from the logic editing
+ * actions (sub_00324F50, _4FA0, _5040, _50C0, _5140, _6550, _8630, _86E0,
+ * _87B0). */
+static const uint32_t mapmaker_logic_room_callers[]={
+    0x00324F70u,0x00324FC0u,0x00325060u,0x003250E0u,0x003251C7u,
+    0x0032656Cu,0x0032865Bu,0x00328700u,0x003287D0u,
+};
+void pc_mapmaker_editor_logic_room(void (*original)(void))
+{
+    uint32_t editor,ret;
+    unsigned i;
+    original();
+    if(!g_eax || !guest_writable(g_esp,4) || !(editor=mapmaker_editor())) return;
+    mapmaker_logic_kinds_apply();
+    ret=WORD_AT(g_esp);
+    for(i=0;i<sizeof mapmaker_logic_room_callers/sizeof mapmaker_logic_room_callers[0];i++)
+        if(ret==mapmaker_logic_room_callers[i]) break;
+    if(i==sizeof mapmaker_logic_room_callers/sizeof mapmaker_logic_room_callers[0]) return;
+    if(WORD_AT(editor+0x41E0u)>=MAPMAKER_EDITOR_OPS_CAP ||
+       WORD_AT(editor+0x81A4u)+MAPMAKER_LOGIC_HEADROOM>MAPMAKER_EDITOR_NODES_CAP ||
+       WORD_AT(editor+0xDD10u)+MAPMAKER_LOGIC_HEADROOM>MAPMAKER_EDITOR_RECORDS_CAP)
+        g_eax=0;
+}
+
+/* ---- play time: the 45-slot logic table (sub_0033F480) ----------------- */
+void pc_mapmaker_editor_logic_slot(void (*original)(void))
+{
+    uint32_t obj=guest_writable(0x00765E44u,4)?WORD_AT(0x00765E44u):0u,arg,count,i;
+    int32_t record;
+    if(!obj || !guest_writable(obj,0x1960) || !guest_writable(g_esp+4u,4)) { original();return; }
+    arg=WORD_AT(g_esp+4u);
+    if(!guest_writable(arg,0x10)) { original();return; }
+    count=WORD_AT(obj+0x1950u);
+    if(count<MAPMAKER_LOGIC_SLOTS) { original();return; }
+    record=(int32_t)(int16_t)(WORD_AT(arg+0xCu)&0xFFFFu);
+    for(i=0;i<MAPMAKER_LOGIC_SLOTS;i++)
+        if((int32_t)WORD_AT(obj+0x13Cu+i*0x8Cu)==record) { original();return; } /* already has a slot */
+    {
+        static unsigned reported;
+        if(!reported++) fprintf(stderr,"[mapmaker] logic table full (%u slots): action skipped\n",MAPMAKER_LOGIC_SLOTS);
+    }
+    g_eax=0;
 }

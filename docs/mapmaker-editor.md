@@ -14,6 +14,12 @@ rewrites), `src/pc_mapmaker_editor.inc` (C policy, wrappers),
     WRAP sub_0031BE70 -> pc_mapmaker_editor_sai_add
     WRAP sub_00301A90 -> pc_mapmaker_editor_load
     WRAP sub_00240C50 -> pc_mapmaker_editor_level_load
+    WRAP sub_00321E60 -> pc_mapmaker_editor_logic_can_add
+    WRAP sub_00321E80 -> pc_mapmaker_editor_logic_full
+    WRAP sub_00325F60 -> pc_mapmaker_editor_objective
+    WRAP sub_0031DB00 -> pc_mapmaker_editor_node_room
+    WRAP sub_00300670 -> pc_mapmaker_editor_logic_room
+    WRAP sub_0033F480 -> pc_mapmaker_editor_logic_slot
 
 Include `pc_mapmaker_editor.inc` after `pc_mapmaker_limits.inc` (it uses
 `mapmaker_limits` / `mapmaker_limits_read`).
@@ -29,8 +35,15 @@ Count fields stay where they were.
 | Array | Stock | Enlarged | Delta |
 |---|---|---|---|
 | Story AI | +0x288, 50 x 0xE4 | +0x11950, 255 | +0x116C8 |
+| Logic ops | +0x41E4, 30 x 0x220 | +0x1FC70, 120 | +0x1BA8C |
+| Logic nodes | +0x81A8, 130 x 0xB4 | +0x2FB70, 520 | +0x279C8 |
+| Logic records | +0xDD14, 100 x 0x8C | +0x46910, 400 | +0x38BFC |
 
-(Logic and free objects: later stages, below.)
+(Free objects: stage 3, below.) The chunk writers read 0xC0 per node and 0x90
+per record (12 / 4 bytes past the element, `0x00301624`, `0x003017C5`); with
+these offsets the last node's over-read reads the first record and the last
+record's reads the free-object array: reads only, inside the object (both
+loaders copy 0xB4 / 0x8C, `0x00302697`, `0x00302736`).
 
 ## How the sites were found
 
@@ -53,7 +66,12 @@ Its results were then checked against:
 - the lift's own verifier (`check-tables.py`: every entry applies, no
   instruction boundary changes).
 
-Corrections to the report found this way: `0x0031FE32`
+Corrections to the report found this way: `0x003260C6`
+(`[esi+ecx+0x404C]`) and `0x003260D4` (`[edi+0x3FC4]`) address the LAST op,
+`ops[count-1]`, through a constant below the array (0x3FC4 = 0x41E4 - 0x220):
+not in the report, they would have read the vacated old array.
+`0x0032490D`/`0x00324914` (`+0x805C`/`+0x8040`, filed under ops) are
+`nodes[sel-2]` (stride 0xB4) and move with the nodes. `0x0031FE32`
 (`[ecx+eax*8+0x11398]`) and `0x0031FCEE`/`0x00327A8D` (`+0x11394`) address the
 [kind][4] x 0x18 table at +0x113C4 with a biased index, not the records
 array, and stay; `0x00316569` and four others read `[x*4+0x4064]`, the dword
@@ -97,6 +115,43 @@ override may set a displacement the encoding does not have).
 - Play time is otherwise heap by count (`desc+0x74` = n x 0x98 etc.).
   Simultaneous AI are not raised (32 actors, 30 AI slots, ~20 live in scene
   100); see "Spawning" below.
+
+## Logic (stage 2)
+
+- 387 operand rewrites (ops 96 incl. the folded `0x00326024`
+  `OPS[node.op]+0x21C = 1` store, nodes 154, records 137) and the three
+  clears in `sub_00321C00` (0xFF0 -> 0x3FC0, 0x16DA -> 0x5B48,
+  0xDAC -> 0x36B0 dwords).
+- Editor limits (opt-in): ops 30 -> 120 and objectives 10 -> 40
+  (`sub_00321E60`/`sub_00321E80` reimplemented; `sub_00325F60`, which turns
+  a mover into an objective without asking `sub_00321E60`, has its own test
+  at `0x00325F65` raised to 40 in editor.json and the stock 10 enforced by the
+  wrapper when the limits are off). Nodes per type (`sub_0031DB00`: type 0
+  -> 30, types 1/2 -> 50) x4; kind-0 ops (data `0x0052E8E8`, read by
+  `sub_00322AC0` and printed by `sub_0031DF80`) 30 -> 120. Kind-1 ops stay at
+  8: `sub_003242B0` sizes a 0x110-byte heap block for 8 entries.
+- Records have no editor limit at all in the stock game (CONFIRMED: no
+  compare against +0xDD10), and the node/record allocators (`sub_00320B20`,
+  `sub_00320CC0`, `sub_00325820`) cannot fail. Backstop: every logic editing
+  action first asks the container-space test `sub_00300670`; for the nine
+  logic call sites (return addresses in the .inc) the wrapper also answers
+  "no room" (stock message) when ops are at capacity or nodes/records are
+  within 8 of it. The objective wrapper applies the same test.
+- `sub_002FBDE0` collects matching op indices into an unchecked 8-slot stack
+  array (`0x002FBE1E`): frame 0x20 -> 0x200 (128 slots, more than the 120
+  ops).
+- Loader: ops 120 (kind-1 ops 8, kind byte at data+4), nodes 520, records
+  400.
+- Play time: heap by count, except the 45-slot table at
+  `[0x00765E44]+0xB4` (`sub_0033F480`, unbounded). Its slot index is the HUD
+  marker id: `sub_002287E0` allocates the marker array `[0x0078CECC]` as
+  (objects + 45) x 0x4C with the first 45 reserved for logic, and
+  `sub_00227750` / `sub_00227620` index it with the slot (`cmp edi, 0x2D` at
+  `0x002277D6`). Enlarging the table would make logic ids alias object
+  markers, so it is guarded instead (`pc_mapmaker_editor_logic_slot`): a 46th
+  distinct record's action is skipped (logged once). INFERRED: actions that
+  reach it are objective/marker actions; more than 45 distinct ones at once
+  is the remaining limit.
 
 ## Validation
 

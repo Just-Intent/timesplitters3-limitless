@@ -27,10 +27,25 @@ MUTATIONS = {
                           'guest_call(sub_003C85D4,3,editor,guest_call(sub_0003D7B0,1,0xBB0u),50u);'),
     'sai-colour-kept': ('if(WORD_AT(entry+0x60u)>=50u) WORD_AT(entry+0x60u)=(count-1u)%50u;', '(void)entry;'),
     'load-no-restore': ('    original();\n    mapmaker_unhide(h,n);', '    original();'),
-    'load-off-by-one': ('++seen[i]>caps[i]', '++seen[i]>caps[i]+1u'),
-    'load-sai-stock': ('{MAPMAKER_TAG_SAI,MAPMAKER_EDITOR_SAI_CAP},', '{MAPMAKER_TAG_SAI,50u},'),
+    'load-off-by-one': ('++seen[i]>caps[i].capacity', '++seen[i]>caps[i].capacity+1u'),
+    'load-sai-stock': ('{MAPMAKER_TAG_SAI,MAPMAKER_EDITOR_SAI_CAP,0,0},', '{MAPMAKER_TAG_SAI,50u,0,0},'),
     'level-slots': ('#define MAPMAKER_LEVEL_SAI_SLOTS 1024u', '#define MAPMAKER_LEVEL_SAI_SLOTS 1100u'),
     'malformed-hides': ('        if(sz>limit_end-c-8u) break;', '        if(sz>limit_end-c-8u) { ok=1;break; }'),
+    'load-kind1-any': ('    {MAPMAKER_TAG_OP,MAPMAKER_KIND1_OPS,1,1},', '    {MAPMAKER_TAG_OP,MAPMAKER_KIND1_OPS,0,0},'),
+    'load-double-count': ('for(i=0;i<ncaps && !hide;i++)', 'for(i=0;i<ncaps;i++)'),
+    'load-nodes-stock': ('{MAPMAKER_TAG_NODE,MAPMAKER_EDITOR_NODES_CAP,0,0},', '{MAPMAKER_TAG_NODE,130u,0,0},'),
+    'ops-always-raised': ('return mapmaker_limits.limits?MAPMAKER_EDITOR_OPS_CAP:MAPMAKER_OPS_STOCK;',
+                          'return MAPMAKER_EDITOR_OPS_CAP;'),
+    'objectives-stock': ('#define MAPMAKER_OBJECTIVES_LIMIT 40u', '#define MAPMAKER_OBJECTIVES_LIMIT 10u'),
+    'objective-no-ops-check': ('       WORD_AT(editor+0x41E0u)>=MAPMAKER_EDITOR_OPS_CAP ||\n       WORD_AT(editor+0x81A4u)+MAPMAKER_LOGIC_HEADROOM>MAPMAKER_EDITOR_NODES_CAP ||\n       WORD_AT(editor+0xDD10u)+MAPMAKER_LOGIC_HEADROOM>MAPMAKER_EDITOR_RECORDS_CAP) {\n        g_eax=editor;',
+                               '       0) {\n        g_eax=editor;'),
+    'kinds-always': ('if(mapmaker_limits.limits && guest_writable(0x0052E8E8u,4)', 'if(guest_writable(0x0052E8E8u,4)'),
+    'node-types-stock': ('    if(mapmaker_limits.limits) cap*=4u;', ''),
+    'node-old-array': ('n+=WORD_AT(editor+MAPMAKER_EDITOR_NODES+i*0xB4u)==type;', 'n+=WORD_AT(editor+0x81A8u+i*0xB4u)==type;'),
+    'room-any-caller': ('    if(i==sizeof mapmaker_logic_room_callers/sizeof mapmaker_logic_room_callers[0]) return;\n', ''),
+    'room-no-headroom': ('#define MAPMAKER_LOGIC_HEADROOM 8u', '#define MAPMAKER_LOGIC_HEADROOM 0u'),
+    'slot-no-guard': ('    if(count<MAPMAKER_LOGIC_SLOTS) { original();return; }', '    original();return;'),
+    'slot-no-dedup': ('        if((int32_t)WORD_AT(obj+0x13Cu+i*0x8Cu)==record) { original();return; } /* already has a slot */', ''),
 }
 
 
@@ -71,9 +86,13 @@ def test_mapmaker_editor(tmp_path, mutation):
 # name: (old offset, stride, old count, new offset, new count)
 LAYOUT = {
     'sai': (0x288, 0xE4, 50, 0x11950, 255),
+    'ops': (0x41E4, 0x220, 30, 0x1FC70, 120),
+    'nodes': (0x81A8, 0xB4, 130, 0x2FB70, 520),
+    'recs': (0xDD14, 0x8C, 100, 0x46910, 400),
 }
 SIZE = 0x58390
-EXPECTED_SITES = {'sai': 136}   # array references incl. the folded one (tracker + report agree)
+# array references incl. folded ones; see docs/mapmaker-editor.md for the cross-checks
+EXPECTED_SITES = {'sai': 136, 'ops': 96, 'nodes': 154, 'recs': 137}
 
 
 def table():
@@ -94,6 +113,12 @@ def test_layout_fits_and_does_not_overlap():
     assert f'#define MAPMAKER_EDITOR_SIZE 0x{SIZE:X}u' in text
     assert f'#define MAPMAKER_EDITOR_SAI 0x{LAYOUT["sai"][3]:X}u' in text
     assert f'#define MAPMAKER_EDITOR_SAI_CAP {LAYOUT["sai"][4]}u' in text
+    for name, macro in (('ops', 'OPS'), ('nodes', 'NODES'), ('recs', 'RECORDS')):
+        assert f'#define MAPMAKER_EDITOR_{macro} 0x{LAYOUT[name][3]:X}u' in text
+        assert f'#define MAPMAKER_EDITOR_{macro}_CAP {LAYOUT[name][4]}u' in text
+    # the chunk writers over-read nodes by 12 and records by 4 bytes (reads only; the loaders copy 0xB4 / 0x8C)
+    assert LAYOUT['nodes'][3] + 0xB4 * LAYOUT['nodes'][4] + 12 <= SIZE
+    assert LAYOUT['recs'][3] + 0x8C * LAYOUT['recs'][4] + 4 <= SIZE
 
 
 def test_allocation_matches_layout():
@@ -146,3 +171,18 @@ def test_sai_sizes_and_stack_frames():
     # sub_00323220: slots at frame+4 must hold every editor SAI
     assert (int(by_id['ed-sai-frame']['value'], 16) - 4) // 4 >= 255
     assert by_id['ed-sai-frame']['value'] == by_id['ed-sai-frame-end']['value']
+
+
+def test_logic_sizes_and_frames():
+    by_id = {e['id']: e for e in table()}
+    for name, dwords in (('ops', 120 * 0x220 // 4), ('nodes', 520 * 0xB4 // 4), ('recs', 400 * 0x8C // 4)):
+        sizes = [e for e in table() if e['reason'].startswith(f'{name} clear size')]
+        assert len(sizes) == 1 and int(sizes[0]['value'], 16) == dwords
+    slots = int(by_id['ed-match-frame']['value'], 16) // 4
+    assert slots >= LAYOUT['ops'][4]                       # one slot per op at most
+    assert all(by_id[f'ed-match-frame-{a}']['value'] == by_id['ed-match-frame']['value']
+               for a in ('002fbe5c', '002fbe68'))
+    assert int(by_id['ed-objective-limit']['value'], 16) == 40
+    assert '#define MAPMAKER_OBJECTIVES_LIMIT 40u' in EDITOR.read_text(encoding='utf-8')
+    folded = [e for e in table() if e.get('folded') and e['array'] == 'ops']
+    assert len(folded) == 1 and folded[0]['address'] == '0x00326024'
