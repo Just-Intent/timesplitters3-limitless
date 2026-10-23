@@ -112,8 +112,8 @@ static int mapmaker_container_raised(void)
  * 1/32736; its only two readers are there). Raised with the editor limit. */
 void mapmaker_container_editor_apply(void)
 {
-    if(mapmaker_container_raised() && guest_writable(0x0049F7ACu,4) &&
-       WORD_AT(0x0049F7ACu)==0x38002008u)
+    /* called every editor frame: 0x0049F7AC is a fixed .rdata/.data float */
+    if(mapmaker_container_raised() && WORD_AT(0x0049F7ACu)==0x38002008u)
         FLOAT_AT(0x0049F7ACu)=(float)(1.0/(double)MAPMAKER_CONTAINER_L);
 }
 

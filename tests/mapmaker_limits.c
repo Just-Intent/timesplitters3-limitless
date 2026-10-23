@@ -103,7 +103,7 @@ int main(void)
     WORD_AT(0x007B6664u)=7;WORD_AT(0x007B666Cu)=9;
     { uint32_t s_=g_esp; pc_display_mapmaker_pools(fake_pools); CHECK(g_esp==s_+4u); g_esp=s_; }
     CHECK(originals==0 && allocs==5);
-    CHECK(alloc_size[0]==4800u*32u && alloc_size[1]==(8800u+3200u+256u)*20u && alloc_size[2]==4800u*44u &&
+    CHECK(alloc_size[0]==4800u*32u && alloc_size[1]==(8800u+16u*241u+256u)*20u && alloc_size[2]==4800u*44u &&
           alloc_size[3]==10496u*32u && alloc_size[4]==0x280u);
     CHECK(alloc_heap[0]==1 && alloc_heap[4]==1);
     CHECK(WORD_AT(0x00715F2Cu)==0x00500000u && WORD_AT(0x00715F30u)==0x00500000u+4800u*32u);

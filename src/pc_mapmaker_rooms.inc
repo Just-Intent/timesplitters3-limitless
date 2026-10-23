@@ -38,6 +38,9 @@
  *
  * Requires the includer's WORD_AT, guest_writable, guest_call, g_esp, g_eax
  * and g_xbox_mem_offset. */
+#ifndef MAPMAKER_GUEST_RET
+#define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
+#endif
 #include <stdio.h>
 #include <string.h>
 
@@ -99,6 +102,7 @@ void pc_mapmaker_rooms_query(void (*original)(void))
     }
     mapmaker_rooms.query_depth--;
     g_eax=found;
+    MAPMAKER_GUEST_RET();                    /* sub_00087310 ends in a plain ret */
 }
 
 /* ---- MapMaker compile: count rooms and portals per piece --------------- */
@@ -144,7 +148,7 @@ void pc_mapmaker_rooms_props(void (*original)(void))
     const uint32_t first=MAPMAKER_ROOMS_MODEL_FIRST,last=MAPMAKER_ROOMS_MODEL_FIRST-1u+MAPMAKER_ROOMS_MAX;
     uint32_t count,slots,fresh,model,extra=0,n,template_slot;
     original();
-    if(!guest_writable(0x0079094Cu,4) || WORD_AT(0x0079094Cu)!=100u) return;
+    if(WORD_AT(0x0079094Cu)!=100u) return;
     for(model=first;model<first+MAPMAKER_ROOMS_STOCK;model++)
         if(!mapmaker_rooms_slot_ok(model)) return;          /* not the MapMaker table */
     for(model=first+MAPMAKER_ROOMS_STOCK;model<=last;model++)

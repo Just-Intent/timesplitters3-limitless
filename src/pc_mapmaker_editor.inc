@@ -65,6 +65,11 @@
  *
  * Requires the includer's WORD_AT, guest_writable, guest_call,
  * g_esp/g_eax and mapmaker_limits (pc_mapmaker_limits.inc). */
+#ifndef MAPMAKER_STACK_OK
+/* Hot hooks check the guest stack with this instead of guest_writable,
+ * whose VirtualQuery made a 186-piece map's AI setup take 13 minutes. */
+#define MAPMAKER_STACK_OK(n) (g_esp>=0x00010000u && g_esp<0x04000000u-(uint32_t)(n))
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -184,7 +189,7 @@ static void mapmaker_hide_run(uint32_t first,uint32_t limit_end,const MapMakerCa
 /* ---- editor map loader ------------------------------------------------ */
 void pc_mapmaker_editor_load(void (*original)(void))
 {
-    uint32_t container=guest_writable(g_esp+4u,4)?WORD_AT(g_esp+4u):0u;
+    uint32_t container=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u;
     if(!container || !guest_writable(container,8) || WORD_AT(container)!=0x00C77667u) {
         original();
         return;
@@ -211,7 +216,7 @@ void pc_mapmaker_editor_sai_add(void (*original)(void))
     uint32_t editor,count,arg,limit,room,result;
     mapmaker_limits_read();
     editor=mapmaker_editor();
-    if(!editor || !guest_writable(g_esp+4u,4)) { original();return; }
+    if(!editor || !MAPMAKER_STACK_OK(8)) { original();return; }
     limit=mapmaker_limits.limits?MAPMAKER_EDITOR_SAI_LIMIT:MAPMAKER_EDITOR_SAI_STOCK;
     arg=WORD_AT(g_esp+4u);
     count=WORD_AT(editor+0x280u);
@@ -268,7 +273,7 @@ void pc_mapmaker_editor_logic_can_add(void (*original)(void))
 void pc_mapmaker_editor_logic_full(void (*original)(void))
 {
     uint32_t editor=mapmaker_editor(),arg,objectives;
-    if(!editor || !guest_writable(g_esp+4u,4)) { original();return; }
+    if(!editor || !MAPMAKER_STACK_OK(8)) { original();return; }
     arg=WORD_AT(g_esp+4u);
     objectives=WORD_AT(editor+0x41D8u);
     if((int32_t)objectives>=(int32_t)mapmaker_objectives_limit())
@@ -301,7 +306,7 @@ void pc_mapmaker_editor_objective(void (*original)(void))
 void pc_mapmaker_editor_node_room(void (*original)(void))
 {
     uint32_t editor=mapmaker_editor(),type,count,n=0,i,cap;
-    if(!editor || !guest_writable(g_esp+4u,4)) { original();return; }
+    if(!editor || !MAPMAKER_STACK_OK(8)) { original();return; }
     mapmaker_logic_kinds_apply();
     type=WORD_AT(g_esp+4u);
     count=WORD_AT(editor+0x81A4u);
@@ -323,7 +328,7 @@ static const uint32_t mapmaker_logic_room_callers[]={
 };
 void pc_mapmaker_editor_logic_room(void (*original)(void))
 {
-    uint32_t editor,ret=guest_writable(g_esp,4)?WORD_AT(g_esp):0u;  /* before the original pops it */
+    uint32_t editor,ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;  /* before the original pops it */
     unsigned i;
     original();
     if(!g_eax || !(editor=mapmaker_editor())) return;
@@ -342,7 +347,7 @@ void pc_mapmaker_editor_logic_slot(void (*original)(void))
 {
     uint32_t obj=guest_writable(0x00765E44u,4)?WORD_AT(0x00765E44u):0u,arg,count,i;
     int32_t record;
-    if(!obj || !guest_writable(obj,0x1960) || !guest_writable(g_esp+4u,4)) { original();return; }
+    if(!obj || !guest_writable(obj,0x1960) || !MAPMAKER_STACK_OK(8)) { original();return; }
     arg=WORD_AT(g_esp+4u);
     if(!guest_writable(arg,0x10)) { original();return; }
     count=WORD_AT(obj+0x1950u);

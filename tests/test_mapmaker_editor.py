@@ -52,7 +52,7 @@ MUTATIONS = {
     'load-free-stock': ('{MAPMAKER_TAG_FREE,MAPMAKER_EDITOR_FREE_CAP,0,0},', '{MAPMAKER_TAG_FREE,170u,0,0},'),
     'replacing-hook-no-ret': ('static void mapmaker_ret(uint32_t n) { g_esp+=4u+n; }', 'static void mapmaker_ret(uint32_t n) { (void)n; }'),
     'replacing-hook-ret-8': ('static void mapmaker_ret(uint32_t n) { g_esp+=4u+n; }', 'static void mapmaker_ret(uint32_t n) { g_esp+=8u+n; }'),
-    'room-ret-after-original': ('ret=guest_writable(g_esp,4)?WORD_AT(g_esp):0u;  /* before the original pops it */', 'ret=0u;'),
+    'room-ret-after-original': ('ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;  /* before the original pops it */', 'ret=0u;'),
     'slot-no-dedup': ('        if((int32_t)WORD_AT(obj+0x13Cu+i*0x8Cu)==record) { original();return; } /* already has a slot */', ''),
 }
 

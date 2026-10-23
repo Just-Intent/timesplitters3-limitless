@@ -30,6 +30,11 @@
  * Requires the includer's WORD_AT, guest_writable, g_esp and, from
  * pc_mapmaker_limits.inc, mapmaker_limits, mapmaker_limits_read,
  * MAPMAKER_LIMIT_COVER and MAPMAKER_POOL_COVER. */
+#ifndef MAPMAKER_STACK_OK
+/* Hot hooks check the guest stack with this instead of guest_writable,
+ * whose VirtualQuery made a 186-piece map's AI setup take 13 minutes. */
+#define MAPMAKER_STACK_OK(n) (g_esp>=0x00010000u && g_esp<0x04000000u-(uint32_t)(n))
+#endif
 #ifndef MAPMAKER_GUEST_RET
 #define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
 #endif
@@ -52,7 +57,7 @@ static struct { uint32_t group_refused, pad_refused, cover_refused; } mapmaker_p
  * [counter] past the end. */
 static int mapmaker_pads_pool_full(uint32_t free_head,uint32_t counter,uint32_t capacity)
 {
-    if(!guest_writable(free_head,4) || !guest_writable(counter,4)) return 0;
+    /* free_head and counter are fixed image (.bss) addresses: always mapped. */
     return (int32_t)WORD_AT(free_head)<0 && WORD_AT(counter)>=capacity;
 }
 
@@ -83,8 +88,8 @@ void pc_mapmaker_pads_pad_node(void (*original)(void))
 void pc_mapmaker_pads_cover_topup(void (*original)(void))
 {
     uint32_t capacity,n,add,count;
-    if(!guest_writable(0x0079094Cu,4) || WORD_AT(0x0079094Cu)!=100u ||
-       !guest_writable(g_esp,12) || !guest_writable(0x007B65C0u,4)) {
+    if(WORD_AT(0x0079094Cu)!=100u ||
+       !MAPMAKER_STACK_OK(12)) {
         original();
         return;
     }

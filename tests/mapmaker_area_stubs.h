@@ -24,4 +24,11 @@ void sub_00242BA0(void) {}
 void sub_00248970(void) {}
 void sub_002FDF50(void) {}
 void sub_00333700(void) {}
+/* editor, rooms */
+void sub_0003D7B0(void) {}
+void sub_0007A270(void) {}
+void sub_00157440(void) {}
+void sub_00300670(void) {}
+void sub_0031BB60(void) {}
+void sub_003C85D4(void) {}
 #endif

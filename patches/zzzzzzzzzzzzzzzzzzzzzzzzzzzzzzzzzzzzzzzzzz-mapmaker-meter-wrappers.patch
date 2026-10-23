@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,272 @@
+@@ -844,6 +844,448 @@
      sub_002FA720_gen();
  #endif
  }
@@ -268,6 +268,182 @@
 +    else sub_002402B0_gen();
 +#else
 +    sub_002402B0_gen();
++#endif
++}
++
++extern void sub_0031BE70_gen(void);
++void sub_0031BE70(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_sai_add")) pc_mapmaker_editor_sai_add(sub_0031BE70_gen);
++    else sub_0031BE70_gen();
++#else
++    sub_0031BE70_gen();
++#endif
++}
++
++extern void sub_00301A90_gen(void);
++void sub_00301A90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_load")) pc_mapmaker_editor_load(sub_00301A90_gen);
++    else sub_00301A90_gen();
++#else
++    sub_00301A90_gen();
++#endif
++}
++
++extern void sub_00240C50_gen(void);
++void sub_00240C50(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_level_load")) pc_mapmaker_editor_level_load(sub_00240C50_gen);
++    else sub_00240C50_gen();
++#else
++    sub_00240C50_gen();
++#endif
++}
++
++extern void sub_00321E60_gen(void);
++void sub_00321E60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_logic_can_add")) pc_mapmaker_editor_logic_can_add(sub_00321E60_gen);
++    else sub_00321E60_gen();
++#else
++    sub_00321E60_gen();
++#endif
++}
++
++extern void sub_00321E80_gen(void);
++void sub_00321E80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_logic_full")) pc_mapmaker_editor_logic_full(sub_00321E80_gen);
++    else sub_00321E80_gen();
++#else
++    sub_00321E80_gen();
++#endif
++}
++
++extern void sub_00325F60_gen(void);
++void sub_00325F60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_objective")) pc_mapmaker_editor_objective(sub_00325F60_gen);
++    else sub_00325F60_gen();
++#else
++    sub_00325F60_gen();
++#endif
++}
++
++extern void sub_0031DB00_gen(void);
++void sub_0031DB00(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_node_room")) pc_mapmaker_editor_node_room(sub_0031DB00_gen);
++    else sub_0031DB00_gen();
++#else
++    sub_0031DB00_gen();
++#endif
++}
++
++extern void sub_00300670_gen(void);
++void sub_00300670(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_logic_room")) pc_mapmaker_editor_logic_room(sub_00300670_gen);
++    else sub_00300670_gen();
++#else
++    sub_00300670_gen();
++#endif
++}
++
++extern void sub_0033F480_gen(void);
++void sub_0033F480(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_logic_slot")) pc_mapmaker_editor_logic_slot(sub_0033F480_gen);
++    else sub_0033F480_gen();
++#else
++    sub_0033F480_gen();
++#endif
++}
++
++extern void sub_00304330_gen(void);
++void sub_00304330(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_free_place")) pc_mapmaker_editor_free_place(sub_00304330_gen);
++    else sub_00304330_gen();
++#else
++    sub_00304330_gen();
++#endif
++}
++
++extern void sub_002F7F30_gen(void);
++void sub_002F7F30(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_free_move")) pc_mapmaker_editor_free_move(sub_002F7F30_gen);
++    else sub_002F7F30_gen();
++#else
++    sub_002F7F30_gen();
++#endif
++}
++
++extern void sub_00087310_gen(void);
++void sub_00087310(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_query")) pc_mapmaker_rooms_query(sub_00087310_gen);
++    else sub_00087310_gen();
++#else
++    sub_00087310_gen();
++#endif
++}
++
++extern void sub_0008A780_gen(void);
++void sub_0008A780(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_compile")) pc_mapmaker_rooms_compile(sub_0008A780_gen);
++    else sub_0008A780_gen();
++#else
++    sub_0008A780_gen();
++#endif
++}
++
++extern void sub_00083F80_gen(void);
++void sub_00083F80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_piece")) pc_mapmaker_rooms_piece(sub_00083F80_gen);
++    else sub_00083F80_gen();
++#else
++    sub_00083F80_gen();
++#endif
++}
++
++extern void sub_00085030_gen(void);
++void sub_00085030(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_piece")) pc_mapmaker_rooms_piece(sub_00085030_gen);
++    else sub_00085030_gen();
++#else
++    sub_00085030_gen();
++#endif
++}
++
++extern void sub_00242780_gen(void);
++void sub_00242780(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_props")) pc_mapmaker_rooms_props(sub_00242780_gen);
++    else sub_00242780_gen();
++#else
++    sub_00242780_gen();
 +#endif
 +}
  

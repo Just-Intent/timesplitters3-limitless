@@ -58,7 +58,7 @@ static int failures;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
 
 static int originals;
-static void fake_original(void) { originals++; }
+static void fake_original(void) { originals++; g_esp+=4u; } /* pops like a real ret */
 
 /* sub_00087310 is cdecl: [esp] return, [esp+4] box, [esp+8] out, [esp+12] max. */
 #define STACK 0x00100000u
@@ -70,6 +70,7 @@ static uint32_t query(uint32_t box,uint32_t max)
     memset((char *)memory+OUT,0xEE,0x1000);
     g_eax=0xDEADu;
     pc_mapmaker_rooms_query(fake_original);
+    if(g_esp!=STACK+4u) return 0xBADu;            /* the replaced original's ret */
     return g_eax;
 }
 
@@ -119,7 +120,7 @@ int main(void)
           query_args[3]==0x00087260u && query_args[4]==MAPMAKER_ROOMS_QUERY_BUFFER);
     CHECK(WORD_AT(OUT)==1 && WORD_AT(OUT+240*4)==241 && WORD_AT(OUT+241*4)==0xEEEEEEEEu);
     for(r=1;r<=241;r++) CHECK(!(*u8(RECORDS+r*0xB4u+0xB2u)&0x10u));       /* flags cleared */
-    CHECK(WORD_AT(STACK)==0x12345678u && g_esp==STACK);
+    CHECK(WORD_AT(STACK)==0x12345678u && g_esp==STACK+4u); /* the original's ret */
     CHECK(mapmaker_rooms.query_depth==0);
     /* the in-box bit decides, max stops listing but every flag is still cleared */
     for(i=0;i<241;i++) fake_inside[i]=i&1;

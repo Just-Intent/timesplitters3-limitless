@@ -45,6 +45,11 @@
  * save_registers/restore_registers, g_esp/g_eax/g_ebx/g_edi,
  * g_xbox_mem_offset and pc_mapmaker_limits.inc (mapmaker_limits,
  * MAPMAKER_LIMIT_LINKS). */
+#ifndef MAPMAKER_STACK_OK
+/* Hot hooks check the guest stack with this instead of guest_writable,
+ * whose VirtualQuery made a 186-piece map's AI setup take 13 minutes. */
+#define MAPMAKER_STACK_OK(n) (g_esp>=0x00010000u && g_esp<0x04000000u-(uint32_t)(n))
+#endif
 #ifndef MAPMAKER_GUEST_RET
 #define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
 #endif
@@ -83,7 +88,7 @@ static unsigned mapmaker_objects_spares_used;
 
 static int mapmaker_objects_scene(uint32_t scene)
 {
-    return guest_writable(0x0079094Cu,4) && WORD_AT(0x0079094Cu)==scene;
+    return WORD_AT(0x0079094Cu)==scene;        /* fixed .bss scene dword */
 }
 
 /* ---- turrets ---------------------------------------------------------- */
@@ -96,7 +101,7 @@ static int mapmaker_objects_turret_full(void)
 }
 void pc_mapmaker_objects_turret_create(void (*original)(void))
 {
-    if(guest_writable(g_esp,4) && WORD_AT(g_esp)==0x0006E818u && mapmaker_objects_turret_full()) {
+    if(MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==0x0006E818u && mapmaker_objects_turret_full()) {
         g_eax=0;      /* sub_0006D7A0 skips a 0 result; esi/edi/ebx untouched */
         MAPMAKER_GUEST_RET();
         return;
@@ -139,7 +144,7 @@ static int mapmaker_objects_listed(uint32_t base,uint32_t count,uint32_t obj)
 void pc_mapmaker_objects_register(void (*original)(void))
 {
     uint32_t obj,slot,flag,count,base,cap;
-    if(!guest_writable(g_esp,16)) { original(); return; }
+    if(!MAPMAKER_STACK_OK(16)) { original(); return; }
     obj=WORD_AT(g_esp+4);slot=WORD_AT(g_esp+8);flag=WORD_AT(g_esp+12);
     if(slot==0) { count=0x007B6258u;base=MAPMAKER_OBJECTS_LIST0;cap=MAPMAKER_OBJECTS_LIST0_CAP; }
     else if(slot==8) { count=0x007B4FA8u;base=MAPMAKER_OBJECTS_LIST8;cap=MAPMAKER_OBJECTS_LIST8_CAP; }
@@ -298,7 +303,7 @@ static int mapmaker_objects_tags_full(void)
 void pc_mapmaker_objects_tag(void (*original)(void))
 {
     uint32_t tag,obj;
-    if(!guest_writable(g_esp,12)) { original(); return; }
+    if(!MAPMAKER_STACK_OK(12)) { original(); return; }
     tag=WORD_AT(g_esp+4);obj=WORD_AT(g_esp+8);
     if((int32_t)tag>0 && tag!=0x3F3F3F3Fu && guest_writable(obj,0x234) && mapmaker_objects_tags_full()) {
         WORD_AT(obj+0x60)=tag;
