@@ -22,10 +22,13 @@ MUTATIONS = {
     'categories-always': ('    if(!mapmaker_limits.limits) return;\n    mapmaker_categories_apply();',
                           '    mapmaker_categories_apply();\n    if(!mapmaker_limits.limits) return;'),
     'categories-overwrite': (' && WORD_AT(a)==mapmaker_categories[i].stock)', ')'),
-    'turrets-raised': ('    {0x00524F2Cu,4u,8u},     /* 35 */',
-                       '    {0x00524F2Cu,4u,8u},{0x00524E6Cu,8u,16u},'),
-    'teleporters-raised': ('    {0x00524D1Cu,2u,8u},     /* 13 keycard green */',
-                           '    {0x00524D1Cu,2u,8u},{0x00524D34u,2u,8u},'),
+    # Turrets: 3 x 24 = 72 of the 80 gun/owner slots (config/guest-code-patches/objects.json).
+    'turrets-past-pool': ('    {0x00524E6Cu,8u,24u},', '    {0x00524E6Cu,8u,32u},'),
+    'turrets-stock': ('    {0x00524E9Cu,8u,24u},', '    {0x00524E9Cu,8u,8u},'),
+    # Teleporters need the sub_0009CD00 wrapper in pc_mapmaker_objects.inc.
+    'teleporters-missing': ('    {0x00524D64u,2u,8u},\n', ''),
+    'teleporters-past-wrapper': ('    {0x00524D34u,2u,8u},', '    {0x00524D34u,2u,16u},'),
+    'cover-props-past-x2': ('{0x00524EFCu,66u,132u}', '{0x00524EFCu,66u,264u}'),
     'flags-clobbered': ('WORD_AT(editor+0x25c)=refuse?(flags|0x400000u):(flags&~0x400000u);',
                         'WORD_AT(editor+0x25c)=refuse?0x400000u:0u;'),
 }

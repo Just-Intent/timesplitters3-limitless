@@ -72,6 +72,15 @@ static const struct { uint32_t address, stock, raised; } mapmaker_categories[]={
     {0x00524CECu,2u,8u},     /* 11 keycard blue */
     {0x00524D04u,2u,8u},     /* 12 keycard yellow */
     {0x00524D1Cu,2u,8u},     /* 13 keycard green */
+    {0x00524D34u,2u,8u},     /* 14-18 teleporters: sub_0009CD00 wrapper (pc_mapmaker_objects.inc) */
+    {0x00524D4Cu,2u,8u},
+    {0x00524D64u,2u,8u},
+    {0x00524D7Cu,2u,8u},
+    {0x00524D94u,2u,8u},
+    {0x00524E6Cu,8u,24u},    /* 27-29 turrets: 72 <= the 80 gun/owner slots (objects.json) */
+    {0x00524E84u,8u,24u},
+    {0x00524E9Cu,8u,24u},
+    {0x00524EFCu,66u,132u},  /* 33 cover props: no cover pads added at load (only starts, sub_0023F9D0) */
     {0x00524DACu,16u,64u},   /* 19 health */
     {0x00524DC4u,16u,64u},   /* 20 armour */
     {0x00524DDCu,12u,48u},   /* 21 power-ups */
