@@ -38,6 +38,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     else if(f==sub_0031BB60) {                        /* stock add: colour id 50 when exhausted */
         uint32_t c=WORD_AT(ED+0x280u),e=ED+0x11950u+c*0xE4u;
         WORD_AT(e+0x60u)=c<50u?c:50u;WORD_AT(ED+0x280u)=c+1u;adds++;r=0x1234u;
+        WORD_AT(ED+0x238u)|=0x40u;                     /* stock: scroll the list to the new row */
     } else if(f==sub_0003D7B0) { last_text=x[0];r=0x00700000u+x[0]; }
     else if(f==sub_003C85D4) last_sprintf_value=x[2];
     else if(f==sub_0007A270) { messages++;last_message_text=x[1];r=0x77u; }
@@ -133,8 +134,10 @@ int main(void)
     set_env("TSFP_MAPMAKER_POOLS",NULL);set_env("TSFP_MAPMAKER_LIMITS",NULL);
     WORD_AT(g_esp+4u)=0x4242u;
     WORD_AT(ED+0x280u)=49;
+    WORD_AT(ED+0x238u)=0x1001u;
     HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(adds==1 && WORD_AT(ED+0x280u)==50 && g_eax==0x1234u && original_calls==0);
+    CHECK(WORD_AT(ED+0x238u)==0x1041u);                      /* limits off: stock jump kept */
     HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(adds==1 && WORD_AT(ED+0x280u)==50 && messages==1 && last_sprintf_value==50u &&
           last_message_text==ED && g_eax==0x77u);
@@ -146,8 +149,15 @@ int main(void)
     /* ---- opted in: up to 255 ---- */
     set_env("TSFP_MAPMAKER_LIMITS","1");
     WORD_AT(ED+0x280u)=50;
-    for(i=0;i<205;i++) HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
-    CHECK(WORD_AT(ED+0x280u)==255 && adds==206);
+    WORD_AT(ED+0x238u)=0x1001u;
+    HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
+    CHECK(WORD_AT(ED+0x280u)==51 && WORD_AT(ED+0x238u)==0x1001u); /* no jump; other flags kept */
+    WORD_AT(ED+0x238u)=0x40u;has_room=0;                        /* refused add: flag untouched */
+    HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
+    CHECK(WORD_AT(ED+0x280u)==51 && WORD_AT(ED+0x238u)==0x40u);
+    has_room=1;WORD_AT(ED+0x238u)=0;
+    for(i=0;i<204;i++) HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
+    CHECK(WORD_AT(ED+0x280u)==255 && adds==206 && !(WORD_AT(ED+0x238u)&0x40u));
     /* colours: entries past 50 get index mod 50 instead of the stock 50 */
     CHECK(WORD_AT(ED+0x11950u+50u*0xE4u+0x60u)==0u && WORD_AT(ED+0x11950u+123u*0xE4u+0x60u)==123u%50u);
     CHECK(WORD_AT(ED+0x11950u+254u*0xE4u+0x60u)==254u%50u);

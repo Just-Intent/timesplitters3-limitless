@@ -131,6 +131,22 @@ override may set a displacement the encoding does not have).
   Simultaneous AI are not raised (32 actors, 30 AI slots, ~20 live in scene
   100); see "Spawning" below.
 
+### Story AI list after "New Story AI"
+
+CONFIRMED: the list is the menu built by `sub_0031D580` (row 0 "New Story
+AI", callback `sub_0031BE70`; one row per story AI with its points). After an
+add, `sub_0031BB60` sets editor+0x238 bit 0x40 (`0x0031BD26`) and flags the
+menu for rebuild (`sub_000746D0`: menu+0x44 |= 0x20). The list's update
+callback `sub_0031C9E0` tests the bit (`0x0031C9E5`), calls
+`sub_000736F0(menu, 1.0)` (scroll target menu+0x88 = the bottom) and clears
+it. Nothing else reads or sets that bit, and neither function changes the
+menu's selected row: the cursor stays on "New Story AI", the view jumps to
+the bottom. With `TSFP_MAPMAKER_LIMITS=1`, `pc_mapmaker_editor_sai_add`
+clears the bit after a successful add, so the scroll position (and the
+selection) stay where they were and several AI can be created in a row.
+Limits off: stock jump. The new row is appended at the bottom and is only
+visible once the player scrolls there.
+
 ## Logic (stage 2)
 
 - 387 operand rewrites (ops 96 incl. the folded `0x00326024`
