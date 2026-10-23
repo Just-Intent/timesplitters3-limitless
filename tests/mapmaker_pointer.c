@@ -86,13 +86,15 @@ int main(void)
     game_frame();move(121.f,60.f);game_frame();
     CHECK(checksum()==before && owner_last==0);
     WORD_AT(0x0079094Cu)=102;
-    /* A menu with rows (category list) or an open child (pause) does not. */
-    WORD_AT(MENU+0x178)=0x00301000u;before=checksum();
+    /* Editor menus with rows (mode dialog, category list) or an open child
+     * (pause) select under the pointer: it follows the mouse there, but they
+     * never own the left button as held A. */
+    WORD_AT(MENU+0x178)=0x00301000u;
     game_frame();move(130.f,70.f);game_frame();
-    CHECK(checksum()==before && owner_last==0);
-    WORD_AT(MENU+0x178)=0;WORD_AT(MENU+0x170)=0x006FEE24u;before=checksum();
-    game_frame();move(131.f,70.f);game_frame();
-    CHECK(checksum()==before && owner_last==0);
+    CHECK(owner_last==0 && NEAR(FLOAT_AT(B+0x20),130.f) && NEAR(FLOAT_AT(B+0x24),70.f));
+    WORD_AT(MENU+0x178)=0;WORD_AT(MENU+0x170)=0x006FEE24u;
+    move(131.f,70.f);game_frame();
+    CHECK(owner_last==0 && NEAR(FLOAT_AT(B+0x20),131.f));
     WORD_AT(MENU+0x170)=0;before=checksum();
 
     /* Editor screen: the first sample only records; a still mouse writes nothing. */

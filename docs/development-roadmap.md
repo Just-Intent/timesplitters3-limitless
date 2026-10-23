@@ -200,6 +200,11 @@ Tracked separately; do not merge their diagnosis.
   scene 102 now hold A for that press instead; rerun pending. Floor buttons
   are not hover-tested (no `sub_000711F0` caller found for them); they likely
   need a click-to-button mapping once the floor input and state are known.
+- **Second run (2026-10-23):** row clicks still did nothing, and the mode
+  dialog (beginner/advanced) only accepted a click when the game's own cursor
+  was over the row. Editor menus (flag `0x8000` in `+0x40`) select the row under
+  the game pointer, so the pointer now follows the mouse in every scene-102
+  menu; only the editor screen owns held A.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 

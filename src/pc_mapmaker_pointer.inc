@@ -7,12 +7,15 @@
  * player index 0x007BA9E0. The game moves that pointer from the stick in
  * sub_00073870 and places it with sub_00071140(x, y).
  *
- * After the original sub_00073870, when the editor screen itself is in front
- * (no menu rows, no open child such as the pause menu or a category list) and
+ * After the original sub_00073870 for any menu dispatched in scene 102, when
  * the mouse has moved or a button was pressed, place the pointer at the mouse
  * exactly as sub_00071140 + sub_00071050 do: normalised offsets at
  * +0x18/+0x1C, position at +0x20/+0x24, clamped to +0x48..+0x54 with bit 2 of
  * +0x00 set when clamped. A still mouse leaves controller movement alone.
+ * Editor menus (mode dialog, pause menu, category lists; menu flag 0x8000)
+ * also select the row under this pointer, so it follows the mouse there too.
+ * Only the editor screen itself (no menu rows, no open child) owns the left
+ * button as held A.
  * The left button becomes the A button on the host side
  * (pc_controls_mapmaker_pointer, pc_mapmaker_pointer.h). A click on an editor
  * menu row becomes a real A press too (mapmaker_pointer_row_click).
@@ -45,12 +48,15 @@ static int mapmaker_pointer_enabled(void)
     return mapmaker_pointer.enabled;
 }
 
+static int mapmaker_pointer_scene(uint32_t menu)
+{
+    return guest_writable(0x0079094Cu,4) &&
+        (int32_t)WORD_AT(0x0079094Cu)==MAPMAKER_POINTER_SCENE && guest_writable(menu,0x23c);
+}
 /* The editor screen is the dispatched menu with no rows and no child. */
 static int mapmaker_pointer_context(uint32_t menu)
 {
-    return guest_writable(0x0079094Cu,4) &&
-        (int32_t)WORD_AT(0x0079094Cu)==MAPMAKER_POINTER_SCENE &&
-        guest_writable(menu,0x23c) && !WORD_AT(menu+0x178) && !WORD_AT(menu+0x170);
+    return mapmaker_pointer_scene(menu) && !WORD_AT(menu+0x178) && !WORD_AT(menu+0x170);
 }
 
 /* sub_00071140(x, y) followed by sub_00071050, for the current player. */
@@ -110,12 +116,11 @@ static void mapmaker_pointer_input(uint32_t menu)
     unsigned sw,sh;
     int moved,pressed;
     if(!mapmaker_pointer_enabled()) return;
-    if(!mapmaker_pointer_context(menu)) {
-        pc_controls_mapmaker_pointer(0);
+    pc_controls_mapmaker_pointer(mapmaker_pointer_context(menu));
+    if(!mapmaker_pointer_scene(menu)) {
         mapmaker_pointer.have_last=0;
         return;
     }
-    pc_controls_mapmaker_pointer(1);
     p=pc_controls_menu_hover_pointer();
     gw=(float)WORD_AT(0x004E8CF0u);gh=(float)WORD_AT(0x004E8CF4u);
     d3d8_display_output_shape((unsigned)gw,(unsigned)gh,&sw,&sh);
