@@ -1,0 +1,32 @@
+--- a/titles/futureperfect/src/recomp_manual.c
++++ b/titles/futureperfect/src/recomp_manual.c
+@@ -822,6 +822,29 @@
+ #endif
+ }
+ 
++/* MapMaker capacity stage A (src/pc_mapmaker_limits.inc): the AI navigation
++ * pool allocator, enlarged when a MapMaker map is played (TSFP_MAPMAKER_POOLS=0
++ * restores it), and the editor's placement limits (TSFP_MAPMAKER_LIMITS=1). */
++extern void sub_0009A140_gen(void);
++void sub_0009A140(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_display_mapmaker_pools(sub_0009A140_gen);
++#else
++    sub_0009A140_gen();
++#endif
++}
++
++extern void sub_002FA720_gen(void);
++void sub_002FA720(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_display_mapmaker_limits(sub_002FA720_gen);
++#else
++    sub_002FA720_gen();
++#endif
++}
++
+ extern void sub_002C3500_gen(void);
+ void sub_002C3500(void)
+ {

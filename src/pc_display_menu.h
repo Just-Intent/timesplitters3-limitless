@@ -25,6 +25,9 @@ void pc_display_menu_slider_bar(void (*original)(void));
 void pc_display_mapmaker_meter(void (*original)(void));
 /* MapMaker level memory estimate: TSFP_MAPMAKER_MEMORY_SCALE divides it. */
 void pc_display_mapmaker_memory(void (*original)(void));
+/* MapMaker capacity stage A: AI navigation pools (scene 100) and editor limits. */
+void pc_display_mapmaker_pools(void (*original)(void));
+void pc_display_mapmaker_limits(void (*original)(void));
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));
 void pc_display_menu_choice_draw(void (*original)(void));

@@ -178,7 +178,7 @@ unless noted.
 | MapMaker room tables (`0x702E20`..`0x7038F8`, `0x708138`, 200 each) | Per-room tile transforms | Hard, local | 4 functions | Only with the room limit |
 | 45-entry model/pad tables (`sub_00085920`) | Unique tile models per map (`0x785000` maybe 32) | Per catalogue | None needed | n/a |
 | Global 300 (`0x002FAEF9`) | AI nav pad groups; N x N distance matrix on the heap (`sub_00275F70`) | Designer (N^2 load cost) | Editor compare | 500-600 after timing load |
-| Sub-entries 50 (`0x002FAF2E`) | Attached items/objects, heap by count (`sub_00240590`) | Designer | Editor compare | ~100 |
+| Sub-entries 50 (`0x002FAF2E`) | Attached items/objects, heap by count (`sub_00240590`); but `sub_0023FD10` writes objects of kinds 10..14 into two 10-slot stack arrays without a bound | Designer, with an unchecked stack array | Bound or relocate those arrays first | Keep 50 |
 | Story AI 50 (`editor+0x280`, `0x0031BE8B`) | Editor array 50x0xE4 (full) and an unchecked 50-slot stack array in `sub_00240590` | Hard | Relocate editor array, reimplement `sub_00240590` | Keep 50 |
 | Logic operations 30 (`+0x41E0`), objectives 10 (`+0x41D8`) | Editor arrays sized exactly 30 (and nodes 130, records 100); heap at play time | Hard in editor only | Relocate editor arrays (~40-50 sites each) | Keep until relocated |
 | Map container 0x7FE0 | Save/load, undo, play-time walkers, System Link transfer (fixed 0x8000) | Hard format | ~33 functions, mostly constant swaps; 16-bit size fields cap at 64 KB | 64 KB (size-gated) |
@@ -192,6 +192,24 @@ as `tools/testing_profile.py`) and the body ends with a zlib CRC-32 at
 Tooling: the generator has no address-keyed constant override; raising a
 compare or pool-size immediate needs either that feature or a wrapper that
 reimplements the function (practical for `sub_0009A140` and `sub_002FA720`).
+
+**Stage A (implemented, 2026-10-23, UNVERIFIED in play).** Wrappers in
+`patches/*-mapmaker-meter-stagea.patch`, policy `src/pc_mapmaker_limits.inc`:
+
+- `sub_0009A140` in scene 100 (on by default, `TSFP_MAPMAKER_POOLS=0` restores
+  it): pads 4800x32 B, links 8800x20 B, AI data 4800x44 B, cover 1280x32 B,
+  runtime 0x280 B; same heap (1), order, zeroing and counters. About 290 KB
+  more Level heap.
+- `sub_002FA720` (opt-in `TSFP_MAPMAKER_LIMITS=1`, only with the pools on):
+  after the original, the decision bit (`editor+0x25C` 0x400000), meter
+  (`+0x270`) and held preview (`+0x274`) are recomputed with pads 4800, cover
+  1280, links 8800 and pad groups 600. Pieces 200, sub-entries 50 and the
+  memory estimate (scaled separately) are unchanged.
+- Open questions for play: stability with cover pads above 1024 (cover
+  handles 0x1F40 + index already overlap the runtime pad handles
+  0x209E..0x20B1 at index 350..369 in stock; 1280 is the pool size the game
+  itself allocates in scene 100, so no new handle range is used); load time
+  with 600 pad groups (N^2 matrix). Probe flag 64 logs the counts.
 
 ## 2. Host memory is not the obvious constraint
 

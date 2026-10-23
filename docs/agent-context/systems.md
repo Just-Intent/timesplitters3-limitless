@@ -161,6 +161,16 @@ policy `src/pc_mapmaker_budget.inc` changes only `g_eax`. Tests:
 `tests/test_mapmaker_budget.py`. Basis and limits:
 `research/capacity-constraints.md` §1b.
 
+## MapMaker capacity stage A (pools on by default, limits opt-in)
+
+`src/pc_mapmaker_limits.inc` via `patches/*-mapmaker-meter-stagea.patch`:
+`sub_0009A140` is reimplemented in scene 100 with enlarged AI navigation
+pools (`TSFP_MAPMAKER_POOLS=0` = original); with `TSFP_MAPMAKER_LIMITS=1`
+(ignored while pools are off) `sub_002FA720`'s decision, meter and preview
+are recomputed with pads 4800, cover 1280, links 8800, groups 600. Tests:
+`tests/test_mapmaker_limits.py`. Probe flag 64. Basis:
+`research/capacity-constraints.md` §1c.
+
 ## MapMaker editor mouse controls
 
 On by default since 2026-10-23 (milestone confirmed in game);

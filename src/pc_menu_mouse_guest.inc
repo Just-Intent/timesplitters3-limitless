@@ -43,6 +43,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_probe.inc"
 #include "pc_mapmaker_pointer.inc"
 #include "pc_mapmaker_budget.inc"
+#include "pc_mapmaker_limits.inc"
 #include "pc_menu_sliders.inc"
 static void menu_team_arrow(unsigned direction);
 #include "pc_menu_choices.inc"
@@ -72,6 +73,7 @@ void pc_display_menu_mouse_mode(void)
 {
     int enabled=menu_mouse_context();
     mapmaker_probe_heap(); /* read-only; inert unless TSFP_MAPMAKER_PROBE has flag 32 */
+    mapmaker_probe_pools(); /* read-only; flag 64 */
     pc_controls_menu_mode(enabled);
     if(!enabled)pc_controls_text_mode(0);
     if(!enabled) {
@@ -552,6 +554,8 @@ void pc_display_menu_sensitivity_draw(void (*original)(void)) { original(); }
 void pc_display_menu_slider_bar(void (*original)(void)) { original(); }
 void pc_display_mapmaker_meter(void (*original)(void)) { original(); }
 void pc_display_mapmaker_memory(void (*original)(void)) { original(); }
+void pc_display_mapmaker_pools(void (*original)(void)) { original(); }
+void pc_display_mapmaker_limits(void (*original)(void)) { original(); }
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
 static int menu_mouse_footer_text(void) { return 0; }

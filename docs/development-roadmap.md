@@ -306,6 +306,13 @@ format change (cost0 x2, cost1 to 1280, cost2 x2, global 600, sub-entries
 100); (B) size-gated 64 KB container; (C) relocate Story AI and logic
 editor arrays; (D) only if needed, the engine-wide 200-room limit.
 
+Stage A implemented (unverified in play): enlarged AI pools when a MapMaker
+map is played (on by default, `TSFP_MAPMAKER_POOLS=0` = original) and raised
+editor limits behind `TSFP_MAPMAKER_LIMITS=1`: pads 4800, cover 1280, links
+8800, pad groups 600. Sub-entries stay 50 (unbounded 10-slot stack arrays in
+`sub_0023FD10`). Probe flag 64 logs the pool counts in play. Next: build a
+map past 1024 cover / 300 groups, play it with flags 113 and save/reload.
+
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 
 - Moving the editor cursor with W/A/S/D works, but is slow and awkward.

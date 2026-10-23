@@ -162,3 +162,14 @@ sorts after it and is skipped with it in the historical-upgrade fixture in
 `tests/test_patch_updates.py`. A new wrapper changes the generation fingerprint,
 so the first build regenerates guest C. Behavior is unchanged unless
 `TSFP_MAPMAKER_PROBE` is set; see `docs/mapmaker-meter-probe.md`.
+
+## MapMaker capacity wrappers
+
+`*-mapmaker-meter-raise.patch` wraps `sub_002FA060`/`sub_002FA0D0` (memory
+estimate, `TSFP_MAPMAKER_MEMORY_SCALE`); `*-mapmaker-meter-stagea.patch`,
+sorting after it, wraps `sub_0009A140` (AI navigation pool allocator,
+reimplemented with larger pools in scene 100 unless `TSFP_MAPMAKER_POOLS=0`)
+and `sub_002FA720` (editor limits, recomputed after the original only with
+`TSFP_MAPMAKER_LIMITS=1`). Both are skipped in the historical-upgrade fixture
+and force one guest regeneration. Policy: `src/pc_mapmaker_budget.inc`,
+`src/pc_mapmaker_limits.inc`; see `docs/agent-context/systems.md`.

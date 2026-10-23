@@ -22,6 +22,7 @@ static const char *log_path;
 static void set_probe(const char *flags)
 {
     memset(&mapmaker_probe_heap_state,0,sizeof mapmaker_probe_heap_state);
+    memset(&mapmaker_probe_pools_state,0,sizeof mapmaker_probe_pools_state);
 #ifdef _WIN32
     _putenv_s("TSFP_MAPMAKER_PROBE",flags?flags:"");
     _putenv_s("TSFP_MAPMAKER_PROBE_LOG",log_path);
@@ -304,6 +305,26 @@ int main(int argc,char **argv)
     mapmaker_probe_heap();                               /* without flag 32: nothing */
     read_log();
     CHECK(strstr(log_text,"heap scene")==NULL);
+    WORD_AT(0x0079094Cu)=0;
+
+    /* Flag 64: AI pad pool counts in scene 100, read-only. */
+    WORD_AT(0x007B6664u)=1200;WORD_AT(0x007B6660u)=2600;WORD_AT(0x007B65C0u)=1100;WORD_AT(0x007B666Cu)=310;
+    WORD_AT(0x00715F2Cu)=0x00380000u;WORD_AT(0x00715F30u)=0x0039E000u;WORD_AT(0x00715F3Cu)=0x003C0000u;
+    WORD_AT(0x00715F34u)=0x003F0000u;WORD_AT(0x00715F38u)=0x003FA000u;
+    WORD_AT(0x0079094Cu)=100;
+    set_probe("64");
+    before=checksum();
+    mapmaker_probe_pools();
+    CHECK(checksum()==before);
+    read_log();
+    CHECK(strstr(log_text,"pools pads=1200 links=2600 cover=1100 groups=310 pads@0x00380000 links@0x0039E000"
+                          " aidata@0x003C0000 cover@0x003F0000 runtime@0x003FA000\n")!=NULL);
+    WORD_AT(0x0079094Cu)=102;                            /* editor: not logged */
+    WORD_AT(0x007B6664u)=1201;
+    tick+=MAPMAKER_PROBE_HEAP_INTERVAL;
+    mapmaker_probe_pools();
+    read_log();
+    CHECK(count("pools ")==1);
     WORD_AT(0x0079094Cu)=0;
 
     /* Output is capped. */

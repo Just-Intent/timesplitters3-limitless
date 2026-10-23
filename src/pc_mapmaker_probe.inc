@@ -23,6 +23,10 @@
  *      (signed) and its minimum since the scene started, Eternal heap pointer
  *      and free, per-frame display buffer size and peak, and the two reserve
  *      flags (research/capacity-constraints.md, play-time memory)
+ *  64  while a MapMaker map is played (scene 100), the AI navigation counts
+ *      once a second when they changed: regular pads [0x007B6664], links
+ *      [0x007B6660], cover pads [0x007B65C0], pad groups [0x007B666C] and the
+ *      pool pointers (gaps give each pool's size)
  * Output: TSFP_MAPMAKER_PROBE_LOG (binary, truncated per process), else stderr.
  * Records are emitted when their content changes, at most four per second,
  * with the number of unchanged repeats; the file is capped at 4 MiB.
@@ -43,7 +47,8 @@
 #define MAPMAKER_PROBE_MENUS 8u
 #define MAPMAKER_PROBE_BUDGETS 16u
 #define MAPMAKER_PROBE_HEAP 32u
-#define MAPMAKER_PROBE_ALL 63u
+#define MAPMAKER_PROBE_POOLS 64u
+#define MAPMAKER_PROBE_ALL 127u
 #define MAPMAKER_PROBE_HEAP_INTERVAL 1000u
 #define MAPMAKER_PROBE_MENU_SLOTS 16u
 #define MAPMAKER_PROBE_MENU_ITEMS 64u
@@ -289,6 +294,28 @@ static void mapmaker_probe_heap(void)
         key[7],key[8],key[9],key[10],key[11]);
     memcpy(mapmaker_probe_heap_state.key,key,sizeof key);
     mapmaker_probe_heap_state.last=now;
+}
+
+/* Flag 64, read-only, called every frame. */
+static struct { uint32_t key[9]; unsigned long long last; } mapmaker_probe_pools_state;
+static void mapmaker_probe_pools(void)
+{
+    uint32_t key[9];
+    unsigned long long now;
+    if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_POOLS) || mapmaker_probe_scene()!=100) return;
+    key[0]=mapmaker_probe_word(0x007B6664u);key[1]=mapmaker_probe_word(0x007B6660u);
+    key[2]=mapmaker_probe_word(0x007B65C0u);key[3]=mapmaker_probe_word(0x007B666Cu);
+    key[4]=mapmaker_probe_word(0x00715F2Cu);key[5]=mapmaker_probe_word(0x00715F30u);
+    key[6]=mapmaker_probe_word(0x00715F3Cu);key[7]=mapmaker_probe_word(0x00715F34u);
+    key[8]=mapmaker_probe_word(0x00715F38u);
+    now=GetTickCount64();
+    if(!memcmp(key,mapmaker_probe_pools_state.key,sizeof key)) return;
+    if(mapmaker_probe_pools_state.last && now-mapmaker_probe_pools_state.last<MAPMAKER_PROBE_HEAP_INTERVAL) return;
+    mapmaker_probe_write("[mapmaker-probe] t=%llu pools pads=%u links=%u cover=%u groups=%u"
+        " pads@0x%08X links@0x%08X aidata@0x%08X cover@0x%08X runtime@0x%08X\n",
+        now,key[0],key[1],key[2],key[3],key[4],key[5],key[6],key[7],key[8]);
+    memcpy(mapmaker_probe_pools_state.key,key,sizeof key);
+    mapmaker_probe_pools_state.last=now;
 }
 
 void pc_display_mapmaker_meter(void (*original)(void))
