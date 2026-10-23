@@ -172,21 +172,11 @@ int main(void)
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     WORD_AT(ED+0x278)=90u*10000u+1000u;
-    /* Items past the stock 50 are charged 2 cover pads each: tile cover 909. */
-    WORD_AT(ED+0x306c)=50u<<16;                                        /* 50 items: no charge */
+    /* Items do not cost cover pads (measured in play): 150 items with tile cover 909. */
+    WORD_AT(ED+0x306c)=150u<<16;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    WORD_AT(ED+0x2f34)=12;                                             /* + held item: 51, cover 911 */
-    pc_display_mapmaker_limits(fake_limits);
-    CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    WORD_AT(ED+0x2f34)=(uint32_t)-1;
-    WORD_AT(ED+0x306c)=107u<<16;                                       /* 909 + 2*57 = 1023 */
-    pc_display_mapmaker_limits(fake_limits);
-    CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    CHECK(NEAR(FLOAT_AT(ED+0x270),(900.f+114.f)/1024.f));             /* meter: placed 900 + charge */
-    WORD_AT(ED+0x306c)=108u<<16;                                       /* 909 + 116 = 1025: refused */
-    pc_display_mapmaker_limits(fake_limits);
-    CHECK(WORD_AT(ED+0x25c)&0x400000u);
+    CHECK(NEAR(FLOAT_AT(ED+0x270),900.f/1024.f));                     /* meter: cover, not items */
     WORD_AT(ED+0x306c)=0;
     /* The item limit itself, with cost-free tiles: 200 allowed, 201 refused. */
     WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,10);
@@ -216,7 +206,8 @@ int main(void)
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(0x00524CD4u)==99);
     CHECK(WORD_AT(0x00524CECu)==8 && WORD_AT(0x00524D04u)==8 && WORD_AT(0x00524D1Cu)==8);
-    CHECK(WORD_AT(0x00524E3Cu)==40 && WORD_AT(0x00524E54u)==40 && WORD_AT(0x00524CA4u)==128);
+    CHECK(WORD_AT(0x00524E3Cu)==80 && WORD_AT(0x00524E54u)==80 && WORD_AT(0x00524CA4u)==128);
+    CHECK(WORD_AT(0x00524E6Cu)==16);                                   /* turrets x2 */
     CHECK(WORD_AT(0x00524D34u)==2 && WORD_AT(0x00524D94u)==2);          /* teleporters unchanged */
     CHECK(WORD_AT(0x00524EFCu)==66);                                   /* cover props unchanged */
 

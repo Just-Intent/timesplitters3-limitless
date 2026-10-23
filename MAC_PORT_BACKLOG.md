@@ -3215,8 +3215,8 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
 - **PC behavior:** When a MapMaker map is played the AI navigation pools are
   enlarged (on by default; `TSFP_MAPMAKER_POOLS=0` = original). With
   `TSFP_MAPMAKER_LIMITS=1` the editor allows pads 4800, links 8800, pad
-  groups 600 and 200 items, with raised per-category maxima (pickups x4,
-  objects x2); cover pads and pieces unchanged. Probe flag 64 logs pool,
+  groups 600 and 200 items, with raised per-category maxima (pickups and
+  movers/props x4, turrets x2); cover pads and pieces unchanged. Probe flag 64 logs pool,
   object and tag counts. The editor item pool (2120) comes from the shared
   guest-code patch table, applied by both builds.
 - **PC source:** Branch `mapmaker-recon`; `patches/*-mapmaker-meter-stagea.patch`

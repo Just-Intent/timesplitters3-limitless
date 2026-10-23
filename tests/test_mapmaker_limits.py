@@ -19,7 +19,6 @@ MUTATIONS = {
     'cover-pool-stock': ('#define MAPMAKER_POOL_COVER 1536u', '#define MAPMAKER_POOL_COVER 1280u'),
     'no-held-pieces': ('p.pieces+h.pieces>MAPMAKER_LIMIT_PIECES', 'p.pieces>MAPMAKER_LIMIT_PIECES'),
     'sub-raised': ('#define MAPMAKER_LIMIT_SUB 200u', '#define MAPMAKER_LIMIT_SUB 400u'),
-    'item-cover-free': ('#define MAPMAKER_ITEM_COVER 2u', '#define MAPMAKER_ITEM_COVER 0u'),
     'categories-always': ('    if(!mapmaker_limits.limits) return;\n    mapmaker_categories_apply();',
                           '    mapmaker_categories_apply();\n    if(!mapmaker_limits.limits) return;'),
     'categories-overwrite': (' && WORD_AT(a)==mapmaker_categories[i].stock)', ')'),

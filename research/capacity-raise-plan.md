@@ -25,16 +25,19 @@ overrides at lift time) plus function wrappers.
 
 ## Status
 
-- Stage 1 implemented 2026-10-23, UNVERIFIED in play: items 200 (opt-in
+- Stage 1 implemented 2026-10-23: items 200 (opt-in
   `TSFP_MAPMAKER_LIMITS=1`), editor item node pool 2120 (guest-code patch),
   category maxima x4 for pickups (weapons, ammo, keycards 8 per colour,
-  health, armour, power-ups, special) and x2 for object-making categories
-  (movers/props 40, turrets 16, categories 35/36 8). Each item past 50 is
-  charged 2 cover pads (estimate from bigmap2: 60 extra cover pads for 50
-  items). Not raised: teleporters, cover props (category 33, they add cover
-  pads), free-standing objects (editor arrays of 170), flags, start points.
-  Probe flag 64 now logs engine objects in use and logic tags; next raise of
-  object-making categories waits for those numbers.
+  health, armour, power-ups, special), movers/props 80 (x4), turrets 16 and
+  categories 35/36 8 (x2). Not raised: teleporters, cover props (category 33),
+  free-standing objects (editor arrays of 170), flags, start points.
+- CONFIRMED in play (2026-10-23, Windows, compile-only build 08809be, map
+  `bigmap3`): 110 tiles, 67 items incl. 8 red keycards and 30+ movers; team
+  deathmatch with no visible problems; saved and reloaded with every item.
+  Probe: cover 990 in the editor, 1050 in play (the same +60 as bigmap2 with
+  142 tiles and 50 items, so items do not add cover pads; the per-item cover
+  charge of the first build was removed), engine objects 203/550, logic tags
+  0, minimum free 11.56 MB.
 
 ## Stages (in order)
 

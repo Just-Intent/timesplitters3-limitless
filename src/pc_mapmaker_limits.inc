@@ -30,18 +30,16 @@
  * and memory (raised separately by TSFP_MAPMAKER_MEMORY_SCALE) keep their
  * limits. The editor's item node pool is 2120 (config/guest-code-patches.json).
  *
- * Items add cover pads when the map loads (60 for 50 items on a test map), and
- * the stock 1024 limit only leaves 256 spare below the 1280 that can work in
- * play, so every item past the stock 50 is charged MAPMAKER_ITEM_COVER cover
- * pads in the decision and the meter. Validate with probe flag 64 (cover in
- * play) before lowering it.
+ * Cover pads stay at the stock 1024: the map adds about 60 more when it loads
+ * (measured: 60 on a 142-tile, 50-item map and on a 110-tile, 67-item map, so
+ * not per item), and more than 1280 cannot work in play.
  *
  * Per-category maxima (writable .data table 0x00524BE0, 37 x 24 B, max at +4,
  * read by sub_00303460 place and sub_00303E10 paste) are raised while the
  * limits are on: pickups x4 (weapons, ammo, keycards, health, armour,
- * power-ups, special pickups) and object-making categories x2 (movers, props,
- * turrets), because objects come from a 550-slot engine pool taken without a
- * bound check. Teleporters stay at 2 per colour (sub_0023FD10 stores them in
+ * power-ups, special pickups), movers and props x4 and turrets x2. Objects
+ * come from a 550-slot engine pool taken without a bound check (203 in use
+ * with 30+ movers on a 110-tile map). Teleporters stay at 2 per colour (sub_0023FD10 stores them in
  * two 10-slot stack arrays without a bound), and flags, start points and cover
  * props (category 33) are unchanged.
  *
@@ -59,8 +57,6 @@
 #define MAPMAKER_LIMIT_GROUPS 600
 #define MAPMAKER_LIMIT_PIECES 200u
 #define MAPMAKER_LIMIT_SUB 200u
-#define MAPMAKER_STOCK_SUB 50u
-#define MAPMAKER_ITEM_COVER 2u      /* cover pads charged per item past the stock 50 */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
 
 static struct { int initialized, pools, limits; } mapmaker_limits;
@@ -77,9 +73,9 @@ static const struct { uint32_t address, stock, raised; } mapmaker_categories[]={
     {0x00524DC4u,16u,64u},   /* 20 armour */
     {0x00524DDCu,12u,48u},   /* 21 power-ups */
     {0x00524ECCu,32u,128u},  /* 31 special pickups */
-    {0x00524E3Cu,20u,40u},   /* 25 mover (object) */
-    {0x00524E54u,20u,40u},   /* 26 props (objects) */
-    {0x00524EE4u,20u,40u},   /* 32 marker */
+    {0x00524E3Cu,20u,80u},   /* 25 mover (object) */
+    {0x00524E54u,20u,80u},   /* 26 props (objects) */
+    {0x00524EE4u,20u,80u},   /* 32 marker */
     {0x00524E6Cu,8u,16u},    /* 27 turrets (objects) */
     {0x00524E84u,8u,16u},    /* 28 */
     {0x00524E9Cu,8u,16u},    /* 29 */
@@ -186,7 +182,7 @@ static float mapmaker_fraction_max(const float *f,unsigned n)
 }
 void pc_display_mapmaker_limits(void (*original)(void))
 {
-    uint32_t editor,placed_head,held_head,flags,placed_mem,total_mem,extra,items,cover;
+    uint32_t editor,placed_head,held_head,flags,placed_mem,total_mem,extra;
     int32_t groups,held_id;
     MapMakerTotals p,h;
     float f[7];
@@ -207,9 +203,7 @@ void pc_display_mapmaker_limits(void (*original)(void))
     placed_mem=mapmaker_placed_memory(placed_head);
     total_mem=WORD_AT(editor+0x278);              /* written by the original */
     /* Meter (placed only), as the first part of the original. */
-    items=p.sub+extra;
-    cover=p.cost[1]+MAPMAKER_ITEM_COVER*(items>MAPMAKER_STOCK_SUB?items-MAPMAKER_STOCK_SUB:0u);
-    f[0]=(float)p.cost[0]/MAPMAKER_LIMIT_PADS;f[1]=(float)cover/MAPMAKER_LIMIT_COVER;
+    f[0]=(float)p.cost[0]/MAPMAKER_LIMIT_PADS;f[1]=(float)p.cost[1]/MAPMAKER_LIMIT_COVER;
     f[2]=(float)p.cost[2]/MAPMAKER_LIMIT_LINKS;f[3]=(float)groups/MAPMAKER_LIMIT_GROUPS;
     f[4]=(float)p.pieces/MAPMAKER_LIMIT_PIECES;f[5]=(float)(p.sub+extra)/MAPMAKER_LIMIT_SUB;
     f[6]=(float)placed_mem/MAPMAKER_LIMIT_MEMORY;
@@ -221,12 +215,10 @@ void pc_display_mapmaker_limits(void (*original)(void))
     f[5]=(float)(total_mem>placed_mem?total_mem-placed_mem:0u)/MAPMAKER_LIMIT_MEMORY;
     FLOAT_AT(editor+0x274)=mapmaker_fraction_max(f,6);
     /* Placement decision over placed + held. */
-    items=p.sub+h.sub+(held_id>9?1u:0u)+extra;
-    cover=p.cost[1]+h.cost[1]+MAPMAKER_ITEM_COVER*(items>MAPMAKER_STOCK_SUB?items-MAPMAKER_STOCK_SUB:0u);
-    refuse=p.cost[0]+h.cost[0]>MAPMAKER_LIMIT_PADS || cover>MAPMAKER_LIMIT_COVER ||
+    refuse=p.cost[0]+h.cost[0]>MAPMAKER_LIMIT_PADS || p.cost[1]+h.cost[1]>MAPMAKER_LIMIT_COVER ||
         p.cost[2]+h.cost[2]>MAPMAKER_LIMIT_LINKS || p.pieces+h.pieces>MAPMAKER_LIMIT_PIECES ||
         total_mem>MAPMAKER_LIMIT_MEMORY || groups>MAPMAKER_LIMIT_GROUPS ||
-        items>MAPMAKER_LIMIT_SUB;
+        p.sub+h.sub+(held_id>9?1u:0u)+extra>MAPMAKER_LIMIT_SUB;
     flags=WORD_AT(editor+0x25c);
     WORD_AT(editor+0x25c)=refuse?(flags|0x400000u):(flags&~0x400000u);
 }
