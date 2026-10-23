@@ -116,6 +116,27 @@ sizes HYPOTHESIS until measured:
 - The 200-piece limit matches fixed 200-entry play-time tables
   (`sub_0008A780`) and must stay.
 
+**Measured headroom (probe flag 32, 2026-10-23, Windows).** CONFIRMED for
+these runs (team deathmatch with bots; bot sets not identical):
+- Arena 47,104,000 bytes; Level heap free stays constant during a match
+  (everything is allocated at level start).
+- MapMaker match, map 5 tiles (s1): minimum free 13,717,248 bytes.
+- MapMaker match, map at the 2,048,000 estimate (112 pieces, several tile
+  types): minimum free 12,771,120 bytes.
+- Large arcade map (scene 53): 15,922,448; main menu: 16,808,352; editor:
+  13,997,808.
+- So the full map's tiles really use about 946,128 bytes while the editor
+  charges about 1.99 MB: the estimate is about 2.1x conservative (real /
+  estimate 0.475). A full map still leaves 12.8 MB free.
+- Projected at the hard 200-piece cap with the same ratio: about 12.0 MB
+  free with average tiles, about 10.7 MB if every piece were the heaviest
+  type (32,085-byte estimate). Attached-asset entries (40 KB estimate each,
+  table of 80) are not covered by these runs.
+- Conclusion: raising the editor's memory estimate so that the 200-piece cap
+  (and the container) bind instead is well within the measured memory. Each
+  raised map must still be checked in play with flag 32 (minimum free must
+  stay well above zero; negative means corruption).
+
 After it, in this tile-only map: the piece count (200) at about 200 tiles,
 then the container at roughly 280 tiles (about 111 bytes per tile). So the
 memory estimate could rise about 1.8x before the save format must change.

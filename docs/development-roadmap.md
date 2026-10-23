@@ -286,8 +286,11 @@ it, then test a raised estimate in memory up to the 200-piece cap, with the
 original save format (no format change needed below about 280 tiles).
 Static analysis: the 2 MB is a designer budget over the shared ~43 MB Level
 heap; overflow corrupts silently. Probe flag 32 logs heap state and the
-minimum free during a match; next run: a full MapMaker map versus a large
-arcade map.
+minimum free during a match. Measured: a full map leaves 12.8 MB free and
+its tiles really use 0.95 MB of the 2.0 MB estimate; the projection at the
+200-piece cap leaves 10.7-12.0 MB free. Next: an opt-in raised memory
+budget, validated in play with flag 32 and through save/reload in the
+original format.
 
 ### MM-5: MapMaker cursor is keyboard/stick only (expected; phase 2b)
 
