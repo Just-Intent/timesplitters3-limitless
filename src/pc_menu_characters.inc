@@ -99,8 +99,16 @@ static void menu_character_pointer(MenuMouseDispatch *s)
             s->actions=0;return;
         }
         if(x>=p->l && x<p->r && y>=p->t && y<p->b) {
+            /* A click previews a portrait; a click on the portrait that is
+             * already previewed confirms it, like Select (E / A). */
+            if((s->actions&2) && WORD_AT(0x0078A248u)==p->group &&
+               WORD_AT(0x0078A148u+p->group*4)==p->variant) {
+                s->actions=0;
+                menu_mouse_press(s,0x80u);
+                return;
+            }
             menu_character_select(p->group,p->variant);
-            s->actions=0;return; /* preview only; Select confirms */
+            s->actions=0;return;
         }
     }
 }
