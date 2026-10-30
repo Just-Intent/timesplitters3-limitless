@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,624 @@
+@@ -844,6 +844,657 @@
      sub_002FA720_gen();
  #endif
  }
@@ -620,6 +620,39 @@
 +    else sub_00064650_gen();
 +#else
 +    sub_00064650_gen();
++#endif
++}
++
++extern void sub_000DAC30_gen(void);
++void sub_000DAC30(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_create")) pc_mapmaker_actors_create(sub_000DAC30_gen);
++    else sub_000DAC30_gen();
++#else
++    sub_000DAC30_gen();
++#endif
++}
++
++extern void sub_001339E0_gen(void);
++void sub_001339E0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_blip")) pc_mapmaker_actors_blip(sub_001339E0_gen);
++    else sub_001339E0_gen();
++#else
++    sub_001339E0_gen();
++#endif
++}
++
++extern void sub_002B24E0_gen(void);
++void sub_002B24E0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_effects")) pc_mapmaker_actors_effects(sub_002B24E0_gen);
++    else sub_002B24E0_gen();
++#else
++    sub_002B24E0_gen();
 +#endif
 +}
  
