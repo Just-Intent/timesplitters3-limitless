@@ -104,6 +104,86 @@
       "reason": "clear of the per-character table above: 0x60 -> 0xC0 dwords (64 ids x 3)"
     },
     {
+      "id": "actor-radar-bound",
+      "kind": "operand",
+      "function": "0x00133AB0",
+      "address": "0x00133BA0",
+      "original_hex": "81fb94ad7700",
+      "operand": 1,
+      "value": "0x0077BB44",
+      "reason": "radar character loop: walks the network table 0x00777244 (0x124 per slot, read only in System Link @0x00133C69) in step and stopped at 52 slots; -> 64 slots (the loop itself is bounded by humans + AI)"
+    },
+    {
+      "id": "actor-blips-write",
+      "kind": "operand",
+      "function": "0x001339E0",
+      "address": "0x00133A2F",
+      "original_hex": "05c05d7a00",
+      "operand": 1,
+      "value": "0x00902100",
+      "reason": "radar blip buffer 0x007A5DC0 (16 B per blip, 56 before 0x007A6140) -> 0x00902100 (256); pc_mapmaker_actors_blip bounds the counter [0x007490F8]"
+    },
+    {
+      "id": "actor-blips-read",
+      "kind": "operand",
+      "function": "0x00133AB0",
+      "address": "0x00134722",
+      "original_hex": "bfc05d7a00",
+      "operand": 1,
+      "value": "0x00902100",
+      "reason": "radar blip drawing loop reads the moved buffer (the only other reference; 0x007A5E78 @0x00147283 is the end of another table)"
+    },
+    {
+      "id": "actor-patrol-1",
+      "kind": "operand",
+      "function": "0x002B2750",
+      "address": "0x002B3B38",
+      "original_hex": "8b0495380c5200",
+      "operand": 1,
+      "value": "0x00901600",
+      "reason": "AI patrol route table 0x00520C38 (index id*10 + step, initialised data, routes for ids 0..4) read from a copy at 0x00901600 with rows for 64 ids (pc_mapmaker_actors_pool fills it: rows 0..31 stock, 32..64 -1)"
+    },
+    {
+      "id": "actor-patrol-2",
+      "kind": "operand",
+      "function": "0x002B2750",
+      "address": "0x002B3B75",
+      "original_hex": "8b148d380c5200",
+      "operand": 1,
+      "value": "0x00901600",
+      "reason": "patrol route table copy (see actor-patrol-1)"
+    },
+    {
+      "id": "actor-patrol-3",
+      "kind": "operand",
+      "function": "0x002B2750",
+      "address": "0x002B3C7D",
+      "original_hex": "391c8d380c5200",
+      "operand": 0,
+      "value": "0x00901600",
+      "reason": "patrol route table copy (see actor-patrol-1): end-of-route test"
+    },
+    {
+      "id": "actor-patrol-4",
+      "kind": "operand",
+      "function": "0x002B2750",
+      "address": "0x002B3C94",
+      "original_hex": "8b0495380c5200",
+      "operand": 1,
+      "value": "0x00901600",
+      "reason": "patrol route table copy (see actor-patrol-1)"
+    },
+    {
+      "id": "actor-patrol-5",
+      "kind": "operand",
+      "function": "0x002B2750",
+      "address": "0x002B3CBB",
+      "original_hex": "8b148d380c5200",
+      "operand": 1,
+      "value": "0x00901600",
+      "reason": "patrol route table copy (see actor-patrol-1)"
+    },
+    {
       "id": "actor-perception-objects",
       "kind": "code",
       "function": "0x000CF8D0",

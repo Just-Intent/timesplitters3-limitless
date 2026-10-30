@@ -75,20 +75,40 @@ MUTATIONS = {
     'pick-type-unsigned': ('if((int32_t)MAPMAKER_ACTORS_S16(e+0x48u)!=(int32_t)t) continue;', 'if((uint32_t)(uint16_t)MAPMAKER_ACTORS_S16(e+0x48u)!=t-1u) continue;'),
     # enemies
     'enemies-33': ('if(n==MAPMAKER_ACTORS_ARRAY) break;', 'if(n==MAPMAKER_ACTORS_ARRAY+1u) break;'),
-    'enemies-not-restored': ('    WORD_AT(MAPMAKER_ACTORS_COUNT)=count+(after-i);', '    (void)after;'),
-    'enemies-team-ignored': ('|| WORD_AT(e+0x84u)==team) continue;', ') continue;'),
-    'enemies-flag-ignored': ('|| (MAPMAKER_ACTORS_B(e+0x24u)&8u) ||', '||'),
-    # scores
-    'kill-not-undone': ('    if(added && MAPMAKER_PTR_OK(a,2)) {', '    if(0) {'),
+    'enemies-one-pass': ('    g_esp-=4u;WORD_AT(g_esp)=ret;                 /* same arguments, same return address */\n    original();\n',
+                         '    g_eax=winner;(void)ret;\n'),
+    'enemies-winner-dropped': ('{ WORD_AT(MAPMAKER_ACTORS_LIST)=saved[i];break; }', '{ break; }'),
+    'enemies-not-restored': ('    for(i=0;i<count;i++) WORD_AT(MAPMAKER_ACTORS_LIST+i*4u)=saved[i];\n}',
+                             '\n}'),
+    'enemies-pass-b-overlap': ('WORD_AT(MAPMAKER_ACTORS_LIST+i*4u)=i<k?self:saved[i];', 'WORD_AT(MAPMAKER_ACTORS_LIST+i*4u)=saved[i];'),
+    'enemies-early-ignored': ("    if((arg2 && WORD_AT(0x0074C388u)!=WORD_AT(self+8u)) || (MAPMAKER_ACTORS_B(0x007DE458u)&0x40u)) { original(); return; }\n", "\n"),
+    # kill words
+    'kill-not-undone': ('        MAPMAKER_ACTORS_S16(a)=(int16_t)(uint16_t)((uint16_t)MAPMAKER_ACTORS_S16(a)-(uint16_t)points);\n', '\n'),
+    'kill-side-not-added': ('            MAPMAKER_ACTORS_S16(a)=(int16_t)(uint16_t)((uint16_t)MAPMAKER_ACTORS_S16(a)+(uint16_t)points);\n', '\n'),
     'kill-any-state': ('added=state==6u || state==7u;', 'added=1;'),
     'kill-low-ids': ('victim<MAPMAKER_ACTORS_SCORE_WORDS ||', 'victim<1u ||'),
     'kill-submode-run': ('    if(sub==0x12u || sub==0x13u) {', '    if(0) {'),
-    'score-unclamped': ('for(j=0;j<MAPMAKER_ACTORS_SCORE_WORDS;j++)', 'for(j=0;j<n;j++)'),
+    'create-object-ignored': (' && WORD_AT(a)==g_eax)', ')'),
+    'create-no-clear': ('        mapmaker_actors_zero(mapmaker_actors_side(slot,MAPMAKER_ACTORS_SCORE_WORDS),MAPMAKER_ACTORS_SCORE_WORDS*2u);', '        ;'),
+    'side-not-cleared-pool': ('    mapmaker_actors_zero(MAPMAKER_ACTORS_SIDE,MAPMAKER_ACTORS_SIDE_BYTES);\n    if(scene!=100u) {', '    if(scene!=100u) {'),
+    'side-not-cleared-clear': ('    mapmaker_actors_zero(MAPMAKER_ACTORS_SIDE,MAPMAKER_ACTORS_SIDE_BYTES);   /* as the pool', '    (void)0;   /* as the pool'),
+    'score-side-ignored': ('    if(k<MAPMAKER_ACTORS_MAX && j<MAPMAKER_ACTORS_MAX) return MAPMAKER_ACTORS_S16(mapmaker_actors_side(k,j));',
+                           '    if(0) return 0;'),
     'score-same-team': ('!=team) sum+=', '==team) sum+='),
     'score-no-network': ('    if(guest_call(sub_003533F0,0)) sum+=', '    if(0) sum+='),
-    'score-own-unclamped': ('            if(id<MAPMAKER_ACTORS_SCORE_WORDS) sum-=', '            sum-='),
-    'deaths-read': ('    if(id<MAPMAKER_ACTORS_SCORE_WORDS || id>=MAPMAKER_ACTORS_MAX) { original(); return; }\n    g_eax=0;',
-                    '    { original(); return; }\n    g_eax=0;'),
+    'score-own-skipped': ('if(flags&0x20u) sum-=mapmaker_actors_kills(e,k,k);', 'if(flags&0x20u) sum-=0;'),
+    'deaths-original': ('    if(id<MAPMAKER_ACTORS_SCORE_WORDS || id>=MAPMAKER_ACTORS_MAX) { original(); return; }\n    n=',
+                        '    if(1) { original(); return; }\n    n='),
+    'deaths-all-slots': ('    if((int32_t)n>(int32_t)MAPMAKER_ACTORS_MAX) n=MAPMAKER_ACTORS_MAX;\n    for(j=0;(int32_t)j<(int32_t)n;j++) sum+=',
+                         '    n=MAPMAKER_ACTORS_MAX;\n    for(j=0;(int32_t)j<(int32_t)n;j++) sum+='),
+    # radar, patrol
+    'blip-off-by-one': ('if(count>=MAPMAKER_ACTORS_BLIP_CAP) {', 'if(count>MAPMAKER_ACTORS_BLIP_CAP) {'),
+    'blip-unbounded': ('if(count>=MAPMAKER_ACTORS_BLIP_CAP) {', 'if(0) {'),
+    'patrol-not-filled': ('           0xFF,(MAPMAKER_ACTORS_MAX-MAPMAKER_ACTORS_STOCK+1u)*MAPMAKER_ACTORS_PATROL_ROW);',
+                          '           0x00,(MAPMAKER_ACTORS_MAX-MAPMAKER_ACTORS_STOCK+1u)*MAPMAKER_ACTORS_PATROL_ROW);'),
+    'patrol-overrun': ('(MAPMAKER_ACTORS_MAX-MAPMAKER_ACTORS_STOCK+1u)*', '(MAPMAKER_ACTORS_MAX-MAPMAKER_ACTORS_STOCK+2u)*'),
+    'patrol-short-copy': ('           MAPMAKER_ACTORS_STOCK*MAPMAKER_ACTORS_PATROL_ROW);', '           (MAPMAKER_ACTORS_STOCK-1u)*MAPMAKER_ACTORS_PATROL_ROW);'),
+    'patrol-not-refreshed': ('    mapmaker_actors_patrol_init();             /* every level load', '    (void)0;             /* every level load'),
 }
 
 
@@ -159,6 +179,23 @@ def test_table_matches_policy():
     assert int(attach['new'], 0) == base and int(attach['new_size'], 0) == n * 3 * 4
     assert int(attach['size'], 0) == 32 * 3 * 4 and base + n * 12 <= hi
     assert entries['actor-attach-clear']['new_hex'] == 'b9' + _le(n * 3)
+    # Radar: the character loop runs to n slots of the 0x124-byte network table; blips move.
+    radar = entries['actor-radar-bound']
+    assert radar['original_hex'] == '81fb' + _le(0x0077AD94) and radar['operand'] == 1
+    assert int(radar['value'], 0) == _define('MAPMAKER_ACTORS_RADAR_END') == 0x00777244 + n * 0x124
+    blips = _define('MAPMAKER_ACTORS_BLIPS')
+    for eid, raw in (('actor-blips-write', '05'), ('actor-blips-read', 'bf')):
+        assert entries[eid]['original_hex'] == raw + _le(0x007A5DC0) and int(entries[eid]['value'], 0) == blips
+    assert blips + 16 * _define('MAPMAKER_ACTORS_BLIP_CAP') <= hi
+    # Patrol routes: every reference of 0x00520C38 reads the 65-row copy.
+    patrol = _define('MAPMAKER_ACTORS_PATROL')
+    sites = [e for e in table['patches'] if e['id'].startswith('actor-patrol-')]
+    assert len(sites) == 5 and all(int(e['value'], 0) == patrol and e['function'] == '0x002B2750'
+                                   and _le(0x00520C38) in e['original_hex'] for e in sites)
+    assert _define('MAPMAKER_ACTORS_PATROL_STOCK') == 0x00520C38 and _define('MAPMAKER_ACTORS_PATROL_ROW') == 40
+    side = _define('MAPMAKER_ACTORS_SIDE')
+    assert base + n * 12 <= side and side + n * 32 * 2 <= patrol
+    assert patrol + (n + 1) * 40 <= blips
     # Perception: characters 0..n-1 then objects; objects.json sizes the slice.
     assert entries['actor-perception-objects']['new_hex'] == 'bf' + _le(n * 16)
     assert entries['actor-perception-objects2']['new_hex'] == 'c7442410' + _le(n * 16)
