@@ -245,3 +245,7 @@ table is guarded rather than relocated.
   its value by exactly its array's delta; old value present in the bytes).
 - `check-tables.py` on the folder: "table verified".
 - Not built, not played.
+
+## Decoder classification (2026-10-30)
+
+`tests/test_mapmaker_editor_classified.py` is an independent, intraprocedural check: in each of the ~490 functions that load `[0x007844A8]` it follows the pointer through registers (copies, constant lea/add/sub; calls clobber eax/ecx/edx) and flags every access whose offset lands in an old array; pointers formed by a patched instruction stop the tracking. It re-finds 571 table sites and nothing unpatched except the five `[x*4+0x4064]` reads of the +0x4068 dword array. It does not follow stack-saved pointers or call arguments (the original tracker does).

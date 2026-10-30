@@ -219,3 +219,7 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
 - `tests/test_mapmaker_limits.py`: updated expectations (cover 9,984, pool
   10,496, link pool 12,256).
 - `logs/limits/check-tables.py` over this folder: "table verified".
+
+## Decoder classification (2026-10-30)
+
+`tests/test_mapmaker_pads_classified.py` decodes all game code with the lifter's decoder (the listing scan above misses elided long instructions) and requires every 0x209D/0x209E/0x20B1/0x20B2/0x243F/0x2440/0x1F40 constant (any sign) and every negative displacement within 0x40 of a handle base x 2..64 to be in pads.json or reviewed: 88 rewritten (all of them in the table), `0x002B0363` kept, 59 cover-base/id-threshold 0x1F40 sites, 7 unrelated 0x1F40 fields. No missed site.
