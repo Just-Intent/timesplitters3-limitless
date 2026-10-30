@@ -971,6 +971,16 @@
       "reason": "cmp ecx, 0xd5: room special id 0xD5 -> 0xFE (global room)"
     },
     {
+      "id": "rooms-000bba05",
+      "kind": "operand",
+      "function": "0x000BB850",
+      "address": "0x000BBA05",
+      "original_hex": "c7848480010000d5000000",
+      "operand": 1,
+      "value": "0xFE",
+      "reason": "mov dword ptr [esp + eax*4 + 0x180], 0xd5: room special id 0xD5 -> 0xFE (global room appended to the room-query list)"
+    },
+    {
       "id": "rooms-0008ce8d",
       "kind": "operand",
       "function": "0x0008CE30",
