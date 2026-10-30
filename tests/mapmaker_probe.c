@@ -312,6 +312,7 @@ int main(int argc,char **argv)
     WORD_AT(0x00715F2Cu)=0x00380000u;WORD_AT(0x00715F30u)=0x0039E000u;WORD_AT(0x00715F3Cu)=0x003C0000u;
     WORD_AT(0x00715F34u)=0x003F0000u;WORD_AT(0x00715F38u)=0x003FA000u;
     WORD_AT(0x007B4FACu)=312;WORD_AT(0x0072F5E4u)=550;WORD_AT(0x0075EA90u)=41;
+    WORD_AT(0x007B6258u)=90;WORD_AT(0x007B4FA8u)=12;WORD_AT(0x007B625Cu)=7;WORD_AT(0x00732D44u)=24;
     WORD_AT(0x0079094Cu)=100;
     set_probe("64");
     before=checksum();
@@ -319,7 +320,7 @@ int main(int argc,char **argv)
     CHECK(checksum()==before);
     read_log();
     CHECK(strstr(log_text,"pools pads=1200 links=2600 cover=1100 groups=310 pads@0x00380000 links@0x0039E000"
-                          " aidata@0x003C0000 cover@0x003F0000 runtime@0x003FA000 objects=312/550 tags=41\n")!=NULL);
+                          " aidata@0x003C0000 cover@0x003F0000 runtime@0x003FA000 objects=312/550 tags=41 lists=90/12/7 turrets=24\n")!=NULL);
     WORD_AT(0x0079094Cu)=102;                            /* editor: not logged */
     WORD_AT(0x007B6664u)=1201;
     tick+=MAPMAKER_PROBE_HEAP_INTERVAL;

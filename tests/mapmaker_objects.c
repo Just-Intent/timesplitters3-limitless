@@ -181,7 +181,7 @@ int main(void)
     /* ---- sub_000A5CE0 list guards ---- */
     {
         static const uint32_t slot[3]={9,8,0},count[3]={0x007B625Cu,0x007B4FA8u,0x007B6258u},
-            base[3]={0x008A0000u,0x008A0200u,0x008A0600u},cap[3]={128,200,448};
+            base[3]={0x008A0000u,0x008AC000u,0x008AD000u},cap[3]={128,1000,1000};
         unsigned s;
         const uint32_t obj=0x00530000u;
         WORD_AT(0x007DE318u)=0x55u;
