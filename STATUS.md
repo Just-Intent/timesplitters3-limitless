@@ -1,3 +1,17 @@
+## MapMaker capacity raise: combined play test (2026-10-30)
+
+Branch `mapmaker-recon`, compile-only build 97f4ad5a (source commit; exe
+SHA-256 prefix e6fa1115), run with `TSFP_MAPMAKER_LIMITS=1` on a second
+Windows 11 PC (Smart App Control blocks unsigned builds on the development
+PC). Tested by the user: MapMaker editor and play on 236-piece maps with 200
+items and 102+ Story AI, up to 64 characters in MapMaker story play, team
+deathmatch, and the first story mission including the exploding barrels
+that crashed build 06aed2de. No crashes; probe flag 64 showed 462 of 1000
+objects, 46 live turrets, 2184 cover pads, 236 of 241 rooms and a minimum of
+5.56 MB free, with no guard drops. Not tested: System Link, splitscreen,
+native Mac, other story levels. Limits and status:
+`research/capacity-raise-plan.md`.
+
 ## MapMaker probe: menu/click capture and binary log (2026-10-22)
 
 Branch `mapmaker-recon`. In the first Windows play session, the game ran with

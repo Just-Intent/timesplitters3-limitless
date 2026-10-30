@@ -42,6 +42,16 @@ overrides at lift time) plus function wrappers.
   charge of the first build was removed), engine objects 203/550, logic tags
   0, minimum free 11.56 MB.
 
+- CONFIRMED in play (2026-10-30, Windows 11 test PC without Smart App Control
+  enforcement, compile-only build 97f4ad5a, maps bigmap6 / bigmap4): MapMaker
+  editor and play with 236 pieces, 200 items, 102+ Story AI, up to 64
+  characters in MapMaker story play, team deathmatch, and the first story
+  mission's exploding barrels (the 06aed2de crash, a missed 0xD5 room id at
+  0x000BBA05, is fixed). Probe: 462 objects of 1000, 46 live turrets, cover
+  pads 2184, 236 rooms of 241, minimum free 5.56 MB, no guard drops, no
+  unresolved jumps. Frame rate fine after the tester fixed the PC's power
+  settings. Not yet tested: System Link, splitscreen, native Mac.
+
 ## Stages (in order)
 
 1. **Item and object quick wins.** Keycards, movers, props and other category
