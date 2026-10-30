@@ -198,9 +198,13 @@ void pc_mapmaker_objects_pool(void (*original)(void))
     WORD_AT(0x0072F5E8u)=guest_call(sub_0003DFA0,2,(MAPMAKER_OBJECTS_POOL*0x2E8u+15u)&~15u,1u);
     WORD_AT(0x0072F5ECu)=guest_call(sub_0003DFA0,2,0x190u,1u);
     WORD_AT(0x00715FB4u)=guest_call(sub_0003DFA0,2,MAPMAKER_OBJECTS_BUCKET_BYTES,1u);
-    mapmaker_objects_clear(0x007B54E0u,0xD6u*4u);
-    mapmaker_objects_clear(0x007B5840u,0xD6u*4u);
-    mapmaker_objects_clear(0x007B6260u,0xD6u*4u);
+    /* The per-room-id prop tables the original clears here were relocated by
+     * the rooms area (config/guest-code-patches/rooms.json: 0x007B54E0,
+     * 0x007B5840, 0x007B6260 -> 0x008C7000, 0x008C7400, 0x008C8000, cleared
+     * with 0xFF dwords); clearing the old addresses left the new ones stale. */
+    mapmaker_objects_clear(0x008C7000u,0xFFu*4u);
+    mapmaker_objects_clear(0x008C7400u,0xFFu*4u);
+    mapmaker_objects_clear(0x008C8000u,0xFFu*4u);
     guest_call(sub_000B05B0,0);guest_call(sub_000B3BE0,0);guest_call(sub_00248970,0);
     guest_call(sub_000C3540,0);guest_call(sub_001806B0,0);   /* two calls of the empty sub_000389B0 omitted */
     guest_call(sub_000AEAC0,0);
