@@ -93,6 +93,11 @@ non-display builds add `{ original(); }` stubs.
     WRAP sub_000644D0 -> pc_mapmaker_actors_kill
     WRAP sub_000640C0 -> pc_mapmaker_actors_score
     WRAP sub_00064650 -> pc_mapmaker_actors_deaths
+    WRAP sub_000DAC30 -> pc_mapmaker_actors_create
+    WRAP sub_001339E0 -> pc_mapmaker_actors_blip
+
+(The last two are new in the second round; `sub_001339E0` takes the blip
+position in `edx`, which the hook leaves untouched.)
 
 **`sub_0015DF20` and `sub_00163F10` must be wrapped wherever `actors.json`
 is applied** (`TSFP_MAPMAKER_AREA_OFF=actors` is not safe with the table):
@@ -143,26 +148,81 @@ New `guest_call` targets: `sub_0003DFA0`, `sub_001CD040`, `sub_001638F0`,
   `+0x28` equal to the own record's `+0x74`; C50/CF0 take every human) in a
   64-entry array below the guest stack and makes the same call. A selector
   < 0 returns the default at once, as the originals.
-- **enemies.** `sub_0027BA40` stores enemies (another team `[e+0x84]`, not
-  `[e+0x24]&8`, more filters) at `[esp+0x34]`, 32 dwords up to the end of its
-  0xA4 frame (CONFIRMED `0x0027BB83`). It is 313 instructions with RNG calls,
-  so it is not reimplemented: past 33 live characters the hook lowers the
-  live count for the call to the longest list prefix holding at most 32
-  team/flag candidates (a superset of its filter) and restores it. The
-  direct-call closure (16 functions) never writes the count and has no
-  indirect call (CONFIRMED). Effect: with more than 32 enemies of one AI,
-  those later in the list are not considered by this picker (counted).
-- **kill / score / deaths.** Each actor has 32 per-opponent kill words at
-  `+0xA10` (cleared as 0x10 dwords + 1 word by `sub_000DAC30` @`0x000DAEC6`);
-  `+0xA50`, `+0xA52`, `+0xA60`.. are other score fields. `sub_000644D0`
-  adds points at `killer+0xA10+victim*2` in round states 6/7 (@`0x000645CC`,
-  CONFIRMED). For victims 32..63 the hook runs the original and subtracts
-  those points again (sub-modes 0x12/0x13 take other paths and are skipped,
-  counted; they never have ids >= 32). `sub_000640C0` (kills on other teams;
-  callers include the AI picker `sub_0027BA40`) is reimplemented past 32
-  slots summing the 32 words only; `sub_00064650` (times killed, a column
-  sum) returns 0 for ids 32..63. Other `+0xA10` users are gated:
-  `sub_00063EB0` (not mode 10), `sub_00359AA0`/`sub_0035BEF0` (network).
+- **enemies.** `sub_0027BA40(entry, flag)` stores enemies (another team
+  `[e+0x84]`, not `[e+0x24]&8`, more filters incl. an RNG test for
+  `[e+0xC6C]&0x10`) at `[esp+0x34]`, 32 dwords up to the end of its 0xA4
+  frame (CONFIRMED `0x0027BB83`), then returns the object with the lowest
+  score. Each score depends only on the AI and that candidate (distance,
+  pair table, `sub_000640C0` of the candidate, `[0x007DE474]` fields), ties
+  keep the first in list order (`comiss`/`jbe` @`0x0027BCA4`,
+  `0x0027BE96`), and the early returns (`flag && [0x0074C388] != id`
+  @`0x0027BA7A`; `[0x007DE458]&0x40` @`0x0027BA98`) build no array
+  (CONFIRMED). Past 33 live characters the hook runs the original twice over
+  a list of the same length in which the other entries are the AI itself
+  (rejected at once by the team test): pass A = the longest prefix holding at
+  most 32 candidates (team/flag superset), pass B = pass A's winner first,
+  then the rest (at most 31 candidates). Pass B returns the stock argmin over
+  all candidates, and the count, hence its `(count - humans)` RNG divisor
+  @`0x0027BB5C`, is unchanged. The list is restored afterwards. The direct
+  call closure (16 functions) never writes the list or the count and has no
+  indirect call (CONFIRMED). Only difference from an unbounded stock run: the
+  pass-A winner's RNG test (flag 0x10 characters only) is rolled again in
+  pass B. Cost: two calls when more than 32 candidates exist.
+- **create / kill / score / deaths.** Each actor has 32 per-opponent kill
+  words at `+0xA10` (cleared as 0x10 dwords + 1 word by `sub_000DAC30`
+  @`0x000DAEC1`); `+0xA50`, `+0xA52`, `+0xA60`.. are other score fields.
+  Victims 32..63 now have a side table at `0x00900600`: 64 killer slots x 32
+  words, word `(k*32 + v-32)*2`.
+  - `sub_000644D0(killer, victim, points)` adds the points at
+    `killer+0xA10+victim*2` in round states 6/7 (@`0x000645CC`, CONFIRMED).
+    For victims 32..63 the hook runs the original, takes the points back out
+    of the stray field and adds them to the side table at the killer's slot
+    (`[killer+8]`). Sub-modes 0x12/0x13 (arcade, other paths) are skipped and
+    counted; they never have ids >= 32.
+  - `sub_000DAC30` (character creation, slot = 3rd argument @`0x000DADAD`)
+    clears the new actor's words; the hook clears its side row when the
+    creation succeeded (the slot's `+0` holds the returned object). The pool
+    allocation (every scene) and the pool clear reset the whole side table,
+    as the pool's own words are reset.
+  - `sub_000640C0` (kills on characters of other teams; callers include the
+    AI picker `sub_0027BA40` and `sub_000674C0`) sums, past 32 slots, the
+    words of victims 0..31 and the side table for 32..63, with the same team
+    test, network term, `[0x007DE474]` and `[0x007DE458]` 0x20/0x10 paths.
+  - `sub_00064650` (times killed: a column sum over every slot) sums the side
+    table's column for ids 32..63.
+  - Other `+0xA10` users are gated: `sub_00063EB0` (not mode 10, copies the
+    arcade scoreboard), `sub_00359AA0`/`sub_0035BEF0` (network). The kill
+    words are therefore shown nowhere in story mode except through these two
+    sums (CONFIRMED by the reference list `0x00063F61`, `0x000640E7`,
+    `0x0006413B`, `0x00064568`, `0x000645CC`, `0x00064689`, `0x000DAEC6`,
+    `0x00359C5C`, `0x0035C1E2/F7/50`).
+- **blip / radar.** `sub_00133AB0` (radar) walks the characters
+  `0..humans+AI` with the network table `0x00777244` (0x124 per slot) in step
+  and stopped at `0x0077AD94`, 52 slots (`0x00133BA0`); `[ebx]` is read only
+  in a System Link session (@`0x00133C60`/`0x00133C69`). The bound is now 64
+  slots (`0x0077BB44`). Each blip is written by `sub_001339E0` to
+  `0x007A5DC0 + n*16` with the counter `[0x007490F8]` and no bound; the buffer
+  ends at `0x007A6140` (56 blips) and also receives the radar objects of the
+  list `[0x007A20C0]` and mode 1/2/6 markers, so even stock could overflow it
+  with many objects. Its two references (`0x00133A2F` write, `0x00134722`
+  draw loop) now point at a 256-blip buffer at `0x00902100`, and the hook
+  skips a blip when 256 are already queued (counted, logged).
+  `0x007A5E78` @`0x00147283` lies in the old range but is the end of
+  another table's loop. Mode 1/2 extras compare the character counter with
+  52 (`0x00133DB2`, `0x00133E0D`); those modes keep <= 32 characters.
+- **patrol table.** `sub_002B2750` (AI behaviour, flag 0x1000000) reads
+  `0x00520C38 + (id*10 + step)*4` (5 sites, CONFIRMED). Only ids 0..4 have
+  routes: its switch on `id-1` (@`0x002B3AB6`) sets the end marker for ids
+  1..4, and the data shows 5 rows of pad ids ending in -1 followed by other
+  tables (rows 5..31 are unrelated data in stock too). The five references
+  now read a copy at `0x00901600` that the pool hook refreshes at each level
+  load: rows 0..31 byte-identical to `0x00520C38`, rows 32..64 all -1.
+  `sub_0009CC40(-1)` returns -1 (binary search, CONFIRMED), so an AI with id
+  >= 32 takes the code's own "no route pad" path: it heads for player 1's
+  current pad (`[[[0x007B0C48]+0x14]+0x7C]+0x678` @`0x002B3B4C`, and the
+  `jl` @`0x002B3CA6`). Story levels read exactly the stock rows for ids
+  0..31 (only a step past row 31's end, which stock would read from the
+  next table, now sees -1).
 
 ## Inventory audit (311 functions)
 
@@ -184,8 +244,9 @@ arrays and narrow id fields. Findings and how each is handled:
 | Level-start AI count | `sub_0025F830` | placed hook |
 | Network 16-slot loops, `0x00777244` net table, byte slots | `sub_003559A0`, `sub_003576B0`, `sub_00357320`, `sub_003580D0`, `sub_00359910`, `sub_0035BEF0`, `sub_00068830` team setup | gated (System Link never wide) |
 | Player structs `[0x007B0C48] + id*0x1584` (16) | indexed by ids < humans (`sub_00259930` and others, CONFIRMED); `sub_002F1C80` @`0x002F1F35` behind `[obj+0x150] != 0` (INFERRED human controller) | none |
-| Radar blips `sub_00133AB0` | loop stops at 52 characters (`cmp ebx,0x0077AD94` @`0x00133BA0`), blip buffer `0x007A5DC0` | bounded, not corrupting: **characters past the 52nd get no radar blip** |
-| Patrol table `0x00520C38` (`id*10 + step`, initialised .data) | `sub_002B2750` @`0x002B3B38`, `0x002B3C7D`, `0x002B3C94`, `0x002B3CBB` | read-only; ids >= 32 read rows past the stock 32 (inside the image). The pad id read goes through `sub_0009CC40`, whose failure path exists (@`0x002B3CA6`). Open risk: an AI with id >= 32 using this scripted-patrol behaviour (flag 0x1000000) may walk to an arbitrary pad |
+| Radar `sub_00133AB0` / blips `sub_001339E0` | loop stopped at 52 characters (`0x00133BA0`); blip buffer `0x007A5DC0` (56) with an unbounded counter | 64 characters; 256-blip buffer at `0x00902100`, bounded by the blip hook |
+| Patrol table `0x00520C38` (`id*10 + step`, initialised .data, routes for ids 0..4) | `sub_002B2750` @`0x002B3B38`, `0x002B3B75`, `0x002B3C7D`, `0x002B3C94`, `0x002B3CBB` | read from a copy: rows 0..31 stock, ids 32..63 "no route" (the code's fallback: player 1's pad) |
+| Per-opponent kill words actor `+0xA10` (32) | `sub_000644D0`, `sub_000640C0`, `sub_00064650`, `sub_000DAC30` | side table for victims 32..63 |
 | Other constants | `sub_00228D90` wave cap 12, `sub_0025F0C0` 32 checkpoints, `sub_001E6F00` slots 0/1, `sub_00245CE0` pickup types | not character limits |
 
 No character id is stored in a field narrower than a byte; the network
@@ -208,8 +269,10 @@ the 0xEA0 actor entry, which grows with the pool.
 
 - Fixed (this area's sub-range): `0x00900000` gate, `0x009000FC..0x009001FF`
   live list (incl. the `list[-1]` word), `0x00900200..0x009002FF` AI table,
-  `0x00900300..0x009005FF` table 0x00739AA0. 0x600 B of the 128 KB; the old
-  .bss tables are left unused.
+  `0x00900300..0x009005FF` table 0x00739AA0, `0x00900600..0x009015FF` kill
+  side table (4 KB), `0x00901600..0x00902027` patrol copy (65 rows x 40 B),
+  `0x00902100..0x009030FF` radar blips (256 x 16 B). About 12.3 KB of the
+  128 KB; the old .bss tables are left unused.
 - Level heap: actor pool +119,808 B (scene 100 only); pair table +18,240 B
   (story-mode levels, every scene); perception +0x200 B per player (every
   scene). Guest stack: 0x100 B transient in the pick hooks.
@@ -232,16 +295,25 @@ the 0xEA0 actor entry, which grows with the pool.
 
 ## Open risks
 
-- Not run. The audit covers the 311 functions that touch the character
-  structures directly; per-character arrays reached only through other
-  pointers (sound voices, animation caches) were looked for by size (global
-  tables of 29-34 entries indexed by a register: only 0x00739AA0 is
-  per-character) but not proven absent.
-- Patrol table `0x00520C38` for ids >= 32 (above).
-- Radar: 52 blips.
-- Kill credit for victims >= 32 is not stored per opponent (team totals that
-  read those words see 0 for them).
-- `sub_0027BA40` ignores enemies past the 32nd candidate of the list.
+- Played once (build 06aed2de, first round): MapMaker story with many AI and
+  team deathmatch ran well; the kill-word guard fired for victims 53/55/57,
+  which the side table now records. The second-round changes are not run.
+- Per-character arrays reached only through other pointers (sound voices,
+  animation caches): two searches found none. (1) Global tables of 29-34
+  entries indexed by a register: only 0x00739AA0 is per-character (moved).
+  (2) Every `mov r,[x+8]` followed by a scaled use of `r` against a global
+  (34 patterns): all are other structures' fields or stack arguments, none a
+  character id. Sound and animation state lives in the 0xEA0 actor entry and
+  the character's engine object (objects area pool), both sized per
+  character. Not proven absent for code reached only through function
+  pointers.
+- AI ids >= 32 have no scripted patrol route (none exists for ids >= 5 in
+  stock either); with behaviour flag 0x1000000 they follow player 1.
+- The enemy picker re-rolls the RNG test of pass A's winner (flag-0x10
+  characters only) in pass B.
+- Without the hooks (non-display builds, `TSFP_MAPMAKER_AREA_OFF=actors`)
+  the patrol copy is all zero and the blip buffer unbounded, in addition to
+  the first-round caveats (slot cap 63, gate 0).
 - More AI means more engine objects and Level heap (the objects area's
   1000-object pool); not measured.
 - `objects.json` and `tests/test_mapmaker_objects.py` were changed (perception
@@ -249,9 +321,12 @@ the 0xEA0 actor entry, which grows with the pool.
 
 ## Validation
 
-- `tests/test_mapmaker_actors.py`: the fixture plus 57 mutations, each
+- `tests/test_mapmaker_actors.py`: the fixture plus 71 mutations, each
   detected; checks that `actors.json`, `actors-list.json` and `objects.json`
-  match the C constants and that every moved reference keeps its offset.
+  match the C constants and that every moved reference keeps its offset. The
+  enemy picker is checked against a model of `sub_0027BA40` (32-entry array
+  overflow flagged, argmin, first on ties) over 24 random lists of 42-64
+  characters: the hook's choice equals the unbounded argmin every time.
 - `logs/limits/check-tables.py` on the whole folder prints "table verified".
 - No build and no game run.
 
@@ -262,6 +337,8 @@ area's raised AI limit), watching stderr for `[mapmaker]` lines:
   live list is at `0x00900100`;
 - four players: 60 AI;
 - AI fighting, targeting, kills and scores with 40+ AI on one team and on two;
+  no `kill of character >= 32` line any more (only in arcade sub-modes);
+- the radar with 60 AI near the player: blips for all of them;
 - the player's auto-aim/targeting on AI with high ids (perception layout);
 - a story level, an arcade MapMaker map and System Link (stock behaviour);
 - frame time on the low-spec PC with 60 AI in view, then

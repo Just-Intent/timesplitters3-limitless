@@ -103,6 +103,33 @@ static void fake_kill(void)
     g_esp+=4u;
 }
 #define HOOK(h,f) do { uint32_t hook_esp_=g_esp; h(f); CHECK(g_esp==hook_esp_+4u); g_esp=hook_esp_; } while(0)
+#define SIDE(k,v) (MAPMAKER_ACTORS_SIDE+((k)*32u+((v)-32u))*2u)
+/* sub_0027BA40 model: candidates (another team, not +0x24&8, not +0x200)
+ * go to a 32-entry array (overflow flagged); the lowest score +0x204
+ * wins, first in list order on ties; returns the object [entry]. */
+static unsigned enemy_calls,enemy_overflow,enemy_count_ok;
+static uint32_t enemy_expect;
+static void fake_enemies(void)
+{
+    uint32_t self=WORD_AT(WORD_AT(g_esp+4)+0x7Cu),team=WORD_AT(self+0x84u),count=WORD_AT(0x0074C37Cu);
+    uint32_t i,e,n=0,best=0xFFFFFFFFu,winner=0;
+    enemy_calls++;
+    if(count!=enemy_expect) enemy_count_ok=0;
+    for(i=0;i<count;i++) {
+        e=WORD_AT(MAPMAKER_ACTORS_LIST+i*4u);
+        if((BYTE_AT(e+0x24u)&8u) || WORD_AT(e+0x84u)==team || WORD_AT(e+0x200u)) continue;
+        if(++n>32u) enemy_overflow=1;
+        if(WORD_AT(e+0x204u)<best) { best=WORD_AT(e+0x204u);winner=WORD_AT(e); }
+    }
+    g_eax=winner;g_esp+=4u;
+}
+static uint32_t create_entity,create_slot;
+static void fake_create(void)
+{
+    originals++;
+    if(create_entity) WORD_AT(ENTRY(create_slot))=create_entity;
+    g_eax=create_entity;g_esp+=4u;
+}
 static void call_setup(uint32_t a1,uint32_t a2,uint32_t a3)
 {
     g_esp=STACK;WORD_AT(STACK)=0x00123456u;WORD_AT(STACK+4)=a1;WORD_AT(STACK+8)=a2;WORD_AT(STACK+12)=a3;
@@ -352,72 +379,155 @@ int main(void)
     call_setup(0x00780000u,0,0);HOOK(pc_mapmaker_actors_pick_team_ai,fake_plain);
     CHECK(picks==0 && originals==0 && g_eax==0);
 
-    /* ---- AI enemy list ---- */
+    /* ---- AI enemy choice: the stock argmin over every candidate ---- */
+    for(i=0;i<64u;i++) WORD_AT(ENTRY(i))=0x00C00000u+i*16u;    /* objects */
+    {
+        static const uint32_t seeds[]={1u,7u,12345u,999u,4242u,31337u};
+        unsigned s,round,two_pass=0;
+        for(s=0;s<sizeof seeds/sizeof seeds[0];s++) for(round=0;round<4u;round++) {
+            uint32_t r=seeds[s]*2654435761u+round,cnt=round==3u?64u:60u-round*9u,want=0,best=0xFFFFFFFFu,ncand=0;
+            live(cnt);
+            for(i=0;i<64u;i++) WORD_AT(ENTRY(i))=0x00C00000u+i*16u;
+            WORD_AT(0x00780000u+0x7Cu)=ENTRY(3);
+            for(i=0;i<cnt;i++) {
+                r=r*1103515245u+12345u;
+                WORD_AT(ENTRY(i)+0x84u)=(i==3u || (r>>28)==0u)?1u:2u;
+                BYTE_AT(ENTRY(i)+0x24u)=((r>>20)&15u)==0u?8u:0u;
+                WORD_AT(ENTRY(i)+0x200u)=((r>>12)&15u)==0u?1u:0u;
+                WORD_AT(ENTRY(i)+0x204u)=(r>>4)&(round==1u?3u:255u);   /* round 1: many ties */
+            }
+            if(round==2u) WORD_AT(ENTRY(55)+0x204u)=0,WORD_AT(ENTRY(55)+0x84u)=2u,BYTE_AT(ENTRY(55)+0x24u)=0,WORD_AT(ENTRY(55)+0x200u)=0;
+            for(i=0;i<cnt;i++) {
+                e=ENTRY(i);
+                if(WORD_AT(e+0x84u)==1u || (BYTE_AT(e+0x24u)&8u)) continue;
+                ncand++;                                        /* the hook's superset */
+                if(WORD_AT(e+0x200u)) continue;
+                if(WORD_AT(e+0x204u)<best) { best=WORD_AT(e+0x204u);want=WORD_AT(e); }
+            }
+            enemy_calls=0;enemy_overflow=0;enemy_count_ok=1;enemy_expect=cnt;
+            call_setup(0x00780000u,0,0);HOOK(pc_mapmaker_actors_enemies,fake_enemies);
+            CHECK(g_eax==want && !enemy_overflow && enemy_calls==(ncand>32u?2u:1u) && enemy_count_ok);
+            if(ncand>32u) two_pass++;
+            for(i=0;i<cnt;i++) CHECK(WORD_AT(LIST+i*4u)==ENTRY(i));            /* list restored */
+            CHECK(WORD_AT(COUNT)==cnt);
+        }
+        CHECK(two_pass>=12u);                                       /* most cases take two passes */
+    }
+    /* early returns: no array, one call */
     live(60u);WORD_AT(0x00780000u+0x7Cu)=ENTRY(3);
-    for(i=0;i<60u;i++) WORD_AT(ENTRY(i)+0x84u)=i<10u?1u:2u;    /* self (3) on team 1: 50 enemies */
-    BYTE_AT(ENTRY(12)+0x24u)=8u;                                /* not a candidate */
-    drops=mapmaker_actors.drops[MAPMAKER_ACTORS_DROP_ENEMIES];
-    call_setup(0x00780000u,0,0);HOOK(pc_mapmaker_actors_enemies,fake_plain);
-    CHECK(originals==1 && count_seen==43u && WORD_AT(COUNT)==60u);   /* 10..42 minus 12 = 32 */
-    CHECK(mapmaker_actors.drops[MAPMAKER_ACTORS_DROP_ENEMIES]==drops+1u);
-    for(i=0;i<60u;i++) WORD_AT(ENTRY(i)+0x84u)=i<40u?1u:2u;    /* 20 enemies: unchanged */
-    call_setup(0x00780000u,0,0);HOOK(pc_mapmaker_actors_enemies,fake_plain);
-    CHECK(originals==1 && count_seen==60u && WORD_AT(COUNT)==60u);
+    for(i=0;i<60u;i++) WORD_AT(ENTRY(i)+0x84u)=i==3u?1u:2u,WORD_AT(ENTRY(i)+0x204u)=0;
+    BYTE_AT(0x007DE458u)=0x40u;enemy_calls=0;
+    call_setup(0x00780000u,0,0);HOOK(pc_mapmaker_actors_enemies,fake_enemies);
+    CHECK(enemy_calls==1u && enemy_overflow);                  /* (the fake does not model the early return) */
+    BYTE_AT(0x007DE458u)=0;WORD_AT(0x0074C388u)=99u;enemy_calls=0;
+    call_setup(0x00780000u,1u,0);HOOK(pc_mapmaker_actors_enemies,fake_enemies);
+    CHECK(enemy_calls==1u);
+    WORD_AT(0x0074C388u)=3u;enemy_calls=0;enemy_overflow=0;
+    call_setup(0x00780000u,1u,0);HOOK(pc_mapmaker_actors_enemies,fake_enemies);
+    CHECK(enemy_calls==2u && !enemy_overflow);
     live(33u);for(i=0;i<33u;i++) WORD_AT(ENTRY(i)+0x84u)=i==3u?1u:2u;
-    call_setup(0x00780000u,0,0);HOOK(pc_mapmaker_actors_enemies,fake_plain);
-    CHECK(originals==1 && count_seen==33u);
+    enemy_calls=0;call_setup(0x00780000u,0,0);HOOK(pc_mapmaker_actors_enemies,fake_enemies);
+    CHECK(enemy_calls==1u);
 
-    /* ---- per-opponent kill words ---- */
+    /* ---- per-opponent kill words: victims 32..63 in the side table ---- */
     live(50u);
     WORD_AT(0x007DE30Cu)=6u;BYTE_AT(SUBMODE)=0;
+    memset((char *)memory+MAPMAKER_ACTORS_SIDE,0,64u*32u*2u);
     HALF_AT(ENTRY(1)+0xA10u+40u*2u)=5;                          /* = +0xA60 */
     call_setup(ENTRY(1),40u,3u);HOOK(pc_mapmaker_actors_kill,fake_kill);
-    CHECK(originals==1 && HALF_AT(ENTRY(1)+0xA60u)==5);
+    CHECK(originals==1 && HALF_AT(ENTRY(1)+0xA60u)==5 && HALF_AT(SIDE(1u,40u))==3);
+    call_setup(ENTRY(1),40u,3u);HOOK(pc_mapmaker_actors_kill,fake_kill);
+    CHECK(HALF_AT(SIDE(1u,40u))==6);
     WORD_AT(0x007DE30Cu)=7u;HALF_AT(ENTRY(1)+0xA10u+33u*2u)=-2;
     call_setup(ENTRY(1),33u,0x10004u);HOOK(pc_mapmaker_actors_kill,fake_kill);
-    CHECK(HALF_AT(ENTRY(1)+0xA52u)==-2);
+    CHECK(HALF_AT(ENTRY(1)+0xA52u)==-2 && HALF_AT(SIDE(1u,33u))==4);
+    WORD_AT(ENTRY(1)+8u)=45u;call_setup(ENTRY(1),63u,2u);HOOK(pc_mapmaker_actors_kill,fake_kill);
+    CHECK(HALF_AT(SIDE(45u,63u))==2);WORD_AT(ENTRY(1)+8u)=1u;
     call_setup(ENTRY(1),20u,3u);HOOK(pc_mapmaker_actors_kill,fake_kill);
-    CHECK(originals==1 && HALF_AT(ENTRY(1)+0xA10u+20u*2u)==3);  /* ids < 32 recorded */
+    CHECK(originals==1 && HALF_AT(ENTRY(1)+0xA10u+20u*2u)==3);  /* ids < 32: the actor's words */
     WORD_AT(0x007DE30Cu)=5u;HALF_AT(ENTRY(1)+0xA60u)=9;
     call_setup(ENTRY(1),40u,3u);HOOK(pc_mapmaker_actors_kill,fake_kill);
-    CHECK(originals==1 && HALF_AT(ENTRY(1)+0xA60u)==9);
+    CHECK(originals==1 && HALF_AT(ENTRY(1)+0xA60u)==9 && HALF_AT(SIDE(1u,40u))==6);
     WORD_AT(0x007DE30Cu)=6u;call_setup(0,40u,3u);HOOK(pc_mapmaker_actors_kill,fake_kill);
     CHECK(originals==1);
     BYTE_AT(SUBMODE)=0x13u;call_setup(ENTRY(1),40u,3u);HOOK(pc_mapmaker_actors_kill,fake_kill);
-    CHECK(originals==0 && HALF_AT(ENTRY(1)+0xA60u)==9);
+    CHECK(originals==0 && HALF_AT(ENTRY(1)+0xA60u)==9 && HALF_AT(SIDE(1u,40u))==6);
     BYTE_AT(SUBMODE)=0x12u;call_setup(ENTRY(1),20u,3u);HOOK(pc_mapmaker_actors_kill,fake_kill);
     CHECK(originals==1);
     BYTE_AT(SUBMODE)=0;
 
-    /* kills on other teams: only the 32 words */
+    /* creation clears the new actor's side row */
+    for(i=0;i<32u;i++) HALF_AT(SIDE(40u,32u+i))=(int16_t)(i+1u);
+    HALF_AT(SIDE(41u,40u))=11;
+    create_entity=0x00C00400u;create_slot=40u;
+    call_setup(0,0,40u);HOOK(pc_mapmaker_actors_create,fake_create);
+    CHECK(originals==1 && HALF_AT(SIDE(40u,32u))==0 && HALF_AT(SIDE(40u,63u))==0 && HALF_AT(SIDE(41u,40u))==11);
+    HALF_AT(SIDE(40u,50u))=4;create_entity=0;
+    call_setup(0,0,40u);HOOK(pc_mapmaker_actors_create,fake_create);
+    CHECK(HALF_AT(SIDE(40u,50u))==4);                          /* creation failed: kept */
+    create_entity=0x00C00400u;create_slot=41u;WORD_AT(ENTRY(40))=0;
+    call_setup(0,0,40u);HOOK(pc_mapmaker_actors_create,fake_create);
+    CHECK(HALF_AT(SIDE(40u,50u))==4);                          /* not this slot's object */
+    create_slot=40u;
+    call_setup(0,0,70u);HOOK(pc_mapmaker_actors_create,fake_create);
+    CHECK(originals==1 && HALF_AT(SIDE(40u,50u))==4);
+
+    /* kills on other teams */
     live(50u);WORD_AT(HUMANS)=2u;WORD_AT(USED)=48u;
+    memset((char *)memory+MAPMAKER_ACTORS_SIDE,0,64u*32u*2u);
     for(i=0;i<64u;i++) WORD_AT(ENTRY(i)+0x84u)=(i%2u)?2u:1u;
-    e=ENTRY(4);                                                 /* team 1 */
+    e=ENTRY(4);                                                 /* team 1, slot 4 */
     for(i=0;i<32u;i++) HALF_AT(e+0xA10u+i*2u)=(int16_t)(i+1u);
+    for(i=32u;i<64u;i++) HALF_AT(SIDE(4u,i))=100;
     HALF_AT(e+0xA50u)=100;HALF_AT(e+0xA52u)=1000;HALF_AT(e+0xA60u)=-7;
     network_call=0;WORD_AT(0x007DE474u)=0;BYTE_AT(0x007DE458u)=0;
     call_setup(e,0,0);HOOK(pc_mapmaker_actors_score,fake_plain);
-    CHECK(originals==0 && g_eax==272u);                         /* odd j: 2+4+..+32 */
+    CHECK(originals==0 && g_eax==272u+900u);                   /* odd j < 32: 2+..+32; odd 33..49: 9 x 100 */
     network_call=1;call_setup(e,0,0);HOOK(pc_mapmaker_actors_score,fake_plain);
-    CHECK(g_eax==372u);
+    CHECK(g_eax==1272u);
     network_call=0;BYTE_AT(0x007DE458u)=0x10u;call_setup(e,0,0);HOOK(pc_mapmaker_actors_score,fake_plain);
-    CHECK((int32_t)g_eax==272-1000);
+    CHECK((int32_t)g_eax==1172-1000);
     BYTE_AT(0x007DE458u)=0x20u;call_setup(e,0,0);HOOK(pc_mapmaker_actors_score,fake_plain);
-    CHECK(g_eax==272u-5u);                                      /* own word: id 4 */
-    WORD_AT(e+8u)=40u;call_setup(e,0,0);HOOK(pc_mapmaker_actors_score,fake_plain);
-    CHECK(g_eax==272u);                                         /* id >= 32: none */
+    CHECK(g_eax==1172u-5u);                                     /* own word: id 4 */
+    WORD_AT(e+8u)=40u;HALF_AT(SIDE(40u,40u))=7;HALF_AT(SIDE(40u,41u))=30;
+    call_setup(e,0,0);HOOK(pc_mapmaker_actors_score,fake_plain);
+    CHECK(g_eax==272u+30u-7u);                                  /* slot 40: its side row, own word */
     WORD_AT(e+8u)=4u;WORD_AT(0x007DE474u)=1u;call_setup(e,0,0);HOOK(pc_mapmaker_actors_score,fake_plain);
     CHECK((int32_t)g_eax==-7);
     WORD_AT(0x007DE474u)=0;BYTE_AT(0x007DE458u)=0;
     WORD_AT(USED)=30u;call_setup(e,0,0);HOOK(pc_mapmaker_actors_score,fake_plain);
     CHECK(originals==1);                                        /* <= 32: the original */
-    /* times killed */
+    /* times killed: the side table's column */
     WORD_AT(USED)=48u;WORD_AT(e+8u)=40u;
-    call_setup(e,0,0);HOOK(pc_mapmaker_actors_deaths,fake_plain);CHECK(originals==0 && g_eax==0);
+    memset((char *)memory+MAPMAKER_ACTORS_SIDE,0,64u*32u*2u);
+    HALF_AT(SIDE(3u,40u))=2;HALF_AT(SIDE(45u,40u))=5;HALF_AT(SIDE(55u,40u))=50;HALF_AT(SIDE(3u,41u))=9;
+    call_setup(e,0,0);HOOK(pc_mapmaker_actors_deaths,fake_plain);CHECK(originals==0 && g_eax==7u);
+    WORD_AT(USED)=38u;call_setup(e,0,0);HOOK(pc_mapmaker_actors_deaths,fake_plain);CHECK(g_eax==2u);
+    WORD_AT(USED)=48u;
     WORD_AT(e+8u)=4u;call_setup(e,0,0);HOOK(pc_mapmaker_actors_deaths,fake_plain);CHECK(originals==1);
     WORD_AT(e+8u)=40u;BYTE_AT(0x007DE458u)=0x40u;call_setup(e,0,0);HOOK(pc_mapmaker_actors_deaths,fake_plain);
     CHECK(originals==1);
     BYTE_AT(0x007DE458u)=0;
+
+    /* ---- radar blips ---- */
+    WORD_AT(0x007490F8u)=255u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_blip,fake_plain);CHECK(originals==1);
+    WORD_AT(0x007490F8u)=256u;drops=mapmaker_actors.drops[MAPMAKER_ACTORS_DROP_BLIP];
+    call_setup(0,0,0);HOOK(pc_mapmaker_actors_blip,fake_plain);
+    CHECK(originals==0 && g_eax==256u && mapmaker_actors.drops[MAPMAKER_ACTORS_DROP_BLIP]==drops+1u);
+
+    /* ---- patrol table copy (refreshed by the pool hook) ---- */
+    for(i=0;i<0x600u;i+=4u) WORD_AT(0x00520C38u+i)=0x10000u+i;
+    memset((char *)memory+MAPMAKER_ACTORS_PATROL,0,0xC00u);
+    WORD_AT(MAPMAKER_ACTORS_PATROL+65u*40u)=0x77u;
+    pool_record(1u);
+    for(i=0;i<32u*40u;i+=4u) CHECK(WORD_AT(MAPMAKER_ACTORS_PATROL+i)==0x10000u+i);
+    for(i=32u*40u;i<65u*40u;i+=4u) CHECK(WORD_AT(MAPMAKER_ACTORS_PATROL+i)==0xFFFFFFFFu);
+    CHECK(WORD_AT(MAPMAKER_ACTORS_PATROL+65u*40u)==0x77u);
+    /* the pool hook (any scene) and the pool clear reset the side table */
+    HALF_AT(SIDE(5u,40u))=3;pool_record(1u);CHECK(HALF_AT(SIDE(5u,40u))==0);
+    HALF_AT(SIDE(5u,40u))=3;WORD_AT(SCENE)=1u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_pool_clear,fake_plain);
+    CHECK(HALF_AT(SIDE(5u,40u))==0);WORD_AT(SCENE)=100u;
+
 
     if(failures) { fprintf(stderr,"%d failures\n",failures); return 1; }
     printf("mapmaker actors ok\n");
