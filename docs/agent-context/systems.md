@@ -191,9 +191,14 @@ compile the whole include chain take link stubs from
 runtime pad handles 0x4740.., bounded A* pools, group A* pool relocated to
 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
-`objects`, `editor`, `rooms` (241 pieces) and `actors` (30 AI alive in
-MapMaker play instead of 20; `TSFP_MAPMAKER_ALIVE=1..32` lowers it, the 32-actor
-engine limit and its blockers are in `docs/mapmaker-actors.md`).
+`objects`, `editor`, `rooms` (241 pieces) and `actors` (64 characters / 63 AI
+in a local MapMaker story map instead of 20 alive; live list moved to
+0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
+`actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;
+perception slice 0xC00 shared with `objects.json`; 16 hooks incl. the 32-entry
+stack-array AI pickers and per-opponent kill words; `pc_network_bots_revive`
+writes the moved AI table; `TSFP_MAPMAKER_ALIVE=1..64` lowers it; sites and
+risks in `docs/mapmaker-actors.md`).
 Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`.
 
 ## MapMaker editor mouse controls
