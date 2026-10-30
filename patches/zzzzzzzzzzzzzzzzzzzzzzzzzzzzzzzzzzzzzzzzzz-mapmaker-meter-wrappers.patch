@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,470 @@
+@@ -844,6 +844,624 @@
      sub_002FA720_gen();
  #endif
  }
@@ -466,6 +466,160 @@
 +    else sub_0015DF20_gen();
 +#else
 +    sub_0015DF20_gen();
++#endif
++}
++
++extern void sub_000D6960_gen(void);
++void sub_000D6960(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_pool")) pc_mapmaker_actors_pool(sub_000D6960_gen);
++    else sub_000D6960_gen();
++#else
++    sub_000D6960_gen();
++#endif
++}
++
++extern void sub_000D6920_gen(void);
++void sub_000D6920(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_pool_clear")) pc_mapmaker_actors_pool_clear(sub_000D6920_gen);
++    else sub_000D6920_gen();
++#else
++    sub_000D6920_gen();
++#endif
++}
++
++extern void sub_0025F830_gen(void);
++void sub_0025F830(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_placed")) pc_mapmaker_actors_placed(sub_0025F830_gen);
++    else sub_0025F830_gen();
++#else
++    sub_0025F830_gen();
++#endif
++}
++
++extern void sub_0015BCA0_gen(void);
++void sub_0015BCA0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_list_add")) pc_mapmaker_actors_list_add(sub_0015BCA0_gen);
++    else sub_0015BCA0_gen();
++#else
++    sub_0015BCA0_gen();
++#endif
++}
++
++extern void sub_0015C3D0_gen(void);
++void sub_0015C3D0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_list_readd")) pc_mapmaker_actors_list_readd(sub_0015C3D0_gen);
++    else sub_0015C3D0_gen();
++#else
++    sub_0015C3D0_gen();
++#endif
++}
++
++extern void sub_00163B40_gen(void);
++void sub_00163B40(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_pick_type")) pc_mapmaker_actors_pick_type(sub_00163B40_gen);
++    else sub_00163B40_gen();
++#else
++    sub_00163B40_gen();
++#endif
++}
++
++extern void sub_00163BD0_gen(void);
++void sub_00163BD0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_pick_team_ai")) pc_mapmaker_actors_pick_team_ai(sub_00163BD0_gen);
++    else sub_00163BD0_gen();
++#else
++    sub_00163BD0_gen();
++#endif
++}
++
++extern void sub_00163C50_gen(void);
++void sub_00163C50(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_pick_group")) pc_mapmaker_actors_pick_group(sub_00163C50_gen);
++    else sub_00163C50_gen();
++#else
++    sub_00163C50_gen();
++#endif
++}
++
++extern void sub_00163CF0_gen(void);
++void sub_00163CF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_pick_team")) pc_mapmaker_actors_pick_team(sub_00163CF0_gen);
++    else sub_00163CF0_gen();
++#else
++    sub_00163CF0_gen();
++#endif
++}
++
++extern void sub_00163D90_gen(void);
++void sub_00163D90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_pick_group_ai")) pc_mapmaker_actors_pick_group_ai(sub_00163D90_gen);
++    else sub_00163D90_gen();
++#else
++    sub_00163D90_gen();
++#endif
++}
++
++extern void sub_0027BA40_gen(void);
++void sub_0027BA40(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_enemies")) pc_mapmaker_actors_enemies(sub_0027BA40_gen);
++    else sub_0027BA40_gen();
++#else
++    sub_0027BA40_gen();
++#endif
++}
++
++extern void sub_000644D0_gen(void);
++void sub_000644D0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_kill")) pc_mapmaker_actors_kill(sub_000644D0_gen);
++    else sub_000644D0_gen();
++#else
++    sub_000644D0_gen();
++#endif
++}
++
++extern void sub_000640C0_gen(void);
++void sub_000640C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_score")) pc_mapmaker_actors_score(sub_000640C0_gen);
++    else sub_000640C0_gen();
++#else
++    sub_000640C0_gen();
++#endif
++}
++
++extern void sub_00064650_gen(void);
++void sub_00064650(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("actors","pc_mapmaker_actors_deaths")) pc_mapmaker_actors_deaths(sub_00064650_gen);
++    else sub_00064650_gen();
++#else
++    sub_00064650_gen();
 +#endif
 +}
  
