@@ -9,7 +9,7 @@ checkout). Static analysis of the US XBE only; nothing here was run in the game.
 
 Parts:
 
-- `config/guest-code-patches/rooms.json`: 322 operand entries and 19
+- `config/guest-code-patches/rooms.json`: 323 operand entries and 19
   relocations (generated from a reviewed site list; `check-tables.py` prints
   "table verified").
 - `src/pc_mapmaker_rooms.inc`: five function wrappers (below).
@@ -49,7 +49,7 @@ wrapper calling `sub_0008A780_gen`, not a replacement.
 -1. Every immediate equal to 0xC9..0xD6 in the game's code was reviewed (377
 immediates, plus negative forms and `lea` displacements); the room ones are:
 
-- 97 x `0xD5` (global room in prop/particle/effect/view code, the four light
+- 98 x `0xD5` (global room in prop/particle/effect/view code, the four light
   row widths `imul 0xD5`, the light clear count, the view room-list cap
   `cmp ax,0xD5` at `0x000899CA`). Not rooms (left alone): `0x001364EA`,
   `0x001C5EC3` (sound ids, `sub_000810C0`/`sub_00080F20`), `0x001C9E45` (menu),
@@ -246,10 +246,36 @@ synced). Mixed builds are already unsupported for raised maps.
   `sub_00114290`, `sub_00356490` (rooms.md §5c). The table and shadow layout
   here already reserve 256 entries per room table.
 
+## Fix 2026-10-30: crash after an exploding barrel (story level 1)
+
+Cause: `sub_000BB850` (explosion/area effect over the rooms touching a box)
+gets the rooms from `sub_000873C0`, then appends the global room with
+`mov [esp+eax*4+0x180], 0xD5` at `0x000BBA05` and skips it in the loop with
+`cmp eax, 0xD5`. The compare had been renumbered to 0xFE but the store had
+not, so 0xD5 (213) was treated as a real room and indexed the per-room prop
+list `[0x7B9784]` (R+1 entries) and the prop table past the level's rooms:
+garbage pointer into `sub_0012A590`. The store was missed because the text
+listing elides the bytes of 11-byte instructions (`c7848480010000d50000..`)
+and the inventory parser skipped those lines; the 288 such lines contain no
+other room constant. Fix: `0x000BBA05` 0xD5 -> 0xFE.
+
+The stale id did not come from level data. Room fields are written by code:
+prop rooms from position (`sub_0009FBE0`, `sub_000888A0`) or the room-model id
+(`sub_000A6880`), effect/particle rooms from immediates passed to
+`sub_000EA9C0` (`+0xF0`) and `sub_000F85C0` (`+0x48`), light rooms from the
+position lookup. So no translation at load is needed, and bounding every
+room-table lookup (dozens of per-frame sites) was not done; instead the test
+`test_every_room_constant_is_classified` decodes the game code with the same
+decoder as the lifter and fails if any immediate 0xC9..0xD6 (or its negative),
+any `cmp ..., 0xC8` or any `lea [r-0xC9..0xD6]` is neither patched nor in the
+reviewed not-a-room list (it fails with `0x000BBA05` removed). It skips when the
+private XBE is not present.
+
 ## Validation done
 
 - `check-tables.py` on the folder (00-header, items, rooms): table verified.
-- `tests/test_mapmaker_rooms.py`: fixture + 18 mutations, table shape.
+- `tests/test_mapmaker_rooms.py`: fixture + 18 mutations, table shape, and the
+  XBE completeness check of every room constant.
 - `tests/test_mapmaker_limits.py`: 241 placed allowed, +1 held refused; two
   new mutations.
 
