@@ -1,0 +1,22 @@
+{
+  "patches": [
+    {
+      "id": "actor-spawn-gate-flagged",
+      "kind": "code",
+      "function": "0x00164010",
+      "address": "0x001640EC",
+      "original_hex": "833d7cc3740014",
+      "new_hex": "833d0000900014",
+      "reason": "spawner: cmp [count],20 (only flag-0x20000 records spawn from 20 alive, every scene) reads the gate dword 0x00900000 instead; pc_mapmaker_actors_spawn_gate (sub_00163F10, called just before) sets it to the count, lowered by (limit - 20) in a MapMaker map played locally"
+    },
+    {
+      "id": "actor-spawn-gate-scene100",
+      "kind": "code",
+      "function": "0x00164010",
+      "address": "0x001641A2",
+      "original_hex": "833d7cc3740014",
+      "new_hex": "833d0000900014",
+      "reason": "spawner, scene 100 only: cmp [count],20 / jle (nothing spawns past 20 alive) reads the same gate; no direct call between the gate write and this check changes the count"
+    }
+  ]
+}
