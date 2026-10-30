@@ -131,8 +131,8 @@ def test_table_matches_policy():
     assert entries['obj-tag-entries-cap']['new_hex'] == '81fa' + _define('MAPMAKER_OBJECTS_TAGS_CAP').to_bytes(4, 'little').hex()
     assert entries['obj-list0-clear']['new_hex'] == 'b9' + _define('MAPMAKER_OBJECTS_LIST0_CAP').to_bytes(4, 'little').hex()
     assert _define('MAPMAKER_OBJECTS_POOL') < 1024        # slot = handle >> 22
-    # The perception array holds 32 characters then one entry per slot-9 list entry.
-    per = 0x200 + 0x10 * _define('MAPMAKER_OBJECTS_LIST9_CAP')
+    # The perception array holds 64 characters (actors area) then one entry per slot-9 list entry.
+    per = 0x400 + 0x10 * _define('MAPMAKER_OBJECTS_LIST9_CAP')
     for pid in ('obj-perception-clear', 'obj-perception-stride', 'obj-perception-alloc'):
         assert entries[pid]['new_hex'].endswith(per.to_bytes(4, 'little').hex())
     for e in table['patches']:

@@ -24,6 +24,10 @@ void sub_00242BA0(void) {}
 void sub_00248970(void) {}
 void sub_002FDF50(void) {}
 void sub_00333700(void) {}
+/* actors */
+void sub_001CD040(void) {}
+void sub_001638F0(void) {}
+void sub_003533F0(void) {}
 /* editor, rooms */
 void sub_0003D7B0(void) {}
 void sub_0007A270(void) {}

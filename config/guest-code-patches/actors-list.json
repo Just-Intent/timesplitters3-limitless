@@ -1,0 +1,1894 @@
+{
+  "patches": [
+    {
+      "id": "actor-list-00067A70",
+      "kind": "operand",
+      "function": "0x000674C0",
+      "address": "0x00067A70",
+      "original_hex": "8b049580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00067AF1",
+      "kind": "operand",
+      "function": "0x000674C0",
+      "address": "0x00067AF1",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00067CE1",
+      "kind": "operand",
+      "function": "0x00067CD0",
+      "address": "0x00067CE1",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00067CFD",
+      "kind": "operand",
+      "function": "0x00067CD0",
+      "address": "0x00067CFD",
+      "original_hex": "8b048580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00067F50",
+      "kind": "operand",
+      "function": "0x00067F00",
+      "address": "0x00067F50",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00067F90",
+      "kind": "operand",
+      "function": "0x00067F00",
+      "address": "0x00067F90",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00068110",
+      "kind": "operand",
+      "function": "0x00067F00",
+      "address": "0x00068110",
+      "original_hex": "8b049d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000691A0",
+      "kind": "operand",
+      "function": "0x00068830",
+      "address": "0x000691A0",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0006C410",
+      "kind": "operand",
+      "function": "0x0006C1E0",
+      "address": "0x0006C410",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000A4BB0",
+      "kind": "operand",
+      "function": "0x000A4B70",
+      "address": "0x000A4BB0",
+      "original_hex": "8b04ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000A8401",
+      "kind": "operand",
+      "function": "0x000A7FA0",
+      "address": "0x000A8401",
+      "original_hex": "8b3c9d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000AF8CA",
+      "kind": "operand",
+      "function": "0x000AF670",
+      "address": "0x000AF8CA",
+      "original_hex": "8b3c9580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000AFB96",
+      "kind": "operand",
+      "function": "0x000AF670",
+      "address": "0x000AFB96",
+      "original_hex": "8b3c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000B0B10",
+      "kind": "operand",
+      "function": "0x000B0A30",
+      "address": "0x000B0B10",
+      "original_hex": "8b14b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000B2760",
+      "kind": "operand",
+      "function": "0x000B26C0",
+      "address": "0x000B2760",
+      "original_hex": "8b04bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000B6514",
+      "kind": "operand",
+      "function": "0x000B6430",
+      "address": "0x000B6514",
+      "original_hex": "8b2c9580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ebp, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000B7DF0",
+      "kind": "operand",
+      "function": "0x000B7DC0",
+      "address": "0x000B7DF0",
+      "original_hex": "8b049580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000C1600",
+      "kind": "operand",
+      "function": "0x000C15B0",
+      "address": "0x000C1600",
+      "original_hex": "8b048580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000CF9D2",
+      "kind": "operand",
+      "function": "0x000CF8D0",
+      "address": "0x000CF9D2",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000D0240",
+      "kind": "operand",
+      "function": "0x000D01C0",
+      "address": "0x000D0240",
+      "original_hex": "8b348d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000D1D20",
+      "kind": "operand",
+      "function": "0x000D1CB0",
+      "address": "0x000D1D20",
+      "original_hex": "8b0cb580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000D1E00",
+      "kind": "operand",
+      "function": "0x000D1CB0",
+      "address": "0x000D1E00",
+      "original_hex": "8b148580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000D8C10",
+      "kind": "operand",
+      "function": "0x000D8C00",
+      "address": "0x000D8C10",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000E9260",
+      "kind": "operand",
+      "function": "0x000E91F0",
+      "address": "0x000E9260",
+      "original_hex": "8b34ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000E93B7",
+      "kind": "operand",
+      "function": "0x000E9380",
+      "address": "0x000E93B7",
+      "original_hex": "8b34ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000E95E7",
+      "kind": "operand",
+      "function": "0x000E94E0",
+      "address": "0x000E95E7",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000EE920",
+      "kind": "operand",
+      "function": "0x000EDD40",
+      "address": "0x000EE920",
+      "original_hex": "8b3cad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000F7DAD",
+      "kind": "operand",
+      "function": "0x000F7B10",
+      "address": "0x000F7DAD",
+      "original_hex": "bf80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, 0x7a3580: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000F855F",
+      "kind": "operand",
+      "function": "0x000F8510",
+      "address": "0x000F855F",
+      "original_hex": "bf80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, 0x7a3580: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-000FE690",
+      "kind": "operand",
+      "function": "0x000FE610",
+      "address": "0x000FE690",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00126570",
+      "kind": "operand",
+      "function": "0x00126560",
+      "address": "0x00126570",
+      "original_hex": "8b0cbd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0013C5D0",
+      "kind": "operand",
+      "function": "0x0013C560",
+      "address": "0x0013C5D0",
+      "original_hex": "8b2c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ebp, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00145160",
+      "kind": "operand",
+      "function": "0x00144F40",
+      "address": "0x00145160",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0014D240",
+      "kind": "operand",
+      "function": "0x0014D1F0",
+      "address": "0x0014D240",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00158D98",
+      "kind": "operand",
+      "function": "0x00158D90",
+      "address": "0x00158D98",
+      "original_hex": "bf80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, 0x7a3580: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015B6D0",
+      "kind": "operand",
+      "function": "0x0015B670",
+      "address": "0x0015B6D0",
+      "original_hex": "8b0c9d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015BAE6",
+      "kind": "operand",
+      "function": "0x0015BA90",
+      "address": "0x0015BAE6",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015BB80",
+      "kind": "operand",
+      "function": "0x0015BB50",
+      "address": "0x0015BB80",
+      "original_hex": "8b04bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015BCAC",
+      "kind": "operand",
+      "function": "0x0015BCA0",
+      "address": "0x0015BCAC",
+      "original_hex": "890c8580357a00",
+      "operand": 0,
+      "value": "0x00900100",
+      "reason": "mov dword ptr [eax*4 + 0x7a3580], ecx: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015BCD3",
+      "kind": "operand",
+      "function": "0x0015BCC0",
+      "address": "0x0015BCD3",
+      "original_hex": "3b148580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "cmp edx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015BCE7",
+      "kind": "operand",
+      "function": "0x0015BCC0",
+      "address": "0x0015BCE7",
+      "original_hex": "8b148d7c357a00",
+      "operand": 1,
+      "value": "0x009000FC",
+      "reason": "mov edx, dword ptr [ecx*4 + 0x7a357c]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015BCEF",
+      "kind": "operand",
+      "function": "0x0015BCC0",
+      "address": "0x0015BCEF",
+      "original_hex": "89148580357a00",
+      "operand": 0,
+      "value": "0x00900100",
+      "reason": "mov dword ptr [eax*4 + 0x7a3580], edx: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015BDD0",
+      "kind": "operand",
+      "function": "0x0015BDC0",
+      "address": "0x0015BDD0",
+      "original_hex": "8b14b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015BDF7",
+      "kind": "operand",
+      "function": "0x0015BDC0",
+      "address": "0x0015BDF7",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015BE1F",
+      "kind": "operand",
+      "function": "0x0015BDC0",
+      "address": "0x0015BE1F",
+      "original_hex": "8b14b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015C133",
+      "kind": "operand",
+      "function": "0x0015C120",
+      "address": "0x0015C133",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015C220",
+      "kind": "operand",
+      "function": "0x0015C1E0",
+      "address": "0x0015C220",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015C416",
+      "kind": "operand",
+      "function": "0x0015C3D0",
+      "address": "0x0015C416",
+      "original_hex": "890c8580357a00",
+      "operand": 0,
+      "value": "0x00900100",
+      "reason": "mov dword ptr [eax*4 + 0x7a3580], ecx: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015C450",
+      "kind": "operand",
+      "function": "0x0015C430",
+      "address": "0x0015C450",
+      "original_hex": "8b0cad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015C57C",
+      "kind": "operand",
+      "function": "0x0015C560",
+      "address": "0x0015C57C",
+      "original_hex": "bf80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, 0x7a3580: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015C5CD",
+      "kind": "operand",
+      "function": "0x0015C560",
+      "address": "0x0015C5CD",
+      "original_hex": "890c8580357a00",
+      "operand": 0,
+      "value": "0x00900100",
+      "reason": "mov dword ptr [eax*4 + 0x7a3580], ecx: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015C825",
+      "kind": "operand",
+      "function": "0x0015C700",
+      "address": "0x0015C825",
+      "original_hex": "890c8580357a00",
+      "operand": 0,
+      "value": "0x00900100",
+      "reason": "mov dword ptr [eax*4 + 0x7a3580], ecx: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015D8C1",
+      "kind": "operand",
+      "function": "0x0015D870",
+      "address": "0x0015D8C1",
+      "original_hex": "8b2c8d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ebp, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015EAA0",
+      "kind": "operand",
+      "function": "0x0015E830",
+      "address": "0x0015EAA0",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015FC66",
+      "kind": "operand",
+      "function": "0x0015F8C0",
+      "address": "0x0015FC66",
+      "original_hex": "890c8580357a00",
+      "operand": 0,
+      "value": "0x00900100",
+      "reason": "mov dword ptr [eax*4 + 0x7a3580], ecx: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0015FD5F",
+      "kind": "operand",
+      "function": "0x0015F8C0",
+      "address": "0x0015FD5F",
+      "original_hex": "890c8580357a00",
+      "operand": 0,
+      "value": "0x00900100",
+      "reason": "mov dword ptr [eax*4 + 0x7a3580], ecx: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00161E70",
+      "kind": "operand",
+      "function": "0x00161E50",
+      "address": "0x00161E70",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00161F30",
+      "kind": "operand",
+      "function": "0x00161F10",
+      "address": "0x00161F30",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00163750",
+      "kind": "operand",
+      "function": "0x00163730",
+      "address": "0x00163750",
+      "original_hex": "8b049580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00163AA2",
+      "kind": "operand",
+      "function": "0x00163A80",
+      "address": "0x00163AA2",
+      "original_hex": "be80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, 0x7a3580: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00163B13",
+      "kind": "operand",
+      "function": "0x00163AF0",
+      "address": "0x00163B13",
+      "original_hex": "be80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, 0x7a3580: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00163B72",
+      "kind": "operand",
+      "function": "0x00163B40",
+      "address": "0x00163B72",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00163C02",
+      "kind": "operand",
+      "function": "0x00163BD0",
+      "address": "0x00163C02",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00163C80",
+      "kind": "operand",
+      "function": "0x00163C50",
+      "address": "0x00163C80",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00163D20",
+      "kind": "operand",
+      "function": "0x00163CF0",
+      "address": "0x00163D20",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00163DC2",
+      "kind": "operand",
+      "function": "0x00163D90",
+      "address": "0x00163DC2",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00163E60",
+      "kind": "operand",
+      "function": "0x00163E10",
+      "address": "0x00163E60",
+      "original_hex": "8b349d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0016CCF0",
+      "kind": "operand",
+      "function": "0x0016CCD0",
+      "address": "0x0016CCF0",
+      "original_hex": "8b1c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ebx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00170817",
+      "kind": "operand",
+      "function": "0x00170690",
+      "address": "0x00170817",
+      "original_hex": "8b14b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00188330",
+      "kind": "operand",
+      "function": "0x001881E0",
+      "address": "0x00188330",
+      "original_hex": "8b3c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001B8C50",
+      "kind": "operand",
+      "function": "0x001B8C40",
+      "address": "0x001B8C50",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001BD120",
+      "kind": "operand",
+      "function": "0x001BD020",
+      "address": "0x001BD120",
+      "original_hex": "8b049d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001BD154",
+      "kind": "operand",
+      "function": "0x001BD020",
+      "address": "0x001BD154",
+      "original_hex": "8b049d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001DF800",
+      "kind": "operand",
+      "function": "0x001DF370",
+      "address": "0x001DF800",
+      "original_hex": "8b3cad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001DFF90",
+      "kind": "operand",
+      "function": "0x001DFF20",
+      "address": "0x001DFF90",
+      "original_hex": "8b148d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001DFFEA",
+      "kind": "operand",
+      "function": "0x001DFF20",
+      "address": "0x001DFFEA",
+      "original_hex": "8b148d84357a00",
+      "operand": 1,
+      "value": "0x00900104",
+      "reason": "mov edx, dword ptr [ecx*4 + 0x7a3584]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001E0044",
+      "kind": "operand",
+      "function": "0x001DFF20",
+      "address": "0x001E0044",
+      "original_hex": "8b148d88357a00",
+      "operand": 1,
+      "value": "0x00900108",
+      "reason": "mov edx, dword ptr [ecx*4 + 0x7a3588]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001E009E",
+      "kind": "operand",
+      "function": "0x001DFF20",
+      "address": "0x001E009E",
+      "original_hex": "8b148d8c357a00",
+      "operand": 1,
+      "value": "0x0090010C",
+      "reason": "mov edx, dword ptr [ecx*4 + 0x7a358c]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001E0140",
+      "kind": "operand",
+      "function": "0x001DFF20",
+      "address": "0x001E0140",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001E8150",
+      "kind": "operand",
+      "function": "0x001E8130",
+      "address": "0x001E8150",
+      "original_hex": "8b04bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-001E83A0",
+      "kind": "operand",
+      "function": "0x001E8210",
+      "address": "0x001E83A0",
+      "original_hex": "8b3cad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00205C80",
+      "kind": "operand",
+      "function": "0x00205BC0",
+      "address": "0x00205C80",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002097A2",
+      "kind": "operand",
+      "function": "0x00209680",
+      "address": "0x002097A2",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0020B650",
+      "kind": "operand",
+      "function": "0x0020B630",
+      "address": "0x0020B650",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0020B7F0",
+      "kind": "operand",
+      "function": "0x0020B630",
+      "address": "0x0020B7F0",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00219AB0",
+      "kind": "operand",
+      "function": "0x002196B0",
+      "address": "0x00219AB0",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0021B210",
+      "kind": "operand",
+      "function": "0x0021B070",
+      "address": "0x0021B210",
+      "original_hex": "8b04bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0021BEE8",
+      "kind": "operand",
+      "function": "0x0021BEB0",
+      "address": "0x0021BEE8",
+      "original_hex": "8b3c9d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00226C10",
+      "kind": "operand",
+      "function": "0x00226B70",
+      "address": "0x00226C10",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00229F92",
+      "kind": "operand",
+      "function": "0x00229F20",
+      "address": "0x00229F92",
+      "original_hex": "8b049580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022A069",
+      "kind": "operand",
+      "function": "0x0022A040",
+      "address": "0x0022A069",
+      "original_hex": "8b0d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022A090",
+      "kind": "operand",
+      "function": "0x0022A090",
+      "address": "0x0022A090",
+      "original_hex": "8b0d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022A500",
+      "kind": "operand",
+      "function": "0x0022A4E0",
+      "address": "0x0022A500",
+      "original_hex": "8b3c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022A980",
+      "kind": "operand",
+      "function": "0x0022A940",
+      "address": "0x0022A980",
+      "original_hex": "8b349d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022AE20",
+      "kind": "operand",
+      "function": "0x0022AE00",
+      "address": "0x0022AE20",
+      "original_hex": "8b2c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ebp, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022B012",
+      "kind": "operand",
+      "function": "0x0022AF40",
+      "address": "0x0022B012",
+      "original_hex": "8b049580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022C5C0",
+      "kind": "operand",
+      "function": "0x0022C5A0",
+      "address": "0x0022C5C0",
+      "original_hex": "8b0cb580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022C950",
+      "kind": "operand",
+      "function": "0x0022C640",
+      "address": "0x0022C950",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022C9A0",
+      "kind": "operand",
+      "function": "0x0022C640",
+      "address": "0x0022C9A0",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022F430",
+      "kind": "operand",
+      "function": "0x0022F400",
+      "address": "0x0022F430",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022F470",
+      "kind": "operand",
+      "function": "0x0022F400",
+      "address": "0x0022F470",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022F8D1",
+      "kind": "operand",
+      "function": "0x0022F8D0",
+      "address": "0x0022F8D1",
+      "original_hex": "8b1c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ebx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0022FE14",
+      "kind": "operand",
+      "function": "0x0022FD30",
+      "address": "0x0022FE14",
+      "original_hex": "8b349d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00233630",
+      "kind": "operand",
+      "function": "0x002332F0",
+      "address": "0x00233630",
+      "original_hex": "8b04bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00234668",
+      "kind": "operand",
+      "function": "0x00234650",
+      "address": "0x00234668",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00236170",
+      "kind": "operand",
+      "function": "0x00236070",
+      "address": "0x00236170",
+      "original_hex": "8b0cb580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00244EC2",
+      "kind": "operand",
+      "function": "0x00244E90",
+      "address": "0x00244EC2",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00245EF8",
+      "kind": "operand",
+      "function": "0x00245CE0",
+      "address": "0x00245EF8",
+      "original_hex": "8b04ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0024BFA4",
+      "kind": "operand",
+      "function": "0x0024ABA0",
+      "address": "0x0024BFA4",
+      "original_hex": "8b348d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00259862",
+      "kind": "operand",
+      "function": "0x00259830",
+      "address": "0x00259862",
+      "original_hex": "8b349d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0025998D",
+      "kind": "operand",
+      "function": "0x00259930",
+      "address": "0x0025998D",
+      "original_hex": "8b348580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002599AC",
+      "kind": "operand",
+      "function": "0x00259930",
+      "address": "0x002599AC",
+      "original_hex": "8b14ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002599BF",
+      "kind": "operand",
+      "function": "0x00259930",
+      "address": "0x002599BF",
+      "original_hex": "8b3580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002599F6",
+      "kind": "operand",
+      "function": "0x00259930",
+      "address": "0x002599F6",
+      "original_hex": "8b348580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0025F0E0",
+      "kind": "operand",
+      "function": "0x0025F0C0",
+      "address": "0x0025F0E0",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0025F440",
+      "kind": "operand",
+      "function": "0x0025F370",
+      "address": "0x0025F440",
+      "original_hex": "8b0cb580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0025FD40",
+      "kind": "operand",
+      "function": "0x0025FB70",
+      "address": "0x0025FD40",
+      "original_hex": "8b3cad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00261FC0",
+      "kind": "operand",
+      "function": "0x00261DE0",
+      "address": "0x00261FC0",
+      "original_hex": "8b3c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0026A52A",
+      "kind": "operand",
+      "function": "0x0026A500",
+      "address": "0x0026A52A",
+      "original_hex": "8b349d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0026C9F7",
+      "kind": "operand",
+      "function": "0x0026C9A0",
+      "address": "0x0026C9F7",
+      "original_hex": "8b349d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0026F2D7",
+      "kind": "operand",
+      "function": "0x0026EFC0",
+      "address": "0x0026F2D7",
+      "original_hex": "a180357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0026F3A2",
+      "kind": "operand",
+      "function": "0x0026EFC0",
+      "address": "0x0026F3A2",
+      "original_hex": "a180357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0026F59A",
+      "kind": "operand",
+      "function": "0x0026EFC0",
+      "address": "0x0026F59A",
+      "original_hex": "8b1580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00271DB4",
+      "kind": "operand",
+      "function": "0x00271CD0",
+      "address": "0x00271DB4",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002725D8",
+      "kind": "operand",
+      "function": "0x00272450",
+      "address": "0x002725D8",
+      "original_hex": "8b0cbd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00272720",
+      "kind": "operand",
+      "function": "0x002726A0",
+      "address": "0x00272720",
+      "original_hex": "8b0cb580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002732C0",
+      "kind": "operand",
+      "function": "0x00273240",
+      "address": "0x002732C0",
+      "original_hex": "8b34ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00273614",
+      "kind": "operand",
+      "function": "0x002735A0",
+      "address": "0x00273614",
+      "original_hex": "8b148580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00273780",
+      "kind": "operand",
+      "function": "0x002735A0",
+      "address": "0x00273780",
+      "original_hex": "8b049580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00274310",
+      "kind": "operand",
+      "function": "0x00274210",
+      "address": "0x00274310",
+      "original_hex": "8b14b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00274533",
+      "kind": "operand",
+      "function": "0x00274510",
+      "address": "0x00274533",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002745C0",
+      "kind": "operand",
+      "function": "0x00274590",
+      "address": "0x002745C0",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002745F1",
+      "kind": "operand",
+      "function": "0x00274590",
+      "address": "0x002745F1",
+      "original_hex": "8b148580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002756F7",
+      "kind": "operand",
+      "function": "0x002756A0",
+      "address": "0x002756F7",
+      "original_hex": "8b0c9580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00275D40",
+      "kind": "operand",
+      "function": "0x00275CC0",
+      "address": "0x00275D40",
+      "original_hex": "8b0cbd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00275E2D",
+      "kind": "operand",
+      "function": "0x00275CC0",
+      "address": "0x00275E2D",
+      "original_hex": "8b3cb580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00276D50",
+      "kind": "operand",
+      "function": "0x00276D10",
+      "address": "0x00276D50",
+      "original_hex": "8b34ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00276EB9",
+      "kind": "operand",
+      "function": "0x00276D10",
+      "address": "0x00276EB9",
+      "original_hex": "8b0c9d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00276ED2",
+      "kind": "operand",
+      "function": "0x00276D10",
+      "address": "0x00276ED2",
+      "original_hex": "8b148580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00276F46",
+      "kind": "operand",
+      "function": "0x00276F20",
+      "address": "0x00276F46",
+      "original_hex": "8b148d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00276FB0",
+      "kind": "operand",
+      "function": "0x00276F80",
+      "address": "0x00276FB0",
+      "original_hex": "8b34ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00277160",
+      "kind": "operand",
+      "function": "0x002770D0",
+      "address": "0x00277160",
+      "original_hex": "8b148d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00278010",
+      "kind": "operand",
+      "function": "0x00277FE0",
+      "address": "0x00278010",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00278034",
+      "kind": "operand",
+      "function": "0x00277FE0",
+      "address": "0x00278034",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002785F0",
+      "kind": "operand",
+      "function": "0x002784D0",
+      "address": "0x002785F0",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0027BAC0",
+      "kind": "operand",
+      "function": "0x0027BA40",
+      "address": "0x0027BAC0",
+      "original_hex": "8b34ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0027CBF0",
+      "kind": "operand",
+      "function": "0x0027CBD0",
+      "address": "0x0027CBF0",
+      "original_hex": "8b0cb580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0027E320",
+      "kind": "operand",
+      "function": "0x0027E2F0",
+      "address": "0x0027E320",
+      "original_hex": "8b348580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B08C0",
+      "kind": "operand",
+      "function": "0x002B0770",
+      "address": "0x002B08C0",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B0CA0",
+      "kind": "operand",
+      "function": "0x002B0B80",
+      "address": "0x002B0CA0",
+      "original_hex": "8b3c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B1E50",
+      "kind": "operand",
+      "function": "0x002B1E30",
+      "address": "0x002B1E50",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B2907",
+      "kind": "operand",
+      "function": "0x002B2750",
+      "address": "0x002B2907",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B4A00",
+      "kind": "operand",
+      "function": "0x002B4870",
+      "address": "0x002B4A00",
+      "original_hex": "8b34ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B4B51",
+      "kind": "operand",
+      "function": "0x002B4870",
+      "address": "0x002B4B51",
+      "original_hex": "8b048d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B4BA0",
+      "kind": "operand",
+      "function": "0x002B4870",
+      "address": "0x002B4BA0",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B79B5",
+      "kind": "operand",
+      "function": "0x002B7750",
+      "address": "0x002B79B5",
+      "original_hex": "8b3c9d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B8380",
+      "kind": "operand",
+      "function": "0x002B7F30",
+      "address": "0x002B8380",
+      "original_hex": "8b3c9d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B87D0",
+      "kind": "operand",
+      "function": "0x002B7F30",
+      "address": "0x002B87D0",
+      "original_hex": "8b3c9d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-002B9E70",
+      "kind": "operand",
+      "function": "0x002B9E50",
+      "address": "0x002B9E70",
+      "original_hex": "8b04b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00339650",
+      "kind": "operand",
+      "function": "0x00339600",
+      "address": "0x00339650",
+      "original_hex": "8b0c9580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00339A80",
+      "kind": "operand",
+      "function": "0x00339900",
+      "address": "0x00339A80",
+      "original_hex": "8b0cb580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0034A32E",
+      "kind": "operand",
+      "function": "0x00349E40",
+      "address": "0x0034A32E",
+      "original_hex": "8b14ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0034A55A",
+      "kind": "operand",
+      "function": "0x00349E40",
+      "address": "0x0034A55A",
+      "original_hex": "8b14ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0034A570",
+      "kind": "operand",
+      "function": "0x00349E40",
+      "address": "0x0034A570",
+      "original_hex": "8b0cad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00355DF0",
+      "kind": "operand",
+      "function": "0x003559A0",
+      "address": "0x00355DF0",
+      "original_hex": "8b1c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ebx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00355E40",
+      "kind": "operand",
+      "function": "0x003559A0",
+      "address": "0x00355E40",
+      "original_hex": "8b349d80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [ebx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-003576D2",
+      "kind": "operand",
+      "function": "0x003576B0",
+      "address": "0x003576D2",
+      "original_hex": "b884357a00",
+      "operand": 1,
+      "value": "0x00900104",
+      "reason": "mov eax, 0x7a3584: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-003576F8",
+      "kind": "operand",
+      "function": "0x003576B0",
+      "address": "0x003576F8",
+      "original_hex": "3dc4357a00",
+      "operand": 1,
+      "value": "0x00900144",
+      "reason": "cmp eax, 0x7a35c4: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0035774B",
+      "kind": "operand",
+      "function": "0x003576B0",
+      "address": "0x0035774B",
+      "original_hex": "b980357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, 0x7a3580: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00357817",
+      "kind": "operand",
+      "function": "0x003576B0",
+      "address": "0x00357817",
+      "original_hex": "81f9c0357a00",
+      "operand": 1,
+      "value": "0x00900140",
+      "reason": "cmp ecx, 0x7a35c0: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00359CA0",
+      "kind": "operand",
+      "function": "0x00359AA0",
+      "address": "0x00359CA0",
+      "original_hex": "3b348580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "cmp esi, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00374870",
+      "kind": "operand",
+      "function": "0x00374840",
+      "address": "0x00374870",
+      "original_hex": "8b14b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-003748D0",
+      "kind": "operand",
+      "function": "0x003748A0",
+      "address": "0x003748D0",
+      "original_hex": "8b14b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00374C90",
+      "kind": "operand",
+      "function": "0x00374C60",
+      "address": "0x00374C90",
+      "original_hex": "8b14b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00374CF0",
+      "kind": "operand",
+      "function": "0x00374CC0",
+      "address": "0x00374CF0",
+      "original_hex": "8b14b580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00375624",
+      "kind": "operand",
+      "function": "0x003755A0",
+      "address": "0x00375624",
+      "original_hex": "8b049580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [edx*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-00375790",
+      "kind": "operand",
+      "function": "0x003756E0",
+      "address": "0x00375790",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0037A5C0",
+      "kind": "operand",
+      "function": "0x0037A570",
+      "address": "0x0037A5C0",
+      "original_hex": "8b3cb580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov edi, dword ptr [esi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0037A6AC",
+      "kind": "operand",
+      "function": "0x0037A570",
+      "address": "0x0037A6AC",
+      "original_hex": "8b04ad80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov eax, dword ptr [ebp*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0037A6C5",
+      "kind": "operand",
+      "function": "0x0037A570",
+      "address": "0x0037A6C5",
+      "original_hex": "8b0c8580357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov ecx, dword ptr [eax*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-list-0037B0C0",
+      "kind": "operand",
+      "function": "0x0037AE20",
+      "address": "0x0037B0C0",
+      "original_hex": "8b34bd80357a00",
+      "operand": 1,
+      "value": "0x00900100",
+      "reason": "mov esi, dword ptr [edi*4 + 0x7a3580]: live character list 0x007A3580 (32) -> 0x00900100 (64 entries)"
+    },
+    {
+      "id": "actor-aitab-0015DFE9",
+      "kind": "operand",
+      "function": "0x0015DF20",
+      "address": "0x0015DFE9",
+      "original_hex": "89048d002d7a00",
+      "operand": 0,
+      "value": "0x00900200",
+      "reason": "mov dword ptr [ecx*4 + 0x7a2d00], eax: AI table 0x007A2D00 (30) -> 0x00900200 (64 entries)"
+    },
+    {
+      "id": "actor-aitab-0015EA70",
+      "kind": "operand",
+      "function": "0x0015E830",
+      "address": "0x0015EA70",
+      "original_hex": "8b048d002d7a00",
+      "operand": 1,
+      "value": "0x00900200",
+      "reason": "mov eax, dword ptr [ecx*4 + 0x7a2d00]: AI table 0x007A2D00 (30) -> 0x00900200 (64 entries)"
+    },
+    {
+      "id": "actor-aitab-0025F94E",
+      "kind": "operand",
+      "function": "0x0025F830",
+      "address": "0x0025F94E",
+      "original_hex": "8904b5002d7a00",
+      "operand": 0,
+      "value": "0x00900200",
+      "reason": "mov dword ptr [esi*4 + 0x7a2d00], eax: AI table 0x007A2D00 (30) -> 0x00900200 (64 entries)"
+    },
+    {
+      "id": "actor-aitab-0025F95E",
+      "kind": "operand",
+      "function": "0x0025F830",
+      "address": "0x0025F95E",
+      "original_hex": "8b04b5002d7a00",
+      "operand": 1,
+      "value": "0x00900200",
+      "reason": "mov eax, dword ptr [esi*4 + 0x7a2d00]: AI table 0x007A2D00 (30) -> 0x00900200 (64 entries)"
+    },
+    {
+      "id": "actor-aitab-0025F96E",
+      "kind": "operand",
+      "function": "0x0025F830",
+      "address": "0x0025F96E",
+      "original_hex": "8b14b5002d7a00",
+      "operand": 1,
+      "value": "0x00900200",
+      "reason": "mov edx, dword ptr [esi*4 + 0x7a2d00]: AI table 0x007A2D00 (30) -> 0x00900200 (64 entries)"
+    },
+    {
+      "id": "actor-aitab-0025F97F",
+      "kind": "operand",
+      "function": "0x0025F830",
+      "address": "0x0025F97F",
+      "original_hex": "8b0cb5002d7a00",
+      "operand": 1,
+      "value": "0x00900200",
+      "reason": "mov ecx, dword ptr [esi*4 + 0x7a2d00]: AI table 0x007A2D00 (30) -> 0x00900200 (64 entries)"
+    },
+    {
+      "id": "actor-aitab-002B522C",
+      "kind": "operand",
+      "function": "0x002B51E0",
+      "address": "0x002B522C",
+      "original_hex": "8904b5002d7a00",
+      "operand": 0,
+      "value": "0x00900200",
+      "reason": "mov dword ptr [esi*4 + 0x7a2d00], eax: AI table 0x007A2D00 (30) -> 0x00900200 (64 entries)"
+    },
+    {
+      "id": "actor-aitab-002B523C",
+      "kind": "operand",
+      "function": "0x002B51E0",
+      "address": "0x002B523C",
+      "original_hex": "8b0cb5002d7a00",
+      "operand": 1,
+      "value": "0x00900200",
+      "reason": "mov ecx, dword ptr [esi*4 + 0x7a2d00]: AI table 0x007A2D00 (30) -> 0x00900200 (64 entries)"
+    }
+  ]
+}
