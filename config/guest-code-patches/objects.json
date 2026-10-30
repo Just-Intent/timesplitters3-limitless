@@ -143,8 +143,8 @@
       "kind": "relocate",
       "old": "0x007161C8",
       "size": "0xC8",
-      "new": "0x008A0200",
-      "new_size": "0x320",
+      "new": "0x008AC000",
+      "new_size": "0xFA0",
       "sites": {
         "0x000A4CF0": "offset",
         "0x000A5D81": "offset",
@@ -163,15 +163,15 @@
         "0x000A5CB1": "keep"
       },
       "data_ok": [],
-      "reason": "sub_000A5CE0 slot-8 list (count [0x007B4FA8]) 50 -> 200 entries; 0x00716290 is a separate list head"
+      "reason": "sub_000A5CE0 slot-8 list (count [0x007B4FA8]) 50 -> 1000 entries (the engine object pool); 0x00716290 is a separate list head"
     },
     {
       "id": "obj-list0-relocate",
       "kind": "relocate",
       "old": "0x007B4FC0",
       "size": "0x1C0",
-      "new": "0x008A0600",
-      "new_size": "0x700",
+      "new": "0x008AD000",
+      "new_size": "0xFA0",
       "sites": {
         "0x000A0EC0": "offset",
         "0x000A5B4E": "offset",
@@ -188,7 +188,7 @@
         "0x000A79C8": "keep"
       },
       "data_ok": [],
-      "reason": "sub_000A5CE0 slot-0 list (count [0x007B6258]) 112 -> 448 entries; 0x007B5180 is the per-room flag array"
+      "reason": "sub_000A5CE0 slot-0 list (count [0x007B6258]) 112 -> 1000 entries (the engine object pool); 0x007B5180 is the per-room flag array"
     },
     {
       "id": "obj-list0-clear",
@@ -196,8 +196,8 @@
       "function": "0x000A5AF0",
       "address": "0x000A5B49",
       "original_hex": "b970000000",
-      "new_hex": "b9c0010000",
-      "reason": "clear the relocated slot-0 list: 112 -> 448 dwords"
+      "new_hex": "b9e8030000",
+      "reason": "clear the relocated slot-0 list: 112 -> 1000 dwords"
     },
     {
       "id": "obj-bucket-bytes",

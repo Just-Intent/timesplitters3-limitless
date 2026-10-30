@@ -58,10 +58,18 @@
 #define MAPMAKER_OBJECTS_TURRETS 80u          /* objects.json obj-turret-* */
 #define MAPMAKER_OBJECTS_LIST9 0x008A0000u    /* obj-list9-relocate */
 #define MAPMAKER_OBJECTS_LIST9_CAP 128u
-#define MAPMAKER_OBJECTS_LIST8 0x008A0200u    /* obj-list8-relocate */
-#define MAPMAKER_OBJECTS_LIST8_CAP 200u
-#define MAPMAKER_OBJECTS_LIST0 0x008A0600u    /* obj-list0-relocate */
-#define MAPMAKER_OBJECTS_LIST0_CAP 448u
+#define MAPMAKER_OBJECTS_LIST8 0x008AC000u    /* obj-list8-relocate */
+#define MAPMAKER_OBJECTS_LIST8_CAP 1000u      /* = the object pool: the guard never drops */
+#define MAPMAKER_OBJECTS_LIST0 0x008AD000u    /* obj-list0-relocate */
+#define MAPMAKER_OBJECTS_LIST0_CAP 1000u      /* = the object pool: the guard never drops */
+
+/* Every guard that turns an object away counts it and logs the first few,
+ * so a missing object in play is never silent (probe flag 64 prints the counts). */
+static struct { unsigned list[3], turret, tag; } mapmaker_objects_drops;
+static void mapmaker_objects_dropped(unsigned *n,const char *what,uint32_t obj)
+{
+    if((*n)++<3u) { fprintf(stderr,"[mapmaker] %s full: object 0x%08X not added\n",what,obj);fflush(stderr); }
+}
 #define MAPMAKER_OBJECTS_SPARE_GUNS 0x008A9000u   /* 8 x 0x1E0 */
 #define MAPMAKER_OBJECTS_SPARE_OWNERS 0x008AA000u /* 8 x 0x130 */
 #define MAPMAKER_OBJECTS_SPARES 8u
@@ -103,6 +111,7 @@ void pc_mapmaker_objects_turret_create(void (*original)(void))
 {
     if(MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==0x0006E818u && mapmaker_objects_turret_full()) {
         g_eax=0;      /* sub_0006D7A0 skips a 0 result; esi/edi/ebx untouched */
+        mapmaker_objects_dropped(&mapmaker_objects_drops.turret,"turret pool",0u);
         MAPMAKER_GUEST_RET();
         return;
     }
@@ -130,7 +139,10 @@ void pc_mapmaker_objects_turret_init(void (*original)(void))
 /* ---- object lists ----------------------------------------------------- */
 void pc_mapmaker_objects_list_add(void (*original)(void))
 {
-    if((int32_t)WORD_AT(0x007B625Cu)>=(int32_t)MAPMAKER_OBJECTS_LIST9_CAP) { MAPMAKER_GUEST_RET(); return; }
+    if((int32_t)WORD_AT(0x007B625Cu)>=(int32_t)MAPMAKER_OBJECTS_LIST9_CAP) {
+        mapmaker_objects_dropped(&mapmaker_objects_drops.list[2],"object list 9",MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4):0u);
+        MAPMAKER_GUEST_RET(); return;
+    }
     original();
 }
 static int mapmaker_objects_listed(uint32_t base,uint32_t count,uint32_t obj)
@@ -154,6 +166,7 @@ void pc_mapmaker_objects_register(void (*original)(void))
        !mapmaker_objects_listed(base,cap,obj)) {
         WORD_AT(obj+0x90)=WORD_AT(0x007DE318u);
         WORD_AT(obj+0x154u+slot*4u)=flag;
+        mapmaker_objects_dropped(&mapmaker_objects_drops.list[slot==0?0:slot==8?1:2],"object list",obj);
         MAPMAKER_GUEST_RET();
         return;
     }
@@ -309,6 +322,7 @@ void pc_mapmaker_objects_tag(void (*original)(void))
         WORD_AT(obj+0x60)=tag;
         WORD_AT(obj+0x230)=WORD_AT(0x00519750u);
         WORD_AT(0x00519750u)++;
+        mapmaker_objects_dropped(&mapmaker_objects_drops.tag,"logic tag table",obj);
         MAPMAKER_GUEST_RET();
         return;
     }

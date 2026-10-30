@@ -298,10 +298,10 @@ static void mapmaker_probe_heap(void)
 }
 
 /* Flag 64, read-only, called every frame. */
-static struct { uint32_t key[12]; unsigned long long last; } mapmaker_probe_pools_state;
+static struct { uint32_t key[16]; unsigned long long last; } mapmaker_probe_pools_state;
 static void mapmaker_probe_pools(void)
 {
-    uint32_t key[12];
+    uint32_t key[16];
     unsigned long long now;
     if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_POOLS) || mapmaker_probe_scene()!=100) return;
     key[0]=mapmaker_probe_word(0x007B6664u);key[1]=mapmaker_probe_word(0x007B6660u);
@@ -312,13 +312,17 @@ static void mapmaker_probe_pools(void)
     /* Engine objects taken / pool capacity (taken without a bound check) and logic tags. */
     key[9]=mapmaker_probe_word(0x007B4FACu);key[10]=mapmaker_probe_word(0x0072F5E4u);
     key[11]=mapmaker_probe_word(0x0075EA90u);
+    /* sub_000A5CE0 object lists 0/8/9 and live turrets (gun pool). */
+    key[12]=mapmaker_probe_word(0x007B6258u);key[13]=mapmaker_probe_word(0x007B4FA8u);
+    key[14]=mapmaker_probe_word(0x007B625Cu);key[15]=mapmaker_probe_word(0x00732D44u);
     now=GetTickCount64();
     if(!memcmp(key,mapmaker_probe_pools_state.key,sizeof key)) return;
     if(mapmaker_probe_pools_state.last && now-mapmaker_probe_pools_state.last<MAPMAKER_PROBE_HEAP_INTERVAL) return;
     mapmaker_probe_write("[mapmaker-probe] t=%llu pools pads=%u links=%u cover=%u groups=%u"
         " pads@0x%08X links@0x%08X aidata@0x%08X cover@0x%08X runtime@0x%08X"
-        " objects=%u/%u tags=%u\n",
-        now,key[0],key[1],key[2],key[3],key[4],key[5],key[6],key[7],key[8],key[9],key[10],key[11]);
+        " objects=%u/%u tags=%u lists=%u/%u/%u turrets=%u\n",
+        now,key[0],key[1],key[2],key[3],key[4],key[5],key[6],key[7],key[8],key[9],key[10],key[11],
+        key[12],key[13],key[14],key[15]);
     memcpy(mapmaker_probe_pools_state.key,key,sizeof key);
     mapmaker_probe_pools_state.last=now;
 }

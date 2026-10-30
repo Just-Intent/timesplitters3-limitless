@@ -117,7 +117,9 @@ def test_table_matches_policy():
         assert int(e['new'], 16) == _define(f'MAPMAKER_OBJECTS_{name}')
         assert int(e['new_size'], 16) == entry * _define(f'MAPMAKER_OBJECTS_{name}_CAP')
     spares = (_define('MAPMAKER_OBJECTS_SPARE_GUNS'), _define('MAPMAKER_OBJECTS_SPARE_OWNERS') + 8 * 0x130)
-    assert relocated[-1][1] <= spares[0] and spares[1] <= extension[1]
+    assert spares[1] <= extension[1]
+    for a, b in relocated:                     # spares and relocated tables never overlap
+        assert b <= spares[0] or spares[1] <= a, (hex(a), hex(b))
     assert _define('MAPMAKER_OBJECTS_SPARE_GUNS') + 8 * 0x1E0 <= _define('MAPMAKER_OBJECTS_SPARE_OWNERS')
     n = _define('MAPMAKER_OBJECTS_TURRETS')
     assert entries['obj-turret-gun-nodes']['new_hex'] == '6a%02x' % n
