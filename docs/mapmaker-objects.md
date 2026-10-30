@@ -224,3 +224,7 @@ MapMaker. **Free heap in story levels has not been measured.** The extra
 - 8 teleporters of one colour;
 - 132 cover props and 80 movers: watch `[0x007B4FAC]` and the free heap;
 - a story level load to check the extra 60 KB.
+
+## Decoder classification (2026-10-30)
+
+`tests/test_mapmaker_objects_classified.py` (lifter's decoder, all game code): turret sizes 0x3B80/0x2600/0xEE0/0x980 and folds anywhere, counts 0x1E..0x21 in the turret functions, 0x3E0 anywhere and 0x225..0x227 anywhere. All patched, hooked (the two 0x226 pool formulas, scenes 100/102) or reviewed (13: other structs' +0x980/+0x3E0 fields, a 32-level-object loop in `sub_00349E40`, type ids). No missed site.
