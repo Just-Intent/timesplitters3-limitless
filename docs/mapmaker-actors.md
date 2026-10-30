@@ -266,3 +266,7 @@ area's raised AI limit), watching stderr for `[mapmaker]` lines:
 - a story level, an arcade MapMaker map and System Link (stock behaviour);
 - frame time on the low-spec PC with 60 AI in view, then
   `TSFP_MAPMAKER_ALIVE=32`.
+
+## Decoder classification (2026-10-30)
+
+`tests/test_mapmaker_actors_classified.py` (lifter's decoder) re-checks the hand inventory: in the ~304 character functions every cmp/mov/push/add/sub/imul/lea immediate 0x1D..0x21 is patched, hooked (the pool formula) or reviewed (32 sites), and every reference into the live list or AI table is moved (189 = 181 + 8, plus the kept `0x002354E8`). No missed site. Two bounded 30-entry lists were noted: `0x007A2880` (`sub_001609F0`, add/remove only, nothing iterates it) and the effect list `0x0075F670` (`sub_002B24E0` refuses past 30): memory-safe stock limits, not per-character tables.

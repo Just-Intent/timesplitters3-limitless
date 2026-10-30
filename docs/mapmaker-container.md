@@ -213,3 +213,7 @@ larger-tier files with error 7 too.
   must stop at the stock size.
 - The other editor limits (200 pieces, memory estimate, cover pads) still
   bind long before 512 KB.
+
+## Decoder classification (2026-10-30)
+
+`tests/test_mapmaker_container_classified.py` scans all game code (lifter's decoder) for 0x7FE0/0x7FDC..0x7FDF/0x1FF8/0x1FF80/0x3FF0/0x7FC0/0x1FF0 in any sign, and 0x8000/0x2000/0x4000/0x10000/0x20000 in the 110 functions that touch the container, undo buffers or save entry. Every site is patched, inside a hooked function (13) or reviewed (39: placement compares, flags, text-call arguments, the rooms view array, the stock-only System Link message). No missed site. Remaining note: the System Link receive (`0x0035504E`) copies one 0x8000 message over the container without clearing the tail; the session start clears it and chunk walkers stop at the received terminator.
