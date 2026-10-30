@@ -190,7 +190,10 @@ compile the whole include chain take link stubs from
 `tests/mapmaker_area_stubs.h`. Areas: `pads` (cover handle range 10,240,
 runtime pad handles 0x4740.., bounded A* pools, group A* pool relocated to
 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
-saves stock-identical when small, large maps refused for System Link).
+saves stock-identical when small, large maps refused for System Link),
+`objects`, `editor`, `rooms` (241 pieces) and `actors` (30 AI alive in
+MapMaker play instead of 20; `TSFP_MAPMAKER_ALIVE=1..32` lowers it, the 32-actor
+engine limit and its blockers are in `docs/mapmaker-actors.md`).
 Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`.
 
 ## MapMaker editor mouse controls
