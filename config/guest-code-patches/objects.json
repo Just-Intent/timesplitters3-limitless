@@ -69,8 +69,8 @@
       "function": "0x000D2FD0",
       "address": "0x000D301C",
       "original_hex": "69c9e0030000",
-      "new_hex": "69c9000a0000",
-      "reason": "per-player perception array clear: players * 0x3E0 -> players * 0xA00"
+      "new_hex": "69c9000c0000",
+      "reason": "per-player perception array clear: players * 0x3E0 -> players * 0xC00 (64 characters + 128 objects; actors area moved the object part to +0x400)"
     },
     {
       "id": "obj-perception-stride",
@@ -78,7 +78,7 @@
       "function": "0x000D2FD0",
       "address": "0x000D3084",
       "original_hex": "81c2e0030000",
-      "new_hex": "81c2000a0000",
+      "new_hex": "81c2000c0000",
       "reason": "per-player slice stride (player+0xF74)"
     },
     {
@@ -87,7 +87,7 @@
       "function": "0x000D2FD0",
       "address": "0x000D39DE",
       "original_hex": "3de0030000",
-      "new_hex": "3d000a0000",
+      "new_hex": "3d000c0000",
       "reason": "per-player reset loop end"
     },
     {
@@ -96,8 +96,8 @@
       "function": "0x000D3B00",
       "address": "0x000D3B60",
       "original_hex": "69d2e0030000",
-      "new_hex": "69d2000a0000",
-      "reason": "allocation players * 0xA00 (Level heap)"
+      "new_hex": "69d2000c0000",
+      "reason": "allocation players * 0xC00 (Level heap)"
     },
     {
       "id": "obj-perception-reset2",
@@ -105,7 +105,7 @@
       "function": "0x000CF320",
       "address": "0x000CF33C",
       "original_hex": "3de0030000",
-      "new_hex": "3d000a0000",
+      "new_hex": "3d000c0000",
       "reason": "per-player reset loop end (sub_000CF320)"
     },
     {

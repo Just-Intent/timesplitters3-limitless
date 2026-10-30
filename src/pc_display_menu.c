@@ -334,7 +334,8 @@ uint32_t pc_network_bots_revive(unsigned slot)
     entity=guest_call(sub_000DAC30,10,character,character,(uint32_t)slot,
         0u,0u,0u,0u,UINT32_MAX,1u,variant);
     if(!entity || !guest_writable(entity,0x25cu) || WORD_AT(actor)!=entity) return 0;
-    WORD_AT(0x007a2d00u+(slot-humans)*4u)=entity;
+    /* AI table: 0x007A2D00 moved to 0x00900200 (actors-list.json actor-aitab-*) */
+    WORD_AT(0x00900200u+(slot-humans)*4u)=entity;
     guest_call(sub_000D7570,1,actor);
     return entity;
 #else

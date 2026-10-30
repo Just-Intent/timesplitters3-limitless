@@ -17,6 +17,118 @@
       "original_hex": "833d7cc3740014",
       "new_hex": "833d0000900014",
       "reason": "spawner, scene 100 only: cmp [count],20 / jle (nothing spawns past 20 alive) reads the same gate; no direct call between the gate write and this check changes the count"
+    },
+    {
+      "id": "actor-ai-slot-cap",
+      "kind": "operand",
+      "function": "0x0015DF20",
+      "address": "0x0015DF7D",
+      "original_hex": "83fb1e",
+      "operand": 1,
+      "value": "0x3F",
+      "reason": "AI slot allocator: cmp ebx,30 (AI slots in use) -> 63, the most a 64-entry AI table can need; pc_mapmaker_actors_slot (sub_0015DF20) keeps the stock 30 everywhere except a local MapMaker story map and never hands out a slot past the actor pool"
+    },
+    {
+      "id": "actor-pairs-alloc",
+      "kind": "code",
+      "function": "0x0015E7C0",
+      "address": "0x0015E7D2",
+      "original_hex": "b920000000",
+      "new_hex": "b940000000",
+      "reason": "pair table [0x0074C368] in story mode: 32 -> 64 characters (2016 pairs x 12 B, Level heap, +18,240 B per story-mode level); index max*(max-1)/2+min (sub_0015BD00)"
+    },
+    {
+      "id": "actor-pairs-clear",
+      "kind": "code",
+      "function": "0x0015E4F0",
+      "address": "0x0015E75F",
+      "original_hex": "b920000000",
+      "new_hex": "b940000000",
+      "reason": "pair table clear at level start, story mode: 32 -> 64 characters, as the allocation"
+    },
+    {
+      "id": "actor-pairs-column",
+      "kind": "code",
+      "function": "0x0015E090",
+      "address": "0x0015E0E8",
+      "original_hex": "ba20000000",
+      "new_hex": "ba40000000",
+      "reason": "new character's pair column clear, story mode: ids up to 32 -> 64, as the allocation"
+    },
+    {
+      "id": "actor-list-clear",
+      "kind": "code",
+      "function": "0x00158D90",
+      "address": "0x00158D91",
+      "original_hex": "b920000000",
+      "new_hex": "b940000000",
+      "reason": "live character list clear: 32 -> 64 dwords (the list moved to 0x00900100, actors-list.json)"
+    },
+    {
+      "id": "actor-list-clear-level",
+      "kind": "code",
+      "function": "0x0015C560",
+      "address": "0x0015C577",
+      "original_hex": "b920000000",
+      "new_hex": "b940000000",
+      "reason": "live character list clear at level start: 32 -> 64 dwords"
+    },
+    {
+      "id": "actor-attach-relocate",
+      "kind": "relocate",
+      "old": "0x00739AA0",
+      "size": "0x180",
+      "new": "0x00900300",
+      "new_size": "0x300",
+      "sites": {
+        "0x000F765E": "offset",
+        "0x000F7722": "offset",
+        "0x000F7AC6": "offset",
+        "0x000F7D5A": "offset",
+        "0x000F7DCA": "offset",
+        "0x000F857A": "offset",
+        "0x000F8981": "offset",
+        "0x000F7B4C": "keep",
+        "0x000F7BBC": "keep"
+      },
+      "data_ok": [],
+      "reason": "per-character table 0x00739AA0 (3 dwords per character id: index id*3 + slot 0..2, sub_000F7630/F76F0/F7B10/F8510) 32 -> 64 ids; 0x00739C20 is a separate counter array (sub_000F7B10)"
+    },
+    {
+      "id": "actor-attach-clear",
+      "kind": "code",
+      "function": "0x000F88F0",
+      "address": "0x000F897C",
+      "original_hex": "b960000000",
+      "new_hex": "b9c0000000",
+      "reason": "clear of the per-character table above: 0x60 -> 0xC0 dwords (64 ids x 3)"
+    },
+    {
+      "id": "actor-perception-objects",
+      "kind": "code",
+      "function": "0x000CF8D0",
+      "address": "0x000CFA31",
+      "original_hex": "bf00020000",
+      "new_hex": "bf00040000",
+      "reason": "per-player perception array: the object part starts after 64 characters (+0x400) instead of 32 (+0x200); the slice grows 0xA00 -> 0xC00 in objects.json"
+    },
+    {
+      "id": "actor-perception-objects2",
+      "kind": "code",
+      "function": "0x000D0730",
+      "address": "0x000D07E7",
+      "original_hex": "c744241000020000",
+      "new_hex": "c744241000040000",
+      "reason": "per-player perception array: object part base +0x200 -> +0x400 (64 characters)"
+    },
+    {
+      "id": "actor-perception-objects3",
+      "kind": "code",
+      "function": "0x00259930",
+      "address": "0x00259B42",
+      "original_hex": "8d7520",
+      "new_hex": "8d7540",
+      "reason": "perception update: object entry (index + 0x20) << 4 -> (index + 0x40) << 4, after 64 characters"
     }
   ]
 }
