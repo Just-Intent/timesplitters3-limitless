@@ -528,6 +528,22 @@ int main(void)
     HALF_AT(SIDE(5u,40u))=3;WORD_AT(SCENE)=1u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_pool_clear,fake_plain);
     CHECK(HALF_AT(SIDE(5u,40u))==0);WORD_AT(SCENE)=100u;
 
+    /* ---- per-death effect list: 64 in wide play, the stock 30 elsewhere ---- */
+    WORD_AT(SCENE)=100u;WORD_AT(NETWORK)=0;mode(1);
+    WORD_AT(0x0075F6E8u)=40u;call_setup(0x00777000u,0,0);HOOK(pc_mapmaker_actors_effects,fake_plain);
+    CHECK(originals==1);                                        /* wide: the original (bound 64) */
+    mode(0);call_setup(0x00777000u,0,0);HOOK(pc_mapmaker_actors_effects,fake_plain);
+    CHECK(originals==0 && g_eax==0x00777000u);                  /* arcade: refused at 30, as stock */
+    WORD_AT(0x0075F6E8u)=30u;call_setup(0x00777000u,0,0);HOOK(pc_mapmaker_actors_effects,fake_plain);
+    CHECK(originals==0);
+    WORD_AT(0x0075F6E8u)=29u;call_setup(0x00777000u,0,0);HOOK(pc_mapmaker_actors_effects,fake_plain);
+    CHECK(originals==1);
+    mode(1);WORD_AT(SCENE)=1u;WORD_AT(0x0075F6E8u)=30u;call_setup(0x00777000u,0,0);HOOK(pc_mapmaker_actors_effects,fake_plain);
+    CHECK(originals==0);                                        /* story level: 30 */
+    WORD_AT(SCENE)=100u;WORD_AT(NETWORK)=1u;call_setup(0x00777000u,0,0);HOOK(pc_mapmaker_actors_effects,fake_plain);
+    CHECK(originals==0);                                        /* System Link: 30 */
+    WORD_AT(NETWORK)=0;
+
 
     if(failures) { fprintf(stderr,"%d failures\n",failures); return 1; }
     printf("mapmaker actors ok\n");

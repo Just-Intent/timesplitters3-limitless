@@ -95,8 +95,9 @@ non-display builds add `{ original(); }` stubs.
     WRAP sub_00064650 -> pc_mapmaker_actors_deaths
     WRAP sub_000DAC30 -> pc_mapmaker_actors_create
     WRAP sub_001339E0 -> pc_mapmaker_actors_blip
+    WRAP sub_002B24E0 -> pc_mapmaker_actors_effects
 
-(The last two are new in the second round; `sub_001339E0` takes the blip
+(The last three are new in the second round; `sub_001339E0` takes the blip
 position in `edx`, which the hook leaves untouched.)
 
 **`sub_0015DF20` and `sub_00163F10` must be wrapped wherever `actors.json`
@@ -210,6 +211,29 @@ New `guest_call` targets: `sub_0003DFA0`, `sub_001CD040`, `sub_001638F0`,
   `0x007A5E78` @`0x00147283` lies in the old range but is the end of
   another table's loop. Mode 1/2 extras compare the character counter with
   52 (`0x00133DB2`, `0x00133E0D`); those modes keep <= 32 characters.
+- **effects.** `sub_002B24E0` (called on a death from `sub_000BABA0`)
+  creates an object at a pad through `sub_002B23D0` and appends it to two
+  parallel 30-entry lists: objects `0x0075F670`, pads `0x0075F5F8`, count
+  `[0x0075F6E8]`; it refuses at 30 (`cmp [0x0075F6E8],0x1E` @`0x002B24E0`,
+  returning its argument), `sub_002B26F0` removes, `sub_002B25E0`/
+  `sub_002B6630` read, `sub_002B0A80` clears the objects list (30 dwords
+  @`0x002B0AC4`). With 60 AI, deaths past 30 live entries were dropped
+  (memory-safe, visible). Now: the objects list is a `relocate` entry to
+  `0x00903400` (64; the checker's full scan covers it, `0x0075F6E8` = keep),
+  its `list[count-1]` reads through `0x0075F66C` (@`0x002B2573`,
+  `0x002B2726`) are operands to `0x009033FC`; the pads list is adjacent to it
+  (one relocate cannot follow two tables, two may not touch), so its 5
+  references are operands to `0x00903200` (`0x002B24BE`, `0x002B271E`,
+  `0x002B272D`, `0x002B6655`, and `list[count-1]` @`0x002B273B` via
+  `0x0075F5F4`, which is otherwise a float of `sub_00293730` and stays). The
+  bound is 64 and the clear 64 dwords; the hook on `sub_002B24E0` keeps the
+  stock refusal at 30 outside wide play. The System Link adder
+  `sub_00357D70` calls `sub_002B23D0` without any bound (stock), now into
+  64 entries.
+  The 30-dword list `0x007A2880` (`sub_001609F0` adds, writing slot 30 at
+  `0x007A28F8` before its bound in stock; `sub_00160A10` removes) has no
+  reader at all (`guest-refs.py 0x007A2880 0x80`: only the add, the remove
+  and the clear), so it is left as is.
 - **patrol table.** `sub_002B2750` (AI behaviour, flag 0x1000000) reads
   `0x00520C38 + (id*10 + step)*4` (5 sites, CONFIRMED). Only ids 0..4 have
   routes: its switch on `id-1` (@`0x002B3AB6`) sets the end marker for ids
@@ -271,7 +295,8 @@ the 0xEA0 actor entry, which grows with the pool.
   live list (incl. the `list[-1]` word), `0x00900200..0x009002FF` AI table,
   `0x00900300..0x009005FF` table 0x00739AA0, `0x00900600..0x009015FF` kill
   side table (4 KB), `0x00901600..0x00902027` patrol copy (65 rows x 40 B),
-  `0x00902100..0x009030FF` radar blips (256 x 16 B). About 12.3 KB of the
+  `0x00902100..0x009030FF` radar blips (256 x 16 B), `0x009031FC..0x009034FF`
+  effect lists (pads, objects; 64 each). About 13 KB of the
   128 KB; the old .bss tables are left unused.
 - Level heap: actor pool +119,808 B (scene 100 only); pair table +18,240 B
   (story-mode levels, every scene); perception +0x200 B per player (every
@@ -321,7 +346,7 @@ the 0xEA0 actor entry, which grows with the pool.
 
 ## Validation
 
-- `tests/test_mapmaker_actors.py`: the fixture plus 71 mutations, each
+- `tests/test_mapmaker_actors.py`: the fixture plus 75 mutations, each
   detected; checks that `actors.json`, `actors-list.json` and `objects.json`
   match the C constants and that every moved reference keeps its offset. The
   enemy picker is checked against a model of `sub_0027BA40` (32-entry array
@@ -339,6 +364,8 @@ area's raised AI limit), watching stderr for `[mapmaker]` lines:
 - AI fighting, targeting, kills and scores with 40+ AI on one team and on two;
   no `kill of character >= 32` line any more (only in arcade sub-modes);
 - the radar with 60 AI near the player: blips for all of them;
+- many deaths in a short time with 60 AI: every death effect appears (no
+  silent drop past 30);
 - the player's auto-aim/targeting on AI with high ids (perception layout);
 - a story level, an arcade MapMaker map and System Link (stock behaviour);
 - frame time on the low-spec PC with 60 AI in view, then

@@ -195,10 +195,10 @@ saves stock-identical when small, large maps refused for System Link),
 in a local MapMaker story map instead of 20 alive; live list moved to
 0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
 `actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;
-perception slice 0xC00 shared with `objects.json`; 18 hooks incl. the 32-entry
+perception slice 0xC00 shared with `objects.json`; 19 hooks incl. the 32-entry
 stack-array AI pickers (`sub_0027BA40` in two passes), a side table at
 0x00900600 for kill words of victims 32..63, radar blips moved to 0x00902100
-(256, bounded) with the radar loop at 64, and the patrol table 0x00520C38 read
+(256, bounded) with the radar loop at 64, the per-death effect lists 0x0075F670/0x0075F5F8 at 64 (0x00903400/0x00903200, stock 30 outside wide play), and the patrol table 0x00520C38 read
 from a copy at 0x00901600 (ids >= 32 have no route); `pc_network_bots_revive`
 writes the moved AI table; `TSFP_MAPMAKER_ALIVE=1..64` lowers it; sites and
 risks in `docs/mapmaker-actors.md`).

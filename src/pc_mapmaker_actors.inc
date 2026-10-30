@@ -49,6 +49,9 @@
  * - blip (sub_001339E0): radar blips go to a 256-entry buffer
  *   (0x00902100, stock 56) and are bounded; the radar's character loop runs
  *   to 64 characters (stock stops at 52).
+ * - effects (sub_002B24E0): the per-death effect lists (objects 0x0075F670,
+ *   pads 0x0075F5F8) hold 64 at 0x00903400 / 0x00903200 with bound 64; the
+ *   hook keeps the stock 30 outside wide play.
  * - The patrol table 0x00520C38 (id*10 + step) is read from a copy at
  *   0x00901600 (rows 0..31 stock, 32..64 "no route"), refreshed by the pool
  *   hook at each level load.
@@ -80,6 +83,9 @@
 #define MAPMAKER_ACTORS_BLIPS 0x00902100u     /* actors.json actor-blips-*: radar blips, 16 B each */
 #define MAPMAKER_ACTORS_BLIP_CAP 256u         /* the stock buffer 0x007A5DC0 holds 56 */
 #define MAPMAKER_ACTORS_RADAR_END 0x0077BB44u /* actor-radar-bound: 0x00777244 + 64 x 0x124 */
+#define MAPMAKER_ACTORS_EFFECT_PADS 0x00903200u /* actors.json actor-effects-pads-*: 0x0075F5F8, 64 dwords */
+#define MAPMAKER_ACTORS_EFFECTS 0x00903400u   /* actor-effects-objects-relocate: 0x0075F670, 64 dwords */
+#define MAPMAKER_ACTORS_EFFECTS_STOCK 30u     /* sub_002B24E0 cmp [0x0075F6E8],0x1E (stock) */
 #define MAPMAKER_ACTORS_PATROL_STOCK 0x00520C38u
 #define MAPMAKER_ACTORS_PATROL_ROW 40u        /* 10 dwords: index id*10 + step */
 #define MAPMAKER_ACTORS_MAX 64u               /* characters when wide: list, AI table, pairs, pool */
@@ -519,6 +525,19 @@ void pc_mapmaker_actors_blip(void (*original)(void))
     if(count>=MAPMAKER_ACTORS_BLIP_CAP) {
         mapmaker_actors_drop(MAPMAKER_ACTORS_DROP_BLIP,count,MAPMAKER_ACTORS_BLIP_CAP);
         g_eax=count;MAPMAKER_GUEST_RET();return;
+    }
+    original();
+}
+
+/* ---- per-death effect list (sub_002B24E0): objects 0x0075F670 / pads
+ * 0x0075F5F8, count [0x0075F6E8] ----
+ * Both lists hold 64 entries now and the adder's bound is 64; outside wide
+ * play the hook keeps the stock 30 (the original's refusal returns its
+ * argument in eax, @0x002B24E7/0x002B25DC). */
+void pc_mapmaker_actors_effects(void (*original)(void))
+{
+    if(!mapmaker_actors_wide() && WORD_AT(0x0075F6E8u)>=MAPMAKER_ACTORS_EFFECTS_STOCK && MAPMAKER_STACK_OK(8)) {
+        g_eax=WORD_AT(g_esp+4);MAPMAKER_GUEST_RET();return;
     }
     original();
 }

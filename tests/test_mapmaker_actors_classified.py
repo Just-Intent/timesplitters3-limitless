@@ -47,8 +47,6 @@ REVIEWED = reviewed("""
 00277057 cmp ecx,0x1E: time difference against [0x007DE318] (30 ticks)
 0027B783 mov [ebp+0xAA8],0x20: field value
 002B0887 add ebx,0x20: 32-byte cover pad stride, loop to [0x007B65C0]
-002B0AC4 mov ecx,0x1E: clears the 30-entry effect list 0x0075F670; its adder sub_002B24E0 is bounded (cmp [0x0075F6E8],0x1E), so a 31st entry is dropped, not written (stock limit, not per character); the other adder sub_00357D70 is System Link
-002B24E0 cmp [0x0075F6E8],0x1E: the bound of that list (kept)
 002B3C31 push 0x20: flag argument of sub_00017570
 002B57FE push 0x20: flag argument of sub_00017570
 002B5821 push 0x20: flag argument of sub_00017570

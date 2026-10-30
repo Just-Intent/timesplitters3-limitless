@@ -108,7 +108,12 @@ MUTATIONS = {
                           '           0x00,(MAPMAKER_ACTORS_MAX-MAPMAKER_ACTORS_STOCK+1u)*MAPMAKER_ACTORS_PATROL_ROW);'),
     'patrol-overrun': ('(MAPMAKER_ACTORS_MAX-MAPMAKER_ACTORS_STOCK+1u)*', '(MAPMAKER_ACTORS_MAX-MAPMAKER_ACTORS_STOCK+2u)*'),
     'patrol-short-copy': ('           MAPMAKER_ACTORS_STOCK*MAPMAKER_ACTORS_PATROL_ROW);', '           (MAPMAKER_ACTORS_STOCK-1u)*MAPMAKER_ACTORS_PATROL_ROW);'),
-    'patrol-not-refreshed': ('    mapmaker_actors_patrol_init();             /* every level load', '    (void)0;             /* every level load'),
+    'effects-always-stock': ('    if(!mapmaker_actors_wide() && WORD_AT(0x0075F6E8u)', '    if(WORD_AT(0x0075F6E8u)'),
+    'effects-never-stock': ('    if(!mapmaker_actors_wide() && WORD_AT(0x0075F6E8u)', '    if(0 && WORD_AT(0x0075F6E8u)'),
+    'effects-off-by-one': ('WORD_AT(0x0075F6E8u)>=MAPMAKER_ACTORS_EFFECTS_STOCK', 'WORD_AT(0x0075F6E8u)>MAPMAKER_ACTORS_EFFECTS_STOCK'),
+    'effects-wrong-result': ('        g_eax=WORD_AT(g_esp+4);MAPMAKER_GUEST_RET();return;\n    }\n    original();\n}',
+                             '        g_eax=0;MAPMAKER_GUEST_RET();return;\n    }\n    original();\n}'),
+    'patrol-not-refreshed':('    mapmaker_actors_patrol_init();             /* every level load', '    (void)0;             /* every level load'),
 }
 
 
@@ -196,6 +201,21 @@ def test_table_matches_policy():
     side = _define('MAPMAKER_ACTORS_SIDE')
     assert base + n * 12 <= side and side + n * 32 * 2 <= patrol
     assert patrol + (n + 1) * 40 <= blips
+    # Per-death effect lists: 64 entries each, bound 64, stock 30 kept by the hook.
+    pads, objs = _define('MAPMAKER_ACTORS_EFFECT_PADS'), _define('MAPMAKER_ACTORS_EFFECTS')
+    assert blips + 16 * _define('MAPMAKER_ACTORS_BLIP_CAP') <= pads - 4 and pads + n * 4 <= objs - 4
+    assert objs + n * 4 <= hi
+    reloc = entries['actor-effects-objects-relocate']
+    assert int(reloc['old'], 0) == 0x0075F670 and int(reloc['size'], 0) == 30 * 4
+    assert int(reloc['new'], 0) == objs and int(reloc['new_size'], 0) == n * 4
+    for e in table['patches']:
+        if e['id'].startswith('actor-effects-pads'):
+            assert int(e['value'], 0) in (pads, pads - 4)
+        if e['id'].startswith('actor-effects-objects-last'):
+            assert int(e['value'], 0) == objs - 4
+    assert int(entries['actor-effects-bound']['value'], 0) == n
+    assert entries['actor-effects-bound']['original_hex'].endswith('%02x' % _define('MAPMAKER_ACTORS_EFFECTS_STOCK'))
+    assert entries['actor-effects-clear']['new_hex'] == 'b9' + _le(n)
     # Perception: characters 0..n-1 then objects; objects.json sizes the slice.
     assert entries['actor-perception-objects']['new_hex'] == 'bf' + _le(n * 16)
     assert entries['actor-perception-objects2']['new_hex'] == 'c7442410' + _le(n * 16)

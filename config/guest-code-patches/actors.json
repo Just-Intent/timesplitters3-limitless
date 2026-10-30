@@ -184,6 +184,126 @@
       "reason": "patrol route table copy (see actor-patrol-1)"
     },
     {
+      "id": "actor-effects-objects-relocate",
+      "kind": "relocate",
+      "old": "0x0075F670",
+      "size": "0x78",
+      "new": "0x00903400",
+      "new_size": "0x100",
+      "sites": {
+        "0x002B0AC9": "offset",
+        "0x002B24B7": "offset",
+        "0x002B2640": "offset",
+        "0x002B2675": "offset",
+        "0x002B2682": "offset",
+        "0x002B26AD": "offset",
+        "0x002B2701": "offset",
+        "0x002B2734": "offset",
+        "0x002B665E": "offset",
+        "0x002B0AE2": "keep",
+        "0x002B24B1": "keep",
+        "0x002B24CF": "keep",
+        "0x002B24E0": "keep",
+        "0x002B256D": "keep",
+        "0x002B262E": "keep",
+        "0x002B26F0": "keep",
+        "0x002B2746": "keep",
+        "0x002B6636": "keep",
+        "0x002B668D": "keep"
+      },
+      "data_ok": [],
+      "reason": "effect list objects 0x0075F670 (30 dwords; added per death by sub_002B24E0 -> sub_002B23D0, removed by sub_002B26F0) -> 0x00903400 (64); 0x0075F6E8 is its count (keep). Its last entry list[count-1] is read through 0x0075F66C (actor-effects-objects-last-*)"
+    },
+    {
+      "id": "actor-effects-objects-last-1",
+      "kind": "operand",
+      "function": "0x002B24E0",
+      "address": "0x002B2573",
+      "original_hex": "8b148d6cf67500",
+      "operand": 1,
+      "value": "0x009033FC",
+      "reason": "mov edx,[ecx*4+0x75f66c]: effect objects list[count-1] -> moved list - 4"
+    },
+    {
+      "id": "actor-effects-objects-last-2",
+      "kind": "operand",
+      "function": "0x002B26F0",
+      "address": "0x002B2726",
+      "original_hex": "8b3c956cf67500",
+      "operand": 1,
+      "value": "0x009033FC",
+      "reason": "mov edi,[edx*4+0x75f66c]: effect objects list[count-1] -> moved list - 4"
+    },
+    {
+      "id": "actor-effects-pads-1",
+      "kind": "operand",
+      "function": "0x002B23D0",
+      "address": "0x002B24BE",
+      "original_hex": "893c8df8f57500",
+      "operand": 0,
+      "value": "0x00903200",
+      "reason": "effect list pads 0x0075F5F8 (30 dwords, parallel to the objects list; adjacent to it, so not a relocate entry) -> 0x00903200 (64); every reference (guest-refs.py 0x0075F5F0 0x100) is moved here"
+    },
+    {
+      "id": "actor-effects-pads-2",
+      "kind": "operand",
+      "function": "0x002B26F0",
+      "address": "0x002B271E",
+      "original_hex": "8b048df8f57500",
+      "operand": 1,
+      "value": "0x00903200",
+      "reason": "effect list pads (see actor-effects-pads-1)"
+    },
+    {
+      "id": "actor-effects-pads-3",
+      "kind": "operand",
+      "function": "0x002B26F0",
+      "address": "0x002B272D",
+      "original_hex": "8d348df8f57500",
+      "operand": 1,
+      "value": "0x00903200",
+      "reason": "effect list pads (see actor-effects-pads-1)"
+    },
+    {
+      "id": "actor-effects-pads-last",
+      "kind": "operand",
+      "function": "0x002B26F0",
+      "address": "0x002B273B",
+      "original_hex": "8b0c95f4f57500",
+      "operand": 1,
+      "value": "0x009031FC",
+      "reason": "mov ecx,[edx*4+0x75f5f4]: pads list[count-1] -> moved list - 4 (0x0075F5F4 itself is a float of sub_00293730 and stays)"
+    },
+    {
+      "id": "actor-effects-pads-4",
+      "kind": "operand",
+      "function": "0x002B6630",
+      "address": "0x002B6655",
+      "original_hex": "392cbdf8f57500",
+      "operand": 0,
+      "value": "0x00903200",
+      "reason": "effect list pads (see actor-effects-pads-1)"
+    },
+    {
+      "id": "actor-effects-bound",
+      "kind": "operand",
+      "function": "0x002B24E0",
+      "address": "0x002B24E0",
+      "original_hex": "833de8f675001e",
+      "operand": 1,
+      "value": "0x40",
+      "reason": "effect list adder: cmp [count],30 -> 64; pc_mapmaker_actors_effects keeps 30 except in wide play"
+    },
+    {
+      "id": "actor-effects-clear",
+      "kind": "code",
+      "function": "0x002B0A80",
+      "address": "0x002B0AC4",
+      "original_hex": "b91e000000",
+      "new_hex": "b940000000",
+      "reason": "level-start clear of the effect objects list: 30 -> 64 dwords"
+    },
+    {
       "id": "actor-perception-objects",
       "kind": "code",
       "function": "0x000CF8D0",
