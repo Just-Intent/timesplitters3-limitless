@@ -512,6 +512,10 @@ static void character_tests(void)
         CHECK(WORD_AT(0x78a248)==2 && WORD_AT(0x78a140)==12 && !early_action);
         CHECK(g_ecx==123 && g_edx==456 && g_edi==789);
         unsigned previews=character_previews;run(parent);CHECK(character_previews==previews);
+        /* A second click on the previewed portrait confirms it (Select). */
+        cursor.left=0;run(parent);character_capture(child);cursor.left=1;run(parent);
+        CHECK((early_source&0x80u) && character_previews==previews && WORD_AT(0x78a248)==2);
+        run(parent);CHECK(!(early_source&0x80u));
         cursor.left=0;run(parent);character_capture(child);cursor.x=width*.5f-140;
         cursor.left=1;run(parent);CHECK(WORD_AT(0x78a150)==1 && WORD_AT(0x78a140)==13 && WORD_AT(0x78a144)==1);
         cursor.left=0;run(parent);character_capture(child);cursor.wheel=-1;run(parent);
