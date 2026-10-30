@@ -642,6 +642,20 @@ void pc_mapmaker_rooms_piece(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_props(void (*original)(void)) { original(); }
 void pc_mapmaker_actors_spawn_gate(void (*original)(void)) { original(); }
 void pc_mapmaker_actors_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pool(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pool_clear(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_placed(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_list_add(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_list_readd(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_type(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_team_ai(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_group(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_team(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_group_ai(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_enemies(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_kill(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_score(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_deaths(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
