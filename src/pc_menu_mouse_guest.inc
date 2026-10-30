@@ -50,6 +50,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_objects.inc"
 #include "pc_mapmaker_editor.inc"
 #include "pc_mapmaker_rooms.inc"
+#include "pc_mapmaker_actors.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
@@ -639,6 +640,8 @@ void pc_mapmaker_rooms_query(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_compile(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_piece(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_props(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_spawn_gate(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_slot(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}

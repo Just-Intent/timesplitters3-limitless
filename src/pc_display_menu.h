@@ -70,6 +70,8 @@ void pc_mapmaker_rooms_query(void (*original)(void));
 void pc_mapmaker_rooms_compile(void (*original)(void));
 void pc_mapmaker_rooms_piece(void (*original)(void));
 void pc_mapmaker_rooms_props(void (*original)(void));
+void pc_mapmaker_actors_spawn_gate(void (*original)(void));
+void pc_mapmaker_actors_slot(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));
