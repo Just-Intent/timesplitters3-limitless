@@ -20,6 +20,7 @@ typedef struct PcSettings {
 extern const char *const pc_action_labels[PC_ACTION_COUNT];
 void pc_settings_defaults(PcSettings *settings);
 int pc_settings_prompt_keys(int keys[PC_ACTION_COUNT]);
+int pc_settings_bound_keys(int keys[PC_ACTION_COUNT][PC_BINDING_SLOTS]);
 int pc_settings_read(PcSettings *settings, char *error, size_t bytes);
 int pc_settings_save(const PcSettings *settings, char *error, size_t bytes);
 void pc_settings_key_name(int key, char *out, size_t bytes);

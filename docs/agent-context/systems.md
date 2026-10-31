@@ -26,6 +26,7 @@ Consult `docs/shared-platform.md` for shared versus adapter responsibilities.
 | Mouse/menu handling | `src/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_mapmaker_browser.inc` | `tests/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
 | Auto-look / camera / cutscene | `src/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py` |
 | Mounted / vehicle gun mouse aim | `src/pc_mounted.h` (called from both adapters' `pc_controls_apply_mouse` after the terminal route, before ordinary look) | `tests/test_mounted_mouse.py` |
+| Mouse-wheel scope zoom | `src/pc_scope_wheel.h` (state from both adapters' `pc_controls_apply_mouse`; wheel and key filters in their wheel/key paths), `pc_settings_bound_keys` in `pc_bindings.inc` | `tests/test_scope_wheel.py` |
 | Display model and native UI | `src/pc_display.c`, `pc_display_*.inc`, `pc_settings.c`, `src/native/` | `tests/test_pc_display_modes.py`, `test_debug_settings_model.py` |
 | GPU clear / screen copies / sampling | `src/pc_clear_rhi.inc`, `src/graphics/`, runtime `src/d3d/` | `tests/test_rhi_menu_sampling.py`, `tests/rhi/`, `docs/shared-platform.md` |
 | Texture loading and formats | `src/texture_pack.c`, `texture_pack_format.h`, `texture_pack_io.h`, `texture_mode.c` | `tests/test_texture_runtime.py`, `tests/texture_pack_tools.py` |
@@ -145,6 +146,37 @@ on-foot look stay on the ordinary path. This branch has no native-rate clock,
 so callers pass `native_timing=0` (whole-tick `0x004E7944` gate). Controller
 aim is untouched (original code). `tests/test_mounted_mouse.py`: fixture plus
 six mutations and an adapter ordering check; not a live turret test.
+
+## Mouse-wheel scope zoom
+
+Request: wheel zooms a zoomable scope and must not change weapon while scoped;
+iron sights/plain aim keep wheel switching. Guest evidence (confirmed from the
+disassembly control flow): `sub_0025E650` (per-player aim/zoom update, called
+from `sub_000D5EB0`; `[0x007B0C7C]` player, `[0x007B0CC0]` its camera, which is
+also player `+0x08`) toggles aim bit `0x20` in player `+0x0C` from aim mask
+`+0x28`. When aim starts it sets bit `0x40` only if `sub_001B7DF0(player+0x55C)`
+reports a scope sight (weapon-table `[0x004F9BAC]` entry flags `0x20`, or `0x40`
+with weapon mode `+0x38 == 1`); `sub_00259DF0`/the exit path clear it and it
+drives camera `+0x21C` bit `0x80`. While aiming, held masks `+0x30/+0x34`
+(D-pad up/down in every control scheme, `sub_002586C0`; game bits 4/8 from the
+pad table at `0x0047DF00`) move zoom target camera `+0x388` by 60 deg/s,
+clamped to `[+0x394, +0x390]` from weapon fields `+0x60/+0x64` (`sub_001B7D00`;
+`sub_001B7D70` collapses the range when the scope is unavailable). Zoom is a
+held-button effect, so a notch is a short hold. Which weapon each table entry
+is (entries 8, 9 and 17 carry flag `0x20` and 0.545x-0.07x ranges) is inferred.
+
+`src/pc_scope_wheel.h`: `pc_scope_view` (player `+4 == 0` only, i.e. local
+player 1; bits `0x60` and min < max), `pc_scope_wheel_bindings` (a wheel
+direction is redirected only when bound to Previous/Next weapon and nothing
+else; zoom keys are the first non-wheel keys of actions 10/11), per-notch
+`PC_SCOPE_WHEEL_MS` (80 ms, about 5 degrees) holds that add up to 640 ms,
+state older than 250 ms ignored, leaving the scope cancels the hold. Both
+adapters read `pc_settings_bound_keys` and `pc_scope_view` before their lock in
+`pc_controls_apply_mouse`, filter wheel notches (`wheel_input` /
+SDL wheel event) and every polled key (`pc_controls_key_down` /
+`tsfp_native_key_down`), and reset on menu/capture/focus changes. Controller
+input and Q/V are unchanged. `tests/test_scope_wheel.py`: fixture plus ten
+mutations and adapter/binding structure checks; no in-game run yet.
 
 ## Crane viewport edge clipping (#221)
 
