@@ -718,3 +718,13 @@ skips the network seal, checks the executable hash against
 artwork/test run, and records BUILD.json `preview` (validated false) plus a
 README warning. It is never a published release. Tests:
 `tests/package_launcher.py`, `tests/test_make_local_release.py`.
+
+## FFmpeg pin (2026-10-31)
+
+`tools/fetch-video.ps1` downloads the BtbN month-end build
+`autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-shared-8.1.zip`
+(SHA-256 `3e47bda1…6811a`, also recorded by `tools/package-release.py`). The
+previous pin named the moving `latest` asset, which BtbN rebuilds daily, so its
+checksum stopped matching; month-end builds are retained. Without
+`third_party/ffmpeg/include` the runtime builds without `XMV_HAVE_FFMPEG`
+(no XMV movie playback), so fetch FFmpeg before a release build.
