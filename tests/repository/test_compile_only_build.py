@@ -53,9 +53,9 @@ def test_switch_is_explicit_and_build_only():
 
 
 def test_required_steps_run_before_and_regardless_of_mode():
-    for step in ('Assert-Game', 'tools\\build_textures.py', 'Apply-LocalPatches', "throw 'Run Generate first.'",
+    for step in ('Assert-Game', 'tools\\textures\\build_textures.py', 'Apply-LocalPatches', "throw 'Run Generate first.'",
                  "recomp-generation.py') $toolRoot", "'-m', 'tools.xdk_symbols'", "'scripts/recompile.py'",
-                 "'--record')", "tools\\network-identity.py'))", "'-S', 'titles/futureperfect'",
+                 "'--record')", "tools\\build\\network-identity.py'))", "'-S', 'titles/futureperfect'",
                  "@('--build', $buildRoot"):
         assert step in BEFORE, step
     # Regeneration is only annotated in compile-only mode, never skipped.
@@ -96,7 +96,7 @@ def test_full_build_behaviour_is_preserved():
     assert FULL.index("'--seal-executable', $exe)") > passed
     # Crash symbols only archive files and run in both modes.
     after = TAIL[len(COMPILE_ONLY):]
-    assert "tools\\crash-symbols.py'), '--build-dir'" in after[after.index(FULL) + len(FULL):]
+    assert "tools\\release\\crash-symbols.py'), '--build-dir'" in after[after.index(FULL) + len(FULL):]
 
 
 def test_report_never_claims_success():
