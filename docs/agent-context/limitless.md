@@ -382,9 +382,15 @@ free) when the map's custom set holds 0x15, before `sub_001CA2F0` registers
 anim names; `sub_0015B830` sets spawn record class 0/0x80 (`sub_00280FA0`)
 for a+0x48 == 0x15 / model 0x5BE when the pak is mounted; `sub_0014CC80`
 (INSIDE bosses) hides the stock bar when that AI has the Boss flag (+0x29),
-so one bar per actor. No save byte; the handler cannot reach `sub_002274C0`
-(decode call graph). `tests/mapmaker/test_mapmaker_realbosses.py`. Not yet
-built or played.
+so one bar per actor. Floating meter (user report, mapmaker.5): stock
+`sub_0014D1F0` draws `sub_0013A400` (only caller 0x0014D25F, ret 0x0014D264)
+over every AI-list actor whose entity has a +0x268 damage record, in scene
+100 story only (0x0014D21C/0x0014D225; mission 5 is scene 1); the deerbeast
+handler makes that record (0x002811A3), MapMaker AIs never do. WRAP
+`sub_0013A400` -> `pc_mapmaker_realbosses_meter` skips it for noted real
+bosses (char 0x15 / model 0x5BE). No save byte; the handler cannot reach
+`sub_002274C0` (decode call graph). `tests/mapmaker/test_mapmaker_realbosses.py`.
+Only the creature itself played (v0.4.0-mapmaker.5); the meter fix is not built.
 
 ### MapMaker and System Link bug fixes
 

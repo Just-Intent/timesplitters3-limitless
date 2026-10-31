@@ -172,6 +172,7 @@ int main(void)
     actor(0,0x15,0x5BE,1);pak_mounted=1;
     CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* off: overhead meter drawn */
     pak_mounted=0;
     set_env("TSFP_MAPMAKER_LIMITS","1");
     set_env("TSFP_MAPMAKER_POOLS","0");                  /* limits need the pools */
@@ -266,6 +267,7 @@ int main(void)
     /* ---- play: class at AI start ----------------------------------------- */
     pak_mounted=0;
     actor(0,0x15,0x5BE,1);
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* no real boss noted yet */
     CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);   /* no anims: bot */
     CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);
     pak_mounted=1;
@@ -317,6 +319,26 @@ int main(void)
     CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
     CHECK(seen_focus==ENT(1));
     WORD_AT(PLAYER+0xFF4u)=ENT(0);
+
+    /* ---- play: no overhead meter on the real boss ------------------------ */
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);  /* hidden */
+    HALF_AT(ENT(0)+0x94u)=0x572u;
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);  /* by character id */
+    HALF_AT(A(0)+0x48u)=0x0C;
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* reused actor, other character */
+    HALF_AT(ENT(0)+0x94u)=0x5BEu;
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);  /* by model */
+    HALF_AT(A(0)+0x48u)=0x15;
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D269u,A(0),0,0x7Fu,1);  /* another caller */
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(1),0,0x7Fu,1);  /* deerbeast without the class */
+    actor(2,0x0C,0x572,0);WORD_AT(A(2)+0xBF0u)=REC(0);
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(2),0,0x7Fu,1);  /* other MapMaker AI keeps it */
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,0,0,0x7Fu,1);     /* bad pointer */
+    BYTE_AT(0x007DE455u)=9u;
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* not story */
+    BYTE_AT(0x007DE455u)=10u;
+    WORD_AT(0x0079094Cu)=1u;
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* story level scene */
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);        /* not in play */
     CHECK(seen_focus==ENT(0));
