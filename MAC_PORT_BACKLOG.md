@@ -694,6 +694,8 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 
 - **Mounted/vehicle gun mouse aim (worktree branch off mapmaker-recon 93ee03b6, not yet merged):** `src/pc_mounted.h` (port of main #182/#405/#412) routes mouse counts to the bound gun angles in player modes `0x80` and `0x400` (Scotland the Brave truck gun); both `src/pc_controls.c` and `src/native/input_sdl.c` call it before ordinary look. Windows fixture `tests/test_mounted_mouse.py` passes; Windows live turret, Mac compile and physical Mac aiming are pending.
 
+- **Mouse-wheel scope zoom (branch `scope-wheel-zoom` off mapmaker-recon df56a044, uncommitted to main):** shared `src/pc_scope_wheel.h` turns wheel notches bound to Next/Previous weapon into short zoom-in/zoom-out key holds while player 1 is in a zoomable scope (player `+0x0C` bits `0x60`, camera range `+0x394 < +0x390`). `src/pc_controls.c` and `src/native/input_sdl.c` both call it (player update, wheel event, key poll); no Mac-specific adaptation is needed. Windows fixture `tests/test_scope_wheel.py` passes; Windows in-game zoom feel, Mac compile and physical Mac wheel checks are pending.
+
 - **Issue #7 follow-up (2026-10-16):** `src/pc_terminal.h`
   on `7-breaking-and-entering-camera-turret-not-working` routes relative mouse
   counts to the active terminal's logical pointer in
