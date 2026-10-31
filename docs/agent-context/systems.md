@@ -25,6 +25,7 @@ Consult `docs/shared-platform.md` for shared versus adapter responsibilities.
 | Bindings, input prompts | `src/pc_controls.c`, `pc_input.c`, `pc_bindings.inc`, `pc_prompts.c` | `tests/pc_controls.c`, `tests/pc_prompts.c`, `docs/windows-settings.md` |
 | Mouse/menu handling | `src/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc` | `tests/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
 | Auto-look / camera / cutscene | `src/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py` |
+| Mounted / vehicle gun mouse aim | `src/pc_mounted.h` (called from both adapters' `pc_controls_apply_mouse` after the terminal route, before ordinary look) | `tests/test_mounted_mouse.py` |
 | Display model and native UI | `src/pc_display.c`, `pc_display_*.inc`, `pc_settings.c`, `src/native/` | `tests/test_pc_display_modes.py`, `test_debug_settings_model.py` |
 | GPU clear / screen copies / sampling | `src/pc_clear_rhi.inc`, `src/graphics/`, runtime `src/d3d/` | `tests/test_rhi_menu_sampling.py`, `tests/rhi/`, `docs/shared-platform.md` |
 | Texture loading and formats | `src/texture_pack.c`, `texture_pack_format.h`, `texture_pack_io.h`, `texture_mode.c` | `tests/test_texture_runtime.py`, `tests/texture_pack_tools.py` |
@@ -124,6 +125,26 @@ Unsupported/empty sizes retain the last valid output (guest output before a wind
 exists); current supported limits remain landscape 640x480 through 7680x4320,
 no wider than 4:1. Manual selection disables this tracking. Desktop resolution
 and refresh rate are never changed.
+
+## Mounted and vehicle gun mouse aim
+
+Ordinary mouse look writes player yaw/pitch (`+0x100/+0x104`) from the
+`sub_000D2B80` wrapper, before `sub_000D5C70` dispatches the player mode
+(`+0x114`). Mode `0x400` (vehicle occupant) goes to `sub_000D2470`
+(`0x000D5DA8`), which rebuilds player yaw from the controller axes for gunner
+seats (`0x000D25E8`, `0x000D2774`, `0x000D2A20`) and aims the seat gun from
+that packet, so mouse look was discarded there (Scotland the Brave truck gun).
+Mode `0x80` (scripted mount `sub_000B76B0`) aims from the gun data angles.
+`src/pc_mounted.h` (port of main's `src/input/pc_mounted.h`, #182/#405/#412)
+routes mouse counts to the bound gun's angles in those two modes: vehicle seat
+lookup through the character `+0xC08` handle, entity table `0x0072F5E8`,
+seat records (`+0x70`, stride `0x34`, types 3/4 gunners, tracked type 0 driver
+camera), gun data `+0x1C/+0x24` with authored limits `+0x34..+0x40`, operator
+`+0xD8` checks. Mode `0x40` (`sub_000D1650`, gun follows the player view) and
+on-foot look stay on the ordinary path. This branch has no native-rate clock,
+so callers pass `native_timing=0` (whole-tick `0x004E7944` gate). Controller
+aim is untouched (original code). `tests/test_mounted_mouse.py`: fixture plus
+six mutations and an adapter ordering check; not a live turret test.
 
 ## Crane viewport edge clipping (#221)
 
