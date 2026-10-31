@@ -32,7 +32,14 @@ MUTATIONS = {
     'rooms-no-dedupe': ('mapmaker_probe_rooms.seen[i][2]==b) return 0;', 'mapmaker_probe_rooms.seen[i][2]==b) break;'),
     'rooms-writes-guest': ('inst=WORD_AT(prop+4u);model=', 'inst=WORD_AT(prop+4u);WORD_AT(prop+0x28u)|=0x800000u;model='),
     'rooms-unscoped-draws': ('if(mapmaker_probe_rooms.depth && mapmaker_probe_rooms.open && ', 'if(mapmaker_probe_rooms.open && '),
-    'rooms-relocated-table-ignored': ('#define MAPMAKER_PROBE_ROOM_COUNTS 0x008C7000u', '#define MAPMAKER_PROBE_ROOM_COUNTS 0x007B54E0u'),
+    'nodes-not-dumped': ('            mapmaker_probe_rooms_nodes(room,model,inst);\n', '            (void)0;\n'),
+    'nodes-every-window': ('mapmaker_probe_nodes.seen[k][1]==header) return;', 'mapmaker_probe_nodes.seen[k][1]==header) break;'),
+    'nodes-wrong-stride': ('#define MAPMAKER_PROBE_NODE_STRIDE 0xC8u', '#define MAPMAKER_PROBE_NODE_STRIDE 0xC4u'),
+    'nodes-uncapped': ('i<count && i<MAPMAKER_PROBE_NODES_PER_MODEL && ', 'i<count && '),
+    'nodes-no-model-cap': ('if(mapmaker_probe_nodes.models==MAPMAKER_PROBE_NODE_MODELS || ', 'if(mapmaker_probe_nodes.models>MAPMAKER_PROBE_NODE_MODELS+100u || '),
+    'nodes-hidden-inverted': ('!m?"always":(m&mask)?"drawn":"hidden"', '!m?"always":(m&mask)?"hidden":"drawn"'),
+    'nodes-writes-guest': ('mapmaker_probe_nodes.lines++;\n        mapmaker_probe_write(', 'mapmaker_probe_nodes.lines++;WORD_AT(node+0x5Cu)&=~0x02000000u;\n        mapmaker_probe_write('),
+    'rooms-relocated-table-ignored':('#define MAPMAKER_PROBE_ROOM_COUNTS 0x008C7000u', '#define MAPMAKER_PROBE_ROOM_COUNTS 0x007B54E0u'),
 }
 
 

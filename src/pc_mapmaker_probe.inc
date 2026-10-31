@@ -33,7 +33,9 @@
  *      (sub_000A2900 caller, room, pass), each prop in that room (model id,
  *      +0x28 flags, the instance's +0x30/+0x1F4 flags) and each model draw
  *      sub_0008F950 made inside it (caller, instance, layer), to find a bit
- *      that hides a tile's geometry prop (docs/mapmaker-sky.md, "sky tile")
+ *      that hides a tile's geometry prop (docs/mapmaker-sky.md, "sky tile");
+ *      also, once per run for each distinct geometry model, its node count
+ *      and each node's type, child, sibling and mask (+0x5C), bounded
  * Output: TSFP_MAPMAKER_PROBE_LOG (binary, truncated per process), else stderr.
  * Records are emitted when their content changes, at most four per second,
  * with the number of unchanged repeats; the file is capped at 4 MiB.
@@ -485,6 +487,63 @@ static struct {
 } mapmaker_probe_rooms;
 
 /* 1 if (kind,a,b) is new in this window; 0 if seen or the set is full. */
+/* Flag 128, once per run per {geometry model, node table}: the node tree that
+ * sub_0008F5E0 walks. The header is [inst+4]; its first dword is the node
+ * count n and node i (0xC8 bytes) is at header - n*0xC8 + i*0xC8
+ * (0x0008F5E6..0x0008F637). Node +0x48 byte type (3 stops the descent),
+ * +0x4B signed first child, +0x4C signed next sibling, +0x5C mask: the mesh
+ * is drawn when the mask is 0 or shares a bit with inst+0x30 (0x0008F64A). */
+#define MAPMAKER_PROBE_NODE_STRIDE 0xC8u
+#define MAPMAKER_PROBE_NODE_COUNT_MAX 4096u
+#define MAPMAKER_PROBE_NODES_PER_MODEL 96u
+#define MAPMAKER_PROBE_NODE_MODELS 256u
+#define MAPMAKER_PROBE_NODE_LINES 8192u
+static struct {
+    unsigned models, lines, capped;
+    uint32_t seen[MAPMAKER_PROBE_NODE_MODELS][2];
+} mapmaker_probe_nodes;
+static void mapmaker_probe_rooms_nodes(uint32_t room,uint32_t model,uint32_t inst)
+{
+    uint32_t header,count,base,mask,all=0,i;
+    unsigned k,always=0,hidden=0;
+    if(!MAPMAKER_PROBE_PTR_OK(inst,0x34u)) return;
+    header=WORD_AT(inst+4u);mask=WORD_AT(inst+0x30u);
+    for(k=0;k<mapmaker_probe_nodes.models;k++)
+        if(mapmaker_probe_nodes.seen[k][0]==model && mapmaker_probe_nodes.seen[k][1]==header) return;
+    if(mapmaker_probe_nodes.models==MAPMAKER_PROBE_NODE_MODELS || mapmaker_probe_nodes.lines>=MAPMAKER_PROBE_NODE_LINES) {
+        if(!mapmaker_probe_nodes.capped++)
+            mapmaker_probe_write("  nodes cap reached (%u models, %u lines); later models not dumped\n",
+                mapmaker_probe_nodes.models,mapmaker_probe_nodes.lines);
+        return;
+    }
+    mapmaker_probe_nodes.seen[mapmaker_probe_nodes.models][0]=model;
+    mapmaker_probe_nodes.seen[mapmaker_probe_nodes.models][1]=header;
+    mapmaker_probe_nodes.models++;mapmaker_probe_nodes.lines++;
+    count=MAPMAKER_PROBE_PTR_OK(header,4u)?WORD_AT(header):0u;
+    base=header-count*MAPMAKER_PROBE_NODE_STRIDE;
+    if(!count || count>MAPMAKER_PROBE_NODE_COUNT_MAX || header<count*MAPMAKER_PROBE_NODE_STRIDE ||
+       !MAPMAKER_PROBE_PTR_OK(base,count*MAPMAKER_PROBE_NODE_STRIDE)) {
+        mapmaker_probe_write("  nodes model=0x%X room=%u inst=0x%08X header=0x%08X count=%u unreadable\n",
+            model,room,inst,header,count);
+        return;
+    }
+    for(i=0;i<count;i++) {
+        uint32_t m=WORD_AT(base+i*MAPMAKER_PROBE_NODE_STRIDE+0x5Cu);
+        all|=m;
+        if(!m) always++; else if(!(m&mask)) hidden++;
+    }
+    mapmaker_probe_write("  nodes model=0x%X room=%u inst=0x%08X inst+30=0x%08X count=%u always=%u hidden-now=%u masks=0x%08X\n",
+        model,room,inst,mask,count,always,hidden,all);
+    for(i=0;i<count && i<MAPMAKER_PROBE_NODES_PER_MODEL && mapmaker_probe_nodes.lines<MAPMAKER_PROBE_NODE_LINES;i++) {
+        uint32_t node=base+i*MAPMAKER_PROBE_NODE_STRIDE,w48=WORD_AT(node+0x48u),m=WORD_AT(node+0x5Cu);
+        mapmaker_probe_nodes.lines++;
+        mapmaker_probe_write("   node model=0x%X index=%u type(+48)=%u child(+4B)=%d sibling(+4C)=%d mask(+5C)=0x%08X %s\n",
+            model,i,w48&0xFFu,(int)(int8_t)(w48>>24),(int)(int8_t)(WORD_AT(node+0x4Cu)&0xFFu),m,
+            !m?"always":(m&mask)?"drawn":"hidden");
+    }
+    if(i<count) mapmaker_probe_write("   nodes truncated model=0x%X shown=%u of %u\n",model,i,count);
+}
+
 static int mapmaker_probe_rooms_first(uint32_t kind,uint32_t a,uint32_t b)
 {
     unsigned i;
@@ -557,6 +616,8 @@ static void mapmaker_probe_rooms_room(uint32_t ret,uint32_t room,uint32_t pass)
             WORD_AT(prop+0x30u)>>8&0xFFu,WORD_AT(prop+0x30u)>>16&0xFFu,(int32_t)WORD_AT(prop+0x34u),inst,
             MAPMAKER_PROBE_PTR_OK(inst,0x1F8u)?WORD_AT(inst+0x30u):0u,
             MAPMAKER_PROBE_PTR_OK(inst,0x1F8u)?WORD_AT(inst+0x1F4u):0u);
+        if(model>=MAPMAKER_PROBE_MODEL_ROOMS && model<MAPMAKER_PROBE_MODEL_ROOMS_END)
+            mapmaker_probe_rooms_nodes(room,model,inst);
     }
     if(count>MAPMAKER_PROBE_ROOM_PROPS)
         mapmaker_probe_write("  props truncated room=%u count=%u\n",room,count);
@@ -601,5 +662,6 @@ static void mapmaker_probe_reset(void)
     if(mapmaker_probe.file)fclose(mapmaker_probe.file);
     memset(&mapmaker_probe,0,sizeof mapmaker_probe);
     memset(&mapmaker_probe_rooms,0,sizeof mapmaker_probe_rooms);
+    memset(&mapmaker_probe_nodes,0,sizeof mapmaker_probe_nodes);
 }
 #endif
