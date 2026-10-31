@@ -39,19 +39,36 @@ MUTATIONS = {
     'changed-ignores-extras': ('    if(memcmp(old,ws.ed,sizeof old)) g_eax=1u;\n', ''),
     'reset-skips': ('    memset(ws.ed,0,sizeof ws.ed);\n    ws.page=0;\n', '    ws.page=0;\n'),
     'held-keeps-slot': ('WORD_AT(e+WS_HELD+WS_NODE_SLOT)=WS_NODE_TAG;', '(void)e;'),
-    'page-no-reset': ('    ws.page=0;ws.title_ok=0;\n    original();', '    ws.title_ok=0;\n    original();'),
+    'page-no-reset': ('    ws.page=0;ws.title_ok=0;ws.view=0;\n    original();', '    ws.title_ok=0;ws.view=0;\n    original();'),
     'no-title': ('        g_eax=WS_TITLE;\n', ''),
-    'title-stale': ('            ws_title_suffix();\n        }\n    }\n    original();', '        }\n    }\n    original();'),
-    'keeps-direction': ('            WORD_AT(pane+0xC4u)&=~0x000F000Fu;WORD_AT(pane+0xC8u)&=~0xFu;\n', ''),
-    'no-cursor': ('            guest_call(sub_00074460,3,pane,to,0u);\n', ''),
+    'title-stale': ('X clear writes the profile (0x002D41D5) */\n    ws_title_suffix();\n', 'X clear writes the profile (0x002D41D5) */\n'),
+    'keeps-direction': ('        WORD_AT(pane+0xC4u)&=~0x000F000Fu;WORD_AT(pane+0xC8u)&=~0xFu;\n', ''),
+    'no-cursor': ('        guest_call(sub_00074460,3,pane,to,0u);\n', ''),
     'page-past-end': ('ws.page<3 && (in&0x00020002u)', 'ws.page<4 && (in&0x00020002u)'),
-    'screen-always-on': ('    if(!ws_custom() || !MAPMAKER_STACK_OK(8) || !ws_on()) { ws.page=0;original();return; }',
-                         '    if(!ws_custom() || !MAPMAKER_STACK_OK(8)) { ws.page=0;original();return; }'),
+    'screen-always-on': ("|| !ws_on() || !MAPMAKER_PTR_OK(pane=WORD_AT(g_esp+4u),0x200u)", "|| !MAPMAKER_PTR_OK(pane=WORD_AT(g_esp+4u),0x200u)"),
     'last-page-overlap': ('static const uint8_t ws_page_first[4]={0u,6u,12u,14u};', 'static const uint8_t ws_page_first[4]={0u,6u,12u,18u};'),
-    'get-any-caller': ('    if(!ws_paged(ret,WS_ROW_RET)) { original();return; }', '    if(!ws.page) { original();return; }'),
-    'set-any-caller': ('    if(!ws_paged(ret,WS_PICK_RET) && !ws_paged(ret,WS_CLEAR_RET)) { original();return; }',
+    'get-any-caller': ('    if(!ws_paged(ret,WS_ROW_RET) && !ws_paged(ret,WS_PREVIEW_RET)) { original();return; }', '    if(!ws.page) { original();return; }'),
+    'get-no-preview': (' && !ws_paged(ret,WS_PREVIEW_RET)) { original();return; }', ') { original();return; }'),
+    'set-any-caller': ('    if(ws.view!=1 || (!ws_paged(ret,WS_PICK_RET) && !ws_paged(ret,WS_CLEAR_RET))) { original();return; }',
                        '    if(!ws.page) { original();return; }'),
-    'set-no-clear': (' && !ws_paged(ret,WS_CLEAR_RET)) { original();return; }', ') { original();return; }'),
+    'set-no-clear': (' && !ws_paged(ret,WS_CLEAR_RET))) { original();return; }', ')) { original();return; }'),
+    'set-frontend': ('    if(ws.view!=1 || (!ws_paged', '    if((!ws_paged'),
+    'no-right-left': ('        else if(in&0x00080008u) step=2;\n        else if(in&0x00040004u) step=-2;\n', ''),
+    'right-on-list-row': ('    if(v>=0 && v<(int32_t)WS_STOCK) {', '    if(v>=-5 && v<(int32_t)WS_STOCK) {'),
+    'no-wrap': ('        ws.page=(ws.page+(step>0?1:3))%4;', '        ws.page+=step>0?1:-1;if(ws.page<0)ws.page=0;if(ws.page>3)ws.page=3;'),
+    'left-moves-cursor': ('step==-1?WS_STOCK-1u:(uint32_t)v;', 'step==-1?WS_STOCK-1u:0u;'),
+    'frontend-off': ('    if(!ws_fe_scene()) return 0;\n', '    return 0;\n'),
+    'frontend-any-set': ('WORD_AT(item+0xC8u)==WS_LIST_MAP?2:0;', '1?2:0;'),
+    'frontend-any-mode': ('    return WORD_AT(WS_SCENE)==101u && WORD_AT(WS_GAMETYPE)==9u &&', '    return WORD_AT(WS_SCENE)==101u &&'),
+    'frontend-link': (' && !WORD_AT(WS_NET);', ';'),
+    'frontend-story': (' && WS_B(WS_TYPEBYTE)!=10u && !WORD_AT(WS_NET)', ' && !WORD_AT(WS_NET)'),
+    'frontend-editor-ids': ('(ws.view==2?ws.fe:ws.ed)[s-WS_STOCK]', 'ws.ed[s-WS_STOCK]'),
+    'frontend-stale-map': ('    if(view==2) ws_extras(ws_chunk(WORD_AT(WS_CONTAINER)),ws.fe);\n', ''),
+    'frontend-x-clear': ('    if(view==2 && ws.page) WORD_AT(pane+0xC4u)&=~0x00800000u;', '    if(0) WORD_AT(pane+0xC4u)&=~0x00800000u;'),
+    'frontend-title-stays': ('        if(ws.view) { ws.view=0;ws_title_suffix(); }\n', '        ws.view=0;\n'),
+    'title-no-count': ('"  (%u-%u of %u)",a,b,WS_SLOTS);', '"  (%u-%u)",a,b);'),
+    'title-frontend-start': ('WORD_AT(p+0x6A4u)==WS_LIST_MAP?2:0;', '1?2:0;'),
+    'view-not-recorded': ('    ws.view=view;                                 /* a page', '    /* a page'),
     'sai-any-caller': ('WORD_AT(g_esp)!=WS_SAI_RET || WORD_AT(WS_SCENE)!=102u', '0 || WORD_AT(WS_SCENE)!=102u'),
     'sai-ignores-switch': ('    if(!ws_on() && !(MAPMAKER_PTR_OK(value,4) && (int32_t)WORD_AT(value)>=(int32_t)WS_STOCK))', '    if(0 && !(MAPMAKER_PTR_OK(value,4) && (int32_t)WORD_AT(value)>=(int32_t)WS_STOCK))'),
     'text-off-by-one': ('"%u: %.40s",(unsigned)slot+1u,s);', '"%u: %.40s",(unsigned)slot,s);'),
@@ -161,6 +178,32 @@ def test_hook_return_addresses():
     assert callers_of(0x23f390) == {0x0006C95E}
     assert {a[c].function for c in callers_of(0x312880)} == {0x00313310}
     assert {a[c].function for c in callers_of(0x2d3b00)} == {0x0006BD30, 0x002D3D30, 0x002D40A0}
+    # the highlighted row's weapon model asks the getter with the row value
+    assert ret_of(a, 0x002D410A, 0x2d3b00) == 0x002D410F and ret_of(a, 0x002D40C6, 0x2d3b00) == 0x002D40CB
+
+
+def test_weapon_screen_routes():
+    """Every way to the slot pane 0x005236EC, and why the in-play pause has none."""
+    a = by_address()
+    pushes = lambda v: {i.address for i in decoded() if i.mnemonic == 'push' and ('imm', v) in i.ops}
+    # screen 0x0052371C (builder sub_002D44D0 adds the pane) is pushed by the setup's
+    # Weapons action sub_002C7710 and the editor's Map Settings action sub_003128F0
+    assert {a[x].function for x in pushes(0x0052371C)} == {0x002C7710, 0x003128F0}
+    # (the weapon list's pick sub_002BF910 and update sub_002BF9C0 return focus to it)
+    assert {a[x].function for x in pushes(0x005236EC)} == {0x002BF910, 0x002BF9C0, 0x002D44D0}
+    # the setup builder sub_002C78F0 skips the Weapons item (text 0x3B7) when its
+    # second argument (ebx, esp+0x2C with 4 pushes pending) is set; the pause passes 1
+    assert 0x2C in disp(a[0x002C79A1]) and a[0x002C808C].mnemonic == 'jne' and ('imm', 0x3B7) in a[0x002C80B6].ops
+    assert ('imm', 1) in a[0x0019A018].ops and '0x2c78f0' in a[0x0019A01B].text
+    # and offers its action only outside scene 100
+    assert ('imm', 0x64) in a[0x002C8097].ops and a[0x002C809E].mnemonic == 'jg' and ('imm', 0x002C7710) in a[0x002C80AB].ops
+    # front end, mode 9, list value 0xF (the map's set): rows are read-only in stock
+    assert ('imm', 0xF) in a[0x002D415B].ops and ('imm', 0xF) in a[0x002D406F].ops
+    # the pane tick runs the pane's update (+0xC, from descriptor +4) before its Up/Down
+    assert a[0x0007AD76].mnemonic == 'call' and 0xC in disp(a[0x0007AD50])
+    assert 0xC4 in disp(a[0x0007AE2E]) and ('imm', 0x20000) in a[0x0007AE7D].ops
+    # Left/Right move only choice items (+0xB4 == 1)
+    assert 0xB4 in disp(a[0x0007AFB1]) and ('imm', 0x40000) in a[0x0007AFC6].ops and ('imm', 0x80000) in a[0x0007AFDB].ops
 
 
 def test_play_set_is_rebuilt_per_call():

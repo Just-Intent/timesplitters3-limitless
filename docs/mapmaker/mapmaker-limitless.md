@@ -196,9 +196,13 @@ characters use more memory. *Automated tests only.* Details:
 ### 20 weapon slots (`LIMITS`)
 
 The custom weapon set has 20 slots instead of 6. In **Map Settings**, open
-the custom weapon set: the title shows **(1-6)**; press Down on the last row
-for **(7-12)**, **(13-18)** and **(15-20)**, Up on the first row to go back
-(the rows stay numbered 1-6). New slots start empty. A weapon or ammo pickup's
+the custom weapon set (the editor's Start menu; this is where the set is
+defined): the title shows **(1-6 of 20)**; press **Right** on any row (or
+Down on the last row) for **(7-12 of 20)**, **(13-18 of 20)** and
+**(15-20 of 20)**, **Left** (or Up on the first row) to go back (the rows
+stay numbered 1-6). New slots start empty. Save the map afterwards. The
+front end's Arcade setup shows the MapMaker set's 20 slots the same way, read
+only; the in-game pause menu has no weapon set screen (as in the original). A weapon or ammo pickup's
 options gain a **Weapon** choice: its own slot (as before) or slots 7-20. A
 Story AI's weapon choice lists all 20 slots. Bots pick from every filled
 slot. A map that uses slots 7-20 needs this fork: the original game and
