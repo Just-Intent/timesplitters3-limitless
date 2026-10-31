@@ -113,7 +113,7 @@ the UI fixture tests both callers and guards, while Mac scenes remain unverified
 
 Reload #337 and interaction #357 use advancing-time admission at their exact
 US compare sites; see [input consumers and validation](interaction-input.md).
-Keyboard reload buffering additionally uses `pc_reload_input.h`, owned by
+Keyboard reload buffering also uses `pc_reload_input.h`, owned by
 `PcInput`, and US state snapshots in `pc_reload_guest.h`. Win32 and SDL publish
 press/release events under input locks, including collapsed down/up events.
 The shared sampler applies configured key roles before merging pad input.

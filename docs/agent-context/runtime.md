@@ -971,3 +971,4 @@ The characters area wraps `sub_001CD980` (unlock test, MapMaker picker return on
 The memory area wraps the Level-heap allocators `sub_0003DFA0`/`sub_0003E0B0` (overrun log) and arena setup `sub_00023930` (`TSFP_MAPMAKER_ARENA_MB`); see [limitless](limitless.md).
 Bosses also wraps `sub_00078590` (Story AI health rows, return 0x0031CFD7) for the levels above Tough Guy; see [limitless](limitless.md).
 The sets area (20-slot custom character set) wraps the set screen, store, play copy and preload and adds layers to compile/load/reset and `sub_00078590`; see [limitless](limitless.md).
+Realbosses (giant trophy monster) wraps the picker, text, model request, anim mount `sub_001C8540` and AI start `sub_0015B830`; its HUD layer sits inside bosses. See [limitless](limitless.md).
