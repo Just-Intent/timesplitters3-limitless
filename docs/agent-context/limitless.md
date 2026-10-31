@@ -475,7 +475,19 @@ the editor T acts as the first "Fire" key (right trigger, floor up;
 and the movement keys (W/A/S/D by default) no longer move the pointer;
 strafe left/right step the toolbar as the D-pad (`pc_mapmaker_move_key`,
 `pc_mapmaker_dpad_alias`). A right click over an empty cell with no piece held
-presses Y (clears the selection; `editor+0x2F7C`/`+0x2F18`, static analysis). No guest regeneration. Fixture:
+presses Y (clears the selection; `editor+0x2F7C`/`+0x2F18`, static analysis). In
+an open list a right click is Back (`+0xC4 |= 0x20`), set by the shared row hook
+(`sub_00073750`, 0x0007ADC5); the dispatcher acts on it through the list's Back
+callback `+0x1C0` (`sub_002FB090`, 0x0007B1A9). The lighting list (descriptor
+`0x0052DFF0`, toolbar table `0x0052CD50` slot 2) and its colour sub-lists
+(`0x0052E000`/`E020`/`E030`/`E040`) have no `+0x1C0` and no pop flag (`+0x40 &
+0x2000`): their tick `sub_0031AF80` (0x0007AD76, before the row hook; `+0xC4` is
+cleared at 0x0007AA12) reads Back itself (0x0031B172, closes via `sub_0031A500`),
+so the late Back was lost. `mapmaker_pointer_tick_back` sets it in
+`pc_display_menu_mouse_input` right after the input read instead, as B does, and
+clears the right-click action for the row hook. Every other MapMaker list descriptor
+in `0x0052C000..0x0052F000` relies on `+0x1C0` (scan of ticks testing `+0xC4 & 0x20`;
+tile/item/Story AI/logic/settings observed with `+0x1C0` set). No guest regeneration. Fixture:
 `tests/mapmaker/test_mapmaker_pointer.py`. Mac: MAC-128.
 
 ### MapMaker editor widescreen

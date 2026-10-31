@@ -53,6 +53,11 @@ MUTATIONS = {
     'right-never-clears': (ADAPTER, 'if(mapmaker_pointer_right_clears()) pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_Y);\n            else ', ''),
     'right-clears-held': (ADAPTER, '!WORD_AT(editor+0x2f7c) && ', ''),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
+    'lighting-back-late': (ADAPTER, 'if(d!=0x0052DFF0u && d!=', 'if(d!='),
+    'tick-back-any-list': (ADAPTER, '    if(d!=0x0052DFF0u && d!=0x0052E000u && d!=0x0052E020u && d!=0x0052E030u && d!=0x0052E040u) return 0;\n', ''),
+    'tick-back-on-screen': (ADAPTER, ' || mapmaker_pointer_context(menu)) return 0;\n    d=', ') return 0;\n    d='),
+    'tick-back-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu)) return 0;\n    d=', 'if(!mapmaker_pointer_enabled() || mapmaker_pointer_context(menu)) return 0;\n    d='),
+    'tick-back-no-bit': (ADAPTER, '    WORD_AT(menu+0xc4)|=0x20u;\n    return 1;\n}', '    return 1;\n}'),
 }
 
 
@@ -103,6 +108,10 @@ def test_pointer_wiring():
     # Both wheel samples (dispatch and layout fallback) go to the editor first.
     assert guest.count('.wheel && mapmaker_pointer_wheel(menu,') == 2
     assert '(actions&4) && !(mapmaker_pointer_enabled() && mapmaker_pointer_context(menu))' in confirm
+    # Lighting list Back: after the input read, before the tick; the late hook skips it.
+    early = guest.split('void pc_display_menu_mouse_input(void (*original)(void))', 1)[1]
+    back = 'if((s->actions&4) && mapmaker_pointer_tick_back(menu)) s->actions&=~4u;'
+    assert early.index('s->sampled=1;') < early.index(back) < early.index('if(!(s->actions&2))')
     for host in ('src/input/pc_controls.c', 'src/native/input_sdl.c'):
         text = (ROOT / host).read_text(encoding='utf-8')
         assert 'void pc_controls_mapmaker_pointer(int active)' in text

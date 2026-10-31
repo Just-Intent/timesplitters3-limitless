@@ -453,6 +453,8 @@ void pc_display_menu_mouse_input(void (*original)(void))
     if(s->pointer.wheel && mapmaker_pointer_wheel(menu,s->pointer.wheel)) s->pointer.wheel=0; /* prototype */
     if((WORD_AT(menu+0xc4)&0x3Fu) && !s->pointer.wheel) menu_mouse.wheel_pending=0;
     s->actions=pc_menu_mouse_actions(&menu_mouse,menu,s->pointer,GetTickCount64());s->sampled=1;
+    /* MapMaker lighting list: its tick reads Back before the row hook. */
+    if((s->actions&4) && mapmaker_pointer_tick_back(menu)) s->actions&=~4u;
     /* Text-only pages (including long Objectives) scroll in sub_00073750
      * using held Up/Down, before the later row-navigation hook. One wheel
      * notch supplies one tick; original input clears it on the next tick. */
