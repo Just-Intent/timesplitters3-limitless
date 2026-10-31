@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,1519 @@
+@@ -1037,6 +1037,1628 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1354,14 +1354,123 @@
 +#endif
 +}
 +
-+extern void sub_0014CC80_gen(void);
-+void sub_0014CC80(void)
++extern void sub_000781A0_gen(void);
++void sub_000781A0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")) pc_mapmaker_bosses_hud(sub_0014CC80_gen);
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_picker_end")) pc_mapmaker_realbosses_picker_end(sub_000781A0_gen);
++    else sub_000781A0_gen();
++#else
++    sub_000781A0_gen();
++#endif
++}
++
++extern void sub_002C1C90_gen(void);
++void sub_002C1C90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_pick")) pc_mapmaker_realbosses_pick(sub_002C1C90_gen);
++    else sub_002C1C90_gen();
++#else
++    sub_002C1C90_gen();
++#endif
++}
++
++extern void sub_002C1E10_gen(void);
++void sub_002C1E10(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_highlight")) pc_mapmaker_realbosses_highlight(sub_002C1E10_gen);
++    else sub_002C1E10_gen();
++#else
++    sub_002C1E10_gen();
++#endif
++}
++
++extern void sub_002BE600_gen(void);
++void sub_002BE600(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_row_of")) pc_mapmaker_realbosses_row_of(sub_002BE600_gen);
++    else sub_002BE600_gen();
++#else
++    sub_002BE600_gen();
++#endif
++}
++
++extern void sub_002BE300_gen(void);
++void sub_002BE300(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_row_text")) pc_mapmaker_realbosses_row_text(sub_002BE300_gen);
++    else sub_002BE300_gen();
++#else
++    sub_002BE300_gen();
++#endif
++}
++
++extern void sub_0003D7B0_gen(void);
++void sub_0003D7B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_text")) pc_mapmaker_realbosses_text(sub_0003D7B0_gen);
++    else sub_0003D7B0_gen();
++#else
++    sub_0003D7B0_gen();
++#endif
++}
++
++extern void sub_000A5E40_gen(void);
++void sub_000A5E40(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_model_request")) pc_mapmaker_realbosses_model_request(sub_000A5E40_gen);
++    else sub_000A5E40_gen();
++#else
++    sub_000A5E40_gen();
++#endif
++}
++
++extern void sub_001C8540_gen(void);
++void sub_001C8540(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_anims")) pc_mapmaker_realbosses_anims(sub_001C8540_gen);
++    else sub_001C8540_gen();
++#else
++    sub_001C8540_gen();
++#endif
++}
++
++extern void sub_0015B830_gen(void);
++void sub_0015B830(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_ai_start")) pc_mapmaker_realbosses_ai_start(sub_0015B830_gen);
++    else sub_0015B830_gen();
++#else
++    sub_0015B830_gen();
++#endif
++}
++
++extern void sub_0014CC80_gen(void);
++static void sub_0014CC80_layer0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_hud")) pc_mapmaker_realbosses_hud(sub_0014CC80_gen);
 +    else sub_0014CC80_gen();
 +#else
 +    sub_0014CC80_gen();
++#endif
++}
++
++void sub_0014CC80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")) pc_mapmaker_bosses_hud(sub_0014CC80_layer0);
++    else sub_0014CC80_layer0();
++#else
++    sub_0014CC80_layer0();
 +#endif
 +}
 +

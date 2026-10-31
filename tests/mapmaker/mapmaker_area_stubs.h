@@ -49,6 +49,11 @@ void sub_00079D60(void) {}
 /* bosses */
 void sub_00139740(void) {}
 void sub_00071800(void) {}
+/* realbosses */
+void sub_0005A130(void) {}
+void sub_00062260(void) {}
+void sub_00071630(void) {}
+void sub_00071C70(void) {}
 /* sky (sub_00078560 becomes a wrapper dispatcher) */
 void sub_00078560(void) {}
 void sub_0007D4F0(void) {}

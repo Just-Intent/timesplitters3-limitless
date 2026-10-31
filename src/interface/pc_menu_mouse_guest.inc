@@ -63,6 +63,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_roof.inc"
 #include "pc_mapmaker_bosses.inc"
 #include "pc_mapmaker_characters.inc"
+#include "pc_mapmaker_realbosses.inc"
 #include "pc_mapmaker_sets.inc"
 /* MapMaker capacity area includes (end) */
 
@@ -743,6 +744,16 @@ void pc_mapmaker_roof_menu_init(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_menu_add(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_menu_hover(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_menu_pick(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_picker_end(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_pick(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_highlight(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_row_of(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_row_text(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_text(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_model_request(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_hud(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_rows(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_close(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_delete(void (*original)(void)) { original(); }
