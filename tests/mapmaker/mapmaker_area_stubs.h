@@ -49,6 +49,7 @@ void sub_00079D60(void) {}
 /* bosses */
 void sub_00139740(void) {}
 void sub_00071800(void) {}
+void sub_0013A400(void) {}
 /* realbosses */
 void sub_0005A130(void) {}
 void sub_00062260(void) {}

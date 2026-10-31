@@ -84,8 +84,8 @@
  *    focus is a real boss whose Story AI also has the Boss flag, the focus
  *    is cleared for the original call and restored after, so the stock bar
  *    is not drawn and the bosses area draws that AI's single Boss bar (its
- *    name, health multiplier, stacking). Without the Boss flag the stock bar
- *    stays (one bar). The Boss/health multipliers act on entity +0x1CC/+0x1D8
+ *    name, health multiplier, stacking), or none for the Sub-boss bar choice.
+ *    Without the Boss flag the stock bar stays (one bar). The Boss/health multipliers act on entity +0x1CC/+0x1D8
  *    as for any Story AI.
  *  - meter (sub_0013A400, the overhead health meter): stock MapMaker story
  *    play draws it in sub_0014D1F0 (HUD, called at 0x001CEF19) only when the
@@ -101,15 +101,20 @@
  *    on its back). Mission 5 is scene 1: the scene test skips the loop. The
  *    hook skips the draw (sub_0013A400 only draws: billboard quads through
  *    sub_0001AC50, plain ret) for actors noted by ai_start whose character
- *    is 0x15 or entity model 0x5BE; every other actor, scene and caller runs
- *    the original. The record itself stays (sub_0014CC80 and the damage
+ *    is 0x15 or entity model 0x5BE, unless their Story AI chose the
+ *    Sub-boss bar; every other actor, scene and caller runs the original. The record itself stays (sub_0014CC80 and the damage
  *    flash in sub_0014D3A0 read it).
  *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax,
  * g_xbox_mem_offset, xbox_HeapAlloc, pc_mapmaker_area_enabled and
  * pc_mapmaker_limits.inc (mapmaker_limits, MAPMAKER_GUEST_RET,
  * MAPMAKER_PTR_OK). Hot hooks (text: every text lookup; hud: every HUD
- * frame; meter: per frame per recorded actor) test fixed values first and use MAPMAKER_PTR_OK only. */
+ * frame; meter: per frame per recorded actor) test fixed values first and use MAPMAKER_PTR_OK only.
+ *
+ * Health display (bosses area row, Story AI chunk +0x29 bit 2), per real boss:
+ * not Boss-flagged = stock bottom bar, meter hidden; Boss bar = the bosses
+ * area's bottom bar, meter hidden; Sub-boss bar = no bottom bar (focus
+ * cleared for the stock call, bosses draws none), the stock meter kept. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -159,7 +164,9 @@
 #define RBS_INFO_MEMBERS 0x18u          /* 4 bytes each, word id */
 #define RBS_SET_MAX 20u
 #define RBS_SAI_INDEX 0x22u
-#define RBS_SAI_BOSS 0x29u              /* bosses area: 0xB0 | (level - 1) */
+#define RBS_SAI_BOSS 0x29u              /* bosses area: 0xB0 | sub-boss 4 | (level - 1) */
+#define RBS_BOSS_BAR 1u                 /* real[].boss: Boss-flagged, the bottom Boss bar */
+#define RBS_BOSS_SUB 2u                 /* Boss-flagged with the Sub-boss bar: overhead meter */
 #define RBS_SAI_MIN 0x44u
 #define RBS_SAI_BASE 0x00783A50u        /* R: Story AI ids are R + index + 1 */
 #define RBS_ACTOR 0xEA0u
@@ -365,7 +372,8 @@ static uint8_t rbs_boss_flag(uint32_t index)
         if(tag==RBS_TAG_END || sz>end-c-8u) break;
         if(tag==RBS_TAG_SAI && sz>=RBS_SAI_MIN && RBS_H(c+8u+RBS_SAI_INDEX)==index) {
             uint8_t f=RBS_B(c+8u+RBS_SAI_BOSS);
-            return (uint8_t)((f&0xFCu)==0xB0u);
+            if((f&0xF8u)!=0xB0u) return 0;
+            return (uint8_t)((f&4u)?RBS_BOSS_SUB:RBS_BOSS_BAR);
         }
         c+=8u+sz;
     }
@@ -422,7 +430,7 @@ void pc_mapmaker_realbosses_hud(void (*original)(void))
     rec=WORD_AT(a+RBS_ACTOR_RECORD);
     for(k=0;k<RBS_REAL_MAX && rbs.real[k].record!=rec;k++) {}
     if(k==RBS_REAL_MAX || !rbs.real[k].boss) { original();return; }
-    WORD_AT(player+RBS_FOCUS)=0;                     /* the Boss bar replaces the stock one */
+    WORD_AT(player+RBS_FOCUS)=0;                     /* Boss bar: ours replaces it; Sub-boss: the meter does */
     original();
     WORD_AT(player+RBS_FOCUS)=focus;
 }
@@ -439,7 +447,7 @@ void pc_mapmaker_realbosses_meter(void (*original)(void))
     if(RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL) { original();return; }
     rec=WORD_AT(a+RBS_ACTOR_RECORD);
     for(k=0;k<RBS_REAL_MAX && rbs.real[k].record!=rec;k++) {}
-    if(k==RBS_REAL_MAX || !rbs_play()) { original();return; }
+    if(k==RBS_REAL_MAX || rbs.real[k].boss==RBS_BOSS_SUB || !rbs_play()) { original();return; }   /* Sub-boss: keep it */
     if(!rbs.meters++) rbs_log("overhead health meter hidden on the giant trophy monster",a,ent);
     MAPMAKER_GUEST_RET();                            /* cdecl: the caller pops the four args */
 }

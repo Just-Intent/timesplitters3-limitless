@@ -1,7 +1,7 @@
 # MapMaker Story AI bosses and the story creature probe
 
 Status: implemented in `src/interface/pc_mapmaker_bosses.inc` (area `bosses`),
-fixture-tested (`tests/mapmaker/test_mapmaker_bosses.py`: 81 mutations plus
+fixture-tested (`tests/mapmaker/test_mapmaker_bosses.py`: 99 mutations plus
 decode checks of every guest site). Not built or played yet.
 
 Later requests (2026-10-31): "If in range of multiple bosses, multiple boss
@@ -9,6 +9,10 @@ health bars should be visible on screen" and "Add multiple additional story
 AI health settings in mapmaker that are stronger than the "Tough Guy"
 setting" - see [Several boss bars](#several-boss-bars) and
 [Stronger health](#stronger-health).
+Request (2026-10-31): "an option to appear on the story AI customization
+screen whenever you set an enemy as a boss to decide whether to use "boss
+health" (big bar on the bottom of the screen) or "sub-boss health" (bar
+visible on the back of the enemy)" - see [Health display](#health-display).
 Research basis: `logs/limits/features/story-enemies.md` (main checkout, ignored).
 No guest-code table entry.
 
@@ -25,7 +29,12 @@ Open a Story AI from the Story AI list. A row **Boss: Off** appears above
 **Done** (after any group rows). Each click cycles
 **Off -> On -> health x2 -> x4 -> x8 -> Off**; the edit screen stays open
 and the label changes in place (if the label does not refresh, reopen the
-AI to see the value). Type 5 AIs (the game-mode-7 singleton) get no row.
+AI to see the value). Type 5 AIs (the game-mode-7 singleton) get no row. While Boss is not Off a
+second row **Health display: Boss bar** follows; a click toggles it to
+**Health display: Sub-boss bar** and back, in place. The row is built with
+the screen, so after switching Boss on from Off reopen the AI to see it;
+cycling Boss to Off clears the choice (its label reads "(Boss off)" and
+clicks do nothing until reopened).
 The setting is per AI: duplicates and linked copies start with Off and a
 group does not share it.
 
@@ -47,7 +56,10 @@ per-level state MapMaker never creates (`sub_0025F720`) and is out of scope.
 ## Save format and compatibility
 
 - Story AI chunk (tag 0x00C7766C) data byte **+0x29**: 0 = no boss,
-  0xB0 | (level - 1) = boss with x1 / x2 / x4 / x8 health.
+  0xB0 | (level - 1) = boss with x1 / x2 / x4 / x8 health and the Boss bar,
+  0xB4 | (level - 1) = the same with the Sub-boss bar (bit 2; mask 0xF8).
+  Builds before this change (mask 0xFC) log 0xB4..0xB7 as unknown and play
+  that AI as an ordinary AI; a stock game ignores the byte.
 - Proof that it is free (decode test `test_sai_chunk_byte_0x29_unused`): the
   compiler zeroes the container (`rep stosd` 0x0030070D); the writer
   (0x003013E1..0x003015E5) stores byte +0x28 (0x00301459, size 1) and word
@@ -146,6 +158,47 @@ farther ones wait for a free place.
   stock HUD draw, so the renderer keeps all bars inside the centred 4:3 HUD
   box ([widescreen](mapmaker-widescreen.md)).
 
+## Health display
+
+| Story AI | bottom bar | overhead meter |
+|---|---|---|
+| Boss, Boss bar | yes (stacked, in range) | no |
+| Boss, Sub-boss bar | no | yes, while alive (any distance, like stock) |
+| real trophy monster, no Boss flag | its stock bar | hidden ([real bosses](mapmaker-realbosses.md)) |
+| real trophy monster, Boss bar | the Boss bar | hidden |
+| real trophy monster, Sub-boss bar | none | its stock meter |
+
+- The meter is the stock MapMaker story overhead meter `sub_0013A400`
+  (CONFIRMED by decode, `test_overhead_meter_draw_contract`): cdecl
+  `(actor, 0, 0x7F, 0x6E)`, plain `ret`, only draws (billboard quads via
+  `sub_0001AC50`); reads actor +0xC68 (fade, `sub_0011F780`), entity +0x10
+  (visibility bit of the camera), +0x64..+0x6C and +0x1CC/+0x1D8, and never
+  +0x268. Stock `sub_0014D1F0` calls it (scene 100, story) only for actors
+  whose entity has a damage-stage record +0x268.
+- Not chosen: giving ordinary AIs a record. `sub_0012C800` is a bump
+  allocator of 17 slots x 0x144 (0x00745938, count [0x007490A0], reset only
+  at 0x0014853D, no free), shared with players and story scripts, so
+  respawning Sub-boss AIs would exhaust it; and +0x268 has about 100
+  readers (damage flash `sub_0014D3A0`, `sub_0014CC80`, hit handling), so
+  it would change behaviour, not just the HUD.
+- Chosen: WRAP `sub_0014D1F0` -> `pc_mapmaker_bosses_meters`. Before the
+  original (which calls nothing before its meter loop, so the render state
+  is the same) it calls `sub_0013A400(actor, 0, 0x7F, 0x6E)` for each live
+  Sub-boss AI (list 0x00900100 from `[0x00790950]`) that is alive, not the
+  player's entity, has a model instance ([entity+4], +0x8C, +0x10) and has
+  no +0x268 record (with one, the stock loop draws it: no double meter).
+  Gated on scene 100, story mode, the switch and a Sub-boss AI in the map;
+  registers are restored after every call.
+- Height (CONFIRMED): the meter spans 0.4..0.6 units ([0x475CC8] = 0.6,
+  [0x4785E4] = 0.2) above node [[[entity+4]+0x8C]+0x18] of the model's own
+  pose (matrix +0x34, plus entity +0x68), so it already follows each
+  model's skeleton rather than a human height; on the trophy monster that
+  node is what puts it on its back. The node index is the first of the
+  skeleton header's body-part nodes (`sub_000C30E4` switch: +0x18, +0x34,
+  +0x38, +0x54; INFERRED head). No cheap model-height field was found, so
+  no extra lift is applied.
+- Health x2..x8 and the stronger health levels apply to Sub-boss AIs too.
+
 ## Stronger health
 
 Stock (CONFIRMED): the Story AI edit screen's **Health** row is text 0xC0D
@@ -229,13 +282,14 @@ WRAP sub_00301A90 -> pc_mapmaker_bosses_load       (chained: OUTSIDE pc_mapmaker
 WRAP sub_00240C50 -> pc_mapmaker_bosses_level      (chained: OUTSIDE pc_mapmaker_editor_level_load; order vs aitemplates free)
 WRAP sub_0014CC80 -> pc_mapmaker_bosses_hud        (new; every HUD frame, ebx = HUD block)
 WRAP sub_00078590 -> pc_mapmaker_bosses_health_rows (new; list binder, acts only for return 0x0031CFD7)
+WRAP sub_0014D1F0 -> pc_mapmaker_bosses_meters     (new; HUD per viewport, scene 100 story; draws before the original)
 ```
 
 `pc_mapmaker_bosses_close` returns without calling its original for its own
 row; inside aitemplates' close, aitemplates would flush its pending group
 snapshot after the click, so bosses goes outside. Include the `.inc` after
 `pc_mapmaker_aitemplates.inc`; link stubs `sub_00139740` and `sub_00071800`
-are in `tests/mapmaker/mapmaker_area_stubs.h`.
+and `sub_0013A400` are in `tests/mapmaker/mapmaker_area_stubs.h`.
 
 ## Limits and not done
 
@@ -269,10 +323,15 @@ are in `tests/mapmaker/mapmaker_area_stubs.h`.
    Colossus after Tough Guy. Pick Titan; save, reload: still Titan. In play
    it takes about 8x the hits of a Tough Guy (16x with Colossus; times the
    Boss factor when both are set).
-5. Without the switch, load and play the same map: ordinary AIs, no bar,
+5. Health display: on a Boss AI (reopen after setting Boss) click
+   **Health display** to **Sub-boss bar**; save, reload: kept. In play no
+   bottom bar appears for it; a small meter floats above it and shrinks as
+   it is hurt; it vanishes when it dies. Another Boss AI on **Boss bar**
+   still gets its bottom bar and no meter.
+6. Without the switch, load and play the same map: ordinary AIs, no bar,
    Titan/Colossus AIs read Tough Guy.
-6. Mission 6 Princess / mission 10 giant robot still show their own bars.
-7. Probe: set `TSFP_MAPMAKER_CREATURE_PROBE=1` and
+7. Mission 6 Princess / mission 10 giant robot still show their own bars.
+8. Probe: set `TSFP_MAPMAKER_CREATURE_PROBE=1` and
    `TSFP_MAPMAKER_CREATURE_PROBE_LOG=<path>\creature-probe.log`, play
    mission 5 until the ghosts and worms have appeared, then a MapMaker
    Story map; send `creature-probe.log`.
