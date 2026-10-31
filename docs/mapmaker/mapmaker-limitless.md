@@ -148,6 +148,15 @@ load in the original game with ordinary AI. Story-only creatures (the mission 5
 ghosts and worms) are not deployable yet. *Automated tests only.*
 Details: [bosses](mapmaker-bosses.md).
 
+### Every character in the custom character set (`LIMITS`)
+
+In **Map Settings**, the custom character set's picker lists all 150 Arcade
+characters and variants, including the giant robot, the Jacob Crow variants
+and challenge or league characters your profile has not unlocked. Only
+characters that Arcade itself can use are offered; story-only creatures are
+not. Maps using them load and play in the original game too. *Automated tests
+only.* Details: [characters](mapmaker-characters.md).
+
 ### Clouds per map (`LIMITS`)
 
 **Map Settings** gains a **Clouds** checkbox beside the sky choice. Clouds are
