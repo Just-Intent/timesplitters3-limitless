@@ -75,7 +75,7 @@ void pc_settings_defaults(PcSettings *s)
     static const int keys[PC_ACTION_COUNT][PC_BINDING_SLOTS] = {
         {'E',VK_SPACE}, {'F',VK_MBUTTON}, {'R'}, {'Y'},
         {'X'}, {'Z'}, {VK_ESCAPE}, {VK_TAB}, {'G',VK_XBUTTON2}, {VK_LBUTTON},
-        {VK_UP,VK_PRIOR}, {VK_DOWN,VK_NEXT}, {VK_LEFT,VK_F24}, {VK_RIGHT,VK_F23},
+        {VK_UP,'Q'}, {VK_DOWN,'V'}, {VK_LEFT,VK_F24}, {VK_RIGHT,VK_F23},
         {'W'}, {'S'}, {'A'}, {'D'}, {VK_CONTROL,'C'}, {0}, {0}, {0}, {0}, {VK_RBUTTON},
 #define PC_WEAPON_SLOT(n,key) {key},
 #include "pc_weapon_slots.def"

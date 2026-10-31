@@ -1,7 +1,7 @@
 # MapMaker Story AI bosses and the story creature probe
 
 Status: implemented in `src/interface/pc_mapmaker_bosses.inc` (area `bosses`),
-fixture-tested (`tests/mapmaker/test_mapmaker_bosses.py`: 76 mutations plus
+fixture-tested (`tests/mapmaker/test_mapmaker_bosses.py`: 81 mutations plus
 decode checks of every guest site). Not built or played yet.
 
 Later requests (2026-10-31): "If in range of multiple bosses, multiple boss
@@ -131,6 +131,17 @@ farther ones wait for a free place.
   (16-entry table keyed by HUD block and entity, oldest reused) swapped in
   before and out after its call; the stock values are restored at the end,
   so a stock bar keeps its own animation.
+- Drain (CONFIRMED, 0x0013994B..0x00139AAF and `sub_0014B090`): with damage
+  d = 1 - cur/max, +0x171C = last d, +0x1724 = recent drain, +0x172C = fade,
+  the solid fill is 1 - (d - drain x fade); a hit raises the fade to 1. Only
+  `sub_0014B090` (game update, per player, from `sub_001CE850` 0x001CE8D1)
+  lowers it: +0x172C -= dt x [0x00475D10] (2.0, floor 0) while the HUD block
+  clock +0x2C += dt. The first build swapped each boss copy out during that
+  tick, so its fade stayed 1 and the bar stayed full ("not showing health
+  decreasing"). Now each copy is faded by the clock time since its own last
+  draw (same rule; a clock that went back counts as no time), so a hit drains
+  to the new length in 0.5 s like the stock bar. A real trophy monster
+  without the Boss flag keeps the stock bar and its live state.
 - Widescreen: the coordinates are the guest's 640x480 HUD space like every
   stock HUD draw, so the renderer keeps all bars inside the centred 4:3 HUD
   box ([widescreen](mapmaker-widescreen.md)).
@@ -251,7 +262,8 @@ are in `tests/mapmaker/mapmaker_area_stubs.h`.
    walk away: it hides; kill it: it hides.
 3. Two or more Boss AIs in range: one bar each, nearest at the bottom,
    stacked upward without overlap (at most four; two in split screen),
-   each draining on its own. Also on a 16:9 display: inside the 4:3 HUD area.
+   each draining on its own: after a hit the bar shrinks to the boss's new
+   health within about half a second (shoot one boss and only its bar moves). Also on a 16:9 display: inside the 4:3 HUD area.
    Check the label sits inside each box and bars do not cover other HUD.
 4. Health: open a Story AI, Health now lists Brute, Juggernaut, Titan,
    Colossus after Tough Guy. Pick Titan; save, reload: still Titan. In play

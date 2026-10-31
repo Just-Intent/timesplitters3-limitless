@@ -70,6 +70,12 @@ MUTATIONS = {
     'shared-smoothing': ('        bos_smooth_io(hud,bos_play.smooth[s].state,1);', ''),
     'smoothing-not-saved': ('        bos_smooth_io(hud,bos_play.smooth[s].state,0);', ''),
     'stock-smoothing-lost': ("    bos_smooth_io(hud,stock,1);", ''),
+    # the drain (fade +0x172C) advances per boss copy
+    'no-fade': ('        bos_smooth_fade(s,hud);\n', ''),
+    'fade-per-draw': ('fade-=dt*bos_getf(BOS_FADE_RATE);', 'fade-=bos_getf(BOS_FADE_RATE);'),
+    'fade-clock-not-kept': ('    bos_play.smooth[s].clock=now;bos_play.smooth[s].timed=1u;', '    bos_play.smooth[s].timed=1u;'),
+    'fade-no-floor': ('        if(fade<0.0f) fade=0.0f;\n', ''),
+    'fade-wrong-field': ('memcpy(&bos_play.smooth[s].state[2],&fade,4);', 'memcpy(&bos_play.smooth[s].state[1],&fade,4);'),
     'no-split-cap': ('cap=WORD_AT(BOS_HUMANS)>1u?BOS_BARS_SPLIT:BOS_BARS_MAX;', 'cap=BOS_BARS_MAX;'),
     'slot-on-undrawn': ('if(drawn) { any=1;slot++; }', 'any|=drawn!=0;slot++;'),
     'one-label': ('uint32_t text=bos_text(1u+k),buf,drawn;', 'uint32_t text=bos_text(1u),buf,drawn;'),

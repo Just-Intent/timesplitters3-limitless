@@ -676,9 +676,9 @@ Mouse to both main Settings and paused Options. It uses the original menu
 builders, callbacks, highlights and footer navigation. The controller-style
 bindings pages draw a keyboard/mouse diagram with primary/alternate columns;
 `pc_keyboard_menu_model.h` partitions all 34 actions across short pages.
-`PC_BINDING_SLOTS` is two in the shared model and native dialogs; old keyboard
-profiles use their first two sources without modifying disk until saved.
-Controller profiles keep their existing source capacity.
+`PC_BINDING_SLOTS` is two (shared model, native dialogs); D-pad up/down
+default to Up+Q / Down+V. Old keyboard profiles use their first two sources
+(disk unchanged until saved; not migrated); controller profiles keep theirs.
 
 For gameplay stick axes, the shared binding sampler uses
 `pc_input_radial_axis_magnitude` from `pc_input.c` on both left and right

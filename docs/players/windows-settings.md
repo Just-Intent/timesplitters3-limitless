@@ -162,8 +162,8 @@ Default bindings:
 | Melee / menu back | F, middle mouse, mouse button 4, or Backspace |
 | Throw grenade | G or mouse button 5 |
 | Change weapon | Mouse wheel or left/right arrows |
-| Weapon mode / scope zoom in | Q or Up / Page Up; mouse wheel up while scoped |
-| Change grenade / scope zoom out | V or Down / Page Down; mouse wheel down while scoped |
+| Weapon mode / scope zoom in | Up or Q; mouse wheel up while scoped |
+| Change grenade / scope zoom out | Down or V; mouse wheel down while scoped |
 | Pause and release cursor | Escape |
 | Show / hide PC Settings menu bar | F1 |
 | Keyboard & mouse settings | F2 |

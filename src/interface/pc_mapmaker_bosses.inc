@@ -68,7 +68,9 @@
  *   [0x004E68F8] around each call and puts it back (the HUD frame rewrites
  *   it, 0x0014B084). A stock bar (HUD +8 bit 0 after the original) keeps
  *   slot 0. The smoothing state +0x171C/+0x1724/+0x172C is swapped per boss
- *   (BOS_SMOOTH table) and the stock values restored afterwards. Coordinates
+ *   (BOS_SMOOTH table) and the stock values restored afterwards; each copy's
+ *   fade +0x172C is lowered as sub_0014B090 lowers the live one (dt x
+ *   [0x00475D10] per HUD block clock +0x2C), else the bar never drains. Coordinates
  *   stay guest 640x480, so widescreen keeps them in the 4:3 HUD box.
  *
  * Stronger health (same switch). The stock Health row of the edit screen
@@ -175,6 +177,8 @@
 #define BOS_HUD_SCALE 0x004E68F8u       /* float HUD y scale */
 #define BOS_HUD_SMOOTH 0x171Cu          /* +0x171C, +0x1724, +0x172C (sub_00139740) */
 #define BOS_SMOOTH 16u
+#define BOS_HUD_CLOCK 0x2Cu             /* float HUD block clock: += dt per sub_0014B090 (0x0014B23E) */
+#define BOS_FADE_RATE 0x00475D10u       /* float 2.0: +0x172C -= dt x this, floor 0 (0x0014B24F..0x0014B276) */
 
 #define BOS_CHARS 0x0053A3CCu           /* per character id, 0x30 bytes */
 #define BOS_RES_SLOT 0x0078B860u        /* int16 per resource id < 0x9D0 */
@@ -202,7 +206,7 @@ static struct {
     uint8_t extra[BOS_LEVEL_SLOTS];     /* stronger health 0..4 */
     char name[BOS_LEVEL_SLOTS][BOS_NAME];
     struct { uint32_t actor, record, max_bits; } scaled[BOS_LIST_MAX];
-    struct { uint32_t hud, entity, frame, state[3]; } smooth[BOS_SMOOTH];
+    struct { uint32_t hud, entity, frame, state[3], timed; float clock; } smooth[BOS_SMOOTH];
     uint32_t frame;
     float range2;
 } bos_play;
@@ -565,6 +569,24 @@ static void bos_smooth_io(uint32_t hud,uint32_t *state,int to_hud)
         if(to_hud) WORD_AT(a)=state[k]; else state[k]=WORD_AT(a);
     }
 }
+/* sub_00139740 shows cur/max + drain x fade (+0x1724 x +0x172C) and only
+ * raises the fade to 1 on a hit; sub_0014B090 (game update, per player) is
+ * what lowers the fade of the LIVE HUD block each tick: +0x172C -= dt x
+ * [0x00475D10] (floor 0) while +0x2C += dt. A boss's copy is swapped out
+ * during that tick, so without this its fade stayed 1 and the bar stayed
+ * at its pre-damage length. Same rule, applied by the HUD clock time since
+ * the copy's last draw (a clock that went back counts as no time). */
+static void bos_smooth_fade(unsigned s,uint32_t hud)
+{
+    float now=bos_getf(hud+BOS_HUD_CLOCK),dt=now-bos_play.smooth[s].clock,fade;
+    if(bos_play.smooth[s].timed && dt>0.0f) {
+        memcpy(&fade,&bos_play.smooth[s].state[2],4);
+        fade-=dt*bos_getf(BOS_FADE_RATE);
+        if(fade<0.0f) fade=0.0f;
+        memcpy(&bos_play.smooth[s].state[2],&fade,4);
+    }
+    bos_play.smooth[s].clock=now;bos_play.smooth[s].timed=1u;
+}
 static int bos_step(void)
 {
     float scale=bos_getf(BOS_HUD_SCALE);
@@ -598,6 +620,7 @@ void pc_mapmaker_bosses_hud(void (*original)(void))
         unsigned s=bos_smooth_slot(hud,ents[k]);
         if(!text) break;
         bos_put_text(text,index[k]<BOS_LEVEL_SLOTS && bos_play.name[index[k]][0]?bos_play.name[index[k]]:"Boss");
+        bos_smooth_fade(s,hud);
         bos_smooth_io(hud,bos_play.smooth[s].state,1);
         WORD_AT(BOS_MARGIN)=margin+(uint32_t)(step*(int)slot);
         save_registers(&r);
