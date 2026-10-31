@@ -192,6 +192,21 @@ summary per map build. Independent of `TSFP_MAPMAKER_LIMITS`; the Test Lab
 runner strips it with the other `TSFP_*` variables. Fixture
 `tests/test_mapmaker_skymask.py`.
 
+MapMaker Open roof / Open air tiles (`src/pc_mapmaker_roof.inc`, area `sky`,
+include after `pc_mapmaker_skymask.inc`; `TSFP_MAPMAKER_LIMITS=1`, editor
+only): `pc_mapmaker_roof_menu_init` (`sub_00316B50`) appends tile 8 twice to
+the last tile category (tables `0x0052DAC0`/`0x0052DB20`) for the duration of
+the build and restores the table; the two items are identified by pointer
+(`sub_000792B0` from `0x00316C84`). Picking one (`sub_00316500`) marks the
+held editor piece (`+0x2F7C`); `sub_002FC680` then drops `0x02000000` (open
+roof) or `0x02FFFFFF` (open air, floor bit 24 kept) and `sub_002FC470` drops
+`0x02000000`. The rebuild hook (`sub_003006C0`) stores record word `+0x26` =
+`0x5201`/`0x5202` and the open `+8`; the load hook (`sub_00301A90`) matches
+marks back to pieces; `sub_00307FD0` and `sub_002FEBF0` forget marks. The map
+stays a stock map (tile 8 + mask), so a stock game plays it open. Notes, WRAP
+lines and test steps: `docs/mapmaker-sky.md` "Open-air tiles". Fixture
+`tests/test_mapmaker_roof.py`.
+
 ## MapMaker level memory budget (opt-in)
 
 `TSFP_MAPMAKER_MEMORY_SCALE=N` (2..8; anything else = off; 8 when
