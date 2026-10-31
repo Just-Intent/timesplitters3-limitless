@@ -37,38 +37,60 @@ MUTATIONS = {
     'load-keeps-junk': ('    for(k=0;k<ws_nn;k++) WORD_AT(ws_nodes[k].at+WS_NODE_SLOT)=WS_NODE_TAG;\n', ''),
     'load-keeps-extras': ('    ws_extras(ws_chunk(c),ws.ed);\n    ws_collect_nodes();', '    ws_collect_nodes();'),
     'changed-ignores-extras': ('    if(memcmp(old,ws.ed,sizeof old)) g_eax=1u;\n', ''),
-    'reset-skips': ('    memset(ws.ed,0,sizeof ws.ed);\n    ws.page=0;\n', '    ws.page=0;\n'),
+    'reset-skips': ('    original();\n    memset(ws.ed,0,sizeof ws.ed);\n}', '    original();\n}'),
+    # the 20-row scrolling list
+    'rows-6': ('    for(v=0;v<WS_SLOTS;v++) guest_call(sub_00079D60', '    for(v=0;v<WS_STOCK;v++) guest_call(sub_00079D60'),
+    'no-scroll-region': ('    guest_call(sub_000780E0,2,ws_float(WS_ROW_HEIGHT*(float)WS_VIEW_ROWS),0u);\n', ''),
+    'no-region-end': ('    guest_call(sub_000781A0,0);\n', ''),
+    'region-height': ('ws_float(WS_ROW_HEIGHT*(float)WS_VIEW_ROWS)', 'ws_float(WS_ROW_HEIGHT*(float)WS_SLOTS)'),
+    'row-height': ('#define WS_ROW_HEIGHT 4.6f', '#define WS_ROW_HEIGHT 4.5f'),
+    'row-callbacks-swapped': ('ws_float(WS_ROW_HEIGHT),WS_ROW_ACTION,WS_ROW_DRAW);', 'ws_float(WS_ROW_HEIGHT),WS_ROW_DRAW,WS_ROW_ACTION);'),
+    'build-ignores-switch': ('    return ws_on() && (WORD_AT(WS_SCENE)==102u || ws_fe_scene());', '    return WORD_AT(WS_SCENE)==102u || ws_fe_scene();'),
+    'build-frontend-off': ('    return ws_on() && (WORD_AT(WS_SCENE)==102u || ws_fe_scene());', '    return ws_on() && WORD_AT(WS_SCENE)==102u;'),
+    'build-no-ret': ('        ret,menu,WORD_AT(menu+4u),scene,set,ws_pointer_mode());\n    MAPMAKER_GUEST_RET();', '        ret,menu,WORD_AT(menu+4u),scene,set,ws_pointer_mode());'),
+    'build-no-focus': ('    guest_call(sub_00077110,2,menu,0xFFFFFFFBu);\n', ''),
+    'build-no-finish': ('    guest_call(sub_00075E70,0);\n', ''),
+    'build-no-choices': ('    guest_call(sub_002BF830,1,menu);\n', ''),
+    'build-hint-args': ('guest_call(sub_00074A00,4,1u,guest_call(sub_0003D7B0,1,0x1A27u),0u,0u);', 'guest_call(sub_00074A00,4,1u,guest_call(sub_0003D7B0,1,0x1A27u),1u,0u);'),
+    'build-scene-size': ('ws_float(scene==102?7.5f:5.5f)', 'ws_float(7.5f)'),
+    'build-rows-stale': ('    ws.rows=WS_SLOTS;\n', ''),
+    'stock-rows-stale': ('        ws.rows=WS_STOCK;\n', ''),
+    'fe-stale-map': ('    if(scene!=102) ws_extras(ws_chunk(WORD_AT(WS_CONTAINER)),ws.fe);', '    (void)0;'),
+    'get-any-caller': ('    if((ret!=WS_ROW_RET && ret!=WS_PREVIEW_RET) || (s=WORD_AT(g_esp+4u))<WS_STOCK', '    if(((s=WORD_AT(g_esp+4u)),0) || s<WS_STOCK'),
+    'get-no-preview': (' && ret!=WS_PREVIEW_RET) || (s=WORD_AT(g_esp+4u))<WS_STOCK', ') || (s=WORD_AT(g_esp+4u))<WS_STOCK'),
+    'get-past-end': (' || s>=WS_SLOTS || !ws_on()) { original();return; }\n    if(ws_custom())', ' || s>WS_SLOTS || !ws_on()) { original();return; }\n    if(ws_custom())'),
+    'get-preset': ('    if(ws_custom()) g_eax=(uint32_t)(int32_t)ws.ed[s-WS_STOCK];', '    if(WORD_AT(WS_SCENE)==102u) g_eax=(uint32_t)(int32_t)ws.ed[s-WS_STOCK];'),
+    'get-ignores-switch': (' || s>=WS_SLOTS || !ws_on()) { original();return; }\n    if(ws_custom())', ' || s>=WS_SLOTS) { original();return; }\n    if(ws_custom())'),
+    'frontend-any-set': ('    else if(ws_fe_scene() && ws_fe_map_set()) g_eax', '    else if(ws_fe_scene()) g_eax'),
+    'frontend-editor-ids': ('g_eax=(uint32_t)(int32_t)ws.fe[s-WS_STOCK];', 'g_eax=(uint32_t)(int32_t)ws.ed[s-WS_STOCK];'),
+    'set-any-caller': ('    if((ret!=WS_PICK_RET && ret!=WS_CLEAR_RET) || !ws_on()', '    if(!ws_on()'),
+    'set-no-clear': ('    if((ret!=WS_PICK_RET && ret!=WS_CLEAR_RET) || !ws_on()', '    if(ret!=WS_PICK_RET || !ws_on()'),
+    'set-no-advance': ('        guest_call(sub_00074460,3,pane,s+1u,0u);\n', ''),
+    'set-advance-from-stock': ('s>=WS_STOCK-1u && s+1u<WS_SLOTS', 's+1u<WS_SLOTS'),
+    'set-advance-past-end': ('s>=WS_STOCK-1u && s+1u<WS_SLOTS', 's>=WS_STOCK-1u && s<WS_SLOTS'),
+    'set-advance-on-clear': ('    if(ret==WS_PICK_RET && s>=WS_STOCK-1u', '    if(s>=WS_STOCK-1u'),
+    'set-advance-value-stale': ('        WORD_AT(pane+0x18Cu)=s+1u;\n', ''),
+    'x-not-cleared': ('    if(WORD_AT(WS_SCENE)!=102u && slot>=(int)WS_STOCK) WORD_AT(pane+0xC4u)&=~0x00800000u;\n', ''),
+    'x-editor': ('    if(WORD_AT(WS_SCENE)!=102u && slot>=(int)WS_STOCK) WORD_AT(pane+0xC4u)', '    if(slot>=(int)WS_STOCK) WORD_AT(pane+0xC4u)'),
+    'x-stock-rows': ('    if(WORD_AT(WS_SCENE)!=102u && slot>=(int)WS_STOCK) WORD_AT(pane+0xC4u)', '    if(WORD_AT(WS_SCENE)!=102u) WORD_AT(pane+0xC4u)'),
+    'row-any': ('(v=WORD_AT(item+0x14u))>=WS_STOCK && v<WS_SLOTS) {', '(v=WORD_AT(item+0x14u))>=1u && v<WS_SLOTS) {'),
+    'row-editor': ('    if(WORD_AT(WS_SCENE)!=102u && MAPMAKER_PTR_OK(pane,0x200u) && (item=', '    if(MAPMAKER_PTR_OK(pane,0x200u) && (item='),
+    'row-no-ret': ('        MAPMAKER_GUEST_RET();\n        return;\n    }\n    original();', '        return;\n    }\n    original();'),
+    'label-number': ('"%u",(unsigned)v+1u);', '"%u",(unsigned)v);'),
+    'label-any-caller': ('    if(ret!=WS_LABEL_RET) return;\n', ''),
+    'label-colour': ('    WORD_AT(entry-0x24u)=WORD_AT(entry-0x18u+4u*(v%WS_STOCK));\n', ''),
+    'label-colour-index': ('WORD_AT(entry-0x18u+4u*(v%WS_STOCK))', 'WORD_AT(entry-0x18u+4u*(v%WS_SLOTS))'),
+    'label-stock-rows': ('(v=WORD_AT(item+0x14u))<WS_STOCK || v>=WS_SLOTS) return;', '(v=WORD_AT(item+0x14u))>=WS_SLOTS) return;'),
+    'label-frame': ('entry=g_esp+0x44u', 'entry=g_esp+0x40u'),
+    'diag-silent': ('    ws_diag_n++;\n    if(moves)', '    if(moves)'),
+    'diag-open-starved': ('    if(moves ? ws_diag_moves>=48u : ws_diag_opens>=256u) return;', '    if(ws_diag_moves>=48u) return;'),
+    'diag-no-open': ('        ws_diag(0,"slot pane open:', '        if(0) ws_diag(0,"slot pane open:'),
+    'diag-every-row': ('        if(slot>=(int)WS_STOCK || scroll!=ws.last_scroll)\n', '        if(1)\n'),
+    'diag-no-moves': ('    ws.last_slot=slot;ws.last_scroll=scroll;\n', ''),
     'held-keeps-slot': ('WORD_AT(e+WS_HELD+WS_NODE_SLOT)=WS_NODE_TAG;', '(void)e;'),
-    'page-no-reset': ('    ws.page=0;ws.title_ok=0;ws.view=0;\n    original();', '    ws.title_ok=0;ws.view=0;\n    original();'),
-    'no-title': ('        g_eax=WS_TITLE;\n', ''),
-    'title-stale': ('X clear writes the profile (0x002D41D5) */\n    ws_title_suffix();\n', 'X clear writes the profile (0x002D41D5) */\n'),
-    'keeps-direction': ('        WORD_AT(pane+0xC4u)&=~0x000F000Fu;WORD_AT(pane+0xC8u)&=~0xFu;\n', ''),
-    'no-cursor': ('        guest_call(sub_00074460,3,pane,to,0u);\n', ''),
-    'page-past-end': ('ws.page<3 && (in&0x00020002u)', 'ws.page<4 && (in&0x00020002u)'),
-    'screen-always-on': ("|| !ws_on() || !MAPMAKER_PTR_OK(pane=WORD_AT(g_esp+4u),0x200u)", "|| !MAPMAKER_PTR_OK(pane=WORD_AT(g_esp+4u),0x200u)"),
-    'last-page-overlap': ('static const uint8_t ws_page_first[4]={0u,6u,12u,14u};', 'static const uint8_t ws_page_first[4]={0u,6u,12u,18u};'),
-    'get-any-caller': ('    if(!ws_paged(ret,WS_ROW_RET) && !ws_paged(ret,WS_PREVIEW_RET)) { original();return; }', '    if(!ws.page) { original();return; }'),
-    'get-no-preview': (' && !ws_paged(ret,WS_PREVIEW_RET)) { original();return; }', ') { original();return; }'),
-    'set-any-caller': ('    if(ws.view!=1 || (!ws_paged(ret,WS_PICK_RET) && !ws_paged(ret,WS_CLEAR_RET))) { original();return; }',
-                       '    if(!ws.page) { original();return; }'),
-    'set-no-clear': (' && !ws_paged(ret,WS_CLEAR_RET))) { original();return; }', ')) { original();return; }'),
-    'set-frontend': ('    if(ws.view!=1 || (!ws_paged', '    if((!ws_paged'),
-    'no-right-left': ('        else if(in&0x00080008u) step=2;\n        else if(in&0x00040004u) step=-2;\n', ''),
-    'right-on-list-row': ('    if(v>=0 && v<(int32_t)WS_STOCK) {', '    if(v>=-5 && v<(int32_t)WS_STOCK) {'),
-    'no-wrap': ('        ws.page=(ws.page+(step>0?1:3))%4;', '        ws.page+=step>0?1:-1;if(ws.page<0)ws.page=0;if(ws.page>3)ws.page=3;'),
-    'left-moves-cursor': ('step==-1?WS_STOCK-1u:(uint32_t)v;', 'step==-1?WS_STOCK-1u:0u;'),
-    'frontend-off': ('    if(!ws_fe_scene()) return 0;\n', '    return 0;\n'),
-    'frontend-any-set': ('WORD_AT(item+0xC8u)==WS_LIST_MAP?2:0;', '1?2:0;'),
     'frontend-any-mode': ('    return WORD_AT(WS_SCENE)==101u && WORD_AT(WS_GAMETYPE)==9u &&', '    return WORD_AT(WS_SCENE)==101u &&'),
     'frontend-link': (' && !WORD_AT(WS_NET);', ';'),
     'frontend-story': (' && WS_B(WS_TYPEBYTE)!=10u && !WORD_AT(WS_NET)', ' && !WORD_AT(WS_NET)'),
-    'frontend-editor-ids': ('(ws.view==2?ws.fe:ws.ed)[s-WS_STOCK]', 'ws.ed[s-WS_STOCK]'),
-    'frontend-stale-map': ('    if(view==2) ws_extras(ws_chunk(WORD_AT(WS_CONTAINER)),ws.fe);\n', ''),
-    'frontend-x-clear': ('    if(view==2 && ws.page) WORD_AT(pane+0xC4u)&=~0x00800000u;', '    if(0) WORD_AT(pane+0xC4u)&=~0x00800000u;'),
-    'frontend-title-stays': ('        if(ws.view) { ws.view=0;ws_title_suffix(); }\n', '        ws.view=0;\n'),
-    'title-no-count': ('"  (%u-%u of %u)",a,b,WS_SLOTS);', '"  (%u-%u)",a,b);'),
-    'title-frontend-start': ('WORD_AT(p+0x6A4u)==WS_LIST_MAP?2:0;', '1?2:0;'),
-    'view-not-recorded': ('    ws.view=view;                                 /* a page', '    /* a page'),
     'sai-any-caller': ('WORD_AT(g_esp)!=WS_SAI_RET || WORD_AT(WS_SCENE)!=102u', '0 || WORD_AT(WS_SCENE)!=102u'),
     'sai-ignores-switch': ('    if(!ws_on() && !(MAPMAKER_PTR_OK(value,4) && (int32_t)WORD_AT(value)>=(int32_t)WS_STOCK))', '    if(0 && !(MAPMAKER_PTR_OK(value,4) && (int32_t)WORD_AT(value)>=(int32_t)WS_STOCK))'),
     'text-off-by-one': ('"%u: %.40s",(unsigned)slot+1u,s);', '"%u: %.40s",(unsigned)slot,s);'),
@@ -126,6 +148,11 @@ def test_mapmaker_weaponset(tmp_path, mutation):
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'mapmaker weaponset ok' in result.stdout
+        # the diagnostics a user run shows (stderr)
+        assert '[mapmaker] weaponset: slot pane build (stock 6 rows: TSFP_MAPMAKER_LIMITS is not 1) ret=0x00078F74 menu=0x00301000 descriptor=0x005236EC' in result.stderr
+        assert '[mapmaker] weaponset: slot pane build (20 rows, scrolling) ret=0x00078F74 menu=0x00301000 descriptor=0x005236EC scene=102 set=15' in result.stderr
+        assert '[mapmaker] weaponset: slot pane open: pane=0x00301000' in result.stderr
+        assert '[mapmaker] weaponset: list: slot 8 highlighted, scroll 0.0' in result.stderr
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 
@@ -180,6 +207,55 @@ def test_hook_return_addresses():
     assert {a[c].function for c in callers_of(0x2d3b00)} == {0x0006BD30, 0x002D3D30, 0x002D40A0}
     # the highlighted row's weapon model asks the getter with the row value
     assert ret_of(a, 0x002D410A, 0x2d3b00) == 0x002D410F and ret_of(a, 0x002D40C6, 0x2d3b00) == 0x002D40CB
+    # the row draw's filter call after the label (pc_mapmaker_weaponset_label)
+    assert ret_of(a, 0x002D3DF1, 0x64e70) == 0x002D3DF6 and a[0x002D3DF1].function == 0x002D3D30
+    # the pane system calls a builder from the descriptor (+0 copied to menu +8) at 0x00078F72
+    assert a[0x00078F72].mnemonic == 'call' and 8 in disp(a[0x00078F67])
+
+
+def test_scrolling_list_facts():
+    """The 20-row list replays the stock builder and uses the weapon list's scroll region."""
+    a = by_address()
+    pushed = lambda x: [op[1] for op in a[x].ops if op[0] == 'imm']
+    # stock builder sub_002D4220: frame, title 0xE86 (-1, 0x30404), set list 0x004766D8 (-5, 0x08030C00),
+    # sub_002BF830(menu), sub_00079710(0), six rows (0, row, 0, 4.6f, sub_002D4040, sub_002D3D30), sizes, footer
+    assert pushed(0x002D4222) == [0x002C1450] and pushed(0x002D4229) == [0x42200000] and pushed(0x002D4230) == [0x20010]
+    assert '0x75b70' in a[0x002D4235].text
+    assert pushed(0x002D4243) == [0x30404] and pushed(0x002D424A) == [0xE86]
+    assert pushed(0x002D4263) == [0x08030C00] and pushed(0x002D426A) == [0x004766D8]
+    assert '0x2bf830' in a[0x002D4279].text and '0x79710' in a[0x002D4280].text
+    assert pushed(0x002D4290) == [0x002D3D30] and pushed(0x002D4295) == [0x002D4040] and pushed(0x002D429A) == [0x40933333]
+    assert ('imm', 6) in a[0x002D42AD].ops
+    assert pushed(0x002D42B7) == [0x40A00000] and '0x772e0' in a[0x002D42BD].text
+    assert pushed(0x002D42D5) == [0x40F00000] and pushed(0x002D42DD + 6) == [0x40B00000] and '0x77320' in a[0x002D42E9].text
+    assert [pushed(x) for x in (0x002D42F5, 0x002D4311, 0x002D432D)] == [[0xE88], [0xE89], [0x1A27]]
+    assert '0x77110' in a[0x002D4345].text and a[0x002D434F].mnemonic == 'jmp' and '0x75e70' in a[0x002D434F].text
+    # the weapon list beside it scrolls: sub_000780E0(67.5f, 0) .. rows .. sub_000781A0()
+    assert '0x780e0' in a[0x002BFAF1].text and pushed(0x002BFAEC) == [0x42870000] and '0x781a0' in a[0x002BFB64].text
+    # sub_000780E0 sets the builder's region mode 2 and height; items made in it get flag 0x40
+    assert ('imm', 2) in a[0x00078115].ops and 0x38 in disp(a[0x00078115]) and 0x3C in disp(a[0x00078126])
+    assert 0x38 in disp(a[0x00079145]) and ('imm', 0x40) in a[0x0007914A].ops
+    # sub_000781A0 ends it: view +0x6C..+0x70 = its height (mode 2)
+    assert 0x3C in disp(a[0x000781D0]) and 0x70 in disp(a[0x000782A1]) and 0x6C in disp(a[0x0007814B])
+    # item flag 0x40 puts an item's height into the menu's scrolling content +0x5C
+    assert ('imm', 0x40) in a[0x00078432 - 4].ops and 0x5C in disp(a[0x00078443])
+
+
+def test_why_paging_was_invisible():
+    """Editor menus are pointer menus: their tick skips the stock Up/Down; the mouse comes later."""
+    a = by_address()
+    # the editor turns pointer menus on (sub_00071010: [0x007BA270 + player*0x1E0] = 1)
+    assert '0x71010' in a[0x00302FE9].text and 0x007BA270 in disp(a[0x0007101B])
+    # the tick: pointer menus go to sub_000777E0 and jump past the Up/Down block at 0x0007AE2E
+    assert 0x007BA270 in disp(a[0x0007ADEC]) and '0x777e0' in a[0x0007AE09].text
+    assert a[0x0007AE0E].mnemonic == 'jmp' and '0x7aff6' in a[0x0007AE0E].text
+    # the pane update runs at 0x0007AD76, the mouse hook's sub_00073750 later at 0x0007ADC5
+    assert a[0x0007AD76].mnemonic == 'call' and '0x73750' in a[0x0007ADC5].text
+    # the row draw: colour table [esp + value*4 + 0x20] (6 entries), label '1' + value
+    assert 0x20 in disp(a[0x002D3D8C]) and ('imm', 0x31) in a[0x002D3DE0].ops and 0x4C in disp(a[0x002D3DE8])
+    assert 0x14 in disp(a[0x002D3D9C]) and 0x48 in disp(a[0x002D3F27])
+    # the pick: slot pane in ebx, cursor on only below value 5
+    assert a[0x002BF935].mnemonic == 'mov' and ('imm', 5) in a[0x002BF990].ops
 
 
 def test_weapon_screen_routes():

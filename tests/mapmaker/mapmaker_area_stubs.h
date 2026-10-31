@@ -88,4 +88,11 @@ void sub_00079DE0(void) {}
 void sub_0007D4A0(void) {}
 void sub_000BE860(void) {}
 void sub_00303350(void) {}
+/* weaponset: the 20-row slot pane builder replays the stock builder's calls */
+void sub_00074A00(void) {} void sub_00077110(void) {} void sub_000772E0(void) {}
+void sub_00077320(void) {} void sub_000780E0(void) {} void sub_000781A0(void) {}
+void sub_002BF830(void) {}
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines these */
+void sub_00075B70(void) {} void sub_00075E70(void) {} void sub_00079710(void) {}
+#endif
 #endif

@@ -20,8 +20,8 @@ VALUES = (5, 6, 0xF)
 SKIP = ('push', 'add', 'sub', 'and', 'or', 'shl', 'sar', 'shr', 'test', 'imul', 'lea')
 
 HANDLED = reviewed("""
-0x002BF990 sub_002BF910 pick: the cursor moves on below row 6 (value 5); page-local, pc_mapmaker_weaponset_set stores pages 2-4 in slots 7-20
-0x002D3BCA sub_002D3B00: slots 6+ answer 0 (the 6-row screen getter); rows on pages 2-4 are answered by pc_mapmaker_weaponset_get
+0x002BF990 sub_002BF910 pick: the cursor moves on below row 6 (value 5); pc_mapmaker_weaponset_set stores rows 7-20 in slots 7-20 and moves on from rows 6-19
+0x002D3BCA sub_002D3B00: slots 6+ answer 0 (the 6-row screen getter); rows 7-20 of the 20-row list are answered by pc_mapmaker_weaponset_get
 0x002FE84B sub_002FE840 editor model: weapon items 0x11..0x16 are slots 1-6; an item on slot 7+ keeps its item type's model (cosmetic, documented)
 0x002FE86C sub_002FE840 editor model: ammo items 0x17..0x1C are slots 1-6 (as above)
 0x003128CF sub_00312880 weapon-set-changed test compares the 15 ids; pc_mapmaker_weaponset_changed compares slots 7-20
@@ -46,7 +46,7 @@ REVIEWED = reviewed("""
 0x002B504D [0x007DE470] value 0xF in the AI weapon choice, not a slot
 0x002D3A67 game type [0x0078AD2C] 6 held in eax
 0x002D3B32 game type [0x0078AD2C] 6 held in eax
-0x002D415B weapon set index 0xF = the map's set in MapMaker Arcade (not editable there); its pages 2-4 are shown read-only from the map (front-end view 2), editor paging needs index >= 10
+0x002D415B weapon set index 0xF = the map's set in MapMaker Arcade (not editable there); its rows 7-20 are shown read-only from the map, the editor list edits them for index >= 10
 0x003022ED item ids 5/6 (starts) in the editor loader
 0x003022F6 item ids 5/6 (starts) in the editor loader
 0x00356519 [0x0077419C] value 6 (network state) in the System Link setup, not a slot

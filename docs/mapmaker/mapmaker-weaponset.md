@@ -2,7 +2,7 @@
 
 Status 2026-10-31: implemented in `src/interface/pc_mapmaker_weaponset.inc`
 (area `weaponset`), fixture-tested (`tests/mapmaker/test_mapmaker_weaponset.py`:
-70 mutations plus decode and XBE facts; `..._weaponset_classified.py`: every
+mutations plus decode and XBE facts; `..._weaponset_classified.py`: every
 slot constant around the weapon set classified). Not built or played. No
 guest-code table (`config/guest-code-patches/weaponset.json` does not exist;
 wrappers only).
@@ -90,16 +90,71 @@ table and every id-indexed table and jump table; rejected. Instead:
   weapon/ammo node's +0x30 from its record. New map `sub_002FEBF0`: empty.
   Map Settings close `sub_00312880` (weapon-set-changed vs the undo shadow
   `[0x00765E38]`): slots 7-20 count too.
-- Weapon set screen: builder `sub_002D4220` resets to page 1; the title text
-  (`sub_0003D7B0` returning to 0x002D4254) is a copy with "(1-6 of 20)",
-  "(7-12 of 20)", "(13-18 of 20)" or "(15-20 of 20)" that the update rewrites
-  (INFERRED: the item keeps the pointer). Update `sub_002D40A0`: Down on row 6
-  (value 5) shows the next six slots, Up on row 1 the previous ones; Right /
-  Left on any slot row turn the page, wrapping (cursor via `sub_00074460`,
-  input bits cleared). On pages 2-4 the row draw (`sub_002D3B00` returning to
-  0x002D3D8C) and the highlighted weapon's model (0x002D410F) show slot row +
-  start and the pick / X (`sub_00312AE0` returning to 0x002BF95A /
-  0x002D41C7) store there. The row digits stay 1-6.
+- Weapon set screen (2026-10-31, replaces the hidden paging): a scrolling
+  list of 20 slot rows. See "Why paging was invisible" below.
+  - Builder `sub_002D4220` (the pane system calls it at 0x00078F72 from
+    descriptor +0, return 0x00078F74): with the switch in scene 102 (any set)
+    or the front end's MapMaker Arcade setup, the hook replays the stock calls
+    (`sub_00075B70(0x20010, 0, 40.0f, 0, 0x002C1450)`, title 0xE86 value -1
+    flags 0x30404, set list 0x004766D8 value -5 flags 0x08030C00,
+    `sub_002BF830(menu)`, `sub_00079710(0)`, sizes 5.0f / 7.5f (5.5f outside
+    the editor), footer 0xE88 / 0xE89 / 0x1A27, `sub_00077110(menu, -5)`,
+    `sub_00075E70`) but adds rows 0..19 (`sub_00079D60(0, row, 0, 4.6f,
+    sub_002D4040, sub_002D3D30)`) inside `sub_000780E0(27.6f, 0)` ..
+    `sub_000781A0()`, the region the weapon list builder `sub_002BFA70` uses
+    (0x002BFAF1 / 0x002BFB64): mode 2 (0x00078115), view = height
+    (+0x6C..+0x70), each item made in it gets flag 0x40 (0x0007914A) and adds
+    its height to the scrolling content +0x5C (0x00078443). 27.6 = six rows
+    of 4.6 (INFERRED unit: the rows' height argument, item +0x74), so the
+    pane keeps its stock size. Row index is still value + 2 (the regions add
+    no items), which the pick and X clear rely on. Otherwise: the original.
+  - The stock cursor, the editor pointer (`sub_000777E0`), the scrollbar and
+    the wheel (`mapmaker_pointer_wheel`, three steps per notch, needs content
+    > view and style flag 0x40; INFERRED: the pane shares the weapon list's
+    current style) then scroll it; nothing list-specific in the mouse code.
+  - Rows 7-20: the row draw and model preview ask `sub_002D3B00(6..19)`
+    (returns 0x002D3D8C / 0x002D410F): custom set -> slots 7-20, front end
+    with the map's set -> the map's (read-only), else the original (0). Pick /
+    X store via `sub_00312AE0(slot, weapon)` (0x002BF95A / 0x002D41C7) into
+    slots 7-20; after a pick on rows 6-19 the cursor moves on (stock stops at
+    value 5, 0x002BF990; slot pane in ebx, 0x002BF935).
+  - Row label: the draw writes '1' + value into the consumed rect argument
+    slot (entry + 0xC, 0x002D3DE8; drawn from esp+0x48 at 0x002D3F27) and
+    reads a 6-entry colour table `[esp + value*4 + 0x20]` (0x002D3D8C). The
+    hook on `sub_00064E70` (only its call at return 0x002D3DF6, after both)
+    rewrites the label to "7".."20" and the stored colour (entry - 0x24) to
+    entry `value % 6`; the read past the table took the return address.
+  - Outside the editor, rows 7-20 are read-only: the row action
+    `sub_002D4040` (opens the weapon list; the front end's pick writes the
+    profile set at row index - 2, 0x002BF982, six slots) does nothing there,
+    and the update clears X (0x800000; profile write 0x002D41D5).
+- Diagnostics (stderr, `[mapmaker] weaponset: ...`, always on, own budget):
+  every build `slot pane build (20 rows, scrolling) ret=0x00078F74
+  menu=... descriptor=0x005236EC scene=102 set=15 pointer=1` (or `slot pane
+  build (stock 6 rows: <reason>) ...`), the first update `slot pane open:
+  pane=... items=22 content=... view=a..b scroll=... slot=... pointer=...`
+  and moves `list: slot N highlighted, scroll S of MAX` (rows 7-20 or a scroll
+  change; at most 48). No such line on opening the screen means the hooks did
+  not run (check `TSFP_MAPMAKER_AREA_OFF` and the wrappers patch).
+
+### Why paging was invisible (CONFIRMED statically, 2026-10-31)
+
+User report (v0.4.0-mapmaker.11/.12, switch on): "I can't page through
+anything. I still only see six slots. I should be able to scroll down."
+The user's log (`20261031-174829-424.err`) has no weaponset line (that area
+logged only errors then). The paging waited for Down on row 6 / Right in the
+pane update, but:
+
+- the editor makes its menus pointer menus: `sub_00071010` (called at
+  0x00302FE9) sets `[0x007BA270 + player*0x1E0]`; the tick `sub_0007A7B0`
+  then selects the row under the pointer in `sub_000777E0` and jumps over the
+  stock Up/Down handling (0x0007ADEC -> 0x0007AFF6), so the stick and mouse
+  move the pointer, not a cursor that could pass row 6;
+- the PC mouse (wheel steps 0x10001/0x20002, the hovered row) is applied by
+  `pc_display_menu_mouse` on `sub_00073750` at 0x0007ADC5, after the update
+  call at 0x0007AD76;
+- six rows fit their view, so the scrollbar and the editor wheel
+  (`mapmaker_pointer_wheel`) had nothing to scroll.
 
 ### Every route to the weapon set screen (CONFIRMED, 2026-10-31)
 
@@ -112,21 +167,18 @@ pane 0x005236EC exists only inside screen 0x0052371C = {`sub_002D44D0`,
   (item 0xB08, `sub_003128F0`), and the Test map setup's Weapons item
   (`sub_002EFBF0` -> `sub_002C78F0(menu, 0, ...)`). Edits the editor set
   (editor +0x11904; slots 7-20 in the hook, saved in the fork chunk). This
-  is the only place the custom set is defined; it was already paged, but only
-  by Down past row 6 with "(1-6)" in the title, so the other 14 slots were
-  easy to miss. Statically the paging works: the pane tick calls the update
-  (+0xC = descriptor +4, `sub_00078E50` 0x00078F57) at 0x0007AD76 before its
-  own Up/Down (0x0007AE2E), so the hook sees Down first. Now the title says
-  "of 20" and Right/Left also turn pages (stock moves only choice items with
-  them, 0x0007AFB1; slot rows are action items). Not verified in play.
+  is the only place the custom set is defined. The pane tick calls the update
+  (+0xC = descriptor +4, `sub_00078E50` 0x00078F57) at 0x0007AD76; the earlier
+  paging there never showed (above); now the pane is a 20-row list. Not
+  verified in play.
 - **Front end** (scene 101) setup Weapons item (`sub_002C7710`, offered only
   when scene > 100 and the builder's second argument is 0): the set list
   `sub_002BF830` (value -5, choice +0xC8 = profile +0x6A4) includes the map's
   set 0xF in MapMaker Arcade (mode 9), shown by `sub_002D3B00` ->
   `sub_002BFF90` -> `sub_00312A60` (the map info's 6 ids) and read-only in
-  stock (0x002D415B, action `sub_002D4040` 0x002D406F). With the switch, its
-  pages 2-4 show the map's slots 7-20 read-only (the X clear, which writes
-  the profile at 0x002D41D5, is suppressed there); profile sets stay stock.
+  stock (0x002D415B, action `sub_002D4040` 0x002D406F). With the switch the pane has
+  20 rows there too: with the map's set rows 7-20 show its slots 7-20
+  read-only; with a profile set they are empty and inert.
 - **In-play pause** (scene 100): pause -> setup `sub_0019A000` calls
   `sub_002C78F0(menu, 1, sub_00196DE0)` (0x0019A018) and the builder skips the
   Weapons item when that argument is set (0x002C808A `jne 0x002C81A8`); the
@@ -171,7 +223,7 @@ pane 0x005236EC exists only inside screen 0x0052371C = {`sub_002D44D0`,
 ## Extension memory
 
 0x00906000..0x0090607F play set, 0x00906080..0x009060FF AI pick set,
-0x00906100..0x0090613F title, 0x00906140..0x0090640F choice texts
+0x00906100..0x0090613F unused (the retired paged title), 0x00906140..0x0090640F choice texts
 (15 x 0x30); 0x00906000..0x009064FF reserved for this area.
 
 ## Hooks (WRAP lines for the integrator, area `weaponset`)
@@ -182,11 +234,13 @@ WRAP sub_00301A90 -> pc_mapmaker_weaponset_load         (chained: editor, aitemp
 WRAP sub_002FEBF0 -> pc_mapmaker_weaponset_reset        (chained: bosses, sky, roof, sets; order free)
 WRAP sub_00312880 -> pc_mapmaker_weaponset_changed      (new)
 WRAP sub_00316D80 -> pc_mapmaker_weaponset_held         (new)
-WRAP sub_002D4220 -> pc_mapmaker_weaponset_build        (new)
-WRAP sub_002D40A0 -> pc_mapmaker_weaponset_screen       (new; also the front-end view, calls sub_00071940)
+WRAP sub_002D4220 -> pc_mapmaker_weaponset_build        (new; replaces the builder for the 20-row list)
+WRAP sub_002D40A0 -> pc_mapmaker_weaponset_screen       (new; diagnostics, front-end X guard)
 WRAP sub_002D3B00 -> pc_mapmaker_weaponset_get          (new; return-address test: row draw and model 0x002D410F)
-WRAP sub_00312AE0 -> pc_mapmaker_weaponset_set          (new; return-address test)
-WRAP sub_0003D7B0 -> pc_mapmaker_weaponset_title        (chained: sky's roof_text, realbosses_text; order free; return-address test, hot)
+WRAP sub_00312AE0 -> pc_mapmaker_weaponset_set          (new; return-address test; reads ebx)
+WRAP sub_002D4040 -> pc_mapmaker_weaponset_row          (new; slot row action)
+WRAP sub_00064E70 -> pc_mapmaker_weaponset_label        (new; return-address test 0x002D3DF6, per drawn row)
+WRAP sub_0003D7B0 -> pc_mapmaker_weaponset_title        (retired pass-through; may be dropped from the chain)
 WRAP sub_00078590 -> pc_mapmaker_weaponset_sai_choice   (chained: bosses, sets; order free; return-address test)
 WRAP sub_000783D0 -> pc_mapmaker_weaponset_options      (new; return-address test)
 WRAP sub_0006BD30 -> pc_mapmaker_weaponset_play_set     (new; hot, per call)
@@ -199,22 +253,28 @@ WRAP sub_0023F390 -> pc_mapmaker_weaponset_preload      (new; level load, no arg
 
 All cdecl, plain `ret`; a hook that answers itself pops the return address
 (`MAPMAKER_GUEST_RET`). Include the `.inc` after `pc_mapmaker_limits.inc`.
-Stubs for whole-chain fixtures: `sub_00064E70`, `sub_00069640`,
+Stubs for whole-chain fixtures (in tests/mapmaker/mapmaker_area_stubs.h):
+`sub_00074A00`, `sub_00077110`, `sub_000772E0`, `sub_00077320`, `sub_000780E0`,
+`sub_000781A0`, `sub_002BF830`, `sub_00075B70`, `sub_00075E70`, `sub_00079710`,
+`sub_00064E70`, `sub_00069640`,
 `sub_000BE860`, `sub_0006B2D0`, `sub_00074460`, `sub_00079DE0`,
 `sub_0007D4A0`, `sub_000716D0`, `sub_000783D0`, `sub_00303350` (plus those
 already stubbed).
 
 ## User test steps
 
-1. `TSFP_MAPMAKER_LIMITS=1`. Editor -> Map Settings -> weapon set: custom.
-   The title reads "(1-6 of 20)". On the last row press Down (or Right on any
-   row): "(7-12 of 20)", empty rows; pick weapons (and on "(13-18 of 20)",
-   "(15-20 of 20)"). Up on the first row or Left goes back; slots 1-6 are
-   unchanged. Save the map.
+1. `TSFP_MAPMAKER_LIMITS=1`. Editor -> Start -> Map Settings -> weapon set,
+   choose the custom set. The slot list shows six rows with a scrollbar;
+   stderr has `[mapmaker] weaponset: slot pane build (20 rows, scrolling)`
+   and `slot pane open: ... items=22`. Scroll with the wheel, the scrollbar
+   or by moving the pointer/Down past row 6: rows 7-20 (labels 7..20,
+   empty). Pick weapons into a few of them (A, choose; X clears). Slots 1-6
+   are unchanged. Save the map. If no `slot pane build` line appears, send
+   the log: the hooks did not run.
 1b. Front end -> MapMaker -> load the map -> Arcade -> setup -> Weapons ->
-   choose the MapMaker set: Right shows "(7-12 of 20)" with the saved slots
-   (read-only, as stock's 1-6). Profile sets: 6 rows, stock. The in-play
-   pause has no weapon set screen (stock).
+   choose the MapMaker set: 20 rows, 7-20 show the saved slots (read-only,
+   as stock's 1-6; A/X do nothing there). Profile sets: rows 7-20 empty.
+   The in-play pause has no weapon set screen (stock).
 2. Place a weapon pickup, open its options: a "Weapon" choice lists the
    item's own slot and "7: ..." .. "20: ...". Pick one. Do the same for an
    ammo pickup. Place a Story AI: its weapon choice lists 20 slots.
@@ -224,5 +284,5 @@ already stubbed).
    stderr has no `[mapmaker] weaponset:` or `heap full` line.
 5. A map that uses none of this saves as before (stock size). A map using it:
    a stock build refuses it; System Link refuses it.
-6. Without the switch: no paging or extra choices; the map from step 3 still
+6. Without the switch: six rows (`slot pane build (stock 6 rows: ...)`), no extra choices; the map from step 3 still
    loads and plays with its 20 slots.
