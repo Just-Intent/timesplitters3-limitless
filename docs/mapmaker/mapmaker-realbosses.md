@@ -2,8 +2,9 @@
 
 Status: implemented in `src/interface/pc_mapmaker_realbosses.inc` (area
 `realbosses`), fixture-tested (`tests/mapmaker/test_mapmaker_realbosses.py`:
-36 mutations, plus decode and US XBE data checks of every site below). Not
-built or played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
+44 mutations, plus decode and US XBE data checks of every site below). The
+creature was played in v0.4.0-mapmaker.5 (user: working); the floating-meter
+fix below is not built or played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
 `TSFP_MAPMAKER_REAL_BOSS=0` keeps the creature on the normal bot AI (stage 1).
 
 User report (2026-10-31): the trophy monster from story mission 5 is much
@@ -83,6 +84,40 @@ that one call instead.
   Boss flag for their own bars.
 - With the `bosses` area switched off the stock bar always stays.
 
+## The floating health meter (fixed after v0.4.0-mapmaker.5)
+
+User report: the creature worked, but a health meter floated above its back,
+unlike the boss bars. It is a stock MapMaker story feature, not a boss bar
+(CONFIRMED by decode, `test_overhead_meter_sites`):
+
+- `sub_0014D1F0` (HUD, called from `sub_001CEBC0` at 0x001CEF19) runs its
+  actor loop only when the scene is 100 (0x0014D21C) and the mode byte
+  [0x007DE455] is story (0x0014D225). For every AI-list actor
+  (0x007A3580, filled with entity +0x7C by `sub_0015BCA0`) from index
+  [0x00790950] to [0x0074C37C] whose entity has a damage-stage record at
+  +0x268 and is not the player's own entity ([[0x007B0C7C]+0x14]) it calls
+  `sub_0013A400(actor, 0, 0x7F, 0x6E)` at 0x0014D25F (its only caller,
+  cdecl). That function only draws: a camera-facing quad meter coloured by
+  entity +0x1CC through `sub_0001AC50`, plain `ret`.
+- The record comes from `sub_0012C800` (17-slot pool 0x00745938). Players
+  (`sub_000D2FD0`), story scripts and the boss handlers create one; MapMaker's
+  own AI setup (`sub_00240C50`, `sub_0015F8C0`/`sub_0015B830`) never does, so
+  ordinary Story AIs (with or without the Boss flag) show no such meter. The
+  deerbeast handler creates one in its intro state (0x002811A3, stored at
+  0x002811AA), so in MapMaker the creature qualified. The meter sits at a
+  human height above the origin, i.e. on its back.
+- Mission 5 is scene 1, so the stock loop never runs there.
+
+| WRAP | what it does |
+|---|---|
+| `sub_0013A400` -> `pc_mapmaker_realbosses_meter` | return 0x0014D264 only: for an actor whose record ai_start noted (the real boss) and whose character is 0x15 or entity model 0x5BE, in scene 100 story, skip the draw (`MAPMAKER_GUEST_RET`, logged once); everything else the original |
+
+The +0x268 record stays: `sub_0014CC80` and the damage flash `sub_0014D3A0`
+read it. With `TSFP_MAPMAKER_REAL_BOSS=0` (bot class) the creature never gets
+a record (INFERRED from the caller list), so there is no meter to hide.
+Narrowest gate by design: other actors that legitimately carry a record keep
+their meter.
+
 ## Save format and stock games
 
 Unchanged: a stock custom-set member (word id 0x15, sbyte variant -1). No
@@ -109,6 +144,7 @@ WRAP sub_000A5E40 -> pc_mapmaker_realbosses_model_request  (new; log only)
 WRAP sub_001C8540 -> pc_mapmaker_realbosses_anims          (new; level load)
 WRAP sub_0015B830 -> pc_mapmaker_realbosses_ai_start       (new; AI start)
 WRAP sub_0014CC80 -> pc_mapmaker_realbosses_hud            (already wrapped by bosses: chain INSIDE pc_mapmaker_bosses_hud)
+WRAP sub_0013A400 -> pc_mapmaker_realbosses_meter          (new; overhead meter, per frame per recorded actor)
 ```
 
 Include the `.inc` after `pc_mapmaker_bosses.inc` / `pc_mapmaker_characters.inc`
@@ -130,6 +166,8 @@ No extension memory.
    model, roars, charges and head-butts, has its own bar labelled "Giant
    Trophy Monster", and dies with its death animation. Logic objectives in
    the map still behave.
+   No health meter floats above its back (stderr: `overhead health meter
+   hidden on the giant trophy monster`, once).
 4. Set its **Boss** row to x4: a single bar with the AI's name and four times
    the health. Two deerbeasts with Boss: two bars.
 5. `TSFP_MAPMAKER_REAL_BOSS=0`: the same model walks and shoots like a bot
