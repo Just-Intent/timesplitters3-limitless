@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,1093 @@
+@@ -844,6 +844,1104 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1089,6 +1089,17 @@
 +    else sub_0008F950_gen();
 +#else
 +    sub_0008F950_gen();
++#endif
++}
++
++extern void sub_00085710_gen(void);
++void sub_00085710(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_sky_room_mask")) pc_mapmaker_sky_room_mask(sub_00085710_gen);
++    else sub_00085710_gen();
++#else
++    sub_00085710_gen();
 +#endif
 +}
  
