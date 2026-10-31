@@ -156,6 +156,8 @@ void pc_mapmaker_bosses_compile(void (*original)(void));
 void pc_mapmaker_bosses_load(void (*original)(void));
 void pc_mapmaker_bosses_level(void (*original)(void));
 void pc_mapmaker_bosses_hud(void (*original)(void));
+void pc_mapmaker_characters_eligible(void (*original)(void));
+void pc_mapmaker_characters_preload(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));
