@@ -551,3 +551,10 @@ A `--local-preview` package of a compile-only (unsealed) build gets its
 `Support/Online/network-build.json` stamp written into the staged copy only
 (`local_preview: true`); `build/windows/generated` stays unsealed and
 BUILD.json keeps `network_sealed: false`.
+
+Launcher MapMaker switches (2026-10-31): `tests/launcher/launcher_settings.cs` (run by
+`tools/build/build-launcher.ps1 -Test --settings`) and the Mac `NativeTests.cs` cover the
+saved `launcher.mapmaker_*` keys and StartInfo export; the portable
+`tools/playable-launch.ps1` mirror is covered by
+`tests/launcher/test_launcher_startup.py::test_script_mapmaker_switches`, which compiles
+and runs a synthetic child exe (may be blocked by local antivirus).

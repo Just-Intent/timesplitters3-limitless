@@ -47,3 +47,43 @@ public class Child {
     assert 'XMV_PLAY=' + ('0' if skip else '1') in output
     assert 'UNWANTED=\n' in output.replace('\r\n', '\n')
     assert 'DISCORD_CONFIG=' + str(tmp_path / 'Settings/pc-discord.ini') in output
+
+
+MAPMAKER_SWITCHES = ('LIMITS', 'OVERLAP', 'STACK_ITEMS', 'ALIVE', 'MEMORY_SCALE')
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows portable launcher')
+@pytest.mark.parametrize('saved, expected', [
+    ({}, {}),
+    ({'mapmaker_limits': True, 'mapmaker_stack_items': True, 'mapmaker_overlap': False,
+      'mapmaker_alive': 64}, {'LIMITS': '1', 'STACK_ITEMS': '1'}),
+    ({'mapmaker_overlap': True, 'mapmaker_alive': 24, 'mapmaker_limits': 'true'},
+     {'OVERLAP': '1', 'ALIVE': '24'}),
+])
+def test_script_mapmaker_switches(tmp_path, saved, expected):
+    """Launch.ps1 exports only saved MapMaker choices, never inherited ones."""
+    windows = Path(os.environ['WINDIR'])
+    compiler = windows / 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+    shell = windows / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    (tmp_path / 'Bin').mkdir()
+    (tmp_path / 'Settings').mkdir()
+    controls = {'mouse': {'sensitivity': .1, 'enabled': True, 'invert_y': False},
+                'launcher': saved}
+    (tmp_path / 'Settings/pc-controls.json').write_text(json.dumps(controls))
+    shutil.copyfile(ROOT / 'tools/playable-launch.ps1', tmp_path / 'Launch.ps1')
+    lines = ''.join(
+        f'Console.WriteLine("{name}=" + Environment.GetEnvironmentVariable("TSFP_MAPMAKER_{name}"));'
+        for name in MAPMAKER_SWITCHES)
+    source = tmp_path / 'child.cs'
+    source.write_text('using System;\npublic class Child { public static int Main() { '
+                      + lines + ' return 0; } }\n')
+    subprocess.run([str(compiler), '/nologo', '/target:exe',
+                    '/out:' + str(tmp_path / 'Bin/futureperfect_recomp.exe'),
+                    str(source)], check=True, cwd=tmp_path, capture_output=True)
+    env = dict(os.environ, **{'TSFP_MAPMAKER_' + name: '7' for name in MAPMAKER_SWITCHES})
+    subprocess.run([str(shell), '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                    '-File', str(tmp_path / 'Launch.ps1')], check=True,
+                   cwd=tmp_path, env=env, capture_output=True, timeout=20)
+    output = next((tmp_path / 'Logs').glob('*.out')).read_text().replace('\r\n', '\n')
+    for name in MAPMAKER_SWITCHES:
+        assert f'{name}={expected.get(name, "")}\n' in output

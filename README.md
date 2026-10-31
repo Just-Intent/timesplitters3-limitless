@@ -67,10 +67,19 @@ This fork adds:
 
 ## MapMaker Limitless
 
-The switches are environment variables read when the game starts. Without
-them the editor keeps the original limits and features; the always-on bug
-fixes, mouse controls and larger play-time capacity remain active. Set them in the PowerShell window you launch from;
-`tsfp.ps1 -Action Run` passes them on to the game:
+The switches are read when the game starts. Without them the editor keeps the
+original limits and features; the always-on bug fixes, mouse controls and
+larger play-time capacity remain active.
+
+**With the launcher:** open **Settings → MapMaker** and tick **Raised MapMaker
+limits**, **Overlapping tiles** or **Stacked items**, and optionally lower
+**Characters alive at once**. Save, then press Play. All are off by default.
+The launcher passes only these choices to the game and ignores the variables
+below, so set them here rather than in a terminal.
+
+**From source:** the switches are environment variables. Set them in the
+PowerShell window you launch from; `tsfp.ps1 -Action Run` passes them on to the
+game (`MEMORY_SCALE` and the developer switches exist only this way):
 
 ```powershell
 $env:TSFP_MAPMAKER_LIMITS = '1'
