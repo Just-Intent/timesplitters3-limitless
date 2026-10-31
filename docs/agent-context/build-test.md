@@ -1030,4 +1030,4 @@ Crossplay rotation/lock/recycle: `test_crossplay_peer.py`; Online interpreter:
 Markers: test_ui_layout.py; test_patch_updates.py checks 2290/2291 after migration.
 
 Mech input: test_mounted_mouse.py; [scope](mounted-mouse.md#battle-mech-mouse-425).
-MapMaker (each area): limitless.md.
+MapMaker areas+menu_mouse: limitless.md.

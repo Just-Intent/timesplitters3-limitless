@@ -278,7 +278,7 @@ See `docs/textures/textures.md` and the runtime tests for usage and failure/boun
 | Area | Start here (tracked root unless noted) | Useful checks/docs |
 | --- | --- | --- |
 | Bindings, input prompts | `src/input/pc_controls.c`, `pc_input.c`, `pc_bindings.inc`, `pc_prompts.c` | `tests/input/pc_controls.c`, `tests/input/pc_prompts.c`, `docs/players/windows-settings.md` |
-| Mouse/menu handling | `src/interface/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_briefing.inc` (Story/event briefings: any fresh left click off the footer is the menu Confirm; see `limitless.md`) | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
+| Mouse/menu handling | `src/interface/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_briefing.inc` (briefings: fresh left click off the footer = Confirm; MapMaker lighting right-click: limitless.md) | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
 | Auto-look / camera / cutscene | `src/gameplay/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/gameplay/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py` |
 | Limitless fork (MapMaker, scope wheel; `pc_display_menu.h` / `pc_menu_mouse_guest.inc` carry the MapMaker hook declarations and stubs, e.g. `pc_mapmaker_aitemplates_menu_item`) | [limitless.md](limitless.md) | `tests/mapmaker/`, `tests/input/test_scope_wheel.py` |
 | Display model and native UI | `src/interface/pc_display.c`, `pc_display_*.inc`, `pc_settings.c`, `src/native/` | `tests/graphics/test_pc_display_modes.py`, `test_debug_settings_model.py` |

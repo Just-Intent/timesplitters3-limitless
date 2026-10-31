@@ -242,9 +242,10 @@ These are on without any switch:
 
 - **Editor:** the pointer follows the mouse; click menu rows, drag scrollbars,
   use the wheel to scroll lists or zoom the view, right-drag or push the window
-  edge to pan, right-click empty ground to clear the selection, and Escape to
-  close menus. A/D switch toolbar categories while a menu is open. Checked in
-  game; `TSFP_MAPMAKER_POINTER=0` turns it off.
+  edge to pan, right-click empty ground to clear the selection, and
+  right-click or Escape to close an open list (the lighting list too). A/D
+  switch toolbar categories while a menu is open. Checked in game;
+  `TSFP_MAPMAKER_POINTER=0` turns it off.
 - **Map browser:** click a map in **MapMaker → Load map** to highlight it,
   click it again to load it.
 - **Character screen:** after previewing a character, a left click anywhere
