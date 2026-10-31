@@ -108,6 +108,16 @@ static void call_meter(void)
 #define ROOM_INST 0x00351000u
 #define ROOM_OTHER 0x00352000u
 #define ROOM_LIST 0x00353000u
+#define ROOM_NODES 0x00357000u   /* node header; 3 nodes of 0xC8 bytes before it */
+#define ROOM_BIG_INST 0x00358000u
+#define ROOM_BIG_NODES 0x00370000u /* 200 nodes before it */
+static void set_node(uint32_t header,uint32_t count,uint32_t i,uint32_t type,int child,int sibling,uint32_t mask)
+{
+    uint32_t node=header-count*0xC8u+i*0xC8u;
+    WORD_AT(node+0x48u)=type|(uint32_t)(uint8_t)child<<24;
+    WORD_AT(node+0x4Cu)=(uint32_t)(uint8_t)sibling;
+    WORD_AT(node+0x5Cu)=mask;
+}
 static unsigned room_originals,draw_originals;
 static void draw_original(void) { draw_originals++;g_esp+=4u; }
 static void draw_model(uint32_t inst,uint32_t pass,uint32_t layer)
@@ -368,6 +378,10 @@ int main(int argc,char **argv)
     WORD_AT(ROOM_PROP+4u)=ROOM_INST;WORD_AT(ROOM_PROP+0x94u)=0x0000090Cu;WORD_AT(ROOM_PROP+0x28u)=0x00400000u;
     WORD_AT(ROOM_PROP+0x20u)=0x80u;WORD_AT(ROOM_PROP+0x0Cu)=1u;WORD_AT(ROOM_PROP+0x30u)=0x00010000u;WORD_AT(ROOM_PROP+0x34u)=5u;
     WORD_AT(ROOM_INST+0x30u)=0x02000000u;WORD_AT(ROOM_INST+0x1F4u)=0x00080000u;
+    WORD_AT(ROOM_INST+4u)=ROOM_NODES;WORD_AT(ROOM_NODES)=3u;
+    set_node(ROOM_NODES,3u,0u,0u,1,-1,0u);             /* always drawn */
+    set_node(ROOM_NODES,3u,1u,2u,-1,2,0x02000000u);    /* drawn: shares bit 25 */
+    set_node(ROOM_NODES,3u,2u,3u,-1,-1,0x01000000u);   /* hidden by inst+0x30 */
     WORD_AT(ROOM_OTHER+4u)=0x00354000u;WORD_AT(ROOM_OTHER+0x94u)=0x00000123u;WORD_AT(ROOM_OTHER+0x34u)=5u;
     WORD_AT(0x0079094Cu)=100;
     set_probe("128");
@@ -384,6 +398,11 @@ int main(int argc,char **argv)
                           " mask(+0C)=0x00000001 +31=0 +32=1 room(+34)=5 inst=0x00351000 inst+30=0x02000000 inst+1F4=0x00080000\n")!=NULL);
     CHECK(strstr(log_text,"  prop room=5 index=1 at=0x00352000 model=0x123 geometry=0 ")!=NULL);
     CHECK(count("  prop room=5 ")==2);
+    CHECK(strstr(log_text,"  nodes model=0x90C room=5 inst=0x00351000 inst+30=0x02000000 count=3 always=1 hidden-now=1 masks=0x03000000\n")!=NULL);
+    CHECK(strstr(log_text,"   node model=0x90C index=0 type(+48)=0 child(+4B)=1 sibling(+4C)=-1 mask(+5C)=0x00000000 always\n")!=NULL);
+    CHECK(strstr(log_text,"   node model=0x90C index=1 type(+48)=2 child(+4B)=-1 sibling(+4C)=2 mask(+5C)=0x02000000 drawn\n")!=NULL);
+    CHECK(strstr(log_text,"   node model=0x90C index=2 type(+48)=3 child(+4B)=-1 sibling(+4C)=-1 mask(+5C)=0x01000000 hidden\n")!=NULL);
+    CHECK(count("  nodes ")==1 && count("   node ")==3);  /* not for the non-geometry prop */
     CHECK(count("  draw ret=0x000A2ACA inst=0x00351000 pass=0 layer=")==2);
     CHECK(strstr(log_text,"  draw ret=0x000A2ACA inst=0x00351000 pass=0 layer=2 room=5 model=0x90C\n")!=NULL);
     call_room(0x00086BDEu,5u,1u);                        /* another pass is a distinct draw */
@@ -410,6 +429,7 @@ int main(int argc,char **argv)
     call_room(0x00086BDEu,5u,0u);                        /* 30 s after the first: a new window */
     read_log();
     CHECK(strstr(log_text,"rooms-window begin n=2 ")!=NULL && count("room-draw ")==3);
+    CHECK(count("  nodes ")==1 && count("   node ")==3);  /* once per run, not per window */
     WORD_AT(0x0079094Cu)=102;                            /* editor: closed and not logged */
     tick+=100u;
     call_room(0x00086BDEu,5u,0u);
@@ -424,6 +444,28 @@ int main(int argc,char **argv)
     call_room(0x00086BDEu,0x1000u,0u);                   /* past the id tables */
     read_log();
     CHECK(strstr(log_text,"room=7 pass=0 props=0\n")!=NULL && strstr(log_text,"room=4096 pass=0 props=0\n")!=NULL);
+    /* Node dump bounds: a bad header, a long node list, the model cap. */
+    WORD_AT(ROOM_BIG_INST+4u)=0x0FFFFFF0u;
+    mapmaker_probe_rooms_nodes(8u,0x910u,ROOM_BIG_INST);
+    read_log();
+    CHECK(strstr(log_text,"  nodes model=0x910 room=8 inst=0x00358000 header=0x0FFFFFF0 count=0 unreadable\n")!=NULL);
+    WORD_AT(ROOM_BIG_INST+4u)=ROOM_BIG_NODES;WORD_AT(ROOM_BIG_NODES)=200u;WORD_AT(ROOM_BIG_INST+0x30u)=0xFFFFFFFFu;
+    for(i=0;i<200u;i++) set_node(ROOM_BIG_NODES,200u,i,1u,-1,-1,1u<<(i%32u));
+    before=checksum();
+    mapmaker_probe_rooms_nodes(9u,0x911u,ROOM_BIG_INST);
+    mapmaker_probe_rooms_nodes(9u,0x911u,ROOM_BIG_INST); /* same model and table: once */
+    CHECK(checksum()==before);
+    read_log();
+    CHECK(strstr(log_text,"  nodes model=0x911 room=9 inst=0x00358000 inst+30=0xFFFFFFFF count=200 always=0 hidden-now=0 masks=0xFFFFFFFF\n")!=NULL);
+    CHECK(count("   node model=0x911 ")==MAPMAKER_PROBE_NODES_PER_MODEL);
+    CHECK(strstr(log_text,"   nodes truncated model=0x911 shown=96 of 200\n")!=NULL);
+    /* another node table under the same model id (a rebuilt map): dumped again */
+    mapmaker_probe_rooms_nodes(9u,0x911u,ROOM_INST);
+    read_log();
+    CHECK(count("  nodes model=0x911 ")==2);
+    for(i=0;i<MAPMAKER_PROBE_NODE_MODELS+8u;i++) mapmaker_probe_rooms_nodes(1u,0x920u+i,ROOM_INST);
+    read_log();
+    CHECK(mapmaker_probe_nodes.models==MAPMAKER_PROBE_NODE_MODELS && count("  nodes cap reached")==1);
     set_probe("64");                                     /* without flag 128: nothing */
     call_room(0x00086BDEu,5u,0u);
     read_log();

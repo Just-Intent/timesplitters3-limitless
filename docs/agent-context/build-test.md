@@ -248,7 +248,11 @@ four mutations and patch shape) and `tests/test_testing_profile.py`.
 Fixture success is not evidence of in-game meter behaviour.
 Probe flags are 1..255 (64 = AI pool counts, 128 = room prop draws, both in
 scene 100). `tests/test_mapmaker_sky.py` (MapMaker clouds) also checks the
-stock sky data against the local XBE and skips that check without it. The MapMaker
+stock sky data against the local XBE and skips that check without it.
+`tests/test_mapmaker_skymask.py` (fixture `tests/mapmaker_skymask.c`, dev
+switch `TSFP_MAPMAKER_ROOM_MASK_CLEAR`) compares the exact stderr text and
+runs 15 mutations; its decoder check of the per-room mask table's references
+skips without the private XBE. Both are in the native CI list. The MapMaker
 pointer, memory budget and stage A limits fixtures
 (`tests/test_mapmaker_pointer.py`, `tests/test_mapmaker_budget.py`,
 `tests/test_mapmaker_limits.py`) are in the same CI list, as is
