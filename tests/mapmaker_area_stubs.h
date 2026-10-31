@@ -35,4 +35,7 @@ void sub_00157440(void) {}
 void sub_00300670(void) {}
 void sub_0031BB60(void) {}
 void sub_003C85D4(void) {}
+/* aitemplates */
+void sub_0031BE70(void) {}
+void sub_00079D60(void) {}
 #endif

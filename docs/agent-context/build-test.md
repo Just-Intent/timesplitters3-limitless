@@ -270,6 +270,10 @@ in `actors-list.json` keeps its offset in the moved table, and that the
 perception slice in `objects.json` matches the actors and objects constants;
 its enemy-picker case compares the two-pass `sub_0027BA40` hook against a
 model of the original's 32-entry array and argmin on random lists.
+`tests/test_mapmaker_aitemplates.py` (Story AI duplicate/linked copies,
+mutations) and `tests/test_mapmaker_aitemplates_classified.py` (decode checks of
+the edit-screen row site, menu table 0x0052E088 and the unused chunk bytes
++0x32/+0x33) are in the same CI list.
 
 Site inventories must come from the lifter's decoder, not from
 `private/pipeline/disasm/asm/text.asm`: the listing elides the byte column of

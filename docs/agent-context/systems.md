@@ -204,6 +204,16 @@ writes the moved AI table; `TSFP_MAPMAKER_ALIVE=1..64` lowers it; sites and
 risks in `docs/mapmaker-actors.md`).
 Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`.
 
+Story AI templates (`src/pc_mapmaker_aitemplates.inc`, `docs/mapmaker-aitemplates.md`,
+`TSFP_MAPMAKER_LIMITS=1`): the Story AI edit screen (`sub_0031CB90`, list path
+close `sub_0031CAC0`) gains "Duplicate Story AI" / "Add linked copy" / "Unlink
+copy" rows (added at the `sub_000784A0` call 0x0031D07E, told apart by
+menu+0x18C). Links live in editor entry +0x50 and Story AI chunk word +0x32
+(stock-zero; stock games load copies as independent AIs). In scene 100 logic on
+the point-less template means "any linked copy" (`sub_0033E560`, `sub_00163780`,
+`sub_0033E620`, `sub_00339600`). Compile/load/level-start hooks chain outside the
+container/editor ones. Not yet integrated, built or played.
+
 ## MapMaker editor mouse controls
 
 On by default since 2026-10-23 (milestone confirmed in game);
