@@ -52,4 +52,10 @@ void sub_00071800(void) {}
 /* sky (sub_00078560 becomes a wrapper dispatcher) */
 void sub_00078560(void) {}
 void sub_0007D4F0(void) {}
+/* sets (pc_mapmaker_sets.inc: slot screen, Story AI choice, preload) */
+void sub_00071970(void) {}
+void sub_00074670(void) {}
+void sub_002BE650(void) {}
+void sub_002BFFD0(void) {}
+void sub_000D7780(void) {}
 #endif

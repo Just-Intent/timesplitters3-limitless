@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,1402 @@
+@@ -1037,6 +1037,1519 @@
      sub_002FA720_gen();
  #endif
  }
@@ -180,13 +180,23 @@
 +#endif
 +}
 +
-+void sub_003006C0(void)
++static void sub_003006C0_layer4(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_compile")) pc_mapmaker_bosses_compile(sub_003006C0_layer3);
 +    else sub_003006C0_layer3();
 +#else
 +    sub_003006C0_layer3();
++#endif
++}
++
++void sub_003006C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_compile")) pc_mapmaker_sets_compile(sub_003006C0_layer4);
++    else sub_003006C0_layer4();
++#else
++    sub_003006C0_layer4();
 +#endif
 +}
 +
@@ -353,13 +363,23 @@
 +#endif
 +}
 +
-+void sub_00301A90(void)
++static void sub_00301A90_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_load")) pc_mapmaker_bosses_load(sub_00301A90_layer2);
 +    else sub_00301A90_layer2();
 +#else
 +    sub_00301A90_layer2();
++#endif
++}
++
++void sub_00301A90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_load")) pc_mapmaker_sets_load(sub_00301A90_layer3);
++    else sub_00301A90_layer3();
++#else
++    sub_00301A90_layer3();
 +#endif
 +}
 +
@@ -1204,13 +1224,23 @@
 +#endif
 +}
 +
-+void sub_002FEBF0(void)
++static void sub_002FEBF0_layer2(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_reset")) pc_mapmaker_bosses_reset(sub_002FEBF0_layer1);
 +    else sub_002FEBF0_layer1();
 +#else
 +    sub_002FEBF0_layer1();
++#endif
++}
++
++void sub_002FEBF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_reset")) pc_mapmaker_sets_reset(sub_002FEBF0_layer2);
++    else sub_002FEBF0_layer2();
++#else
++    sub_002FEBF0_layer2();
 +#endif
 +}
 +
@@ -1336,13 +1366,23 @@
 +}
 +
 +extern void sub_00078590_gen(void);
-+void sub_00078590(void)
++static void sub_00078590_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_health_rows")) pc_mapmaker_bosses_health_rows(sub_00078590_gen);
 +    else sub_00078590_gen();
 +#else
 +    sub_00078590_gen();
++#endif
++}
++
++void sub_00078590(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_sai_choice")) pc_mapmaker_sets_sai_choice(sub_00078590_layer0);
++    else sub_00078590_layer0();
++#else
++    sub_00078590_layer0();
 +#endif
 +}
 +
@@ -1365,6 +1405,83 @@
 +    else sub_000D7780_gen();
 +#else
 +    sub_000D7780_gen();
++#endif
++}
++
++extern void sub_00312810_gen(void);
++void sub_00312810(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_changed")) pc_mapmaker_sets_changed(sub_00312810_gen);
++    else sub_00312810_gen();
++#else
++    sub_00312810_gen();
++#endif
++}
++
++extern void sub_002C0490_gen(void);
++void sub_002C0490(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_screen")) pc_mapmaker_sets_screen(sub_002C0490_gen);
++    else sub_002C0490_gen();
++#else
++    sub_002C0490_gen();
++#endif
++}
++
++extern void sub_002C0290_gen(void);
++void sub_002C0290(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_set_ptr")) pc_mapmaker_sets_set_ptr(sub_002C0290_gen);
++    else sub_002C0290_gen();
++#else
++    sub_002C0290_gen();
++#endif
++}
++
++extern void sub_00312950_gen(void);
++void sub_00312950(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_editor_set")) pc_mapmaker_sets_editor_set(sub_00312950_gen);
++    else sub_00312950_gen();
++#else
++    sub_00312950_gen();
++#endif
++}
++
++extern void sub_00314210_gen(void);
++void sub_00314210(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_store")) pc_mapmaker_sets_store(sub_00314210_gen);
++    else sub_00314210_gen();
++#else
++    sub_00314210_gen();
++#endif
++}
++
++extern void sub_0033EBF0_gen(void);
++void sub_0033EBF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_play_set")) pc_mapmaker_sets_play_set(sub_0033EBF0_gen);
++    else sub_0033EBF0_gen();
++#else
++    sub_0033EBF0_gen();
++#endif
++}
++
++extern void sub_0023F320_gen(void);
++void sub_0023F320(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_preload")) pc_mapmaker_sets_preload(sub_0023F320_gen);
++    else sub_0023F320_gen();
++#else
++    sub_0023F320_gen();
 +#endif
 +}
 +
