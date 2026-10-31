@@ -26,11 +26,15 @@
  * sub-entries, and writes the meter (editor+0x270, placed only) and the held
  * piece preview (editor+0x274) from the same limits. After the original runs,
  * the decision and both values are recomputed with pads 4800, links 8800,
- * pad groups 600, 200 items ("sub-entries"; cover pads stay 1024) and 241
+ * pad groups 600, 500 items ("sub-entries"; cover pads stay 1024) and 241
  * pieces (one visibility room each: the engine's 200-room limit is raised to
  * 241 by config/guest-code-patches/rooms.json, see src/interface/pc_mapmaker_rooms.inc);
  * memory (raised separately by TSFP_MAPMAKER_MEMORY_SCALE) keeps its limit.
- * The editor's item node pool is 2120 (config/guest-code-patches/).
+ * The editor's item node pool is 5300 (config/guest-code-patches/items.json):
+ * 500 items, their clipboard copies and up to 81 start points fit twice over.
+ * In play items are Level-heap arrays by count (sub_00240590) and about one
+ * engine object each (pool 1000, pc_mapmaker_objects.inc; round 3: 500 items
+ * + 241 rooms + 64 characters stay below it, measure with probe flag 64).
  *
  * Cover pads stay at the stock 1024: the map adds about 60 more when it loads
  * (measured: 60 on a 142-tile, 50-item map and on a 110-tile, 67-item map, so
@@ -39,7 +43,10 @@
  * Per-category maxima (writable .data table 0x00524BE0, 37 x 24 B, max at +4,
  * read by sub_00303460 place and sub_00303E10 paste) are raised while the
  * limits are on: pickups x4 (weapons, ammo, keycards, health, armour,
- * power-ups, special pickups) and movers and props x4. Objects come from a
+ * power-ups, special pickups) x4, keycards x8 (16 per colour) and movers,
+ * props and markers x8 (160 each; round 3, all within the 500 item total and
+ * the 1000-object pool; the slot-0/8 object lists drop and log past
+ * 448/200, pc_mapmaker_objects.inc). Objects come from a
  * 550-slot engine pool taken without a bound check (203 in use with 30+ movers
  * on a 110-tile map). Turrets (categories 27-29, 8 each) stay at stock: each
  * live turret takes a gun and an owner struct from two 32-slot pools whose
@@ -65,7 +72,7 @@
 #define MAPMAKER_LIMIT_LINKS 8800u
 #define MAPMAKER_LIMIT_GROUPS 600
 #define MAPMAKER_LIMIT_PIECES 241u    /* = MAPMAKER_ROOMS_MAX */
-#define MAPMAKER_LIMIT_SUB 200u
+#define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
 
 static struct { int initialized, pools, limits; } mapmaker_limits;
@@ -88,10 +95,10 @@ static struct { int initialized, pools, limits; } mapmaker_limits;
 static const struct { uint32_t address, stock, raised; } mapmaker_categories[]={
     {0x00524CA4u,32u,128u},  /* 8  weapon pickups */
     {0x00524CBCu,32u,128u},  /* 9  ammo */
-    {0x00524CD4u,2u,8u},     /* 10 keycard red */
-    {0x00524CECu,2u,8u},     /* 11 keycard blue */
-    {0x00524D04u,2u,8u},     /* 12 keycard yellow */
-    {0x00524D1Cu,2u,8u},     /* 13 keycard green */
+    {0x00524CD4u,2u,16u},    /* 10 keycard red: pickup records by count, no pool of their own */
+    {0x00524CECu,2u,16u},    /* 11 keycard blue */
+    {0x00524D04u,2u,16u},    /* 12 keycard yellow */
+    {0x00524D1Cu,2u,16u},    /* 13 keycard green */
     {0x00524D34u,2u,8u},     /* 14-18 teleporters: sub_0009CD00 wrapper (pc_mapmaker_objects.inc) */
     {0x00524D4Cu,2u,8u},
     {0x00524D64u,2u,8u},
@@ -105,9 +112,9 @@ static const struct { uint32_t address, stock, raised; } mapmaker_categories[]={
     {0x00524DC4u,16u,64u},   /* 20 armour */
     {0x00524DDCu,12u,48u},   /* 21 power-ups */
     {0x00524ECCu,32u,128u},  /* 31 special pickups */
-    {0x00524E3Cu,20u,80u},   /* 25 mover (object) */
-    {0x00524E54u,20u,80u},   /* 26 props (objects) */
-    {0x00524EE4u,20u,80u},   /* 32 marker */
+    {0x00524E3Cu,20u,160u},  /* 25 mover (object) */
+    {0x00524E54u,20u,160u},  /* 26 props (objects) */
+    {0x00524EE4u,20u,160u},  /* 32 marker */
     {0x00524F2Cu,4u,8u},     /* 35 */
     {0x00524F44u,4u,8u},     /* 36 */
 };

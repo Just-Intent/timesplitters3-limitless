@@ -1,0 +1,103 @@
+{
+  "patches": [
+    {
+      "id": "sai-index-getter",
+      "kind": "code",
+      "function": "0x0031BA80",
+      "address": "0x0031BA80",
+      "original_hex": "a0942f7600",
+      "new_hex": "a1942f7600",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): sub_0031BA80 returns the index: mov al,[0x762F94] -> mov eax,[0x762F94] (its one caller 0x00336E60 passes eax to sub_0031BAA0)"
+    },
+    {
+      "id": "sai-index-setter-load",
+      "kind": "code",
+      "function": "0x0031BA90",
+      "address": "0x0031BA90",
+      "original_hex": "8a442404",
+      "new_hex": "8b442404",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): sub_0031BA90 argument: mov al,[esp+4] -> mov eax,[esp+4] (its one caller 0x003057E3 pushes the dword index edi = [editor+0x2F20])"
+    },
+    {
+      "id": "sai-index-setter-store",
+      "kind": "code",
+      "function": "0x0031BA90",
+      "address": "0x0031BA94",
+      "original_hex": "a2942f7600",
+      "new_hex": "a3942f7600",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): sub_0031BA90 store: mov [0x762F94],al -> mov [0x762F94],eax (0x762F95..97 have no references: padding)"
+    },
+    {
+      "id": "sai-index-entry-arg",
+      "kind": "code",
+      "function": "0x0031BAA0",
+      "address": "0x0031BAA0",
+      "original_hex": "0fb6442404",
+      "new_hex": "0fb7442404",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): sub_0031BAA0(index) -> entry: movzx eax, byte [esp+4] -> word (callers 0x00336DFD push count-1, 0x00336E66 push the getter)"
+    },
+    {
+      "id": "sai-index-read-0031bac0",
+      "kind": "code",
+      "function": "0x0031BAC0",
+      "address": "0x0031BAC0",
+      "original_hex": "0fb60d942f7600",
+      "new_hex": "0fb70d942f7600",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): movzx ecx, byte [0x762F94] -> word"
+    },
+    {
+      "id": "sai-index-read-0031bb30",
+      "kind": "code",
+      "function": "0x0031BB30",
+      "address": "0x0031BB30",
+      "original_hex": "0fb615942f7600",
+      "new_hex": "0fb715942f7600",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): movzx edx, byte [0x762F94] -> word"
+    },
+    {
+      "id": "sai-index-read-0031cac0",
+      "kind": "code",
+      "function": "0x0031CAC0",
+      "address": "0x0031CAC0",
+      "original_hex": "0fb605942f7600",
+      "new_hex": "0fb705942f7600",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): movzx eax, byte [0x762F94] -> word (edit screen close)"
+    },
+    {
+      "id": "sai-index-read-0031cb91",
+      "kind": "code",
+      "function": "0x0031CB90",
+      "address": "0x0031CB91",
+      "original_hex": "0fb605942f7600",
+      "new_hex": "0fb705942f7600",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): movzx eax, byte [0x762F94] -> word (edit screen build)"
+    },
+    {
+      "id": "sai-index-select-load",
+      "kind": "code",
+      "function": "0x0031BF00",
+      "address": "0x0031BF04",
+      "original_hex": "8a828c010000",
+      "new_hex": "8b828c010000",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): sub_0031BF00 (Story AI list row callback): mov al, byte [row+0x18C] -> mov eax, dword (the row id is the AI index)"
+    },
+    {
+      "id": "sai-index-select-index",
+      "kind": "code",
+      "function": "0x0031BF00",
+      "address": "0x0031BF0A",
+      "original_hex": "0fb6c8",
+      "new_hex": "0fb7c8",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): movzx ecx, al -> movzx ecx, ax (entry = index * 0xE4)"
+    },
+    {
+      "id": "sai-index-select-store",
+      "kind": "code",
+      "function": "0x0031BF00",
+      "address": "0x0031BF14",
+      "original_hex": "a2942f7600",
+      "new_hex": "a3942f7600",
+      "reason": "Story AI selection index [0x00762F94] byte -> word (511 Story AI, round 3; identical for indices below 256): mov [0x762F94], al -> eax"
+    }
+  ]
+}

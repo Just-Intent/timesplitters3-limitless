@@ -129,6 +129,16 @@ static void make_map(uint32_t c,uint32_t used,uint32_t seed)
     for(i=0;i<fill;i++) host(c+16+0x3DC+8)[i]=(uint8_t)(i*31u+seed);
     WORD_AT(c+used-8)=0x00C7766Au;WORD_AT(c+used-4)=used-8u;
 }
+/* The same map with n chunks of one tag (0x50 bytes each) where the filler
+ * starts; the filler takes the rest. */
+static void make_chunks(uint32_t c,uint32_t used,uint32_t tag,uint32_t n)
+{
+    uint32_t p,i;
+    make_map(c,used,9);
+    p=c+16+0x3DC;
+    for(i=0;i<n;i++) { WORD_AT(p)=tag;WORD_AT(p+4)=0x50u;p+=8u+0x50u; }
+    WORD_AT(p)=0x00C77669u;WORD_AT(p+4)=c+used-8u-(p+8u);
+}
 /* What the save state stores: CRC over used bytes at c + used. */
 static void seal(uint32_t c)
 {
@@ -279,6 +289,60 @@ int main(void)
     stack(0x00190A1Fu,4,c,MAPMAKER_CONTAINER_STOCK+20u,0x00600000u,2u);
     pc_mapmaker_container_save_sign(record_arg1);
     CHECK(seen_size==0x1FFE0u+20u);
+
+    /* ---- maps past the stock limits save in the 64 KB tier ---- */
+    {
+        static const struct { uint32_t tag, stock; } chunks[]={
+            {0x00C7766Bu,170u},{0x00C7766Cu,50u},{0x00C7766Du,130u},{0x00C7766Eu,30u},{0x00C7766Fu,100u}};
+        uint32_t k,ed=0x00300000u,piece=0x00380000u,tp=0x00381000u,sub=0x00382000u,n;
+        for(k=0;k<sizeof chunks/sizeof chunks[0];k++) {
+            make_chunks(c,0x4000u,chunks[k].tag,chunks[k].stock);
+            CHECK(save_tier(c)==MAPMAKER_CONTAINER_STOCK);
+            make_chunks(c,0x4000u,chunks[k].tag,chunks[k].stock+1u);
+            CHECK(save_tier(c)==0xFFE0u);
+        }
+        make_map(c,0x1000u,5);WORD_AT(c+16+4)=200u;CHECK(save_tier(c)==MAPMAKER_CONTAINER_STOCK);
+        WORD_AT(c+16+4)=201u;CHECK(save_tier(c)==0xFFE0u);          /* header piece count */
+        make_map(c,0x10000u,5);WORD_AT(c+16+4)=201u;CHECK(save_tier(c)==0x1FFE0u); /* larger anyway */
+        /* The editor's own counts (scene 102): story AI, logic, free objects,
+         * attached items in all and per category, tiles and their pad costs. */
+        make_map(c,0x1000u,5);
+        for(k=0;k<37u;k++) WORD_AT(0x00524BE4u+k*24u)=32u;
+        WORD_AT(0x0079094Cu)=102u;WORD_AT(0x007844A8u)=ed;WORD_AT(0x0078400Cu)=0;
+        CHECK(save_tier(c)==MAPMAKER_CONTAINER_STOCK);
+        WORD_AT(ed+0x280u)=51u;CHECK(save_tier(c)==0xFFE0u);WORD_AT(ed+0x280u)=50u;
+        WORD_AT(ed+0x41E0u)=31u;CHECK(save_tier(c)==0xFFE0u);WORD_AT(ed+0x41E0u)=0;
+        WORD_AT(ed+0x81A4u)=131u;CHECK(save_tier(c)==0xFFE0u);WORD_AT(ed+0x81A4u)=0;
+        WORD_AT(ed+0xDD10u)=101u;CHECK(save_tier(c)==0xFFE0u);WORD_AT(ed+0xDD10u)=0;
+        WORD_AT(ed+0x3068u)=41u;CHECK(save_tier(c)==0xFFE0u);
+        WORD_AT(ed+0x3068u)=31u<<16;CHECK(save_tier(c)==0xFFE0u);WORD_AT(ed+0x3068u)=0;
+        WORD_AT(ed+0x306Cu)=101u;CHECK(save_tier(c)==0xFFE0u);
+        WORD_AT(ed+0x306Cu)=51u<<16;CHECK(save_tier(c)==0xFFE0u);   /* free objects count toward the 50 items */
+        WORD_AT(ed+0x306Cu)=0;
+        WORD_AT(0x00762CB8u)=301u;CHECK(save_tier(c)==0xFFE0u);WORD_AT(0x00762CB8u)=0;
+        /* One tile with items of id 20 (category 10, stock 2 per colour). */
+        WORD_AT(0x0078400Cu)=piece;WORD_AT(piece+0x2c)=tp;WORD_AT(tp)=0;WORD_AT(piece+0x40)=0;WORD_AT(piece+0x3c)=sub;
+        WORD_AT(0x00524F58u+20u*0xC4u)=10u<<16;
+        WORD_AT(0x00524BE4u+10u*24u)=2u;
+        for(n=0;n<3u;n++) { WORD_AT(sub+n*0x20u)=20u;WORD_AT(sub+n*0x20u+0x14u)=n<2u?sub+(n+1u)*0x20u:0u; }
+        WORD_AT(sub+0x20u+0x14u)=0;                                     /* two keycards: stock */
+        CHECK(save_tier(c)==MAPMAKER_CONTAINER_STOCK);
+        WORD_AT(sub+0x20u+0x14u)=sub+0x40u;                             /* three */
+        CHECK(save_tier(c)==0xFFE0u);
+        WORD_AT(0x00524BE4u+10u*24u)=16u;                               /* raised table, stock max from the list */
+        CHECK(save_tier(c)==0xFFE0u);
+        WORD_AT(0x00524F58u+20u*0xC4u)=9u<<16;                          /* ammo (stock 32): three are stock */
+        CHECK(save_tier(c)==MAPMAKER_CONTAINER_STOCK);
+        for(n=0;n<51u;n++) { WORD_AT(sub+n*0x20u)=20u;WORD_AT(sub+n*0x20u+0x14u)=n<50u?sub+(n+1u)*0x20u:0u; }
+        WORD_AT(0x00524F58u+20u*0xC4u)=22u<<16;WORD_AT(0x00524BE4u+22u*24u)=100u; /* not in the raised list */
+        CHECK(save_tier(c)==0xFFE0u);                                   /* 51 items */
+        WORD_AT(sub+49u*0x20u+0x14u)=0;
+        CHECK(save_tier(c)==MAPMAKER_CONTAINER_STOCK);                  /* 50 items */
+        WORD_AT(0x00529400u)=2401u;CHECK(save_tier(c)==0xFFE0u);WORD_AT(0x00529400u)=0;   /* pad cost of tile 0 */
+        WORD_AT(0x0079094Cu)=100u;WORD_AT(ed+0x280u)=51u;
+        CHECK(save_tier(c)==MAPMAKER_CONTAINER_STOCK);                  /* not the editor: chunks only */
+        WORD_AT(ed+0x280u)=0;WORD_AT(0x0079094Cu)=0;WORD_AT(0x007844A8u)=0;WORD_AT(0x0078400Cu)=0;
+    }
 
     /* ---- save CRC past 64 KB: real CRC at used, caller's store a no-op ---- */
     make_map(c,0x18000u,6);

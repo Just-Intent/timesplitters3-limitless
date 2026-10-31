@@ -226,4 +226,9 @@ void pc_capture_match(unsigned humans,unsigned bots,unsigned difficulty,unsigned
     if(capture)pc_crumb_match(&capture->breadcrumbs,ticks()-capture->started_ms,values);
 }
 
-void pc_capture_allocation(uint32_t event,uint32_t address,uint32_t bytes){if(capture)pc_crumb_allocation(&capture->allocations,ticks()-capture->started_ms,event,address,bytes);}
+static volatile uint32_t allocation_usage[PC_USAGE_WORDS];
+void pc_capture_allocation(uint32_t event,uint32_t address,uint32_t bytes){
+    pc_allocation_usage_note(allocation_usage,event,address,bytes);
+    if(capture)pc_crumb_allocation(&capture->allocations,ticks()-capture->started_ms,event,address,bytes);
+}
+void pc_capture_allocation_usage(uint32_t out[PC_USAGE_WORDS]){for(unsigned i=0;i<PC_USAGE_WORDS;i++)out[i]=allocation_usage[i];}

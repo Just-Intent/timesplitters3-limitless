@@ -204,6 +204,27 @@ pad -> pad nav link of a stacked teleporter pair; a
 unchanged; `docs/mapmaker/mapmaker-grid.md`).
 Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`.
 
+Round 3 (2026-10-31, `docs/mapmaker/mapmaker-memory.md`, not built or played):
+area `memory` (`src/interface/pc_mapmaker_memory.inc`, included first among the
+areas): a read-only guard on the game heaps `sub_0003DFA0`/`sub_0003E0B0` that
+logs `[mapmaker] heap full: ...` once per overrun event (8 per run), and the
+off-by-default `TSFP_MAPMAKER_ARENA_MB=0..16` that raises the arena dword
+`[0x004C0450]` before `sub_00023930` reads it (trial block from the
+contiguous window first; stock kept if it fails). Probe flag 32 now adds the
+host window/runtime-heap peaks from the allocation observer
+(`pc_capture_allocation_usage`, `src/diagnostics/pc_breadcrumbs.h`, fed in
+`pc_crash.c` and `src/native/crash_posix.c`). Raises: items 500
+(`MAPMAKER_LIMIT_SUB`, node pool 5300 in `items.json`), keycards 16 per colour,
+movers/props/markers 160 (category table), Story AI 511: `editor.json` moves
+the Story AI array to the end of the editor object (+0x58390, object
+0x74C00), `sai-index.json` widens the selection index `[0x00762F94]` to a
+word (11 same-length rewrites, no wrapper), the editor menu item pool is
+6144. Saves: `mapmaker_container_over_stock` forces the 64 KB tier for any
+map past a stock count (chunks, or the editor's counts in scene 102), so
+stock builds refuse it. Decoder checks:
+`tests/mapmaker/test_mapmaker_limits_classified.py`; fixtures
+`tests/mapmaker/test_mapmaker_memory.py`.
+
 risks in `docs/mapmaker/mapmaker-actors.md`).
 Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`. `sky` (no table; not yet
 wired) adds a per-map cloud layer with `TSFP_MAPMAKER_LIMITS=1`: a "Clouds"
@@ -301,7 +322,7 @@ unplaced (`ait_unplace`: +0x58 = 0, +0x64..+0xE3 zero) so the list shows the
 empty-handed pick-up on a shared cell takes the highest-index AI first
 (`pc_mapmaker_stack_sai_point`, old maps with stacked copies). The editor's
 menu item pool (`aitemplates-pool.json`, operand 0x00070DC3 in `sub_00070DB0`,
-scene 102 branch only) is 3072 items instead of 920; WRAP `sub_000715E0` ->
+scene 102 branch only) is 6144 items instead of 920; WRAP `sub_000715E0` ->
 `pc_mapmaker_aitemplates_menu_item` logs once when it runs out in scene 102.
 Not yet built or played.
 

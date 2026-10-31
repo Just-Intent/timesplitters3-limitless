@@ -52,6 +52,16 @@ overrides at lift time) plus function wrappers.
   unresolved jumps. Frame rate fine after the tester fixed the PC's power
   settings. Not yet tested: System Link, splitscreen, native Mac.
 
+- Round 3 implemented 2026-10-31 (not built or played;
+  `docs/mapmaker/mapmaker-memory.md`): heap overrun guard and the probe's
+  host headroom fields (step A1/A2), `TSFP_MAPMAKER_ARENA_MB` prepared off by
+  default (A3, needs the probe measurement), items 500 (node pool 5300),
+  keycards 16 per colour, movers/props/markers 160, Story AI 511 (array at
+  the end of the editor object, word selection index, menu pool 6144), and
+  maps past any stock count saved in the 64 KB tier. Not done: moving pools
+  out of the Level heap, a larger extension block, rooms 512, Story AI 1023
+  (menu pool and editor heap unmeasured).
+
 ## Stages (in order)
 
 1. **Item and object quick wins.** Keycards, movers, props and other category

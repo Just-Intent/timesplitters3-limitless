@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,1358 @@
+@@ -1037,6 +1037,1391 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1354,6 +1354,39 @@
 +    else sub_000D7780_gen();
 +#else
 +    sub_000D7780_gen();
++#endif
++}
++
++extern void sub_0003DFA0_gen(void);
++void sub_0003DFA0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("memory","pc_mapmaker_memory_heap_alloc")) pc_mapmaker_memory_heap_alloc(sub_0003DFA0_gen);
++    else sub_0003DFA0_gen();
++#else
++    sub_0003DFA0_gen();
++#endif
++}
++
++extern void sub_0003E0B0_gen(void);
++void sub_0003E0B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("memory","pc_mapmaker_memory_heap_alloc_aligned")) pc_mapmaker_memory_heap_alloc_aligned(sub_0003E0B0_gen);
++    else sub_0003E0B0_gen();
++#else
++    sub_0003E0B0_gen();
++#endif
++}
++
++extern void sub_00023930_gen(void);
++void sub_00023930(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("memory","pc_mapmaker_memory_arena")) pc_mapmaker_memory_arena(sub_00023930_gen);
++    else sub_00023930_gen();
++#else
++    sub_00023930_gen();
 +#endif
 +}
  

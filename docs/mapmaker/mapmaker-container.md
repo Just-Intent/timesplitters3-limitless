@@ -200,6 +200,11 @@ larger-tier files with error 7 too.
   stock limit) now saves in the 64 KB tier with a correct CRC; the stock game
   saved a body that lost its CRC.
 - Old maps load unchanged (stock body read first).
+- Round 3: a map past any stock count (Story AI, logic, free objects,
+  tiles, items, a category maximum, pad costs, pad groups) saves in the
+  64 KB tier even when it fits 32 KB, so a stock build refuses it instead of
+  overflowing (`mapmaker_container_over_stock`; list in
+  `docs/mapmaker/mapmaker-memory.md`).
 
 ## Open risks / to test in play
 

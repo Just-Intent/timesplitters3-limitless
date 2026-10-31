@@ -45,6 +45,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
 /* MapMaker capacity area includes (begin) */
+#include "pc_mapmaker_memory.inc"
 #include "pc_mapmaker_pads.inc"
 #include "pc_mapmaker_container.inc"
 #include "pc_mapmaker_objects.inc"
@@ -751,6 +752,9 @@ void pc_mapmaker_bosses_level(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_hud(void (*original)(void)) { original(); }
 void pc_mapmaker_characters_eligible(void (*original)(void)) { original(); }
 void pc_mapmaker_characters_preload(void (*original)(void)) { original(); }
+void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
+void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
+void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}

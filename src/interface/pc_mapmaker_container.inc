@@ -15,6 +15,9 @@
  *  - files are saved in the smallest size tier that holds the map, so a map
  *    that fits the stock body saves byte-identical to stock; the loader tries
  *    the stock size first and the larger tiers on error 7 (file too large);
+ *    a map holding more of anything than the stock game allows saves in the
+ *    64 KB tier at least, so a stock build refuses it instead of overflowing
+ *    (mapmaker_container_over_stock, round 3);
  *  - the save CRC and the load check use the 16-bit word [0x00765AEE]; for
  *    maps past 64 KB the CRC is computed over the full length here;
  *  - System Link only ever carries the stock size: in a network session a
@@ -92,14 +95,108 @@ static uint32_t mapmaker_container_used(uint32_t c)
     uint32_t info=mapmaker_container_info(c);
     return info?WORD_AT(info+0x248):0u;
 }
-/* Body size a save of this buffer writes: smallest tier holding used + CRC. */
+/* ---- maps past the stock limits ---------------------------------------- */
+/* A stock build loads any file whose body is exactly 0x7FE0 and trusts every
+ * count in it: more than 50 story AI smash sub_00240590's stack array, more
+ * than 30 ops / 130 nodes / 100 records / 170 free objects run past the
+ * stock editor object, more than 10 teleporters past sub_0023FD10's stack
+ * arrays, more than 32 turrets give a gun struct at address 0, and 200+
+ * rooms, 2400+ pads or 550+ objects overrun their pools. So a map holding
+ * more of anything than the stock game allows is saved in the 64 KB tier
+ * even when it would fit 32 KB: the stock loader refuses that file (error 7,
+ * file larger than the body), this build reads it through its tiers. Maps
+ * within every stock limit still save byte-identical to stock.
+ *
+ * Two sources, either one is enough: the chunk counts of the buffer being
+ * saved (always), and while the editor runs (scene 102) the editor's own
+ * counts, which also cover the items attached to tiles: the item total, the
+ * per-category counts of sub_00303460 (catalogue 0x00524F58, 80 x 0xC4,
+ * category word +2; stock maxima from mapmaker_categories[] or the table
+ * itself), the tile pad costs and the global pad groups. */
+#define MAPMAKER_CONTAINER_OVER_TIER 0xFFE0u
+static const struct { uint32_t tag, stock; } mapmaker_container_stock_chunks[]={
+    {0x00C7766Bu,170u},   /* free objects: editor +0x3070, 170 x 12 */
+    {0x00C7766Cu,50u},    /* story AI: sub_00240590 50-slot stack array */
+    {0x00C7766Du,130u},   /* logic nodes */
+    {0x00C7766Eu,30u},    /* logic ops */
+    {0x00C7766Fu,100u},   /* logic records */
+};
+#define MAPMAKER_CONTAINER_STOCK_CHUNKS (sizeof mapmaker_container_stock_chunks/sizeof mapmaker_container_stock_chunks[0])
+#define MAPMAKER_CONTAINER_STOCK_PIECES 200u
+static int mapmaker_container_over_chunks(uint32_t c)
+{
+    uint32_t counts[MAPMAKER_CONTAINER_STOCK_CHUNKS],p,end;
+    unsigned i,steps;
+    if(!guest_writable(c,MAPMAKER_CONTAINER_B+8u) || WORD_AT(c)!=0x00C77667u || WORD_AT(c+4)!=0x12Du) return 0;
+    memset(counts,0,sizeof counts);
+    end=c+MAPMAKER_CONTAINER_B;
+    for(p=c+8,steps=0;p+8u<=end && steps<0x40000u;steps++) {
+        uint32_t tag=WORD_AT(p),size=WORD_AT(p+4),next=p+8u+size;
+        if(tag==0x00C7766Au || next<=p || next>end) break;
+        if(tag==0x00C77668u && size>=8u && WORD_AT(p+8u+4u)>MAPMAKER_CONTAINER_STOCK_PIECES &&
+           (int32_t)WORD_AT(p+8u+4u)>0) return 1;          /* header piece count */
+        for(i=0;i<MAPMAKER_CONTAINER_STOCK_CHUNKS;i++)
+            if(tag==mapmaker_container_stock_chunks[i].tag && ++counts[i]>mapmaker_container_stock_chunks[i].stock) return 1;
+        p=next;
+    }
+    return 0;
+}
+static uint32_t mapmaker_container_stock_max(unsigned cat)
+{
+    uint32_t a=0x00524BE4u+cat*24u;
+    unsigned i;
+    for(i=0;i<sizeof mapmaker_categories/sizeof mapmaker_categories[0];i++)
+        if(mapmaker_categories[i].address==a) return mapmaker_categories[i].stock;
+    return WORD_AT(a);
+}
+static int mapmaker_container_over_editor(void)
+{
+    uint32_t editor,piece,counts[37];
+    MapMakerTotals t;
+    unsigned i,j;
+    if(!guest_writable(0x0079094Cu,4) || WORD_AT(0x0079094Cu)!=102u ||
+       !guest_writable(0x007844A8u,4) || !guest_writable(0x0078400Cu,4)) return 0;
+    editor=WORD_AT(0x007844A8u);
+    if(!guest_writable(editor,0xDD14u)) return 0;
+    piece=WORD_AT(0x0078400Cu);
+    mapmaker_list_totals(piece,&t);
+    if(t.pieces>MAPMAKER_CONTAINER_STOCK_PIECES || t.cost[0]>2400u || t.cost[1]>1024u || t.cost[2]>4400u ||
+       t.sub+(WORD_AT(editor+0x306Cu)>>16)>50u || (int32_t)WORD_AT(0x00762CB8u)>300) return 1;
+    if((int32_t)WORD_AT(editor+0x280u)>50 || (int32_t)WORD_AT(editor+0x41E0u)>30 ||
+       (int32_t)WORD_AT(editor+0x81A4u)>130 || (int32_t)WORD_AT(editor+0xDD10u)>100) return 1;
+    if((WORD_AT(editor+0x3068u)&0xFFFFu)>40u || (WORD_AT(editor+0x3068u)>>16)>30u ||
+       (WORD_AT(editor+0x306Cu)&0xFFFFu)>100u) return 1;   /* free objects per type */
+    memset(counts,0,sizeof counts);
+    for(i=0;piece && i<4096u && MAPMAKER_PTR_OK(piece,0x44);i++,piece=WORD_AT(piece+0x40)) {
+        uint32_t sub=WORD_AT(piece+0x3c);
+        for(j=0;sub && j<4096u && MAPMAKER_PTR_OK(sub,0x18);j++,sub=WORD_AT(sub+0x14)) {
+            uint32_t id=WORD_AT(sub),cat;
+            if(id>=80u) continue;
+            cat=WORD_AT(0x00524F58u+id*0xC4u)>>16;            /* word +2 */
+            if(cat<37u) counts[cat]++;
+        }
+    }
+    for(i=0;i<37u;i++) if(counts[i]>mapmaker_container_stock_max(i)) return 1;
+    return 0;
+}
+static int mapmaker_container_over_stock(uint32_t c)
+{
+    return mapmaker_container_over_chunks(c) || mapmaker_container_over_editor();
+}
+
+/* Body size a save of this buffer writes: smallest tier holding used + CRC,
+ * at least 64 KB for a map past the stock limits. */
 static uint32_t mapmaker_container_tier(uint32_t c)
 {
     uint32_t used=mapmaker_container_used(c);
     unsigned i;
-    if(used && used<=MAPMAKER_CONTAINER_B-4u)
+    int over;
+    if(used && used<=MAPMAKER_CONTAINER_B-4u) {
+        over=mapmaker_container_over_stock(c);
         for(i=0;i<MAPMAKER_CONTAINER_TIER_COUNT;i++)
-            if(used+4u<=mapmaker_container_tiers[i]) return mapmaker_container_tiers[i];
+            if(used+4u<=mapmaker_container_tiers[i] && (!over || mapmaker_container_tiers[i]>=MAPMAKER_CONTAINER_OVER_TIER))
+                return mapmaker_container_tiers[i];
+    }
     return MAPMAKER_CONTAINER_STOCK;
 }
 

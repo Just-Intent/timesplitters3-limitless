@@ -24,6 +24,10 @@ MUTATIONS = {
     'heap-without-flag': ('    if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_HEAP)) return;\n', ''),
     'heap-no-minimum': ('    if(free_now<mapmaker_probe_heap_state.min_free) mapmaker_probe_heap_state.min_free=free_now;\n', ''),
     'heap-unthrottled': ('    if(mapmaker_probe_heap_state.last && now-mapmaker_probe_heap_state.last<MAPMAKER_PROBE_HEAP_INTERVAL) return;\n', ''),
+    'host-peak-not-kept': ('    if(extent>mapmaker_probe_heap_state.extent_peak) mapmaker_probe_heap_state.extent_peak=extent;\n',
+                           '    mapmaker_probe_heap_state.extent_peak=extent;\n'),
+    'host-observer-end-ignored': ('    if(usage[PC_USAGE_PHYS_END_PEAK]>contig_end) contig_end=usage[PC_USAGE_PHYS_END_PEAK];\n', ''),
+    'container-walk-stock-size': ('    for(off=8;off+8<=0x7FFE0;off+=8+size) {', '    for(off=8;off+8<=0x7FE0;off+=8+size) {'),
     'uncapped': ('if(mapmaker_probe.written+length>MAPMAKER_PROBE_CAP) {', 'if(0) {'),
     'rooms-without-flag': ('if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_ROOMS) || ', 'if('),
     'rooms-any-scene': ('if((int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_PROBE_SCENE_PLAY) {', 'if(0) {'),
@@ -99,3 +103,14 @@ def test_meter_wrapper_patch():
         hook.index('mapmaker_probe_menu(menu,caller);') < hook.index('if(!menu_mouse_context()')
     assert hook.index('choice_direction=menu_choice_hit(') < hook.index('mapmaker_probe_click(menu,x,y,hit,actions);')
     assert 'fopen(path,"wb")' in PROBE.read_text(encoding='utf-8')
+
+
+def test_usage_words_match_the_breadcrumb_header():
+    """The probe's fallback copy of the counter indices equals the header's."""
+    import re
+    def words(text):
+        m = re.search(r'enum \{ (PC_USAGE_HEAP_LIVE.*?PC_USAGE_WORDS) \};', text, re.S)
+        assert m
+        return ' '.join(m.group(1).split())
+    header = (ROOT / 'src/diagnostics/pc_breadcrumbs.h').read_text(encoding='utf-8')
+    assert words(PROBE.read_text(encoding='utf-8')) == words(header)
