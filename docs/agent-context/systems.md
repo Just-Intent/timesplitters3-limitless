@@ -23,8 +23,9 @@ Consult `docs/shared-platform.md` for shared versus adapter responsibilities.
 | Area | Start here (tracked root unless noted) | Useful checks/docs |
 | --- | --- | --- |
 | Bindings, input prompts | `src/pc_controls.c`, `pc_input.c`, `pc_bindings.inc`, `pc_prompts.c` | `tests/pc_controls.c`, `tests/pc_prompts.c`, `docs/windows-settings.md` |
-| Mouse/menu handling | `src/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc` | `tests/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
+| Mouse/menu handling | `src/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_mapmaker_browser.inc` | `tests/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
 | Auto-look / camera / cutscene | `src/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py` |
+| Mounted / vehicle gun mouse aim | `src/pc_mounted.h` (called from both adapters' `pc_controls_apply_mouse` after the terminal route, before ordinary look) | `tests/test_mounted_mouse.py` |
 | Display model and native UI | `src/pc_display.c`, `pc_display_*.inc`, `pc_settings.c`, `src/native/` | `tests/test_pc_display_modes.py`, `test_debug_settings_model.py` |
 | GPU clear / screen copies / sampling | `src/pc_clear_rhi.inc`, `src/graphics/`, runtime `src/d3d/` | `tests/test_rhi_menu_sampling.py`, `tests/rhi/`, `docs/shared-platform.md` |
 | Texture loading and formats | `src/texture_pack.c`, `texture_pack_format.h`, `texture_pack_io.h`, `texture_mode.c` | `tests/test_texture_runtime.py`, `tests/texture_pack_tools.py` |
@@ -125,6 +126,26 @@ exists); current supported limits remain landscape 640x480 through 7680x4320,
 no wider than 4:1. Manual selection disables this tracking. Desktop resolution
 and refresh rate are never changed.
 
+## Mounted and vehicle gun mouse aim
+
+Ordinary mouse look writes player yaw/pitch (`+0x100/+0x104`) from the
+`sub_000D2B80` wrapper, before `sub_000D5C70` dispatches the player mode
+(`+0x114`). Mode `0x400` (vehicle occupant) goes to `sub_000D2470`
+(`0x000D5DA8`), which rebuilds player yaw from the controller axes for gunner
+seats (`0x000D25E8`, `0x000D2774`, `0x000D2A20`) and aims the seat gun from
+that packet, so mouse look was discarded there (Scotland the Brave truck gun).
+Mode `0x80` (scripted mount `sub_000B76B0`) aims from the gun data angles.
+`src/pc_mounted.h` (port of main's `src/input/pc_mounted.h`, #182/#405/#412)
+routes mouse counts to the bound gun's angles in those two modes: vehicle seat
+lookup through the character `+0xC08` handle, entity table `0x0072F5E8`,
+seat records (`+0x70`, stride `0x34`, types 3/4 gunners, tracked type 0 driver
+camera), gun data `+0x1C/+0x24` with authored limits `+0x34..+0x40`, operator
+`+0xD8` checks. Mode `0x40` (`sub_000D1650`, gun follows the player view) and
+on-foot look stay on the ordinary path. This branch has no native-rate clock,
+so callers pass `native_timing=0` (whole-tick `0x004E7944` gate). Controller
+aim is untouched (original code). `tests/test_mounted_mouse.py`: fixture plus
+six mutations and an adapter ordering check; not a live turret test.
+
 ## Crane viewport edge clipping (#221)
 
 `pc_ui_vignette_clip` in `pc_ui_layout.h` converts the crane/remote-view
@@ -216,6 +237,40 @@ in scene 100 by copying sky record 5's cloud fields into the map's MapMaker
 sky record (58..67) around `sub_0011C9F0`. Four hooks (`sub_0011C9F0`,
 `sub_00078560`, `sub_002FEBF0`, `sub_003006C0` chained after the container
 hook); details and test steps in `docs/mapmaker-sky.md`.
+
+## MapMaker map browser mouse
+
+Main menu > MapMaker > Load map is an ordinary menu (descriptor `0x0052EA88`,
+construct `sub_0032BEA0`, tick `sub_0032BDD0`) whose type-7 rows carry the
+index of the enumerated file list `[0x00778D38]` (count `+8`, 0x6C-byte
+entries at `+0xC`). Its tick loads the highlighted row when the active menu's
+`+0xC4` has Confirm (0x10), but `sub_0007A7B0` runs the tick (0x0007AD76)
+before the row hook `sub_00073750` (0x0007ADC5), so the shared row click was
+too late. `src/pc_menu_mapmaker_browser.inc`, called from
+`pc_display_menu_mouse_input` after the footer test (scene 101 only), makes a
+fresh left click on a row highlight it (`sub_00076EF0`) and a click on the
+highlighted row Confirm (raw pad A plus `+0xC4`/`+0xC8` bit 0x10, as the
+footer). Rows flagged `+0x28 & 5` or with an id past the count are ignored;
+hover and the wheel keep the shared row behaviour. No patch or regeneration.
+Fixture: `map_browser_tests` in `tests/menu_mouse.c` (mutation
+`late-map-confirm`).
+
+## MapMaker Story character choice
+
+`story-character.json` makes the four MapMaker-Story Cortez branches
+(`cmp byte [0x0078ADAE],2` after a mode-9 test: roster `sub_002C6C80`
+0x002C6D1F, preview `sub_002C6680` 0x002C672E, confirm `sub_002D4D00`
+0x002D5414, config `sub_002D2C70` 0x002D359D) read the gate byte 0x00903500.
+`src/pc_mapmaker_story_character.inc` wraps those four functions (area
+`story`) and sets the gate on entry: the sub-mode byte (stock, Cortez only)
+unless `TSFP_MAPMAKER_LIMITS=1`, then 0, so MapMaker Story uses the Arcade
+roster of player 0's unlocked characters, starts on the profile's last
+choice, stores the choice and writes it (and the variant) to the config for
+each local player. Play code already takes the character from the config.
+Campaign story, Arcade Custom, challenges and System Link (modes 11..13) are
+unchanged. The gate stays 0 if the hooks do not run, so `story` must not be
+switched off by `TSFP_MAPMAKER_AREA_OFF`. Tests:
+`tests/test_mapmaker_story_character.py`; notes `docs/mapmaker-story-character.md`.
 
 ## MapMaker editor mouse controls
 

@@ -9,7 +9,7 @@ from native_compiler import native_compiler
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize('mutation', ['fixed', 'missing-source', 'hover-conflict', 'missing-slider-drag', 'missing-setting-drag'])
+@pytest.mark.parametrize('mutation', ['fixed', 'missing-source', 'hover-conflict', 'missing-slider-drag', 'missing-setting-drag', 'late-map-confirm'])
 def test_menu_mouse(tmp_path, mutation):
     compiler, env = native_compiler(tmp_path)
     source = ROOT / 'tests/menu_mouse.c'
@@ -41,6 +41,12 @@ def test_menu_mouse(tmp_path, mutation):
         # Quoted includes resolve alongside the adapter before -I directories.
         (tmp_path / 'pc_menu_mouse_guest.inc').write_text(
             (ROOT / 'src/pc_menu_mouse_guest.inc').read_text(encoding='utf-8'), encoding='utf-8')
+    if mutation == 'late-map-confirm':
+        # Without the input-hook click the browser tick never sees Confirm.
+        adapter = (ROOT / 'src/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
+        hook = 'else menu_map_browser_click(s,menu,x,y);'
+        assert hook in adapter
+        (tmp_path / 'pc_menu_mouse_guest.inc').write_text(adapter.replace(hook, ''), encoding='utf-8')
     if os.name == 'nt':
         args = [compiler, '/nologo', '/std:c11', '/O2', '/W4',
                 '/I' + str(tmp_path), '/I' + str(ROOT / 'src'), str(source), '/Fe:' + str(exe)]
@@ -65,6 +71,10 @@ def test_menu_mouse(tmp_path, mutation):
     if mutation == 'missing-setting-drag':
         assert result.returncode != 0
         assert 'FLOAT_AT(value_address)==.25f' in result.stderr
+        return
+    if mutation == 'late-map-confirm':
+        assert result.returncode != 0
+        assert '!WORD_AT(m+0xc4)' in result.stderr  # late row confirm only
         return
     assert result.returncode == 0, result.stdout + result.stderr
     assert 'PASS:' in result.stdout
