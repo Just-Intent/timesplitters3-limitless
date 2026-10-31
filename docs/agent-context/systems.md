@@ -292,15 +292,22 @@ unchanged. The gate stays 0 if the hooks do not run, so `story` must not be
 switched off by `TSFP_MAPMAKER_AREA_OFF`. Tests:
 `tests/test_mapmaker_story_character.py`; notes `docs/mapmaker-story-character.md`.
 
-Story AI templates (`src/pc_mapmaker_aitemplates.inc`, `docs/mapmaker-aitemplates.md`,
+Story AI groups (`src/pc_mapmaker_aitemplates.inc`, `docs/mapmaker-aitemplates.md`,
 `TSFP_MAPMAKER_LIMITS=1`): the Story AI edit screen (`sub_0031CB90`, list path
-close `sub_0031CAC0`) gains "Duplicate Story AI" / "Add linked copy" / "Unlink
-copy" rows (added at the `sub_000784A0` call 0x0031D07E, told apart by
-menu+0x18C). Links live in editor entry +0x50 and Story AI chunk word +0x32
-(stock-zero; stock games load copies as independent AIs). In scene 100 logic on
-the point-less template means "any linked copy" (`sub_0033E560`, `sub_00163780`,
-`sub_0033E620`, `sub_00339600`). Compile/load/level-start hooks chain outside the
-container/editor ones. Not yet integrated, built or played.
+close `sub_0031CAC0`) gains "Duplicate Story AI" / "Add linked copy" / "Unlink"
+rows and, on a group leader, a "Logic means: this AI / whole group" toggle
+(added at the `sub_000784A0` call 0x0031D07E, told apart by menu+0x18C). The
+first linked copy makes the AI the leader (no extra entry) and copies are named
+"<leader> N". Links live in editor entry +0x50 (low word leader+1, bit 16 group
+logic) and Story AI chunk word +0x32 (0x4000 format marker, 0x8000 group logic;
+stock-zero, stock games load members as independent AIs). Unlink/delete of a
+leader promotes its first copy. Old template-format maps (plain link to an
+"All X" entry) are converted at editor load. In scene 100 logic on a leader
+with group logic (or an unconverted old template) means "any member"
+(`sub_0033E560`, `sub_00163780`, `sub_0033E620`, `sub_00339600`). A separate
+logic-picker entry was rejected: Story AI ids are R + index + 1 and the object
+ids start at R + count (0x0031DA9B). Compile/load/level-start hooks chain
+outside the container/editor ones. Not yet built or played.
 
 ## MapMaker and System Link bug fixes
 
