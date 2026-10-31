@@ -270,7 +270,9 @@ fails verification stops the build with the entry id. See
 MapMaker capacity area fixtures (`tests/test_mapmaker_pads.py`,
 `tests/test_mapmaker_container.py`, and later areas) are registered in the
 native CI list; `menu_mouse.c` and `fov_settings.c` include
-`tests/mapmaker_area_stubs.h` for the game functions those areas call.
+`tests/mapmaker_area_stubs.h` for the game functions those areas call. The
+`test_menu_mouse.py` mutation `footer-only-character-confirm` checks that a
+character-screen click off the footer confirms the previewed character.
 `tests/test_mapmaker_actors.py` also checks that every generated operand entry
 in `actors-list.json` keeps its offset in the moved table, and that the
 perception slice in `objects.json` matches the actors and objects constants;

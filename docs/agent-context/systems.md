@@ -265,6 +265,16 @@ hover and the wheel keep the shared row behaviour. No patch or regeneration.
 Fixture: `map_browser_tests` in `tests/menu_mouse.c` (mutation
 `late-map-confirm`).
 
+## Character selection mouse
+
+`src/pc_menu_characters.inc` captures the drawn portrait quads of the
+carousel (`0x005237E0` child of container `0x005237F0`). The wheel and a
+click on another visible portrait preview it (`sub_002C4310`). The previewed
+portrait is replaced by the 3D model, so any other fresh left click (on it,
+empty space or footer Select) confirms the previewed character as raw Select
+(0x80); footer Back or right-click is Back (0x120). Fixture: `character_tests`
+in `tests/menu_mouse.c` (mutation `footer-only-character-confirm`).
+
 ## MapMaker Story character choice
 
 `story-character.json` makes the four MapMaker-Story Cortez branches

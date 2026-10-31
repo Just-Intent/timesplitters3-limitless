@@ -193,8 +193,8 @@ to set its level, or hold left-click and drag. This works from Settings and Paus
 **Accept** saves the changes; **Cancel** restores the previous levels.
 Click either arrow beside a menu choice to change its value. In multiplayer
 lobbies, the **Options** and **Select Character** footer prompts are clickable.
-In character selection, click a portrait (including adjacent variants) to preview
-it, use the wheel to browse, then **Select** to confirm. **Back** or right-click
+In character selection, use the wheel or click a portrait (including adjacent
+variants) to preview it, then left-click anywhere else to confirm it (as **Select**). **Back** or right-click
 cancels without replacing the previously confirmed character.
 The team chooser supports its left/right arrows and **Select/Back** footer;
 **WASD** also supplies directional-pad input while menus are open.
