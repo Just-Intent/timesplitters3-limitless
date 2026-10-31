@@ -175,7 +175,22 @@ the model draws inside them through two further wrappers,
 `pc_mapmaker_probe_room_draw` (`sub_000A2900`) and
 `pc_mapmaker_probe_prop_draw` (`sub_0008F950`, every model draw, inert outside
 a window); it reads the per-room prop tables at their `rooms.json` locations
-(`0x008C7000`/`0x008C7C00`). See `docs/mapmaker-sky.md`.
+(`0x008C7000`/`0x008C7C00`). Once per run per geometry model and node table
+it also dumps the model's node tree (`[inst+4]` header, 0xC8-byte nodes
+before it; type `+0x48`, child `+0x4B`, sibling `+0x4C`, mask `+0x5C`), capped
+at 96 nodes per model, 256 models and 8192 lines. See `docs/mapmaker-sky.md`.
+
+Dev-only sky-tile switch `TSFP_MAPMAKER_ROOM_MASK_CLEAR=<hex>`
+(`src/pc_mapmaker_skymask.inc`, included after `pc_mapmaker_sky.inc`): the
+`sub_00085710` wrapper `pc_mapmaker_sky_room_mask` clears those bits in the
+relocated per-room mask table `0x008C0800` right after the stock store
+(`0x000857A3`), scene 100 only, so `inst+0x30` (`0x00085DCA`), the camera
+and the weather getter `sub_00083970` agree; editor and saved data are not
+touched. `pc_mapmaker_sky_room_mask_flush()` (called from
+`pc_display_menu_mouse_mode`) prints one `[mapmaker] room mask: cleared ...`
+summary per map build. Independent of `TSFP_MAPMAKER_LIMITS`; the Test Lab
+runner strips it with the other `TSFP_*` variables. Fixture
+`tests/test_mapmaker_skymask.py`.
 
 ## MapMaker level memory budget (opt-in)
 
