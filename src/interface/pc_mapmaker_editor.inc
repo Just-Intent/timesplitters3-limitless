@@ -5,10 +5,11 @@
  * fixed arrays against each other. config/guest-code-patches/editor.json
  * grows the object from 0x11950 to MAPMAKER_EDITOR_SIZE bytes, keeps every
  * existing field where it is and rewrites every displacement that names an
- * old array so the arrays live after +0x11950:
+ * old array so the arrays live after +0x11950 (round 3: the Story AI array
+ * moved again, to the end of the object, for 511 entries):
  *
  *   array          stock                enlarged (offset, entries)   count
- *   Story AI       +0x288   50 x 0xE4   +0x11950  255                +0x280
+ *   Story AI       +0x288   50 x 0xE4   +0x58390  511                +0x280
  *   logic ops      +0x41E4  30 x 0x220  +0x1FC70  120                +0x41E0
  *   logic nodes    +0x81A8 130 x 0xB4   +0x2FB70  520                +0x81A4
  *   logic records  +0xDD14 100 x 0x8C   +0x46910  400                +0xDD10
@@ -26,7 +27,7 @@
  * always on.
  *
  *  - pc_mapmaker_editor_sai_add (WRAP sub_0031BE70): add a story AI. Stock
- *    refuses at 50; opted in, 255. Same container-space test and messages
+ *    refuses at 50; opted in, 511. Same container-space test and messages
  *    (the "limit reached" text gets the limit in force). Entries past the 50
  *    editor colours get colour (index mod 50) instead of the stock 50.
  *    Opted in, the list no longer jumps to the bottom after each add.
@@ -74,11 +75,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MAPMAKER_EDITOR_SIZE 0x58390u
-#define MAPMAKER_EDITOR_SAI 0x11950u            /* 255 x 0xE4 */
-#define MAPMAKER_EDITOR_SAI_CAP 255u
+#define MAPMAKER_EDITOR_SIZE 0x74C00u           /* 0x58390 + 511 x 0xE4, rounded up */
+#define MAPMAKER_EDITOR_SAI 0x58390u            /* 511 x 0xE4 (round 3; was +0x11950, 255) */
+#define MAPMAKER_EDITOR_SAI_CAP 511u
 #define MAPMAKER_EDITOR_SAI_STOCK 50u
-#define MAPMAKER_EDITOR_SAI_LIMIT 255u          /* byte index [0x00762F94] is unsigned */
+#define MAPMAKER_EDITOR_SAI_LIMIT 511u          /* index [0x00762F94] widened to a word (sai-index.json) */
 #define MAPMAKER_LEVEL_SAI_SLOTS 1024u          /* sub_00240590 frame, editor.json */
 #define MAPMAKER_EDITOR_OPS 0x1FC70u            /* 120 x 0x220 */
 #define MAPMAKER_EDITOR_OPS_CAP 120u

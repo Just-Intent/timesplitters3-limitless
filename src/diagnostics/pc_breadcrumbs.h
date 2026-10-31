@@ -81,6 +81,25 @@ static inline void pc_crumb_allocation(PcBreadcrumbs *b,int64_t ms,uint32_t even
     pc_crumb_append_locked(b,ms,40,(int32_t)event);pc_crumb_append_locked(b,ms,41,(int32_t)address);pc_crumb_append_locked(b,ms,42,(int32_t)bytes);
     pc_crumb_store(&b->writer,0);
 }
+/* Guest allocation headroom (read by the MapMaker probe, flag 32). Fed by the
+ * allocation observer, which the runtime calls under its arena lock, so there
+ * is one writer at a time; readers take plain 32-bit snapshots. Event kind 1
+ * = runtime heap (xbox_HeapAlloc), 3 = physical/contiguous window; bit 8 =
+ * release (only successful allocations are reported). Ends are guest
+ * addresses one past the highest block seen. */
+enum { PC_USAGE_HEAP_LIVE, PC_USAGE_HEAP_PEAK, PC_USAGE_HEAP_END_PEAK,
+       PC_USAGE_PHYS_LIVE, PC_USAGE_PHYS_PEAK, PC_USAGE_PHYS_END_PEAK,
+       PC_USAGE_WORDS };
+static inline void pc_allocation_usage_note(volatile uint32_t u[PC_USAGE_WORDS],uint32_t event,uint32_t address,uint32_t bytes){
+    unsigned kind=event&0xFFu,live=kind==1u?PC_USAGE_HEAP_LIVE:kind==3u?PC_USAGE_PHYS_LIVE:PC_USAGE_WORDS;
+    if(live==PC_USAGE_WORDS)return;
+    if(event&0x100u) { u[live]=u[live]>=bytes?u[live]-bytes:0u;return; }
+    u[live]+=bytes;
+    if(u[live]>u[live+1u])u[live+1u]=u[live];
+    if(address+bytes>u[live+2u])u[live+2u]=address+bytes;
+}
+/* Copy of the counters above (zero before the first allocation). */
+void pc_capture_allocation_usage(uint32_t out[PC_USAGE_WORDS]);
 void pc_capture_allocation(uint32_t event,uint32_t address,uint32_t bytes);
 void pc_capture_match(unsigned humans,unsigned bots,unsigned difficulty,unsigned capacity);
 void pc_capture_model(uint32_t model,uint32_t node,unsigned depth);

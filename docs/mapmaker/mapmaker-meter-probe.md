@@ -80,6 +80,14 @@ Manual use outside the runner (still with isolated paths) is the pair
 `TSFP_MAPMAKER_PROBE=<flags>` and `TSFP_MAPMAKER_PROBE_LOG=<file>`; without a
 log path, output goes to stderr (`game.err` under the runner).
 
+## Round 3: flag 32 host fields
+
+Each flag-32 `heap` line now ends with the host side of the same memory:
+`contig_extent`, `contig_extent_peak`, `contig_live`, `contig_live_peak`,
+`contig_free_min` (64 MB contiguous window less the 128 KB GPU instance)
+and `runtime_heap_live`, `runtime_heap_peak`, `runtime_heap_free_min`;
+see [memory](mapmaker-memory.md). Flag 16 walks the whole 512 KB container.
+
 ## Reading the log
 
 ```
