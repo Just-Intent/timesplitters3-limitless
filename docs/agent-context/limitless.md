@@ -551,11 +551,36 @@ empty AI slot -> first used), preload `sub_0023F320` and match start
 editor screen closed on page 2, since the rows are the match's bots). The
 pause / front-end Arcade Bots screen (`sub_002C78F0` item 0x3B8 ->
 `sub_002C7730` -> 0x0052375C, scenes 100/101, map set = index 0x11 in mode 9
-only) stays 10 rows: rows are bots, 16 actors per match (0x0078AD6C..);
-stock stores its edits in the profile settings, never the map. Extension memory
+only) is not paged by this area: rows are bots, 16 actors per match
+(0x0078AD6C..), stock stores its edits in the profile settings, never the
+map; its page 2 is the `matchbots` area below. Extension memory
 0x00903700..0x009037FF. Weapon sets stay 6 (slots are item types
 0x11..0x1C). Contract and WRAP lines: `docs/mapmaker/mapmaker-sets.md`; tests
 `tests/mapmaker/test_mapmaker_sets.py`, `..._sets_classified.py`.
+
+### MapMaker Arcade bots per match (area `matchbots`)
+
+`src/interface/pc_mapmaker_matchbots.inc` + `config/guest-code-patches/matchbots.json`
+(not built or played): with `TSFP_MAPMAKER_LIMITS=1` a local MapMaker Arcade
+match (mode 9, Test map mode 5 on scene byte 0x64, editor Test map) gets up to
+20 bots / 24 characters (the 26-record arcade stats table `[0x0075CCC0]` and
+the 26-row awards frame of `sub_0023A040` set 24). The table, applied in every
+scene: the 26 indexed references to the live block's per-actor arrays
+(0x007DE414/24/34/44, 16 each) read a 64-entry mirror at 0x00904000
+(chars, teams, difficulty, variants x 0x40); the rank table 0x007DE4C0 (16)
+is relocated to 0x00904100 (64; team scores 0x007DE500 kept, the System Link
+copy end `0x00064CAB` an operand to 0x00904140); the non-story pair table is
+`humans + 20` (`0x0015E0F5`, `0x0015E76C`, `0x0015E7DF`). Six wrappers:
+`sub_000670C0` (pending -> live copy; refreshes the mirror: 0..15 from the
+block, 16+ from the side arrays of the match start that added them; must be
+wrapped wherever the table is applied), `sub_002EF9F0` (live -> setup: mirror
+0..15 back), `sub_002D2C70` (chained: rows 11-20 after the stock roster,
+stock team/difficulty rules), Bots screen `sub_002C0490` (chained with sets;
+Down on row 10 swaps the work copy 0x0075FD90 with ten host-memory rows),
+builder `sub_002C2C20` and store `sub_002BFFD0` (skipped on page 2). System
+Link, story type, monkey sub-mode 0x13 and ordinary Arcade maps stay stock.
+Contract and WRAP lines: `docs/mapmaker/mapmaker-matchbots.md`; tests
+`tests/mapmaker/test_mapmaker_matchbots.py`, `..._matchbots_classified.py`.
 
 ### Guest memory extension block
 
