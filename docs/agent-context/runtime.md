@@ -968,3 +968,4 @@ visibility and objective logic remain guest-owned (Refs #338).
 `0460-native-wind-history` wraps `sub_000A5CE0`; its policy calls the MapMaker chain ([limitless](limitless.md)).
 `aitemplates-pool.json` raises the editor menu-item pool (0x00070DC3, 0x398 to 0xC00); details in [limitless](limitless.md).
 The characters area wraps `sub_001CD980` (unlock test, MapMaker picker return only) and `sub_000D7780` (log-only preload); see [limitless](limitless.md).
+The memory area wraps the Level-heap allocators `sub_0003DFA0`/`sub_0003E0B0` (overrun log) and arena setup `sub_00023930` (`TSFP_MAPMAKER_ARENA_MB`); see [limitless](limitless.md).
