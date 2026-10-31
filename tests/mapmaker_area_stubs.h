@@ -35,4 +35,8 @@ void sub_00157440(void) {}
 void sub_00300670(void) {}
 void sub_0031BB60(void) {}
 void sub_003C85D4(void) {}
+/* sky (sub_00078560 becomes a wrapper dispatcher; sub_00079D60 already is one) */
+void sub_00078560(void) {}
+void sub_00079D60(void) {}
+void sub_0007D4F0(void) {}
 #endif

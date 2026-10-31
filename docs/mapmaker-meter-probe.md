@@ -43,6 +43,7 @@ Flags add together (for example `11` = 1 + 2 + 8):
 | `16` | With `1`: each meter record adds a `budgets` line: the map container's used bytes (of 32736) and each category `sub_002FA720` folds into `editor+0x270` (cost sums of 2400/1024/4400, global count of 300, pieces of 200, sub-entries plus `editor+0x306E` of 50), with `editor+0x270`/`+0x274`. Use `17` (or `27` with menus). See `research/capacity-constraints.md` §1b |
 | `32` | In every scene, the game's heap state once a second when it changed: arena, Level heap pointers, the shared free count and its minimum since the scene started (negative means the heaps overlapped), Eternal heap, display buffer size/peak, reserve flags. Use with any other flags, e.g. `49` = 1+16+32 |
 | `64` | While a MapMaker map is played (scene 100), the AI navigation counts once a second when they changed: regular pads, links, cover pads, pad groups, the pool pointers (gaps give each pool's size), engine objects taken of the pool capacity (`objects=N/550`, taken without a bound check) and logic tags (`tags=`, 250 slots). Use with stage A (`TSFP_MAPMAKER_LIMITS=1`), e.g. `113` = 1+16+32+64 |
+| `128` | While a MapMaker map is played (scene 100): for 5 s after the map's first room draw, then again for 5 s every 30 s, each distinct room draw (`room-draw ret= room= pass= props=`), each prop in that room (`prop ... model= geometry= flags(+28)= ... inst+30= inst+1F4=`) and each model draw made inside it (`draw ret= inst= layer= model=`). Room geometry props have models 0x908 + room - 1 (`geometry=1`). For the later "sky tile" feature; see "Room draw capture" below and `docs/mapmaker-sky.md` |
 | `8` | While MapMaker (scene 100 or 102) runs: each menu the game lays out (`sub_00073750`): its caller, descriptor, state, rectangle and every item's type, flags, callback, rectangle and 64 raw bytes, plus each left click's pointer position in game-UI coordinates and the item it hit (`hit=0` means none). Use this for the toolbar click investigation (MM-4) |
 
 The log is `private\test-saves\quick-test\mapmaker-probe.log`. It is truncated
@@ -138,6 +139,35 @@ are drawn outside the menu engine and need a different hook.
 
 The log does not contain personal data, but it does contain guest memory
 values; share it with the project only, and do not commit it.
+
+### Room draw capture (flag 128, sky tile)
+
+Needs a build with the probe wrappers `sub_000A2900 -> pc_mapmaker_probe_room_draw`
+and `sub_0008F950 -> pc_mapmaker_probe_prop_draw` (docs/mapmaker-sky.md).
+
+1. In the editor, build a small map: one tileset, about six tiles in a row
+   (one of them a tall or stacked tile), a player start, and the default sky.
+   Save it.
+2. Start the runner with `--mapmaker-probe 128` (with `TSFP_MAPMAKER_LIMITS=1`
+   if you want the raised limits as usual) and play that map.
+3. As soon as the map has loaded, stand still for 6 seconds looking along the
+   row (first window).
+4. Walk to the far end, turn round and stand still; wait until about 35 s after
+   the start so the second window (30-35 s) sees the other view. Optionally
+   look straight up for the third window (60-65 s).
+5. Quit. Note the times of each step.
+
+Send `mapmaker-probe.log` (inside `private\test-saves\quick-test\`). What it is
+used for: `room-draw ret=` gives the callers of the room draw (sky draw
+`0x00086B3E`/`0x00086B85` versus world rooms), `prop ... geometry=1` gives each
+tile room's geometry prop with its `+0x28` flags and its instance's `+0x30` and
+`+0x1F4` words, and `draw ret=0x000A2ACA ... model=0x9..` confirms that room
+geometry is drawn by `sub_0008F950` from `sub_000A2900`. The two stock skip
+tests in `sub_000A2900` are prop `+0x28` bit 0x800000 (for props whose `+0x34`
+is a real room) and instance byte `+0x1F6` bit 3 (`inst+1F4` bit 0x80000); the
+log shows which of them are clear on geometry props and therefore usable as a
+"hidden" bit. The window lines `rooms-window end ... unlogged=N` say whether
+anything was dropped (N > 0 means more than 1024 distinct records).
 
 ## Recording results
 
