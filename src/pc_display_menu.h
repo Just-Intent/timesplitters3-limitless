@@ -131,6 +131,16 @@ void pc_mapmaker_sky_compile(void (*original)(void));
 void pc_mapmaker_probe_room_draw(void (*original)(void));
 void pc_mapmaker_probe_prop_draw(void (*original)(void));
 void pc_mapmaker_sky_room_mask(void (*original)(void));
+void pc_mapmaker_roof_mask(void (*original)(void));
+void pc_mapmaker_roof_reduced(void (*original)(void));
+void pc_mapmaker_roof_piece_new(void (*original)(void));
+void pc_mapmaker_roof_reset(void (*original)(void));
+void pc_mapmaker_roof_compile(void (*original)(void));
+void pc_mapmaker_roof_load(void (*original)(void));
+void pc_mapmaker_roof_menu_init(void (*original)(void));
+void pc_mapmaker_roof_menu_add(void (*original)(void));
+void pc_mapmaker_roof_menu_hover(void (*original)(void));
+void pc_mapmaker_roof_menu_pick(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));
