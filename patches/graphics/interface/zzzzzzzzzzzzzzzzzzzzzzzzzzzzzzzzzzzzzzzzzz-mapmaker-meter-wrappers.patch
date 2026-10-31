@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,2048 @@
+@@ -1037,6 +1037,2059 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2011,6 +2011,17 @@
 +    else sub_0023F390_gen();
 +#else
 +    sub_0023F390_gen();
++#endif
++}
++
++extern void sub_000862C0_gen(void);
++void sub_000862C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bigdraw","pc_mapmaker_bigdraw_rect")) pc_mapmaker_bigdraw_rect(sub_000862C0_gen);
++    else sub_000862C0_gen();
++#else
++    sub_000862C0_gen();
 +#endif
 +}
 +

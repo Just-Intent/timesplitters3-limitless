@@ -965,17 +965,4 @@ the first outline draw's projected midpoint. Shared PcUiWorldAnchor retains that
 anchor for labels and resets at placement boundaries; viewport/scissor share it.
 Both common backends and legacy GL consume the helper. Original world projection,
 visibility and objective logic remain guest-owned (Refs #338).
-`0460-native-wind-history` wraps `sub_000A5CE0`; its policy calls the MapMaker chain ([limitless](limitless.md)).
-`aitemplates-pool.json` raises the editor menu-item pool (0x00070DC3, 0x398 to 0xC00); details in [limitless](limitless.md).
-The characters area wraps `sub_001CD980` (unlock test, MapMaker picker return only) and `sub_000D7780` (log-only preload); see [limitless](limitless.md).
-The memory area wraps the Level-heap allocators `sub_0003DFA0`/`sub_0003E0B0` (overrun log) and arena setup `sub_00023930` (`TSFP_MAPMAKER_ARENA_MB`); see [limitless](limitless.md).
-Bosses also wraps `sub_00078590` (Story AI health rows, return 0x0031CFD7) for the levels above Tough Guy; see [limitless](limitless.md).
-The sets area (20-slot custom character set) wraps the set screen, store, play copy and preload and adds layers to compile/load/reset and `sub_00078590`; see [limitless](limitless.md).
-Realbosses (giant trophy monster) wraps the picker, text, model request, anim mount `sub_001C8540` and AI start `sub_0015B830`; its HUD layer sits inside bosses. See [limitless](limitless.md).
-Realbosses also wraps `sub_0013A400` (Story overhead meter; skipped only for the real trophy monster at return 0x0014D264).
-Sets also wraps `sub_002D2C70` (match start; editor Test map bots from slots 1-10), chained with the story character hook.
-Sky also wraps piece move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`) to carry open-roof marks, and text `sub_0003D7B0` (chained with realbosses).
-Bosses also wraps `sub_0014D1F0` (HUD per viewport) to draw Sub-boss overhead meters via `sub_0013A400` before the stock loop.
-`matchbots.json` moves the 26 live per-actor reads to a 64-entry mirror at 0x00904000 and the rank table to 0x00904100 (every scene); the matchbots area fills them. See [limitless](limitless.md).
-The weaponset area (20 weapon slots) wraps the play set `sub_0006BD30`, pickup slot/veto/spawn and weapon set screen functions, and chains compile/load/reset, `sub_0003D7B0` and `sub_00078590`; roof wraps the label format `sub_00151030` and caption `sub_0032D9F0`.
-Realbosses adds the giant skeleton: story level init `sub_0025F720`, `sub_0029FE00` variant, `sub_002875F0` emerge, `sub_00287E20` throw and level events `sub_002274C0` (death event dropped).
+MapMaker wrapper and table notes: [limitless](limitless.md) "Runtime patches".
