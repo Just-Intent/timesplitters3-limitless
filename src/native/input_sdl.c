@@ -8,6 +8,7 @@
 #include "pc_prompts.h"
 #include "pc_camera.h"
 #include "pc_terminal.h"
+#include "pc_mounted.h"
 #include "pc_mapmaker_pointer.h"
 #include "pc_debug.h"
 #include "pc_input.h"
@@ -328,7 +329,11 @@ void pc_controls_apply_mouse(uint32_t player,uint32_t fov_object,ptrdiff_t offse
     camera_input.focused=atomic_load(&focused)&&atomic_load(&mouse_enabled)&&!atomic_load(&menu_active);
     int terminal=pc_terminal_mouse(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),player,offset);
     pc_input_terminal_context(&camera_input,terminal>=0,atomic_load(&keys[1]));
-    if(terminal>=0 || !pc_camera_fields(player,fov_object,offset,&yaw,&pitch,&fov)) {
+    /* Mounted guns and vehicle gunner seats aim from gun angles (pc_mounted.h). */
+    if(terminal>=0 ||
+       pc_mounted_mouse(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),
+                        atomic_load(&mouse_invert),player,fov_object,offset,0)>=0 ||
+       !pc_camera_fields(player,fov_object,offset,&yaw,&pitch,&fov)) {
         pthread_mutex_unlock(&camera_lock);
         return;
     }
