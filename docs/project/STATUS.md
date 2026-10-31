@@ -1,3 +1,10 @@
+## MapMaker boss bars and alternate-fire key: in-game checks (2026-10-31)
+
+Launcher-installed local previews v0.4.0-mapmaker.3 to .6 on the second Windows 11 PC. Confirmed by
+the user: several boss bars show at once; the health levels above Tough Guy work; the 20-slot
+custom set is available in the editor; the giant trophy monster works (its overhead meter was then
+hidden and made a per-AI choice); boss bars drain (mapmaker.6); Q changes weapon mode again.
+
 ## MapMaker widescreen editor and briefing clicks: in-game checks (2026-10-31)
 
 Launcher-installed local preview v0.4.0-mapmaker.1 (exe SHA-256 prefix 4b5baad7, source 92c02652),

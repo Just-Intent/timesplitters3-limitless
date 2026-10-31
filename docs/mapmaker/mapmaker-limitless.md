@@ -44,7 +44,7 @@ are not in the launcher.
 
 | Switch | Default | What it does | Tested |
 | --- | --- | --- | --- |
-| `TSFP_MAPMAKER_LIMITS=1` | Off | The main switch: the raised editor limits below, seven floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, and the Clouds checkbox. | See each feature below |
+| `TSFP_MAPMAKER_LIMITS=1` | Off | The main switch: the raised editor limits below, seven floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, the Clouds checkbox and the open-sky tiles. | See each feature below |
 | `TSFP_MAPMAKER_OVERLAP=1` | Off | Tiles can be placed over other tiles. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_STACK_ITEMS=1` | Off | Several items can share one grid cell. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_MEMORY_SCALE=2..8` | 8 with `LIMITS` | How far the editor's memory estimate is relaxed. Lower it if large maps run short of memory. | Used in the capacity play test |
@@ -215,10 +215,21 @@ plays such a map with the bot behaviour and shows an empty name in the editor.
 shown only in play, not in the editor. A map saved with clouds loads normally
 without the switch, just without clouds. *Automated tests only.*
 
-### Open-air tiles (in progress)
+### Open-sky tiles (`LIMITS`)
 
-Making indoor tiles open to the sky is being investigated with the developer
-switch `TSFP_MAPMAKER_ROOM_MASK_CLEAR`. It is not a finished feature.
+The last tile category of every tileset ends with two extra 1x1 tiles:
+**Small Open (No Roof)** (the Small Open tile without its ceiling, so you see
+the sky) and **Small Open (Open Air)** (floor only: no ceiling and no walls).
+The name shows under the palette preview and when the placed tile is
+selected. The editor never draws ceilings, so No Roof looks like Small Open
+there; Open Air shows its walls gone. Placed, moved and copied tiles keep
+their type, and a saved map reloads them. In play the open tiles show the sky
+and let weather in. Hidden walls and ceilings have no collision: rockets leave
+through the top, and you can walk out of an Open Air tile's sides, so keep it
+away from the map edge. The original game plays the map open too, but
+re-saving it there turns them back into Small Open. *Automated tests only.*
+`TSFP_MAPMAKER_ROOM_MASK_CLEAR` stays a developer test switch. Details:
+[open sky](mapmaker-sky.md).
 
 ## Mouse controls
 

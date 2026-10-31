@@ -266,11 +266,21 @@ doorframe or pillar modelled that way would stay.
   callback) to the **last** category: text 0xA36 = tiles 15 and 30 in the
   8-row table (INFERRED to be the special/extra category: both tiles carry
   catalogue flag `+0x12 = 0x04`), text 0xA30 in the 3-row table (which has no
-  special row). The first added item is **Open roof**, the second **Open
-  air**. They show the tile-8 picture and name (the stock draw callback
-  `sub_003165C0` draws the tile from `+0x14`; no new caption). The table is
+  special row). The first added item is **Small Open (No Roof)**, the
+  second **Small Open (Open Air)**. They show the tile-8 picture (the stock
+  draw callback `sub_003165C0` draws the tile from `+0x14`). The table is
   restored right after the build, the list lives in 136 bytes from
   `xbox_HeapAlloc`.
+- Names (CONFIRMED): the palette has no per-item text; the caption under
+  the preview is the tile name, `sub_0003D7B0(catalogue[tile] +8)` for the
+  tile `[palette+0x90]` (`0x0032E5C8..0x0032E5CF`), and the selected piece's
+  name comes from `sub_00317C40` (`0x00317C54..0x00317C5B`, piece `editor
+  +0x2F18`). Tile 8's name is text 0x0A3F, "Small Open" (the English names
+  use suffixes such as "S", "Alt.", "Mirrored", "Pillars"; no tile carries a
+  number). The text hook answers 0x0A3F at exactly those two return
+  addresses, in the editor, with "Small Open (No Roof)" / "Small Open (Open
+  Air)" (64 bytes from `xbox_HeapAlloc`) for a highlighted open entry or a
+  selected open piece; every other lookup is the stock one.
 - **Why not a new tile id:** every tile id indexes fixed 45-entry tables:
   `0x00783F40` (filled by `sub_003089E0`, counter `0x00783FF4` follows),
   `0x00785000`, `0x00789440` (`sub_00330DF0`), `0x00785080 + (tileset*45 +
@@ -289,14 +299,30 @@ doorframe or pillar modelled that way would stay.
 ### Storage and persistence
 
 - Editor side: a host table keyed by editor piece pointer (pieces are 0x48
-  bytes from one constructor `sub_00307FD0`, callers `0x003021C1` loader and
-  `0x0031658E` palette; the hook forgets a reused pointer; the map reset
-  `sub_002FEBF0` clears the table). Moving a placed piece keeps it marked.
+  bytes from one pool `[0x00762CC4]`; constructor `sub_00307FD0`, callers
+  `0x003021C1` loader and `0x0031658E` palette; the hook forgets a reused
+  pointer; the map reset `sub_002FEBF0` clears the table).
+- **Placing copies the piece (the v0.4.0-mapmaker.5 bug, CONFIRMED).** The
+  pick marks the held piece `editor+0x2F7C`, but placing it
+  (`sub_003037A0`) allocates a new piece (`sub_00307EC0`, `0x00303862`),
+  copies the 0x48 bytes (`rep movsd`, ecx 0x12, `0x0030387C`), links the copy
+  (`sub_00307EF0`) and frees the held list (`sub_00308560`, `0x0030398A`).
+  Picking up a placed piece does the same the other way
+  (`0x002F9A3E`/`0x002F9BE9`/`0x002F9C8F`). The first build marked only the
+  held pointer, so every placed tile was an unmarked tile 8 and the saved
+  `+8` was the stock mask: the open tiles played as plain Small Open. Fix:
+  each copy is followed by `sub_002F95E0(old, new)` (move: placing,
+  `0x0030387E`; pick-up-to-move, `0x002F9B7F`, `0x002F9C36`, `0x002F9CB2`)
+  or `sub_00308120(src, dst)` (copy: `0x002F9BB6`, `0x002F9C66`,
+  `0x002F9CC7`); both hooks pass the mark to the destination.
+  `sub_00308480` (frees one piece; `sub_00308560` frees a list through it)
+  forgets the mark, so a pooled pointer starts closed.
 - `sub_002FC680` (writer `0x00300CA4`/`0x00300CB5`, editor 3D view
   `0x0032FEBF`) returns the open mask for marked pieces; `sub_002FC470`
   drops `0x02000000`, so the writer stores record `+0x23` = 1 ("exposed",
   `0x00300C2F..0x00300C93`) when nothing is above.
-- Saved: after each rebuild (`sub_003006C0`, also for the undo shadow) the
+- Saved: after each rebuild (`sub_003006C0`, also for the undo shadow and
+  in any scene, as the marks exist only for editor pieces) the
   hook walks the piece records with the editor list (one record per list
   piece, same order, checked by tile id; a mismatch is logged and nothing is
   stored) and sets record word **`+0x26` = 0x5201 (open roof) / 0x5202
@@ -314,6 +340,9 @@ doorframe or pillar modelled that way would stay.
   record is matched to an unmarked editor piece with the same tile, x, y, z
   and rotation; an unmatched mark is logged (`[mapmaker] roof: an open tile
   in the map has no loaded piece`).
+- Play: `sub_0008A780` takes record `+8` unchanged (`0x0008A91D`) and calls
+  none of the editor mask builders, so the saved open mask is what the
+  per-room table (`sub_00085710`) and `inst+0x30` get; no play hook.
 - Stock game / switch off: the map is a normal map (tile 8, version 0x12D) and
   plays with the open mask (play only reads `+8`); re-saving it in a stock
   editor or with the switch off recomputes `+8` and drops `+0x26`, so the tile
@@ -358,7 +387,7 @@ INFERRED.
 
 - Per-map "Open all roofs" checkbox: skipped (the palette entries cover the
   request; a map-wide flag would need another info bit and a play-side hook).
-- English-only, no caption change; the entries look like tile 8.
+- English-only names; the palette picture is tile 8's.
 
 ### Wrappers (area `sky`)
 
@@ -372,8 +401,16 @@ INFERRED.
     WRAP sub_000792B0 -> pc_mapmaker_roof_menu_add
     WRAP sub_00316920 -> pc_mapmaker_roof_menu_hover
     WRAP sub_00316500 -> pc_mapmaker_roof_menu_pick
+    WRAP sub_002F95E0 -> pc_mapmaker_roof_move
+    WRAP sub_00308120 -> pc_mapmaker_roof_copy
+    WRAP sub_00308480 -> pc_mapmaker_roof_piece_free
+    WRAP sub_0003D7B0 -> pc_mapmaker_roof_text
 
-All call their original exactly once (no `MAPMAKER_GUEST_RET`). Chains:
+All but the text hook call their original exactly once (no
+`MAPMAKER_GUEST_RET`); `pc_mapmaker_roof_text` returns its string with
+`MAPMAKER_GUEST_RET` for the two tile-name call sites and otherwise calls
+the original. `sub_0003D7B0` is already wrapped (realbosses text); chain
+the layers in either order (each handles a different id). Chains:
 `sub_003006C0` (container, aitemplates, sky compile) and `sub_00301A90`
 (editor, aitemplates) and `sub_002FEBF0` (sky reset) already have layers; the
 roof hooks only act after the original returns, so any layer order works
@@ -383,18 +420,20 @@ resolves them to the wrapper). `sub_000792B0` is the generic menu add (every
 menu); its hook only compares a flag set during the tile menu build. Include
 `pc_mapmaker_roof.inc` after `pc_mapmaker_skymask.inc`; it uses
 `mapmaker_limits`, `MAPMAKER_PTR_OK`/`MAPMAKER_STACK_OK`, `WORD_AT`,
-`FLOAT_AT`, `xbox_HeapAlloc`. It calls no guest function.
+`FLOAT_AT`, `xbox_HeapAlloc`, `g_xbox_mem_offset`. It calls no guest
+function.
 
 ### What the user tests
 
 1. Build with the wrappers; `TSFP_MAPMAKER_LIMITS=1`.
 2. Editor, any tileset: open the tile list, go to the last category (the
-   one with tiles 15/30): it ends with two more 1x1 tiles. Highlight the
-   first (Open roof) and the second (Open air) and compare the preview with
-   the same tile in the first category. Repeat in another tileset.
+   one with tiles 15/30): it ends with two more 1x1 tiles. Highlight them:
+   the caption reads "Small Open (No Roof)" and "Small Open (Open Air)"; the
+   Open Air preview has no walls. Repeat in another tileset.
 3. Place an Open air tile in the middle of a floor of normal tiles and one at
    the map edge; place an Open roof tile; in the 3D view the open-air tile
-   shows a floor without walls. Move one with pick-up/drop: it stays open.
+   shows a floor without walls (log: `roof: open air tile picked`, no `roof:`
+   warning). Move one with pick-up/drop and copy one: both stay open.
    Undo/redo once.
 4. Save, back to the main menu, load the map: still open (log has no
    `roof:` warning). Play: look up and around (sky, neighbours' walls over the
