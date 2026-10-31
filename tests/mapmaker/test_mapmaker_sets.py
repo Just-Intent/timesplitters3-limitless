@@ -52,6 +52,11 @@ MUTATIONS = {
     'play-empty-ai': ('            SETS_H(SETS_MEMBER(dst,k))=SETS_H(SETS_MEMBER(dst,first));\n', ''),
     'play-any-caller': ('WORD_AT(g_esp)!=SETS_PLAY_RET) { original();return; }', '0) { original();return; }'),
     'preload-empty': ('        if(id!=-1) guest_call(sub_000D7780', '        if(1) guest_call(sub_000D7780'),
+    'match-no-refill': ('        guest_call(sub_002C0310,0);\n', ''),
+    'match-any-scene': ('    if(sets.page && WORD_AT(SETS_SCENE)==102u && (int32_t)WORD_AT(SETS_INDEX)>=0xC) {',
+                        '    if(sets.page && (int32_t)WORD_AT(SETS_INDEX)>=0xC) {'),
+    'match-keeps-page': ('        sets.page=0;\n        g_eax=WORD_AT(SETS_INDEX);', '        g_eax=WORD_AT(SETS_INDEX);'),
+    'match-eax-lost': ('        g_eax=a;\n', ''),
     'preload-any-caller': ('    if(ret!=SETS_PRELOAD_RET || !(data=', '    if(!(data='),
 }
 
@@ -187,6 +192,37 @@ def test_slot_screen_and_choice():
     assert ('imm', 0xD7C) in a[0x0031CD0A].ops and '0x71800' in a[0x0031CD18].text
     # item ids 0x38 + k name slot k (sub_00303350 case 3: id*8 - 0x1BC = +4 + 8*(id-0x38))
     assert mem(a[0x003033A9])[0][4] == (-0x1BC) & 0xFFFFFFFF and mem(a[0x003033B1])[0][4] == (-0x1B6) & 0xFFFFFFFF
+
+
+def test_pause_bots_screen_is_the_arcade_roster():
+    """The pause / Arcade setup Bots screen is the slot screen, editing the match's bots."""
+    a = by_address()
+    # pause > setup (descriptor 0x004E9544 = sub_001A40A0) > sub_0019A000 > sub_002C78F0(menu, 1, ...)
+    assert '0x19a000' in a[0x001A40E0].text and '0x2c78f0' in a[0x0019A01B].text
+    assert ('imm', 1) in a[0x0019A018].ops
+    # its Bots item (text 0x3B8) opens sub_002C7730 = push the slot screen 0x0052375C
+    assert ('imm', 0x002C7730) in a[0x002C81CD].ops and ('imm', 0x3B8) in a[0x002C81D8].ops
+    assert ('imm', 0x0052375C) in a[0x002C7735].ops
+    # the editor's Test map setup (sub_002EFBF0) uses the same builder; its start is sub_002D38C0
+    assert '0x2c78f0' in a[0x002EFC22].text and a[0x002EFBE0].branch and '0x2d38c0' in a[0x002EFBE0].text
+    assert ret_of(a, 0x002D392E, 0x2d2c70) == 0x002D3933 and ret_of(a, 0x002D5E4D, 0x2d2c70) == 0x002D5E52
+    # outside the editor the custom getter: mode 9 (MapMaker Arcade, sub_002C8400) and index 0x11
+    # -> the map's set rebuilt from map info (10 members), else the profile's sets
+    assert ('imm', 9) in a[0x002BFEFC].ops and ('imm', 0x11) in a[0x002BFF05].ops
+    assert '0x312950' in a[0x002BFF1F].text and mem(a[0x002BFF15])[0][4] == (-0x4E4) & 0xFFFFFFFF
+    assert ('imm', 9) in a[0x002C8429].ops
+    # index 0x11 is offered only in mode 9 (sub_002C1830)
+    assert ('imm', 0x11) in a[0x002C18B5].ops and ('imm', 9) in a[0x002C18AC].ops
+    # match start: the 10 work-copy rows become bots in 16-byte per-actor arrays
+    assert ('imm', 0x0075FDA0) in a[0x002D36EA].ops and ('imm', 0x0075FEB8) in a[0x002D381C].ops
+    assert mem(a[0x002D37C3])[0][4] == 0x0078AD6C and mem(a[0x002D37C9])[0][4] == 0x0078AD9C
+    assert mem(a[0x002D37B7])[0][4] == 0x0078AD7C and mem(a[0x002D3811])[0][4] == 0x0078AD8C
+    rd = xbe_reader()
+    assert struct.unpack('<2I', rd(0x004E9544, 8)) == (0x001A40A0, 0x001A4070)
+    # actors per match by sub-mode (players + bots), mode row 0x10
+    assert struct.unpack('<4i', rd(0x004D239C + 0x10 * 60, 16)) == (14, 14, 16, 16)
+    # the hook pages only the editor (scene 102)
+    assert "return WORD_AT(SETS_SCENE)==102u && (int32_t)WORD_AT(SETS_INDEX)>=0xC;" in INC.read_text(encoding='utf-8')
 
 
 def xbe_reader():
