@@ -20,7 +20,13 @@
  *    (undo step) compares them too;
  *  - the slot screen pages: Down on row 10 shows slots 11-20, Up on row 11
  *    returns; the fill/store of the shared work copy are pointed at members
- *    10..19 while page 2 is shown; the title gets "(1-10)" / "(11-20)";
+ *    10..19 while page 2 is shown; the title gets "(1-10)" / "(11-20)"; a
+ *    match start (editor Test map) after the screen closed on slots 11-20
+ *    refills rows 1-10 first, since the work copy rows are its bots;
+ *  - the in-game pause and Arcade setup Bots screen is the same screen, but
+ *    there (scenes 100/101, MapMaker Arcade mode 9, index 0x11) its rows are
+ *    the match's bot roster (at most 10 rows, 16 actors per match), so it is
+ *    not paged (see the doc);
  *  - the Story AI character choice lists slots 11-20 after the stock ten;
  *  - play: the level load's set copy (sub_0033EBF0) gets members 10..19 and
  *    count 20 (the per-member loops that use the count skip id -1), the
@@ -80,7 +86,7 @@
 #define SETS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 extern void sub_00074670(void),sub_00071970(void),sub_00076EF0(void),sub_002BFFD0(void),
-    sub_0003D7B0(void),sub_002BE650(void),sub_00071800(void),sub_000D7780(void);
+    sub_0003D7B0(void),sub_002BE650(void),sub_00071800(void),sub_000D7780(void),sub_002C0310(void);
 
 static struct {
     int page,forced,in_update,in_store;
@@ -332,6 +338,27 @@ void pc_mapmaker_sets_store(void (*original)(void))
         uint32_t s=SETS_MEMBER(SETS_SCRATCH,k),m=SETS_MEMBER(e+SETS_EDITOR_SET,SETS_STOCK+k);
         SETS_H(m)=SETS_H(s);SETS_B(m+3u)=SETS_B(s+3u);SETS_H(m+6u)=SETS_H(s+6u);
     }
+}
+
+/* WRAP sub_002D2C70 (cdecl, no arguments): match start. Its roster loop
+ * (0x002D36EA..0x002D3822) turns the 10 work-copy rows 0x0075FD90 into the
+ * match's bots (0x0078AD6C.. per-actor bytes, 16 actors). The editor's Test
+ * map setup (sub_002EFBF0 -> sub_002D38C0) reaches it in scene 102 with the
+ * work copy the slot screen left behind: closed on slots 11-20, the test's
+ * bots would be those. Refill rows 1-10 (sub_002C0310, index in eax) first;
+ * stock fills them the same way when the screen opens. */
+void pc_mapmaker_sets_match_start(void (*original)(void))
+{
+    if(sets.page && WORD_AT(SETS_SCENE)==102u && (int32_t)WORD_AT(SETS_INDEX)>=0xC) {
+        uint32_t a=g_eax;
+        sets.page=0;
+        g_eax=WORD_AT(SETS_INDEX);
+        guest_call(sub_002C0310,0);
+        g_eax=a;
+        WORD_AT(SETS_LOADED)=WORD_AT(SETS_INDEX);
+    }
+    sets.page=0;
+    original();
 }
 
 /* ---- Story AI character choice ----------------------------------------- */

@@ -533,12 +533,18 @@ character set has 20 slots with `TSFP_MAPMAKER_LIMITS=1` (the 0xA4 set
 structs and `sub_0006BC50` already hold 20). Members 11-20 travel in a
 fork-only chunk 0x00C776F5 before the terminator (written only when used or a
 Story AI uses slot >= 10; `mapmaker_container_over_stock` then forces the
-64 KB tier, so stock builds and System Link refuse the map). Eleven wrappers:
+64 KB tier, so stock builds and System Link refuse the map). Twelve wrappers:
 compile/load/reset (chained), set-changed `sub_00312810`, slot screen paging
 (`sub_002C0490`, `sub_002C0290`, `sub_00312950`, `sub_00314210`: Down on row
 10 / Up on row 11, title "(1-10)"/"(11-20)" via menu `+0x204`), Story AI
 choice `sub_00078590` (0x0031CD32), play copy `sub_0033EBF0` (count 20,
-empty AI slot -> first used) and preload `sub_0023F320`. Extension memory
+empty AI slot -> first used), preload `sub_0023F320` and match start
+`sub_002D2C70` (chained with story; refills work-copy rows 1-10 when the
+editor screen closed on page 2, since the rows are the match's bots). The
+pause / front-end Arcade Bots screen (`sub_002C78F0` item 0x3B8 ->
+`sub_002C7730` -> 0x0052375C, scenes 100/101, map set = index 0x11 in mode 9
+only) stays 10 rows: rows are bots, 16 actors per match (0x0078AD6C..);
+stock stores its edits in the profile settings, never the map. Extension memory
 0x00903700..0x009037FF. Weapon sets stay 6 (slots are item types
 0x11..0x1C). Contract and WRAP lines: `docs/mapmaker/mapmaker-sets.md`; tests
 `tests/mapmaker/test_mapmaker_sets.py`, `..._sets_classified.py`.

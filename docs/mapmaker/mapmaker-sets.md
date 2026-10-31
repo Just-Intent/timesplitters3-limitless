@@ -2,7 +2,7 @@
 
 Status 2026-10-31: character slots implemented in
 `src/interface/pc_mapmaker_sets.inc` (area `sets`), fixture-tested
-(`tests/mapmaker/test_mapmaker_sets.py`: 30 mutations plus decode and XBE
+(`tests/mapmaker/test_mapmaker_sets.py`: 34 mutations plus decode and XBE
 facts; `tests/mapmaker/test_mapmaker_sets_classified.py`: every slot
 constant around the set classified). Not built or played. No guest-code
 table (`config/guest-code-patches/sets.json` does not exist; wrappers only).
@@ -109,6 +109,52 @@ limit.
   guard logs `[mapmaker] heap full: ...` on an overrun; with many distinct
   big characters, watch it and the probe's free-memory figure.
 
+## Pause and Arcade Bots screen (2026-10-31, not paged)
+
+User report: 20 slots in the editor, but the pause menu's screen for the
+custom MapMaker bot set shows 10. CONFIRMED path: pause -> game setup
+(descriptor 0x004E9544 = {`sub_001A40A0`, `sub_001A4070`}, pushed at
+0x001AFFF7) -> `sub_0019A000` (0x001A40E0) -> setup builder
+`sub_002C78F0(menu, 1, sub_00196DE0)` (0x0019A01B; the front end calls it at
+0x002D5EDF, the editor's Test map setup `sub_002EFBF0` at 0x002EFC22) -> Bots
+item (text 0x3B8, action `sub_002C7730` at 0x002C81CD, shown unless mode
+0xB/0xC/0xD) -> the same slot screen 0x0052375C. Outside scene 102 it
+differs:
+
+- The set index is the pane's item -2 (`sub_002C0490` 0x002C04D4), stored in
+  the profile settings `sub_00069640()+0x6A8`. Index 0x11 (the map's set) is
+  offered only in game mode 9 (`sub_002C1830` 0x002C18AC/0x002C18B5); mode 9
+  is MapMaker Arcade (`sub_002C8400` 0x002C8429, after reading the map info).
+- Fill: `sub_002BFEF0` returns, for mode 9 and index 0x11, `sub_00312950`'s
+  non-editor path = 0x00762DC0 rebuilt from the map-info chunk (10 members),
+  else profile set `settings + index*0xA4 - 0x4E4` (0x002BFF15).
+- Store (`sub_002BFFD0` 0x002BFFEC..): member ids and the per-row team /
+  difficulty arrays (`settings + 0x6B0/0x6D8/0x700/0x728 + index*0xA0`, 10
+  per index) in the profile settings, never the map. So stock pause edits are
+  profile/session state; for index 0x11 in mode 9 the getter ignores even
+  that and the screen reloads from the map on reopening (`sub_002C2C20` sets
+  `[0x0078AEAC]` = 0).
+- Apply: the rows ARE the match's bots. `sub_002D2C70` (front end 0x002D5E4D,
+  `sub_002D38C0` 0x002D392E for setup confirms including the editor's Test
+  map) loops the 10 rows (0x002D36EA..0x002D381C) into per-actor bytes after
+  the players: characters 0x0078AD6C, teams 0x0078AD7C, difficulty
+  0x0078AD8C, variants 0x0078AD9C - 16 bytes each, 16 actors per match (the
+  0xA0-byte match block 0x0078AD58). The actors table 0x004D239C allows 14 or
+  16 actors (mode row 0x10: 14, 14, 16, 16).
+
+So paging this screen to 20 would show bots that cannot exist: at most 16
+players + bots, at most 10 rows in the work copy shared with the front end.
+Slots 11-20 of a map's set are Story AI characters only. More Arcade bots
+(up to 15 with one player) would be a separate feature: work copy and the
+profile's per-row arrays beyond 10, the fill/store/match-start loop bounds
+and System Link's copy of the match block; not done here.
+
+What changed: the editor's Test map setup Bots screen (scene 102) is paged by
+the existing hooks, and its rows become the test's bots. A match start after
+the screen closed on "(11-20)" refills rows 1-10 first
+(`pc_mapmaker_sets_match_start`: `sub_002C0310` with the index in eax,
+getters unshifted), so the test's bots stay slots 1-10 as in stock.
+
 ## Extension memory
 
 0x00903700..0x0090373F title text, 0x00903740..0x009037E3 page-2 store
@@ -128,6 +174,7 @@ WRAP sub_00314210 -> pc_mapmaker_sets_store        (new)
 WRAP sub_00078590 -> pc_mapmaker_sets_sai_choice   (new; every choice item, return-address test)
 WRAP sub_0033EBF0 -> pc_mapmaker_sets_play_set     (new; level load)
 WRAP sub_0023F320 -> pc_mapmaker_sets_preload      (new; level load; argument in ebx, untouched)
+WRAP sub_002D2C70 -> pc_mapmaker_sets_match_start  (chained: story's pc_mapmaker_story_char_config; order free)
 ```
 
 All cdecl, plain `ret`; every hook calls its original once. Include the
@@ -164,3 +211,7 @@ struct everywhere it is copied. That is a separate feature, not a slot raise.
    refuses it.
 5. Without the switch: no paging, 10 choices; the map from step 2 still loads
    and plays with its 20 slots.
+6. Editor -> Test map setup -> Bots: pages like Map Settings. Leave it on
+   "(11-20)", back out and start the test (Arcade type): the bots are slots
+   1-10. Front end / in-game pause -> setup -> Bots on a MapMaker map: 10
+   rows, stock (see "Pause and Arcade Bots screen").

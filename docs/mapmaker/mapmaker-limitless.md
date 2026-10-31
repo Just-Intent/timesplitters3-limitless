@@ -189,6 +189,15 @@ characters use more memory. Weapon sets stay at 6 slots: each weapon slot is
 its own pickup item (Weapon 1-6, Ammo 1-6). *Automated tests only.* Details:
 [sets](mapmaker-sets.md).
 
+The **Bots** screen of an Arcade match setup (front end and the in-game pause
+menu's setup, when you play a MapMaker map in Arcade) looks like the same
+screen, but its rows are that match's bots: it stays at 10 rows, as in the
+original game (a match holds at most 16 players and bots). Choosing the map's
+own character set there fills those bots from slots 1-10; slots 11-20 are for
+Story AI characters. In the editor the Test map setup's Bots screen edits the
+map's set and pages like Map Settings, and the test's bots are slots 1-10
+even if you left the screen on (11-20).
+
 ### The giant trophy monster from story mission 5 (`LIMITS`)
 
 The custom character set's picker also ends with **Giant Trophy Monster**: the
