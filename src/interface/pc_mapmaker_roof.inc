@@ -48,12 +48,26 @@
  *   copy; both pass the mark on. sub_00308480 (free one piece; sub_00308560
  *   frees a held list through it) forgets it. Before this, only the held
  *   piece was marked and every placed tile was a plain tile 8;
- * - the palette caption (0x0032E5CF, tile [palette+0x90]) and the selected
- *   piece's name (sub_00317C40, 0x00317C5B) read the tile name text
- *   (catalogue +8, tile 8 = 0x0A3F "Small Open") through sub_0003D7B0; for an
- *   open entry/piece the hook returns "Small Open (No Roof)" / "Small Open
- *   (Open Air)" instead (the stock names use suffixes such as "S" and
- *   "Alt.", no numbers).
+ * - names: the palette caption (0x0032E5CF, tile [palette+0x90]), the tile
+ *   label over the grid (0x00311718: piece editor +0x2F18 under the cursor,
+ *   else the held piece +0x2F7C) and the selected piece's name (sub_00317C40,
+ *   0x00317C5B) read the tile name text (catalogue +8, tile 8 = 0x0A3F
+ *   "Small Open") through sub_0003D7B0; for an open entry/piece the hook
+ *   returns "Small Open (No Roof)" / "Small Open (Open Air)". The number in
+ *   front is the catalogue's +4 (tiles 1..45 in palette order): the caption
+ *   draws "%d. " (0x0049F838, sub_0032D9F0; -1 = none in the 3-category
+ *   palette), the grid label "%d.%s" (0x0049F7C0, sub_00151030). The stock
+ *   formats are kept and the open entries get 46 / 47: "46. Small Open (No
+ *   Roof)" in the palette, "46.Small Open (No Roof)" over the grid (stock
+ *   "1.Small Open"); the selected piece's name has no number in stock either.
+ * - piece records are 0x28 bytes + pads*8 (word +0x24) + the piece's items
+ *   (word +0x1E of them, each (byte +0x14 * 4 + 0x1B) & ~3 bytes); a walk
+ *   that skipped only +0x24 stopped at the first piece carrying items (a
+ *   start point, a weapon): no +0x26 mark after it was stored. Play was open
+ *   anyway (the writer's own sub_002FC680 call is hooked), but the editor
+ *   reload after the play (editor start sub_00302A60 -> sub_00301A90
+ *   ([0x00784014], 2) at 0x00303076; the pool is rebuilt, pointers change)
+ *   found no marks, so the next rebuild closed every tile.
  * Play reads record +8 unchanged (sub_0008A780 0x0008A91D); it never
  * recomputes the mask, so no play-time hook is needed.
  * The saved tile is the ordinary base tile id with the open mask in +8, so the
@@ -93,6 +107,12 @@
 #define MAPMAKER_ROOF_RET_CAPTION 0x0032E5D4u   /* palette caption, sub_0003D7B0 at 0x0032E5CF */
 #define MAPMAKER_ROOF_RET_PIECE_NAME 0x00317C60u /* sub_00317C40: name of piece editor +0x2F18 */
 #define MAPMAKER_ROOF_LABEL_BYTES 32u
+#define MAPMAKER_ROOF_RET_HOVER 0x0031171Du      /* tile label: sub_0003D7B0 at 0x00311718 */
+#define MAPMAKER_ROOF_RET_HOVER_FORMAT 0x00311729u /* sub_00151030("%d.%s", number, name) at 0x00311724 */
+#define MAPMAKER_ROOF_HOVER_FORMAT 0x0049F7C0u   /* "%d.%s" */
+#define MAPMAKER_ROOF_RET_CAPTION_DRAW 0x0032E5E3u /* sub_0032D9F0 (eax number, ecx name) at 0x0032E5DE */
+#define MAPMAKER_ROOF_NUMBER 46u                /* stock tiles are numbered 1..45 (catalogue +4) */
+#define MAPMAKER_ROOF_ITEM_MIN 0x18u            /* item sub-record: (count byte +0x14 * 4 + 0x1B) & ~3 */
 static const char mapmaker_roof_names[2][MAPMAKER_ROOF_LABEL_BYTES]={"Small Open (No Roof)","Small Open (Open Air)"};
 
 static struct {
@@ -240,10 +260,20 @@ static int mapmaker_roof_records(uint32_t c,int (*fn)(uint32_t record,void *ctx)
         if(size>MAPMAKER_ROOF_CONTAINER_MAX-off || !MAPMAKER_PTR_OK(c+off+8u,size)) return -1;
         if(tag!=0x00C77669u) continue;
         for(r=c+off+8u,end=r+size;r+MAPMAKER_ROOF_RECORD<=end;n++) {
-            uint32_t length=WORD_AT(r+0x24u)&0xFFFFu;
+            /* +0x24 is 0x28 + pads*8 only (0x00300D60); the piece's items
+             * (count word +0x1E) follow the pads (0x00300D93..0x0030116E,
+             * loader 0x00302260..0x003023F8). */
+            uint32_t length=WORD_AT(r+0x24u)&0xFFFFu,items=WORD_AT(r+0x1Cu)>>16,at,k;
             if(length<MAPMAKER_ROOF_RECORD || length>end-r) return -1;
+            for(at=r+length,k=0;k<items;k++) {
+                uint32_t bytes;
+                if(end-at<MAPMAKER_ROOF_ITEM_MIN) return -1;
+                bytes=((WORD_AT(at+0x14u)&0xFFu)*4u+0x1Bu)&~3u;
+                if(bytes>end-at) return -1;
+                at+=bytes;
+            }
             if(!fn(r,ctx)) return n;
-            r+=length;
+            r=at;
         }
     }
     return -1;
@@ -433,9 +463,45 @@ void pc_mapmaker_roof_text(void (*original)(void))
     if(ret==MAPMAKER_ROOF_RET_CAPTION) mode=mapmaker_roof.preview_mode;
     else if(ret==MAPMAKER_ROOF_RET_PIECE_NAME && MAPMAKER_PTR_OK(editor=WORD_AT(0x007844A8u),0x2F1Cu) &&
             (piece=WORD_AT(editor+0x2F18u))!=0) mode=mapmaker_roof_mode(piece);
+    else if(ret==MAPMAKER_ROOF_RET_HOVER && MAPMAKER_PTR_OK(editor=WORD_AT(0x007844A8u),0x2F80u) &&
+            ((piece=WORD_AT(editor+0x2F18u))!=0 || (piece=WORD_AT(editor+0x2F7Cu))!=0)) mode=mapmaker_roof_mode(piece);
     if((mode!=MAPMAKER_ROOF_OPEN_ROOF && mode!=MAPMAKER_ROOF_OPEN_AIR) || !mapmaker_roof_editor()) { original();return; }
     g_eax=mapmaker_roof.labels+(mode-1u)*MAPMAKER_ROOF_LABEL_BYTES;
     MAPMAKER_GUEST_RET();
+}
+
+/* Which label a guest string is (0: none). Only the text hook hands them out. */
+static unsigned mapmaker_roof_label_mode(uint32_t s)
+{
+    if(!mapmaker_roof.labels) return 0;
+    return s==mapmaker_roof.labels?MAPMAKER_ROOF_OPEN_ROOF:
+           s==mapmaker_roof.labels+MAPMAKER_ROOF_LABEL_BYTES?MAPMAKER_ROOF_OPEN_AIR:0u;
+}
+
+/* WRAP sub_00151030 (sprintf into a static buffer, cdecl). The tile label
+ * over the grid (0x0031171D..0x00311724) prints "%d.%s" with the tile's
+ * number (catalogue +4, 1..45) and name; for an open piece's label the
+ * number becomes 46 / 47, the next numbers of the list. One compare per call
+ * while no label exists. */
+void pc_mapmaker_roof_format(void (*original)(void))
+{
+    unsigned mode;
+    if(mapmaker_roof.labels && MAPMAKER_STACK_OK(16u) && WORD_AT(g_esp)==MAPMAKER_ROOF_RET_HOVER_FORMAT &&
+       WORD_AT(g_esp+4u)==MAPMAKER_ROOF_HOVER_FORMAT && (mode=mapmaker_roof_label_mode(WORD_AT(g_esp+12u)))!=0)
+        WORD_AT(g_esp+8u)=MAPMAKER_ROOF_NUMBER+mode-1u;
+    original();
+}
+
+/* WRAP sub_0032D9F0 (draw "%d. " + name: eax number or -1, ecx name, cdecl
+ * stack arguments). The palette caption (0x0032E5DE) passes catalogue +4 in
+ * the 8-category palette and -1 (no number) in the 3-category one. */
+void pc_mapmaker_roof_caption(void (*original)(void))
+{
+    unsigned mode;
+    if(mapmaker_roof.labels && MAPMAKER_STACK_OK(4u) && WORD_AT(g_esp)==MAPMAKER_ROOF_RET_CAPTION_DRAW &&
+       (int32_t)g_eax>=0 && (mode=mapmaker_roof_label_mode(g_ecx))!=0)
+        g_eax=MAPMAKER_ROOF_NUMBER+mode-1u;
+    original();
 }
 
 #ifdef TSFP_MAPMAKER_ROOF_TEST
