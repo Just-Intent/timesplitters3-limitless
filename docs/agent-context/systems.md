@@ -221,6 +221,23 @@ hover and the wheel keep the shared row behaviour. No patch or regeneration.
 Fixture: `map_browser_tests` in `tests/menu_mouse.c` (mutation
 `late-map-confirm`).
 
+## MapMaker Story character choice
+
+`story-character.json` makes the four MapMaker-Story Cortez branches
+(`cmp byte [0x0078ADAE],2` after a mode-9 test: roster `sub_002C6C80`
+0x002C6D1F, preview `sub_002C6680` 0x002C672E, confirm `sub_002D4D00`
+0x002D5414, config `sub_002D2C70` 0x002D359D) read the gate byte 0x00903500.
+`src/pc_mapmaker_story_character.inc` wraps those four functions (area
+`story`) and sets the gate on entry: the sub-mode byte (stock, Cortez only)
+unless `TSFP_MAPMAKER_LIMITS=1`, then 0, so MapMaker Story uses the Arcade
+roster of player 0's unlocked characters, starts on the profile's last
+choice, stores the choice and writes it (and the variant) to the config for
+each local player. Play code already takes the character from the config.
+Campaign story, Arcade Custom, challenges and System Link (modes 11..13) are
+unchanged. The gate stays 0 if the hooks do not run, so `story` must not be
+switched off by `TSFP_MAPMAKER_AREA_OFF`. Tests:
+`tests/test_mapmaker_story_character.py`; notes `docs/mapmaker-story-character.md`.
+
 ## MapMaker editor mouse controls
 
 On by default since 2026-10-23 (milestone confirmed in game);
