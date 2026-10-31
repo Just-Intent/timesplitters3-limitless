@@ -57,6 +57,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_grid.inc"
 #include "pc_mapmaker_bugfix.inc"
 #include "pc_mapmaker_sky.inc"
+#include "pc_mapmaker_skymask.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
@@ -136,6 +137,7 @@ void pc_display_menu_mouse_mode(void)
     int enabled=menu_mouse_context();
     mapmaker_probe_heap(); /* read-only; inert unless TSFP_MAPMAKER_PROBE has flag 32 */
     mapmaker_probe_pools(); /* read-only; flag 64 */
+    pc_mapmaker_sky_room_mask_flush(); /* summary of TSFP_MAPMAKER_ROOM_MASK_CLEAR; idle otherwise */
     pc_controls_menu_mode(enabled);
     if(!enabled)pc_controls_text_mode(0);
     if(!enabled) {
@@ -719,6 +721,7 @@ void pc_mapmaker_sky_reset(void (*original)(void)) { original(); }
 void pc_mapmaker_sky_compile(void (*original)(void)) { original(); }
 void pc_mapmaker_probe_room_draw(void (*original)(void)) { original(); }
 void pc_mapmaker_probe_prop_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_sky_room_mask(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}

@@ -43,7 +43,7 @@ Flags add together (for example `11` = 1 + 2 + 8):
 | `16` | With `1`: each meter record adds a `budgets` line: the map container's used bytes (of 32736) and each category `sub_002FA720` folds into `editor+0x270` (cost sums of 2400/1024/4400, global count of 300, pieces of 200, sub-entries plus `editor+0x306E` of 50), with `editor+0x270`/`+0x274`. Use `17` (or `27` with menus). See `research/capacity-constraints.md` §1b |
 | `32` | In every scene, the game's heap state once a second when it changed: arena, Level heap pointers, the shared free count and its minimum since the scene started (negative means the heaps overlapped), Eternal heap, display buffer size/peak, reserve flags. Use with any other flags, e.g. `49` = 1+16+32 |
 | `64` | While a MapMaker map is played (scene 100), the AI navigation counts once a second when they changed: regular pads, links, cover pads, pad groups, the pool pointers (gaps give each pool's size), engine objects taken of the pool capacity (`objects=N/550`, taken without a bound check) and logic tags (`tags=`, 250 slots). Use with stage A (`TSFP_MAPMAKER_LIMITS=1`), e.g. `113` = 1+16+32+64 |
-| `128` | While a MapMaker map is played (scene 100): for 5 s after the map's first room draw, then again for 5 s every 30 s, each distinct room draw (`room-draw ret= room= pass= props=`), each prop in that room (`prop ... model= geometry= flags(+28)= ... inst+30= inst+1F4=`) and each model draw made inside it (`draw ret= inst= layer= model=`). Room geometry props have models 0x908 + room - 1 (`geometry=1`). For the later "sky tile" feature; see "Room draw capture" below and `docs/mapmaker-sky.md` |
+| `128` | While a MapMaker map is played (scene 100): for 5 s after the map's first room draw, then again for 5 s every 30 s, each distinct room draw (`room-draw ret= room= pass= props=`), each prop in that room (`prop ... model= geometry= flags(+28)= ... inst+30= inst+1F4=`) and each model draw made inside it (`draw ret= inst= layer= model=`). Room geometry props have models 0x908 + room - 1 (`geometry=1`). Once per run for each distinct geometry model (and node table), its node tree: `nodes model= room= inst+30= count= always= hidden-now= masks=` and per node `node model= index= type(+48)= child(+4B)= sibling(+4C)= mask(+5C)= always/drawn/hidden` (at most 96 nodes per model, 256 models, 8192 lines). For the later "sky tile" feature; see "Room draw capture" below and `docs/mapmaker-sky.md` |
 | `8` | While MapMaker (scene 100 or 102) runs: each menu the game lays out (`sub_00073750`): its caller, descriptor, state, rectangle and every item's type, flags, callback, rectangle and 64 raw bytes, plus each left click's pointer position in game-UI coordinates and the item it hit (`hit=0` means none). Use this for the toolbar click investigation (MM-4) |
 
 The log is `private\test-saves\quick-test\mapmaker-probe.log`. It is truncated
@@ -168,6 +168,28 @@ is a real room) and instance byte `+0x1F6` bit 3 (`inst+1F4` bit 0x80000); the
 log shows which of them are clear on geometry props and therefore usable as a
 "hidden" bit. The window lines `rooms-window end ... unlogged=N` say whether
 anything was dropped (N > 0 means more than 1024 distinct records).
+The `nodes` / `node` lines (once per tile model per run) list each node's mask
+`+0x5C` and whether the current `inst+30` draws it, which shows which nodes
+depend on which mask bit.
+
+#### With the room mask switch (sky tile, which bit is the ceiling)
+
+Needs `WRAP sub_00085710 -> pc_mapmaker_sky_room_mask` as well. The Test Lab
+runner strips inherited `TSFP_*` variables and has no option for this switch,
+so use the direct launch block above (or a launcher that sets it) and add,
+before `Start-Process`:
+
+```powershell
+$env:TSFP_MAPMAKER_PROBE = '128'
+$env:TSFP_MAPMAKER_ROOM_MASK_CLEAR = '2000000'   # hex; one value per run
+```
+
+Run once without the switch, then with `2000000`, `1000000`, `8000000` (and
+only if no ceiling went: `FC000000`, `FFF`, `FFF000`), looking straight up in
+each tile. `game.err` gets `[mapmaker] room mask: cleared 0x… on N rooms` plus a
+`room <id> <old> -> <new>` line per changed room after each map load; the
+probe's `inst+30=` values then show the cleared masks. Details:
+`docs/mapmaker-sky.md` ("Room mask test switch", "Sky-tile test session").
 
 ## Recording results
 

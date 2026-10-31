@@ -8,8 +8,10 @@ been built or played yet.
 Files: `src/pc_mapmaker_sky.inc` (C policy, wrappers), `tests/mapmaker_sky.c`
 + `tests/test_mapmaker_sky.py` (fixture with mutations, stock-data checks
 against the local XBE), probe flag 128 in `src/pc_mapmaker_probe.inc`
-(`tests/mapmaker_probe.c`, `docs/mapmaker-meter-probe.md`). No guest-code
-table entries, no extension memory.
+(`tests/mapmaker_probe.c`, `docs/mapmaker-meter-probe.md`), and the dev-only
+room mask switch in `src/pc_mapmaker_skymask.inc` (`tests/mapmaker_skymask.c`
++ `tests/test_mapmaker_skymask.py`). No guest-code table entries, no extension
+memory.
 
 ## The sky choice already exists in the stock editor
 
@@ -120,6 +122,7 @@ copied floats; the cloud texture loads in scene 100 as in story levels.
     WRAP sub_003006C0 -> pc_mapmaker_sky_compile
     WRAP sub_000A2900 -> pc_mapmaker_probe_room_draw
     WRAP sub_0008F950 -> pc_mapmaker_probe_prop_draw
+    WRAP sub_00085710 -> pc_mapmaker_sky_room_mask
 
 `sub_003006C0` is already wrapped by the container area
 (`pc_mapmaker_container_compile`). Chain them with the sky hook outside, so it
@@ -140,6 +143,68 @@ its PC hook acts only on its own call sites), `sub_0007D4F0` and
 The two probe hooks are in `pc_mapmaker_probe.inc` and are inert unless
 `TSFP_MAPMAKER_PROBE` has flag 128; `sub_0008F950` runs for every model draw,
 so its hook only tests a counter unless a capture window is open.
+`sub_00085710` is not wrapped by any other area. `pc_mapmaker_sky_room_mask`
+is in `src/pc_mapmaker_skymask.inc` (included after `pc_mapmaker_sky.inc`;
+prototype in `pc_display_menu.h`, pass-through stub in the non-display branch
+of `pc_menu_mouse_guest.inc`); its summary is printed by
+`pc_mapmaker_sky_room_mask_flush()`, called once per frame from
+`pc_display_menu_mouse_mode` beside the probe's heap/pool ticks. It calls its
+original exactly once (no `MAPMAKER_GUEST_RET`).
+
+## Room mask test switch (`TSFP_MAPMAKER_ROOM_MASK_CLEAR`, dev only)
+
+Purpose: one play session that shows which node-mask bit removes a tile's
+ceiling (research report `logs/limits/features/sky-tile.md`, sections 2 and 6).
+
+- **Mechanism (CONFIRMED).** A tile room is one model; `sub_0008F5E0` skips a
+  node's mesh when its mask `+0x5C` is non-zero and shares no bit with the
+  instance mask `inst+0x30` (`0x0008F637..0x0008F64D`). `inst+0x30` is copied
+  from the per-room dword table (stock `0x00703460`, `rooms.json` moves it to
+  `0x008C0800`, 256 entries) at `0x00085DCA..0x00085DD0` in `sub_00085CC0`.
+  A decoder scan of the stock range (`tools/guest-refs.py 0x703460 0x31C`,
+  repeated by `tests/test_mapmaker_skymask.py`) finds four references: the only
+  store `0x000857A3` in `sub_00085710` (`table[build+0x28 + j] = build+0x44`
+  for `j < build+0x14`), the clear `0x0008A79B` at the start of `sub_0008A780`,
+  the read `0x00085DCA`, and the getter `0x00083974` (`sub_00083970`: camera
+  `0x000CAB14`, weather `0x003381DC`). `sub_0008A780` calls `sub_00085710`
+  once per piece (`0x0008AC71`, cdecl, one argument, plain `ret`) before it
+  creates the room props (`sub_000895F0` at `0x0008BAAD`).
+- **Hook.** `WRAP sub_00085710 -> pc_mapmaker_sky_room_mask`: after the
+  original store, in scene 100 only, the bits of the switch are cleared in the
+  table entries of that piece's rooms. The draw mask, the camera's bit-25 test
+  and the weather test then all see the same value. Nothing is written in the
+  build record, the editor or the saved map; other scenes run the stock code
+  and log `room build in scene N ignored` once. Independent of
+  `TSFP_MAPMAKER_LIMITS`; default off; not for release.
+- **Value.** Hex, with or without `0x` (`2000000` = bit 25). Anything that is
+  not a 32-bit hex number is refused with a message; `0` is off.
+- **Log (stderr, `game.err`).** At start: `[mapmaker] room mask: dev switch
+  TSFP_MAPMAKER_ROOM_MASK_CLEAR=0x02000000 (MapMaker play only)`. After each map
+  build (next frame): `[mapmaker] room mask: cleared 0x02000000 on N rooms
+  (build K: R rooms in P pieces)`, then up to 64 lines `room <id> <old> -> <new>`
+  (room id = table index + 1, the probe's `room=`; model `0x908 + room - 1`), a
+  count of further rooms, and any rooms beyond the 256-entry table (left
+  unchanged).
+- **Side effects to expect (INFERRED).** Clearing bit 25 marks rooms as open to
+  the sky for the weather test (`sub_003381D0`), the camera (`0x000CAB1C`) and,
+  on tileset 2, `sub_0010EC20` (`0x00085DFA..0x00085E26`). If collision follows
+  the mask, ceilings may lose collision as well.
+
+## Node dump (probe flag 128)
+
+Once per run for each distinct `{geometry model, node table [inst+4]}` seen in
+a capture window, the probe writes the node tree that `sub_0008F5E0` walks:
+
+    nodes model=0x908 room=1 inst=0x… inst+30=0x020001C7 count=N always=A hidden-now=H masks=0x…
+     node model=0x908 index=I type(+48)=T child(+4B)=C sibling(+4C)=S mask(+5C)=0x… always|drawn|hidden
+
+The header `[inst+4]` holds the count `n`; node `i` (0xC8 bytes) is at
+`header - n*0xC8 + i*0xC8` (`0x0008F5E6..0x0008F637`, CONFIRMED). `drawn` /
+`hidden` is evaluated against the instance mask at that moment (so it already
+reflects `TSFP_MAPMAKER_ROOM_MASK_CLEAR`); `masks` is the OR of all node masks.
+Bounds: 96 node lines per model (`nodes truncated ...`), 256 models and 8192
+lines per run (`nodes cap reached` once), plus the probe's 4 MiB file cap. The
+dump is read-only (fixture checksum).
 
 ## Probe for the sky tile (flag 128)
 
@@ -165,7 +230,35 @@ in `docs/mapmaker-meter-probe.md`.
   data the design relies on (sky list, cloud fields, level table, tileset
   defaults, call-site bytes), skipped without the local XBE.
 - `tests/test_mapmaker_probe.py`: flag 128 window, deduplication, scene gate,
-  read-only check, relocated tables (8 mutations).
+  read-only check, relocated tables, node dump (once per model and table,
+  stride, drawn/hidden, per-model and per-run caps, read-only; 7 more mutations).
+- `tests/test_mapmaker_skymask.py` (fixture `tests/mapmaker_skymask.c`): the
+  room mask switch: off by default, scene 100 only, after the original, the
+  relocated table only, build record untouched, 256-entry bound, one summary per
+  build (also when a second build starts before a frame), bad values refused,
+  exact log text (15 mutations); plus the decoder check that `0x000857A3` is the
+  only store into the table and that `rooms.json` relocates every reference
+  (skipped without the private XBE).
+
+## Sky-tile test session (user, dev switch + probe)
+
+Needs a build with `WRAP sub_00085710 -> pc_mapmaker_sky_room_mask` and the two
+probe wrappers. Use a small map with a stackable and a plain tile, nothing above
+them, default sky; note each tile's name and rotation. For each value below,
+start one play session with `TSFP_MAPMAKER_PROBE=128` (log path set) and
+`TSFP_MAPMAKER_ROOM_MASK_CLEAR=<value>`, stand in each tile, look straight up,
+and note sky / ceiling / missing walls:
+
+1. no switch (baseline; the node dump of every tile model);
+2. `2000000` (bit 25, "closed top", expected ceiling);
+3. `1000000`, then `8000000` (the other vertical bits);
+4. only if none removed a ceiling: `FC000000` (bits 26..31), then `FFF` and
+   `FFF000` (the two edge banks; expect walls to vanish).
+
+Send per run: `mapmaker-probe.log`, the `[mapmaker] room mask:` lines of
+`game.err`, and the notes (with screenshots of looking up). The node dump of run
+1 shows which node masks contain which bit, so later runs can be matched to
+nodes.
 
 ## What to test in play (user)
 
