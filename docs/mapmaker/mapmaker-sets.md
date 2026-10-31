@@ -2,7 +2,7 @@
 
 Status 2026-10-31: character slots implemented in
 `src/interface/pc_mapmaker_sets.inc` (area `sets`), fixture-tested
-(`tests/mapmaker/test_mapmaker_sets.py`: 34 mutations plus decode and XBE
+(`tests/mapmaker/test_mapmaker_sets.py`: 40 mutations plus decode and XBE
 facts; `tests/mapmaker/test_mapmaker_sets_classified.py`: every slot
 constant around the set classified). Not built or played. No guest-code
 table (`config/guest-code-patches/sets.json` does not exist; wrappers only).
@@ -90,6 +90,28 @@ limit.
   variant)` through `sub_0003D7B0`, empty text 0xD7C). Without the switch they
   are added only for an AI that already uses slot 11-20. The Story AI chunk
   stores the slot as byte +0x28.
+- Story AI icons (user report 2026-10-31, build .8/.9: slots 11-20 showed
+  no name and a time crystal icon). CONFIRMED: a Story AI is drawn as
+  catalogue item 0x38 + slot (9 for type 5): `sub_0031D3E0` (0x0031D406,
+  only caller the editor overview's AI marker `sub_00309A80`, icon call
+  0x00309AC2) and the Story AI list's icon row callback `sub_0031D410`
+  (pushed by `sub_0031D4C0` at 0x0031D532; 0x0031D442, icon call
+  0x0031D45B). `sub_00315D20(item)` draws catalogue +0xB4 (flag +0xB8 &
+  0x400). Items 0x38..0x41 all have icon 0x42 / flags 1; slots 11-20 gave
+  items 0x42..0x4B, other items (0x42: icon 0x45, the time crystal the user
+  saw). `pc_mapmaker_sets_icon` (`sub_00315D20` returning to 0x0031D460 or
+  0x00309AC7 only) draws items 0x42..0x4B there as item - 10, the same icon
+  as slots 1-10; the palette and other callers keep the real items.
+- Slot names: the choice used `sub_002BE650` from the host, so the realbosses
+  area (row 150 only for `sub_002BE600` returning to 0x002BE65F from
+  0x003033C0) never named the Giant Trophy Monster (id 0x15) in slots
+  11-20. The label is now `sub_0003D7B0(sub_002BE300(row))` with row =
+  `sub_002BE600(id, variant)`, -1 for id 0x15 -> 150 (the realbosses text;
+  stock `sub_002BE300(150)` = 0 = stock's -1). Ordinary ids: same text as
+  before. Not built or played: whether a generic bot's name was also
+  missing in-game is not reproduced here (the choice text path is the stock
+  one); the portrait in the list row (`sub_0031BF60`) already reads the
+  20-member editor set.
 - Map Settings close (`sub_00312810`): a change to slots 11-20 against the
   undo shadow `[0x00765E38]` also counts, so it gets its undo step.
 
@@ -171,7 +193,8 @@ WRAP sub_002C0490 -> pc_mapmaker_sets_screen       (new)
 WRAP sub_002C0290 -> pc_mapmaker_sets_set_ptr      (new; per frame, return-address test)
 WRAP sub_00312950 -> pc_mapmaker_sets_editor_set   (new; per frame, return-address test)
 WRAP sub_00314210 -> pc_mapmaker_sets_store        (new)
-WRAP sub_00078590 -> pc_mapmaker_sets_sai_choice   (new; every choice item, return-address test)
+WRAP sub_00078590 -> pc_mapmaker_sets_sai_choice   (chained: bosses, weaponset; every choice item, return-address test)
+WRAP sub_00315D20 -> pc_mapmaker_sets_icon         (new; per drawn item icon, return-address test 0x0031D460/0x00309AC7)
 WRAP sub_0033EBF0 -> pc_mapmaker_sets_play_set     (new; level load)
 WRAP sub_0023F320 -> pc_mapmaker_sets_preload      (new; level load; argument in ebx, untouched)
 WRAP sub_002D2C70 -> pc_mapmaker_sets_match_start  (chained: story's pc_mapmaker_story_char_config; order free)
@@ -202,7 +225,10 @@ struct everywhere it is copied. That is a separate feature, not a slot raise.
    reads "(11-20)" and the rows are empty. Pick characters into a few of them;
    press Up on the first row: slots 1-10 are unchanged.
 2. Place a Story AI, open it: the character choice lists 20 slots; pick one
-   from 11-20. Save, reload the map: the slots and the AI's choice are kept.
+   from 11-20 (named like 1-10; the Giant Trophy Monster by that name). Back
+   in the Story AI list and the editor overview, its icon is the Story AI
+   icon of slots 1-10, not a time crystal. Save, reload the map: the slots
+   and the AI's choice are kept.
 3. Play the map (Story): the AI spawns with its character; stderr has no
    `[mapmaker] sets:` or `heap full` line. Point an AI at an empty slot: it
    spawns as the first used slot and the log says so.

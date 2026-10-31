@@ -62,6 +62,7 @@ void sub_0007D4F0(void) {}
 void sub_00071970(void) {}
 void sub_00074670(void) {}
 void sub_002BE650(void) {}
+void sub_002BE300(void) {}  /* sets: slot label, row -> text id */
 void sub_002BFFD0(void) {}
 void sub_000D7780(void) {}
 void sub_002C0310(void) {}

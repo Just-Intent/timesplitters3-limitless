@@ -27,7 +27,10 @@
  *    there (scenes 100/101, MapMaker Arcade mode 9, index 0x11) its rows are
  *    the match's bot roster (at most 10 rows, 16 actors per match); its page
  *    2 (more bots) is pc_mapmaker_matchbots.inc;
- *  - the Story AI character choice lists slots 11-20 after the stock ten;
+ *  - the Story AI character choice lists slots 11-20 after the stock ten
+ *    (realboss ids get their synthetic name), and a Story AI on slot 11-20
+ *    gets the stock Story AI icon (list icon row, overview marker) instead
+ *    of item 0x42.. (0x38 + slot);
  *  - play: the level load's set copy (sub_0033EBF0) gets members 10..19 and
  *    count 20 (the per-member loops that use the count skip id -1), the
  *    custom-set preload also preloads them, and a Story AI that names an
@@ -82,11 +85,16 @@
 #define SETS_PLAY_RET 0x00240DD3u       /* sub_00240C50: call sub_0033EBF0 */
 #define SETS_PRELOAD_RET 0x0023F477u    /* sub_0023F390: call sub_0023F320 */
 #define SETS_SAVE_COMPILE_RET 0x0032C6FFu
+#define SETS_ICON_LIST_RET 0x0031D460u  /* sub_0031D410: call sub_00315D20 */
+#define SETS_ICON_MAP_RET 0x00309AC7u   /* sub_00309A80: call sub_00315D20 */
+#define SETS_SLOT_ITEM 0x38u            /* item 0x38 + k = slot k (sub_00303350 case 3) */
+#define SETS_RBS_ID 0x15u               /* realbosses: Giant Trophy Monster id ... */
+#define SETS_RBS_ROW 150u               /* ... and its synthetic picker row */
 #define SETS_H(a) (*(int16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define SETS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 extern void sub_00074670(void),sub_00071970(void),sub_00076EF0(void),sub_002BFFD0(void),
-    sub_0003D7B0(void),sub_002BE650(void),sub_00071800(void),sub_000D7780(void),sub_002C0310(void);
+    sub_0003D7B0(void),sub_002BE600(void),sub_002BE300(void),sub_00071800(void),sub_000D7780(void),sub_002C0310(void);
 
 static struct {
     int page,forced,in_update,in_store;
@@ -362,6 +370,21 @@ void pc_mapmaker_sets_match_start(void (*original)(void))
 }
 
 /* ---- Story AI character choice ----------------------------------------- */
+/* A slot's label, as sub_00303350 case 3 (0x0030339E) makes it for slots
+ * 1-10: sub_0003D7B0(sub_002BE650(id, variant)) = sub_0003D7B0(
+ * sub_002BE300(sub_002BE600(id, variant))). The realbosses area gives the
+ * Giant Trophy Monster (id 0x15) its row 150 only for the stock caller
+ * (sub_002BE600 returning to 0x002BE65F from 0x003033C0), so the row is
+ * given here; without that area sub_002BE300(150) is 0 like stock's -1. */
+static uint32_t sets_label(uint32_t m)
+{
+    int32_t id=SETS_H(m);
+    uint32_t row;
+    if(id==-1) return guest_call(sub_0003D7B0,1,0xD7Cu);                  /* as 0x0031CD0A */
+    row=guest_call(sub_002BE600,2,(uint32_t)id,(uint32_t)(int32_t)SETS_H(m+6u));
+    if(row==0xFFFFFFFFu && id==(int32_t)SETS_RBS_ID) row=SETS_RBS_ROW;
+    return guest_call(sub_0003D7B0,1,guest_call(sub_002BE300,1,row));
+}
 /* WRAP sub_00078590 (cdecl value pointer): ends a choice item. At
  * 0x0031CD2D it ends the Story AI character choice, whose options 0..9 are
  * the set's slots; add slots 11-20 the same way (name or the empty text). */
@@ -377,12 +400,26 @@ void pc_mapmaker_sets_sai_choice(void (*original)(void))
         original();return;
     }
     set=e+SETS_EDITOR_SET;
-    for(k=SETS_STOCK;k<SETS_SLOTS;k++) {
-        uint32_t m=SETS_MEMBER(set,k),text;
-        if(SETS_H(m)==-1) text=guest_call(sub_0003D7B0,1,0xD7Cu);          /* as 0x0031CD0A */
-        else text=guest_call(sub_0003D7B0,1,guest_call(sub_002BE650,2,(uint32_t)(int32_t)SETS_H(m),
-                                                        (uint32_t)(int32_t)SETS_H(m+6u)));
-        guest_call(sub_00071800,2,text,(uint32_t)k);
+    for(k=SETS_STOCK;k<SETS_SLOTS;k++) guest_call(sub_00071800,2,sets_label(SETS_MEMBER(set,k)),(uint32_t)k);
+    original();
+}
+
+/* WRAP sub_00315D20 (cdecl item type -> icon; catalogue 0x00524F58 +0xB4,
+ * flag +0xB8 & 0x400). A Story AI is drawn as item 0x38 + its slot
+ * (sub_0031D3E0 0x0031D406, sub_0031D410 0x0031D442; 9 for type 5): the
+ * Story AI list's icon row (call 0x0031D45B) and the editor overview's AI
+ * marker (sub_00309A80, call 0x00309AC2). Slots 11-20 give items
+ * 0x42..0x4B, other items (0x42 is the one with icon 0x45); the ten slot
+ * items 0x38..0x41 share icon 0x42, so use slot k - 10's item. */
+void pc_mapmaker_sets_icon(void (*original)(void))
+{
+    uint32_t ret,item;
+    if(MAPMAKER_STACK_OK(8)) {
+        ret=WORD_AT(g_esp);
+        if(ret==SETS_ICON_LIST_RET || ret==SETS_ICON_MAP_RET) {
+            item=WORD_AT(g_esp+4u);
+            if(item>=SETS_SLOT_ITEM+SETS_STOCK && item<SETS_SLOT_ITEM+SETS_SLOTS) WORD_AT(g_esp+4u)=item-SETS_STOCK;
+        }
     }
     original();
 }
