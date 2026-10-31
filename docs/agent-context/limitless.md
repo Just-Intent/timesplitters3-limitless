@@ -591,8 +591,11 @@ Story AI uses slot >= 10; `mapmaker_container_over_stock` then forces the
 compile/load/reset (chained), set-changed `sub_00312810`, slot screen paging
 (`sub_002C0490`, `sub_002C0290`, `sub_00312950`, `sub_00314210`: Down on row
 10 / Up on row 11, title "(1-10)"/"(11-20)" via menu `+0x204`), Story AI
-choice `sub_00078590` (0x0031CD32; labels `sub_002BE600` -> `sub_002BE300`,
-id 0x15 -> realbosses row 150), Story AI icon `sub_00315D20` (returns
+choice `sub_00078590` (0x0031CD32; slot k >= 10 named by stock
+`sub_00303350(0x38 + k - 10)` with `sub_002C0290` ret 0x003033A9 shifted 10
+members, so realbosses' 0x003033C0 name rows 150/151 apply; the old host
+lookup gave the Giant Skeleton no name; `mapmaker_sets_names.c` whole-chain
+fixture), Story AI icon `sub_00315D20` (returns
 0x0031D460 list icon row, 0x00309AC7 overview marker: a Story AI is item
 0x38 + slot, so slots 11-20 drew items 0x42..0x4B, e.g. the time crystal;
 drawn as item - 10), play copy `sub_0033EBF0` (count 20,

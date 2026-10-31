@@ -102,16 +102,32 @@ limit.
   saw). `pc_mapmaker_sets_icon` (`sub_00315D20` returning to 0x0031D460 or
   0x00309AC7 only) draws items 0x42..0x4B there as item - 10, the same icon
   as slots 1-10; the palette and other callers keep the real items.
-- Slot names: the choice used `sub_002BE650` from the host, so the realbosses
-  area (row 150 only for `sub_002BE600` returning to 0x002BE65F from
-  0x003033C0) never named the Giant Trophy Monster (id 0x15) in slots
-  11-20. The label is now `sub_0003D7B0(sub_002BE300(row))` with row =
-  `sub_002BE600(id, variant)`, -1 for id 0x15 -> 150 (the realbosses text;
-  stock `sub_002BE300(150)` = 0 = stock's -1). Ordinary ids: same text as
-  before. Not built or played: whether a generic bot's name was also
-  missing in-game is not reproduced here (the choice text path is the stock
-  one); the portrait in the list row (`sub_0031BF60`) already reads the
-  20-member editor set.
+- Slot names (CONFIRMED path, disassembly + whole-chain fixture). Slots
+  1-10: the loop 0x0031CCF8..0x0031CD27 calls `sub_00303350(0x38 + k)`
+  (0x0031CD03, ret 0x0031CD08; empty member: `sub_0003D7B0(0xD7C)`), whose
+  case 3 (0x0030339E) reads member item - 0x38 of `sub_002C0290(
+  sub_003129D0())` (call 0x003033A4, ret 0x003033A9; scene 102 custom
+  index -> `sub_002BFEF0` -> `sub_00312950` = editor +0x11860) and calls
+  `sub_002BE650` (0x003033BB, ret 0x003033C0) = `sub_002BE300(
+  sub_002BE600(id, variant))` (rets 0x002BE65F / 0x002BE665), then jumps to
+  `sub_0003D7B0`. realbosses names ids 0x15 / 0x28 (rows 150 / 151 ->
+  synthetic text -> "Giant Trophy Monster" / "Giant Skeleton") only for
+  `sub_002BE600` returning to 0x002BE65F with 0x003033C0 above it; the slot
+  screen uses its reload return 0x002C054C. The choice shows the option
+  whose value is the current one (`sub_00078590` -> `sub_00075540`), so the
+  list and the selected value share these labels.
+  Slots 11-20 were named from the host (`guest_call` return address), so
+  `sub_002BE600` returned -1 for both bosses; v0.4.0-mapmaker.11 remapped
+  only id 0x15 to row 150, so a Giant Skeleton there had no name (user
+  report). Now `sets_label` runs the stock path itself:
+  `sub_00303350(0x38 + k - 10)` with `sets.name_shift` set, and
+  `pc_mapmaker_sets_set_ptr` (existing `sub_002C0290` WRAP) adds 10 members
+  for return 0x003033A9 while it is set; every name hook (current and future
+  realboss ids) applies as for slots 1-10. Without the realbosses area both
+  halves show stock's empty text. `tests/mapmaker/mapmaker_sets_names.c`
+  chains the real hooks (realbosses inside sets) on a real guest stack;
+  its mutations include the mapmaker.11 code. Not built or played. The
+  portrait in the list row (`sub_0031BF60`) already reads the 20-member set.
 - Map Settings close (`sub_00312810`): a change to slots 11-20 against the
   undo shadow `[0x00765E38]` also counts, so it gets its undo step.
 

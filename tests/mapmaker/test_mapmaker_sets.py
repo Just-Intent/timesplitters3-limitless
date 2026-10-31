@@ -47,10 +47,10 @@ MUTATIONS = {
     'no-title': ('    if(MAPMAKER_PTR_OK(menu,0x208u)) sets_title(menu);\n', ''),
     'choice-any-caller': ('WORD_AT(g_esp)!=SETS_CHOICE_RET || !sets_custom()', '0 || !sets_custom()'),
     'choice-ignores-switch': ('    if(!sets_on() && !(MAPMAKER_PTR_OK(value,4)', '    if(0 && !(MAPMAKER_PTR_OK(value,4)'),
-    'choice-empty-name': ('    if(id==-1) return guest_call(sub_0003D7B0,1,0xD7Cu);', '    if(0) return 0;'),
-    'choice-no-realboss-row': ('    if(row==0xFFFFFFFFu && id==(int32_t)SETS_RBS_ID) row=SETS_RBS_ROW;\n', ''),
-    'choice-variant-lost': ('row=guest_call(sub_002BE600,2,(uint32_t)id,(uint32_t)(int32_t)SETS_H(m+6u));',
-                            'row=guest_call(sub_002BE600,2,(uint32_t)id,0u);'),
+    'choice-empty-name': ('    if(SETS_H(m)==-1) return guest_call(sub_0003D7B0,1,0xD7Cu);', '    if(0) return 0;'),
+    'name-no-shift': ('    else if(ret==SETS_NAME_SET_RET && sets.name_shift && g_eax) g_eax+=8u*SETS_STOCK;\n', ''),
+    'name-shift-sticks': ('    sets.name_shift=0;\n    return text;', '    return text;'),
+    'name-wrong-item': ('SETS_SLOT_ITEM+k-SETS_STOCK);', 'SETS_SLOT_ITEM+k);'),
     'icon-skips': ('WORD_AT(g_esp+4u)=item-SETS_STOCK;', '(void)item;'),
     'icon-any-caller': ('        if(ret==SETS_ICON_LIST_RET || ret==SETS_ICON_MAP_RET) {', '        if(ret) {'),
     'icon-one-caller': ('        if(ret==SETS_ICON_LIST_RET || ret==SETS_ICON_MAP_RET) {', '        if(ret==SETS_ICON_LIST_RET) {'),
@@ -68,15 +68,40 @@ MUTATIONS = {
 }
 
 
-def build(tmp_path, mutation):
+RBS = ROOT / 'src/interface/pc_mapmaker_realbosses.inc'
+# Whole name chain (mapmaker_sets_names.c: realbosses inside sets, real guest
+# stack and return addresses). 'trophy-remap-only' is the v0.4.0-mapmaker.11
+# code: slots 11-20 asked sub_002BE600 for the row from the host, a return
+# address realbosses does not name (-1), and remapped only id 0x15 to row
+# 150, so the Giant Skeleton (0x28, row 151) had no name there;
+# 'host-row-lookup' is the code before that (no boss named).
+_HOST_ROW = ('    { uint32_t row=guest_call(sub_002BE600,2,(uint32_t)(int32_t)SETS_H(m),(uint32_t)(int32_t)SETS_H(m+6u));\n'
+             '%s      text=guest_call(sub_0003D7B0,1,guest_call(sub_002BE300,1,row)); }\n')
+NAME_MUTATIONS = {
+    'trophy-remap-only': (INC, '    text=guest_call(sub_00303350,1,SETS_SLOT_ITEM+k-SETS_STOCK);\n',
+                          _HOST_ROW % '      if(row==0xFFFFFFFFu && SETS_H(m)==0x15) row=150u;\n'),
+    'host-row-lookup': (INC, '    text=guest_call(sub_00303350,1,SETS_SLOT_ITEM+k-SETS_STOCK);\n', _HOST_ROW % ''),
+    'no-shift': (INC, '    else if(ret==SETS_NAME_SET_RET && sets.name_shift && g_eax) g_eax+=8u*SETS_STOCK;\n', ''),
+    'shift-sticks': (INC, '    sets.name_shift=0;\n    return text;', '    return text;'),
+    'wrong-item': (INC, 'SETS_SLOT_ITEM+k-SETS_STOCK);', 'SETS_SLOT_ITEM+k);'),
+    'shift-any-time': (INC, 'else if(ret==SETS_NAME_SET_RET && sets.name_shift && g_eax)',
+                       'else if(ret==SETS_NAME_SET_RET && g_eax)'),
+    'rbs-skeleton-unnamed': (RBS, '    row=id==RBS_ID?RBS_ROW:RBS_SKEL_ROW;', '    row=RBS_ROW;'),
+    'rbs-name-caller-only': (RBS, '(ret==RBS_RET_NAME && WORD_AT(g_esp+12u)==RBS_RET_NAME_OUTER)', '0'),
+}
+
+
+def build(tmp_path, mutation, source_name='mapmaker_sets.c', edit=None):
     compiler, env = native_compiler(tmp_path)
-    if mutation != 'fixed':
-        old, new = MUTATIONS[mutation]
-        text = INC.read_text(encoding='utf-8')
+    if edit is None and mutation != 'fixed':
+        edit = (INC, *MUTATIONS[mutation])
+    if edit is not None:
+        path, old, new = edit
+        text = path.read_text(encoding='utf-8')
         assert text.count(old) == 1, mutation
-        (tmp_path / INC.name).write_text(text.replace(old, new), encoding='utf-8')
-    exe = tmp_path / ('sets.exe' if os.name == 'nt' else 'sets')
-    source = ROOT / 'tests/mapmaker/mapmaker_sets.c'
+        (tmp_path / path.name).write_text(text.replace(old, new), encoding='utf-8')
+    exe = tmp_path / (Path(source_name).stem + ('.exe' if os.name == 'nt' else ''))
+    source = ROOT / 'tests/mapmaker' / source_name
     if os.name == 'nt':
         args = [compiler, '/nologo', '/std:c11', '/O2', '/W4', '/wd4996', '/wd4706',
                 '/I' + str(tmp_path), '/I' + str(ROOT / 'src/interface'), '/I' + str(ROOT / 'src'),
@@ -98,6 +123,19 @@ def test_mapmaker_sets(tmp_path, mutation):
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'mapmaker sets ok' in result.stdout
+    else:
+        assert result.returncode != 0, f'{mutation} was not detected'
+
+
+@pytest.mark.parametrize('mutation', ['fixed', *NAME_MUTATIONS])
+def test_mapmaker_sets_names(tmp_path, mutation):
+    """Slots 11-20 are named exactly as slots 1-10, realboss rows included."""
+    exe = build(tmp_path, mutation, 'mapmaker_sets_names.c', NAME_MUTATIONS.get(mutation))
+    env = {k: v for k, v in os.environ.items() if k not in ('TSFP_MAPMAKER_POOLS', 'TSFP_MAPMAKER_LIMITS')}
+    result = subprocess.run([str(exe)], env=env, capture_output=True, text=True, timeout=60)
+    if mutation == 'fixed':
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert 'mapmaker sets names ok' in result.stdout
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 
@@ -221,6 +259,11 @@ def test_story_ai_item_icon_and_name():
     # sub_002BE650 = sub_002BE300(sub_002BE600(id, variant)); sub_00303350 case 3 calls it at 0x003033BB
     assert '0x2be600' in a[0x002BE65A].text and '0x2be300' in a[0x002BE660].text
     assert ret_of(a, 0x003033BB, 0x2be650) == 0x003033C0
+    # the name reads the set from sub_002C0290(sub_003129D0()) (return 0x003033A9, wrapped by
+    # pc_mapmaker_sets_set_ptr), member item - 0x38; the loop calls it for item 0x38 + k
+    assert ret_of(a, 0x003033A4, 0x2c0290) == 0x003033A9 and a[0x003033A4].function == 0x00303350
+    assert '0x3129d0' in a[0x0030339E].text and mem(a[0x003129D0])[0][4] == 0x00784024
+    assert ret_of(a, 0x0031CD03, 0x303350) == 0x0031CD08 and mem(a[0x0031CCFF])[0][4] == 0x38
     rd = xbe_reader()
     row = lambda item: rd(0x00524F58 + item * 0xC4, 0xC4)
     slot_icons = {struct.unpack_from('<2I', row(item), 0xB4) for item in range(0x38, 0x42)}
