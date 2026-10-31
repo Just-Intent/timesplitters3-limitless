@@ -65,7 +65,11 @@ overrides at lift time) plus function wrappers.
 - Character set slots 10 -> 20 implemented 2026-10-31 (not built or
   played; `docs/mapmaker/mapmaker-sets.md`): fork-only chunk for slots
   11-20, paged slot screen, 20 Story AI character choices, play copy and
-  preload. Weapon sets stay at 6 slots (each slot is a pickup item type).
+  preload.
+- Weapon set slots 6 -> 20 implemented 2026-10-31 (not built or played;
+  `docs/mapmaker/mapmaker-weaponset.md`): fork-only chunk for slots 7-20, a
+  slot byte (+0xC) on weapon/ammo pickup records instead of new item types,
+  paged weapon set screen, 20 Story AI weapon choices, 20+ id play set.
 
 ## Stages (in order)
 
