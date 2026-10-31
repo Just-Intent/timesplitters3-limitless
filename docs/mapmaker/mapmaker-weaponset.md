@@ -2,7 +2,7 @@
 
 Status 2026-10-31: implemented in `src/interface/pc_mapmaker_weaponset.inc`
 (area `weaponset`), fixture-tested (`tests/mapmaker/test_mapmaker_weaponset.py`:
-53 mutations plus decode and XBE facts; `..._weaponset_classified.py`: every
+70 mutations plus decode and XBE facts; `..._weaponset_classified.py`: every
 slot constant around the weapon set classified). Not built or played. No
 guest-code table (`config/guest-code-patches/weaponset.json` does not exist;
 wrappers only).
@@ -91,13 +91,48 @@ table and every id-indexed table and jump table; rejected. Instead:
   Map Settings close `sub_00312880` (weapon-set-changed vs the undo shadow
   `[0x00765E38]`): slots 7-20 count too.
 - Weapon set screen: builder `sub_002D4220` resets to page 1; the title text
-  (`sub_0003D7B0` returning to 0x002D4254) is a copy with "(1-6)", "(7-12)",
-  "(13-18)" or "(15-20)" that a flip rewrites (INFERRED: the item keeps the
-  pointer). Update `sub_002D40A0`: Down on row 6 (value 5) shows the next six
-  slots, Up on row 1 the previous ones (cursor via `sub_00074460`, input bits
-  cleared). On pages 2-4 the row draw (`sub_002D3B00` returning to 0x002D3D8C)
-  shows slot row + start and the pick / X (`sub_00312AE0` returning to
-  0x002BF95A / 0x002D41C7) store there. The row digits stay 1-6.
+  (`sub_0003D7B0` returning to 0x002D4254) is a copy with "(1-6 of 20)",
+  "(7-12 of 20)", "(13-18 of 20)" or "(15-20 of 20)" that the update rewrites
+  (INFERRED: the item keeps the pointer). Update `sub_002D40A0`: Down on row 6
+  (value 5) shows the next six slots, Up on row 1 the previous ones; Right /
+  Left on any slot row turn the page, wrapping (cursor via `sub_00074460`,
+  input bits cleared). On pages 2-4 the row draw (`sub_002D3B00` returning to
+  0x002D3D8C) and the highlighted weapon's model (0x002D410F) show slot row +
+  start and the pick / X (`sub_00312AE0` returning to 0x002BF95A /
+  0x002D41C7) store there. The row digits stay 1-6.
+
+### Every route to the weapon set screen (CONFIRMED, 2026-10-31)
+
+User report (v0.4.0-mapmaker.11): "Only six slots appear for weapon
+customization on the pause menu custom mapmaker weapon set screen." The slot
+pane 0x005236EC exists only inside screen 0x0052371C = {`sub_002D44D0`,
+`sub_002BFC30`} (pushes of 0x0052371C: `sub_002C7710`, `sub_003128F0` only):
+
+- **Editor** (scene 102): Start menu -> Map Settings -> edit weapon set
+  (item 0xB08, `sub_003128F0`), and the Test map setup's Weapons item
+  (`sub_002EFBF0` -> `sub_002C78F0(menu, 0, ...)`). Edits the editor set
+  (editor +0x11904; slots 7-20 in the hook, saved in the fork chunk). This
+  is the only place the custom set is defined; it was already paged, but only
+  by Down past row 6 with "(1-6)" in the title, so the other 14 slots were
+  easy to miss. Statically the paging works: the pane tick calls the update
+  (+0xC = descriptor +4, `sub_00078E50` 0x00078F57) at 0x0007AD76 before its
+  own Up/Down (0x0007AE2E), so the hook sees Down first. Now the title says
+  "of 20" and Right/Left also turn pages (stock moves only choice items with
+  them, 0x0007AFB1; slot rows are action items). Not verified in play.
+- **Front end** (scene 101) setup Weapons item (`sub_002C7710`, offered only
+  when scene > 100 and the builder's second argument is 0): the set list
+  `sub_002BF830` (value -5, choice +0xC8 = profile +0x6A4) includes the map's
+  set 0xF in MapMaker Arcade (mode 9), shown by `sub_002D3B00` ->
+  `sub_002BFF90` -> `sub_00312A60` (the map info's 6 ids) and read-only in
+  stock (0x002D415B, action `sub_002D4040` 0x002D406F). With the switch, its
+  pages 2-4 show the map's slots 7-20 read-only (the X clear, which writes
+  the profile at 0x002D41D5, is suppressed there); profile sets stay stock.
+- **In-play pause** (scene 100): pause -> setup `sub_0019A000` calls
+  `sub_002C78F0(menu, 1, sub_00196DE0)` (0x0019A018) and the builder skips the
+  Weapons item when that argument is set (0x002C808A `jne 0x002C81A8`); the
+  item's action is also absent at scene <= 100 (0x002C809E). No weapon set
+  can be viewed or changed there in stock or now; the match's set is fixed at
+  load (play set 0x00906000 from the saved map).
 - Story AI weapon choice (`sub_00078590` returning to 0x0031CDB7): 14 more
   options, values 6..19, "7: <weapon>" .. "20: <weapon>". Without the switch
   only for an AI that already uses slot 7+.
@@ -148,8 +183,8 @@ WRAP sub_002FEBF0 -> pc_mapmaker_weaponset_reset        (chained: bosses, sky, r
 WRAP sub_00312880 -> pc_mapmaker_weaponset_changed      (new)
 WRAP sub_00316D80 -> pc_mapmaker_weaponset_held         (new)
 WRAP sub_002D4220 -> pc_mapmaker_weaponset_build        (new)
-WRAP sub_002D40A0 -> pc_mapmaker_weaponset_screen       (new)
-WRAP sub_002D3B00 -> pc_mapmaker_weaponset_get          (new; return-address test)
+WRAP sub_002D40A0 -> pc_mapmaker_weaponset_screen       (new; also the front-end view, calls sub_00071940)
+WRAP sub_002D3B00 -> pc_mapmaker_weaponset_get          (new; return-address test: row draw and model 0x002D410F)
 WRAP sub_00312AE0 -> pc_mapmaker_weaponset_set          (new; return-address test)
 WRAP sub_0003D7B0 -> pc_mapmaker_weaponset_title        (chained: sky's roof_text, realbosses_text; order free; return-address test, hot)
 WRAP sub_00078590 -> pc_mapmaker_weaponset_sai_choice   (chained: bosses, sets; order free; return-address test)
@@ -172,9 +207,14 @@ already stubbed).
 ## User test steps
 
 1. `TSFP_MAPMAKER_LIMITS=1`. Editor -> Map Settings -> weapon set: custom.
-   The title reads "(1-6)". On the last row press Down: "(7-12)", empty rows;
-   pick weapons (and on "(13-18)", "(15-20)"). Up on the first row goes back;
-   slots 1-6 are unchanged.
+   The title reads "(1-6 of 20)". On the last row press Down (or Right on any
+   row): "(7-12 of 20)", empty rows; pick weapons (and on "(13-18 of 20)",
+   "(15-20 of 20)"). Up on the first row or Left goes back; slots 1-6 are
+   unchanged. Save the map.
+1b. Front end -> MapMaker -> load the map -> Arcade -> setup -> Weapons ->
+   choose the MapMaker set: Right shows "(7-12 of 20)" with the saved slots
+   (read-only, as stock's 1-6). Profile sets: 6 rows, stock. The in-play
+   pause has no weapon set screen (stock).
 2. Place a weapon pickup, open its options: a "Weapon" choice lists the
    item's own slot and "7: ..." .. "20: ...". Pick one. Do the same for an
    ammo pickup. Place a Story AI: its weapon choice lists 20 slots.
