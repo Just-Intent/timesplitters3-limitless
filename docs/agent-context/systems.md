@@ -276,6 +276,21 @@ the point-less template means "any linked copy" (`sub_0033E560`, `sub_00163780`,
 `sub_0033E620`, `sub_00339600`). Compile/load/level-start hooks chain outside the
 container/editor ones. Not yet integrated, built or played.
 
+## MapMaker and System Link bug fixes
+
+Area `bugfix` (`src/pc_mapmaker_bugfix.inc`, `src/pc_mapmaker_validate.inc`,
+`config/guest-code-patches/bugfix.json`; table and sites in
+`docs/mapmaker-bugfix.md`). Always on unless noted: System Link fragment
+bounds (`sub_00352DF0`), the `sub_0006D0B0` return-address overwrite
+(0x0006D115, at most 79 matches), turret-sync slot/player bounds
+(`sub_003596F0`), network death-effect bounds (`sub_00357D70`), the arcade
+mode 1 bot goal read (`sub_002B0320`), and a bounds-only map validator: the
+editor loader refuses a bad map the stock way, and level setup
+(`sub_0006D7A0`) hides bad chunks for that call. With
+`TSFP_MAPMAKER_LIMITS=1` in scene 100 story mode the HUD turret icons scan
+the whole gun pool (`sub_00349E40`/`sub_00349970`). Tests:
+`tests/test_mapmaker_bugfix.py`, `tests/test_mapmaker_validate.py`.
+
 ## MapMaker editor mouse controls
 
 On by default since 2026-10-23 (milestone confirmed in game);
