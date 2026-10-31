@@ -232,7 +232,10 @@ risks in `docs/mapmaker-actors.md`), and `grid` (editor only: with
 `TSFP_MAPMAKER_LIMITS=1` floors -2..4 and an 80x80x8 occupancy grid, the five
 grid functions `sub_00307C20/CC0/CF0/DA0/E60` reimplemented, a placement
 guard above the top level; `TSFP_MAPMAKER_OVERLAP=1` overlapping tiles and
-`TSFP_MAPMAKER_STACK_ITEMS=1` several items per cell, both env-only; a
+`TSFP_MAPMAKER_STACK_ITEMS=1` several items per cell (hooks on
+`sub_00308260`/`sub_00334770`, and `sub_003348C0` at return 0x003070A7 sets
+the per-frame valid bit editor `+0x25C`&4 that the item-under-cursor test at
+0x003070B4 otherwise leaves clear = red X), both env-only; a
 16-byte settings block at 0x00903600 (`src/pc_mapmaker_grid.h`) that
 `grid.json` redirects the editor's 40.0/5.0/60.0/(1/60) reads to; save format
 unchanged; `docs/mapmaker-grid.md`).
