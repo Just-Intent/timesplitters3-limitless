@@ -6,7 +6,7 @@ If you find a vulnerability that could expose private information, run
 untrusted code or compromise a player's computer, **do not post exploit
 details in a public issue or Discussion**.
 
-Open the repository's [Security advisories page](https://github.com/TheDoffman/timesplitters-future-perfect-pc/security/advisories)
+Open the repository's [Security advisories page](https://github.com/JustinDent/timesplitters3-limitless/security/advisories)
 and choose **Report a vulnerability** to send a private report through GitHub.
 Sign in to GitHub if needed. This reaches the repository maintainers without
 publishing the report.
@@ -33,5 +33,5 @@ the private report. Response and fix times depend on maintainer availability
 and the issue; there is no guaranteed deadline or paid bug bounty.
 
 Ordinary crashes, visual problems and feature requests belong in the
-[issue forms](https://github.com/TheDoffman/timesplitters-future-perfect-pc/issues/new/choose).
+[issue forms](https://github.com/JustinDent/timesplitters3-limitless/issues/new/choose).
 For community conduct concerns, see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

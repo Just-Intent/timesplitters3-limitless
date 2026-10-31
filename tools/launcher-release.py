@@ -14,7 +14,9 @@ import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-REPOSITORY = 'TheDoffman/timesplitters-future-perfect-pc'
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from project_repository import REPOSITORY  # noqa: E402  shared release source
 PLATFORMS = ('windows-x64', 'macos-arm64')
 VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z.-]+))?\Z')
 
