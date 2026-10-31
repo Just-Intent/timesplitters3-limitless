@@ -173,6 +173,52 @@ spoofed scene during aiming, the fight's untraced reliance on mansion script
 state, the throw target point (state +0x4164, filled by `sub_00159150`),
 collision on tiles.
 
+## Whole height on screen
+
+User report (v0.4.0-mapmaker.11): the giant skeleton is visible only up to
+about two floors. Area `bigdraw`, `src/interface/pc_mapmaker_bigdraw.inc`,
+`tests/mapmaker/test_mapmaker_bigdraw.py` (fixture, 20 mutations, decode
+checks). Not built or played.
+
+Cause (CONFIRMED, decode): every prop is drawn with a screen scissor that is
+the union of the portal rectangles of the rooms its box touches.
+
+- `sub_0009FBE0` lists up to 10 rooms (+0x30 count, +0x38 ids) overlapping
+  the box +0x1A8 +- +0x1C0 (`sub_000873C0` at 0x0009FCF0); a character's box
+  is a cube of its model radius (`sub_0009EAB0` -> `sub_0008E5F0`).
+- The portal walk `sub_00087F80` gives the camera's room the whole viewport
+  `[0x007E71C8]` (call 0x00089BD9) and every other room the rectangle of the
+  portals it is seen through (view +0x3BC + 12*room).
+- `sub_000862C0(prop)` (only caller 0x000A246B in `sub_000A2430`, ret
+  0x000A2470, per prop of a room about to be drawn) stores the union of the
+  visible listed rooms' rectangles at +0x118 x0, +0x11C y0, +0x120 x1, +0x124
+  y1. `sub_000A2430` culls the prop when its projected box misses it;
+  `sub_000A2740` makes it the scissor (`sub_0001A010`, 0x000A285B) before the
+  model draw (0x000A28D4).
+
+A MapMaker tile is one room one floor high, with portals (doorways, open
+sides) one floor high, and an open top has no room above it. A boss in
+another tile than the camera is therefore cut at the projected top of the
+portal it is seen through: roughly two floors at its distance. Mission 5
+fights it inside the courtyard room the player stands in, whose rectangle is
+the whole viewport, so stock never clips it. Not the cause: frustum or fog
+culling (the box test uses the same rectangle), node masks (tile rooms only),
+bones.
+
+| WRAP | what it does |
+|---|---|
+| `sub_000862C0` -> `pc_mapmaker_bigdraw_rect` | after the original, for a character prop (+0x20 == 8) with model 0x5E9 or 0x5BE, return 0x000A2470, scene 100, `TSFP_MAPMAKER_LIMITS=1`: when the stock rectangle is not empty, replace it with the whole viewport (what the camera's own room gets); logged once. An empty rectangle (no listed room visible) stays, so the stock cull applies (logged once) |
+
+Depth testing still hides the boss behind every drawn wall: from inside a
+closed tile only its doorways show it, and a closed tile's ceiling still
+covers it. Where stock shows only sky (over an open top) the boss is now
+drawn. INFERRED risk: a part inside a tile that is not drawn at all (no
+portal path to it) shows where stock showed sky; the box is still the
+model's radius, so a boss whose drawn height exceeds it can be culled when
+only its head is on screen. The giant trophy monster gets the same fix (it
+is clipped the same way once taller than the portal it is seen through).
+Other characters, objects, scenes and story levels: stock.
+
 ## Save format and stock games
 
 Unchanged: a stock custom-set member (word id 0x15, sbyte variant -1). No
@@ -205,6 +251,7 @@ WRAP sub_0029FE00 -> pc_mapmaker_realbosses_princess       (new; class 0x20000 d
 WRAP sub_002875F0 -> pc_mapmaker_realbosses_risen          (new; per skeleton frame in state 1)
 WRAP sub_00287E20 -> pc_mapmaker_realbosses_throw          (new; per skeleton frame)
 WRAP sub_002274C0 -> pc_mapmaker_realbosses_event          (new; level events, return-address test first)
+WRAP sub_000862C0 -> pc_mapmaker_bigdraw_rect             (new, area bigdraw; prop draw rectangle, per frame per prop of a drawn room)
 ```
 
 Include the `.inc` after `pc_mapmaker_bosses.inc` / `pc_mapmaker_characters.inc`
@@ -213,7 +260,9 @@ Include the `.inc` after `pc_mapmaker_bosses.inc` / `pc_mapmaker_characters.inc`
 `sub_00071630`, `sub_00071C70`, `sub_00287E00`, `sub_0029CEF0`, `sub_00059DB0`,
 `sub_000EA9C0` and `sub_0010EB90` are in `tests/mapmaker/mapmaker_area_stubs.h`;
 the off-build no-op hooks are in `pc_menu_mouse_guest.inc`, prototypes in `pc_display_menu.h`.
-No extension memory.
+`pc_mapmaker_bigdraw.inc` (area `bigdraw`) is included right after it (needs
+only `pc_mapmaker_limits.inc`; its stub and prototype are in place, no link
+stubs). No extension memory.
 
 ## User test steps
 
@@ -250,3 +299,9 @@ No extension memory.
    change. Boss Off: no health; Boss x4: one bar with the name; Sub-boss
    bar: the meter. A second Giant Skeleton AI: `only one giant skeleton per
    map` and it fights as a bot. Mission 5 and 6 still play stock.
+8. Whole height: put the Giant Skeleton in a tile next to an open area and
+   watch it rise from a neighbouring tile and from further away: the whole
+   body shows above the tile walls (stderr `real boss drawn over the whole
+   view`, once). From inside a closed tile it shows only through doorways,
+   not through walls or the ceiling. Same for the Giant Trophy Monster.
+   Without `TSFP_MAPMAKER_LIMITS=1` it is clipped as before.

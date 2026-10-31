@@ -64,6 +64,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_bosses.inc"
 #include "pc_mapmaker_characters.inc"
 #include "pc_mapmaker_realbosses.inc"
+#include "pc_mapmaker_bigdraw.inc"
 #include "pc_mapmaker_sets.inc"
 #include "pc_mapmaker_matchbots.inc"
 #include "pc_mapmaker_weaponset.inc"
@@ -819,6 +820,7 @@ void pc_mapmaker_weaponset_weapon_veto(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_ammo_veto(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_pickup(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_preload(void (*original)(void)) { original(); }
+void pc_mapmaker_bigdraw_rect(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }

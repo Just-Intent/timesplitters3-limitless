@@ -1,3 +1,9 @@
+## MapMaker boss names in slots 11-20 and weapon set: in-game checks (2026-10-31)
+
+Local preview v0.4.0-mapmaker.12 (exe SHA-256 prefix 27a46650, source 991aac91) on the second Windows
+11 PC: Story AI character choice shows the real-boss names for custom-set slots 11-20 (user-confirmed).
+Not working: the custom weapon set screen still shows six slots and does not page (mapmaker.11 and .12).
+
 ## MapMaker lighting list right-click: in-game check (2026-10-31)
 
 Local preview v0.4.0-mapmaker.9 (exe SHA-256 prefix dc2e0e9f) on the second Windows 11 PC: a right click
