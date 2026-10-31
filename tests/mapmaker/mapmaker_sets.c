@@ -24,8 +24,8 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 static volatile uint32_t stub_ran;
 #define STUB(name,n) void name(void) { stub_ran=n; }
 STUB(sub_0003DFA0,1) STUB(sub_00074670,2) STUB(sub_00071970,3) STUB(sub_00076EF0,4) STUB(sub_002BFFD0,5)
-STUB(sub_0003D7B0,6) STUB(sub_002BE600,7) STUB(sub_00071800,8) STUB(sub_000D7780,9)
-STUB(sub_002C0310,10) STUB(sub_002BE300,11)
+STUB(sub_0003D7B0,6) STUB(sub_00303350,7) STUB(sub_00071800,8) STUB(sub_000D7780,9)
+STUB(sub_002C0310,10)
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -46,6 +46,7 @@ static unsigned refills;
 static uint32_t refill_index;
 static void fake_refill(void);
 static void hook_store_entry(void);
+static uint32_t fake_slot_name(uint32_t item);
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -59,10 +60,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     else if(f==sub_00076EF0) { if(x[0]==PANE) selected=x[1]; }
     else if(f==sub_002BFFD0) hook_store_entry();
     else if(f==sub_0003D7B0) r=0x00700000u+x[0];
-    /* row of (id, variant): -1 for ids past the Arcade table (0x15 the realboss, 0x1FF) */
-    else if(f==sub_002BE600) r=(x[0]==0x15u || x[0]==0x1FFu)?0xFFFFFFFFu:x[0]*16u+(x[1]&0xFu);
-    /* row -> text id: 0 for -1 and rows >= 150 (stock), realbosses' row 150 -> 0x52420015 */
-    else if(f==sub_002BE300) r=x[0]==150u?0x52420015u:(x[0]==0xFFFFFFFFu?0u:0x5000u+x[0]);
+    else if(f==sub_00303350) r=fake_slot_name(x[0]);
     else if(f==sub_00071800) { if(noptions<32u) { options[noptions][0]=x[0];options[noptions][1]=x[1]; } noptions++; }
     else if(f==sub_002C0310) fake_refill();
     else if(f==sub_000D7780) { if(npreloaded<32u && x[0]==x[1]) preloaded[npreloaded]=x[0]; npreloaded++; }
@@ -397,6 +395,21 @@ static void match_tests(void)
 }
 
 /* ---- Story AI choice --------------------------------------------------- */
+/* sub_00303350 case 3 (items 0x38..0x41): member item - 0x38 of the set
+ * sub_002C0290 returns to 0x003033A9, named by sub_002BE650: row of (id,
+ * variant) -1 past the Arcade table (the realbosses 0x15/0x28, 0x1FF, -1),
+ * row -> text 0 for -1 (this fixture has no realbosses area; see
+ * mapmaker_sets_names.c for the whole chain). Other items: 0. */
+static uint32_t fake_slot_name(uint32_t item)
+{
+    uint32_t set,m,row;
+    int id;
+    if(item<0x38u || item>=0x42u) return 0;
+    set=inner_call(pc_mapmaker_sets_set_ptr,fake_set_ptr,0x003033A9u);
+    m=set+4u+8u*(item-0x38u);id=HALF_AT(m);
+    row=(id==-1 || id==0x15 || id==0x28 || id==0x1FF)?0xFFFFFFFFu:(uint32_t)id*16u+((uint32_t)(int32_t)HALF_AT(m+6u)&0xFu);
+    return 0x00700000u+(row==0xFFFFFFFFu?0u:0x5000u+row);
+}
 static void fake_choice(void) { originals++;CHECK(noptions==0u || noptions==10u);g_esp+=4u; }
 static void choice_tests(void)
 {
@@ -412,14 +425,19 @@ static void choice_tests(void)
         CHECK(options[k][1]==10u+k);
         CHECK(options[k][0]==(id==-1?0x00700000u+0xD7Cu:0x00700000u+0x5000u+(uint32_t)id*16u+(uint32_t)((10u+k)%3u==0?0xFu:(10u+k)%3u)));
     }
-    /* the realboss (no Arcade row) gets its synthetic row 150's name; another
-       unknown id gets stock's empty text 0, as slots 1-10 would */
+    /* the names come from the stock path for member k (not k - 10, which is
+       a different character); ids without an Arcade row get what slots 1-10
+       would get there (here, no realbosses area: stock's empty text 0) */
     HALF_AT(ESET+4u+8u*13u)=0x15;HALF_AT(ESET+4u+8u*13u+6u)=-1;
     HALF_AT(ESET+4u+8u*14u)=0x1FF;
     noptions=0;CALL(pc_mapmaker_sets_sai_choice,fake_choice,0x0031CD32u,value,0u);
-    CHECK(noptions==10u && options[3][1]==13u && options[3][0]==0x00700000u+0x52420015u);
+    CHECK(noptions==10u && options[3][1]==13u && options[3][0]==0x00700000u);
     CHECK(options[4][1]==14u && options[4][0]==0x00700000u);
     CHECK(options[0][0]==0x00700000u+0x5000u+200u*16u+1u);
+    CHECK(options[9][0]==0x00700000u+0x5000u+0xA8u*16u+1u);
+    /* the stock name path afterwards (slots 1-10) reads members 0..9 */
+    CHECK(!sets.name_shift && inner_call(pc_mapmaker_sets_set_ptr,fake_set_ptr,0x003033A9u)==ESET);
+    CHECK(fake_slot_name(0x38u+3u)==0x00700000u+0x5000u+103u*16u+0xFu);
     editor_set(some_extras);
     noptions=0;CALL(pc_mapmaker_sets_sai_choice,fake_choice,0x0031CD37u,value,0u);CHECK(noptions==0u);
     WORD_AT(0x00784024u)=4u;noptions=0;

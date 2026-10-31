@@ -27,8 +27,10 @@
  *    there (scenes 100/101, MapMaker Arcade mode 9, index 0x11) its rows are
  *    the match's bot roster (at most 10 rows, 16 actors per match); its page
  *    2 (more bots) is pc_mapmaker_matchbots.inc;
- *  - the Story AI character choice lists slots 11-20 after the stock ten
- *    (realboss ids get their synthetic name), and a Story AI on slot 11-20
+ *  - the Story AI character choice lists slots 11-20 after the stock ten,
+ *    each named by the stock slot-name path (sub_00303350 case 3 for slot
+ *    k - 10 with the set read shifted 10 members, so realbosses' names of
+ *    rows 150/151 apply as for slots 1-10), and a Story AI on slot 11-20
  *    gets the stock Story AI icon (list icon row, overview marker) instead
  *    of item 0x42.. (0x38 + slot);
  *  - play: the level load's set copy (sub_0033EBF0) gets members 10..19 and
@@ -88,16 +90,15 @@
 #define SETS_ICON_LIST_RET 0x0031D460u  /* sub_0031D410: call sub_00315D20 */
 #define SETS_ICON_MAP_RET 0x00309AC7u   /* sub_00309A80: call sub_00315D20 */
 #define SETS_SLOT_ITEM 0x38u            /* item 0x38 + k = slot k (sub_00303350 case 3) */
-#define SETS_RBS_ID 0x15u               /* realbosses: Giant Trophy Monster id ... */
-#define SETS_RBS_ROW 150u               /* ... and its synthetic picker row */
+#define SETS_NAME_SET_RET 0x003033A9u  /* sub_00303350 case 3: call sub_002C0290 */
 #define SETS_H(a) (*(int16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define SETS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 extern void sub_00074670(void),sub_00071970(void),sub_00076EF0(void),sub_002BFFD0(void),
-    sub_0003D7B0(void),sub_002BE600(void),sub_002BE300(void),sub_00071800(void),sub_000D7780(void),sub_002C0310(void);
+    sub_0003D7B0(void),sub_00303350(void),sub_00071800(void),sub_000D7780(void),sub_002C0310(void);
 
 static struct {
-    int page,forced,in_update,in_store;
+    int page,forced,in_update,in_store,name_shift;
     uint32_t title_menu,title_original;
     unsigned logged;
 } sets;
@@ -314,12 +315,15 @@ void pc_mapmaker_sets_screen(void (*original)(void))
     if(sets.forced && WORD_AT(SETS_LOADED)!=0xFFFFFFFFu) sets.forced=0;
 }
 /* WRAP sub_002C0290 (cdecl index; returns a set): the fill sub_002C0310
- * reads members +4.. of it; page 2 reads members 10..19. */
+ * reads members +4.. of it; page 2 reads members 10..19. The slot name of
+ * sub_00303350 case 3 (0x003033A4) reads member item - 0x38; while
+ * sets_label asks for slot k (11-20) as item 0x38 + k - 10, member k. */
 void pc_mapmaker_sets_set_ptr(void (*original)(void))
 {
     uint32_t ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;
     original();
     if(ret==SETS_FILL_RET && sets.in_update && sets.page && g_eax) g_eax+=8u*SETS_STOCK;
+    else if(ret==SETS_NAME_SET_RET && sets.name_shift && g_eax) g_eax+=8u*SETS_STOCK;
 }
 /* WRAP sub_00312950 (returns the editor set in scene 102): page 2 for the
  * byte fill sub_003141B0, and the store's scratch. */
@@ -370,20 +374,22 @@ void pc_mapmaker_sets_match_start(void (*original)(void))
 }
 
 /* ---- Story AI character choice ----------------------------------------- */
-/* A slot's label, as sub_00303350 case 3 (0x0030339E) makes it for slots
- * 1-10: sub_0003D7B0(sub_002BE650(id, variant)) = sub_0003D7B0(
- * sub_002BE300(sub_002BE600(id, variant))). The realbosses area gives the
- * Giant Trophy Monster (id 0x15) its row 150 only for the stock caller
- * (sub_002BE600 returning to 0x002BE65F from 0x003033C0), so the row is
- * given here; without that area sub_002BE300(150) is 0 like stock's -1. */
-static uint32_t sets_label(uint32_t m)
+/* Slot k's label, made by the stock code that names slots 1-10 (0x0031CD03:
+ * sub_00303350(0x38 + k), case 3 at 0x0030339E: sub_0003D7B0(sub_002BE650(
+ * id, variant)) of member item - 0x38 of sub_002C0290(index)). Slots 11-20
+ * are items 0x38..0x41 with that set read 10 members on (name_shift), so
+ * every hook on the stock name path applies unchanged: realbosses names
+ * ids 0x15 / 0x28 (rows 150 / 151) only for sub_002BE600 returning to
+ * 0x002BE65F inside sub_002BE650 called from 0x003033C0. Asking for the
+ * row from here (another return address) gave -1, so no name. */
+static uint32_t sets_label(unsigned k,uint32_t m)
 {
-    int32_t id=SETS_H(m);
-    uint32_t row;
-    if(id==-1) return guest_call(sub_0003D7B0,1,0xD7Cu);                  /* as 0x0031CD0A */
-    row=guest_call(sub_002BE600,2,(uint32_t)id,(uint32_t)(int32_t)SETS_H(m+6u));
-    if(row==0xFFFFFFFFu && id==(int32_t)SETS_RBS_ID) row=SETS_RBS_ROW;
-    return guest_call(sub_0003D7B0,1,guest_call(sub_002BE300,1,row));
+    uint32_t text;
+    if(SETS_H(m)==-1) return guest_call(sub_0003D7B0,1,0xD7Cu);           /* as 0x0031CD0A */
+    sets.name_shift=1;
+    text=guest_call(sub_00303350,1,SETS_SLOT_ITEM+k-SETS_STOCK);
+    sets.name_shift=0;
+    return text;
 }
 /* WRAP sub_00078590 (cdecl value pointer): ends a choice item. At
  * 0x0031CD2D it ends the Story AI character choice, whose options 0..9 are
@@ -400,7 +406,7 @@ void pc_mapmaker_sets_sai_choice(void (*original)(void))
         original();return;
     }
     set=e+SETS_EDITOR_SET;
-    for(k=SETS_STOCK;k<SETS_SLOTS;k++) guest_call(sub_00071800,2,sets_label(SETS_MEMBER(set,k)),(uint32_t)k);
+    for(k=SETS_STOCK;k<SETS_SLOTS;k++) guest_call(sub_00071800,2,sets_label(k,SETS_MEMBER(set,k)),(uint32_t)k);
     original();
 }
 
