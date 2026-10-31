@@ -40,54 +40,59 @@ class LauncherPackaging(unittest.TestCase):
                     self.assertIn('Release launcher artwork is required: ' + missing + ' missing', result.stderr)
                     self.assertFalse((output / 'TimeSplitters Launcher.exe').exists())
 
+    @staticmethod
+    def _fixture(root):
+        (root/'VERSION').write_text('0.2.0-alpha.4\n')
+        upstream = root / 'external/ts3FPrecomp'
+        # Even when a repository pack exists, the default game ZIP must omit it.
+        textures = root/'assets/textures'
+        textures.mkdir(parents=True)
+        words = [0]*32
+        for index, value in {0: 0x20534444, 1: 124, 3: 1, 4: 1, 7: 1,
+                             19: 32, 20: 4, 21: 0x31545844}.items():
+            words[index] = value
+        dds = struct.pack('<32I', *words)+b'\0'*8
+        key = '0123456789abcdef'
+        (textures/(key+'.dds')).write_bytes(dds)
+        (textures/(key+'.json')).write_text(json.dumps({
+            'key': key, 'sha256': hashlib.sha256(dds).hexdigest(),
+            'prompt': 'private fixture prompt', 'source': '/private/art.png'}))
+
+        def put(path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'synthetic test fixture')
+
+        for path in [root / 'build/windows/Release/futureperfect_recomp.exe',
+                     root / 'build/windows/Release/futureperfect_recomp.pdb',
+                     root / 'build/windows/Release/tsfp_crash_helper.exe',
+                     root / 'build/launcher/TimeSplitters Launcher.exe',
+                     root / 'build/launcher/Bin/TimeSplitters.App.exe',
+                     root / 'config/pc-controls.default.json', root / 'tools/playable-launch.ps1',
+                     root / 'config/pc-discord.default.ini', root / 'docs/discord-presence.md',
+                     root / 'tools/start-game.ps1', root / 'tools/release/ImportGame.cs',
+                     root / 'tools/launcher/GameMonogram.NOTICE.txt',
+                     root / 'tools/release/Import-game.ps1', root / 'tools/release/Play.cmd',
+                     root / 'Data/default.xbe', root / 'Saves/profile',
+                     root / 'Settings/pc-controls.json']:
+            put(path)
+        discord_default = (ROOT / 'config/pc-discord.default.ini').read_bytes()
+        (root / 'config/pc-discord.default.ini').write_bytes(discord_default)
+        (root / 'config/pc-discord.ini').write_text('TSFP_DISCORD_V1 1 999999999999999999\n')
+        manifest_path = root / 'build/launcher/Support/Launcher/manifest.json'
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps({'schema': 1, 'version': '1.1.0', 'files': {}}))
+        for relative in ['LICENSE', 'LICENSE.upstream-MIT', 'NOTICE', 'LICENSES/LGPL-2.1.txt',
+                         'third_party/SDL/LICENSE.txt', 'third_party/ffmpeg/LICENSE.txt',
+                         'third_party/ffmpeg/bin/avcodec-62.dll', 'third_party/ffmpeg/bin/avutil-60.dll',
+                         'third_party/ffmpeg/bin/swresample-6.dll']:
+            put(upstream / relative)
+        put(root / 'ProgramFiles/Microsoft Visual Studio/2022/Test/VC/Redist/MSVC/1/x64/Microsoft.VC143.CRT/vcruntime140.dll')
+        return key, dds, discord_default
+
     def test_manifest_and_user_data_exclusion(self):
         with tempfile.TemporaryDirectory(prefix='launcher-package-') as directory:
             root = Path(directory)
-            (root/'VERSION').write_text('0.2.0-alpha.4\n')
-            upstream = root / 'external/ts3FPrecomp'
-            # Even when a repository pack exists, the default game ZIP must omit it.
-            textures = root/'assets/textures'
-            textures.mkdir(parents=True)
-            words = [0]*32
-            for index, value in {0: 0x20534444, 1: 124, 3: 1, 4: 1, 7: 1,
-                                 19: 32, 20: 4, 21: 0x31545844}.items():
-                words[index] = value
-            dds = struct.pack('<32I', *words)+b'\0'*8
-            key = '0123456789abcdef'
-            (textures/(key+'.dds')).write_bytes(dds)
-            (textures/(key+'.json')).write_text(json.dumps({
-                'key': key, 'sha256': hashlib.sha256(dds).hexdigest(),
-                'prompt': 'private fixture prompt', 'source': '/private/art.png'}))
-
-            def put(path):
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(b'synthetic test fixture')
-
-            for path in [root / 'build/windows/Release/futureperfect_recomp.exe',
-                         root / 'build/windows/Release/futureperfect_recomp.pdb',
-                         root / 'build/windows/Release/tsfp_crash_helper.exe',
-                         root / 'build/launcher/TimeSplitters Launcher.exe',
-                         root / 'build/launcher/Bin/TimeSplitters.App.exe',
-                         root / 'config/pc-controls.default.json', root / 'tools/playable-launch.ps1',
-                         root / 'config/pc-discord.default.ini', root / 'docs/discord-presence.md',
-                         root / 'tools/start-game.ps1', root / 'tools/release/ImportGame.cs',
-                         root / 'tools/launcher/GameMonogram.NOTICE.txt',
-                         root / 'tools/release/Import-game.ps1', root / 'tools/release/Play.cmd',
-                         root / 'Data/default.xbe', root / 'Saves/profile',
-                         root / 'Settings/pc-controls.json']:
-                put(path)
-            discord_default = (ROOT / 'config/pc-discord.default.ini').read_bytes()
-            (root / 'config/pc-discord.default.ini').write_bytes(discord_default)
-            (root / 'config/pc-discord.ini').write_text('TSFP_DISCORD_V1 1 999999999999999999\n')
-            manifest_path = root / 'build/launcher/Support/Launcher/manifest.json'
-            manifest_path.parent.mkdir(parents=True, exist_ok=True)
-            manifest_path.write_text(json.dumps({'schema': 1, 'version': '1.1.0', 'files': {}}))
-            for relative in ['LICENSE', 'LICENSE.upstream-MIT', 'NOTICE', 'LICENSES/LGPL-2.1.txt',
-                             'third_party/SDL/LICENSE.txt', 'third_party/ffmpeg/LICENSE.txt',
-                             'third_party/ffmpeg/bin/avcodec-62.dll', 'third_party/ffmpeg/bin/avutil-60.dll',
-                             'third_party/ffmpeg/bin/swresample-6.dll']:
-                put(upstream / relative)
-            put(root / 'ProgramFiles/Microsoft Visual Studio/2022/Test/VC/Redist/MSVC/1/x64/Microsoft.VC143.CRT/vcruntime140.dll')
+            key, dds, discord_default = self._fixture(root)
             with mock.patch.object(package, 'ROOT', root), \
                     mock.patch.object(sys, 'argv', ['package-release.py', '--version', 'v1.2.3']), \
                     mock.patch.dict(os.environ, {'ProgramFiles': str(root / 'ProgramFiles')}), \
@@ -131,6 +136,47 @@ class LauncherPackaging(unittest.TestCase):
                 self.assertIn('futureperfect_recomp.pdb', symbols.namelist())
                 info = json.loads(symbols.read('BUILD.json'))
                 self.assertEqual(info['files']['futureperfect_recomp.exe'], hashlib.sha256(symbols.read('futureperfect_recomp.exe')).hexdigest())
+
+    def test_local_preview_keeps_compile_only_provenance(self):
+        with tempfile.TemporaryDirectory(prefix='launcher-preview-') as directory:
+            root = Path(directory)
+            self._fixture(root)
+            exe = root / 'build/windows/Release/futureperfect_recomp.exe'
+            (root / 'build/windows/compile-only-build.json').write_text(json.dumps({
+                'schema': 1, 'mode': 'compile-only', 'tests_run': False, 'network_sealed': False,
+                'executable_sha256': hashlib.sha256(exe.read_bytes()).hexdigest(),
+                'source_commit': 'abc123', 'source_changes': [], 'skipped': ['tsfp_pc_network_test.exe']}))
+            tag = 'v1.2.3-mapmaker-preview.1'
+            with mock.patch.object(package, 'ROOT', root), \
+                    mock.patch.object(sys, 'argv', ['package-release.py', '--version', tag, '--local-preview']), \
+                    mock.patch.dict(os.environ, {'ProgramFiles': str(root / 'ProgramFiles')}), \
+                    mock.patch.object(package.subprocess, 'run') as build, \
+                    mock.patch.object(package.subprocess, 'check_output', side_effect=lambda args,**kw: b'' if 'ls-files' in args or 'diff' in args else 'test-source\n'), \
+                    mock.patch.object(package, 'bundle', return_value={'test':True}), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                package.main()
+                # No network seal check; the launcher is built without private artwork or its test run.
+                self.assertEqual(build.call_count, 1)
+                self.assertIn(str(root / 'tools/build-launcher.ps1'), build.call_args.args[0])
+                self.assertNotIn('-RequireArtwork', build.call_args.args[0])
+            archive_path = root / f'build/releases/TimeSplitters-Future-Perfect-PC-{tag}-windows-x64.zip'
+            prefix = archive_path.stem + '/'
+            with zipfile.ZipFile(archive_path) as archive:
+                manifest = json.loads(archive.read(prefix + 'BUILD.json'))
+                self.assertIs(manifest['preview']['validated'], False)
+                self.assertEqual(manifest['preview']['build_mode'], 'compile-only')
+                self.assertIs(manifest['preview']['network_sealed'], False)
+                self.assertEqual(manifest['preview']['skipped_checks'], ['tsfp_pc_network_test.exe'])
+                readme = archive.read(prefix + 'README.txt').decode()
+                self.assertTrue(readme.startswith('TEST-ONLY LOCAL PREVIEW'))
+                self.assertIn('https://github.com/JustinDent/timesplitters3-limitless/issues', readme)
+                self.assertFalse(any('/Data/' in name or '/Saves/' in name for name in archive.namelist()))
+            exe.write_bytes(b'different executable')
+            with mock.patch.object(package, 'ROOT', root), \
+                    mock.patch.object(sys, 'argv', ['package-release.py', '--version', tag + '0', '--local-preview']), \
+                    mock.patch.object(package.subprocess, 'run'), \
+                    self.assertRaisesRegex(RuntimeError, 'compile-only-build.json'):
+                package.main()
 
     def test_invalid_release_versions_are_rejected(self):
         for tag in ['main', '../escape', 'v01.2.3', 'v1.2.3-alpha.01']:

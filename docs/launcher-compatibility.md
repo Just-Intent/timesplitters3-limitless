@@ -267,3 +267,20 @@ branch protection. `Launcher compatibility` separately gates both launcher build
 Manual dispatch selects all suites owned by that workflow: dispatch runtime CI
 for full runtime validation and launcher compatibility for both launcher builds.
 These asset-free checks do not launch the game or verify visual/gameplay parity.
+
+## Test-only local release source
+
+To exercise a fresh install without publishing, build a local release folder on
+Windows (`python tools/make-local-release.py [--build-root <checkout>]
+[--with-textures]`; default output `build/local-release/<tag>`). It contains
+`releases.json`, the game runtime ZIP and the launcher ZIP with `.sha256` files,
+`launcher-update.json`, `RELEASE-NOTES.md`, `SHA256SUMS.txt` and
+`Use-local-release-source.cmd`. The game build keeps its compile-only provenance
+(BUILD.json `preview`, README warning) and is a prerelease, so select the
+**Preview** channel. Set `TSFP_LAUNCHER_RELEASE_SOURCE` to that folder (or drag
+`TimeSplitters Launcher.exe` onto the `.cmd`) before starting the launcher; the
+status line then shows `TEST ONLY: local release source`. Unset it to return to
+GitHub. The launcher's release repository is `JustinDent/timesplitters3-limitless`
+(`ReleaseClient.Repository`, `tools/project_repository.py`). The asset-free
+regressions cover the local source; a real fresh install still needs a manual
+run on the target PC.

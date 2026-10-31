@@ -9,7 +9,7 @@ See [Discord setup and configuration](discord-presence.md).
 whole launcher ZIP into a writable installation folder, keeping the application
 `Bin/TimeSplitters.App.exe` and `Support/Launcher/manifest.json` beside it in
 their subfolders. It installs game runtime packages from the
-public `TheDoffman/timesplitters-future-perfect-pc` GitHub Releases page. It never
+public `JustinDent/timesplitters3-limitless` GitHub Releases page. It never
 pulls a branch, builds game code, requests a GitHub login or downloads original
 game data. It reuses `tools/release/ImportGame.cs` for local ISO/folder import.
 For normal installation, download the latest stable launcher and keep the game

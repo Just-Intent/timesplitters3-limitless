@@ -141,6 +141,39 @@ static class LauncherDownloadChecks
             }finally{ui.Window.Close();}
         }}));
         Test("recovery actions retry and open embedded repair while busy state disables retry",()=>STA(()=>{using(var f=new Fixture()){var ui=new LauncherWindow(f.Root,true);try{int retried=0;var show=typeof(LauncherWindow).GetMethod("ShowRecovery",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance);show.Invoke(ui,new object[]{new IOException("network"),new Func<Task>(()=>{retried++;return Task.FromResult(0);}),true});var retry=(System.Windows.Controls.Button)ui.Window.FindName("RetryButton");retry.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));Need(retried==1);((System.Windows.Controls.Button)ui.Window.FindName("RecoveryRepairButton")).RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));Need(((System.Windows.Controls.ContentControl)ui.Window.FindName("MaintenanceHost")).Visibility==System.Windows.Visibility.Visible);typeof(LauncherWindow).GetField("busy",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).SetValue(ui,true);typeof(LauncherWindow).GetMethod("Refresh",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).Invoke(ui,null);Need(!retry.IsEnabled);}finally{typeof(LauncherWindow).GetField("busy",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).SetValue(ui,false);ui.Window.Close();}}}));
+        Test("test-only local release source serves GitHub URLs and keeps checksum verification",()=>{using(var f=new Fixture()){
+            string previous=Environment.GetEnvironmentVariable(LocalReleaseSource.Variable);
+            try{
+                Environment.SetEnvironmentVariable(LocalReleaseSource.Variable,null);
+                Need(!LocalReleaseSource.Active && LocalReleaseSource.FromEnvironment()==null && LocalReleaseSource.Decorate("Ready.")=="Ready.");
+                string tag="v9.8.7-p.1",name="TimeSplitters-Future-Perfect-PC-"+tag+"-windows-x64.zip",source=Path.Combine(temp,"s q");
+                Directory.CreateDirectory(Path.Combine(source,tag));File.WriteAllBytes(Path.Combine(source,tag,name),f.Bytes);
+                string url="https://github.com/"+ReleaseClient.Repository+"/releases/download/"+tag+"/"+name;
+                File.WriteAllText(Path.Combine(source,"releases.json"),Json.Encode(new[]{new{tag_name=tag,name="preview",body="notes",draft=false,prerelease=true,published_at="2026-10-31T00:00:00Z",
+                    assets=new[]{new{name=name,state="uploaded",size=f.Bytes.Length,digest="sha256:"+Hash(f.Bytes),browser_download_url=url}}}}));
+                Environment.SetEnvironmentVariable(LocalReleaseSource.Variable,"\""+source+"\"");
+                Need(LocalReleaseSource.Active && LocalReleaseSource.Decorate("Ready.").StartsWith("[TEST ONLY: local release source "+source,StringComparison.Ordinal));
+                using(var client=new ReleaseClient()){
+                    Need(client.Check(false,CancellationToken.None).GetAwaiter().GetResult()==null);
+                    var item=client.Check(true,CancellationToken.None).GetAwaiter().GetResult();
+                    Need(item!=null && item.Tag==tag && item.AssetUrl==url && item.IsPreview);
+                    Need(client.FindGame(tag,CancellationToken.None).GetAwaiter().GetResult().Tag==tag);
+                    client.Download(item,f.Dest,null,CancellationToken.None,f.Prefix).GetAwaiter().GetResult();f.Complete();
+                    File.Delete(f.Dest);DownloadTransfer.Forget(f.Prefix);
+                    var damaged=(byte[])f.Bytes.Clone();damaged[0]^=1;File.WriteAllBytes(Path.Combine(source,tag,name),damaged);
+                    Reject(()=>client.Download(item,f.Dest,null,CancellationToken.None,f.Prefix).GetAwaiter().GetResult());Need(!File.Exists(f.Dest));
+                }
+                var local=new LocalReleaseSource(source);
+                using(var ranged=new HttpRequestMessage(HttpMethod.Get,url)){ranged.Headers.Range=new RangeHeaderValue(10,null);var reply=local.Answer(ranged);
+                    Need(reply.StatusCode==HttpStatusCode.PartialContent && reply.Content.Headers.ContentRange.From==10 && reply.Content.Headers.ContentLength==f.Bytes.Length-10);reply.Dispose();}
+                foreach(string other in new[]{"https://example.com/"+name,"http://github.com/"+ReleaseClient.Repository+"/releases/download/"+tag+"/"+name,
+                    "https://github.com/"+ReleaseClient.UpstreamRepository+"/releases/download/"+tag+"/"+name,"https://api.github.com/repos/"+ReleaseClient.Repository+"/pulls"})
+                    using(var request=new HttpRequestMessage(HttpMethod.Get,other))Need(local.Answer(request).StatusCode==HttpStatusCode.NotFound);
+                foreach(string escape in new[]{"..%2F..%2Freleases.json","..%5Creleases.json","..","%2E%2E"})
+                    using(var request=new HttpRequestMessage(HttpMethod.Get,"https://github.com/"+ReleaseClient.Repository+"/releases/download/"+tag+"/"+escape)){
+                        bool refused=false;try{refused=local.Answer(request).StatusCode==HttpStatusCode.NotFound;}catch(InvalidDataException){refused=true;}Need(refused);}
+            }finally{Environment.SetEnvironmentVariable(LocalReleaseSource.Variable,previous);if(Directory.Exists(Path.Combine(temp,"s q")))Directory.Delete(Path.Combine(temp,"s q"),true);}
+        }});
         Console.WriteLine("PASS: "+count+" isolated download and recovery checks.");return 0;
     }finally{Need(Path.GetDirectoryName(temp)==Path.GetDirectoryName(typeof(LauncherDownloadChecks).Assembly.Location));Directory.Delete(temp,true);}}
 }
