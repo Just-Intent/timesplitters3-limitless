@@ -139,7 +139,9 @@ int main(void)
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     WORD_AT(ED+0x2f34)=(uint32_t)-1;WORD_AT(ED+0x306c)=0;
     WORD_AT(0x00762CB8u)=400;                                          /* > 300, < 600 */
-    WORD_AT(ED+0x278)=90u*10000u+1000u;                               /* placed + held memory */
+    /* Placed + held memory as the wrapped originals report it: with the limits
+     * on and no TSFP_MAPMAKER_MEMORY_SCALE the budget scale is 8. */
+    WORD_AT(ED+0x278)=(90u*10000u+1000u)/8u;
     WORD_AT(ED+0x25c)=0;
 
     stock_categories();
@@ -153,9 +155,9 @@ int main(void)
     WORD_AT(ED+0x25c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u) && (WORD_AT(ED+0x25c)&2u));  /* allowed; other flags kept */
-    /* meter: max(900/4800, 900/9984, 2700/8800, 400/600, 90/241, 0, 900000/2048000) */
+    /* meter: max(900/4800, 900/9984, 2700/8800, 400/600, 90/241, 0, 112500/2048000) */
     CHECK(NEAR(FLOAT_AT(ED+0x270),400.f/600.f));
-    /* held preview: max(2/4800, 9/9984, 20/8800, 1/241, 0, 1000/2048000) */
+    /* held preview: max(2/4800, 9/9984, 20/8800, 1/241, 0, 125/2048000) */
     CHECK(NEAR(FLOAT_AT(ED+0x274),1.f/241.f));
 
     WORD_AT(0x00762CB8u)=601;                                          /* groups over 600 */
@@ -177,7 +179,7 @@ int main(void)
     WORD_AT(ED+0x278)=2048001u;                                        /* memory over budget */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
-    WORD_AT(ED+0x278)=90u*10000u+1000u;
+    WORD_AT(ED+0x278)=(90u*10000u+1000u)/8u;
     /* Items do not cost cover pads (measured in play): 150 items with tile cover 909. */
     WORD_AT(ED+0x306c)=150u<<16;
     pc_display_mapmaker_limits(fake_limits);

@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,940 @@
+@@ -844,6 +844,1017 @@
      sub_002FA720_gen();
  #endif
  }
@@ -936,6 +936,83 @@
 +    else sub_00334770_gen();
 +#else
 +    sub_00334770_gen();
++#endif
++}
++
++extern void sub_00352DF0_gen(void);
++void sub_00352DF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bugfix","pc_mapmaker_bugfix_net_fragment")) pc_mapmaker_bugfix_net_fragment(sub_00352DF0_gen);
++    else sub_00352DF0_gen();
++#else
++    sub_00352DF0_gen();
++#endif
++}
++
++extern void sub_003596F0_gen(void);
++void sub_003596F0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bugfix","pc_mapmaker_bugfix_turret_sync")) pc_mapmaker_bugfix_turret_sync(sub_003596F0_gen);
++    else sub_003596F0_gen();
++#else
++    sub_003596F0_gen();
++#endif
++}
++
++extern void sub_00357D70_gen(void);
++void sub_00357D70(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bugfix","pc_mapmaker_bugfix_net_death")) pc_mapmaker_bugfix_net_death(sub_00357D70_gen);
++    else sub_00357D70_gen();
++#else
++    sub_00357D70_gen();
++#endif
++}
++
++extern void sub_002B0320_gen(void);
++void sub_002B0320(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bugfix","pc_mapmaker_bugfix_bot_goal")) pc_mapmaker_bugfix_bot_goal(sub_002B0320_gen);
++    else sub_002B0320_gen();
++#else
++    sub_002B0320_gen();
++#endif
++}
++
++extern void sub_00349E40_gen(void);
++void sub_00349E40(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bugfix","pc_mapmaker_bugfix_hud")) pc_mapmaker_bugfix_hud(sub_00349E40_gen);
++    else sub_00349E40_gen();
++#else
++    sub_00349E40_gen();
++#endif
++}
++
++extern void sub_00349970_gen(void);
++void sub_00349970(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bugfix","pc_mapmaker_bugfix_hud_turret")) pc_mapmaker_bugfix_hud_turret(sub_00349970_gen);
++    else sub_00349970_gen();
++#else
++    sub_00349970_gen();
++#endif
++}
++
++extern void sub_0006D7A0_gen(void);
++void sub_0006D7A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bugfix","pc_mapmaker_validate_level")) pc_mapmaker_validate_level(sub_0006D7A0_gen);
++    else sub_0006D7A0_gen();
++#else
++    sub_0006D7A0_gen();
 +#endif
 +}
  

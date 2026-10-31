@@ -24,6 +24,8 @@ void sub_0031BB60(void) { g_ecx=2; }
 void sub_0003D7B0(void) { g_ecx=3; }
 void sub_0007A270(void) { g_ecx=4; }
 void sub_003C85D4(void) { g_ecx=5; }
+void sub_00333700(void) { g_ecx=7; }  /* tile pad counts for pc_mapmaker_validate.inc (0 here) */
+void sub_002FDF50(void) { g_ecx=8; }
 static int has_room=1, adds, messages;
 static uint32_t last_text, last_sprintf_value, last_message_text;
 static uint32_t guest_call(void (*f)(void),int n,...)
@@ -46,6 +48,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 }
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
+#include "pc_mapmaker_validate.inc"
 #include "pc_mapmaker_editor.inc"
 
 static int failures, esp_errors;
@@ -199,14 +202,22 @@ int main(void)
     end=put_chunks(c+8u,0x00C7766Cu,10,0x50u);WORD_AT(end)=0x00C7766Au;
     HOOK(pc_mapmaker_editor_load,count_chunks);
     CHECK(seen_by_original[1]==10 && hidden_by_original==0);
-    /* malformed (a chunk size past the scan bound): nothing hidden */
+    /* malformed (a chunk size past the scan bound): refused by the validator
+     * the stock way (magic cleared, original called once), nothing hidden */
     end=put_chunks(c+8u,0x00C7766Cu,300,0x50u);
     WORD_AT(end)=0x00C7766Cu;WORD_AT(end+4)=0x7FFFFFF0u;
     original_calls=0;
     HOOK(pc_mapmaker_editor_load,count_chunks);           /* stops at the oversized chunk */
-    CHECK(original_calls==1 && hidden_by_original==0 && seen_by_original[1]==300);
-    WORD_AT(end)=0x00C7766Au;
+    CHECK(original_calls==1 && hidden_by_original==0 && seen_by_original[1]==300 && WORD_AT(c)==0);
+    WORD_AT(end)=0x00C7766Au;WORD_AT(c)=0x00C77667u;
     CHECK(count_tag(c+8u,0)==0 && count_tag(c+8u,0x00C7766Cu)==300);
+    /* a chunk the validator refuses (patrol count 9): no hiding either */
+    end=put_chunks(c+8u,0x00C7766Cu,300,0x50u);WORD_AT(end)=0x00C7766Au;
+    WORD_AT(c+8u+20u*0x58u+8u+0x2Cu)=9u;
+    original_calls=0;
+    HOOK(pc_mapmaker_editor_load,count_chunks);
+    CHECK(original_calls==1 && hidden_by_original==0 && WORD_AT(c)==0);
+    WORD_AT(c+8u+20u*0x58u+8u+0x2Cu)=0;WORD_AT(c)=0x00C77667u;
     /* wrong header: original only */
     WORD_AT(c)=0;original_calls=0;
     HOOK(pc_mapmaker_editor_load,fake_original_sai);
@@ -223,6 +234,12 @@ int main(void)
     HOOK(pc_mapmaker_editor_level_load,count_chunks);
     CHECK(seen_by_original[1]==1024 && seen_by_original[2]==600 && hidden_by_original==76);
     CHECK(count_tag(c+8u,0x00C7766Cu)==1100 && count_tag(c+8u,0)==0);
+    /* malformed walk at level start: nothing hidden */
+    end=put_chunks(c+8u,0x00C7766Cu,1100,0x50u);
+    WORD_AT(end)=0x00C7766Cu;WORD_AT(end+4)=0x7FFFFFF0u;
+    HOOK(pc_mapmaker_editor_level_load,count_chunks);
+    CHECK(hidden_by_original==0 && seen_by_original[1]==1100);
+    WORD_AT(end)=0x00C7766Au;
 
     /* ---- logic limits ---- */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);

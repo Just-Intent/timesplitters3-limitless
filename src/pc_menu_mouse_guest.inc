@@ -48,12 +48,14 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_pads.inc"
 #include "pc_mapmaker_container.inc"
 #include "pc_mapmaker_objects.inc"
+#include "pc_mapmaker_validate.inc"
 #include "pc_mapmaker_editor.inc"
 #include "pc_mapmaker_rooms.inc"
 #include "pc_mapmaker_actors.inc"
 #include "pc_mapmaker_story_character.inc"
 #include "pc_mapmaker_aitemplates.inc"
 #include "pc_mapmaker_grid.inc"
+#include "pc_mapmaker_bugfix.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
@@ -702,6 +704,13 @@ void pc_mapmaker_grid_floor_bar(void (*original)(void)) { original(); }
 void pc_mapmaker_overlap_cell(void (*original)(void)) { original(); }
 void pc_mapmaker_stack_find(void (*original)(void)) { original(); }
 void pc_mapmaker_stack_cell(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_net_fragment(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_turret_sync(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_net_death(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_bot_goal(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_hud_turret(void (*original)(void)) { original(); }
+void pc_mapmaker_validate_level(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
