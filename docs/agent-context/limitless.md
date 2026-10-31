@@ -324,6 +324,17 @@ read-only `TSFP_MAPMAKER_CREATURE_PROBE=1` (log
 resource slots per level and every new live character's id, AI class,
 record, model and skeleton. Not yet built or played.
 
+Custom character set (area `characters`, `src/interface/pc_mapmaker_characters.inc`,
+`docs/mapmaker/mapmaker-characters.md`, `TSFP_MAPMAKER_LIMITS=1`): the Map
+Settings picker `sub_002C1EA0` (descriptor 0x0052374C) adds an Arcade-table
+row (0x00521A18, 150 x 0x30) only if `sub_001CD980` says unlocked; there is no
+size or category filter. WRAP `sub_001CD980` answers 1 for rows with rule type
+1..8 only for return 0x002C1F35 in scene 102 (other callers stock). WRAP
+`sub_000D7780` logs (never skips) set members without an Arcade row or model
+resource slot at the scene 100 set preload (returns 0x0023F33F/0x0023F37F).
+No save change (chunk 0xC77668 +0x18 word id, +0x1B variant). Not yet built
+or played.
+
 ### MapMaker and System Link bug fixes
 
 Area `bugfix` (`src/interface/pc_mapmaker_bugfix.inc`, `src/interface/pc_mapmaker_validate.inc`,

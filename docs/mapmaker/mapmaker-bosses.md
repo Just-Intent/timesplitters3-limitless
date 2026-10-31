@@ -151,9 +151,9 @@ snapshot after the click, so bosses goes outside. Include the `.inc` after
   the story level paks, and MapMaker hard-codes the AI class. The probe run
   decides the next step.
 - Part C (every Arcade-roster character in MapMaker character sets
-  regardless of unlocks) was skipped: the custom-set picker was not found
-  quickly (`sub_001CD980`, the unlocked-roster builder, has no editor
-  caller).
+  regardless of unlocks) is done separately in
+  [characters](mapmaker-characters.md): the picker is `sub_002C1EA0`, whose
+  only filter is `sub_001CD980` (call 0x002C1F30).
 - The range unit is the game's world unit (INFERRED close to a metre).
 - The label text and bar position are the stock story bar's; no split-screen
   player 2 bar in story split screen (stock behaviour).
