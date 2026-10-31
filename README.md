@@ -46,9 +46,9 @@ This fork adds:
 
 - Development builds are compile-only Windows builds tested by the maintainer
   on a separate Windows 11 PC. The combined capacity play test is recorded in
-  [STATUS.md](STATUS.md) (2026-10-30). Several newer features have only
-  automated fixture tests so far; the [MapMaker Limitless table](#mapmaker-limitless)
-  marks each one.
+  [STATUS.md](STATUS.md) (2026-10-30), and the newer features checked in game on 2026-10-31 are
+  listed there too. The rest have automated fixture tests only; the
+  [MapMaker Limitless table](#mapmaker-limitless) marks each one.
 - No fork release has been published. The download buttons point to this
   fork's [releases page](https://github.com/JustinDent/timesplitters3-limitless/releases),
   which stays empty until a release is made.
@@ -81,8 +81,8 @@ $env:TSFP_MAPMAKER_STACK_ITEMS = '1'   # optional
 | Switch | Default | Effect | Status |
 | --- | --- | --- | --- |
 | `TSFP_MAPMAKER_LIMITS=1` | Off | Raised editor limits: 241 tiles, 200 items, 255 Story AI, x4 keycards, movers and props, more turrets, teleporters, logic and free-standing objects, 512 KB maps and an x8 memory budget. The larger play-time capacity behind them (for example 64 characters alive in a local MapMaker Story map) is always present. Also turns on seven floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, and the Clouds checkbox. | Capacity play-tested on Windows (236 tiles, 200 items, 102+ Story AI, 64 characters; see [STATUS.md](STATUS.md)). Story AI duplicates and linked copies: reported working by the maintainer. Grid, Story character and Clouds: fixture-tested, no recorded play test yet. |
-| `TSFP_MAPMAKER_OVERLAP=1` | Off | Tiles may be placed over other tiles. Overlapping maps can show visual and pathing artefacts by design. | Fixture-tested |
-| `TSFP_MAPMAKER_STACK_ITEMS=1` | Off | Several pickups or props in one grid cell. Stacked items spawn on the same spot. | Reported working by the maintainer |
+| `TSFP_MAPMAKER_OVERLAP=1` | Off | Tiles may be placed over other tiles. Overlapping maps can show visual and pathing artefacts by design. | Checked in game (2026-10-31) |
+| `TSFP_MAPMAKER_STACK_ITEMS=1` | Off | Several pickups or props in one grid cell. Stacked items spawn on the same spot. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_MEMORY_SCALE=2..8` | 8 with `LIMITS`, otherwise off | Divides the editor's play-time memory estimate. | Part of the capacity play test |
 | `TSFP_MAPMAKER_ALIVE=1..64` | 64 | Lowers the number of characters alive at once (20 = original) for slower PCs. | Fixture-tested |
 | `TSFP_MAPMAKER_POINTER=0` | Mouse on | Turns off the MapMaker editor mouse controls. | Editor mouse checked in game |

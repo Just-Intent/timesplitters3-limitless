@@ -1,3 +1,26 @@
+## MapMaker features: in-game checks (2026-10-31)
+
+Branch `mapmaker-recon`, compile-only builds run by the user on the second
+Windows 11 PC with `TSFP_MAPMAKER_LIMITS=1` (switches via the transfer
+folder's `Run-Test.ps1`).
+
+- Build c1a94e23 (source 35c28c9c): clicking a map in MapMaker > Load map
+  loads it; every unlocked character is offered in MapMaker Story;
+  overlapping tiles work with `TSFP_MAPMAKER_OVERLAP=1`; seven floors and the
+  80x80 grid work; Story AI Duplicate works; mouse aim on the Scotland the
+  Brave truck gun works. Stacked items still showed the red X (fixed in the
+  next build); the character screen could not confirm by click (fixed next);
+  linked copies made an extra "All X" entry (redesigned next). No crash
+  (the two crash dumps in that log folder came from an older build).
+- Build 64042eae (source df56a044): the character screen confirms with a
+  left click anywhere; stacked items drop onto an occupied tile with
+  `TSFP_MAPMAKER_STACK_ITEMS=1`; linked copies (leader plus numbered copies)
+  work; `TSFP_MAPMAKER_ROOM_MASK_CLEAR=2000000` removes tile roofs in play,
+  confirming room-mask bit 25 as the ceiling.
+
+Not yet checked in game: the Clouds checkbox, System Link with the bug
+fixes, `TSFP_MAPMAKER_ALIVE`, splitscreen, native Mac.
+
 ## MapMaker capacity raise: combined play test (2026-10-30)
 
 Branch `mapmaker-recon`, compile-only build 97f4ad5a (source commit; exe
