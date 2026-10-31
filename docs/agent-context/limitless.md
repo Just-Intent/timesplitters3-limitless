@@ -446,10 +446,9 @@ Tests: `tests/compiler/test_guest_code_patches.py`, `tests/compiler/test_recomp_
 
 Where an upstream patch already defines a guest wrapper (today `sub_000A5CE0`, wrapped by
 `patches/gameplay/timing/0460-native-wind-history.patch`), the generated MapMaker chain is
-exported as `sub_<addr>_mapmaker` and
-`patches/graphics/interface/zzz…-mapmaker-meter-wrappers-chain.patch` makes the upstream
-wrapper call it (upstream outermost, MapMaker inside, original innermost). Add new
-collisions to the generator's `CHAIN_ONTO` set and to the chain patch.
+exported as `sub_<addr>_mapmaker` (generator `CHAIN_ONTO` set) and the upstream policy
+function calls it instead of `original` (`src/gameplay/pc_native_wind_guest.inc`): upstream
+outermost, MapMaker inside, original innermost.
 
 ## Build and test (extends [build-test.md](build-test.md))
 
