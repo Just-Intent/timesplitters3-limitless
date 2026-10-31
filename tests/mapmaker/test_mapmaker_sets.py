@@ -99,7 +99,7 @@ def test_no_guest_code_table_and_over_stock():
     """Wrappers only; the container's over-stock check knows the fork tag."""
     assert not (ROOT / 'config/guest-code-patches/sets.json').exists()
     container = (ROOT / 'src/interface/pc_mapmaker_container.inc').read_text(encoding='utf-8')
-    assert 'if(tag==0x00C776F5u) return 1;' in container
+    assert 'if(tag==0x00C776F5u ||' in container
     assert '#define SETS_TAG 0x00C776F5u' in INC.read_text(encoding='utf-8')
 
 

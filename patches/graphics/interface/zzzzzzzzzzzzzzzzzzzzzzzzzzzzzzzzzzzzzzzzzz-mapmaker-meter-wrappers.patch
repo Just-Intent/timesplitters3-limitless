@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,1789 @@
+@@ -1037,6 +1037,1982 @@
      sub_002FA720_gen();
  #endif
  }
@@ -190,13 +190,23 @@
 +#endif
 +}
 +
-+void sub_003006C0(void)
++static void sub_003006C0_layer5(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_compile")) pc_mapmaker_sets_compile(sub_003006C0_layer4);
 +    else sub_003006C0_layer4();
 +#else
 +    sub_003006C0_layer4();
++#endif
++}
++
++void sub_003006C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_compile")) pc_mapmaker_weaponset_compile(sub_003006C0_layer5);
++    else sub_003006C0_layer5();
++#else
++    sub_003006C0_layer5();
 +#endif
 +}
 +
@@ -373,13 +383,23 @@
 +#endif
 +}
 +
-+void sub_00301A90(void)
++static void sub_00301A90_layer4(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_load")) pc_mapmaker_sets_load(sub_00301A90_layer3);
 +    else sub_00301A90_layer3();
 +#else
 +    sub_00301A90_layer3();
++#endif
++}
++
++void sub_00301A90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_load")) pc_mapmaker_weaponset_load(sub_00301A90_layer4);
++    else sub_00301A90_layer4();
++#else
++    sub_00301A90_layer4();
 +#endif
 +}
 +
@@ -1254,13 +1274,23 @@
 +#endif
 +}
 +
-+void sub_002FEBF0(void)
++static void sub_002FEBF0_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_reset")) pc_mapmaker_sets_reset(sub_002FEBF0_layer2);
 +    else sub_002FEBF0_layer2();
 +#else
 +    sub_002FEBF0_layer2();
++#endif
++}
++
++void sub_002FEBF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_reset")) pc_mapmaker_weaponset_reset(sub_002FEBF0_layer3);
++    else sub_002FEBF0_layer3();
++#else
++    sub_002FEBF0_layer3();
 +#endif
 +}
 +
@@ -1418,13 +1448,23 @@
 +#endif
 +}
 +
-+void sub_0003D7B0(void)
++static void sub_0003D7B0_layer1(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_text")) pc_mapmaker_realbosses_text(sub_0003D7B0_layer0);
 +    else sub_0003D7B0_layer0();
 +#else
 +    sub_0003D7B0_layer0();
++#endif
++}
++
++void sub_0003D7B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_title")) pc_mapmaker_weaponset_title(sub_0003D7B0_layer1);
++    else sub_0003D7B0_layer1();
++#else
++    sub_0003D7B0_layer1();
 +#endif
 +}
 +
@@ -1581,13 +1621,23 @@
 +#endif
 +}
 +
-+void sub_00078590(void)
++static void sub_00078590_layer1(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_sai_choice")) pc_mapmaker_sets_sai_choice(sub_00078590_layer0);
 +    else sub_00078590_layer0();
 +#else
 +    sub_00078590_layer0();
++#endif
++}
++
++void sub_00078590(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_sai_choice")) pc_mapmaker_weaponset_sai_choice(sub_00078590_layer1);
++    else sub_00078590_layer1();
++#else
++    sub_00078590_layer1();
 +#endif
 +}
 +
@@ -1752,6 +1802,149 @@
 +    else sub_002BFFD0_gen();
 +#else
 +    sub_002BFFD0_gen();
++#endif
++}
++
++extern void sub_00312880_gen(void);
++void sub_00312880(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_changed")) pc_mapmaker_weaponset_changed(sub_00312880_gen);
++    else sub_00312880_gen();
++#else
++    sub_00312880_gen();
++#endif
++}
++
++extern void sub_00316D80_gen(void);
++void sub_00316D80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_held")) pc_mapmaker_weaponset_held(sub_00316D80_gen);
++    else sub_00316D80_gen();
++#else
++    sub_00316D80_gen();
++#endif
++}
++
++extern void sub_002D4220_gen(void);
++void sub_002D4220(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_build")) pc_mapmaker_weaponset_build(sub_002D4220_gen);
++    else sub_002D4220_gen();
++#else
++    sub_002D4220_gen();
++#endif
++}
++
++extern void sub_002D40A0_gen(void);
++void sub_002D40A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_screen")) pc_mapmaker_weaponset_screen(sub_002D40A0_gen);
++    else sub_002D40A0_gen();
++#else
++    sub_002D40A0_gen();
++#endif
++}
++
++extern void sub_002D3B00_gen(void);
++void sub_002D3B00(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_get")) pc_mapmaker_weaponset_get(sub_002D3B00_gen);
++    else sub_002D3B00_gen();
++#else
++    sub_002D3B00_gen();
++#endif
++}
++
++extern void sub_00312AE0_gen(void);
++void sub_00312AE0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_set")) pc_mapmaker_weaponset_set(sub_00312AE0_gen);
++    else sub_00312AE0_gen();
++#else
++    sub_00312AE0_gen();
++#endif
++}
++
++extern void sub_000783D0_gen(void);
++void sub_000783D0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_options")) pc_mapmaker_weaponset_options(sub_000783D0_gen);
++    else sub_000783D0_gen();
++#else
++    sub_000783D0_gen();
++#endif
++}
++
++extern void sub_0006BD30_gen(void);
++void sub_0006BD30(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_play_set")) pc_mapmaker_weaponset_play_set(sub_0006BD30_gen);
++    else sub_0006BD30_gen();
++#else
++    sub_0006BD30_gen();
++#endif
++}
++
++extern void sub_0033E6C0_gen(void);
++void sub_0033E6C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_slot")) pc_mapmaker_weaponset_slot(sub_0033E6C0_gen);
++    else sub_0033E6C0_gen();
++#else
++    sub_0033E6C0_gen();
++#endif
++}
++
++extern void sub_0033E780_gen(void);
++void sub_0033E780(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_weapon_veto")) pc_mapmaker_weaponset_weapon_veto(sub_0033E780_gen);
++    else sub_0033E780_gen();
++#else
++    sub_0033E780_gen();
++#endif
++}
++
++extern void sub_0033E7B0_gen(void);
++void sub_0033E7B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_ammo_veto")) pc_mapmaker_weaponset_ammo_veto(sub_0033E7B0_gen);
++    else sub_0033E7B0_gen();
++#else
++    sub_0033E7B0_gen();
++#endif
++}
++
++extern void sub_0033E3B0_gen(void);
++void sub_0033E3B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_pickup")) pc_mapmaker_weaponset_pickup(sub_0033E3B0_gen);
++    else sub_0033E3B0_gen();
++#else
++    sub_0033E3B0_gen();
++#endif
++}
++
++extern void sub_0023F390_gen(void);
++void sub_0023F390(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_preload")) pc_mapmaker_weaponset_preload(sub_0023F390_gen);
++    else sub_0023F390_gen();
++#else
++    sub_0023F390_gen();
 +#endif
 +}
 +

@@ -1,3 +1,10 @@
+## MapMaker lighting list right-click: in-game check (2026-10-31)
+
+Local preview v0.4.0-mapmaker.9 (exe SHA-256 prefix dc2e0e9f) on the second Windows 11 PC: a right click
+closes the open editor lighting list, as for the other lists (user-confirmed). Found: Story AI character
+choice shows no name and a time-crystal icon for custom-set slots 11-20; the giant trophy monster shows
+its boss bar with Boss set to Off.
+
 ## MapMaker open-air tiles and trophy monster meter: in-game checks (2026-10-31)
 
 Launcher-installed local preview v0.4.0-mapmaker.7 (exe SHA-256 prefix 5c3a356b, source f5ff50de) on the
