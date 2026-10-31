@@ -40,7 +40,22 @@
  *   the same way, sub_00337600) the marks are put back on the matching
  *   pieces. The editor piece pool is 0x48-byte records from one constructor
  *   (sub_00307FD0, callers 0x003021C1 loader and 0x0031658E palette), which
- *   forgets a reused pointer.
+ *   forgets a reused pointer;
+ * - the mark follows the piece when the editor copies it: placing the held
+ *   piece (sub_003037A0) and picking up a placed one (0x002F9A3E..0x002F9CC7)
+ *   allocate a new piece (sub_00307EC0) and `rep movsd` the 0x48 bytes, then
+ *   call sub_002F95E0(old, new) for a move or sub_00308120(src, dst) for a
+ *   copy; both pass the mark on. sub_00308480 (free one piece; sub_00308560
+ *   frees a held list through it) forgets it. Before this, only the held
+ *   piece was marked and every placed tile was a plain tile 8;
+ * - the palette caption (0x0032E5CF, tile [palette+0x90]) and the selected
+ *   piece's name (sub_00317C40, 0x00317C5B) read the tile name text
+ *   (catalogue +8, tile 8 = 0x0A3F "Small Open") through sub_0003D7B0; for an
+ *   open entry/piece the hook returns "Small Open (No Roof)" / "Small Open
+ *   (Open Air)" instead (the stock names use suffixes such as "S" and
+ *   "Alt.", no numbers).
+ * Play reads record +8 unchanged (sub_0008A780 0x0008A91D); it never
+ * recomputes the mask, so no play-time hook is needed.
  * The saved tile is the ordinary base tile id with the open mask in +8, so the
  * stock game loads and plays it open (no new id: the 45-entry tables
  * 0x00783F40, 0x00785000, 0x00789440 and 0x00785080 + (tileset*45)*64 index
@@ -55,6 +70,9 @@
 #endif
 #ifndef MAPMAKER_STACK_OK
 #define MAPMAKER_STACK_OK(n) MAPMAKER_PTR_OK(g_esp,(n))
+#endif
+#ifndef MAPMAKER_GUEST_RET
+#define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
 #endif
 
 #define MAPMAKER_ROOF_BASE_TILE 8u              /* 1x1, four sides + up (connections 0x00528F48) */
@@ -71,6 +89,11 @@
 #define MAPMAKER_ROOF_SLOTS 2048u               /* > the 1024-piece pool */
 #define MAPMAKER_ROOF_CONTAINER_MAX 0x00080000u
 #define MAPMAKER_ROOF_LIST_STEPS 4096u
+#define MAPMAKER_ROOF_NAME_TEXT 0x0A3Fu         /* catalogue[8] +8 (0x00529F18): "Small Open" */
+#define MAPMAKER_ROOF_RET_CAPTION 0x0032E5D4u   /* palette caption, sub_0003D7B0 at 0x0032E5CF */
+#define MAPMAKER_ROOF_RET_PIECE_NAME 0x00317C60u /* sub_00317C40: name of piece editor +0x2F18 */
+#define MAPMAKER_ROOF_LABEL_BYTES 32u
+static const char mapmaker_roof_names[2][MAPMAKER_ROOF_LABEL_BYTES]={"Small Open (No Roof)","Small Open (Open Air)"};
 
 static struct {
     uint32_t key[MAPMAKER_ROOF_SLOTS];
@@ -81,7 +104,9 @@ static struct {
     int building;
     uint32_t ordinal, first, item[2];
     uint32_t preview_inst, preview_saved, preview_applied;
-    unsigned long long placed, mismatch, unmatched, restored, full, no_list;
+    unsigned preview_mode;         /* open entry highlighted in the palette */
+    uint32_t labels;               /* guest strings, 2 x MAPMAKER_ROOF_LABEL_BYTES */
+    unsigned long long placed, mismatch, unmatched, restored, full, no_list, carried, freed;
 } mapmaker_roof;
 
 static uint32_t mapmaker_roof_clear(unsigned mode)
@@ -161,6 +186,46 @@ void pc_mapmaker_roof_reset(void (*original)(void))
     if(mapmaker_roof.keys) mapmaker_roof_forget_all();
 }
 
+/* The editor copies pieces instead of moving them: placing the held piece
+ * (sub_003037A0: sub_00307EC0, rep movsd 0x12 dwords at 0x0030387C, then
+ * sub_002F95E0(held, new) at 0x0030387E and sub_00308560(held) at
+ * 0x0030398A) and picking up a placed piece (0x002F9A3E/0x002F9BE9/
+ * 0x002F9C8F; sub_002F95E0(placed, held) and sub_00308480(placed) for a
+ * move, sub_00308120(placed, held) for a copy). Both helpers are cdecl with
+ * (source, destination). */
+static void mapmaker_roof_carry(void)
+{
+    uint32_t from,to;
+    unsigned mode;
+    if(!mapmaker_roof.marked || !MAPMAKER_STACK_OK(12u)) return;
+    from=WORD_AT(g_esp+4u);to=WORD_AT(g_esp+8u);
+    if(!from || !to || from==to || !(mode=mapmaker_roof_mode(from))) return;
+    if(mapmaker_roof_mode(to)!=mode) { mapmaker_roof_set(to,mode);mapmaker_roof.carried++; }
+}
+
+/* WRAP sub_002F95E0 (editor: replace references to a piece, old -> new). */
+void pc_mapmaker_roof_move(void (*original)(void))
+{
+    mapmaker_roof_carry();
+    original();
+}
+
+/* WRAP sub_00308120 (editor: copy a piece's item list, src -> dst). */
+void pc_mapmaker_roof_copy(void (*original)(void))
+{
+    mapmaker_roof_carry();
+    original();
+}
+
+/* WRAP sub_00308480 (editor: free one piece; its pointer goes back to the
+ * pool [0x00762CC4] that sub_00307EC0 and sub_00307FD0 allocate from). */
+void pc_mapmaker_roof_piece_free(void (*original)(void))
+{
+    uint32_t piece=mapmaker_roof.marked && MAPMAKER_STACK_OK(8u)?WORD_AT(g_esp+4u):0u;
+    original();
+    if(piece && mapmaker_roof_mode(piece)) { mapmaker_roof_set(piece,0);mapmaker_roof.freed++; }
+}
+
 /* Piece records of a container: calls fn(record) in order; returns the count
  * or -1 for a malformed chunk. */
 static int mapmaker_roof_records(uint32_t c,int (*fn)(uint32_t record,void *ctx),void *ctx)
@@ -202,12 +267,16 @@ static int mapmaker_roof_store(uint32_t record,void *ctx)
 
 /* WRAP sub_003006C0 (rebuild: container, mode). The writer emits one record
  * per editor piece in list order ([0x0078400C], next +0x40, 0x00300B88..
- * 0x0030116E). */
+ * 0x0030116E). Marks exist only for editor pieces, so any scene that
+ * rebuilds the editor's map (the editor itself, or the hand-over to a test
+ * play) stores them. */
 void pc_mapmaker_roof_compile(void (*original)(void))
 {
     uint32_t c=MAPMAKER_STACK_OK(8u)?WORD_AT(g_esp+4u):0u,piece;
     original();
-    if(!c || !mapmaker_roof.marked || !mapmaker_roof_editor()) return;
+    if(!c || !mapmaker_roof.marked) return;
+    mapmaker_limits_read();
+    if(!mapmaker_limits.limits) return;
     piece=WORD_AT(0x0078400Cu);
     mapmaker_roof_records(c,mapmaker_roof_store,&piece);
 }
@@ -261,10 +330,17 @@ void pc_mapmaker_roof_menu_init(void (*original)(void))
         original();
         return;
     }
+    if(!mapmaker_roof.labels) {
+        uint32_t p=xbox_HeapAlloc(2u*MAPMAKER_ROOF_LABEL_BYTES,4u);
+        if(p && MAPMAKER_PTR_OK(p,2u*MAPMAKER_ROOF_LABEL_BYTES)) {
+            memcpy((void *)((uintptr_t)p+g_xbox_mem_offset),mapmaker_roof_names,sizeof mapmaker_roof_names);
+            mapmaker_roof.labels=p;
+        } else if(mapmaker_roof.no_list++<4u) fprintf(stderr,"[mapmaker] roof: no memory for the tile names; they show as Small Open\n");
+    }
     for(i=0;i<count;i++) WORD_AT(mapmaker_roof.list+i*4u)=WORD_AT(list+i*4u);
     WORD_AT(mapmaker_roof.list+count*4u)=MAPMAKER_ROOF_BASE_TILE;
     WORD_AT(mapmaker_roof.list+count*4u+4u)=MAPMAKER_ROOF_BASE_TILE;
-    mapmaker_roof.item[0]=mapmaker_roof.item[1]=0;
+    mapmaker_roof.item[0]=mapmaker_roof.item[1]=0;mapmaker_roof.preview_mode=0;
     mapmaker_roof.ordinal=0;mapmaker_roof.first=before+count;mapmaker_roof.building=1;
     WORD_AT(last+4u)=mapmaker_roof.list;WORD_AT(last+8u)=count+2u;
     original();
@@ -305,6 +381,7 @@ void pc_mapmaker_roof_menu_hover(void (*original)(void))
     original();
     if(!menu || !(mapmaker_roof.item[0]|mapmaker_roof.item[1]) || !mapmaker_roof_editor()) return;
     mode=mapmaker_roof_item_mode(menu);
+    mapmaker_roof.preview_mode=mode;
     if(!mode) {
         mapmaker_roof_preview_restore();
         mapmaker_roof.preview_inst=0;
@@ -341,6 +418,24 @@ void pc_mapmaker_roof_menu_pick(void (*original)(void))
     mapmaker_roof_set(piece,mode);
     if(mapmaker_roof.placed++<4u)
         fprintf(stderr,"[mapmaker] roof: %s tile picked\n",mode==MAPMAKER_ROOF_OPEN_AIR?"open air":"open roof");
+}
+
+/* WRAP sub_0003D7B0 (text id -> string, cdecl, one argument). Runs for
+ * every text lookup: without names or for any other id it is one compare.
+ * Only the tile 8 name, and only for the palette caption of a highlighted
+ * open entry or the name of a selected open piece. */
+void pc_mapmaker_roof_text(void (*original)(void))
+{
+    uint32_t ret,piece,editor;
+    unsigned mode=0;
+    if(!mapmaker_roof.labels || !MAPMAKER_STACK_OK(8u) || WORD_AT(g_esp+4u)!=MAPMAKER_ROOF_NAME_TEXT) { original();return; }
+    ret=WORD_AT(g_esp);
+    if(ret==MAPMAKER_ROOF_RET_CAPTION) mode=mapmaker_roof.preview_mode;
+    else if(ret==MAPMAKER_ROOF_RET_PIECE_NAME && MAPMAKER_PTR_OK(editor=WORD_AT(0x007844A8u),0x2F1Cu) &&
+            (piece=WORD_AT(editor+0x2F18u))!=0) mode=mapmaker_roof_mode(piece);
+    if((mode!=MAPMAKER_ROOF_OPEN_ROOF && mode!=MAPMAKER_ROOF_OPEN_AIR) || !mapmaker_roof_editor()) { original();return; }
+    g_eax=mapmaker_roof.labels+(mode-1u)*MAPMAKER_ROOF_LABEL_BYTES;
+    MAPMAKER_GUEST_RET();
 }
 
 #ifdef TSFP_MAPMAKER_ROOF_TEST
