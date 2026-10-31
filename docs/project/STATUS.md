@@ -1,3 +1,11 @@
+## MapMaker open-air tiles and trophy monster meter: in-game checks (2026-10-31)
+
+Launcher-installed local preview v0.4.0-mapmaker.7 (exe SHA-256 prefix 5c3a356b, source f5ff50de) on the
+second Windows 11 PC. Confirmed by the user: Open roof and Open air tiles show the sky in play (Open air
+without walls); the overhead meter on the giant trophy monster is gone. Found: hover label still reads
+"1.Small Open"; after play and return to the editor, copying a marked tile turns all marked tiles plain;
+right-click outside the open lighting list does not close it (other main lists do).
+
 ## MapMaker boss bars and alternate-fire key: in-game checks (2026-10-31)
 
 Launcher-installed local previews v0.4.0-mapmaker.3 to .6 on the second Windows 11 PC. Confirmed by
