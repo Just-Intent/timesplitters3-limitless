@@ -59,6 +59,30 @@
  *   meter in sub_0014F0B0 (0x0014FAE3, player +0x9E0 against the focus's
  *   a+0x28) is a different bar. Out of range, dead (health <= 0) or gone
  *   from the live list: no bar.
+ * - Several bosses: up to BOS_BARS_MAX bars (2 in split screen), nearest
+ *   first, stacked upward from the stock bar position. sub_00139740 places
+ *   its box at the bottom of the viewport: y1 = [[0x007E71C8]+0x18] - the int
+ *   HUD margin [0x007A614C] (0x0013986E..0x001398AB), height 45 x [0x004E68F8]
+ *   x 1, 0.933 or 0.8 (0x00139840..0x0013988C), frame 6 x [0x004E68F8] above
+ *   it (sub_00130400). The hook raises the margin by slot x BOS_BAR_STEP x
+ *   [0x004E68F8] around each call and puts it back (the HUD frame rewrites
+ *   it, 0x0014B084). A stock bar (HUD +8 bit 0 after the original) keeps
+ *   slot 0. The smoothing state +0x171C/+0x1724/+0x172C is swapped per boss
+ *   (BOS_SMOOTH table) and the stock values restored afterwards. Coordinates
+ *   stay guest 640x480, so widescreen keeps them in the 4:3 HUD box.
+ *
+ * Stronger health (same switch). The stock Health row of the edit screen
+ * (text 0xC0D, options 0xC0E..0xC12 = Weakling, Low, Normal, High, Tough Guy,
+ * values 0..4, bound to entry +0x4C by sub_00078590 at 0x0031CFD2) gets four
+ * more options (values 5..8): Brute, Juggernaut, Titan, Colossus = 2, 4, 8,
+ * 16 x Tough Guy. The writer copies +0x4C to chunk +0x30 (0x0030149F); play
+ * maps it through 0x0052E060[v] (sub_0031BA70, 0x00242356; 5 entries) to the
+ * spawn record +0x4E and the scene-100 health table 0x004DACF4 (sub_000B9A30;
+ * Tough Guy 20.0 = index 0). So the compile hook stores 4 (Tough Guy) at +0x30
+ * for 5..8 and the extra level in chunk byte +0x21 (0xA0 | 1..4; never
+ * written or read by stock code, decode check); a stock game reads Tough
+ * Guy. The editor load puts 4 + extra back into +0x4C; in play the HUD hook
+ * multiplies such an AI's health by 2^extra (times the Boss factor).
  *
  * Probe (TSFP_MAPMAKER_CREATURE_PROBE=1, any scene where the HUD runs; log
  * TSFP_MAPMAKER_CREATURE_PROBE_LOG (appended) or stderr). Once per level
@@ -116,6 +140,15 @@
 #define BOS_LEVELS 4u                   /* 1..4: health x1, x2, x4, x8 */
 #define BOS_LEVEL_SLOTS 1024u           /* play-time index bound (= aitemplates) */
 #define BOS_NAME 32u
+#define BOS_HEALTH 0x4Cu                /* entry: Health list value 0..4 (+ ours 5..8) */
+#define BOS_HEALTH_ROW_AT 0x0031CFD7u   /* return from sub_00078590(&entry+0x4C) */
+#define BOS_HEALTH_TOUGH 4u             /* stock maximum: Tough Guy */
+#define BOS_HEALTH_EXTRA 4u             /* 5..8: x2, x4, x8, x16 Tough Guy */
+#define BOS_CHUNK_HEALTH 0x30u          /* writer 0x003014A2 (byte) */
+#define BOS_CHUNK_EXTRA 0x21u           /* 0xA0 | extra level */
+#define BOS_EXTRA_MARK 0xA0u
+#define BOS_EXTRA_MASK 0xF8u
+#define BOS_TEXTS (1u+BOS_BARS_MAX+BOS_HEALTH_EXTRA)   /* row label, HUD labels, health options */
 
 #define BOS_PLAYER 0x007B0C7Cu          /* current player: +4 index, +0x14 entity */
 #define BOS_HUD 0x007A6160u             /* HUD block per player, 0x0014F0CC */
@@ -135,6 +168,13 @@
 #define BOS_ENT_HEALTH 0x1CCu
 #define BOS_ENT_MAX 0x1D8u
 #define BOS_RANGE 30.0f                 /* game units; TSFP_MAPMAKER_BOSS_RANGE */
+#define BOS_BARS_MAX 4u                 /* boss bars per viewport, stock bar included */
+#define BOS_BARS_SPLIT 2u               /* with more than one human player */
+#define BOS_BAR_STEP 57.0f              /* 45 box + 6 frame + 6 gap, x [0x004E68F8] */
+#define BOS_MARGIN 0x007A614Cu          /* int bottom HUD margin read at 0x00139876 */
+#define BOS_HUD_SCALE 0x004E68F8u       /* float HUD y scale */
+#define BOS_HUD_SMOOTH 0x171Cu          /* +0x171C, +0x1724, +0x172C (sub_00139740) */
+#define BOS_SMOOTH 16u
 
 #define BOS_CHARS 0x0053A3CCu           /* per character id, 0x30 bytes */
 #define BOS_RES_SLOT 0x0078B860u        /* int16 per resource id < 0x9D0 */
@@ -145,22 +185,25 @@
 
 #define BOS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
-extern void sub_00079D60(void),sub_00139740(void);
+extern void sub_00079D60(void),sub_00139740(void),sub_00071800(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
 static struct {
     uint32_t editor;                    /* editor object the table belongs to */
     uint8_t level[BOS_CAP];             /* 0 off, 1..4 */
     uint16_t colour[BOS_CAP];
-    uint32_t text;                      /* guest: row label (32 B) + HUD label (32 B) */
-    unsigned logged, dropped, bad_flags;
+    uint32_t text;                      /* guest: BOS_TEXTS labels of 32 B */
+    unsigned logged, dropped, bad_flags, bad_extra;
 } bos;
 
 static struct {
     int active;
-    uint8_t level[BOS_LEVEL_SLOTS];
+    uint8_t level[BOS_LEVEL_SLOTS];     /* boss level 0..4 */
+    uint8_t extra[BOS_LEVEL_SLOTS];     /* stronger health 0..4 */
     char name[BOS_LEVEL_SLOTS][BOS_NAME];
     struct { uint32_t actor, record, max_bits; } scaled[BOS_LIST_MAX];
+    struct { uint32_t hud, entity, frame, state[3]; } smooth[BOS_SMOOTH];
+    uint32_t frame;
     float range2;
 } bos_play;
 
@@ -180,6 +223,16 @@ static unsigned bos_decode(uint32_t flag)
     if(!flag) return 0;
     if((flag&BOS_FLAG_MASK)!=BOS_FLAG_MARK) { bos.bad_flags++;bos_log("unknown chunk +0x29 value ignored",flag,0);return 0; }
     return (flag&3u)+1u;
+}
+/* Chunk +0x21: 0 or 0xA0 | 1..4 with the stock health byte at Tough Guy. */
+static unsigned bos_decode_extra(uint32_t flag,uint32_t health)
+{
+    if(!flag) return 0;
+    if((flag&BOS_EXTRA_MASK)!=BOS_EXTRA_MARK || !(flag&7u) || (flag&7u)>BOS_HEALTH_EXTRA || health!=BOS_HEALTH_TOUGH) {
+        bos.bad_extra++;bos_log("unknown chunk +0x21 health value ignored",flag,health);
+        return 0;
+    }
+    return flag&7u;
 }
 
 /* ---- editor ------------------------------------------------------------- */
@@ -214,11 +267,11 @@ static void bos_set(uint32_t e,uint32_t i,unsigned level)
 static uint32_t bos_text(unsigned which)
 {
     if(!bos.text) {
-        bos.text=xbox_HeapAlloc(2u*BOS_NAME,4u);
+        bos.text=xbox_HeapAlloc(BOS_TEXTS*BOS_NAME,4u);
         if(!bos.text) return 0;
-        memset((void *)((uintptr_t)bos.text+g_xbox_mem_offset),0,2u*BOS_NAME);
+        memset((void *)((uintptr_t)bos.text+g_xbox_mem_offset),0,BOS_TEXTS*BOS_NAME);
     }
-    return bos.text+which*BOS_NAME;
+    return which<BOS_TEXTS?bos.text+which*BOS_NAME:0u;
 }
 static void bos_put_text(uint32_t text,const char *s)
 {
@@ -249,6 +302,25 @@ void pc_mapmaker_bosses_rows(void (*original)(void))
     s=bos_selected();
     if(s>=bos_count(e) || WORD_AT(bos_entry(e,s)+BOS_TYPE)==5u) return;
     if((text=bos_label(bos_get(e,s)))!=0) guest_call(sub_00079D60,6,text,BOS_ROW,0u,0u,BOS_CLOSE,0u);
+}
+
+/* sub_00078590(&field): binds the current list row to a field and selects its
+ * value. At 0x0031CFD2 the row is the stock Health list (values 0..4); the
+ * stronger options are appended first so the binding finds values 5..8. */
+void pc_mapmaker_bosses_health_rows(void (*original)(void))
+{
+    static const char *const label[BOS_HEALTH_EXTRA]={"Brute","Juggernaut","Titan","Colossus"};
+    uint32_t r=0,field=0,e,s,k;
+    if(MAPMAKER_STACK_OK(8)) { r=WORD_AT(g_esp);field=WORD_AT(g_esp+4u); }
+    if(r==BOS_HEALTH_ROW_AT && bos_on() && WORD_AT(BOS_SCENE)==102u && (e=bos_editor())!=0
+       && (s=bos_selected())<bos_count(e) && field==bos_entry(e,s)+BOS_HEALTH)
+        for(k=0;k<BOS_HEALTH_EXTRA;k++) {
+            uint32_t text=bos_text(1u+BOS_BARS_MAX+k);
+            if(!text) break;
+            bos_put_text(text,label[k]);
+            guest_call(sub_00071800,2,text,BOS_HEALTH_TOUGH+1u+k);
+        }
+    original();
 }
 
 /* sub_0031CAC0(menu): edit screen close, also the boss row's callback. */
@@ -311,9 +383,18 @@ static unsigned bos_walk(uint32_t container,unsigned max,BosChunkFn fn,void *ctx
 static void bos_compile_chunk(uint32_t data,unsigned ordinal,void *ctx)
 {
     uint32_t e=*(const uint32_t *)ctx,i=bos_get16(data+BOS_CHUNK_INDEX);
-    unsigned level=bos_get(e,i);
+    unsigned level=bos_get(e,i),extra=0;
     (void)ordinal;
     BOS_B(data+BOS_CHUNK_FLAG)=(uint8_t)(level?BOS_FLAG_MARK|(level-1u):0u);
+    if(i<bos_count(e)) {
+        uint32_t health=WORD_AT(bos_entry(e,i)+BOS_HEALTH);
+        if(health>BOS_HEALTH_TOUGH) {
+            if(health<=BOS_HEALTH_TOUGH+BOS_HEALTH_EXTRA) extra=health-BOS_HEALTH_TOUGH;
+            else bos_log("health value out of range saved as Tough Guy",i,health);
+            BOS_B(data+BOS_CHUNK_HEALTH)=(uint8_t)BOS_HEALTH_TOUGH;   /* the stock table has 5 entries */
+        }
+    }
+    BOS_B(data+BOS_CHUNK_EXTRA)=(uint8_t)(extra?BOS_EXTRA_MARK|extra:0u);
 }
 /* sub_003006C0(container, flags): compile the editor into a container. */
 void pc_mapmaker_bosses_compile(void (*original)(void))
@@ -324,12 +405,14 @@ void pc_mapmaker_bosses_compile(void (*original)(void))
     bos_walk(container,bos_count(e),bos_compile_chunk,&e);
 }
 
-typedef struct { uint32_t index[BOS_CAP], flag[BOS_CAP]; } BosLoad;
+typedef struct { uint32_t index[BOS_CAP], flag[BOS_CAP], extra[BOS_CAP], health[BOS_CAP]; } BosLoad;
 static void bos_load_chunk(uint32_t data,unsigned ordinal,void *ctx)
 {
     BosLoad *x=(BosLoad *)ctx;
     x->index[ordinal]=(uint32_t)(int32_t)(int16_t)bos_get16(data+BOS_CHUNK_INDEX);
     x->flag[ordinal]=BOS_B(data+BOS_CHUNK_FLAG);
+    x->extra[ordinal]=BOS_B(data+BOS_CHUNK_EXTRA);
+    x->health[ordinal]=BOS_B(data+BOS_CHUNK_HEALTH);
 }
 /* sub_00301A90(container, flags): editor load (appends the chunks' entries). */
 void pc_mapmaker_bosses_load(void (*original)(void))
@@ -344,12 +427,18 @@ void pc_mapmaker_bosses_load(void (*original)(void))
     if(n>count) n=count;
     base=count-n;
     for(k=0;k<n;k++) {
-        unsigned level=bos_decode(x.flag[k]);
-        if(level && WORD_AT(bos_entry(e,base+k)+BOS_ENTRY_INDEX)!=x.index[k]) {
+        unsigned level=bos_decode(x.flag[k]),extra=bos_decode_extra(x.extra[k],x.health[k]);
+        uint32_t entry=bos_entry(e,base+k);
+        int same=WORD_AT(entry+BOS_ENTRY_INDEX)==x.index[k];
+        if(level && !same) {
             bos.dropped++;bos_log("boss setting dropped at load",k,x.flag[k]);
             level=0;
         }
         bos_set(e,base+k,level);
+        if(extra) {
+            if(same && WORD_AT(entry+BOS_HEALTH)==BOS_HEALTH_TOUGH) WORD_AT(entry+BOS_HEALTH)=BOS_HEALTH_TOUGH+extra;
+            else { bos.dropped++;bos_log("health setting dropped at load",k,x.extra[k]); }
+        }
     }
 }
 
@@ -358,10 +447,12 @@ static void bos_level_chunk(uint32_t data,unsigned ordinal,void *ctx)
 {
     uint32_t i=bos_get16(data+BOS_CHUNK_INDEX);
     unsigned level=bos_decode(BOS_B(data+BOS_CHUNK_FLAG)),*n=(unsigned *)ctx;
+    unsigned extra=bos_decode_extra(BOS_B(data+BOS_CHUNK_EXTRA),BOS_B(data+BOS_CHUNK_HEALTH));
     (void)ordinal;
-    if(!level) return;
+    if(!level && !extra) return;
     if(i>=BOS_LEVEL_SLOTS) { bos_log("boss index out of range in play",i,0);return; }
     bos_play.level[i]=(uint8_t)level;
+    bos_play.extra[i]=(uint8_t)extra;
     memcpy(bos_play.name[i],(const char *)((uintptr_t)(data+BOS_CHUNK_NAME)+g_xbox_mem_offset),BOS_NAME-1u);
     bos_play.name[i][BOS_NAME-1u]=0;
     ++*n;
@@ -388,24 +479,27 @@ void pc_mapmaker_bosses_level(void (*original)(void))
     bos_play.active=n!=0;
 }
 
-/* Boss level of live pool entry a (0 = none); its entity in *entity. */
-static unsigned bos_actor(uint32_t a,uint32_t *entity,uint32_t *record)
+/* Story AI index of live pool entry a with a boss or health setting, else
+ * BOS_LEVEL_SLOTS; its entity and spawn record in *entity / *record. */
+static uint32_t bos_actor(uint32_t a,uint32_t *entity,uint32_t *record)
 {
     uint32_t ent,rec,i;
-    if(!MAPMAKER_PTR_OK(a,BOS_ACTOR_SIZE)) return 0;
+    if(!MAPMAKER_PTR_OK(a,BOS_ACTOR_SIZE)) return BOS_LEVEL_SLOTS;
     ent=WORD_AT(a);rec=WORD_AT(a+BOS_ACTOR_RECORD);
-    if(!MAPMAKER_PTR_OK(ent,BOS_ENT_SIZE) || WORD_AT(ent+BOS_ENT_AI)!=a || !MAPMAKER_PTR_OK(rec,12u)) return 0;
+    if(!MAPMAKER_PTR_OK(ent,BOS_ENT_SIZE) || WORD_AT(ent+BOS_ENT_AI)!=a || !MAPMAKER_PTR_OK(rec,12u)) return BOS_LEVEL_SLOTS;
     i=WORD_AT(rec+8u)-WORD_AT(BOS_SAI_BASE)-1u;
-    if(i>=BOS_LEVEL_SLOTS || !bos_play.level[i]) return 0;
+    if(i>=BOS_LEVEL_SLOTS || (!bos_play.level[i] && !bos_play.extra[i])) return BOS_LEVEL_SLOTS;
     *entity=ent;*record=rec;
-    return bos_play.level[i];
+    return i;
 }
-static void bos_scale(uint32_t a,uint32_t ent,uint32_t rec,unsigned level)
+/* Health factor: Boss x1..x8 times stronger health x2..x16. */
+static unsigned bos_factor(uint32_t i) { return bos_multiplier(bos_play.level[i])<<bos_play.extra[i]; }
+static void bos_scale(uint32_t a,uint32_t ent,uint32_t rec,unsigned factor)
 {
     unsigned k,free_slot=BOS_LIST_MAX;
-    float m=(float)bos_multiplier(level),max,cur,scaled;
+    float m=(float)factor,max,cur,scaled;
     uint32_t bits;
-    if(level<2u) return;
+    if(factor<2u) return;
     for(k=0;k<BOS_LIST_MAX;k++) {
         if(bos_play.scaled[k].actor==a) break;
         if(!bos_play.scaled[k].actor && free_slot==BOS_LIST_MAX) free_slot=k;
@@ -426,53 +520,100 @@ static void bos_scale(uint32_t a,uint32_t ent,uint32_t rec,unsigned level)
     bos_play.scaled[k].record=rec;
     bos_play.scaled[k].max_bits=WORD_AT(ent+BOS_ENT_MAX);
 }
-/* Nearest living boss entity within range of the current player, or 0;
- * scales boss health on the way. */
-static uint32_t bos_nearest(uint32_t player,unsigned *index)
+/* Scales every live Story AI with a factor and returns the living Boss AIs
+ * within range of the current player, nearest first (at most max). */
+static unsigned bos_nearest(uint32_t player,uint32_t *ents,uint32_t *index,unsigned max)
 {
-    uint32_t pe=WORD_AT(player+0x14u),count=WORD_AT(BOS_LIST_COUNT),humans=WORD_AT(BOS_HUMANS),i,best=0;
-    float px,py,pz,best_d=0.0f;
+    uint32_t pe=WORD_AT(player+0x14u),count=WORD_AT(BOS_LIST_COUNT),humans=WORD_AT(BOS_HUMANS),i;
+    float px,py,pz,dist[BOS_BARS_MAX];
+    unsigned n=0,k;
     if(!MAPMAKER_PTR_OK(pe,BOS_ENT_SIZE)) return 0;
     px=bos_getf(pe+BOS_ENT_POS);py=bos_getf(pe+BOS_ENT_POS+4u);pz=bos_getf(pe+BOS_ENT_POS+8u);
     if(count>BOS_LIST_MAX) count=BOS_LIST_MAX;
+    if(max>BOS_BARS_MAX) max=BOS_BARS_MAX;
     for(i=humans<count?humans:count;i<count;i++) {
-        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0;
-        unsigned level=bos_actor(a,&ent,&rec);
+        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec);
         float dx,dy,dz,d;
-        if(!level) continue;
-        bos_scale(a,ent,rec,level);
-        if(!(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;
+        if(s>=BOS_LEVEL_SLOTS) continue;
+        bos_scale(a,ent,rec,bos_factor(s));
+        if(!bos_play.level[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;
         dx=bos_getf(ent+BOS_ENT_POS)-px;dy=bos_getf(ent+BOS_ENT_POS+4u)-py;dz=bos_getf(ent+BOS_ENT_POS+8u)-pz;
         d=dx*dx+dy*dy+dz*dz;
-        if(!(d<=bos_play.range2) || (best && d>=best_d)) continue;
-        best=ent;best_d=d;*index=WORD_AT(rec+8u)-WORD_AT(BOS_SAI_BASE)-1u;
+        if(!(d<=bos_play.range2)) continue;
+        for(k=n;k>0 && dist[k-1u]>d;k--) if(k<max) { dist[k]=dist[k-1u];ents[k]=ents[k-1u];index[k]=index[k-1u]; }
+        if(k<max) { dist[k]=d;ents[k]=ent;index[k]=s;if(n<max) n++; }
     }
-    return best;
+    return n;
+}
+/* Per-boss copy of the bar's smoothing state (HUD block +0x171C/+0x1724/+0x172C). */
+static unsigned bos_smooth_slot(uint32_t hud,uint32_t ent)
+{
+    unsigned k,old=0;
+    for(k=0;k<BOS_SMOOTH;k++) {
+        if(bos_play.smooth[k].hud==hud && bos_play.smooth[k].entity==ent) return k;
+        if(bos_play.smooth[k].frame<bos_play.smooth[old].frame) old=k;
+    }
+    memset(&bos_play.smooth[old],0,sizeof bos_play.smooth[old]);   /* oldest: a fresh bar */
+    bos_play.smooth[old].hud=hud;bos_play.smooth[old].entity=ent;
+    return old;
+}
+static void bos_smooth_io(uint32_t hud,uint32_t *state,int to_hud)
+{
+    unsigned k;
+    for(k=0;k<3u;k++) {
+        uint32_t a=hud+BOS_HUD_SMOOTH+k*8u;
+        if(to_hud) WORD_AT(a)=state[k]; else state[k]=WORD_AT(a);
+    }
+}
+static int bos_step(void)
+{
+    float scale=bos_getf(BOS_HUD_SCALE);
+    if(!(scale>=0.25f && scale<=4.0f)) scale=1.0f;
+    return (int)(BOS_BAR_STEP*scale+0.5f);
 }
 
 static void bos_probe_frame(void);
 /* sub_0014CC80 (ebx = HUD block): the story boss bar, every HUD frame. */
 void pc_mapmaker_bosses_hud(void (*original)(void))
 {
-    uint32_t hud=g_ebx,player,p,ent,text,buf,drawn;
-    unsigned index=0;
+    uint32_t hud=g_ebx,player,p,ents[BOS_BARS_MAX],index[BOS_BARS_MAX],stock[3],margin;
+    unsigned n,k,slot,cap,any=0;
+    int step;
     GuestRegisters r;
     original();
     bos_probe_frame();
     if(!bos_play.active || !mapmaker_limits.limits || WORD_AT(BOS_SCENE)!=100u || BOS_B(BOS_MODE)!=10u) return;
     player=WORD_AT(BOS_PLAYER);
     if(!MAPMAKER_PTR_OK(player,0x1000u) || (p=WORD_AT(player+4u))>3u || hud!=BOS_HUD+p*BOS_HUD_STRIDE) return;
-    ent=bos_nearest(player,&index);
-    if(!ent || (WORD_AT(hud+BOS_HUD_FLAGS)&1u) || !MAPMAKER_STACK_OK(0x100) || !(text=bos_text(1))) return;
-    bos_put_text(text,index<BOS_LEVEL_SLOTS && bos_play.name[index][0]?bos_play.name[index]:"Boss");
-    save_registers(&r);
-    buf=g_esp-0x80u;g_esp=buf;
-    WORD_AT(buf+0x40u)=0;
-    g_esi=hud;g_edi=ent;
-    guest_call(sub_00139740,3,text,0u,buf+0x40u);
-    drawn=WORD_AT(buf+0x40u);
-    restore_registers(&r);
-    if(drawn) WORD_AT(hud+BOS_HUD_FLAGS)|=1u;    /* as the stock bar (0x0014D0D5) */
+    cap=WORD_AT(BOS_HUMANS)>1u?BOS_BARS_SPLIT:BOS_BARS_MAX;
+    slot=(WORD_AT(hud+BOS_HUD_FLAGS)&1u)?1u:0u;  /* a stock bar keeps the bottom slot */
+    n=bos_nearest(player,ents,index,cap-slot);
+    if(!n || !MAPMAKER_STACK_OK(0x100)) return;
+    bos_play.frame++;
+    step=bos_step();
+    margin=WORD_AT(BOS_MARGIN);
+    bos_smooth_io(hud,stock,0);
+    for(k=0;k<n && slot<cap;k++) {
+        uint32_t text=bos_text(1u+k),buf,drawn;
+        unsigned s=bos_smooth_slot(hud,ents[k]);
+        if(!text) break;
+        bos_put_text(text,index[k]<BOS_LEVEL_SLOTS && bos_play.name[index[k]][0]?bos_play.name[index[k]]:"Boss");
+        bos_smooth_io(hud,bos_play.smooth[s].state,1);
+        WORD_AT(BOS_MARGIN)=margin+(uint32_t)(step*(int)slot);
+        save_registers(&r);
+        buf=g_esp-0x80u;g_esp=buf;
+        WORD_AT(buf+0x40u)=0;
+        g_esi=hud;g_edi=ents[k];
+        guest_call(sub_00139740,3,text,0u,buf+0x40u);
+        drawn=WORD_AT(buf+0x40u);
+        restore_registers(&r);
+        bos_smooth_io(hud,bos_play.smooth[s].state,0);
+        bos_play.smooth[s].frame=bos_play.frame;
+        if(drawn) { any=1;slot++; }
+    }
+    WORD_AT(BOS_MARGIN)=margin;
+    bos_smooth_io(hud,stock,1);                   /* the stock bar's own state */
+    if(any) WORD_AT(hud+BOS_HUD_FLAGS)|=1u;      /* as the stock bar (0x0014D0D5) */
 }
 
 /* ---- creature probe (read-only) ------------------------------------------ */

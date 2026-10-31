@@ -40,12 +40,16 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 void sub_0003DFA0(void) { g_ecx=1; }
 void sub_00079D60(void) { g_ecx=4; }
 void sub_00139740(void) { g_ecx=8; }
+void sub_00071800(void) { g_ecx=16; }
 static uint32_t heap_next=HEAP;
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment) { uint32_t p=heap_next;(void)alignment;heap_next+=(bytes+15u)&~15u;return p; }
 
-static unsigned nrows, bars, bar_draw=1;
+#define MARGIN 0x007A614Cu
+static unsigned nrows, bars, bar_draw=1, nlog, nitems, bound_items;
 static struct { uint32_t text, id, cb; } rows[16];
-static struct { uint32_t esi, edi, text, frac, out, esp; char label[32]; } bar;
+static struct { uint32_t text, value; } items[16];
+typedef struct { uint32_t esi, edi, text, frac, out, esp, margin, smooth[3]; char label[32]; } Bar;
+static Bar bar, blog[8];                         /* bar = first call of a frame */
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -55,10 +59,18 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     for(i=0;i<n && i<8;i++) x[i]=va_arg(a,uint32_t);
     va_end(a);
     if(f==sub_00079D60) { if(nrows<16) { rows[nrows].text=x[0];rows[nrows].id=x[1];rows[nrows].cb=x[4]; } nrows++; }
+    else if(f==sub_00071800) { if(nitems<16) { items[nitems].text=x[0];items[nitems].value=x[1]; } nitems++; }
     else if(f==sub_00139740) {                    /* esi = HUD block, edi = entity; (text, fraction, int *) */
-        bars++;bar.esi=g_esi;bar.edi=g_edi;bar.text=x[0];bar.frac=x[1];bar.out=x[2];bar.esp=g_esp;
-        memcpy(bar.label,(const char *)((uintptr_t)x[0]+g_xbox_mem_offset),31);bar.label[31]=0;
+        Bar b;
+        unsigned k;
+        b.esi=g_esi;b.edi=g_edi;b.text=x[0];b.frac=x[1];b.out=x[2];b.esp=g_esp;b.margin=WORD_AT(MARGIN);
+        for(k=0;k<3;k++) b.smooth[k]=WORD_AT(g_esi+0x171Cu+k*8u);
+        memcpy(b.label,(const char *)((uintptr_t)x[0]+g_xbox_mem_offset),31);b.label[31]=0;
+        if(nlog<8) blog[nlog]=b;
+        if(!nlog) bar=b;
+        nlog++;bars++;
         if(bar_draw && x[2]>=0x10000u && x[2]<sizeof memory) WORD_AT(x[2])=1;
+        for(k=0;k<3;k++) WORD_AT(g_esi+0x171Cu+k*8u)=g_edi+k;   /* the bar's own smoothing */
         g_esi=g_edi=0xDEADu;                      /* clobbers; the hook must restore */
     }
     return r;
@@ -106,6 +118,8 @@ static void fake_compile(void)                   /* sub_003006C0: zero, one chun
         memcpy((char *)((uintptr_t)p+8u+g_xbox_mem_offset),(const char *)((uintptr_t)E(i)+g_xbox_mem_offset),31);
         WORD_AT(p+8u+0x20u)=(WORD_AT(E(i)+0x34u)&0xFFu)|(i<<16);  /* +0x20 type, +0x22 index */
         WORD_AT(p+8u+0x28u)=1u|(0x0007u<<16);                     /* +0x28 toggle, +0x2A weapon */
+        *(uint8_t *)((uintptr_t)p+8u+0x30u+g_xbox_mem_offset)=(uint8_t)WORD_AT(E(i)+0x4Cu);   /* health byte */
+        *(uint8_t *)((uintptr_t)p+8u+0x31u+g_xbox_mem_offset)=0x5Au;
         p+=8u+sz;
     }
     WORD_AT(p)=0x00C7766Au;WORD_AT(p+4u)=0;
@@ -121,6 +135,7 @@ static void fake_load(void)                      /* sub_00301A90: append entries
             memset((void *)((uintptr_t)E(n)+g_xbox_mem_offset),0,0xE4);
             WORD_AT(E(n)+0x24u)=(uint32_t)(int32_t)(int16_t)(WORD_AT(c+8u+0x20u)>>16)+(load_skew && n==first+load_skew-1u?1u:0u);
             WORD_AT(E(n)+0x34u)=WORD_AT(c+8u+0x20u)&0xFFu;
+            WORD_AT(E(n)+0x4Cu)=*(uint8_t *)((uintptr_t)c+8u+0x30u+g_xbox_mem_offset);   /* 0x0030260A */
             WORD_AT(E(n)+0x60u)=n%50u;n++;
         }
         c+=8u+WORD_AT(c+4u);
@@ -196,18 +211,24 @@ static void list_set(uint32_t n)
 }
 static void play_container(void)
 {
-    /* chunks: index 0 boss x4 "Big Robot", 1 none, 3 x1 unnamed, 2 bad flag */
+    /* chunks: index 0 boss x4 "Big Robot", 1 none, 3 x1 unnamed, 2 bad flag,
+     * 4 Titan (x8, no boss), 5 boss x2 + Brute (x4), 6 health byte not Tough
+     * Guy (extra ignored), 7 bad extra mark */
     uint32_t p=CONT+8u,k;
-    static const uint32_t idx[4]={0,1,3,2};
-    static const uint8_t flag[4]={0xB2,0,0xB0,0x77};
-    static const char *const name[4]={"Big Robot","Guard","","Odd"};
+    static const uint32_t idx[8]={0,1,3,2,4,5,6,7};
+    static const uint8_t flag[8]={0xB2,0,0xB0,0x77,0,0xB1,0,0};
+    static const uint8_t extra[8]={0,0,0,0,0xA3,0xA1,0xA2,0x93};
+    static const uint8_t health[8]={2,2,2,2,4,4,3,4};
+    static const char *const name[8]={"Big Robot","Guard","","Odd","Titan","Duo","Weak","Bad"};
     memset((void *)((uintptr_t)CONT+g_xbox_mem_offset),0,0x2000);
     WORD_AT(CONT)=0x00C77667u;
-    for(k=0;k<4;k++) {
+    for(k=0;k<8;k++) {
         WORD_AT(p)=0x00C7766Cu;WORD_AT(p+4u)=0x50u;
         snprintf((char *)((uintptr_t)p+8u+g_xbox_mem_offset),32,"%s",name[k]);
         WORD_AT(p+8u+0x20u)=1u|(idx[k]<<16);
+        *(uint8_t *)((uintptr_t)p+8u+0x21u+g_xbox_mem_offset)=extra[k];
         *(uint8_t *)((uintptr_t)p+8u+0x29u+g_xbox_mem_offset)=flag[k];
+        *(uint8_t *)((uintptr_t)p+8u+0x30u+g_xbox_mem_offset)=health[k];
         p+=0x58u;
     }
     WORD_AT(p)=0x00C7766Au;
@@ -215,12 +236,27 @@ static void play_container(void)
 }
 static int hud_frame(uint32_t hud)              /* returns 1 when our bar was drawn */
 {
-    unsigned before=bars;
-    g_ebx=hud;g_esi=0x51u;g_edi=0xD1u;orig_calls=0;
+    unsigned before=bars,k;
+    g_ebx=hud;g_esi=0x51u;g_edi=0xD1u;orig_calls=0;nlog=0;
+    WORD_AT(MARGIN)=20u;
+    for(k=0;k<3;k++) WORD_AT(hud+0x171Cu+k*8u)=0x5100u+k;  /* the stock bar's smoothing */
     HOOK(pc_mapmaker_bosses_hud,fake_hud,0);
     CHECK(orig_calls==1);
     CHECK(g_ebx==hud && g_esi==0x51u && g_edi==0xD1u);
+    CHECK(WORD_AT(MARGIN)==20u);                  /* margin put back */
+    for(k=0;k<3;k++) CHECK(WORD_AT(hud+0x171Cu+k*8u)==0x5100u+k);
     return bars!=before;
+}
+static int margin_ok(unsigned k,unsigned slot,unsigned step) { return k<nlog && blog[k].margin==20u+slot*step; }
+/* the health list row: options appended before the original binds the field */
+static void bind_fake(void) { orig_calls++;bound_items=nitems;g_esp+=4u; }
+static void health_rows(uint32_t s,uint32_t ret,uint32_t field)
+{
+    nitems=0;bound_items=99;select_ai(s);orig_calls=0;
+    g_esp=ESP0;WORD_AT(ESP0)=ret;WORD_AT(ESP0+4u)=field;
+    pc_mapmaker_bosses_health_rows(bind_fake);
+    if(g_esp!=ESP0+4u) { fprintf(stderr,"health rows: esp %+d\n",(int)(g_esp-ESP0));esp_errors++; }
+    CHECK(orig_calls==1);
 }
 
 int main(void)
@@ -240,8 +276,23 @@ int main(void)
     click(0);
     CHECK(orig_calls==1);
     CHECK(bos.level[0]==0);
+    health_rows(0,0x0031CFD7u,E(0)+0x4Cu);
+    CHECK(nitems==0);
 
     set_env("TSFP_MAPMAKER_LIMITS","1");
+
+    /* ---- stronger health options on the stock Health row ---- */
+    health_rows(0,0x0031CFD7u,E(0)+0x4Cu);
+    CHECK(nitems==4 && bound_items==4);           /* before the binding */
+    {
+        static const char *const want[4]={"Brute","Juggernaut","Titan","Colossus"};
+        for(i=0;i<4;i++) CHECK(items[i].value==5u+i && !strcmp(text_of(items[i].text),want[i]));
+    }
+    health_rows(0,0x0031CFD8u,E(0)+0x4Cu); CHECK(nitems==0);        /* another binding */
+    health_rows(0,0x0031CFD7u,E(0)+0x48u); CHECK(nitems==0);        /* another field */
+    health_rows(1,0x0031CFD7u,E(0)+0x4Cu); CHECK(nitems==0);        /* not the selected entry */
+    WORD_AT(0x0079094Cu)=100u; health_rows(0,0x0031CFD7u,E(0)+0x4Cu); CHECK(nitems==0);
+    WORD_AT(0x0079094Cu)=102u;
 
     /* ---- rows ---- */
     make_ai(1,1,"Guard");make_ai(2,3,"Sniper");make_ai(3,5,"Solo");WORD_AT(ED+0x280u)=4;
@@ -306,10 +357,21 @@ int main(void)
     WORD_AT(E(1)+0x60u)=2u;
     click(1);click(1);click(1);click(1);CHECK(level_of(1)==4u);
 
-    /* ---- compile: +0x29 = 0xB0 | (level - 1) ---- */
+    /* ---- compile: +0x29 = 0xB0 | (level - 1); health 5..8 -> +0x30 = 4, +0x21 = 0xA0 | 1..4 ---- */
+    WORD_AT(E(0)+0x4Cu)=7u;WORD_AT(E(1)+0x4Cu)=2u;WORD_AT(E(2)+0x4Cu)=12u;   /* Titan, Normal, garbage */
     HOOK(pc_mapmaker_bosses_compile,fake_compile,CONT);
     CHECK(saved_flag(0)==0xB0u && saved_flag(1)==0xB3u && saved_flag(2)==0u);
     CHECK(byte_at(sai_data(0)+0x28u)==1u && byte_at(sai_data(0)+0x2Au)==7u);  /* neighbours kept */
+    CHECK(byte_at(sai_data(0)+0x30u)==4u && byte_at(sai_data(0)+0x21u)==0xA3u);
+    CHECK(byte_at(sai_data(1)+0x30u)==2u && byte_at(sai_data(1)+0x21u)==0u);
+    CHECK(byte_at(sai_data(2)+0x30u)==4u && byte_at(sai_data(2)+0x21u)==0u);  /* stock-safe */
+    CHECK(byte_at(sai_data(0)+0x20u)==1u && byte_at(sai_data(0)+0x31u)==0x5Au && byte_at(sai_data(1)+0x22u)==1u);
+    WORD_AT(E(0)+0x4Cu)=4u;
+    HOOK(pc_mapmaker_bosses_compile,fake_compile,CONT);
+    CHECK(byte_at(sai_data(0)+0x30u)==4u && byte_at(sai_data(0)+0x21u)==0u);  /* Tough Guy itself */
+    WORD_AT(E(0)+0x4Cu)=8u;WORD_AT(E(2)+0x4Cu)=0u;
+    HOOK(pc_mapmaker_bosses_compile,fake_compile,CONT);
+    CHECK(byte_at(sai_data(0)+0x30u)==4u && byte_at(sai_data(0)+0x21u)==0xA4u);  /* Colossus */
 
     /* ---- reset + load restore them; bad values are ignored ---- */
     HOOK(pc_mapmaker_bosses_reset,fake_reset,0);
@@ -319,11 +381,28 @@ int main(void)
     CHECK(WORD_AT(ED+0x280u)==3u);
     CHECK(level_of(0)==1u && level_of(1)==4u && level_of(2)==0u);
     CHECK(bos.bad_flags==1u);
+    CHECK(WORD_AT(E(0)+0x4Cu)==8u && WORD_AT(E(1)+0x4Cu)==2u && WORD_AT(E(2)+0x4Cu)==0u);
     HOOK(pc_mapmaker_bosses_reset,fake_reset,0);
     load_skew=2;                                                    /* entry 1 holds the wrong index */
+    *(uint8_t *)((uintptr_t)sai_data(1)+0x21u+g_xbox_mem_offset)=0xA1u;
+    *(uint8_t *)((uintptr_t)sai_data(1)+0x30u+g_xbox_mem_offset)=4u;
     HOOK(pc_mapmaker_bosses_load,fake_load,CONT);
     load_skew=0;
     CHECK(level_of(0)==1u && level_of(1)==0u);
+    CHECK(WORD_AT(E(0)+0x4Cu)==8u && WORD_AT(E(1)+0x4Cu)==4u);    /* skewed: stays Tough Guy */
+    HOOK(pc_mapmaker_bosses_reset,fake_reset,0);
+    *(uint8_t *)((uintptr_t)sai_data(0)+0x30u+g_xbox_mem_offset)=3u;   /* re-saved as High elsewhere */
+    *(uint8_t *)((uintptr_t)sai_data(2)+0x21u+g_xbox_mem_offset)=0xA5u; /* out of range */
+    *(uint8_t *)((uintptr_t)sai_data(2)+0x30u+g_xbox_mem_offset)=4u;
+    i=bos.bad_extra;
+    HOOK(pc_mapmaker_bosses_load,fake_load,CONT);
+    CHECK(WORD_AT(E(0)+0x4Cu)==3u && WORD_AT(E(2)+0x4Cu)==4u && bos.bad_extra==i+2u);
+    *(uint8_t *)((uintptr_t)sai_data(0)+0x30u+g_xbox_mem_offset)=4u;
+    *(uint8_t *)((uintptr_t)sai_data(2)+0x21u+g_xbox_mem_offset)=0u;
+    *(uint8_t *)((uintptr_t)sai_data(2)+0x30u+g_xbox_mem_offset)=0u;
+    HOOK(pc_mapmaker_bosses_reset,fake_reset,0);
+    HOOK(pc_mapmaker_bosses_load,fake_load,CONT);
+    CHECK(level_of(0)==1u && level_of(1)==4u && WORD_AT(E(0)+0x4Cu)==8u && WORD_AT(E(1)+0x4Cu)==5u);
     /* off: the compile leaves the zero */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
     HOOK(pc_mapmaker_bosses_compile,fake_compile,CONT);
@@ -348,15 +427,20 @@ int main(void)
     CHECK(bar.edi==ENT(2) && bar.esi==HUD0 && !strcmp(bar.label,"Boss") && bar.frac==0);
     CHECK(bar.esp<ESP0 && bar.out<ESP0 && bar.out>=bar.esp);        /* out slot on the guest stack */
     CHECK(WORD_AT(HUD0+8u)&1u);                                     /* shown like the stock bar */
+    CHECK(nlog==2 && blog[1].edi==ENT(1) && !strcmp(blog[1].label,"Big Robot") && blog[1].text!=bar.text);
+    CHECK(margin_ok(0,0,57) && margin_ok(1,1,57));                  /* stacked upward */
+    CHECK(blog[0].smooth[0]==0 && blog[1].smooth[1]==0);            /* fresh state, not the stock bar's */
     CHECK(FLOAT_AT(ENT(1)+0x1D8u)==4.0f && FLOAT_AT(ENT(1)+0x1CCu)==4.0f);   /* x4 */
     CHECK(FLOAT_AT(ENT(2)+0x1D8u)==1.0f);                           /* x1 unchanged */
     CHECK(FLOAT_AT(ENT(3)+0x1D8u)==1.0f && FLOAT_AT(ENT(4)+0x1D8u)==1.0f);
     CHECK(hud_frame(HUD0) && FLOAT_AT(ENT(1)+0x1D8u)==4.0f);       /* scaled once */
+    CHECK(nlog==2 && blog[0].smooth[0]==ENT(2) && blog[1].smooth[2]==ENT(1)+2u);   /* each its own state */
     setf(ENT(1)+0x1CCu,3.0f);
     CHECK(hud_frame(HUD0) && FLOAT_AT(ENT(1)+0x1CCu)==3.0f);       /* damage kept */
 
     setf(ENT(2)+0x1CCu,0.0f);                                       /* dead: the next one */
     CHECK(hud_frame(HUD0) && bar.edi==ENT(1) && !strcmp(bar.label,"Big Robot"));
+    CHECK(nlog==1 && margin_ok(0,0,57));
     setf(ENT(1)+0x64u,40.0f);                                       /* out of range */
     CHECK(!hud_frame(HUD0));
     CHECK(!(WORD_AT(HUD0+8u)&1u));
@@ -376,27 +460,68 @@ int main(void)
     WORD_AT(REC(1)+8u)=R+0u+1u;
     CHECK(hud_frame(HUD0) && FLOAT_AT(ENT(1)+0x1D8u)==4.0f);
 
-    /* two bosses: the nearer one */
+    /* two bosses: the nearer one first */
     setf(ENT(2)+0x1CCu,1.0f);
-    CHECK(hud_frame(HUD0) && bar.edi==ENT(2));
+    CHECK(hud_frame(HUD0) && bar.edi==ENT(2) && nlog==2 && blog[1].edi==ENT(1));
     setf(ENT(2)+0x64u,12.0f);
-    CHECK(hud_frame(HUD0) && bar.edi==ENT(1));
+    CHECK(hud_frame(HUD0) && bar.edi==ENT(1) && nlog==2 && blog[1].edi==ENT(2));
     setf(ENT(2)+0x64u,5.0f);
 
-    /* the stock bar wins; wrong HUD block, mode, scene, player, not drawn */
-    stock_bar=1;CHECK(!hud_frame(HUD0));stock_bar=0;
+    /* a stock bar keeps the bottom slot: ours above it */
+    stock_bar=1;
+    CHECK(hud_frame(HUD0) && nlog==2 && bar.edi==ENT(2) && margin_ok(0,1,57) && margin_ok(1,2,57));
+    CHECK(WORD_AT(HUD0+8u)&1u);
+    stock_bar=0;
+    /* wrong HUD block, mode, scene, player, not drawn */
     CHECK(!hud_frame(HUD0+0x177Cu));
     WORD_AT(PLAYER+4u)=1u;CHECK(hud_frame(HUD0+0x177Cu));WORD_AT(PLAYER+4u)=0;
     WORD_AT(PLAYER+4u)=7u;CHECK(!hud_frame(HUD0+7u*0x177Cu));WORD_AT(PLAYER+4u)=0;
     *(uint8_t *)((uintptr_t)0x007DE455u+g_xbox_mem_offset)=3u;CHECK(!hud_frame(HUD0));
     *(uint8_t *)((uintptr_t)0x007DE455u+g_xbox_mem_offset)=10u;
     WORD_AT(0x0079094Cu)=1u;CHECK(!hud_frame(HUD0));WORD_AT(0x0079094Cu)=100u;
-    bar_draw=0;CHECK(hud_frame(HUD0) && !(WORD_AT(HUD0+8u)&1u));bar_draw=1;
+    bar_draw=0;CHECK(hud_frame(HUD0) && !(WORD_AT(HUD0+8u)&1u) && margin_ok(1,0,57));bar_draw=1;   /* not drawn: no slot used */
     WORD_AT(ENT(1)+0x7Cu)=0x1234u;WORD_AT(ENT(2)+0x7Cu)=0x1234u;   /* entity no longer this actor */
     CHECK(!hud_frame(HUD0));
     WORD_AT(ENT(1)+0x7Cu)=A(1);WORD_AT(ENT(2)+0x7Cu)=A(2);
-    list_set(2);CHECK(hud_frame(HUD0) && bar.edi==ENT(1));         /* only the listed */
+    list_set(2);CHECK(hud_frame(HUD0) && bar.edi==ENT(1) && nlog==1);   /* only the listed */
     list_set(5);
+
+    /* ---- stronger health and more bosses ---- */
+    {
+        unsigned bad=bos.bad_extra;
+        make_actor(5,4,0.5f,1.0f);                                  /* Titan x8, no boss: no bar */
+        make_actor(6,5,3.0f,1.0f);                                  /* Duo: boss x2 and Brute: x4 */
+        make_actor(7,6,4.0f,1.0f);                                  /* extra with health High: ignored */
+        make_actor(8,7,4.5f,1.0f);                                  /* bad mark: ignored */
+        list_set(9);
+        HOOK(pc_mapmaker_bosses_level,fake_plain,0);
+        CHECK(bos_play.extra[4]==3u && !bos_play.level[4] && bos_play.extra[5]==1u && bos_play.level[5]==2u);
+        CHECK(!bos_play.extra[6] && !bos_play.extra[7] && bos.bad_extra==bad+2u);
+        FLOAT_AT(0x004E68F8u)=2.0f;                                 /* HUD scale: twice the step */
+        CHECK(hud_frame(HUD0) && nlog==3);
+        CHECK(blog[0].edi==ENT(6) && !strcmp(blog[0].label,"Duo") && blog[1].edi==ENT(2) && blog[2].edi==ENT(1));
+        CHECK(margin_ok(0,0,114) && margin_ok(1,1,114) && margin_ok(2,2,114));
+        CHECK(FLOAT_AT(ENT(5)+0x1D8u)==8.0f && FLOAT_AT(ENT(5)+0x1CCu)==8.0f);
+        CHECK(FLOAT_AT(ENT(6)+0x1D8u)==4.0f && FLOAT_AT(ENT(7)+0x1D8u)==1.0f && FLOAT_AT(ENT(8)+0x1D8u)==1.0f);
+        CHECK(hud_frame(HUD0) && FLOAT_AT(ENT(5)+0x1D8u)==8.0f && FLOAT_AT(ENT(6)+0x1D8u)==4.0f);   /* once */
+        make_actor(9,0,7.0f,1.0f);make_actor(10,3,8.0f,1.0f);       /* five bosses in range */
+        list_set(11);
+        CHECK(hud_frame(HUD0) && nlog==4);                          /* the cap: the farthest is left out */
+        CHECK(blog[0].edi==ENT(6) && blog[1].edi==ENT(2) && blog[2].edi==ENT(9) && blog[3].edi==ENT(10));
+        CHECK(margin_ok(3,3,114) && FLOAT_AT(ENT(9)+0x1D8u)==4.0f);
+        CHECK(hud_frame(HUD0) && blog[2].smooth[0]==ENT(9) && blog[3].smooth[0]==ENT(10));
+        stock_bar=1;
+        CHECK(hud_frame(HUD0) && nlog==3 && blog[2].edi==ENT(9) && margin_ok(0,1,114) && margin_ok(2,3,114));
+        WORD_AT(0x00790950u)=2u;                                    /* split screen: two bars */
+        CHECK(hud_frame(HUD0) && nlog==1 && margin_ok(0,1,114));
+        stock_bar=0;
+        CHECK(hud_frame(HUD0) && nlog==2 && blog[1].edi==ENT(2));
+        FLOAT_AT(0x004E68F8u)=1000.0f;WORD_AT(0x00790950u)=1u;      /* nonsense scale: 1 */
+        CHECK(hud_frame(HUD0) && margin_ok(1,1,57));
+        FLOAT_AT(0x004E68F8u)=0.0f;
+        list_set(5);
+        HOOK(pc_mapmaker_bosses_level,fake_plain,0);
+    }
 
     /* range switch */
     setf(ENT(1)+0x64u,40.0f);setf(ENT(2)+0x1CCu,0.0f);

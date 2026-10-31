@@ -335,10 +335,19 @@ loader and every chunk walker); in the editor a C table indexed like the
 entries, colour-checked, kept through delete/reset/load/compile. In scene
 100 story mode, each HUD frame (wrap of the story boss bar `sub_0014CC80`,
 ebx = HUD block) multiplies a Boss AI's entity health +0x1CC/+0x1D8 once
-per (re)initialisation and, when no stock bar was drawn (HUD block +8 bit
-0), draws the nearest living Boss AI within `TSFP_MAPMAKER_BOSS_RANGE`
-(default 30 units) through `sub_00139740` (esi HUD block, edi entity) with
-the AI's saved name. The focus field +0xFF4 and the `sub_0014F0B0`
+per (re)initialisation and draws up to 4 living Boss AIs (2 in split
+screen, nearest first) within `TSFP_MAPMAKER_BOSS_RANGE` (default 30 units)
+through `sub_00139740` (esi HUD block, edi entity) with the AI's saved name,
+stacked upward by raising the int HUD margin `[0x007A614C]` 57 x
+`[0x004E68F8]` per slot around each call (restored after); a stock bar (HUD
+block +8 bit 0) keeps the bottom slot; the bar smoothing +0x171C/+0x1724/
++0x172C is swapped per boss. Stronger health: WRAP `sub_00078590` ->
+`pc_mapmaker_bosses_health_rows` appends Brute/Juggernaut/Titan/Colossus
+(entry +0x4C values 5..8 = x2..x16 Tough Guy) to the stock Health row (text
+0xC0D, values 0..4, bind at 0x0031CFD2); compile saves chunk +0x30 = 4 and
+byte +0x21 = 0xA0 | 1..4 (decode-proven unused), load restores, play
+multiplies health by 2^extra x the Boss factor (stock 0x0052E060 has 5
+entries; Tough Guy = 20.0 in 0x004DACF4). The focus field +0xFF4 and the `sub_0014F0B0`
 0x0014FAE3 meter (a different, player-drain bar) are untouched. Same file:
 read-only `TSFP_MAPMAKER_CREATURE_PROBE=1` (log
 `TSFP_MAPMAKER_CREATURE_PROBE_LOG`) listing story-only character model
@@ -604,8 +613,9 @@ copies/duplicates, menu-pool diagnostic, mutations) and `tests/mapmaker/test_map
 the edit-screen row site, menu table 0x0052E088 and the unused chunk bytes
 +0x32/+0x33) are in the same CI list.
 `tests/mapmaker/test_mapmaker_bosses.py` (Boss row, editor table, chunk +0x29,
-health scaling, nearest-boss bar, read-only probe; mutations; decode checks of
-chunk byte +0x29 and the `sub_0014CC80`/`sub_00139740` bar sites) is too.
+health scaling, stacked boss bars, stronger health options, read-only probe;
+mutations; decode checks of chunk bytes +0x29/+0x21, the Health row and
+tables, and the `sub_0014CC80`/`sub_00139740` bar sites) is too.
 
 `tests/mapmaker/test_mapmaker_grid.py` (fixture `tests/mapmaker/mapmaker_grid.c`) checks that
 `grid.json` redirects exactly the decoded editor reads of the grid constants

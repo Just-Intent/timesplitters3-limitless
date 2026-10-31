@@ -750,6 +750,7 @@ void pc_mapmaker_bosses_compile(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_load(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_level(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_health_rows(void (*original)(void)) { original(); }
 void pc_mapmaker_characters_eligible(void (*original)(void)) { original(); }
 void pc_mapmaker_characters_preload(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
