@@ -430,6 +430,67 @@ public static class LauncherSettingsChecks
                     Require(GameSettings.StartInfo(root).EnvironmentVariables["RECOMP_XMV_PLAY"]=="1");
                 } finally {Environment.SetEnvironmentVariable("RECOMP_XMV_PLAY",inherited);}
             });
+            Test("MapMaker switches default off, round-trip, keep unknown keys and replace inherited values",()=>{
+                string root=Root("mapmaker");var model=GameSettings.Load(root,null);
+                Require(!model.MapMakerLimits && !model.MapMakerOverlap && !model.MapMakerStackItems && model.MapMakerAlive==64);
+                string[] names={"TSFP_MAPMAKER_LIMITS","TSFP_MAPMAKER_OVERLAP","TSFP_MAPMAKER_STACK_ITEMS","TSFP_MAPMAKER_ALIVE","TSFP_MAPMAKER_MEMORY_SCALE"};
+                var inherited=names.ToDictionary(n=>n,Environment.GetEnvironmentVariable);
+                try {
+                    foreach(string name in names)Environment.SetEnvironmentVariable(name,name.EndsWith("ALIVE")?"7":"1");
+                    var env=GameSettings.StartInfo(root).EnvironmentVariables;
+                    Require(names.All(n=>env[n]==null),"Inherited MapMaker switches must not reach the game when off");
+                    model.Save();
+                    var json=Json.Object(Read(root,"Settings/pc-controls.json"));var launcher=(System.Collections.Generic.Dictionary<string,object>)json["launcher"];
+                    Require(launcher["mapmaker_limits"] is bool && !(bool)launcher["mapmaker_limits"] && Convert.ToInt32(launcher["mapmaker_alive"])==64);
+                    launcher["future_option"]="keep";json["future_setting"]="keep too";Put(root,"Settings/pc-controls.json",Json.Encode(json));
+                    model=GameSettings.Load(root,null);model.MapMakerLimits=true;model.MapMakerStackItems=true;model.Save();
+                    var saved=GameSettings.Load(root,null);
+                    Require(saved.MapMakerLimits && !saved.MapMakerOverlap && saved.MapMakerStackItems && saved.MapMakerAlive==64);
+                    Require(Read(root,"Settings/pc-controls.json").Contains("future_option") && Read(root,"Settings/pc-controls.json").Contains("keep too"));
+                    env=GameSettings.StartInfo(root).EnvironmentVariables;
+                    Require(env["TSFP_MAPMAKER_LIMITS"]=="1" && env["TSFP_MAPMAKER_STACK_ITEMS"]=="1","Chosen MapMaker switches must reach the game");
+                    Require(env["TSFP_MAPMAKER_OVERLAP"]==null && env["TSFP_MAPMAKER_ALIVE"]==null && env["TSFP_MAPMAKER_MEMORY_SCALE"]==null,"Only chosen MapMaker switches may reach the game");
+                    saved.MapMakerLimits=false;saved.MapMakerStackItems=false;saved.MapMakerOverlap=true;saved.MapMakerAlive=24;saved.Save();
+                    env=GameSettings.StartInfo(root).EnvironmentVariables;
+                    Require(env["TSFP_MAPMAKER_OVERLAP"]=="1" && env["TSFP_MAPMAKER_ALIVE"]=="24" && env["TSFP_MAPMAKER_LIMITS"]==null && env["TSFP_MAPMAKER_STACK_ITEMS"]==null);
+                    Require(GameSettings.Load(root,null).MapMakerAlive==24);
+                    saved.MapMakerAlive=0;Reject(()=>saved.Save());saved.MapMakerAlive=65;Reject(()=>saved.Save());
+                } finally { foreach(var pair in inherited)Environment.SetEnvironmentVariable(pair.Key,pair.Value); }
+            });
+            Test("invalid MapMaker preferences are refused without altering settings",()=>{
+                var cases=new System.Collections.Generic.KeyValuePair<string,object>[]{
+                    new System.Collections.Generic.KeyValuePair<string,object>("mapmaker_limits","true"),
+                    new System.Collections.Generic.KeyValuePair<string,object>("mapmaker_overlap",1),
+                    new System.Collections.Generic.KeyValuePair<string,object>("mapmaker_stack_items",null),
+                    new System.Collections.Generic.KeyValuePair<string,object>("mapmaker_alive",0),
+                    new System.Collections.Generic.KeyValuePair<string,object>("mapmaker_alive",65),
+                    new System.Collections.Generic.KeyValuePair<string,object>("mapmaker_alive","64"),
+                    new System.Collections.Generic.KeyValuePair<string,object>("mapmaker_alive",12.5) };
+                for(int i=0;i<cases.Length;i++) {
+                    string root=Root("bad-mapmaker-"+i);var model=GameSettings.Load(root,null);model.Save();
+                    var json=Json.Object(Read(root,"Settings/pc-controls.json"));
+                    ((System.Collections.Generic.Dictionary<string,object>)json["launcher"])[cases[i].Key]=cases[i].Value;
+                    Put(root,"Settings/pc-controls.json",Json.Encode(json));string before=Read(root,"Settings/pc-controls.json");
+                    Reject(()=>GameSettings.Load(root,null));Require(Read(root,"Settings/pc-controls.json")==before);
+                }
+            });
+            Test("MapMaker settings UI saves the chosen switches",()=>STA(()=>{
+                string root=Root("mapmaker-ui");var owner=new System.Windows.Window();
+                var editor=new SettingsPage(owner.Resources,root,true);editor.SelectTab(3);owner.Content=editor.View;
+                var nodes=Descendants(editor.View).ToList();
+                var limits=nodes.OfType<System.Windows.Controls.CheckBox>().Single(c=>c.Name=="MapMakerLimits");
+                var overlap=nodes.OfType<System.Windows.Controls.CheckBox>().Single(c=>c.Name=="MapMakerOverlap");
+                var stack=nodes.OfType<System.Windows.Controls.CheckBox>().Single(c=>c.Name=="MapMakerStackItems");
+                var alive=nodes.OfType<System.Windows.Controls.ComboBox>().Single(c=>c.Name=="MapMakerAlive");
+                Require(limits.IsChecked==false && overlap.IsChecked==false && stack.IsChecked==false && (string)alive.SelectedItem=="64 (Default)");
+                limits.IsChecked=true;overlap.IsChecked=true;alive.SelectedItem="32";
+                Click(nodes.OfType<System.Windows.Controls.Button>().Single(c=>c.Name=="SettingsSaveButton"));
+                var saved=GameSettings.Load(root,null);
+                Require(saved.MapMakerLimits && saved.MapMakerOverlap && !saved.MapMakerStackItems && saved.MapMakerAlive==32 && !saved.SkipStartupSplashes);
+                owner.Close();
+                var reopened=new SettingsPage(new System.Windows.Window().Resources,root,true);
+                Require((string)Descendants(reopened.View).OfType<System.Windows.Controls.ComboBox>().Single(c=>c.Name=="MapMakerAlive").SelectedItem=="32");
+            }));
             Test("invalid startup preference is refused without altering settings",()=>{
                 string root=Root("bad-startup");var model=GameSettings.Load(root,null);model.Save();
                 var json=Json.Object(Read(root,"Settings/pc-controls.json"));

@@ -15,6 +15,16 @@ what has and has not been tested. Technical notes for each area are in the
 
 ## Getting started
 
+**With the launcher:** open **Settings → MapMaker**, tick the switches you want
+(**Raised MapMaker limits** = `LIMITS`, **Overlapping tiles** = `OVERLAP`,
+**Stacked items** = `STACK_ITEMS`; **Characters alive at once** = `ALIVE`),
+save, then press Play and open **MapMaker**. Everything is off (64 characters)
+by default. The launcher ignores these environment variables from your shell
+and passes only its saved choices. `MEMORY_SCALE` and the developer switches
+are not in the launcher.
+
+**From source:**
+
 1. Build the game from source with the [build guide](building.md). You need
    your own US Xbox copy of the game (title ID `45410066`).
 2. Open PowerShell in the checkout and set the switches you want:
@@ -179,5 +189,7 @@ Details: [mapmaker-bugfix.md](mapmaker-bugfix.md).
   `TSFP_MAPMAKER_MEMORY_SCALE` if needed.
 - Untested: System Link, splitscreen, Mac, story levels after the first, and
   save/load of maps larger than 64 KB.
-- The switches are environment variables only; they are not in the launcher or
-  the in-game settings yet.
+- `LIMITS`, `OVERLAP`, `STACK_ITEMS` and `ALIVE` are in the launcher's
+  **Settings → MapMaker** tab (Windows checked by compiling only; Mac not run).
+  They are not in the in-game settings. Other switches are environment
+  variables for source runs only.

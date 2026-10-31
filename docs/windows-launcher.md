@@ -302,6 +302,21 @@ game and launcher updates. Launching sets the existing runtime's
 inherited overrides. This works with the published alpha.4 game without a
 runtime rebuild. New packages' `Launch.ps1` also honor this preference.
 
+**Game settings → MapMaker** (shared with the Mac launcher) turns on the fork's
+MapMaker Limitless switches for the next launch: **Raised MapMaker limits**
+(`TSFP_MAPMAKER_LIMITS`), **Overlapping tiles** (`TSFP_MAPMAKER_OVERLAP`),
+**Stacked items** (`TSFP_MAPMAKER_STACK_ITEMS`) and **Characters alive at once**
+(`TSFP_MAPMAKER_ALIVE`, 64/48/32/24/20). All default to off / 64, the game's own
+defaults. Choices are stored as `launcher.mapmaker_limits`,
+`launcher.mapmaker_overlap`, `launcher.mapmaker_stack_items` (true/false) and
+`launcher.mapmaker_alive` (1-64) in `Settings/pc-controls.json`, beside the other
+launcher preferences, with the usual backup and unknown-key preservation.
+Launching still clears every inherited `TSFP_*`/`RECOMP_*` variable, then sets
+only the switches that are on (and `ALIVE` only when it is not 64).
+`TSFP_MAPMAKER_MEMORY_SCALE` and the diagnostic switches stay environment-only
+for source runs. Packaged `Launch.ps1` honors the same saved keys. The switches
+need a game build from this fork; older games ignore them.
+
 Controls and resolution use the same `Settings/pc-controls.json` and
 `Settings/pc-display.ini` formats as the in-game settings. Graphics use a portable
 `Settings/runtime.conf`; when it is absent, the UI reads the existing per-user

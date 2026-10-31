@@ -111,6 +111,12 @@ link and do not restore the removed enhancement issue form. The existing Windows
 empty diagnostics payload and unchanged bug-report round trip. These run in the
 already registered issue-form and launcher workflows; native Mac builds consume
 the same `DiagnosticIssueDraft.cs` URL policy.
+Launcher MapMaker switches (2026-10-31): `tests/launcher_settings.cs` (run by
+`build-launcher.ps1 -Test --settings`) and the Mac `NativeTests.cs` cover the
+saved `launcher.mapmaker_*` keys and StartInfo export; the portable
+`tools/playable-launch.ps1` mirror is covered by
+`tests/test_launcher_startup.py::test_script_mapmaker_switches`, which compiles
+and runs a synthetic child exe (may be blocked by local antivirus).
 The mocked version-refresh PR creation check also verifies that the generated
 description preserves Ideas routing instead of referring to a removed form.
 The v1.2.23 release bump changes only shared version metadata; existing launcher
