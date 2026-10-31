@@ -1,10 +1,10 @@
-# MapMaker grid: seven floors, 80x80, overlapping tiles, stacked items
+# MapMaker grid: seven floors, 80x80, overlapping tiles, stacked items and Story AI
 
 Editor-only feature area (scene 102). Research and evidence:
 `logs/limits/features/floors-grid.md` and `overlap-items.md` (ignored, main
 checkout). Code: `src/pc_mapmaker_grid.inc`, `src/pc_mapmaker_grid.h`,
 `config/guest-code-patches/grid.json`; fixture `tests/mapmaker_grid.c` +
-`tests/test_mapmaker_grid.py` (55 mutations, table/settings-block checks,
+`tests/test_mapmaker_grid.py` (70 mutations, table/settings-block checks,
 decoder inventory of the redirected constants). Nothing here was built or run
 in the game.
 
@@ -14,7 +14,7 @@ in the game.
 |---|---|
 | `TSFP_MAPMAKER_LIMITS=1` (pools on) | floors -2..4 (7 bars), grid 80 x 80 x 8 levels (z -2..5), placement refused above level 5, view/pan/shading/placement bounds 80, widest zoom 100 cells |
 | `TSFP_MAPMAKER_OVERLAP=1` | tile placement ignores occupancy (bounds still apply; layers above the top grid level refused) |
-| `TSFP_MAPMAKER_STACK_ITEMS=1` | several items per cell for weapons, ammo, keycards, health, armour, power-ups, special pickups and props (categories 8-13, 19-21, 26, 31, 33, 35, 36); every other category keeps one per cell |
+| `TSFP_MAPMAKER_STACK_ITEMS=1` | several items per cell for weapons, ammo, keycards, teleporters, health, armour, power-ups, special pickups and props (categories 8-13, 14-18, 19-21, 26, 31, 33, 35, 36); Story AI on cells with those items and with other Story AI, and those items on Story AI cells; starts, flags, turrets, movers, markers and unknown categories keep one per cell (nothing joins them) |
 | `LIMITS` or `OVERLAP` | removing a piece writes back the cells of other pieces inside its box (last placed wins) |
 
 The overlap and stack switches are not in `src/pc_debug_options.def`: those
@@ -64,8 +64,11 @@ launchers.
   0x00303696 (held item from `sub_00303460`'s `[ebp+0x14]`), so nothing is
   replaced or uncounted; the pick-up caller 0x002F831B is unchanged (repeated
   pick-up peels the oldest first). `sub_00334770` sees the piece's items in the
-  cell with x = 0x7FFF for the call (restored after, also on refusal); held id
-  editor+0x2F34. `sub_00308260` itself always runs (a pure list walk), so the
+  cell whose category may share with x = 0x7FFF for the call (restored after,
+  also on refusal); held id editor+0x2F34. Since 2026-10-31 an item of a
+  non-sharing category (start, flag, turret, mover, marker) stays visible, so
+  a pickup can no longer be dropped onto a start or flag cell (it could
+  before); in `sub_00303460` such an item is replaced as stock. `sub_00308260` itself always runs (a pure list walk), so the
   log line `stack: item added to an occupied cell` now appears only when a
   real item was in the cell (it used to print on every placement).
 - Red X / refusal (fixed 2026-10-31): the per-frame "placement valid" bit
@@ -81,6 +84,31 @@ launchers.
   item is under the cursor and the held item may stack; the button then takes
   the stock drop path (0x00304CD5 -> `sub_00334770` at 0x00304D0B ->
   `sub_00303460`). `+0x2F1C` is left as it is (HUD text and highlight).
+- Story AI (2026-10-31). No catalogue category: a Story AI is an entry of the
+  editor array (relocated by `editor.json` to editor+0x11950, 0xE4 bytes, count
+  editor+0x280, point count +0x58, up to 8 points `{piece, x, y, z}` x 0x10 from
+  +0x64). Its points are placed in Story AI mode (`+0x254` = 3; button handler
+  `sub_003051F0`); held = signed word editor+0x2F10 >= 0 (+0x2F12 = point
+  index; picking a point up removes it from the array, 0x003056EF..0x00305735).
+  Two stock checks refuse a shared cell: (1) `sub_00334770`, also used for
+  items, refuses an item of the piece in the cell (0x0033482A..0x00334846)
+  and any Story AI point in the cell (0x0033484F..0x00334893); (2) in Story AI
+  mode `sub_00306460` stores `sub_002F8B40` (point under the cursor, (sai << 16)
+  | point or -1, call 0x0030723A) in `[editor+0x2F20]`; the valid bit is set at
+  0x003072BE only when `sub_003348C0` passed (0x003072A2) and +0x2F20 < 0
+  (0x003072B4), and the drop needs +0x2F20 < 0 as well (0x00305238).
+  `pc_mapmaker_stack_cell` now also hides the Story AI points in the cell
+  (x word = 0x7FFF) except the held AI's own points, whether an allowed item
+  or a Story AI is held; `pc_mapmaker_stack_sai_point` (on `sub_002F8B40`,
+  return 0x0030723F only) answers -1 while a Story AI is held (with empty
+  hands the point is found, so pick-up takes the AIs apart lowest index
+  first). No other Story AI limit applies per cell (the add check
+  `sub_0031BE70` counts AIs, not cells). A Story AI's own points still may not
+  share a cell. Points beyond 8 in an entry (only from damaged files) are left
+  to the original, which then refuses.
+- Teleporters (categories 14-18, one per colour, ids 0x0A..0x0E) now share
+  like pickups. Each colour's cap (2 stock, 8 with the limits) still applies,
+  so two of one colour stack only while the pair is incomplete.
 - Button meaning: holding an item the button always drops; it picks up the
   item under the cursor only with empty hands (0x00304D7D, the first item of
   the cell, so repeated pick-ups peel the stack oldest first).
@@ -92,8 +120,31 @@ launchers.
   play-time position hook; not done). Pickups are separate objects, so one
   does not block collecting the other (INFERRED, not tested). The fill
   handler's pad writes (`pad+4 |= 0x4000`, `pad+0x18`) repeat per item; the
-  last item wins `+0x18` (INFERRED harmless for pickups; why teleporters stay
-  denied).
+  last item wins `+0x18` (INFERRED harmless for pickups).
+- Play time, Story AI: AIs on one cell spawn on the same pad (the same as
+  Duplicate Story AI, user-tested), and next to any pickup there.
+- Play time, teleporters (CONFIRMED code, behaviour not tested in game).
+  Destination: `sub_000C0540` sends the toucher to the first other teleporter
+  object of the same colour in pool order (0x000C05A1..0x000C05E2, the touched
+  object itself excluded at 0x000C05B6), at that object's pad. A per-character
+  cooldown `[char+0xB40]` must be <= 0 (0x000C0572) and is set to 2.0
+  (`[0x475D10]`) on every teleport (0x000C0673), counting down per frame
+  (0x000D8EC9; the rate is a .data value, INFERRED frame time). So: a pair stacked on one cell teleports you to where you
+  stand (a no-op with the effect); two colours on one cell, or a teleporter
+  on the arrival cell of another colour, send you on only after the cooldown
+  and only if you are still on the pad, exactly as standing on the stock
+  arrival teleporter does. Nothing loops faster than stock, and a second
+  teleporter touched in the same frame is skipped by the cooldown. AI only
+  teleport when their route's next pad is the destination (0x000C0615). The
+  arrival facing is your yaw minus the source pad's `+0x18` plus the
+  destination's (0x000C0731, 0x000C078C); teleporters sharing a pad share
+  that angle (the last loaded wins, fill 0x0024140D), so a rotated teleporter
+  on a shared pad can turn you differently than its arrow shows (cosmetic).
+  Nav pairing `sub_0009CD00` links each teleporter to the next of its colour;
+  a stacked pair would get a pad -> pad self link from `sub_0009A5B0`. The
+  play-time hook `pc_mapmaker_objects_teleporters` (`src/pc_mapmaker_objects.inc`,
+  scene 100, always on) now skips that link (logged `teleporter pair on one
+  pad`); the chain continues with the next teleporter.
 
 ## Save and story compatibility
 
@@ -123,6 +174,7 @@ WRAP sub_002F8140 -> pc_mapmaker_overlap_cell
 WRAP sub_00308260 -> pc_mapmaker_stack_find
 WRAP sub_00334770 -> pc_mapmaker_stack_cell
 WRAP sub_003348C0 -> pc_mapmaker_stack_valid
+WRAP sub_002F8B40 -> pc_mapmaker_stack_sai_point
 ```
 
 `sub_0001ED50` is a 5-byte `jmp` thunk to `sub_0001C720` called from 353
@@ -137,4 +189,5 @@ sites; the hook costs one stack compare when not in the floor menu.
   calls per frame).
 - 80x80 play: longer sightlines, AI pathing over distance, fog; rooms stay
   capped at 241 pieces.
-- Overlap maps look broken by design; teleporters/starts/flags never stack.
+- Overlap maps look broken by design; starts/flags/turrets/movers never stack.
+- Stacked teleporters and Story AI are not tested in game (see play time above).

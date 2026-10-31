@@ -250,7 +250,14 @@ guard above the top level; `TSFP_MAPMAKER_OVERLAP=1` overlapping tiles and
 `TSFP_MAPMAKER_STACK_ITEMS=1` several items per cell (hooks on
 `sub_00308260`/`sub_00334770`, and `sub_003348C0` at return 0x003070A7 sets
 the per-frame valid bit editor `+0x25C`&4 that the item-under-cursor test at
-0x003070B4 otherwise leaves clear = red X), both env-only; a
+0x003070B4 otherwise leaves clear = red X; pickups, props and teleporters
+(categories 14-18) share with each other and with Story AI points, several
+Story AI share a cell: `sub_00334770` also hides other AIs' points from its
+refusal 0x0033484F..0x00334893, and `sub_002F8B40` at return 0x0030723F
+answers -1 while a Story AI is held, which the valid bit 0x003072B4 and the
+drop 0x00305238 require; starts, flags, turrets, movers and markers are never
+hidden), both env-only; in play `pc_mapmaker_objects_teleporters` skips the
+pad -> pad nav link of a stacked teleporter pair; a
 16-byte settings block at 0x00903600 (`src/pc_mapmaker_grid.h`) that
 `grid.json` redirects the editor's 40.0/5.0/60.0/(1/60) reads to; save format
 unchanged; `docs/mapmaker-grid.md`).

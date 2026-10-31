@@ -109,13 +109,33 @@ static void orig_find(void)  /* first item of the piece with the cell */
     g_eax=item;orig_calls++;g_esp+=4u;
 }
 static void orig_valid(void) { g_eax=(g_eax&~0xFFu)|(valid_result&0xFFu);orig_calls++;g_esp+=4u; }
-static void orig_cell(void)  /* refusal 3.1.4 only, plus an injected other refusal */
+/* Story AI array as editor.json relocates it: editor+0x11950, 0xE4 each,
+ * point count +0x58, points {piece, x, y, z} x 0x10 from +0x64. */
+#define SAI(s) (ED+0x11950u+(uint32_t)(s)*0xE4u)
+static void orig_cell(void)  /* refusals 3.1.4 and 3.1.5 (0x0033482A..0x00334893), plus an injected other refusal */
 {
-    uint32_t item=WORD_AT(WORD_AT(g_esp+4u)+0x3Cu);
+    uint32_t piece=WORD_AT(g_esp+4u),item=WORD_AT(piece+0x3Cu),s,k;
     uint16_t x=U16_AT(g_esp+8u),y=U16_AT(g_esp+10u),z=U16_AT(g_esp+12u);
     g_eax=(g_eax&~0xFFu)|(cell_extra_refusal?0u:1u);
     for(;item;item=WORD_AT(item+0x14u))
         if(U16_AT(item+0xCu)==x && U16_AT(item+0xEu)==y && U16_AT(item+0x10u)==z) g_eax&=~0xFFu;
+    for(s=0;(int32_t)s<(int32_t)WORD_AT(ED+0x280u);s++)
+        for(k=0;(int32_t)k<(int32_t)WORD_AT(SAI(s)+0x58u);k++) {
+            uint32_t pt=SAI(s)+0x64u+k*0x10u;
+            if(WORD_AT(pt)==piece && U16_AT(pt+4u)==x && U16_AT(pt+6u)==y && U16_AT(pt+8u)==z) g_eax&=~0xFFu;
+        }
+    orig_calls++;g_esp+=4u;
+}
+static void orig_sai_point(void)  /* sub_002F8B40: first (sai << 16) | point in the cell, or -1 */
+{
+    uint32_t piece=WORD_AT(g_esp+4u),s,k;
+    uint16_t x=U16_AT(g_esp+8u),y=U16_AT(g_esp+10u),z=U16_AT(g_esp+12u);
+    g_eax=0xFFFFFFFFu;
+    for(s=0;(int32_t)s<(int32_t)WORD_AT(ED+0x280u) && g_eax==0xFFFFFFFFu;s++)
+        for(k=0;(int32_t)k<(int32_t)WORD_AT(SAI(s)+0x58u);k++) {
+            uint32_t pt=SAI(s)+0x64u+k*0x10u;
+            if(WORD_AT(pt)==piece && U16_AT(pt+4u)==x && U16_AT(pt+6u)==y && U16_AT(pt+8u)==z) { g_eax=(s<<16)|k;break; }
+        }
     orig_calls++;g_esp+=4u;
 }
 
@@ -159,9 +179,13 @@ static void reset_world(void)
     FLOAT_AT(0x004760CCu)=5.f;FLOAT_AT(0x004788B8u)=40.f;FLOAT_AT(0x004760ACu)=60.f;
     WORD_AT(0x00478394u)=0x3C888889u;               /* 1/60 as in the XBE */
     WORD_AT(0x007844A8u)=ED;WORD_AT(SCENE)=102u;
-    /* catalogue categories: id 5 weapon (8), 6 teleporter (14), 7 cover prop (33), 8 start (0) */
+    /* catalogue categories: id 5 weapon (8), 6 teleporter (14), 7 cover prop (33), 8 start (0),
+     * 9 ammo (9), 10 flag (4), 11 turret (27), 12 teleporter (18) */
     U16_AT(0x00524F5Au+5u*0xC4u)=8;U16_AT(0x00524F5Au+6u*0xC4u)=14;
     U16_AT(0x00524F5Au+7u*0xC4u)=33;U16_AT(0x00524F5Au+8u*0xC4u)=0;
+    U16_AT(0x00524F5Au+9u*0xC4u)=9;U16_AT(0x00524F5Au+10u*0xC4u)=4;
+    U16_AT(0x00524F5Au+11u*0xC4u)=27;U16_AT(0x00524F5Au+12u*0xC4u)=18;
+    U16_AT(ED+0x2F10u)=0xFFFFu;                      /* no story AI held */
 }
 
 static void test_stock(void)
@@ -343,9 +367,9 @@ static void item(uint32_t addr,uint32_t id,uint16_t x,uint16_t y,uint16_t z,uint
 }
 static void test_stack(void)
 {
-    uint32_t p=0x00210000u,i1=0x00211000u,i2=0x00211100u,i3=0x00211200u,held=0x00212000u;
+    uint32_t p=0x00210000u,i1=0x00211000u,i2=0x00211100u,i3=0x00211200u,i4=0x00211300u,held=0x00212000u;
     set_env(NULL,NULL,"1");reset_world();
-    WORD_AT(p+0x3Cu)=i1;item(i1,5,1,2,0,i2);item(i2,9,1,2,0,i3);item(i3,9,3,3,0,0);
+    WORD_AT(p+0x3Cu)=i1;item(i1,5,1,2,0,i2);item(i2,9,1,2,0,i3);item(i3,9,3,3,0,i4);item(i4,8,5,5,0,0);
     /* sub_00303460 frame: [ebp+0x14] = held item node */
     g_ebp=0x00610000u;WORD_AT(g_ebp+0x14u)=held;WORD_AT(held)=5;
     CALL(pc_mapmaker_stack_find,orig_find,MAPMAKER_STACK_RET_REPLACE,p,1u|(2u<<16),0u,0xFFFFFFFFu);
@@ -359,7 +383,10 @@ static void test_stack(void)
     CHECK(orig_calls==1 && g_eax==i1);
     WORD_AT(held)=6;                                                                          /* teleporter */
     CALL(pc_mapmaker_stack_find,orig_find,MAPMAKER_STACK_RET_REPLACE,p,1u|(2u<<16),0u,0xFFFFFFFFu);
-    CHECK(orig_calls==1 && g_eax==i1);
+    CHECK(orig_calls==1 && g_eax==0u && mapmaker_grid.stacked==2u);
+    WORD_AT(held)=5;                                                                          /* a start in the cell stays */
+    CALL(pc_mapmaker_stack_find,orig_find,MAPMAKER_STACK_RET_REPLACE,p,5u|(5u<<16),0u,0xFFFFFFFFu);
+    CHECK(orig_calls==1 && g_eax==i4 && mapmaker_grid.stacked==2u);
     WORD_AT(held)=8;                                                                          /* start point */
     CALL(pc_mapmaker_stack_find,orig_find,MAPMAKER_STACK_RET_REPLACE,p,1u|(2u<<16),0u,0xFFFFFFFFu);
     CHECK(orig_calls==1 && g_eax==i1);
@@ -377,7 +404,15 @@ static void test_stack(void)
     cell_extra_refusal=1;                                                                     /* refused anyway */
     CALL(pc_mapmaker_stack_cell,orig_cell,0x00304D10u,p,1u|(2u<<16),0u);
     CHECK((g_eax&0xFFu)==0u && U16_AT(i1+0xCu)==1u && U16_AT(i2+0xCu)==1u);
-    cell_extra_refusal=0;WORD_AT(ED+0x2F34u)=6;
+    cell_extra_refusal=0;WORD_AT(ED+0x2F34u)=6;                                               /* teleporter */
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
+    CHECK((g_eax&0xFFu)==1u && U16_AT(i1+0xCu)==1u && U16_AT(i2+0xCu)==1u);
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,5u|(5u<<16),0u);                   /* onto a start */
+    CHECK((g_eax&0xFFu)==0u && U16_AT(i4+0xCu)==5u);
+    WORD_AT(ED+0x2F34u)=5;
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,5u|(5u<<16),0u);
+    CHECK((g_eax&0xFFu)==0u && U16_AT(i4+0xCu)==5u);
+    WORD_AT(ED+0x2F34u)=8;                                                                    /* start held */
     CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
     CHECK((g_eax&0xFFu)==0u);
     WORD_AT(ED+0x2F34u)=0xFFFFFFFFu;                                                          /* nothing held */
@@ -405,8 +440,8 @@ static void test_stack(void)
     CHECK(orig_calls==1 && WORD_AT(ED+0x25Cu)==0x10u);
     WORD_AT(ED+0x2F34u)=6;                                                                    /* teleporter */
     CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
-    CHECK(WORD_AT(ED+0x25Cu)==0x10u);
-    WORD_AT(ED+0x2F34u)=8;                                                                    /* start point */
+    CHECK(WORD_AT(ED+0x25Cu)==0x14u);
+    WORD_AT(ED+0x25Cu)=0x10u;WORD_AT(ED+0x2F34u)=8;                                                                  /* start point */
     CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
     CHECK(WORD_AT(ED+0x25Cu)==0x10u);
     WORD_AT(ED+0x2F34u)=7;WORD_AT(SCENE)=100u;                                                /* not the editor */
@@ -427,6 +462,85 @@ static void test_stack(void)
     CHECK(orig_calls==1 && g_eax==i1);
 }
 
+static void point(unsigned s,unsigned k,uint32_t piece,uint16_t x,uint16_t y,uint16_t z)
+{
+    uint32_t pt=SAI(s)+0x64u+k*0x10u;
+    WORD_AT(pt)=piece;U16_AT(pt+4u)=x;U16_AT(pt+6u)=y;U16_AT(pt+8u)=z;
+    if(WORD_AT(SAI(s)+0x58u)<k+1u) WORD_AT(SAI(s)+0x58u)=k+1u;
+}
+static void hold_sai(int s) { WORD_AT(ED+0x2F34u)=0xFFFFFFFFu;U16_AT(ED+0x2F10u)=(uint16_t)(int16_t)s; }
+static void test_stack_sai(void)
+{
+    uint32_t p=0x00210000u,q=0x00210100u,i1=0x00211000u,i2=0x00211100u,i3=0x00211200u;
+    set_env(NULL,NULL,"1");reset_world();
+    /* cell (1,2,0): weapon + teleporter; (3,3,0): start; story AI 0: (1,2,0),(5,5,0);
+     * 1: (1,2,0); 2: (3,3,0) and one point on another piece at (1,2,0) */
+    WORD_AT(p+0x3Cu)=i1;item(i1,5,1,2,0,i2);item(i2,12,1,2,0,i3);item(i3,8,3,3,0,0);
+    WORD_AT(ED+0x280u)=3;
+    point(0,0,p,1,2,0);point(0,1,p,5,5,0);point(1,0,p,1,2,0);point(2,0,p,3,3,0);point(2,1,q,1,2,0);
+    /* a held story AI may join items and other story AI ... */
+    hold_sai(2);
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
+    CHECK(orig_calls==1 && (g_eax&0xFFu)==1u);
+    CHECK(U16_AT(i1+0xCu)==1u && U16_AT(i2+0xCu)==1u && U16_AT(SAI(0)+0x68u)==1u && U16_AT(SAI(1)+0x68u)==1u);
+    CHECK(U16_AT(SAI(2)+0x78u)==1u);
+    /* ... but not its own points, nor a start */
+    hold_sai(0);
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
+    CHECK((g_eax&0xFFu)==0u && U16_AT(SAI(0)+0x68u)==1u && U16_AT(SAI(1)+0x68u)==1u && U16_AT(i1+0xCu)==1u);
+    hold_sai(1);
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,3u|(3u<<16),0u);
+    CHECK((g_eax&0xFFu)==0u && U16_AT(i3+0xCu)==3u && U16_AT(SAI(2)+0x68u)==3u);
+    /* story AI points past the 8 an entry holds are left to the original */
+    WORD_AT(SAI(1)+0x58u)=9;point(1,8,p,7,7,0);hold_sai(2);
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,7u|(7u<<16),0u);
+    CHECK((g_eax&0xFFu)==0u && U16_AT(SAI(1)+0x68u+0x80u)==7u);
+    WORD_AT(SAI(1)+0x58u)=1;
+    /* items held: on story AI points, still not on a start */
+    WORD_AT(ED+0x2F34u)=5;
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,5u|(5u<<16),0u);
+    CHECK((g_eax&0xFFu)==1u && U16_AT(SAI(0)+0x78u)==5u);
+    WORD_AT(ED+0x2F34u)=6;
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
+    CHECK((g_eax&0xFFu)==1u && U16_AT(SAI(0)+0x68u)==1u);
+    WORD_AT(ED+0x2F34u)=10;                                                                   /* flag */
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,5u|(5u<<16),0u);
+    CHECK((g_eax&0xFFu)==0u);
+    WORD_AT(ED+0x2F34u)=11;                                                                   /* turret */
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,5u|(5u<<16),0u);
+    CHECK((g_eax&0xFFu)==0u);
+    /* nothing held, wrong scene, switch off: stock */
+    hold_sai(-1);
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,5u|(5u<<16),0u);
+    CHECK((g_eax&0xFFu)==0u);
+    hold_sai(2);WORD_AT(SCENE)=100u;
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
+    CHECK((g_eax&0xFFu)==0u);
+    WORD_AT(SCENE)=102u;
+    /* point under the cursor (sub_002F8B40): none while a story AI is held */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,1u|(2u<<16),0u);
+    CHECK(orig_calls==1 && g_eax==0xFFFFFFFFu && mapmaker_grid.stack_sai==1u);
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,9u|(9u<<16),0u);
+    CHECK(orig_calls==1 && g_eax==0xFFFFFFFFu && mapmaker_grid.stack_sai==1u);              /* empty cell: not counted */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,0x00300000u,p,5u|(5u<<16),0u);         /* other caller */
+    CHECK(g_eax==1u);
+    hold_sai(-1);                                                                             /* empty hands: pick-up */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,5u|(5u<<16),0u);
+    CHECK(g_eax==1u);
+    WORD_AT(ED+0x2F34u)=5;                                                                    /* an item held */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,5u|(5u<<16),0u);
+    CHECK(g_eax==1u);
+    hold_sai(2);WORD_AT(SCENE)=100u;
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,3u|(3u<<16),0u);
+    CHECK(g_eax==(2u<<16));
+    WORD_AT(SCENE)=102u;
+    set_env(NULL,NULL,NULL);
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,3u|(3u<<16),0u);
+    CHECK(orig_calls==1 && g_eax==(2u<<16));
+    CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
+    CHECK(orig_calls==1 && (g_eax&0xFFu)==0u);
+}
+
 int main(void)
 {
     g_xbox_mem_offset=(uintptr_t)memory;
@@ -434,6 +548,7 @@ int main(void)
     test_wide();
     test_overlap();
     test_stack();
+    test_stack_sai();
     if(failures || esp_errors) { fprintf(stderr,"%d failures, %d esp errors\n",failures,esp_errors);return 1; }
     printf("mapmaker grid ok\n");
     return 0;

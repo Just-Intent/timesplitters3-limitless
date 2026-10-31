@@ -265,7 +265,11 @@ include `pc_display_menu.c` or `pc_menu_mouse_guest.inc` (`menu_mouse.c`,
 `tests/test_mapmaker_grid.py` covers stacked items with the per-frame valid
 bit hook `pc_mapmaker_stack_valid` (`sub_003348C0`, return 0x003070A7) and
 the always-run `sub_00308260` original (`stack-valid-*`, `stack-find-*`
-mutations).
+mutations), and Story AI / teleporter stacking (`test_stack_sai`: a fake
+`sub_00334770` with both refusals over the relocated Story AI array at
+editor+0x11950, a fake `sub_002F8B40`; `sai-*`, `stack-hides-any-item`,
+`stack-no-teleporter*` mutations). `tests/test_mapmaker_objects.py` covers the
+skipped self link of a stacked teleporter pair (`tele-self-*`).
 
 ## Guest-code patch table
 

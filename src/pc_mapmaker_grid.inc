@@ -42,8 +42,8 @@
  * TSFP_MAPMAKER_STACK_ITEMS=1 (editor only): sub_00303460 neither replaces
  * nor uncounts the item already in the cell (sub_00308260 answers "none" at
  * returns 0x003034AD/0x00303696), and the validity test sub_00334770 does
- * not refuse an occupied cell (matching items' x word hidden as 0x7FFF for
- * the call and restored). The per-frame "placement valid" bit (editor
+ * not refuse an occupied cell (matching items' and story AI points' x word
+ * hidden as 0x7FFF for the call and restored). The per-frame "placement valid" bit (editor
  * +0x25C value 4; clear = red X, and the drop refuses with 0x1576) has a
  * second occupancy test in sub_00306460: after sub_003348C0 passes for a
  * held item (return 0x003070A7) it is set only when no item is under the
@@ -51,9 +51,17 @@
  * the held item may stack. Holding an item, the button always drops
  * (pick-up of the item under the cursor runs only with empty hands,
  * sub_00304C30 0x00304D7D). Only for allowed categories (weapons, ammo,
- * keycards, health, armour, power-ups, special pickups, props); starts,
- * flags, teleporters, turrets, movers, markers, the single item and unknown
- * categories keep the stock one-per-cell rule.
+ * keycards, health, armour, teleporters, power-ups, special pickups,
+ * props), held and already in the cell; starts, flags, turrets, movers,
+ * markers, the single item and unknown categories keep the stock
+ * one-per-cell rule (nothing joins them, they join nothing). Story AI (a
+ * held story AI, editor +0x2F10 >= 0, story AI mode sub_003051F0) may go
+ * on a cell with allowed items and with points of other story AI, and
+ * allowed items on story AI points: sub_00334770 hides those points too,
+ * and sub_002F8B40 (point under the cursor, return 0x0030723F) answers
+ * none while a story AI is held, which both the valid bit (0x003072B4)
+ * and the drop (0x00305238) require. A story AI's own points still may
+ * not share a cell.
  *
  * The map format is unchanged: absolute signed-byte cells, rebuilt into the
  * grid at load. Requires the includer's WORD_AT, FLOAT_AT, guest_writable,
@@ -85,12 +93,13 @@
 #define MAPMAKER_STACK_RET_COUNT 0x003034ADu
 #define MAPMAKER_STACK_RET_REPLACE 0x00303696u
 #define MAPMAKER_STACK_RET_VALID 0x003070A7u
+#define MAPMAKER_STACK_RET_SAI_POINT 0x0030723Fu
 #define MAPMAKER_STACK_HIDE 0x7FFFu
 #define MAPMAKER_GRID_U16(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 static struct {
     int initialized, wide, overlap, stack;
-    unsigned refused, overlaps, stacked, reregistered, stack_valid;
+    unsigned refused, overlaps, stacked, reregistered, stack_valid, stack_sai;
     uint32_t allocated;   /* the grid this hook allocated (wide mode) */
 } mapmaker_grid;
 
@@ -354,14 +363,15 @@ void pc_mapmaker_overlap_cell(void (*original)(void))
     g_eax=0;
 }
 
-/* ---- stacked items ----------------------------------------------------- */
-/* Catalogue category (word at 0x00524F5A + id*0xC4) may share a cell. */
+/* ---- stacked items and story AI ---------------------------------------- */
+/* Catalogue category (word at 0x00524F5A + id*0xC4) may share a cell, both
+ * as the held item and as an item already there. */
 static int mapmaker_stack_allowed(int32_t id)
 {
     static const unsigned char allowed[37]={
         0,0,0,0, 0,0,0,0,      /* 0-3 starts, 4-6 flags, 7 */
         1,1,1,1, 1,1,          /* 8 weapons, 9 ammo, 10-13 keycards */
-        0,0,0,0,0,             /* 14-18 teleporters */
+        1,1,1,1,1,             /* 14-18 teleporters (one colour each) */
         1,1,1,                 /* 19 health, 20 armour, 21 power-ups */
         0,0,0,0,               /* 22 single item, 23, 24, 25 movers */
         1,                     /* 26 props */
@@ -374,6 +384,19 @@ static int mapmaker_stack_allowed(int32_t id)
     if(!MAPMAKER_PTR_OK(a,2)) return 0;
     category=(int16_t)MAPMAKER_GRID_U16(a);
     return category>=0 && category<37 && allowed[category];
+}
+/* What the editor holds: an item id (+0x2F34 >= 0, which sub_00306460 tests
+ * first), else a story AI (signed word +0x2F10 >= 0; its point being placed
+ * was taken out of the array, sub_003051F0 0x003056EF..0x00305735). */
+#define MAPMAKER_STACK_HELD_NONE (-2)
+#define MAPMAKER_STACK_HELD_ITEM (-1)
+static int32_t mapmaker_stack_held(uint32_t editor)
+{
+    int32_t sai;
+    if((int32_t)WORD_AT(editor+0x2F34u)>=0)
+        return mapmaker_stack_allowed((int32_t)WORD_AT(editor+0x2F34u))?MAPMAKER_STACK_HELD_ITEM:MAPMAKER_STACK_HELD_NONE;
+    sai=(int16_t)MAPMAKER_GRID_U16(editor+0x2F10u);
+    return sai>=0?sai:MAPMAKER_STACK_HELD_NONE;
 }
 /* sub_00308260(piece, cell, id): the item already in the cell (a pure
  * list walk). In sub_00303460 (place) answer none, so nothing is replaced
@@ -388,6 +411,7 @@ void pc_mapmaker_stack_find(void (*original)(void))
        !mapmaker_grid_editor() || !MAPMAKER_PTR_OK(g_ebp+0x14u,4)) return;
     held=WORD_AT(g_ebp+0x14u);                /* sub_00303460's held item node */
     if(!MAPMAKER_PTR_OK(held,4) || !mapmaker_stack_allowed((int32_t)WORD_AT(held))) return;
+    if(MAPMAKER_PTR_OK(g_eax,4) && !mapmaker_stack_allowed((int32_t)WORD_AT(g_eax))) return;  /* a start etc. is replaced as stock */
     if(ret==MAPMAKER_STACK_RET_REPLACE && mapmaker_grid.stacked++<3u)
         fprintf(stderr,"[mapmaker] stack: item added to an occupied cell\n");
     g_eax=0;
@@ -397,7 +421,8 @@ void pc_mapmaker_stack_find(void (*original)(void))
  * item is under the cursor (0x003070B4: [editor+0x2F1C] != 0 -> 0x003070C2,
  * which for every allowed category reaches 0x00307175 without setting it).
  * Set the bit here for an allowed held item; nothing later in the frame
- * clears it (the only clear, 0x00306EA1, runs before). */
+ * clears it (the only clear, 0x00306EA1, runs before). The pass itself
+ * already proves every item in the cell may share (pc_mapmaker_stack_cell). */
 void pc_mapmaker_stack_valid(void (*original)(void))
 {
     uint32_t ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u,editor;
@@ -412,28 +437,78 @@ void pc_mapmaker_stack_valid(void (*original)(void))
     if(mapmaker_grid.stack_valid++<3u)
         fprintf(stderr,"[mapmaker] stack: drop allowed over an existing item\n");
 }
-/* sub_00334770(piece, x, y, z words): may the held item go in this cell?
- * Hide the piece's items in the cell from refusal 4 for the call. */
-#define MAPMAKER_STACK_MAX 256u
+/* sub_002F8B40(piece, cell): the story AI point in the cell, (sai << 16) |
+ * point, or -1 (a pure walk of the array). Its only caller (0x0030723A,
+ * story AI mode of sub_00306460) stores it in [editor+0x2F20]; a point
+ * there keeps the valid bit clear (0x003072B4) and the drop refuses it
+ * (sub_003051F0 0x00305238). While a story AI is held answer -1, the value
+ * the frame already uses for "nothing under the cursor"; with empty hands
+ * the point is still found, so pick-up takes the AI apart one at a time. */
+void pc_mapmaker_stack_sai_point(void (*original)(void))
+{
+    uint32_t ret,editor;
+    mapmaker_grid_read();
+    ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;  /* before the original pops it */
+    original();
+    if((int32_t)g_eax<0 || ret!=MAPMAKER_STACK_RET_SAI_POINT || !mapmaker_grid.stack || !mapmaker_grid_editor()) return;
+    editor=WORD_AT(MAPMAKER_GRID_EDITOR);
+    if(!MAPMAKER_PTR_OK(editor,0x2F38) || mapmaker_stack_held(editor)<0) return;
+    if(mapmaker_grid.stack_sai++<3u)
+        fprintf(stderr,"[mapmaker] stack: story AI over another story AI\n");
+    g_eax=0xFFFFFFFFu;
+}
+/* sub_00334770(piece, x, y, z words): may the held item or story AI point
+ * go in this cell? For the call, hide (x word = 0x7FFF, restored after)
+ * the piece's items in the cell whose category may share (refusal
+ * 0x0033482A..0x00334846) and the story AI points in the cell (refusal
+ * 0x0033484F..0x00334893; array at editor+MAPMAKER_STACK_SAI, relocated by
+ * editor.json, count +0x280), except the held story AI's own points.
+ * Starts, flags, turrets, movers and markers stay visible, so nothing
+ * joins them and they join nothing. */
+#define MAPMAKER_STACK_MAX 2304u    /* 256 items + 255 story AI x 8 points */
+#define MAPMAKER_STACK_SAI 0x11950u /* editor.json: 0x288 -> 0x11950 */
+#define MAPMAKER_STACK_SAI_CAP 255u
+#define MAPMAKER_STACK_SAI_POINTS 8u /* 0x64 + 8 x 0x10 fills the 0xE4 entry */
 void pc_mapmaker_stack_cell(void (*original)(void))
 {
-    uint32_t editor,piece,item,hidden[MAPMAKER_STACK_MAX];
+    static uint32_t hidden[MAPMAKER_STACK_MAX];
+    uint32_t editor,piece,item,count,s,k;
+    int32_t held;
     uint16_t x,y,z;
     unsigned n=0,i;
     mapmaker_grid_read();
     if(!mapmaker_grid.stack || !mapmaker_grid_editor() || !MAPMAKER_STACK_OK(16)) { original();return; }
     editor=WORD_AT(MAPMAKER_GRID_EDITOR);
-    if(!MAPMAKER_PTR_OK(editor,0x2F38) || !mapmaker_stack_allowed((int32_t)WORD_AT(editor+0x2F34u))) { original();return; }
+    if(!MAPMAKER_PTR_OK(editor,0x2F38) || (held=mapmaker_stack_held(editor))==MAPMAKER_STACK_HELD_NONE) { original();return; }
     piece=WORD_AT(g_esp+4u);
     x=MAPMAKER_GRID_U16(g_esp+8u);y=MAPMAKER_GRID_U16(g_esp+10u);z=MAPMAKER_GRID_U16(g_esp+12u);
     if(MAPMAKER_PTR_OK(piece,0x40)) {
         item=WORD_AT(piece+0x3Cu);
-        for(i=0;item && i<4096u && n<MAPMAKER_STACK_MAX && MAPMAKER_PTR_OK(item,0x18);i++,item=WORD_AT(item+0x14u))
-            if(MAPMAKER_GRID_U16(item+0xCu)==x && MAPMAKER_GRID_U16(item+0xEu)==y && MAPMAKER_GRID_U16(item+0x10u)==z) {
+        for(i=0;item && i<4096u && n<256u && MAPMAKER_PTR_OK(item,0x18);i++,item=WORD_AT(item+0x14u))
+            if(MAPMAKER_GRID_U16(item+0xCu)==x && MAPMAKER_GRID_U16(item+0xEu)==y && MAPMAKER_GRID_U16(item+0x10u)==z &&
+               mapmaker_stack_allowed((int32_t)WORD_AT(item))) {
                 MAPMAKER_GRID_U16(item+0xCu)=MAPMAKER_STACK_HIDE;
-                hidden[n++]=item;
+                hidden[n++]=item+0xCu;
             }
     }
+    count=WORD_AT(editor+0x280u);
+    if((int32_t)count<0) count=0;
+    if(count>MAPMAKER_STACK_SAI_CAP) count=MAPMAKER_STACK_SAI_CAP;
+    if(MAPMAKER_PTR_OK(editor+MAPMAKER_STACK_SAI,count*0xE4u))
+        for(s=0;s<count;s++) {
+            uint32_t sai=editor+MAPMAKER_STACK_SAI+s*0xE4u,points=WORD_AT(sai+0x58u);
+            if((int32_t)s==held) continue;
+            if((int32_t)points<0) points=0;
+            if(points>MAPMAKER_STACK_SAI_POINTS) points=MAPMAKER_STACK_SAI_POINTS;
+            for(k=0;k<points && n<MAPMAKER_STACK_MAX;k++) {
+                uint32_t pt=sai+0x64u+k*0x10u;
+                if(WORD_AT(pt)==piece && MAPMAKER_GRID_U16(pt+4u)==x && MAPMAKER_GRID_U16(pt+6u)==y &&
+                   MAPMAKER_GRID_U16(pt+8u)==z) {
+                    MAPMAKER_GRID_U16(pt+4u)=MAPMAKER_STACK_HIDE;
+                    hidden[n++]=pt+4u;
+                }
+            }
+        }
     original();
-    for(i=0;i<n;i++) MAPMAKER_GRID_U16(hidden[i]+0xCu)=x;
+    for(i=0;i<n;i++) MAPMAKER_GRID_U16(hidden[i])=x;
 }
