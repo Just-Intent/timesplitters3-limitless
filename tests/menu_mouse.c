@@ -98,6 +98,10 @@ static uint32_t guest_call(void (*fn)(void),unsigned n,...)
     item=va_arg(ap,uint32_t);va_end(ap);
     WORD_AT(menu+0x198)=item; ++selections; return 0;
 }
+/* The widescreen editor scope (pc_mapmaker_widescreen.inc) needs the display
+ * layer, which this fixture does not compile: a 4:3 display, no rescoping. */
+int pc_display_wide_now(void) { return 0; }
+void pc_display_ui_scope(void (*original)(void),int placement,uint32_t tag) { (void)placement;(void)tag;original(); }
 #include "pc_menu_mouse_guest.inc"
 static void original(void) { ++original_calls;WORD_AT(WORD_AT(g_esp+4)+0xc4)|=navigation;g_esp+=4; }
 static void dispatch(void)

@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,1222 @@
+@@ -955,6 +955,1244 @@
      sub_002FA720_gen();
  #endif
  }
@@ -988,6 +988,28 @@
 +    else sub_002F8B40_gen();
 +#else
 +    sub_002F8B40_gen();
++#endif
++}
++
++extern void sub_00310A20_gen(void);
++void sub_00310A20(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_view")) pc_mapmaker_grid_view(sub_00310A20_gen);
++    else sub_00310A20_gen();
++#else
++    sub_00310A20_gen();
++#endif
++}
++
++extern void sub_0030A550_gen(void);
++void sub_0030A550(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_lines")) pc_mapmaker_grid_lines(sub_0030A550_gen);
++    else sub_0030A550_gen();
++#else
++    sub_0030A550_gen();
 +#endif
 +}
 +

@@ -55,6 +55,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_story_character.inc"
 #include "pc_mapmaker_aitemplates.inc"
 #include "pc_mapmaker_grid.inc"
+#include "pc_mapmaker_widescreen.inc"
 #include "pc_mapmaker_bugfix.inc"
 #include "pc_mapmaker_sky.inc"
 #include "pc_mapmaker_skymask.inc"
@@ -710,6 +711,8 @@ void pc_mapmaker_stack_find(void (*original)(void)) { original(); }
 void pc_mapmaker_stack_cell(void (*original)(void)) { original(); }
 void pc_mapmaker_stack_valid(void (*original)(void)) { original(); }
 void pc_mapmaker_stack_sai_point(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_view(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_lines(void (*original)(void)) { original(); }
 void pc_mapmaker_bugfix_net_fragment(void (*original)(void)) { original(); }
 void pc_mapmaker_bugfix_turret_sync(void (*original)(void)) { original(); }
 void pc_mapmaker_bugfix_net_death(void (*original)(void)) { original(); }
