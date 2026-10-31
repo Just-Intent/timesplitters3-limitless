@@ -116,6 +116,7 @@ void pc_mapmaker_overlap_cell(void (*original)(void));
 void pc_mapmaker_stack_find(void (*original)(void));
 void pc_mapmaker_stack_cell(void (*original)(void));
 void pc_mapmaker_stack_valid(void (*original)(void));
+void pc_mapmaker_stack_sai_point(void (*original)(void));
 void pc_mapmaker_bugfix_net_fragment(void (*original)(void));
 void pc_mapmaker_bugfix_turret_sync(void (*original)(void));
 void pc_mapmaker_bugfix_net_death(void (*original)(void));
