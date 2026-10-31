@@ -158,6 +158,7 @@ void pc_mapmaker_realbosses_model_request(void (*original)(void));
 void pc_mapmaker_realbosses_anims(void (*original)(void));
 void pc_mapmaker_realbosses_ai_start(void (*original)(void));
 void pc_mapmaker_realbosses_hud(void (*original)(void));
+void pc_mapmaker_realbosses_meter(void (*original)(void));
 void pc_mapmaker_bosses_rows(void (*original)(void));
 void pc_mapmaker_bosses_close(void (*original)(void));
 void pc_mapmaker_bosses_delete(void (*original)(void));
