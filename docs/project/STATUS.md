@@ -1,3 +1,10 @@
+## MapMaker giant skeleton: in-game check (2026-10-31)
+
+Local preview v0.4.0-mapmaker.13 (exe SHA-256 prefix dc838fb3, source 1c7350ff) on the second Windows 11 PC:
+the giant skeleton boss works in MapMaker Story play (user-confirmed). An earlier mapmaker.12 log showed the
+skeleton falling back to bot behaviour (lv1_6.pak not mounted) with the skeleton in custom-set slot 0 and the
+trophy monster in slot 1; that set check is being re-verified.
+
 ## MapMaker boss names in slots 11-20 and weapon set: in-game checks (2026-10-31)
 
 Local preview v0.4.0-mapmaker.12 (exe SHA-256 prefix 27a46650, source 991aac91) on the second Windows
