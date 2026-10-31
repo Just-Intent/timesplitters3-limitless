@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,1628 @@
+@@ -1037,6 +1037,1639 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1471,6 +1471,17 @@
 +    else sub_0014CC80_layer0();
 +#else
 +    sub_0014CC80_layer0();
++#endif
++}
++
++extern void sub_0013A400_gen(void);
++void sub_0013A400(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_meter")) pc_mapmaker_realbosses_meter(sub_0013A400_gen);
++    else sub_0013A400_gen();
++#else
++    sub_0013A400_gen();
 +#endif
 +}
 +
