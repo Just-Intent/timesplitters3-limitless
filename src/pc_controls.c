@@ -9,6 +9,7 @@
 #include "pc_camera.h"
 #include "pc_terminal.h"
 #include "pc_mounted.h"
+#include "pc_scope_wheel.h"
 #include "pc_mapmaker_pointer.h"
 #include "pc_settings.h"
 #include "pc_prompts.h"
@@ -38,6 +39,7 @@ static ULONGLONG mapmaker_pulse_until[1];
 static PcMapMakerClick mapmaker_click;
 static PcMapMakerEscape mapmaker_escape;
 static PcTextInput text_input;
+static PcScopeWheel scope_wheel; /* wheel zoom while player 1 is scoped */
 
 void pc_controls_text_mode(uint32_t owner) {
     AcquireSRWLockExclusive(&lock);
@@ -83,7 +85,10 @@ static void wheel_input(int steps)
         if(menu_wheel>8) menu_wheel=8;
         if(menu_wheel<-8) menu_wheel=-8;
         menu_wheel_at=GetTickCount64();
-    } else pc_input_wheel(&input,steps);
+    } else if(input.focused && input.captured) {
+        /* In a zoomable scope, notches bound to weapon switching zoom instead. */
+        pc_input_wheel(&input,pc_scope_wheel_input(&scope_wheel,steps,GetTickCount64()));
+    }
 }
 
 static void replay_tick(void)
@@ -145,6 +150,7 @@ static void capture(HWND window, int on)
 {
     AcquireSRWLockExclusive(&lock);
     pc_input_capture(&input, enabled && on && !replaying && !menu_mode);
+    pc_scope_wheel_reset(&scope_wheel);
     wheel_remainder = 0;
     menu_wheel = 0;
     on = input.captured;
@@ -481,6 +487,10 @@ int pc_controls_key_down(int key)
     down=pc_mapmaker_zoom_key(&mapmaker_zoom,menu_mode && mapmaker_editor &&
                               (replaying || GetForegroundWindow()==window_handle),
                               key,mapmaker_zoom_up_key,mapmaker_zoom_down_key,down,GetTickCount64());
+    /* Scoped: the weapon-switch wheel keys stay up and a notch holds zoom. */
+    down=pc_scope_wheel_key(&scope_wheel,key,down,
+                            !menu_mode && !text_input.owner && input.focused && input.captured &&
+                            (replaying || GetForegroundWindow()==window_handle),GetTickCount64());
     ReleaseSRWLockExclusive(&lock);
     return down;
 }
@@ -494,6 +504,7 @@ void pc_controls_menu_mode(int active)
         menu_button_block=(input.keys[VK_LBUTTON]?1:0)|(input.keys[VK_RBUTTON]?2:0);
         menu_mode=!!active;
         if(!menu_mode) mapmaker_pointer_active=mapmaker_editor=0;
+        pc_scope_wheel_reset(&scope_wheel);
         menu_wheel=0; wheel_remainder=0;
         input.dx=input.dy=0;
     }
@@ -607,9 +618,14 @@ int pc_controls_terminal_click(void)
 void pc_controls_apply_mouse(uint32_t player, uint32_t fov_object, ptrdiff_t memory_offset)
 {
     float *yaw, *pitch, fov, old_yaw, old_pitch;
-    int changed, terminal;
+    int changed, terminal, bound[PC_ACTION_COUNT][PC_BINDING_SLOTS], have_bound, scope;
     if (InterlockedCompareExchange(&editing, 0, 0)) return;
+    /* Read bindings and guest scope state before taking the controls lock. */
+    have_bound = pc_settings_bound_keys(bound);
+    scope = pc_scope_view(player, fov_object, memory_offset);
     AcquireSRWLockExclusive(&lock);
+    pc_scope_wheel_bindings(&scope_wheel, have_bound ? (const int (*)[PC_BINDING_SLOTS])bound : NULL);
+    pc_scope_wheel_state(&scope_wheel, scope, GetTickCount64());
     replay_tick();
     if (!(replaying || GetForegroundWindow() == window_handle)) {
         ReleaseSRWLockExclusive(&lock);

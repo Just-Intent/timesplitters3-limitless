@@ -255,8 +255,8 @@ existing Quit still returns to the game menus.
 | Melee / menu back | F, middle mouse or Backspace |
 | Throw grenade | G or mouse button 5 |
 | Change weapon | Mouse wheel or left/right arrows |
-| Weapon mode / scope zoom in | Q or Up / Page Up |
-| Change grenade / scope zoom out | V or Down / Page Down |
+| Weapon mode / scope zoom in | Q or Up / Page Up; mouse wheel up while scoped |
+| Change grenade / scope zoom out | V or Down / Page Down; mouse wheel down while scoped |
 | Keyboard and mouse settings | F2 |
 | Fullscreen | Alt+Enter |
 | Show / hide the PC menu bar | F1 |
@@ -265,7 +265,11 @@ existing Quit still returns to the game menus.
 The original game has no jump action; Space is a confirm/action binding. Aim
 and crouch behavior follows your in-game profile settings. F2 blocks gameplay
 input but does not pause the simulation. Prompts baked into artwork retain their
-original appearance. [Full controls and display guide →](docs/windows-settings.md)
+original appearance. While you look through a zoomable scope (for example the
+sniper rifle), the mouse wheel zooms in and out instead of changing weapon;
+iron sights and ordinary aim keep wheel weapon switching. This applies only
+while the wheel is bound to Next/Previous weapon, so a rebound wheel keeps its
+own action. [Full controls and display guide →](docs/windows-settings.md)
 
 </details>
 
