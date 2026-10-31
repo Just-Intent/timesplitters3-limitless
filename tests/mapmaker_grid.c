@@ -97,7 +97,7 @@ static void orig_lookup(void)
 static uint32_t sound_arg;
 static void orig_sound(void) { sound_arg=WORD_AT(g_esp+4u);orig_calls++;g_esp+=4u; }
 static void orig_bar(void) { orig_calls++;g_esp+=4u; }
-static uint32_t placement_result, probe_result, cell_extra_refusal;
+static uint32_t placement_result, probe_result, cell_extra_refusal, valid_result;
 static void orig_placement(void) { g_eax=placement_result;orig_calls++;g_esp+=4u; }
 static void orig_probe(void) { g_eax=probe_result;WORD_AT(ED+0x2F80u)=0x77u;orig_calls++;g_esp+=4u; }
 static void orig_find(void)  /* first item of the piece with the cell */
@@ -108,6 +108,7 @@ static void orig_find(void)  /* first item of the piece with the cell */
         if(U16_AT(item+0xCu)==x && U16_AT(item+0xEu)==y && U16_AT(item+0x10u)==z) break;
     g_eax=item;orig_calls++;g_esp+=4u;
 }
+static void orig_valid(void) { g_eax=(g_eax&~0xFFu)|(valid_result&0xFFu);orig_calls++;g_esp+=4u; }
 static void orig_cell(void)  /* refusal 3.1.4 only, plus an injected other refusal */
 {
     uint32_t item=WORD_AT(WORD_AT(g_esp+4u)+0x3Cu);
@@ -348,9 +349,12 @@ static void test_stack(void)
     /* sub_00303460 frame: [ebp+0x14] = held item node */
     g_ebp=0x00610000u;WORD_AT(g_ebp+0x14u)=held;WORD_AT(held)=5;
     CALL(pc_mapmaker_stack_find,orig_find,MAPMAKER_STACK_RET_REPLACE,p,1u|(2u<<16),0u,0xFFFFFFFFu);
-    CHECK(orig_calls==0 && g_eax==0u);
+    CHECK(orig_calls==1 && g_eax==0u && mapmaker_grid.stacked==1u);
     CALL(pc_mapmaker_stack_find,orig_find,MAPMAKER_STACK_RET_COUNT,p,1u|(2u<<16),0u,0xFFFFFFFFu);
-    CHECK(orig_calls==0 && g_eax==0u);
+    CHECK(orig_calls==1 && g_eax==0u && mapmaker_grid.stacked==1u);
+    /* an empty cell is an ordinary placement: not counted as a stack */
+    CALL(pc_mapmaker_stack_find,orig_find,MAPMAKER_STACK_RET_REPLACE,p,4u|(4u<<16),0u,0xFFFFFFFFu);
+    CHECK(orig_calls==1 && g_eax==0u && mapmaker_grid.stacked==1u);
     CALL(pc_mapmaker_stack_find,orig_find,0x002F831Bu,p,1u|(2u<<16),0u,0xFFFFFFFFu);      /* pick-up */
     CHECK(orig_calls==1 && g_eax==i1);
     WORD_AT(held)=6;                                                                          /* teleporter */
@@ -364,7 +368,7 @@ static void test_stack(void)
     CHECK(orig_calls==1 && g_eax==i1);
     WORD_AT(SCENE)=102u;
     CALL(pc_mapmaker_stack_find,orig_find,MAPMAKER_STACK_RET_REPLACE,p,1u|(2u<<16),0u,0xFFFFFFFFu);
-    CHECK(orig_calls==0 && g_eax==0u);                                                        /* cover prop */
+    CHECK(orig_calls==1 && g_eax==0u);                                                        /* cover prop */
     /* validity: the occupied cell is allowed for an allowed held item */
     WORD_AT(ED+0x2F34u)=5;cell_extra_refusal=0;
     CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
@@ -386,8 +390,36 @@ static void test_stack(void)
     CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
     CHECK((g_eax&0xFFu)==0u);
     WORD_AT(SCENE)=102u;
+    /* per-frame valid bit: sub_003348C0 passed but an item is under the cursor */
+    WORD_AT(ED+0x2F34u)=5;WORD_AT(ED+0x2F1Cu)=i1;WORD_AT(ED+0x25Cu)=0x10u;valid_result=1;
+    CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
+    CHECK(orig_calls==1 && (g_eax&0xFFu)==1u && WORD_AT(ED+0x25Cu)==0x14u);
+    WORD_AT(ED+0x25Cu)=0x10u;valid_result=0;                                                  /* refused cell */
+    CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
+    CHECK(orig_calls==1 && (g_eax&0xFFu)==0u && WORD_AT(ED+0x25Cu)==0x10u);
+    valid_result=1;WORD_AT(ED+0x2F1Cu)=0;                                                     /* stock sets it */
+    CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
+    CHECK(WORD_AT(ED+0x25Cu)==0x10u);
+    WORD_AT(ED+0x2F1Cu)=i1;                                                                   /* no item held */
+    CALL(pc_mapmaker_stack_valid,orig_valid,0x0030707Cu,1u|(2u<<16),0u);
+    CHECK(orig_calls==1 && WORD_AT(ED+0x25Cu)==0x10u);
+    WORD_AT(ED+0x2F34u)=6;                                                                    /* teleporter */
+    CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
+    CHECK(WORD_AT(ED+0x25Cu)==0x10u);
+    WORD_AT(ED+0x2F34u)=8;                                                                    /* start point */
+    CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
+    CHECK(WORD_AT(ED+0x25Cu)==0x10u);
+    WORD_AT(ED+0x2F34u)=7;WORD_AT(SCENE)=100u;                                                /* not the editor */
+    CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
+    CHECK(WORD_AT(ED+0x25Cu)==0x10u);
+    WORD_AT(SCENE)=102u;                                                                      /* cover prop */
+    CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
+    CHECK(WORD_AT(ED+0x25Cu)==0x14u);
     /* switch off: stock */
     set_env(NULL,NULL,NULL);
+    WORD_AT(ED+0x25Cu)=0x10u;WORD_AT(ED+0x2F34u)=5;
+    CALL(pc_mapmaker_stack_valid,orig_valid,MAPMAKER_STACK_RET_VALID,1u|(2u<<16),0u);
+    CHECK(orig_calls==1 && (g_eax&0xFFu)==1u && WORD_AT(ED+0x25Cu)==0x10u);
     CALL(pc_mapmaker_stack_cell,orig_cell,0x00334937u,p,1u|(2u<<16),0u);
     CHECK((g_eax&0xFFu)==0u);
     WORD_AT(held)=5;

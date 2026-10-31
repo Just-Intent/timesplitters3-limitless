@@ -4,7 +4,7 @@ Editor-only feature area (scene 102). Research and evidence:
 `logs/limits/features/floors-grid.md` and `overlap-items.md` (ignored, main
 checkout). Code: `src/pc_mapmaker_grid.inc`, `src/pc_mapmaker_grid.h`,
 `config/guest-code-patches/grid.json`; fixture `tests/mapmaker_grid.c` +
-`tests/test_mapmaker_grid.py` (44 mutations, table/settings-block checks,
+`tests/test_mapmaker_grid.py` (55 mutations, table/settings-block checks,
 decoder inventory of the redirected constants). Nothing here was built or run
 in the game.
 
@@ -65,7 +65,35 @@ launchers.
   replaced or uncounted; the pick-up caller 0x002F831B is unchanged (repeated
   pick-up peels the oldest first). `sub_00334770` sees the piece's items in the
   cell with x = 0x7FFF for the call (restored after, also on refusal); held id
-  editor+0x2F34.
+  editor+0x2F34. `sub_00308260` itself always runs (a pure list walk), so the
+  log line `stack: item added to an occupied cell` now appears only when a
+  real item was in the cell (it used to print on every placement).
+- Red X / refusal (fixed 2026-10-31): the per-frame "placement valid" bit
+  (editor `+0x25C` value 4, cleared at 0x00306EA1) has a second occupancy test
+  in `sub_00306460`. With an item held, `sub_003348C0` (-> `sub_00334770`) is
+  called at 0x003070A2; when it passes, 0x003070B4 still requires no item
+  under the cursor (`[editor+0x2F1C]`, from `sub_002F82E0` -> `sub_00308260`
+  at 0x00306F9D) before setting the bit at 0x00307168; otherwise it goes to
+  0x003070C2 -> 0x0030713A, which only sets it for category 0x22, so the bit
+  stays clear: red X, and the button (`sub_00304C30`) refuses with text
+  0x1576 at 0x00304E0D..0x00304E3E. `pc_mapmaker_stack_valid` (on
+  `sub_003348C0`, return 0x003070A7 only) sets the bit after a pass when an
+  item is under the cursor and the held item may stack; the button then takes
+  the stock drop path (0x00304CD5 -> `sub_00334770` at 0x00304D0B ->
+  `sub_00303460`). `+0x2F1C` is left as it is (HUD text and highlight).
+- Button meaning: holding an item the button always drops; it picks up the
+  item under the cursor only with empty hands (0x00304D7D, the first item of
+  the cell, so repeated pick-ups peel the stack oldest first).
+- Play time: each stacked item is its own record and spawns (the fill pass
+  walks every record, items.md section 2.1). They share the cell's pad
+  (`sub_00331E50` picks it from piece and cell), and the pickup record stores
+  only the pad (`0x002413E8 mov [edi+0x14],ebp`), so they spawn on one spot;
+  no offset is applied (that needs a different pad per item at save time or a
+  play-time position hook; not done). Pickups are separate objects, so one
+  does not block collecting the other (INFERRED, not tested). The fill
+  handler's pad writes (`pad+4 |= 0x4000`, `pad+0x18`) repeat per item; the
+  last item wins `+0x18` (INFERRED harmless for pickups; why teleporters stay
+  denied).
 
 ## Save and story compatibility
 
@@ -94,6 +122,7 @@ WRAP sub_0001ED50 -> pc_mapmaker_grid_floor_bar
 WRAP sub_002F8140 -> pc_mapmaker_overlap_cell
 WRAP sub_00308260 -> pc_mapmaker_stack_find
 WRAP sub_00334770 -> pc_mapmaker_stack_cell
+WRAP sub_003348C0 -> pc_mapmaker_stack_valid
 ```
 
 `sub_0001ED50` is a 5-byte `jmp` thunk to `sub_0001C720` called from 353
