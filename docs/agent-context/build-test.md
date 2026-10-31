@@ -251,9 +251,13 @@ scene 100). `tests/test_mapmaker_sky.py` (MapMaker clouds) also checks the
 stock sky data against the local XBE and skips that check without it. The MapMaker
 pointer, memory budget and stage A limits fixtures
 (`tests/test_mapmaker_pointer.py`, `tests/test_mapmaker_budget.py`,
-`tests/test_mapmaker_limits.py`) are in the same CI list. Fixtures that
+`tests/test_mapmaker_limits.py`) are in the same CI list, as is
+`tests/test_mounted_mouse.py` (mounted/vehicle gun mouse aim; compiles
+`tests/mounted_mouse.c` with `src/pc_input.c`, six header mutations must fail). Fixtures that
 include `pc_display_menu.c` or `pc_menu_mouse_guest.inc` (`menu_mouse.c`,
 `fov_settings.c`) need a `sub_0003DFA0` stub for the stage A allocator.
+`tests/test_menu_mouse.py` also covers the MapMaker map browser click
+(`map_browser_tests`; mutation `late-map-confirm` removes the input-hook click).
 
 ## Guest-code patch table
 
@@ -272,6 +276,9 @@ in `actors-list.json` keeps its offset in the moved table, and that the
 perception slice in `objects.json` matches the actors and objects constants;
 its enemy-picker case compares the two-pass `sub_0027BA40` hook against a
 model of the original's 32-entry array and argmin on random lists.
+`tests/test_mapmaker_story_character.py` (also in the native CI list) checks
+the gate wrappers with mutations, the table bytes, and (with the private XBE)
+that every `cmp byte [0x0078ADAE],2` in game code is patched or reviewed.
 
 Site inventories must come from the lifter's decoder, not from
 `private/pipeline/disasm/asm/text.asm`: the listing elides the byte column of

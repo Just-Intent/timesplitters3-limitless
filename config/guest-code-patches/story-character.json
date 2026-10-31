@@ -1,0 +1,40 @@
+{
+  "patches": [
+    {
+      "id": "story-char-roster",
+      "kind": "code",
+      "function": "0x002C6C80",
+      "address": "0x002C6D1F",
+      "original_hex": "803daead780002",
+      "new_hex": "803d0035900002",
+      "reason": "character roster builder: after cmp edi,9 (MapMaker), cmp [0x78ADAE],2 (sub-mode Story -> one fixed Cortez entry per player) reads the gate byte 0x00903500 instead; pc_mapmaker_story_char_roster (this function) sets it to the sub-mode, or 0 (the Arcade roster of unlocked characters) with TSFP_MAPMAKER_LIMITS=1"
+    },
+    {
+      "id": "story-char-preview",
+      "kind": "code",
+      "function": "0x002C6680",
+      "address": "0x002C672E",
+      "original_hex": "803daead780002",
+      "new_hex": "803d0035900002",
+      "reason": "carousel init: MapMaker Story previews Cortez (sub_002C4310 ecx=0xC); through the gate byte it starts on the profile's last choice (+0x60/+0x64) as Arcade does; pc_mapmaker_story_char_preview sets the gate"
+    },
+    {
+      "id": "story-char-confirm",
+      "kind": "code",
+      "function": "0x002D4D00",
+      "address": "0x002D5414",
+      "original_hex": "803daead780002",
+      "new_hex": "803d0035900002",
+      "reason": "carousel confirm: MapMaker Story skips storing the choice in the profile (+0x60/+0x64) and player record 0x777344; through the gate byte it stores it as Arcade does; pc_mapmaker_story_char_confirm sets the gate"
+    },
+    {
+      "id": "story-char-config",
+      "kind": "code",
+      "function": "0x002D2C70",
+      "address": "0x002D359D",
+      "original_hex": "803daead780002",
+      "new_hex": "803d0035900002",
+      "reason": "config builder: MapMaker Story writes character 0xC (Cortez) for every local player; through the gate byte it takes the profile's choice and variant (sub_00069620(i)+0x60/+0x64) as Arcade does; pc_mapmaker_story_char_config sets the gate"
+    }
+  ]
+}
