@@ -185,9 +185,22 @@ empty. A Story AI's character choice lists all 20 slots. Arcade bots and
 players still use slots 1-10. A map that uses slots 11-20 needs this fork:
 the original game and System Link refuse it; other maps are saved as before.
 An AI set to an empty slot plays as the first filled slot. More different
-characters use more memory. Weapon sets stay at 6 slots: each weapon slot is
-its own pickup item (Weapon 1-6, Ammo 1-6). *Automated tests only.* Details:
+characters use more memory. *Automated tests only.* Details:
 [sets](mapmaker-sets.md).
+
+### 20 weapon slots (`LIMITS`)
+
+The custom weapon set has 20 slots instead of 6. In **Map Settings**, open
+the custom weapon set: the title shows **(1-6)**; press Down on the last row
+for **(7-12)**, **(13-18)** and **(15-20)**, Up on the first row to go back
+(the rows stay numbered 1-6). New slots start empty. A weapon or ammo pickup's
+options gain a **Weapon** choice: its own slot (as before) or slots 7-20. A
+Story AI's weapon choice lists all 20 slots. Bots pick from every filled
+slot. A map that uses slots 7-20 needs this fork: the original game and
+System Link refuse it; other maps are saved as before. More different weapons
+use more memory. The editor shows a pickup on slots 7-20 with its own
+slot's model. *Automated tests only.* Details:
+[weapon set](mapmaker-weaponset.md).
 
 The **Bots** screen of an Arcade match setup (front end and the in-game pause
 menu's setup, when you play a MapMaker map in Arcade) looks like the same

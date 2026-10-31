@@ -553,9 +553,27 @@ pause / front-end Arcade Bots screen (`sub_002C78F0` item 0x3B8 ->
 `sub_002C7730` -> 0x0052375C, scenes 100/101, map set = index 0x11 in mode 9
 only) stays 10 rows: rows are bots, 16 actors per match (0x0078AD6C..);
 stock stores its edits in the profile settings, never the map. Extension memory
-0x00903700..0x009037FF. Weapon sets stay 6 (slots are item types
-0x11..0x1C). Contract and WRAP lines: `docs/mapmaker/mapmaker-sets.md`; tests
-`tests/mapmaker/test_mapmaker_sets.py`, `..._sets_classified.py`.
+0x00903700..0x009037FF. Contract and WRAP lines: `docs/mapmaker/mapmaker-sets.md`;
+tests `tests/mapmaker/test_mapmaker_sets.py`, `..._sets_classified.py`.
+
+### MapMaker weapon set slots (area `weaponset`)
+
+`src/interface/pc_mapmaker_weaponset.inc` (not built or played): 20 weapon
+slots with `TSFP_MAPMAKER_LIMITS=1`, no new item types. The play set
+(`sub_0006BD30`, scene 100 rebuilds 0x006F1E28: 0x44 struct, map info count 6)
+is read by slot everywhere (pickup record +0x10 = catalogue +8, Story AI chunk
+word +0x26 is a SLOT, `sub_001C8540` file loads, AI random pick); no caller
+copies it as 0x44, so the hook returns a 20+ id copy at 0x00906000 when the
+map's custom set is the source. A weapon/ammo pickup's slot 7-20 is record
+byte +0xC (unwritten by `sub_00300800` for categories 8/9) and editor node
++0x30 ('WS' tag; no stock writer), paired by piece/item key on save/load.
+Slots 7-20 travel in fork chunk 0x00C776F6 (only when used; over_stock ->
+64 KB tier, stock and System Link refuse). Editor: weapon set pane
+0x005236EC pages 1-6/7-12/13-18/15-20, Story AI weapon choice (0x0031CDB7) and
+pickup options `sub_00319300` (0x003193A2) get slots 7-20. Eighteen wrappers;
+extension 0x00906000..0x009064FF. Contract, WRAP lines:
+`docs/mapmaker/mapmaker-weaponset.md`; tests `tests/mapmaker/test_mapmaker_weaponset.py`,
+`..._weaponset_classified.py`.
 
 ### Guest memory extension block
 
