@@ -324,7 +324,10 @@ static void mapmaker_pointer_navigate(uint32_t menu,float x,float y,float gw,flo
     else if(x>gw-MAPMAKER_EDGE) ex=(x-(gw-MAPMAKER_EDGE))/MAPMAKER_EDGE;
     if(y<MAPMAKER_EDGE) ey=-(MAPMAKER_EDGE-y)/MAPMAKER_EDGE;
     else if(y>gh-MAPMAKER_EDGE) ey=(y-(gh-MAPMAKER_EDGE))/MAPMAKER_EDGE;
-    if(ex || ey) mapmaker_pointer_pan(fminf(1.f,ex)*MAPMAKER_EDGE_SPEED,fminf(1.f,ey)*MAPMAKER_EDGE_SPEED);
+    /* Widescreen: the window's side bars map left of 0 / right of 640, so
+       clamp both directions (the left/top once ran up to 5x faster at 16:9). */
+    if(ex || ey) mapmaker_pointer_pan(fmaxf(-1.f,fminf(1.f,ex))*MAPMAKER_EDGE_SPEED,
+                                      fmaxf(-1.f,fminf(1.f,ey))*MAPMAKER_EDGE_SPEED);
 }
 
 /* The logic list keeps a passive description panel open as its child, so

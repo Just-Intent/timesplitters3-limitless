@@ -151,6 +151,7 @@ void pc_display_menu_team_tick(void (*original)(void));
 void pc_display_camera(void (*original)(void));
 void pc_display_camera_feed(void (*original)(void));
 void pc_display_ui(void (*original)(void),uint32_t tag);
+void pc_display_ui_scope(void (*original)(void),int placement,uint32_t tag);
 void pc_display_scope(void (*original)(void),uint32_t tag);
 int pc_display_scope_mask(void (*original)(void));
 void pc_display_aim_primitive(void (*original)(void),unsigned kind);

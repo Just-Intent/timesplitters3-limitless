@@ -346,7 +346,10 @@ roof / Open air palette tiles: 29 mutations; its XBE data, record word +0x26
 and hook-site decoder checks skip without the private XBE). The MapMaker
 pointer, memory budget and stage A limits fixtures
 (`tests/test_mapmaker_pointer.py`, `tests/test_mapmaker_budget.py`,
-`tests/test_mapmaker_limits.py`) are in the same CI list, as is
+`tests/test_mapmaker_limits.py`) are in the same CI list, as are
+`tests/test_mapmaker_widescreen.py` (editor 2D placement on non-4:3 displays;
+compiles `tests/mapmaker_widescreen.c` on the `ui_layout.c` batch harness,
+8 mutations incl. `pc_display_ui.inc`) and
 `tests/test_mounted_mouse.py` (mounted/vehicle gun mouse aim; compiles
 `tests/mounted_mouse.c` with `src/pc_input.c`, six header mutations must fail)
 and `tests/test_scope_wheel.py` (mouse-wheel scope zoom; compiles

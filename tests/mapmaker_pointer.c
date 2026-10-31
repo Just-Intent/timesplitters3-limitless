@@ -31,7 +31,9 @@ static int zoom_notches;
 static void pc_controls_mapmaker_zoom(int notches) { zoom_notches+=notches; }
 static int pulses_y;
 static void pc_controls_mapmaker_pulse(int button) { if(button==0) pulses_y++; }
-static void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh) { *sw=w;*sh=h; }
+static unsigned shape_w,shape_h; /* Auto output shape; 0 = the guest's 4:3 */
+static void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh)
+{ *sw=shape_w?shape_w:w;*sh=shape_h?shape_h:h; }
 /* sub_00076EF0(menu,item) highlights a row; record the call instead. */
 static void sub_00076EF0(void) {}
 static uint32_t highlight_menu, highlight_item;
@@ -316,6 +318,23 @@ int main(void)
     CHECK(FLOAT_AT(0x00783DD8u)==9.f);
     move(630.f,200.f);game_frame();                         /* right edge pans right */
     CHECK(FLOAT_AT(0x00783DD8u)>9.f);
+    /* Widescreen (16:9 and 21:9 windows, Auto output): the side bars map
+       outside 0..640, yet edge panning keeps its speed in both directions. */
+    {
+        static const float wins[][2]={{1920.f,1080.f},{2560.f,1080.f}};
+        for(unsigned i=0;i<2;i++) {
+            shape_w=(unsigned)wins[i][0];shape_h=(unsigned)wins[i][1];
+            cursor.width=wins[i][0];cursor.height=wins[i][1];
+            FLOAT_AT(0x00783DD8u)=9.f;cursor.x=wins[i][0]*.5f;cursor.y=wins[i][1]*.5f;game_frame();
+            CHECK(NEAR(FLOAT_AT(B+0x20),320.f) && FLOAT_AT(0x00783DD8u)==9.f); /* centre: no pan */
+            cursor.x=0.f;game_frame();                      /* window's left edge */
+            CHECK(NEAR(FLOAT_AT(B+0x20),FLOAT_AT(B+0x48)));  /* pointer held at its left bound */
+            CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f-MAPMAKER_EDGE_SPEED));
+            FLOAT_AT(0x00783DD8u)=9.f;cursor.x=wins[i][0]-1.f;game_frame();
+            CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f+MAPMAKER_EDGE_SPEED));
+        }
+        shape_w=shape_h=0;cursor.width=1280.f;cursor.height=960.f;move(320.f,240.f);game_frame();
+    }
     FLOAT_AT(0x00783DD8u)=9.f;move(2.f,200.f);
     WORD_AT(MENU+0x178)=0x00301000u;FLOAT_AT(0x00783DD8u)=9.f;
     game_frame();
