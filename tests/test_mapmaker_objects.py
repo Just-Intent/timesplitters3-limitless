@@ -46,6 +46,8 @@ MUTATIONS = {
     'tele-cover-inclusive': ('if((int32_t)pad>0x1F40) {', 'if((int32_t)pad>=0x1F40) {'),
     'tele-wrong-range': ('id>=0x0A && id<=0x0E', 'id>=0x0A && id<=0x11'),
     'tele-direction': ('g_ebx=a;g_edi=b;', 'g_ebx=b;g_edi=a;'),
+    'tele-self-link': ('            if(a==b) {', '            if(0) {'),
+    'tele-self-ends-chain': ('            if(a==b) {', '            if(a==b) { n=0;'),
     'tele-registers-leak': ('    restore_registers(&r);\n    MAPMAKER_GUEST_RET();\n}\n\n/* ---- logic tags',
                             '    MAPMAKER_GUEST_RET();\n}\n\n/* ---- logic tags'),
     'tele-any-scene': ('    if(!mapmaker_objects_scene(100u)) { original(); return; }\n    save_registers(&r);\n    mapmaker_limits_read();',
