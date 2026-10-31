@@ -2,9 +2,9 @@
 
 Status: implemented in `src/interface/pc_mapmaker_realbosses.inc` (area
 `realbosses`), fixture-tested (`tests/mapmaker/test_mapmaker_realbosses.py`:
-44 mutations, plus decode and US XBE data checks of every site below). The
+49 mutations, plus decode and US XBE data checks of every site below). The
 creature was played in v0.4.0-mapmaker.5 (user: working); the floating-meter
-fix below is not built or played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
+fix and the health display choice below are not built or played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
 `TSFP_MAPMAKER_REAL_BOSS=0` keeps the creature on the normal bot AI (stage 1).
 
 User report (2026-10-31): the trophy monster from story mission 5 is much
@@ -80,6 +80,9 @@ that one call instead.
   AI's Boss bar (its name, stacking, health x2..x8 and the health levels).
   One bar per actor. The Boss health multiplier applies in both cases (it
   scales entity +0x1CC/+0x1D8 in the bosses hook).
+- Boss flag with **Health display: Sub-boss bar** (+0x29 bit 2): the focus
+  is cleared as for the Boss bar, the bosses area draws no bottom bar for it,
+  and the overhead meter below is kept: the meter instead of any bar.
 - Several deerbeasts: the stock focus holds one at a time; give the others the
   Boss flag for their own bars.
 - With the `bosses` area switched off the stock bar always stays.
@@ -110,13 +113,17 @@ unlike the boss bars. It is a stock MapMaker story feature, not a boss bar
 
 | WRAP | what it does |
 |---|---|
-| `sub_0013A400` -> `pc_mapmaker_realbosses_meter` | return 0x0014D264 only: for an actor whose record ai_start noted (the real boss) and whose character is 0x15 or entity model 0x5BE, in scene 100 story, skip the draw (`MAPMAKER_GUEST_RET`, logged once); everything else the original |
+| `sub_0013A400` -> `pc_mapmaker_realbosses_meter` | return 0x0014D264 only: for an actor whose record ai_start noted (the real boss) and whose character is 0x15 or entity model 0x5BE, in scene 100 story, skip the draw (`MAPMAKER_GUEST_RET`, logged once) unless its Story AI chose the Sub-boss bar; everything else the original |
 
 The +0x268 record stays: `sub_0014CC80` and the damage flash `sub_0014D3A0`
 read it. With `TSFP_MAPMAKER_REAL_BOSS=0` (bot class) the creature never gets
 a record (INFERRED from the caller list), so there is no meter to hide.
 Narrowest gate by design: other actors that legitimately carry a record keep
-their meter.
+their meter. Per real boss (ai_start notes 0 / Boss bar / Sub-boss bar from
+chunk +0x29): no Boss flag = stock bottom bar, meter hidden; Boss bar = the
+bosses area's bar, meter hidden; Sub-boss bar = meter shown, no bottom bar.
+The meter's height comes from the model's own skeleton node, not a fixed
+human offset ([bosses: Health display](mapmaker-bosses.md#health-display)).
 
 ## Save format and stock games
 
@@ -169,7 +176,9 @@ No extension memory.
    No health meter floats above its back (stderr: `overhead health meter
    hidden on the giant trophy monster`, once).
 4. Set its **Boss** row to x4: a single bar with the AI's name and four times
-   the health. Two deerbeasts with Boss: two bars.
+   the health. Two deerbeasts with Boss: two bars. Reopen it and set
+   **Health display: Sub-boss bar**: in play no bottom bar, the meter on its
+   back is shown and drains as it is hurt.
 5. `TSFP_MAPMAKER_REAL_BOSS=0`: the same model walks and shoots like a bot
    (human animations). Without `TSFP_MAPMAKER_LIMITS` the row is absent; the
    saved map still plays (bot behaviour).

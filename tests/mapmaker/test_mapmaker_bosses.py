@@ -29,7 +29,7 @@ MUTATIONS = {
     'click-closes': ('    MAPMAKER_GUEST_RET();                         /* sub_0031CAC0: ret; the screen stays open */',
                      '    original();'),
     'click-no-ret': ('    MAPMAKER_GUEST_RET();                         /* sub_0031CAC0: ret; the screen stays open */', ''),
-    'cycle-skips-x8': ('level=(bos_get(e,s)+1u)%(BOS_LEVELS+1u);', 'level=(bos_get(e,s)+1u)%BOS_LEVELS;'),
+    'cycle-skips-x8': ('level=(level+1u)%(BOS_LEVELS+1u);', 'level=(level+1u)%BOS_LEVELS;'),
     'label-not-in-place': ('    uint32_t text=bos_text(0);\n    if(text) bos_put_text',
                            '    uint32_t text=xbox_HeapAlloc(BOS_NAME,4u);\n    if(text) bos_put_text'),
     'no-colour-check': ('    if(bos.colour[i]!=bos_colour_of(e,i)) {', '    if(0) {'),
@@ -49,9 +49,12 @@ MUTATIONS = {
     'cur-not-scaled': ('    if(cur<=max*1.0001f) cur*=m;', ''),
     'range-2d': ('d=dx*dx+dy*dy+dz*dz;', 'd=dx*dx+dy*dy;'),
     'farthest': ('k>0 && dist[k-1u]>d;', 'k>0 && dist[k-1u]<d;'),
-    'dead-shown': ('if(!bos_play.level[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;',
-                   'if(!bos_play.level[s]) continue;'),
-    'humans-included': ('for(i=humans<count?humans:count;i<count;i++)', 'for(i=0;i<count;i++)'),
+    'dead-shown': ('if(!bos_play.level[s] || bos_play.sub[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;',
+                   'if(!bos_play.level[s] || bos_play.sub[s]) continue;'),
+    'humans-included': ('for(i=humans<count?humans:count;i<count;i++) {\n        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec);',
+                        'for(i=0;i<count;i++) {\n        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec);'),
+    'meter-humans-included': ('for(i=humans<count?humans:count;i<count;i++) {\n        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec),inst;',
+                              'for(i=0;i<count;i++) {\n        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec),inst;'),
     'no-entity-check': (' || WORD_AT(ent+BOS_ENT_AI)!=a || ', ' || '),
     'over-stock-bar': ('slot=(WORD_AT(hud+BOS_HUD_FLAGS)&1u)?1u:0u;', 'slot=0;'),
     'any-mode': (" || BOS_B(BOS_MODE)!=10u) return;", ') return;'),
@@ -98,7 +101,7 @@ MUTATIONS = {
     'extra-range': (' || (flag&7u)>BOS_HEALTH_EXTRA', ''),
     'extra-not-multiplied': ('return bos_multiplier(bos_play.level[i])<<bos_play.extra[i];', 'return bos_multiplier(bos_play.level[i]);'),
     'extra-additive': ('<<bos_play.extra[i];', '+bos_play.extra[i];'),
-    'extra-gets-bar': ('if(!bos_play.level[s] || !(', 'if(!('),
+    'extra-gets-bar': ('if(!bos_play.level[s] || bos_play.sub[s] || !(', 'if(bos_play.sub[s] || !('),
     'extra-not-active': ('    if(!level && !extra) return;', '    if(!level) return;'),
     'range-ignored': ('        if(f>=1.0f && f<=100000.0f) r=f;', ''),
     'range-unclamped': ('        if(f>=1.0f && f<=100000.0f) r=f;', '        r=f;'),
@@ -109,6 +112,34 @@ MUTATIONS = {
                        '    if(scene!=bos_probe.scene) bos_probe_level(scene,pool);'),
     'probe-writes': ('            model=bos_get16(ent+BOS_ENT_MODEL);', '            model=bos_get16(ent+BOS_ENT_MODEL);WORD_AT(ent+0x1F0u)^=1u;'),
     'probe-always': ("        bos_probe.on=v && v[0]=='1' && !v[1];", '        bos_probe.on=1;'),
+    # health display: Boss bar / Sub-boss bar (+0x29 bit 2)
+    'display-row-always': ('    if(text && level && (text=bos_display_label', '    if(text && (text=bos_display_label'),
+    'display-row-missing': ('        guest_call(sub_00079D60,6,text,BOS_ROW_DISPLAY,0u,0u,BOS_CLOSE,0u);', '        (void)text;'),
+    'display-click-closes': ('if((row!=BOS_ROW && row!=BOS_ROW_DISPLAY) ||', 'if(row!=BOS_ROW ||'),
+    'display-label-stale': ('    bos_label(level);\n    bos_display_label(level,bos_get_sub(e,s));\n', '    bos_label(level);\n'),
+    'display-cycles-level': ('    if(row==BOS_ROW) level=', '    if(1) level='),
+    'delete-no-sub-shift': ('    memmove(bos.sub+i,bos.sub+i+1u,before-i-1u);\n', ''),
+    'sub-not-saved': ('(bos_get_sub(e,i)?BOS_FLAG_SUB:0u)', '0u'),
+    'sub-wrong-bit': ('#define BOS_FLAG_SUB 0x04u', '#define BOS_FLAG_SUB 0x08u'),
+    'old-mask': ('#define BOS_FLAG_MASK 0xF8u', '#define BOS_FLAG_MASK 0xFCu'),
+    'loose-mask': ('#define BOS_FLAG_MASK 0xF8u', '#define BOS_FLAG_MASK 0xF0u'),
+    'sub-not-loaded': ('bos_set(e,base+k,level,bos_decode_sub(x.flag[k]));', 'bos_set(e,base+k,level,0);'),
+    'sub-not-in-play': ('    bos_play.sub[i]=(uint8_t)(level && sub);', '    bos_play.sub[i]=0;'),
+    'sub-gets-bar': ('if(!bos_play.level[s] || bos_play.sub[s] || !(', 'if(!bos_play.level[s] || !('),
+    'meter-no-original': ('    restore_registers(&r);\n    original();\n}', '    restore_registers(&r);\n    MAPMAKER_GUEST_RET();\n}'),
+    'meter-after-original': ('    save_registers(&r);\n    for(i=humans<count?humans:count;i<count;i++) {\n        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec),inst;',
+                             '    original();g_esp-=4u;save_registers(&r);\n    for(i=humans<count?humans:count;i<count;i++) {\n        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec),inst;'),
+    'meter-with-record': (' || WORD_AT(ent+BOS_ENT_RECORD)) continue;', ') continue;'),
+    'meter-dead': ('        if(!(bos_getf(ent+BOS_ENT_HEALTH)>0.0f) || !(bos_getf(ent+BOS_ENT_MAX)>0.0f)) continue;\n', ''),
+    'meter-player': ('        if(ent==pe || !MAPMAKER_PTR_OK(ent,', '        if(!MAPMAKER_PTR_OK(ent,'),
+    'meter-any-scene': ('WORD_AT(BOS_SCENE)!=100u || BOS_B(BOS_MODE)!=10u\n       || !MAPMAKER_STACK_OK(0x400)', '!MAPMAKER_STACK_OK(0x400)'),
+    'meter-args': ('guest_call(sub_0013A400,4,a,0u,0x7Fu,0x6Eu);', 'guest_call(sub_0013A400,4,ent,0u,0x7Fu,0x6Eu);'),
+    'meter-bar-bosses': (' || !bos_play.sub[s]) continue;', ') continue;'),
+    'meter-no-model-check': ('        if(!MAPMAKER_PTR_OK(inst,0x90u) || !MAPMAKER_PTR_OK(WORD_AT(inst+0x8Cu),0x1Cu) || !MAPMAKER_PTR_OK(WORD_AT(inst+0x10u),0x40u)) continue;\n',
+                             '        (void)inst;\n'),
+    'meter-negative-player': (' || (int32_t)WORD_AT(player+4u)<0) { original();return; }', ') { original();return; }'),
+    'meter-no-restore': ('        restore_registers(&r);\n        bos_play.meters++;\n    }\n    restore_registers(&r);', '        bos_play.meters++;\n    }'),
+    'meter-no-count': ('    if(level && sub) bos_play.subs++;\n', ''),
 }
 
 
@@ -204,6 +235,31 @@ def test_sai_chunk_byte_0x29_unused():
     assert mem(a[0x00301459])[0][4] == 0x28 and mem(a[0x00301459])[0][5] == 1
     assert mem(a[0x0030146A])[0][4] == 0x2A and mem(a[0x0030146A])[0][5] == 2
     assert mem(a[0x0030143F])[0][4] == 0x22 and mem(a[0x0030143F])[0][5] == 2    # writer: loop index
+
+
+def test_overhead_meter_draw_contract():
+    """Sub-boss meters: sub_0013A400 is a pure draw that never reads the
+    damage-stage record (+0x268) and sits above a model node; making records
+    with sub_0012C800 is a 17-slot bump allocator; sub_0014D1F0 calls nothing
+    before its meter loop, so drawing before the original is the same context."""
+    insns = decoded()
+    a = by_address()
+    meter = [i for i in insns if i.function == 0x0013A400]
+    assert meter and not any(op[4] == 0x268 for i in meter for op in mem(i))
+    assert a[0x0013AB00].mnemonic == 'ret' and not a[0x0013AB00].ops
+    # height: node matrix [[entity+4]+0x10] + [[[entity+4]+0x8C]+0x18]*64, +0x34 (y), + entity +0x68 + [0x475CC8]
+    assert mem(a[0x0013A688])[0][4] == 0x8C and mem(a[0x0013A68E])[0][4] == 0x18 and mem(a[0x0013A691])[0][4] == 0x10
+    assert mem(a[0x0013A69F])[0][4] == 0x34 and mem(a[0x0013A6A5])[0][4] == 0x68
+    assert mem(a[0x0013A694])[0][4] == 0x00475CC8
+    assert ('imm', 0xC68) in a[0x0013A429].ops and '0x11f780' in a[0x0013A42F].text   # actor +0xC68 fade (read only)
+    # sub_0012C800: [0x007490A0] < 0x11 slots of 0x144 at 0x00745938; reset only at 0x0014853D
+    assert ('imm', 0x11) in a[0x0012C806].ops and ('imm', 0x144) in a[0x0012C80D].ops
+    writes = sorted(i.address for i in insns if i.mnemonic == 'mov' and mem(i) and mem(i)[0][4] == 0x007490A0
+                    and i.text.split(',')[0].count('[') == 1)
+    assert writes == [0x0012C819, 0x0014853D]
+    # sub_0014D1F0: no call before the meter loop's call at 0x0014D25F
+    calls = sorted(i.address for i in insns if i.function == 0x0014D1F0 and i.call)
+    assert calls[0] == 0x0014D25F
 
 
 def touches(op, byte):
