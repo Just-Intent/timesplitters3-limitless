@@ -31,6 +31,8 @@ MUTATIONS = {
     'escape-everywhere': (POLICY, 'if (!editor || !cancel_key', 'if (!cancel_key'),
     'pan-any-state': (ADAPTER, '(WORD_AT(editor+0x25c)&0x0C044088u) ||', ''),
     'pan-no-clamp': (ADAPTER, 'c=left+w*.5f; if(c<0) left-=c; else if(c>MAPMAKER_GRID) left-=c-MAPMAKER_GRID;', ''),
+    'pan-grid-fixed-40': (ADAPTER, '#define MAPMAKER_GRID mapmaker_pointer_grid()', '#define MAPMAKER_GRID 40.f'),
+    'pan-grid-unchecked': (ADAPTER, 'return g>=40.f && g<=127.f?g:40.f;', 'return g>0.f?g:40.f;'),
     'pan-in-menus': (ADAPTER, 'if(root) mapmaker_pointer_navigate(', 'if(1) mapmaker_pointer_navigate('),
     'no-scroll-clamp': (ADAPTER, 'if(target>last) target=last;', ''),
     'arrow-no-repeat-delay': (ADAPTER, 'if(now<mapmaker_pointer.grab_next) return;', ''),

@@ -210,5 +210,8 @@ runtime's low memory (kernel data, stack, heap) moves up past it, so the heap
 shrinks by its size, and it counts as image for host writers. Future Perfect's
 `main.c` reserves 0x80000 bytes at 0x008A0000 (`TSFP_GUEST_EXTENSION_VA/SIZE`)
 and stops with a message if the block lands elsewhere, because relocated
-tables in the generated code point into it.
+tables in the generated code point into it. Operand entries may also redirect a
+read to a C-written value there: `grid.json` points eight MapMaker editor
+constant reads at the 16-byte settings block 0x00903600
+(`src/pc_mapmaker_grid.h`), written by the grid hooks before the editor runs.
 Tests: `tests/test_guest_code_patches.py`, `tests/test_recomp_generation.py`.

@@ -23,8 +23,9 @@
  * Navigation (editor screen only): right-drag grabs and pans the map, and the
  * mouse at a window edge pans like the right stick. Both apply the game's pan
  * (sub_00309160: view left/top +=, right/bottom recomputed) and its centre
- * clamp to the 40x40 grid (sub_002F9F70), and are skipped in the states where
- * the editor itself does not pan (editor+0x25C & 0x0C044088).
+ * clamp to the grid (sub_002F9F70; 40x40, or 80x80 with the limits), and
+ * are skipped in the states where the editor itself does not pan
+ * (editor+0x25C & 0x0C044088).
  *
  * Menu scrollbars (tile, item and Story AI lists): A over the bar did not
  * scroll the Story AI list in game, so the scrollbar is driven directly. A
@@ -43,6 +44,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "pc_mapmaker_pointer.h"
+#include "pc_mapmaker_grid.h"
 
 #define MAPMAKER_POINTER_SCENE 102
 #define MAPMAKER_POINTER_PLAYER 0x007BA9E0u
@@ -51,7 +53,9 @@
 #define MAPMAKER_EDITOR 0x007844A8u
 #define MAPMAKER_EDGE 24.f           /* UI pixels from the canvas edge (of 640x480) */
 #define MAPMAKER_EDGE_SPEED 0.25f    /* cells per frame at the very edge */
-#define MAPMAKER_GRID 40.f
+/* Grid cells per axis: the editor's own value from the settings block
+ * (40 stock, 80 with TSFP_MAPMAKER_LIMITS=1; src/pc_mapmaker_grid.inc). */
+#define MAPMAKER_GRID mapmaker_pointer_grid()
 #define MAPMAKER_SCROLL_DELAY 300u   /* ms before an arrow repeats */
 #define MAPMAKER_SCROLL_REPEAT 80u   /* ms between repeats */
 
@@ -75,6 +79,12 @@ static int mapmaker_pointer_enabled(void)
         mapmaker_pointer.enabled=!(v && v[0]=='0' && !v[1]);
     }
     return mapmaker_pointer.enabled;
+}
+
+static float mapmaker_pointer_grid(void)
+{
+    float g=guest_writable(MAPMAKER_GRID_CFG_EXTENT,4)?FLOAT_AT(MAPMAKER_GRID_CFG_EXTENT):0.f;
+    return g>=40.f && g<=127.f?g:40.f;
 }
 
 static int mapmaker_pointer_scene(uint32_t menu)

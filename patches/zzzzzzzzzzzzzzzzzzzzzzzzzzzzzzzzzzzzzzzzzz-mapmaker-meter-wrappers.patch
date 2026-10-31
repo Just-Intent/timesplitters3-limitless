@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,819 @@
+@@ -844,6 +844,940 @@
      sub_002FA720_gen();
  #endif
  }
@@ -815,6 +815,127 @@
 +    else sub_00339600_gen();
 +#else
 +    sub_00339600_gen();
++#endif
++}
++
++extern void sub_00307CC0_gen(void);
++void sub_00307CC0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_alloc")) pc_mapmaker_grid_alloc(sub_00307CC0_gen);
++    else sub_00307CC0_gen();
++#else
++    sub_00307CC0_gen();
++#endif
++}
++
++extern void sub_00307C20_gen(void);
++void sub_00307C20(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_reset")) pc_mapmaker_grid_reset(sub_00307C20_gen);
++    else sub_00307C20_gen();
++#else
++    sub_00307C20_gen();
++#endif
++}
++
++extern void sub_00307CF0_gen(void);
++void sub_00307CF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_insert")) pc_mapmaker_grid_insert(sub_00307CF0_gen);
++    else sub_00307CF0_gen();
++#else
++    sub_00307CF0_gen();
++#endif
++}
++
++extern void sub_00307DA0_gen(void);
++void sub_00307DA0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_remove")) pc_mapmaker_grid_remove(sub_00307DA0_gen);
++    else sub_00307DA0_gen();
++#else
++    sub_00307DA0_gen();
++#endif
++}
++
++extern void sub_00307E60_gen(void);
++void sub_00307E60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_lookup")) pc_mapmaker_grid_lookup(sub_00307E60_gen);
++    else sub_00307E60_gen();
++#else
++    sub_00307E60_gen();
++#endif
++}
++
++extern void sub_002F8DE0_gen(void);
++void sub_002F8DE0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_placement")) pc_mapmaker_grid_placement(sub_002F8DE0_gen);
++    else sub_002F8DE0_gen();
++#else
++    sub_002F8DE0_gen();
++#endif
++}
++
++extern void sub_002F79E0_gen(void);
++void sub_002F79E0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_floor_sound")) pc_mapmaker_grid_floor_sound(sub_002F79E0_gen);
++    else sub_002F79E0_gen();
++#else
++    sub_002F79E0_gen();
++#endif
++}
++
++extern void sub_0001ED50_gen(void);
++void sub_0001ED50(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_grid_floor_bar")) pc_mapmaker_grid_floor_bar(sub_0001ED50_gen);
++    else sub_0001ED50_gen();
++#else
++    sub_0001ED50_gen();
++#endif
++}
++
++extern void sub_002F8140_gen(void);
++void sub_002F8140(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_overlap_cell")) pc_mapmaker_overlap_cell(sub_002F8140_gen);
++    else sub_002F8140_gen();
++#else
++    sub_002F8140_gen();
++#endif
++}
++
++extern void sub_00308260_gen(void);
++void sub_00308260(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_stack_find")) pc_mapmaker_stack_find(sub_00308260_gen);
++    else sub_00308260_gen();
++#else
++    sub_00308260_gen();
++#endif
++}
++
++extern void sub_00334770_gen(void);
++void sub_00334770(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("grid","pc_mapmaker_stack_cell")) pc_mapmaker_stack_cell(sub_00334770_gen);
++    else sub_00334770_gen();
++#else
++    sub_00334770_gen();
 +#endif
 +}
  
