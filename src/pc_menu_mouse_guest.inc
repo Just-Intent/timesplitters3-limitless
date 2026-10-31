@@ -48,9 +48,11 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_pads.inc"
 #include "pc_mapmaker_container.inc"
 #include "pc_mapmaker_objects.inc"
+#include "pc_mapmaker_validate.inc"
 #include "pc_mapmaker_editor.inc"
 #include "pc_mapmaker_rooms.inc"
 #include "pc_mapmaker_actors.inc"
+#include "pc_mapmaker_bugfix.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
