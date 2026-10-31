@@ -203,4 +203,4 @@ Copy only these values; do not commit raw logs or guest memory dumps.
 The wrapper and probe are shared and also built for native Mac
 (`tools/test-native-mac.py --unlocked-profile --mapmaker-probe 3`, log in
 `private/test-saves/native-mac/`). Mac compilation and runs are pending; see
-MAC-060.
+MAC-063.

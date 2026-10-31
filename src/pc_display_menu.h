@@ -134,6 +134,7 @@ void pc_mapmaker_sky_room_mask(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));
+void pc_display_menu_highlight(void (*original)(void));
 void pc_display_menu_choice_draw(void (*original)(void));
 void pc_display_menu_team_draw(void (*original)(void));
 void pc_display_menu_team_tick(void (*original)(void));
