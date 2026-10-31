@@ -67,6 +67,14 @@ overrides at lift time) plus function wrappers.
   11-20, paged slot screen, 20 Story AI character choices, play copy and
   preload. Weapon sets stay at 6 slots (each slot is a pickup item type).
 
+- Arcade bots per MapMaker match 10 -> 20 (24 characters) implemented
+  2026-10-31 (not built or played; `docs/mapmaker/mapmaker-matchbots.md`):
+  live per-actor arrays read through a 64-entry mirror (26 operands), rank
+  table relocated to 64, pair table humans + 20 outside story, Bots screen
+  page 2 and match-start extras for MapMaker Arcade / Test map; the 26-entry
+  arcade stats table sets the 24 limit. Ordinary Arcade and System Link
+  stay stock.
+
 ## Stages (in order)
 
 1. **Item and object quick wins.** Keycards, movers, props and other category

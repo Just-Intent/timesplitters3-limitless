@@ -65,4 +65,10 @@ void sub_002BE650(void) {}
 void sub_002BFFD0(void) {}
 void sub_000D7780(void) {}
 void sub_002C0310(void) {}
+/* matchbots (pc_mapmaker_matchbots.inc: profile, slot portrait, availability) */
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it */
+void sub_00069640(void) {}
+#endif
+void sub_002BE600(void) {}
+void sub_002BE270(void) {}
 #endif
