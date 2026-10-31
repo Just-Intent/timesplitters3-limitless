@@ -254,6 +254,19 @@ int main(void)
     WORD_AT(0x0079094Cu)=101;
     CHECK(!mapmaker_pointer_wheel(SM,1));                  /* other scenes: generic wheel */
     WORD_AT(0x0079094Cu)=102;
+    /* The weapon set's slot list (pc_mapmaker_weaponset.inc): 20 rows of 4.6 in a
+     * view of six (27.6); no step of its own -> a tenth of the view per step. */
+    {
+        float c=FLOAT_AT(SM+0x5c),v0=FLOAT_AT(SM+0x6c),v1=FLOAT_AT(SM+0x70),st=FLOAT_AT(SM+0x98);
+        FLOAT_AT(0x007BA188u)=4.8f;                          /* 480 lines: percent -> pixels */
+        FLOAT_AT(SM+0x5c)=92.f;FLOAT_AT(SM+0x70)=v0+27.6f;FLOAT_AT(SM+0x98)=0.f;FLOAT_AT(SM+0x88)=0.f;
+        CHECK(mapmaker_pointer_wheel(SM,-1) && fabs(FLOAT_AT(SM+0x88)-8.28f)<1e-3);
+        CHECK(mapmaker_pointer_wheel(SM,-9) && fabs(FLOAT_AT(SM+0x88)-64.4f)<1e-3);   /* last six rows */
+        CHECK(mapmaker_pointer_wheel(SM,20) && FLOAT_AT(SM+0x88)==0.f);
+        FLOAT_AT(SM+0x5c)=FLOAT_AT(SM+0x70)-FLOAT_AT(SM+0x6c);
+        CHECK(!mapmaker_pointer_wheel(SM,-1));               /* the stock six rows fit: nothing to scroll */
+        FLOAT_AT(SM+0x5c)=c;FLOAT_AT(SM+0x6c)=v0;FLOAT_AT(SM+0x70)=v1;FLOAT_AT(SM+0x98)=st;FLOAT_AT(0x007BA188u)=1.f;
+    }
     row_presses=0;
     FLOAT_AT(0x007BA038u)=320.f;FLOAT_AT(0x007BA188u)=240.f;
 

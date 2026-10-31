@@ -219,6 +219,8 @@ void pc_mapmaker_weaponset_weapon_veto(void (*original)(void));
 void pc_mapmaker_weaponset_ammo_veto(void (*original)(void));
 void pc_mapmaker_weaponset_pickup(void (*original)(void));
 void pc_mapmaker_weaponset_preload(void (*original)(void));
+void pc_mapmaker_weaponset_row(void (*original)(void));
+void pc_mapmaker_weaponset_label(void (*original)(void));
 void pc_mapmaker_bigdraw_rect(void (*original)(void));
 void pc_mapmaker_memory_heap_alloc(void (*original)(void));
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void));

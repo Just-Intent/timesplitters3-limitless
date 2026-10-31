@@ -22,20 +22,25 @@
  *  - a weapon or ammo pickup picks its slot with the stock-unused record byte
  *    +0xC (0 = the item's own slot 1-6, 7..20 = an extra slot): the pickup
  *    record +0x10, the play vetoes and the preload follow it;
- *  - editor: the weapon set screen pages (1-6, 7-12, 13-18, 15-20) with
- *    Down/Up at its ends and Right/Left on any row, its title "(1-6 of 20)";
- *    the front end's setup shows the MapMaker set's pages read-only (as
- *    stock shows its slots 1-6); the Story AI weapon choice lists 20 slots; a placed
+ *  - editor: the weapon set screen's slot pane is built with 20 slot rows in
+ *    the engine's own scrolling region (sub_000780E0 .. sub_000781A0, as the
+ *    weapon list beside it), six rows tall, so the stock cursor, the pointer,
+ *    the scrollbar and the mouse wheel reach slots 7-20; rows 7-20 edit the
+ *    slots through the get/set hooks. The front end's setup shows the
+ *    MapMaker set's 20 rows read-only (as stock shows its slots 1-6); the
+ *    Story AI weapon choice lists 20 slots; a placed
  *    weapon/ammo pickup's options get a "Weapon" slot choice, kept in node
  *    +0x30 (tagged 'WS'; no stock code writes it) and matched to the saved
  *    records by piece and item position on save and load.
  * Editing needs TSFP_MAPMAKER_LIMITS=1; loading and playing such a map works
  * without it. Empty extra slots are id 0, as stock "None".
  *
- * Extension memory: 0x00906000..0x009064FF (sets 0x00906000, title
- * 0x00906100, choice texts 0x00906140..0x00906410).
- * Requires the includer's WORD_AT, FLOAT_AT, guest_call, g_eax, g_esp,
+ * Extension memory: 0x00906000..0x009064FF (sets 0x00906000, choice texts
+ * 0x00906140..0x00906410; 0x00906100..0x0090613F, the retired paged title,
+ * is unused).
+ * Requires the includer's WORD_AT, FLOAT_AT, guest_call, g_eax, g_ebx, g_esp,
  * g_xbox_mem_offset and pc_mapmaker_limits.inc. */
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -81,7 +86,6 @@
 #define WS_SELECTED 0x2F1Cu             /* editor +0x2F1C: selected node (item options menu) */
 #define WS_BIGSET 0x00906000u           /* 0x80: +0 word, +4 count, +8 29 ids */
 #define WS_COMPACT 0x00906080u          /* 0x80 */
-#define WS_TITLE 0x00906100u            /* 0x40 */
 #define WS_TEXT 0x00906140u             /* 15 x 0x30 */
 #define WS_TEXT_N 0x30u
 #define WS_BIGMAX 29u
@@ -93,7 +97,14 @@
 #define WS_LIST_MAP 0xFu                /* front-end set list value: the MapMaker map's set (mode 9 only) */
 #define WS_PICK_RET 0x002BF95Au         /* sub_002BF910: weapon picked for row */
 #define WS_CLEAR_RET 0x002D41C7u        /* sub_002D40A0: X clears the row */
-#define WS_TITLE_RET 0x002D4254u        /* sub_002D4220: title text 0xE86 */
+#define WS_LABEL_RET 0x002D3DF6u        /* sub_002D3D30: sub_00064E70(filter, weapon) after the row label */
+#define WS_BUILDING 0x007BB1E8u         /* the menu being built */
+#define WS_ROW_ACTION 0x002D4040u       /* slot row callbacks (0x002D4295 / 0x002D4290) */
+#define WS_ROW_DRAW 0x002D3D30u
+#define WS_ROW_HEIGHT 4.6f              /* the rows' height argument (0x002D429A) */
+#define WS_VIEW_ROWS 6u                 /* the list is as tall as the stock six rows */
+#define WS_POINTER_MODE 0x007BA270u     /* + player * 0x1E0: editor pointer menus (sub_00071010) */
+#define WS_PLAYER 0x007BA9E0u           /* menu player index */
 #define WS_SAI_RET 0x0031CDB7u          /* sub_0031CB90: Story AI weapon choice ends */
 #define WS_OPTIONS_RET 0x003193A2u      /* sub_00319300: pickup options, after the respawn time item */
 #define WS_SAVE_COMPILE_RET 0x0032C6FFu
@@ -105,13 +116,15 @@
 extern void sub_00064E70(void),sub_00069640(void),sub_000BE860(void),sub_0006B2D0(void),
     sub_00333700(void),sub_002FDF50(void),sub_00074460(void),sub_0003D7B0(void),sub_00071800(void),
     sub_00079DE0(void),sub_0007D4A0(void),sub_000716D0(void),sub_00078590(void),sub_000783D0(void),
-    sub_00303350(void),sub_00071940(void);
+    sub_00303350(void),sub_00075B70(void),sub_00079D60(void),sub_002BF830(void),
+    sub_00079710(void),sub_000780E0(void),sub_000781A0(void),sub_000772E0(void),sub_00077320(void),
+    sub_00074A00(void),sub_00077110(void),sub_00075E70(void);
 
-static const uint8_t ws_page_first[4]={0u,6u,12u,14u};
 static struct {
-    int page,title_ok,view;          /* view: 1 editor custom set, 2 front-end map set (read-only) */
-    unsigned title_len;
-    char title_orig[0x2A];
+    unsigned rows;                   /* slot rows of the last pane built (6 stock, 20) */
+    uint32_t menu;                   /* that pane */
+    int opened,last_slot;            /* diagnostics: first update seen, highlighted slot */
+    float last_scroll;
     int16_t ed[WS_EXTRA];            /* editor: slots 7-20 */
     int16_t fe[WS_EXTRA];            /* front end: the loaded map's slots 7-20 */
     /* play cache (scene 100) */
@@ -128,6 +141,22 @@ static void ws_log(const char *what,int a,int b)
     if(ws.logged>=16u) return;
     ws.logged++;
     fprintf(stderr,"[mapmaker] weaponset: %s (%d, %d)\n",what,a,b);
+    fflush(stderr);
+}
+/* Screen diagnostics (own budget): the pane build, its first update and
+ * moves of the highlight / scroll, so a run shows whether the hooks act. */
+static unsigned ws_diag_n,ws_diag_moves,ws_diag_opens;
+/* moves: 0 = a build or first-update line (one each per screen open, own
+ * budget of 256), 1 = a highlight/scroll move (48 in total). */
+static void ws_diag(int moves,const char *format,...)
+{
+    va_list ap;
+    if(moves ? ws_diag_moves>=48u : ws_diag_opens>=256u) return;
+    ws_diag_n++;
+    if(moves) ws_diag_moves++; else ws_diag_opens++;
+    fputs("[mapmaker] weaponset: ",stderr);
+    va_start(ap,format);vfprintf(stderr,format,ap);va_end(ap);
+    fputc('\n',stderr);
     fflush(stderr);
 }
 static int ws_on(void)
@@ -352,7 +381,6 @@ void pc_mapmaker_weaponset_reset(void (*original)(void))
 {
     original();
     memset(ws.ed,0,sizeof ws.ed);
-    ws.page=0;
 }
 
 /* WRAP sub_00312880 (returns 1 when the weapon set differs from the undo
@@ -376,12 +404,22 @@ void pc_mapmaker_weaponset_held(void (*original)(void))
     if((e=ws_editor()) && WS_PICKUP_ID(WORD_AT(e+WS_HELD))) WORD_AT(e+WS_HELD+WS_NODE_SLOT)=WS_NODE_TAG;
 }
 
-/* ---- weapon set screen paging ------------------------------------------ */
+/* ---- weapon set screen: a 20-row scrolling slot list --------------------- */
 /* The pane 0x005236EC is reached only through screen 0x0052371C (builder
  * sub_002D44D0): from the editor's Map Settings (sub_003128F0, scene 102) or
  * its Test map setup, and from the front end's setup Weapons item
  * (sub_002C7710, scene 101). The in-play pause setup has no Weapons item
- * (sub_002C78F0 skips it when its second argument is 1, 0x002C808A). */
+ * (sub_002C78F0 skips it when its second argument is 1, 0x002C808A).
+ *
+ * Why the earlier hidden paging never showed in game: the editor turns its
+ * menus into pointer menus (sub_00071010 from 0x00302FE9 sets
+ * [0x007BA270 + player*0x1E0]); their tick (sub_0007A7B0) then picks the row
+ * under the pointer in sub_000777E0 and jumps over the stock Up/Down handling
+ * (0x0007ADEC -> 0x0007AFF6), and the PC mouse (wheel steps, hovered row)
+ * reaches the pane in sub_00073750 at 0x0007ADC5, after the update at
+ * 0x0007AD76 where the paging looked for "Down on row 6". The six rows also
+ * fit their view, so there was nothing for the scrollbar or the wheel
+ * (pc_mapmaker_pointer.inc needs content > view) to scroll. */
 static int ws_custom(void)
 {
     return WORD_AT(WS_SCENE)==102u && (int32_t)WORD_AT(WS_EINDEX)>=10;
@@ -390,123 +428,168 @@ static int ws_fe_scene(void)
 {
     return WORD_AT(WS_SCENE)==101u && WORD_AT(WS_GAMETYPE)==9u && WS_B(WS_TYPEBYTE)!=10u && !WORD_AT(WS_NET);
 }
-/* 1: the editor's custom set (editable), 2: the front end showing the
- * MapMaker map's set (stock: read-only, 0x002D415B / 0x002D406F), else 0. */
-static int ws_view(uint32_t pane)
+/* The set the front end's rows show: profile +0x6A4 (sub_002BFF30, scene 101). */
+static int ws_fe_map_set(void)
 {
-    uint32_t item;
-    if(ws_custom()) return 1;
-    if(!ws_fe_scene()) return 0;
-    item=guest_call(sub_00071940,2,pane,0xFFFFFFFBu);           /* the set list item, value -5 */
-    return item && MAPMAKER_PTR_OK(item,0xCCu) && WORD_AT(item+0xC8u)==WS_LIST_MAP?2:0;
+    uint32_t p=guest_call(sub_00069640,0);
+    return MAPMAKER_PTR_OK(p,0x6A8u) && WORD_AT(p+0x6A4u)==WS_LIST_MAP;
 }
-static int ws_view_live(void)
+/* 20 rows: the editor (any set; rows 7-20 of a preset are empty, as stock
+ * slots past a set's count) and the front end's MapMaker Arcade setup. */
+static int ws_list_wanted(void)
 {
-    return ws.view==1?ws_custom():ws.view==2 && ws_fe_scene();
+    return ws_on() && (WORD_AT(WS_SCENE)==102u || ws_fe_scene());
 }
-static void ws_title_suffix(void)
+static uint32_t ws_float(float f) { uint32_t u;memcpy(&u,&f,4);return u; }
+static unsigned ws_pointer_mode(void)
 {
-    char *t=(char *)((uintptr_t)WS_TITLE+g_xbox_mem_offset);
-    unsigned a=ws_page_first[ws.page]+1u,b=a+5u;
-    if(!ws.title_ok) return;
-    memcpy(t,ws.title_orig,ws.title_len);
-    if(ws.view) snprintf(t+ws.title_len,0x40u-ws.title_len,"  (%u-%u of %u)",a,b,WS_SLOTS);
-    else t[ws.title_len]=0;
+    uint32_t p=WORD_AT(WS_PLAYER);
+    return p<4u?WORD_AT(WS_POINTER_MODE+p*0x1E0u):0u;
 }
-/* WRAP sub_002D4220 (cdecl menu): builder of the weapon slot pane 0x005236EC;
- * the screen opens on slots 1-6. */
+/* WRAP sub_002D4220 (cdecl menu): builder of the weapon slot pane 0x005236EC.
+ * Stock adds the title (0xE86), the set list (value -5), six slot rows
+ * (sub_00079D60(0, row, 0, 4.6f, sub_002D4040, sub_002D3D30), values 0..5)
+ * and the footer. With the list wanted this replays the same calls, but the
+ * rows 0..19 go into a scrolling region six rows tall (sub_000780E0(height,
+ * 0) .. sub_000781A0(), as the weapon list builder sub_002BFA70 does), which
+ * gives each row the scrolling flag 0x40 (sub_00078FF0 0x0007914A). The row
+ * index stays value + 2 (the pick and X clear store slot index - 2). */
 void pc_mapmaker_weaponset_build(void (*original)(void))
 {
-    ws.page=0;ws.title_ok=0;ws.view=0;
-    original();
-}
-/* WRAP sub_0003D7B0 (cdecl text id; returns the text): the pane's title
- * (0xE86) gets the page and the slot count, kept in a buffer the update
- * rewrites (INFERRED: the item keeps the pointer). */
-void pc_mapmaker_weaponset_title(void (*original)(void))
-{
-    uint32_t ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;
-    original();
-    if(ret!=WS_TITLE_RET || !g_eax || !(ws_custom() || ws_fe_scene()) || !ws_on() || !MAPMAKER_PTR_OK(g_eax,1)) return;
-    {
-        const char *o=(const char *)((uintptr_t)g_eax+g_xbox_mem_offset);
-        size_t n=strnlen(o,0x2Au);
-        uint32_t p;
-        if(n>=0x2Au) return;                      /* too long to extend: stock title */
-        memcpy(ws.title_orig,o,n);
-        ws.title_len=(unsigned)n;ws.title_ok=1;
-        if(ws_custom()) ws.view=1;
-        else {                                    /* the set list starts on profile +0x6A4 (sub_002BF8F8) */
-            p=guest_call(sub_00069640,0);
-            ws.view=MAPMAKER_PTR_OK(p,0x6A8u) && WORD_AT(p+0x6A4u)==WS_LIST_MAP?2:0;
-        }
-        ws_title_suffix();
-        g_eax=WS_TITLE;
-    }
-}
-/* WRAP sub_002D40A0 (cdecl pane): update of the weapon slot pane, called by
- * the pane tick before its own Up/Down handling (0x0007AD76 vs 0x0007AE2E).
- * Its rows have values 0..5 (the set list -5), the highlighted value is
- * +0x18C, input +0xC4. Down on row 6 shows the next six slots, Up on row 1
- * the previous ones (cursor on the near row, sub_00074460 as the pick does);
- * Right / Left on any row turn the page (wrapping; stock moves only choice
- * items with them, 0x0007AFB1). In the front end the MapMaker set's pages
- * 2-4 are read-only as its page 1 is in stock (no X clear there). */
-void pc_mapmaker_weaponset_screen(void (*original)(void))
-{
-    uint32_t pane,in;
-    int32_t v;
-    int view,step=0;
-    if(!MAPMAKER_STACK_OK(8) || !ws_on() || !MAPMAKER_PTR_OK(pane=WORD_AT(g_esp+4u),0x200u) || !(view=ws_view(pane))) {
-        ws.page=0;
-        if(ws.view) { ws.view=0;ws_title_suffix(); }
+    uint32_t ret=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp):0u,menu=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,built,v;
+    int scene=(int)WORD_AT(WS_SCENE),set=scene==102?(int)WORD_AT(WS_EINDEX):-1;
+    ws.opened=0;ws.last_slot=-1;ws.last_scroll=-1.f;ws.menu=menu;
+    if(!ws_list_wanted() || !MAPMAKER_PTR_OK(menu,0x200u)) {
+        ws.rows=WS_STOCK;
+        ws_diag(0,"slot pane build (stock 6 rows: %s) ret=0x%08X menu=0x%08X descriptor=0x%08X scene=%d set=%d",
+            !ws_on()?"TSFP_MAPMAKER_LIMITS is not 1":"not the editor or MapMaker Arcade",ret,menu,
+            MAPMAKER_PTR_OK(menu,8u)?WORD_AT(menu+4u):0u,scene,set);
         original();return;
     }
-    ws.view=view;                                 /* a page is kept only while a view lasts (above) */
-    if(view==2) ws_extras(ws_chunk(WORD_AT(WS_CONTAINER)),ws.fe);
-    v=(int32_t)WORD_AT(pane+0x18Cu);in=WORD_AT(pane+0xC4u);
-    if(v>=0 && v<(int32_t)WS_STOCK) {
-        if(v==(int32_t)WS_STOCK-1 && ws.page<3 && (in&0x00020002u)) step=1;
-        else if(v==0 && ws.page>0 && (in&0x00010001u)) step=-1;
-        else if(in&0x00080008u) step=2;
-        else if(in&0x00040004u) step=-2;
-    }
-    if(step) {
-        uint32_t to=step==1?0u:step==-1?WS_STOCK-1u:(uint32_t)v;
-        ws.page=(ws.page+(step>0?1:3))%4;
-        WORD_AT(pane+0xC4u)&=~0x000F000Fu;WORD_AT(pane+0xC8u)&=~0xFu;
-        WORD_AT(pane+0x18Cu)=to;
-        guest_call(sub_00074460,3,pane,to,0u);
-    }
-    if(view==2 && ws.page) WORD_AT(pane+0xC4u)&=~0x00800000u;   /* X clear writes the profile (0x002D41D5) */
-    ws_title_suffix();
+    if(scene!=102) ws_extras(ws_chunk(WORD_AT(WS_CONTAINER)),ws.fe);   /* the loaded map's slots 7-20 */
+    guest_call(sub_00075B70,5,0x00020010u,0u,ws_float(40.f),0u,0x002C1450u);
+    guest_call(sub_00079D60,6,guest_call(sub_0003D7B0,1,0xE86u),0xFFFFFFFFu,0x00030404u,0u,0u,0u);
+    guest_call(sub_00079D60,6,0x004766D8u,0xFFFFFFFBu,0x08030C00u,0u,0u,0u);
+    guest_call(sub_002BF830,1,menu);
+    guest_call(sub_00079710,1,0u);
+    guest_call(sub_000780E0,2,ws_float(WS_ROW_HEIGHT*(float)WS_VIEW_ROWS),0u);
+    for(v=0;v<WS_SLOTS;v++) guest_call(sub_00079D60,6,0u,v,0u,ws_float(WS_ROW_HEIGHT),WS_ROW_ACTION,WS_ROW_DRAW);
+    guest_call(sub_000781A0,0);
+    built=WORD_AT(WS_BUILDING);
+    guest_call(sub_000772E0,2,built,ws_float(5.f));
+    guest_call(sub_00077320,2,WORD_AT(WS_BUILDING),ws_float(scene==102?7.5f:5.5f));
+    guest_call(sub_00074A00,4,0u,guest_call(sub_0003D7B0,1,0xE88u),1u,0u);
+    guest_call(sub_00074A00,4,3u,guest_call(sub_0003D7B0,1,0xE89u),1u,0u);
+    guest_call(sub_00074A00,4,1u,guest_call(sub_0003D7B0,1,0x1A27u),0u,0u);
+    guest_call(sub_00077110,2,menu,0xFFFFFFFBu);
+    guest_call(sub_00075E70,0);
+    ws.rows=WS_SLOTS;
+    ws_diag(0,"slot pane build (20 rows, scrolling) ret=0x%08X menu=0x%08X descriptor=0x%08X scene=%d set=%d pointer=%u",
+        ret,menu,WORD_AT(menu+4u),scene,set,ws_pointer_mode());
+    MAPMAKER_GUEST_RET();
+}
+/* WRAP sub_0003D7B0: retired (the paged title). Kept as a pass-through so the
+ * existing wrapper chain links; the integrator may drop its WRAP line. */
+void pc_mapmaker_weaponset_title(void (*original)(void))
+{
     original();
 }
-static int ws_paged(uint32_t ret,uint32_t want)
+/* WRAP sub_002D40A0 (cdecl pane): update of the weapon slot pane, called by
+ * the pane tick before its own row handling (0x0007AD76). Outside the editor
+ * the X clear writes the profile set at row index - 2 (0x002D41D5), which is
+ * only six slots: suppressed on rows 7-20 (read-only there, as stock's
+ * MapMaker set). Logs the first update and moves of the highlight/scroll. */
+void pc_mapmaker_weaponset_screen(void (*original)(void))
 {
-    return ret==want && ws.page && ws_view_live();
+    uint32_t pane;
+    int slot;
+    float scroll;
+    if(!MAPMAKER_STACK_OK(8) || ws.rows!=WS_SLOTS || !MAPMAKER_PTR_OK(pane=WORD_AT(g_esp+4u),0x200u)) {
+        if(!ws.opened && MAPMAKER_STACK_OK(8)) {
+            ws.opened=1;
+            ws_diag(0,"slot pane update (%u rows, stock) pane=0x%08X",ws.rows,WORD_AT(g_esp+4u));
+        }
+        original();return;
+    }
+    slot=(int)WORD_AT(pane+0x184u)-2;
+    if(WORD_AT(WS_SCENE)!=102u && slot>=(int)WS_STOCK) WORD_AT(pane+0xC4u)&=~0x00800000u;
+    scroll=FLOAT_AT(pane+0x88u);
+    if(!ws.opened) {
+        ws.opened=1;
+        ws_diag(0,"slot pane open: pane=0x%08X built=0x%08X items=%u content=%.1f view=%.1f..%.1f scroll=%.1f slot=%d pointer=%u",
+            pane,ws.menu,WORD_AT(pane+0x180u),(double)FLOAT_AT(pane+0x5Cu),(double)FLOAT_AT(pane+0x6Cu),
+            (double)FLOAT_AT(pane+0x70u),(double)scroll,slot+1,ws_pointer_mode());
+    } else if(slot!=ws.last_slot || scroll!=ws.last_scroll) {
+        if(slot>=(int)WS_STOCK || scroll!=ws.last_scroll)
+            ws_diag(1,"list: slot %d highlighted, scroll %.1f of %.1f",slot+1,(double)scroll,
+                (double)(FLOAT_AT(pane+0x5Cu)-(FLOAT_AT(pane+0x70u)-FLOAT_AT(pane+0x6Cu))));
+    }
+    ws.last_slot=slot;ws.last_scroll=scroll;
+    original();
 }
-/* WRAP sub_002D3B00 (cdecl slot; returns the weapon id): the row draw and
- * the highlighted weapon's model show slot row + page start. */
+/* WRAP sub_002D4040 (cdecl pane): a slot row's action (opens the weapon list
+ * when the set is editable). Outside the editor rows 7-20 are read-only: the
+ * front end's pick stores into the profile set at row index - 2 (0x002BF982),
+ * which has six slots. */
+void pc_mapmaker_weaponset_row(void (*original)(void))
+{
+    uint32_t pane=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,item,v;
+    if(WORD_AT(WS_SCENE)!=102u && MAPMAKER_PTR_OK(pane,0x200u) && (item=WORD_AT(pane+0x198u))!=0 &&
+       MAPMAKER_PTR_OK(item,0x18u) && (v=WORD_AT(item+0x14u))>=WS_STOCK && v<WS_SLOTS) {
+        MAPMAKER_GUEST_RET();
+        return;
+    }
+    original();
+}
+/* WRAP sub_002D3B00 (cdecl slot; returns the weapon id): the row draw
+ * (0x002D3D8C) and the highlighted weapon's model (0x002D410F) ask for rows
+ * 7-20 by their value 6..19. Editor custom set: slots 7-20; front end with
+ * the MapMaker set: the map's (read-only); anything else: the original
+ * (0 for a row past 6). */
 void pc_mapmaker_weaponset_get(void (*original)(void))
 {
     uint32_t ret=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp):0u,s;
-    if(!ws_paged(ret,WS_ROW_RET) && !ws_paged(ret,WS_PREVIEW_RET)) { original();return; }
-    s=WORD_AT(g_esp+4u)+ws_page_first[ws.page];
-    if(s<WS_STOCK || s>=WS_SLOTS) { original();return; }
-    g_eax=(uint32_t)(int32_t)(ws.view==2?ws.fe:ws.ed)[s-WS_STOCK];
+    if((ret!=WS_ROW_RET && ret!=WS_PREVIEW_RET) || (s=WORD_AT(g_esp+4u))<WS_STOCK || s>=WS_SLOTS || !ws_on()) { original();return; }
+    if(ws_custom()) g_eax=(uint32_t)(int32_t)ws.ed[s-WS_STOCK];
+    else if(ws_fe_scene() && ws_fe_map_set()) g_eax=(uint32_t)(int32_t)ws.fe[s-WS_STOCK];
+    else { original();return; }
     MAPMAKER_GUEST_RET();
 }
-/* WRAP sub_00312AE0 (cdecl slot, weapon): editor set store from the pick and
- * the X clear; on pages 2-4 it lands in slots 7-20. */
+/* WRAP sub_00312AE0 (cdecl slot, weapon): editor set store from the pick
+ * (slot = row index - 2) and the X clear; slots 7-20 land in the hook. The
+ * pick moves the cursor on only while the value is below 5 (0x002BF990):
+ * from rows 6-19 it moves on here (the slot pane is ebx, 0x002BF935). */
 void pc_mapmaker_weaponset_set(void (*original)(void))
 {
-    uint32_t ret=MAPMAKER_STACK_OK(12)?WORD_AT(g_esp):0u,s;
-    if(ws.view!=1 || (!ws_paged(ret,WS_PICK_RET) && !ws_paged(ret,WS_CLEAR_RET))) { original();return; }
-    s=WORD_AT(g_esp+4u)+ws_page_first[ws.page];
-    if(s<WS_STOCK || s>=WS_SLOTS) { original();return; }
-    ws.ed[s-WS_STOCK]=(int16_t)WORD_AT(g_esp+8u);
-    MAPMAKER_GUEST_RET();
+    uint32_t ret=MAPMAKER_STACK_OK(12)?WORD_AT(g_esp):0u,s,pane=g_ebx;
+    if((ret!=WS_PICK_RET && ret!=WS_CLEAR_RET) || !ws_on() || ws.rows!=WS_SLOTS) { original();return; }
+    s=WORD_AT(g_esp+4u);
+    if(s>=WS_STOCK && s<WS_SLOTS) {
+        ws.ed[s-WS_STOCK]=(int16_t)WORD_AT(g_esp+8u);
+        MAPMAKER_GUEST_RET();
+    } else original();
+    if(ret==WS_PICK_RET && s>=WS_STOCK-1u && s+1u<WS_SLOTS && MAPMAKER_PTR_OK(pane,0x200u) &&
+       WORD_AT(pane+0x184u)==s+2u && WORD_AT(pane+0x18Cu)==s) {
+        WORD_AT(pane+0x18Cu)=s+1u;
+        guest_call(sub_00074460,3,pane,s+1u,0u);
+    }
+}
+/* WRAP sub_00064E70 (cdecl filter, weapon; returns 1 when not allowed): only
+ * its call in the row draw (return 0x002D3DF6) matters. The draw indexes a
+ * six-colour table on its stack by the row value ([esp + value*4 + 0x20],
+ * 0x002D3D8C) and writes the label '1' + value into the consumed rect
+ * argument slot (entry + 0xC, 0x002D3DE8; drawn from there at 0x002D3F27).
+ * For rows 7-20 the label becomes "7".."20" and the colour the table's
+ * value mod 6 (the read past the table took the return address and args). */
+void pc_mapmaker_weaponset_label(void (*original)(void))
+{
+    uint32_t ret=MAPMAKER_STACK_OK(0x60)?WORD_AT(g_esp):0u,entry=g_esp+0x44u,item,v;
+    original();
+    if(ret!=WS_LABEL_RET) return;
+    item=WORD_AT(entry+8u);
+    if(!MAPMAKER_PTR_OK(item,0x18u) || (v=WORD_AT(item+0x14u))<WS_STOCK || v>=WS_SLOTS) return;
+    snprintf((char *)((uintptr_t)(entry+0xCu)+g_xbox_mem_offset),4,"%u",(unsigned)v+1u);
+    WORD_AT(entry-0x24u)=WORD_AT(entry-0x18u+4u*(v%WS_STOCK));
 }
 
 /* ---- slot choices ------------------------------------------------------- */

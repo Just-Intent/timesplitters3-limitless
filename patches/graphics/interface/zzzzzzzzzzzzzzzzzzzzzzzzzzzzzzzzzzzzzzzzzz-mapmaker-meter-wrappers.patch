@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,2059 @@
+@@ -1037,6 +1037,2081 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2011,6 +2011,28 @@
 +    else sub_0023F390_gen();
 +#else
 +    sub_0023F390_gen();
++#endif
++}
++
++extern void sub_002D4040_gen(void);
++void sub_002D4040(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_row")) pc_mapmaker_weaponset_row(sub_002D4040_gen);
++    else sub_002D4040_gen();
++#else
++    sub_002D4040_gen();
++#endif
++}
++
++extern void sub_00064E70_gen(void);
++void sub_00064E70(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_label")) pc_mapmaker_weaponset_label(sub_00064E70_gen);
++    else sub_00064E70_gen();
++#else
++    sub_00064E70_gen();
 +#endif
 +}
 +
