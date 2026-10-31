@@ -1,3 +1,11 @@
+## MapMaker widescreen editor and briefing clicks: in-game checks (2026-10-31)
+
+Launcher-installed local preview v0.4.0-mapmaker.1 (exe SHA-256 prefix 4b5baad7, source 92c02652),
+run by the user on the second Windows 11 PC in a widescreen window. Confirmed: the MapMaker editor
+grid, tiles and pointer stay aligned in widescreen; a left click confirms the story mission and
+arcade/challenge event briefings. Found: the MapMaker custom bot set offers no large characters
+(giant robot etc.), so Boss Story AI with big characters could not be tried yet.
+
 ## MapMaker features: in-game checks (2026-10-31)
 
 Branch `mapmaker-recon`, compile-only builds run by the user on the second
