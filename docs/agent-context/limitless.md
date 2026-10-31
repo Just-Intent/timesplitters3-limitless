@@ -341,7 +341,9 @@ through `sub_00139740` (esi HUD block, edi entity) with the AI's saved name,
 stacked upward by raising the int HUD margin `[0x007A614C]` 57 x
 `[0x004E68F8]` per slot around each call (restored after); a stock bar (HUD
 block +8 bit 0) keeps the bottom slot; the bar smoothing +0x171C/+0x1724/
-+0x172C is swapped per boss. Stronger health: WRAP `sub_00078590` ->
++0x172C is swapped per boss, each copy's fade +0x172C lowered by HUD clock
++0x2C time x [0x00475D10] as `sub_0014B090` does for the live block (else the
+bars never drained). Stronger health: WRAP `sub_00078590` ->
 `pc_mapmaker_bosses_health_rows` appends Brute/Juggernaut/Titan/Colossus
 (entry +0x4C values 5..8 = x2..x16 Tough Guy) to the stock Health row (text
 0xC0D, values 0..4, bind at 0x0031CFD2); compile saves chunk +0x30 = 4 and

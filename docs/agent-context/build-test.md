@@ -769,10 +769,10 @@ Python cases; there is no game or native launcher behavior change.
 ## Weapon-slot selection checks
 
 `test_weapon_slots.py` checks shared key state and guest selection on both hosts:
-press/held/focus/menu input, expiry, empty/grouped slots and local-player guards.
-Windows Build's `pc_settings.c` checks migration and last-slot persistence;
-launcher tests cover defaults, conflicts, Unbound, moving keys and reset.
-Input-hook edits require supported regeneration; animations need gameplay checks.
+press/held/focus/menu input, expiry, empty/grouped slots, local-player guards.
+`pc_settings.c`: migration, last slot; launcher: defaults, conflicts, Unbound,
+moves, reset; `test_scope_wheel.py` copies src/runtime, src/interface headers.
+Input-hook edits need supported regeneration; animations need gameplay checks.
 
 ## Themed keyboard editor checks
 

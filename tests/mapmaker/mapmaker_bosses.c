@@ -50,6 +50,20 @@ static struct { uint32_t text, id, cb; } rows[16];
 static struct { uint32_t text, value; } items[16];
 typedef struct { uint32_t esi, edi, text, frac, out, esp, margin, smooth[3]; char label[32]; } Bar;
 static Bar bar, blog[8];                         /* bar = first call of a frame */
+/* bar_model: sub_00139740's drain rule (0x001398B8..0x00139AAF), fill = the
+ * solid length 1 - (damage - drain x fade) it passes to sub_00130400. */
+static int bar_model;
+static float fills[8];
+static float clamp01(float f) { return f<0.0f?0.0f:f>1.0f?1.0f:f; }
+static void model_bar(uint32_t hud,uint32_t ent,unsigned k)
+{
+    float d=clamp01(1.0f-FLOAT_AT(ent+0x1CCu)/FLOAT_AT(ent+0x1D8u)),prev=FLOAT_AT(hud+0x171Cu);
+    float drain=FLOAT_AT(hud+0x1724u),fade=FLOAT_AT(hud+0x172Cu),hit=d>prev?d-prev:0.0f;
+    if(fade>0.0f) { if(hit>0.0f) { fade=(drain*fade+hit)/(drain+hit);drain+=hit; } }
+    else if(hit>0.0f) { drain=hit;fade=1.0f; }
+    if(k<8) fills[k]=clamp01(1.0f-(d-drain*fade));
+    FLOAT_AT(hud+0x171Cu)=d;FLOAT_AT(hud+0x1724u)=drain;FLOAT_AT(hud+0x172Cu)=fade;
+}
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -70,7 +84,8 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         if(!nlog) bar=b;
         nlog++;bars++;
         if(bar_draw && x[2]>=0x10000u && x[2]<sizeof memory) WORD_AT(x[2])=1;
-        for(k=0;k<3;k++) WORD_AT(g_esi+0x171Cu+k*8u)=g_edi+k;   /* the bar's own smoothing */
+        if(bar_model) model_bar(g_esi,g_edi,nlog-1u);
+        else for(k=0;k<3;k++) WORD_AT(g_esi+0x171Cu+k*8u)=g_edi+k;   /* the bar's own smoothing */
         g_esi=g_edi=0xDEADu;                      /* clobbers; the hook must restore */
     }
     return r;
@@ -247,6 +262,27 @@ static int hud_frame(uint32_t hud)              /* returns 1 when our bar was dr
     for(k=0;k<3;k++) CHECK(WORD_AT(hud+0x171Cu+k*8u)==0x5100u+k);
     return bars!=before;
 }
+/* one game tick (sub_0014B090 on the live HUD block) and one HUD frame */
+static void drain_frame(uint32_t hud)
+{
+    float fade=FLOAT_AT(hud+0x172Cu)-(1.0f/60.0f)*FLOAT_AT(0x00475D10u);
+    uint32_t live[3];
+    unsigned k;
+    FLOAT_AT(hud+0x2Cu)+=1.0f/60.0f;
+    FLOAT_AT(hud+0x172Cu)=fade<0.0f?0.0f:fade;
+    for(k=0;k<3;k++) live[k]=WORD_AT(hud+0x171Cu+k*8u);
+    g_ebx=hud;orig_calls=0;nlog=0;
+    HOOK(pc_mapmaker_bosses_hud,fake_hud,0);
+    CHECK(orig_calls==1);
+    for(k=0;k<3;k++) CHECK(WORD_AT(hud+0x171Cu+k*8u)==live[k]);   /* the stock bar's own state */
+}
+static float fill_of(uint32_t ent)
+{
+    unsigned k;
+    for(k=0;k<nlog && k<8;k++) if(blog[k].edi==ent) return fills[k];
+    return -1.0f;
+}
+static int near(float a,float b) { return a>b-0.002f && a<b+0.002f; }
 static int margin_ok(unsigned k,unsigned slot,unsigned step) { return k<nlog && blog[k].margin==20u+slot*step; }
 /* the health list row: options appended before the original binds the field */
 static void bind_fake(void) { orig_calls++;bound_items=nitems;g_esp+=4u; }
@@ -520,6 +556,52 @@ int main(void)
         CHECK(hud_frame(HUD0) && margin_ok(1,1,57));
         FLOAT_AT(0x004E68F8u)=0.0f;
         list_set(5);
+        HOOK(pc_mapmaker_bosses_level,fake_plain,0);
+    }
+
+    /* ---- health drain over frames (sub_00139740's rule, fade per tick) ---- */
+    {
+        unsigned n;
+        float f;
+        FLOAT_AT(0x00475D10u)=2.0f;bar_model=1;
+        for(n=0;n<3u;n++) WORD_AT(HUD0+0x171Cu+n*8u)=0;           /* the live (stock) bar state */
+        FLOAT_AT(HUD0+0x2Cu)=100.0f;
+        make_actor(1,0,10.0f,1.0f);list_set(2);                     /* one boss: Big Robot x4 */
+        HOOK(pc_mapmaker_bosses_level,fake_plain,0);
+        drain_frame(HUD0);
+        CHECK(nlog==1 && FLOAT_AT(ENT(1)+0x1D8u)==4.0f && near(fill_of(ENT(1)),1.0f));
+        setf(ENT(1)+0x1CCu,3.0f);                                   /* hit: 75 % */
+        drain_frame(HUD0);
+        CHECK(near(fill_of(ENT(1)),1.0f));                          /* the drain starts full */
+        for(n=0;n<15u;n++) drain_frame(HUD0);
+        CHECK(near(fill_of(ENT(1)),0.875f));                        /* half-way after 0.25 s */
+        for(n=0;n<16u;n++) drain_frame(HUD0);
+        CHECK(near(fill_of(ENT(1)),0.75f));                         /* at its health after 0.5 s */
+        setf(ENT(1)+0x1CCu,1.0f);                                   /* 25 % */
+        f=2.0f;
+        for(n=0;n<40u;n++) {
+            drain_frame(HUD0);
+            CHECK(fill_of(ENT(1))<=f+0.0001f);f=fill_of(ENT(1));    /* never grows back */
+        }
+        CHECK(near(f,0.25f));
+        /* three bosses, each its own drain; a stock bar's live state ticks on its own */
+        make_actor(1,0,10.0f,1.0f);make_actor(2,3,5.0f,1.0f);make_actor(3,5,6.0f,1.0f);list_set(4);
+        HOOK(pc_mapmaker_bosses_level,fake_plain,0);
+        stock_bar=1;FLOAT_AT(HUD0+0x172Cu)=1.0f;
+        drain_frame(HUD0);
+        CHECK(nlog==3 && near(fill_of(ENT(1)),1.0f) && near(fill_of(ENT(2)),1.0f) && near(fill_of(ENT(3)),1.0f));
+        CHECK(FLOAT_AT(ENT(3)+0x1D8u)==4.0f && FLOAT_AT(ENT(2)+0x1D8u)==1.0f);
+        setf(ENT(1)+0x1CCu,2.0f);setf(ENT(2)+0x1CCu,0.75f);         /* 50 %, 75 %, ENT(3) untouched */
+        drain_frame(HUD0);
+        CHECK(near(fill_of(ENT(1)),1.0f) && near(fill_of(ENT(2)),1.0f) && near(fill_of(ENT(3)),1.0f));
+        for(n=0;n<15u;n++) drain_frame(HUD0);
+        CHECK(near(fill_of(ENT(1)),0.75f) && near(fill_of(ENT(2)),0.875f) && near(fill_of(ENT(3)),1.0f));
+        CHECK(near(FLOAT_AT(HUD0+0x172Cu),1.0f-17.0f*2.0f/60.0f));   /* live fade: the stock ticks only */
+        setf(ENT(3)+0x1CCu,1.0f);                                   /* the third one hit later */
+        for(n=0;n<40u;n++) drain_frame(HUD0);
+        CHECK(near(fill_of(ENT(1)),0.5f) && near(fill_of(ENT(2)),0.75f) && near(fill_of(ENT(3)),0.25f));
+        stock_bar=0;bar_model=0;
+        make_actor(1,0,10.0f,1.0f);make_actor(2,3,5.0f,1.0f);make_actor(3,1,2.0f,1.0f);list_set(5);
         HOOK(pc_mapmaker_bosses_level,fake_plain,0);
     }
 

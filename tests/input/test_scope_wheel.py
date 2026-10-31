@@ -65,8 +65,8 @@ def test_scope_wheel(tmp_path, mutation):
         assert header.count(old) == 1, mutation
         header = header.replace(old, new)
     (include_dir / 'pc_scope_wheel.h').write_text(header)
-    for name in ('pc_guest_memory.h', 'pc_settings.h'):
-        shutil.copy(ROOT / 'src' / name, include_dir / name)
+    for name in ('runtime/pc_guest_memory.h', 'interface/pc_settings.h'):
+        shutil.copy(ROOT / 'src' / name, include_dir / Path(name).name)
     result = build_and_run(tmp_path, include_dir)
     if mutation == 'none':
         assert result.returncode == 0, result.stdout + result.stderr
