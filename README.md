@@ -37,7 +37,8 @@ This fork adds:
   overlapping tiles and stacked items, any unlocked character in MapMaker Story,
   Story AI duplicates and linked copies, and a per-map Clouds option.
 - **PC control fixes:** MapMaker editor mouse controls, click-to-load in the map
-  browser, click-to-confirm on the character screen and mouse aiming for mounted
+  browser, click-to-confirm on the character screen and mission/event briefings,
+  and mouse aiming for mounted
   and vehicle guns.
 - **Bug fixes** for MapMaker and System Link memory-safety problems, listed in
   [the bug-fix notes](docs/mapmaker/mapmaker-bugfix.md).
@@ -106,7 +107,9 @@ limits and test notes: **[MapMaker Limitless guide](docs/mapmaker/mapmaker-limit
 **Mouse and control fixes in this fork** (no switch needed): MapMaker editor
 mouse controls (pointer, menus, scrollbars, wheel zoom and panning); click a
 map in **MapMaker → Load map** to load it; on the character screen, click
-anywhere other than another portrait to confirm the previewed character; and
+anywhere other than another portrait to confirm the previewed character; on a
+Story mission briefing or an Arcade League / Challenge event page, click
+anywhere (except Back) to start; and
 mouse aiming for mounted and vehicle guns (for example the truck gun in
 *Scotland the Brave*). Planned, not yet merged: mouse-wheel scope zoom.
 

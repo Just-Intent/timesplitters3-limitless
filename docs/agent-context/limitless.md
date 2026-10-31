@@ -30,7 +30,7 @@ MapMaker player/contract docs live in `docs/mapmaker/`; measured results in
 
 | Area | Files | Tests |
 | --- | --- | --- |
-| Mouse/menu handling | `src/interface/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_mapmaker_browser.inc` | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
+| Mouse/menu handling | `src/interface/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_mapmaker_browser.inc`, `pc_menu_briefing.inc` | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
 | Mounted / vehicle gun mouse aim | `src/input/pc_mounted.h` (called from both adapters' `pc_controls_apply_mouse` after the terminal route, before ordinary look) | `tests/gameplay/test_mounted_mouse.py` |
 | Mouse-wheel scope zoom | `src/input/pc_scope_wheel.h` (state from both adapters' `pc_controls_apply_mouse`; wheel and key filters in their wheel/key paths), `pc_settings_bound_keys` in `pc_bindings.inc` | `tests/input/test_scope_wheel.py` |
 | MapMaker capacity areas | `src/interface/pc_mapmaker_*.inc` (included by `pc_menu_mouse_guest.inc`), `config/guest-code-patches/`, `tools/compiler/guest_code_patches.py`, `src/runtime/guest_extension.h` | `tests/mapmaker/`, `tests/compiler/test_guest_code_patches.py` |
@@ -230,6 +230,28 @@ footer). Rows flagged `+0x28 & 5` or with an id past the count are ignored;
 hover and the wheel keep the shared row behaviour. No patch or regeneration.
 Fixture: `map_browser_tests` in `tests/input/menu_mouse.c` (mutation
 `late-map-confirm`).
+
+### Mission and event briefing click
+
+The Story briefing (descriptor `0x005238C0`, construct `sub_002CAC30`, menu
+Confirm `+0x1BC = sub_002BEAA0` -> start screen) and the Arcade League /
+Challenge event briefing (`0x00523870`, construct `sub_002D5F40`, tick
+`sub_002C9A80`, Confirm `sub_002D5F10` -> character carousel) hold only
+display items (item flag 4), so the shared row click hit nothing. With no
+highlighted row `sub_0007A7B0` jumps from 0x0007B0C7 straight to the `+0x1BC`
+call (0x0007B179); neither tick consumes Confirm (`sub_002C9A80` only reads
+`+0xC4 & 0x400000`, the online leaderboard footer). `src/interface/pc_menu_briefing.inc`,
+called from `pc_display_menu_mouse_input` when the map browser did not take
+the click (after tabs, profile prompts and footer prompts), makes any fresh
+left click on these two pages (scene 101, descriptor and callback both
+matched) Confirm as raw Select 0x80 plus `+0xC4`/`+0xC8` bit 0x10. Footer
+Back/leaderboard, right-click Back and the wheel text scroll are unchanged.
+The lists before them (categories `0x00523840` and events `0x00523860`,
+flags 0x2A00; Story missions `0x005238E0` and difficulty `0x005238D0`, flags
+0) are ordinary selectable type-7 rows the shared row click already handles
+(static check of the generated constructors; locked rows `+0x28 & 1` skip).
+No patch or regeneration. Fixture: `briefing_tests` in
+`tests/input/menu_mouse.c` (mutation `late-briefing-confirm`). Untested in game.
 
 ### Character selection mouse
 
@@ -474,7 +496,8 @@ and `tests/input/test_scope_wheel.py` (mouse-wheel scope zoom; compiles
 include `pc_display_menu.c` or `pc_menu_mouse_guest.inc` (`menu_mouse.c`,
 `fov_settings.c`) need a `sub_0003DFA0` stub for the stage A allocator.
 `tests/input/test_menu_mouse.py` also covers the MapMaker map browser click
-(`map_browser_tests`; mutation `late-map-confirm` removes the input-hook click).
+(`map_browser_tests`; mutation `late-map-confirm` removes the input-hook click)
+and the briefing click (`briefing_tests`; mutation `late-briefing-confirm`).
 `tests/mapmaker/test_mapmaker_grid.py` covers stacked items with the per-frame valid
 bit hook `pc_mapmaker_stack_valid` (`sub_003348C0`, return 0x003070A7) and
 the always-run `sub_00308260` original (`stack-valid-*`, `stack-find-*`
