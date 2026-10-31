@@ -142,6 +142,11 @@ them untouched.
 - **Same pairing as stock.** Each teleporter is linked to the next one of the
   same colour (`sub_0009A2C0` check, then a `sub_0009A5B0` link with
   ebx → edi).
+- **No self link.** A pair stacked on one cell (`TSFP_MAPMAKER_STACK_ITEMS=1`,
+  docs/mapmaker-grid.md) shares one pad; stock `sub_0009A5B0` would add a
+  pad -> pad nav link. The hook skips it (counted, first three logged as
+  `teleporter pair on one pad`) and stops that teleporter's search as stock
+  does after a pair, so the next one still pairs onward.
 - **Link-pool guard.** No link is added once the pool is full: 8800 with the
   stage-A pools, otherwise 4400. `sub_0009A5B0` itself has no bound
   (CONFIRMED).
