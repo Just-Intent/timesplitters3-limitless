@@ -24,8 +24,8 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 static volatile uint32_t stub_ran;
 #define STUB(name,n) void name(void) { stub_ran=n; }
 STUB(sub_0003DFA0,1) STUB(sub_00074670,2) STUB(sub_00071970,3) STUB(sub_00076EF0,4) STUB(sub_002BFFD0,5)
-STUB(sub_0003D7B0,6) STUB(sub_002BE650,7) STUB(sub_00071800,8) STUB(sub_000D7780,9)
-STUB(sub_002C0310,10)
+STUB(sub_0003D7B0,6) STUB(sub_002BE600,7) STUB(sub_00071800,8) STUB(sub_000D7780,9)
+STUB(sub_002C0310,10) STUB(sub_002BE300,11)
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -59,7 +59,10 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     else if(f==sub_00076EF0) { if(x[0]==PANE) selected=x[1]; }
     else if(f==sub_002BFFD0) hook_store_entry();
     else if(f==sub_0003D7B0) r=0x00700000u+x[0];
-    else if(f==sub_002BE650) r=0x5000u+x[0]*16u+(x[1]&0xFu);
+    /* row of (id, variant): -1 for ids past the Arcade table (0x15 the realboss, 0x1FF) */
+    else if(f==sub_002BE600) r=(x[0]==0x15u || x[0]==0x1FFu)?0xFFFFFFFFu:x[0]*16u+(x[1]&0xFu);
+    /* row -> text id: 0 for -1 and rows >= 150 (stock), realbosses' row 150 -> 0x52420015 */
+    else if(f==sub_002BE300) r=x[0]==150u?0x52420015u:(x[0]==0xFFFFFFFFu?0u:0x5000u+x[0]);
     else if(f==sub_00071800) { if(noptions<32u) { options[noptions][0]=x[0];options[noptions][1]=x[1]; } noptions++; }
     else if(f==sub_002C0310) fake_refill();
     else if(f==sub_000D7780) { if(npreloaded<32u && x[0]==x[1]) preloaded[npreloaded]=x[0]; npreloaded++; }
@@ -409,6 +412,15 @@ static void choice_tests(void)
         CHECK(options[k][1]==10u+k);
         CHECK(options[k][0]==(id==-1?0x00700000u+0xD7Cu:0x00700000u+0x5000u+(uint32_t)id*16u+(uint32_t)((10u+k)%3u==0?0xFu:(10u+k)%3u)));
     }
+    /* the realboss (no Arcade row) gets its synthetic row 150's name; another
+       unknown id gets stock's empty text 0, as slots 1-10 would */
+    HALF_AT(ESET+4u+8u*13u)=0x15;HALF_AT(ESET+4u+8u*13u+6u)=-1;
+    HALF_AT(ESET+4u+8u*14u)=0x1FF;
+    noptions=0;CALL(pc_mapmaker_sets_sai_choice,fake_choice,0x0031CD32u,value,0u);
+    CHECK(noptions==10u && options[3][1]==13u && options[3][0]==0x00700000u+0x52420015u);
+    CHECK(options[4][1]==14u && options[4][0]==0x00700000u);
+    CHECK(options[0][0]==0x00700000u+0x5000u+200u*16u+1u);
+    editor_set(some_extras);
     noptions=0;CALL(pc_mapmaker_sets_sai_choice,fake_choice,0x0031CD37u,value,0u);CHECK(noptions==0u);
     WORD_AT(0x00784024u)=4u;noptions=0;
     CALL(pc_mapmaker_sets_sai_choice,fake_choice,0x0031CD32u,value,0u);CHECK(noptions==0u);
@@ -418,6 +430,24 @@ static void choice_tests(void)
     WORD_AT(value)=13u;noptions=0;                 /* a map made with the switch on */
     CALL(pc_mapmaker_sets_sai_choice,fake_choice,0x0031CD32u,value,0u);CHECK(noptions==10u);
     set_env("TSFP_MAPMAKER_LIMITS","1");
+}
+
+/* ---- Story AI icons ---------------------------------------------------- */
+static uint32_t icon_item;
+static void fake_icon(void) { originals++;icon_item=WORD_AT(g_esp+4u);g_eax=0x00710000u+icon_item;g_esp+=4u; }
+static void icon_tests(void)
+{
+    static const uint32_t rets[2]={0x0031D460u,0x00309AC7u};
+    unsigned r,item;
+    for(r=0;r<2u;r++)
+        for(item=0;item<0x50u;item++) {
+            CALL(pc_mapmaker_sets_icon,fake_icon,rets[r],item,0u);
+            CHECK(icon_item==(item>=0x42u && item<0x4Cu?item-10u:item) && g_eax==0x00710000u+icon_item);
+        }
+    /* every other caller: the item itself (0x42 is a real item there) */
+    CALL(pc_mapmaker_sets_icon,fake_icon,0x0032054Au,0x42u,0u);CHECK(icon_item==0x42u);
+    CALL(pc_mapmaker_sets_icon,fake_icon,0x003362B0u,0x45u,0u);CHECK(icon_item==0x45u);
+    CALL(pc_mapmaker_sets_icon,fake_icon,0x0030DA3Au,0x4Bu,0u);CHECK(icon_item==0x4Bu);
 }
 
 /* ---- play -------------------------------------------------------------- */
@@ -471,6 +501,7 @@ int main(void)
     load_tests();
     screen_tests();
     choice_tests();
+    icon_tests();
     play_tests();
     match_tests();
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
