@@ -350,6 +350,19 @@ pad -> pad nav link of a stacked teleporter pair; a
 unchanged; `docs/mapmaker-grid.md`).
 Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`.
 
+MapMaker editor widescreen (`src/pc_mapmaker_widescreen.inc`, include after
+the area files): the editor view (scene 102) is 2D guest-pixel drawing, not a
+camera (`sub_003111F0` reaches neither `sub_000C77C0` nor `sub_00151CF0`), so
+`pc_display_camera`'s factor never applies to it. AUTO 2D placement stretched
+the grid's one flat full-width line list (`sub_0030A550` via `sub_0001B090`)
+while tiles/pointer stayed in the 4:3 box. `pc_mapmaker_grid_view`
+(`sub_00310A20`) and `pc_mapmaker_grid_lines` (`sub_0030A550`) run them at
+CENTRE through `pc_display_ui_scope` (`pc_display_ui.inc`) on non-4:3 displays
+in scene 102 only; backdrop caller `0x0030A580` stretches via
+`pc_display_transition_overlay`. `TSFP_MAPMAKER_WIDESCREEN=0` = old. Edge
+panning clamps both directions. Tests `tests/test_mapmaker_widescreen.py`,
+`test_mapmaker_pointer.py`, `test_ui_layout.py`; `docs/mapmaker-widescreen.md`.
+
 risks in `docs/mapmaker-actors.md`).
 Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`. `sky` (no table; not yet
 wired) adds a per-map cloud layer with `TSFP_MAPMAKER_LIMITS=1`: a "Clouds"
