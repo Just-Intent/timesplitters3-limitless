@@ -108,6 +108,7 @@ void pc_mapmaker_aitemplates_event(void (*original)(void));
 void pc_mapmaker_aitemplates_remove(void (*original)(void));
 void pc_mapmaker_aitemplates_spawn_gate(void (*original)(void));
 void pc_mapmaker_aitemplates_alert(void (*original)(void));
+void pc_mapmaker_aitemplates_menu_item(void (*original)(void));
 void pc_mapmaker_grid_alloc(void (*original)(void));
 void pc_mapmaker_grid_reset(void (*original)(void));
 void pc_mapmaker_grid_insert(void (*original)(void));

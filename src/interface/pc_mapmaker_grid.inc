@@ -99,7 +99,7 @@
 
 static struct {
     int initialized, wide, overlap, stack;
-    unsigned refused, overlaps, stacked, reregistered, stack_valid, stack_sai;
+    unsigned refused, overlaps, stacked, reregistered, stack_valid, stack_sai, stack_newest;
     uint32_t allocated;   /* the grid this hook allocated (wide mode) */
 } mapmaker_grid;
 
@@ -437,22 +437,58 @@ void pc_mapmaker_stack_valid(void (*original)(void))
     if(mapmaker_grid.stack_valid++<3u)
         fprintf(stderr,"[mapmaker] stack: drop allowed over an existing item\n");
 }
-/* sub_002F8B40(piece, cell): the story AI point in the cell, (sai << 16) |
- * point, or -1 (a pure walk of the array). Its only caller (0x0030723A,
- * story AI mode of sub_00306460) stores it in [editor+0x2F20]; a point
- * there keeps the valid bit clear (0x003072B4) and the drop refuses it
- * (sub_003051F0 0x00305238). While a story AI is held answer -1, the value
- * the frame already uses for "nothing under the cursor"; with empty hands
- * the point is still found, so pick-up takes the AI apart one at a time. */
+/* Story AI array as editor.json relocates it (0x288 -> 0x11950). */
+#define MAPMAKER_STACK_SAI 0x11950u /* editor.json: 0x288 -> 0x11950 */
+#define MAPMAKER_STACK_SAI_CAP 255u
+#define MAPMAKER_STACK_SAI_POINTS 8u /* 0x64 + 8 x 0x10 fills the 0xE4 entry */
+/* sub_002F8B40(piece, x|y<<16, z) cdecl (caller add esp,0xC at 0x0030724B):
+ * the story AI point in the cell, (sai << 16) | point, or -1 (a pure walk
+ * of the array, lowest index first). Its only caller (0x0030723A, story AI
+ * mode of sub_00306460) stores it in [editor+0x2F20]; a point there keeps
+ * the valid bit clear (0x003072B4) and the drop refuses it (sub_003051F0
+ * 0x00305238). While a story AI is held answer -1, the value the frame
+ * already uses for "nothing under the cursor". With empty hands answer the
+ * HIGHEST index with a point in the cell, so pick-up takes a shared cell
+ * apart newest first: on maps saved while linked copies were born on their
+ * leader's points, the copy comes off before the leader. */
 void pc_mapmaker_stack_sai_point(void (*original)(void))
 {
-    uint32_t ret,editor;
+    uint32_t ret,editor,piece=0,count,s,k,first;
+    uint16_t x=0,y=0,z=0;
+    int args;
     mapmaker_grid_read();
     ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;  /* before the original pops it */
+    if((args=MAPMAKER_STACK_OK(16))!=0) {
+        piece=WORD_AT(g_esp+4u);
+        x=MAPMAKER_GRID_U16(g_esp+8u);y=MAPMAKER_GRID_U16(g_esp+10u);z=MAPMAKER_GRID_U16(g_esp+12u);
+    }
     original();
     if((int32_t)g_eax<0 || ret!=MAPMAKER_STACK_RET_SAI_POINT || !mapmaker_grid.stack || !mapmaker_grid_editor()) return;
     editor=WORD_AT(MAPMAKER_GRID_EDITOR);
-    if(!MAPMAKER_PTR_OK(editor,0x2F38) || mapmaker_stack_held(editor)<0) return;
+    if(!MAPMAKER_PTR_OK(editor,0x2F38)) return;
+    if(mapmaker_stack_held(editor)<0) {
+        if(!args || (int32_t)WORD_AT(editor+0x2F34u)>=0) return;     /* an item in hand: stock */
+        count=WORD_AT(editor+0x280u);
+        if((int32_t)count<0) count=0;
+        if(count>MAPMAKER_STACK_SAI_CAP) count=MAPMAKER_STACK_SAI_CAP;
+        first=g_eax>>16;
+        if(!MAPMAKER_PTR_OK(editor+MAPMAKER_STACK_SAI,count*0xE4u)) return;
+        for(s=count;s-->first+1u;) {
+            uint32_t sai=editor+MAPMAKER_STACK_SAI+s*0xE4u,points=WORD_AT(sai+0x58u);
+            points=(int32_t)points<0?0u:points>MAPMAKER_STACK_SAI_POINTS?MAPMAKER_STACK_SAI_POINTS:points;
+            for(k=0;k<points;k++) {
+                uint32_t pt=sai+0x64u+k*0x10u;
+                if(WORD_AT(pt)==piece && MAPMAKER_GRID_U16(pt+4u)==x && MAPMAKER_GRID_U16(pt+6u)==y &&
+                   MAPMAKER_GRID_U16(pt+8u)==z) {
+                    if(mapmaker_grid.stack_newest++<3u)
+                        fprintf(stderr,"[mapmaker] stack: pick-up takes the newest story AI on a shared cell\n");
+                    g_eax=(s<<16)|k;
+                    return;
+                }
+            }
+        }
+        return;
+    }
     if(mapmaker_grid.stack_sai++<3u)
         fprintf(stderr,"[mapmaker] stack: story AI over another story AI\n");
     g_eax=0xFFFFFFFFu;
@@ -466,9 +502,6 @@ void pc_mapmaker_stack_sai_point(void (*original)(void))
  * Starts, flags, turrets, movers and markers stay visible, so nothing
  * joins them and they join nothing. */
 #define MAPMAKER_STACK_MAX 2304u    /* 256 items + 255 story AI x 8 points */
-#define MAPMAKER_STACK_SAI 0x11950u /* editor.json: 0x288 -> 0x11950 */
-#define MAPMAKER_STACK_SAI_CAP 255u
-#define MAPMAKER_STACK_SAI_POINTS 8u /* 0x64 + 8 x 0x10 fills the 0xE4 entry */
 void pc_mapmaker_stack_cell(void (*original)(void))
 {
     static uint32_t hidden[MAPMAKER_STACK_MAX];
