@@ -13,7 +13,8 @@ import urllib.request
 import zipfile
 
 import vulkan_sdk
-from build_textures import ensure_pack, zip_entries, write_zip
+from release_channels import identity as release_identity
+from build_textures import ensure_pack, optional_identity, zip_entries, write_zip, write_source_files
 
 ROOT = Path(__file__).resolve().parents[1]
 GAME = 'Bin/futureperfect_recomp'
@@ -155,12 +156,17 @@ def main():
     parser.add_argument('--version', required=True)
     parser.add_argument('--output', type=Path, default=ROOT/'build/releases')
     parser.add_argument('--launcher', type=Path, default=ROOT/'build/macos-launcher')
+    parser.add_argument('--with-textures', action='store_true', help='Explicitly bundle the audited enhanced pack (offline distribution)')
     parser.add_argument('--without-textures', action='store_true', help='Make a lightweight package without enhanced textures')
     parser.add_argument('--texture-pack', type=Path, help='Use this audited compiled pack instead of the committed repository pack')
     parser.add_argument('--licenses', type=Path, default=ROOT/'external/native-mac-licenses',
                         help='Directory containing verified Vulkan/DXC third-party notices')
     args = parser.parse_args()
-    if args.without_textures and args.texture_pack:
+    try:
+        release_identity(args.version, publishing=True)
+    except ValueError as error:
+        parser.error(str(error))
+    if args.without_textures and (args.texture_pack or args.with_textures):
         parser.error('--texture-pack cannot be combined with --without-textures')
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
         parser.error('Package the native game on its Apple Silicon build host.')
@@ -178,8 +184,8 @@ def main():
     if native['source_revision'] != release_source:
         parser.error('Game source must match the existing release tag.')
     sdk = vulkan_sdk.verify_install()
-    texture_rows, textures = [], None
-    if not args.without_textures:
+    texture_rows, textures = [], optional_identity(ROOT)
+    if args.with_textures or args.texture_pack:
         _, texture_rows, textures = ensure_pack(ROOT, args.texture_pack)
     prepare_licenses(args.licenses)
     name = f'TimeSplitters-Future-Perfect-PC-{args.version}-macos-arm64'
@@ -226,11 +232,11 @@ def main():
     (stage/'Source').mkdir()
     sources = sorted(set(run('git', 'ls-files', '-z').split('\0')) | set(native['source_sha256']))
     with zipfile.ZipFile(stage/'Source/pc-port-source.zip', 'x', zipfile.ZIP_DEFLATED) as archive:
-        for relative in sources:
-            if relative and (ROOT/relative).is_file():
-                archive.write(ROOT/relative, relative)
+        write_source_files(archive, ROOT, sources)
         archive.writestr('runtime-local.patch', subprocess.check_output(['git', '-C', str(upstream), 'diff', '--binary']))
     (stage/'Source/README.txt').write_text('Project source and the exact runtime patch are in pc-port-source.zip.\n'
+        'Enhanced textures are an optional launcher download; source archives omit them.\n'
+        'Source builds may use assets/textures; explicit offline bundles include Textures.\n'
         'Runtime: https://github.com/nemonicicon/ts3FPrecomp/tree/'+native['runtime_revision']+'\n'
         'SDL: https://github.com/libsdl-org/SDL/tree/'+run('git','-C',upstream/'third_party/SDL','rev-parse','HEAD')+'\n'
         'Build with tools/build-native-mac.py; package with tools/package-native-mac.py.\n')
@@ -248,7 +254,8 @@ require System Settings > Privacy & Security > Open Anyway for the downloaded ap
 WASD: move. Mouse: look/fire/aim. E/Enter: confirm. Escape: pause.
 F2: controls/settings. F12: debug. F11: fullscreen. F9: FPS display.
 Saves and settings stay in Saves and Settings. Keep Data, Saves, Settings and
-Textures when upgrading. Game data, personal settings and saves are not bundled.
+Textures when upgrading. Enhanced textures are an optional launcher download.
+Game data, personal settings and saves are not bundled.
 
 Uses the shared experimental Xbox/Vulkan renderer with bundled MoltenVK.
 Basic first-level gameplay has been checked previously; complete rendering,
@@ -263,6 +270,7 @@ Exact native build and packaging provenance: BUILD.json and Support/Launcher.
 Source and third-party notices: Source and Licenses.
 ''', encoding='utf-8')
     manifest = dict(auto_display_resolution=native.get("auto_display_resolution", False), version=args.version, platform='macos-arm64', source_commit=release_source,
+        release_channel=release_identity(args.version),
         packaging_commit=run('git','rev-parse','HEAD'),
         packaging_changes=run('git','status','--porcelain'),
         renderer='vulkan', vulkan_driver='moltenvk', minimum_macos=minimum,

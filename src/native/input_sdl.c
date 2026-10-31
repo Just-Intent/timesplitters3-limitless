@@ -6,11 +6,14 @@
 #include "settings_macos.h"
 #include "input_bindings.h"
 #include "pc_prompts.h"
+#include "pc_settings.h"
 #include "pc_camera.h"
+#include "pc_mounted.h"
 #include "pc_terminal.h"
 #include "pc_mounted.h"
 #include "pc_scope_wheel.h"
 #include "pc_mapmaker_pointer.h"
+#include "pc_native_rate.h"
 #include "pc_debug.h"
 #include "pc_input.h"
 #include "pc_text_input.h"
@@ -32,7 +35,7 @@ static PcInput camera_input;
 static pthread_mutex_t camera_lock=PTHREAD_MUTEX_INITIALIZER;
 static atomic_int mouse_enabled=1, mouse_invert;
 static _Atomic float mouse_sensitivity=0.10f;
-static int captured;
+static atomic_int captured;
 static int capture_click;
 static atomic_int menu_active, menu_capture_request;
 /* Published under camera_lock; only the SDL thread calls window APIs. */
@@ -42,6 +45,13 @@ static float menu_wheel_remainder;
 static Uint64 menu_wheel_at;
 static PcTextInput text_input;
 static PcScopeWheel scope_wheel; /* under camera_lock: wheel zoom while scoped */
+int pc_controls_weapon_slots_active(void) {
+    pthread_mutex_lock(&camera_lock);
+    int active=atomic_load(&focused) && captured && !atomic_load(&menu_active) && !text_input.owner;
+    pthread_mutex_unlock(&camera_lock);
+    return active;
+}
+
 void pc_controls_text_mode(uint32_t owner) {
     pthread_mutex_lock(&camera_lock);
     if(text_input.owner!=owner) {
@@ -76,6 +86,7 @@ static PcMenuPointer menu_pointer_snapshot(int consume) {
     p.wheel=consume && p.valid && SDL_GetTicks()-menu_wheel_at<250?p.wheel:0;
     if(consume)menu_pointer_state.wheel=0;
     pthread_mutex_unlock(&camera_lock);
+    if(pc_settings_capture_blocked())p.valid=p.left=p.right=p.wheel=0;
     return p;
 }
 PcMenuPointer pc_controls_menu_pointer(void) {return menu_pointer_snapshot(1);}
@@ -164,6 +175,17 @@ static void release_all(void) {
 void tsfp_native_settings_release_input(SDL_Window *window) {release_all();set_capture(window,0);}
 int tsfp_native_input_focused(void) {return atomic_load(&focused);}
 static int native_key_state(int vk);
+int pc_controls_binding_keys(unsigned char down[256]) {
+    memset(down,0,256);
+    int focus=atomic_load(&focused);
+    if(!focus)return 0;
+    for(unsigned i=1;i<256;i++)down[i]=atomic_load(&keys[i]);
+    down[0x10]=down[0xa0]||down[0xa1];down[0x11]=down[0xa2]||down[0xa3];down[0x12]=down[0xa4]||down[0xa5];
+    memset(down+0xa0,0,6);
+    pthread_mutex_lock(&camera_lock);
+    if(SDL_GetTicks()-menu_wheel_at<250) {down[0x86]|=menu_pointer_state.wheel>0;down[0x87]|=menu_pointer_state.wheel<0;}
+    pthread_mutex_unlock(&camera_lock);return 1;
+}
 int tsfp_native_key_down(int vk) {
     if(!atomic_load(&focused)||vk<=0||vk>255)return 0;
     pthread_mutex_lock(&camera_lock);
@@ -224,6 +246,11 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
     }
     if(e->type==SDL_EVENT_KEY_DOWN||e->type==SDL_EVENT_KEY_UP){
         int vk=tsfp_native_virtual_key(e->key.scancode),down=e->type==SDL_EVENT_KEY_DOWN;
+        if(pc_settings_capture_blocked()) {
+            if(vk)atomic_store(&keys[vk],down);
+            if(down && atomic_load(&focused))pc_settings_capture_key(vk);
+            return;
+        }
         pthread_mutex_lock(&camera_lock);
         int typing=text_input.owner && pc_text_key((unsigned)vk);
         if(typing && down && atomic_load(&focused))
@@ -272,6 +299,7 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
         int vk=e->button.button==SDL_BUTTON_LEFT?1:e->button.button==SDL_BUTTON_RIGHT?2:
                e->button.button==SDL_BUTTON_MIDDLE?4:e->button.button==SDL_BUTTON_X1?5:e->button.button==SDL_BUTTON_X2?6:0;
         if(vk)atomic_store(&keys[vk],e->type==SDL_EVENT_MOUSE_BUTTON_DOWN);
+        if(down && atomic_load(&focused))pc_settings_capture_key(vk);
     }
     if(e->type==SDL_EVENT_MOUSE_WHEEL && atomic_load(&menu_active) && atomic_load(&focused)) {
         float delta=e->wheel.direction==SDL_MOUSEWHEEL_FLIPPED?-e->wheel.y:e->wheel.y;
@@ -282,6 +310,7 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
             menu_wheel_remainder+=fmaxf(-8,fminf(8,delta));
             int steps=(int)menu_wheel_remainder;menu_wheel_remainder-=steps;
             if(steps) {
+                pc_settings_capture_key(steps>0?0x86:0x87);
                 if((steps>0)!=(menu_pointer_state.wheel>0))menu_pointer_state.wheel=0;
                 menu_pointer_state.wheel+=steps;
                 if(menu_pointer_state.wheel>8)menu_pointer_state.wheel=8;
@@ -321,7 +350,7 @@ void pc_controls_mapmaker_pointer(int active) {
     mapmaker_pointer_active=!!active;
     pthread_mutex_unlock(&camera_lock);
 }
-/* Escape-as-Back in the editor is Windows-only for now (MAC-062). */
+/* Escape-as-Back in the editor is Windows-only for now (MAC-065). */
 void pc_controls_mapmaker_editor(int active) { (void)active; }
 int pc_controls_mapmaker_editor_active(void) { return 0; }
 void pc_controls_mapmaker_zoom(int notches) { (void)notches; }
@@ -351,12 +380,12 @@ void pc_controls_apply_mouse(uint32_t player,uint32_t fov_object,ptrdiff_t offse
     pc_scope_wheel_bindings(&scope_wheel,have_bound?(const int (*)[PC_BINDING_SLOTS])bound:NULL);
     pc_scope_wheel_state(&scope_wheel,scope,SDL_GetTicks());
     camera_input.focused=atomic_load(&focused)&&atomic_load(&mouse_enabled)&&!atomic_load(&menu_active);
-    int terminal=pc_terminal_mouse(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),player,offset);
+    int terminal=pc_terminal_mouse(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),player,offset,pc_native_rate()!=0);
     pc_input_terminal_context(&camera_input,terminal>=0,atomic_load(&keys[1]));
     /* Mounted guns and vehicle gunner seats aim from gun angles (pc_mounted.h). */
     if(terminal>=0 ||
        pc_mounted_mouse(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),
-                        atomic_load(&mouse_invert),player,fov_object,offset,0)>=0 ||
+                        atomic_load(&mouse_invert),player,fov_object,offset,pc_native_rate()!=0)>=0 ||
        !pc_camera_fields(player,fov_object,offset,&yaw,&pitch,&fov)) {
         pthread_mutex_unlock(&camera_lock);
         return;
@@ -525,6 +554,64 @@ int tsfp_native_input_test(void) {
     e.type=SDL_EVENT_MOUSE_BUTTON_UP;tsfp_native_input_event(&e,NULL);recomp_bindings_sample(0,&pad);
     e.type=SDL_EVENT_MOUSE_BUTTON_DOWN;tsfp_native_input_event(&e,NULL);recomp_bindings_sample(0,&pad);
     ok &= pad.bAnalogButtons[XBOX_BUTTON_A]==0 && pad.bAnalogButtons[XBOX_BUTTON_RTRIGGER]==255;
+    {
+        /* Route fractional terminal time through the actual SDL adapter.
+         * This is synthetic SDL input, not physical-device latency evidence. */
+        unsigned char *terminal_guest=calloc(1,0x800000);
+        const char *rate_env=getenv("TSFP_NATIVE_FPS");
+        char *saved_rate=rate_env?strdup(rate_env):NULL;
+        ok &= terminal_guest!=NULL && (!rate_env || saved_rate!=NULL);
+        if(terminal_guest && (!rate_env || saved_rate)) {
+            ptrdiff_t terminal_offset=(ptrdiff_t)terminal_guest;
+            #define TU(a) (*(uint32_t *)(terminal_guest+(a)))
+            #define TF(a) (*(float *)(terminal_guest+(a)))
+            TU(0x10114)=0x2000;TU(0x76c27c)=0x21000;TU(0x2107c)=0x22000;
+            TU(0x22014)=0x10000;TU(0x22030)=0x23000;
+            TF(0x20384)=55;TF(0x22038)=100;TF(0x2203c)=100;
+            ok &= setenv("TSFP_NATIVE_FPS","144",1)==0;
+            for(int step=0;step<5;++step) {
+                TU(0x4e7944)=(step==1 || step==4)?1:0;
+                TF(0x4e794c)=(step==1 || step==4)?0:60.f/144;
+                if(step==3)ok &= setenv("TSFP_NATIVE_FPS","0",1)==0;
+                e.type=SDL_EVENT_MOUSE_MOTION;e.motion.xrel=100;e.motion.yrel=20;
+                tsfp_native_input_event(&e,NULL);
+                pc_controls_apply_mouse(0x10000,0x20000,terminal_offset);
+                const float expected[]={110,110,120,120,130};
+                ok &= fabsf(TF(0x22038)-expected[step])<.001f && TF(0x10100)==0;
+            }
+            /* The same live-rate selection must reach mounted gun routing. */
+            TU(0x10114)=0x80;TU(0x10014)=0x21000;TU(0x2107c)=0x22000;
+            TU(0x22c14)=0x30000;TU(0x3007c)=0x31000;
+            TU(0x31000)=0x30000;TU(0x31004)=0x4147554e;TU(0x31010)=4;TU(0x31068)=0x21000;
+            TF(0x31034)=-90;TF(0x31038)=90;TF(0x3103c)=-179;TF(0x31040)=179;
+            ok &= setenv("TSFP_NATIVE_FPS","144",1)==0;
+            for(int step=0;step<5;++step) {
+                TU(0x4e7944)=(step==1 || step==4)?1:0;
+                TF(0x4e794c)=(step==1 || step==4)?0:60.f/144;
+                if(step==3)ok &= setenv("TSFP_NATIVE_FPS","0",1)==0;
+                e.type=SDL_EVENT_MOUSE_MOTION;e.motion.xrel=100;e.motion.yrel=20;
+                tsfp_native_input_event(&e,NULL);
+                pc_controls_apply_mouse(0x10000,0x20000,terminal_offset);
+                const float expected[]={10,10,20,20,30};
+                ok &= fabsf(TF(0x31024)+expected[step])<.001f;
+                ok &= fabsf(TF(0x3101c)-expected[step]*.2f)<.001f;
+                ok &= TF(0x10100)==0 && TF(0x10104)==0;
+            }
+            TU(0x10114)=2;
+            pc_controls_apply_mouse(0x10000,0x20000,terminal_offset);
+            ok &= TF(0x10100)==0 && TF(0x10104)==0;
+            if(saved_rate)ok &= setenv("TSFP_NATIVE_FPS",saved_rate,1)==0;
+            else ok &= unsetenv("TSFP_NATIVE_FPS")==0;
+            #undef TU
+            #undef TF
+        }
+        free(saved_rate);free(terminal_guest);
+    }
+    /* The synthetic terminal guest was freed above. End its input context
+     * before the independent capture/fire test, as a real gameplay frame does. */
+    pthread_mutex_lock(&camera_lock);
+    pc_input_terminal_context(&camera_input,0,0);
+    pthread_mutex_unlock(&camera_lock);
     captured=0;tsfp_native_mouse_config(1,0.1,0);release_all();
     /* Exercise capture activation through a real SDL window, including the
      * swallowed first click and immediate release of a published look sample. */

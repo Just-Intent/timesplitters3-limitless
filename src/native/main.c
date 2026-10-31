@@ -4,6 +4,7 @@
 #include "recomp_config.h"
 #include "crash_posix.h"
 #include "../pc_discord.h"
+#include "../pc_native_rate.h"
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,7 +69,9 @@ int main(int argc, char **argv)
         fprintf(stderr, "Native bring-up requires explicit game, save, input and runtime-display configuration paths.\n");
         return 2;
     }
-    fprintf(stderr,"[native] fixed 60 FPS; interpolation disabled\n");
+    int native_rate=pc_native_rate();
+    if(native_rate) fprintf(stderr,"[native] target %d fresh game FPS; console clock unchanged\n",native_rate);
+    else fprintf(stderr,"[native] fixed 60 FPS; interpolation disabled\n");
     char path[4096];
     if (snprintf(path, sizeof path, "%s/default.xbe", game) >= (int)sizeof path) return 2;
     FILE *f = fopen(path, "rb");
@@ -91,6 +94,21 @@ int main(int argc, char **argv)
     printf("[NATIVE-BOOT] Xbox memory offset: %p\n", (void *)g_xbox_mem_offset);
     xbox_kernel_init();
     xbox_path_init(game, saves);
+    {
+        extern int xbox_save_root_utf8(char *, unsigned);
+        extern void pc_storage_set_path(const char *);
+        extern int xbox_set_profile_root_utf8(const char *);
+        extern void pc_storage_set_profile_router(int (*)(const char *));
+        pc_storage_set_profile_router(xbox_set_profile_root_utf8);
+        extern int pc_storage_resolve_root(const char *,char *,size_t);
+        char save_root[4096],selected[4096];
+        if(xbox_save_root_utf8(save_root,sizeof save_root)) {
+            int result=pc_storage_resolve_root(save_root,selected,sizeof selected);
+            if(result<0){fprintf(stderr,"Selected save drive unavailable. Reconnect it or remove save-location.txt beside the controls file.\n");return 2;}
+            if(result>0){xbox_path_init(game,selected);xbox_save_root_utf8(save_root,sizeof save_root);}
+            pc_storage_set_path(save_root);
+        }
+    }
     xbox_kernel_bridge_init();
     xbox_watch_init();
     if (xbox_EnvSwitch("RECOMP_AC97_READY", 1)) {

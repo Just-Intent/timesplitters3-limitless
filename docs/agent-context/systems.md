@@ -11,7 +11,7 @@ authoritative place to implement portable behavior.
 
 Textures: root `src/texture_pack*`, `texture_mode*`, runtime `src/d3d/` and HLE
 texture hooks; offline tooling `tools/texture-*`. Sanitized replacements now live
-in `assets/textures` (DDS via Git LFS), audited/bundled by `tools/build_textures.py`;
+in `assets/textures` (DDS via Git LFS), audited by `tools/build_textures.py` for optional delivery;
 private source art and original assets stay local. Networking: `src/pc_network*`,
 `pc_online*`, runtime HLE/kernel patches and `tools/online.py`. Crash capture:
 `src/pc_crash*`, `pc_hang_policy.h`, runtime crash hooks and launcher diagnostics.
@@ -59,6 +59,40 @@ native Mac visual validation remains pending under MAC-036.
 
 ## State and data boundaries
 
+Online bot presentation (#222) uses `pc_network_bot_motion.h` from the
+`pc_network_bots_guest_frame` hook. The transport still consumes each validated
+host snapshot once. The guest caches it and updates the displayed body, spatial
+bounds and matching animation frame times every frame over a 50 ms span, retargeting
+from the current display pose when arrivals vary. Discrete vitals, scores, shots,
+absence and spawn transitions retain host values; no guest AI or extrapolation
+is enabled. A gap over 250 ms snaps to the next received host state. Match,
+host, actor-pool and inactive-state changes clear presentation history. The
+Windows QPC adapter supplies monotonic seconds independently of guest game time.
+Human controller replication and the host's three-tick send interval are unchanged.
+Native Mac fallback remains original until its network adapter exists (MAC-052).
+Only clip-block `+8` (model `DC`/`134`) is interpolated within the same clip/cycle;
+the other animation channels and crossfade controls stay atomic. US `5CEF0`
+can promote the secondary clip during zero-advance evaluation, so mixing fade
+duration/elapsed with another snapshot's clip identity can select an invalid clip.
+
+Camera and perspective corrections use `pc_display_memory.h` to retain one
+OS-validated writable region only after their original guest routine returns.
+The stack-local snapshot expires when the correction returns; no guest calls,
+allocations or protection changes may occur while it is reused. Bounds,
+overflow, read-only and guard/no-access rejection remain enforced. Other
+display/menu validation still uses its existing checks. This avoids repeating
+the VM query for camera, output and source matrices within the same region;
+it does not cache matrices, reduce updates or change projection arithmetic.
+Decal corrections validate the camera and its source matrix before the output
+because the original callers build their temporary output on the guest stack.
+Separate camera/stack regions therefore need two queries, not three.
+
+The native SDL input self-test ends its synthetic terminal context before
+testing independent mouse capture/fire behavior. The fractional-terminal case
+otherwise leaves `camera_input.terminal_active` set after its mock guest is freed,
+suppressing the next case's Fire button. This is test isolation inside
+`tsfp_native_input_test`; ordinary frame/input behavior is unchanged.
+
 `config/*.default.*` is tracked default configuration; `config/pc-controls.json`
 and `config/pc-display.ini` are personal. `private/game` is the single extracted
 game-data copy; `private/saves` is personal; `private/test-fixtures/unlocked` is
@@ -66,9 +100,10 @@ the canonical local fixture and must remain unchanged. Test runners copy it into
 bounded disposable test roots. `private/texture-remaster/pack` is the one active
 6-GiB-capped art-production pack; source art and original game assets stay ignored.
 Sanitized compiled DDS/JSON replacements are tracked in `assets/textures` and
-bundled with game releases; `tools/texture-repository.py` stages them with LFS,
+published as optional packs; `tools/texture-repository.py` stages them with LFS,
 `tools/build_textures.py` audits them. Leave pointers unhydrated for unrelated
-source work. Packaging must reject missing LFS content, not silently omit it.
+source work. Optional pack publication must reject missing LFS content. Ordinary
+game packages omit textures; existing installed packs and runtime fallback remain.
 
 For installed layouts, use the launcher platform adapter instead of assuming
 checkout names. Never include private data, generated guest code, credentials,
@@ -81,8 +116,13 @@ symbols, semantics and sanitized measured conclusions instead.
 thread-local `pc_text_read_scope.h` cache uses existing OS VM query adapters.
 It is valid only during synchronous text layout, with no mapping/protection
 changes or event dispatch. Nested scopes retain intervals; the next outer scope
-clears them. Scratch writes still use a fresh protection query. Scope wrapping,
-label construction/drawing and nested prompt measurement through the shared
+clears them. Scratch writes still use a fresh protection query.
+The cached interval covers the full OS-validated region, so descending guest
+stack reads and earlier labels in the same mapping reuse one query. It never
+extends beyond that region or survives the outer layout scope.
+The US outlined-label wrapper (`sub_00041E30`) retains this same scope over
+its four outline draws and foreground pass, then expires it at return.
+Scope wrapping, label construction/drawing and nested prompt measurement use the shared
 hooks in `pc_tutorial_ui.inc`, `pc_display_ui.inc` and `pc_prompt_guest.inc`.
 `pc_display_menu.c` includes `pc_prompts.h` before the .inc callers to avoid
 implicit declarations. Do not extend caches across menu ticks or frames.
@@ -201,7 +241,7 @@ calls in the existing `pc_display_menu_mouse` (`sub_00073750`) wrapper: the
 layout after the original runs (before its context checks, so rejected menus
 are logged too), and the click after hit testing. No guest regeneration. It must never write guest memory or registers;
 `tests/test_mapmaker_probe.py` enforces this with mutations. Usage and the
-experiment protocol: `docs/mapmaker-meter-probe.md`. Mac: MAC-060.
+experiment protocol: `docs/mapmaker-meter-probe.md`. Mac: MAC-063.
 Flag 128 (scene 100, 5 s windows every 30 s) logs room draws, their props and
 the model draws inside them through two further wrappers,
 `pc_mapmaker_probe_room_draw` (`sub_000A2900`) and
@@ -431,4 +471,191 @@ and the movement keys (W/A/S/D by default) no longer move the pointer;
 strafe left/right step the toolbar as the D-pad (`pc_mapmaker_move_key`,
 `pc_mapmaker_dpad_alias`). A right click over an empty cell with no piece held
 presses Y (clears the selection; `editor+0x2F7C`/`+0x2F18`, static analysis). No guest regeneration. Fixture:
-`tests/test_mapmaker_pointer.py`. Mac: MAC-062.
+`tests/test_mapmaker_pointer.py`. Mac: MAC-065.
+
+## Mounted and CCTV gun mouse aim (#182)
+
+`src/pc_mounted.h` handles guest player mode `0x80` before ordinary player
+camera updates in both `pc_controls.c` and `native/input_sdl.c`. The US guest
+`sub_0025D520`/`sub_00258A20` aim an AGUN through player entity data `+0xC14`;
+ordinary player yaw/pitch do not turn it. The shared helper validates its AGUN
+tag and reverse owner link, uses local input port zero (not guest player ID),
+and updates gun pitch/yaw with authored limits, sensitivity, inversion, FOV and
+optional gun speed. Mouse displacement is consumed once without frame-time
+multiplication. Invalid ownership, pause, focus loss and stale motion consume
+input without falling through to hidden player angles. Terminal mode `0x2000`
+and its left-click mapping retain `pc_terminal_mouse` behavior. Controller
+input remains in the guest routines. The separate vehicle-seat mode `0x8000`
+is not routed by this helper. `tests/test_mounted_mouse.py` runs the guarded C
+fixture on Windows/macOS; physical Mac validation is tracked under MAC-001.
+The mounted helper receives the adapter's explicit native-timing selection.
+Native mode accepts finite positive game-float time at `4E794C`; Original60
+retains its whole-time gate at `4E7944`. Both consume/rebase mouse batches with
+`pc_input_consume_motion`, preventing fresh packets from expiring against a
+previous batch timestamp. Paused/invalid native time consumes without aiming.
+The helper still handles only AGUN mode `0x80`, not vehicle-seat mode `0x8000`.
+Host input self-tests route synthetic motion through `pc_controls_apply_mouse`
+in Windows and SDL, with zero-whole positive time, paused stale whole time,
+live return to Original60 and return to on-foot controls. Windows execution
+passes; native SDL self-test execution remains a host validation requirement.
+
+## Unified Video Options and native presets (PR #285)
+
+`pc_display_menu.c` stages resolution (including Auto), aspect, vertical FOV,
+texture style, FPS and subtitles behind one dirty-state Apply. Auto uses the
+`1,1` saved sentinel and is labeled Auto, never displayed as a pixel size.
+Controls follows Video Options; conditional frontend Cheats is last. Audio
+retains its frontend/pause-specific alignment and common highlights are rounded.
+`pc_frame_rate_settings.h` persists the beta presets; live requests enter
+`pc_frame_rate_live.inc` and commit at the guest clock boundary.
+
+The merge retains main's nested text-read scope and fresh scratch-write checks
+rather than the older per-hook stack-query optimization. The real-protection
+fixture in `tests/pc_prompts.c` retains boundary/ABI checks; query reduction is
+measured inside the cache by `tests/text_read_scope.c`, because reads now execute
+in a separately compiled translation unit. Mounted mouse aim remains ahead of
+ordinary camera input in both adapters; fractional terminal handling is retained.
+Native high-refresh validation is MAC-060, distinct from crane MAC-058 and
+text input MAC-059.
+
+## Issue #74 menu texture additions
+
+The branch pack now contains 2,046 accepted replacements. The same keyed DDS
+files serve Windows and the common native Mac renderer; loader contracts are
+unchanged. Menu coverage is 574/750 keys, with 164 original character icons, eight
+intentional functional originals and four unresolved replacements.
+`config/texture-originals.json` records excluded icon keys; the worklist rejects
+installed replacements for those keys and hybrid planning retains the original
+lane. Character model materials remain in scope. Source resampling and original-detail
+recovery are distinguished from newly generated art in `docs/main-menu-textures.md`.
+Offline acceptance does not certify mapped scene appearance or Mac GPU behavior.
+
+The original-icon policy also includes historical public DDS/JSON hashes.
+`build_textures.ensure_pack` rejects reintroduced icon keys and emits these
+identities in `BUILD.json` under `textures.retired` for both game packagers.
+The shared launcher retires only matching installed pairs transactionally;
+custom artwork stays protected. See the launcher guide for recovery behavior.
+
+## Native movement boost resource
+
+The US walking routine `sub_00258F50` gates a movement boost on mode byte
+`0x7DE456 == 0x11`, selected player `0x7DE498`, input bit `0x800`, and positive
+entity+0x1D0 resource. The fixed subtraction at `0x259060` is now scoped through
+`pc_native_boost_drain` in `pc_native_numeric.h`. Native frames split one active
+original-update charge by `max(0, min(1, raw_delta, game_delta))`: slow motion
+retains the original zero-whole-tick gate's reduced consumption; fast/catch-up
+updates still consume at most one charge. Original mode and other sites retain
+exact subtraction. No constant table, boost speed, threshold or stored clock
+is changed. The complete US routine fixture uses a controlled flat collision
+floor; it does not establish real-map geometry, input acceleration or network
+transport parity. The game rule-name table at 0x4D1F90 + index*0x20, decoded
+through the existing Discord string-table path, identifies index 17 as Escort.
+A bounded frontend lookup confirms the name; live boost activation remains
+unverified.
+
+Escort recovery takes a separate route: active-match `sub_00068830` calls
+`sub_000681C0`, then `sub_000654E0`. Its original game-clock delay is more than
+five seconds; eligible match updates include zero-whole-game-tick frames.
+`pc_native_boost_recover` therefore scales only addition site `0x6552D` by
+`max(0,min(1,raw_delta))`. The original dispatcher gates pause; its selected-actor
+write and mirror, threshold overshoot and health-dependent clamp are preserved.
+The full three-routine fixture controls external services and validates those
+boundaries separately from the walking drain's active-game-update budget.
+
+## Experimental water coefficient precision
+
+`pc_surface_coefficients` in `pc_surface_bias.h` preserves the current guest
+uploader's clamped/truncated byte anchors, then scales acceleration/displacement
+and exponentiates damping without repacking fractional values. The existing
+bias+float+fractional opt-in gates enable it. `pc_native_surface_guest.h` copies
+original parameters into the HLE state before temporary guest scaling; whole
+steps retain original uploads. The HLE path copies bank 0 stages 3/5/7 and bank
+1 stage 6 into ordered commands only for shader 0x4BBF10, caching duplicates and
+clearing on scope exit. Defaults and original/catch-up behavior stay unchanged.
+The constant-uploader fixture documents the current lifter's truncation; this
+change does not claim original Xbox MXCSR rounding fidelity or full wave parity.
+
+The opt-in precision policy now selects full-float format 0x4B for registered
+feedback intermediates. Final byte textures, guest headers, rate gating and
+normal-play defaults are unchanged. Common-RHI promotion/demotion preserves
+live GPU contents and capture bytes; the transaction still flushes before copy,
+rebinds only on success and retains the old resource on failure. This removes
+measured half-float accumulation error but does not prove original wave parity.
+
+Optional game packages use `build_textures.optional_identity` to retain only the
+small `textures.retired` migration, without any DDS/JSON payload or LFS access.
+This preserves the original-icon fix using the existing shared launcher consumer;
+ordinary missing texture files never cause removal of an installed pack.
+
+## Direct keyboard inventory slots
+
+`pc_weapon_slots.def` appends host-only actions after the 24 Xbox controls;
+`pc_weapon_slots.h` owns press edges and expiring requests. `pc_bindings.inc`
+loads/saves them through the normal binding editor and migrates only missing
+slots. Stock White=1 and Black=2 move to free Z/X keys; existing custom and
+explicitly unbound actions remain intact. No migration writes until Save.
+Both Win32 and SDL gate requests on focus, mouse capture, menus and text input.
+
+The additive keyboard-weapon-slots patch wraps US `sub_001BF140`, the original
+player weapon-input routine. `pc_weapon_slots_guest.inc` runs on that guest
+thread after ordinary input, using the ordered table at `0x4FC888`, the original
+variant filter `sub_001BAA70`, usability `sub_001BA410` and selection
+`sub_001BA130`, then refreshes the weapon HUD with `sub_00142820`. It deduplicates
+weapon groups, checks local input slot zero rather than network player ID, and
+never grants inventory. Empty slots do nothing. Settings expose exactly ten bindable
+slots, defaulting to 1–9/0. The separate 70-entry internal table bound covers
+weapon IDs and variants; it does not add settings rows.
+
+## Themed live keyboard and mouse editor
+
+`pc_keyboard_menu.inc` is included by `pc_display_menu.c`, adding Keyboard and
+Mouse to both main Settings and paused Options. It uses the original menu
+builders, callbacks, highlights and footer navigation. The controller-style
+bindings pages draw a keyboard/mouse diagram with primary/alternate columns;
+`pc_keyboard_menu_model.h` partitions all 34 actions across short pages.
+`PC_BINDING_SLOTS` is two in the shared model and native dialogs; old keyboard
+profiles use their first two sources without modifying disk until saved.
+Controller profiles keep their existing source capacity.
+
+`pc_binding_capture.h` handles opening-input release, capture, final-input
+release, Escape cancellation, focus loss and timeout. `pc_bindings.inc` owns
+its lock/state; Windows and SDL supply raw physical keys and wheel pulses, latching press
+events so quick taps are retained between polling ticks.
+While capturing, controller polling and menu pointer dispatch are suppressed,
+so E/F/Y and mouse clicks bind without activating menu commands. Assignments
+use the existing atomic settings save/conflict API. Mouse sensitivity previews
+live, debounces writes, flushes on exit, and restores previous values on error.
+
+Capture starts once in the new page update. Native descriptor +12 is a per-frame
+callback, not a destructor; installing capture cleanup there cancels it every
+frame. The callback fixture in `tests/fov_settings.c` exercises both native
+per-frame callbacks and requires a selectable capture instruction row.
+
+## Host storage choices in Create Profile
+
+`pc_storage_menu.inc` injects mounted host drive rows at native storage-button
+site 001944C3, directly in Select Storage Device. Rows sort by drive letter on Windows and case-insensitive volume name on Mac;
+Rows show only volume names and drive letters, with no game/save role suffix.
+Native menu sizing is widened before its
+title at 0019440B. Labels are ASCII-safe for the guest font. Windows lists mounted
+drive letters; Mac lists the startup volume and /Volumes mounts. Neither lists
+unmounted partitions. The native 00192770 update and 00191470 icon adapter keep
+host indices away from the console device table. Selection delegates to original
+00192E60 with console index zero, preserving the save/overwrite state machine.
+After a drive change, synchronous 00024EC0/00190F70 enumeration rebuilds the native
+profile list (74F9FC) before duplicate-name validation against the new location.
+
+`pc_storage.inc` supplies actual volume metadata, cached five seconds for original
+storage-text replacements. `pc_storage_routes.inc` validates a writable save
+folder, prepares UserData/45410066 for the native free-space query, and atomically
+saves save-location.txt beside RECOMP_INPUT_CONFIG. Changes immediately redirect
+future UDATA opens through the registered kernel adapter; failed persistence
+rolls that route back. Existing handles, caches and partition devices stay put.
+Startup also honors the preference; profiles are neither moved nor deleted.
+An unavailable configured location fails explicitly instead of silently
+creating a new profile elsewhere. TSFP_SAVE_LOCATION_LOCK protects isolated test
+sessions from changing real drive preferences. Windows resolves junctions and
+volume identities; drive metadata retains executable-volume identity internally.
+The Mac metadata adapter includes unistd.h before calling getattrlist; sys/attr.h
+provides attribute structures but not that function declaration. The production
+pc_prompts.c compile contract checks this include order in Mac CI.

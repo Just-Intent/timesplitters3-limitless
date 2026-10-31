@@ -1,4 +1,4 @@
-"""Build a public Windows prerelease ZIP without game data or personal files."""
+"""Build a public Windows game release ZIP without game data or personal files."""
 import argparse
 import hashlib
 import json
@@ -9,7 +9,8 @@ import shutil
 import subprocess
 import zipfile
 from bundle_online import bundle
-from build_textures import ensure_pack, zip_entries, write_zip
+from release_channels import identity as release_identity
+from build_textures import ensure_pack, optional_identity, zip_entries, write_zip, write_source_files
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -18,21 +19,26 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--version', default='v'+(ROOT/'VERSION').read_text().strip())
     parser.add_argument('--output', type=Path, default=ROOT / 'build/releases')
+    parser.add_argument('--with-textures', action='store_true', help='Explicitly bundle the audited enhanced pack (offline distribution)')
     parser.add_argument('--without-textures', action='store_true', help='Make a smaller package without enhanced textures')
     parser.add_argument('--texture-pack', type=Path, help='Use this audited compiled pack instead of the committed repository pack')
     args = parser.parse_args()
-    if args.without_textures and args.texture_pack:
+    try:
+        release_identity(args.version, publishing=True)
+    except ValueError as error:
+        parser.error(str(error))
+    if args.without_textures and (args.texture_pack or args.with_textures):
         parser.error('--texture-pack cannot be combined with --without-textures')
     if not re.fullmatch(r'v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?', args.version):
-        parser.error('Use a semantic release version, such as v1.2.3 or v1.2.3-alpha.1.')
+        parser.error('Use a semantic release version, such as v1.2.3 or v1.2.3-beta.1.')
     if '-' in args.version and any(part.isdecimal() and len(part)>1 and part[0]=='0' for part in args.version.split('-',1)[1].split('.')):
         parser.error('Numeric prerelease identifiers must not contain leading zeros.')
     name = f'TimeSplitters-Future-Perfect-PC-{args.version}-windows-x64'
     # Only a successfully built executable with matching content can be packaged.
     subprocess.run([os.sys.executable, str(ROOT/'tools/network-identity.py'), '--verify',
                     '--executable', str(ROOT/'build/windows/Release/futureperfect_recomp.exe')], check=True)
-    texture_rows, textures = [], None
-    if not args.without_textures:
+    texture_rows, textures = [], optional_identity(ROOT)
+    if args.with_textures or args.texture_pack:
         _, texture_rows, textures = ensure_pack(ROOT, args.texture_pack)
     stage = args.output.resolve() / name
     stage.mkdir(parents=True, exist_ok=False)
@@ -87,19 +93,18 @@ def main():
     source_files = subprocess.check_output(
         ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], cwd=ROOT).decode().split('\0')
     with zipfile.ZipFile(source_dir/'pc-port-source.zip', 'w', zipfile.ZIP_DEFLATED) as source:
-        for relative in sorted(set(source_files)):
-            path = ROOT/relative
-            if relative and path.is_file():
-                source.write(path, relative)
+        write_source_files(source, ROOT, source_files)
         local_patch = subprocess.check_output(['git', '-C', str(upstream), 'diff', '--binary'])
         source.writestr('runtime-local.patch', local_patch)
     (source_dir/'README.txt').write_text(
         'pc-port-source.zip contains the project source and local runtime patch for this build.\n'
+        'Enhanced textures are an optional launcher download; source archives omit them.\n'
+        'Source builds may use assets/textures; explicit offline bundles include Textures.\n'
         f'Base runtime: https://github.com/nemonicicon/ts3FPrecomp/tree/'
         f'{subprocess.check_output(["git", "-C", str(upstream), "rev-parse", "HEAD"], text=True).strip()}\n'
         'See the project README and requirements-release.txt for build and packaging instructions.\n',
         encoding='utf-8')
-    (stage / 'README.txt').write_text(f'''TimeSplitters: Future Perfect PC {args.version} - experimental prerelease
+    (stage / 'README.txt').write_text(f'''TimeSplitters: Future Perfect PC {args.version} - {release_identity(args.version)['name']}
 
 Requires 64-bit Windows 10/11 and your own US Xbox game files.
 Extract this entire ZIP to a writable folder. Open TimeSplitters Launcher.exe.
@@ -117,7 +122,7 @@ E/Space/Enter: use/confirm. Escape: pause/release mouse. Click: recapture mouse.
 F1: show/hide the PC Settings menu bar (also PC Settings > Hide Menu Bar).
 F2: keyboard/mouse bindings and sensitivity. F12: Debug settings.
 F10: switch Classic/Enhanced textures live.
-Enhanced textures: {'included in Textures; partial overhaul' if textures else 'not bundled in this lightweight package'}.
+Enhanced textures: {'included in Textures; partial overhaul' if texture_rows else 'optional download in launcher settings'}.
 Alt+Enter: fullscreen (also available under PC Settings).
 Button prompts show your first assigned keyboard/mouse binding. Controller input
 restores controller icons; using the keyboard/mouse switches them back.
@@ -140,8 +145,8 @@ Real internet connections and full-match stability remain experimental.
 Online preferences and hosting certificates are stored under Settings.
 
 Settings: Settings/pc-controls.json. Saves: Saves. Diagnostics: Logs.
-Keep Data, Settings, and Saves when upgrading. Extract upgrades to a new folder
-and copy those three folders over. Do not overwrite your settings with defaults.
+Keep Data, Settings, Saves, and Textures when upgrading. Extract upgrades to a new folder
+and copy those four folders over. Do not overwrite your settings with defaults.
 
 This is an experimental native recompilation, not the original source code.
 Startup and short first-mission gameplay have been checked; a full campaign
@@ -162,6 +167,7 @@ Third-party notices are in Licenses. Microsoft Visual C++ runtime is bundled.
 ''', encoding='utf-8')
     info = {
         'version': args.version,
+        'release_channel': release_identity(args.version),
         'auto_display_resolution': True,
         'launcher_version': json.loads((stage/'Support/Launcher/manifest.json').read_text())['version'],
         'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),

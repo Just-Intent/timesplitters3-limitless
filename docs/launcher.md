@@ -33,8 +33,8 @@ change Windows security settings or unblock files automatically.
 
 ## First-time setup
 
-1. Choose **Preview** under **Update channel**. Current game releases are
-   prereleases, so they do not appear in Stable.
+1. Keep **Stable** under **Update channel** for the default game release.
+   Launcher 1.3.0+ also offers named opt-in previews for testing.
 2. Select **Install release**. The launcher downloads a published Windows game
    runtime from this project's GitHub Releases and checks its integrity before
    installing it. It does not download original game data.
@@ -56,8 +56,8 @@ See the [Windows settings guide](windows-settings.md) for the full controls.
 Open **TimeSplitters Launcher.exe** and select **Play Game**. An installed game
 can still be launched when a release check fails or you are offline.
 
-**Stable** offers stable game releases; **Preview** also includes published
-prereleases. The launcher checks published releases, not development branches.
+**Stable** offers stable game releases; general **Preview** and named previews
+follow their own testing channels in launcher 1.3.0+. The launcher checks published releases, not development branches.
 A newer GitHub commit does not become an installed game update until a compatible
 release is published. Launcher and game versions are separate.
 
@@ -69,25 +69,34 @@ launcher closes after preparation and automatically reopens after installation,
 so Play always uses the newly installed launcher. Repairs and restoring a previous
 game use the same restart flow. Cancelling a download does not restart it.
 Leave room for staging and one rollback snapshot in addition to
-the installed game, including its bundled replacement textures.
+the installed game. Optional texture updates also need temporary space for one part.
 
 Launcher updates are checked separately at startup. **Open installed launcher**
 lets you continue with the installed launcher while a startup check is underway.
 
 ## Enhanced textures (upcoming launcher update)
 
-Under **Game settings → Graphics & resolution**, enable **Use enhanced textures
-(Beta)** and select **Save settings**. The next launch uses the replacement
-textures bundled with supported game releases. Turn it off to start with the
-original textures; original textures are the default.
+Windows and Mac use the same optional pack. Under **Game settings → Graphics &
+resolution**, select **Check texture downloads**, then **Download / update textures**.
+Review the confirmation. Progress supports cancellation; retry resumes verified
+parts. A download enables **Check for texture updates when opening settings**.
+Checks never start an update without confirmation. Turning checks off keeps the
+installed pack. Downloads and this preference take effect immediately.
 
-The Beta is incomplete and may have visual issues. Textures without replacements,
-or game versions without a bundled pack, retain their original appearance. The
-toggle does not download, install or delete textures. Normal game updates deliver
-the pack; the separate download, ZIP and folder installation buttons are removed.
+Save **Use enhanced textures (Beta)** to use installed replacements next launch.
+Classic is the default. The toggle does not download or delete files. F10 and
+in-game Texture style changes affect only the current session. Missing replacements
+always use originals; this incomplete Beta may contain visual issues.
 
-Changing textures in the game's **Display settings** or with **F10** affects only
-that session. The launcher's saved choice applies again on the next launch.
+Existing packs from bundled game releases are recognized by file hashes. Matching
+files require no download; only parts containing new or changed files are fetched.
+Unchanged pairs within those parts are not rewritten. Official updates replace
+matching keys and preserve unrelated custom keys, saves and settings. Each part is
+validated before installation and rolls back on failure; completed parts survive
+cancellation. Game upgrades, repair and rollback preserve the installed pack.
+
+The optional pack must be published before downloads become available. Until then,
+the launcher explains its availability and continues to support installed packs.
 
 ## Compare specific game versions (upcoming launcher update)
 
@@ -218,3 +227,21 @@ unchanged. Launch uses the saved choice as `TSFP_NATIVE_FPS`; zero explicitly
 overrides older native-FPS runtime overrides. Legacy presentation keys retain
 their safe fixed-60 migration values for compatibility with older game packages.
 The common settings model and page serve both Windows and Mac.
+
+
+## Stable and named game previews
+
+Launcher 1.3.0 source adds independent game channels on Windows and native Mac.
+New installations default to **Stable**; use the game update channel selector to
+choose **Preview**, then select **Beta** or a named feature such as
+**Story Co-op** under **Testing track**. Each track receives only its own updates.
+The track selector appears only for Preview; switching through Stable remembers
+the previously selected track. Old Preview preferences
+migrate to Beta without enabling launcher preview updates. Historical alpha and
+`-preview.N` versions remain available only in Game versions; no release-candidate type is required.
+Select Stable and confirm the channel switch to install its latest game, even
+when its version is lower than the installed preview. **Game versions** still
+allows exact-version installation. Missing channels never silently substitute
+another channel. Saves/settings/game data/textures are preserved; back up saves
+before testing because preview save/network compatibility can vary.
+See [versions, publishing and recovery](releasing.md) for the full process.
