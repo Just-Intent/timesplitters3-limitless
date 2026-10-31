@@ -96,6 +96,13 @@ the existing launcher maintenance fixture checks destination and diagnostic isol
 `publish_version_pr` describes continued Ideas routing in generated version-refresh
 PRs; its mocked creation fixture checks this explanation alongside the uploaded files.
 
+Fork home (2026-10-31): the issue chooser links, the bug form's "existing
+reports" link, README, CONTRIBUTING and SECURITY now point at
+`JustinDent/timesplitters3-limitless`. The launcher's own Ideas/issue URLs,
+release repository constant and repository-gated workflows are unchanged by
+that docs change. The fork currently has Issues and Discussions disabled, so
+these links work only after they are enabled on GitHub.
+
 ## Auto display selection
 
 Shared `DisplayModes.cs` and `SettingsPage.cs` expose Auto in the aspect and

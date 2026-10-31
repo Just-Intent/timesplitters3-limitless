@@ -43,7 +43,8 @@ when a covered system changes without its documentation update.
 | Launcher | `python tools/launcher-compatibility.py --local` | Host build/lifecycle and affected `tests/launcher_*` fixtures |
 | Issue automation | `tests/test_issue_forms.py`, `tests/test_issue_resolution.py` | Read-only fixtures, workflow checks; no posting for tests |
 
-Enhancement routing uses the Ideas contact link in the issue chooser. The existing
+Enhancement routing uses the Ideas contact link in the issue chooser (the fork's
+`JustinDent/timesplitters3-limitless` Discussions since 2026-10-31). The existing
 `test_issue_forms.py` refresh fixture verifies that release updates preserve that
 link and do not restore the removed enhancement issue form. The existing Windows
 `launcher_maintenance.cs` draft checks cover the shared launcher Ideas destination,
