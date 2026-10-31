@@ -348,7 +348,9 @@ Off/On/health x2/x4/x8" row on the same edit screen (same `sub_000784A0`
 site; the click cycles in place and keeps the screen open). Saved in Story
 AI chunk byte +0x29 (0xB0 | level-1; decode-proven unused by the writer,
 loader and every chunk walker); in the editor a C table indexed like the
-entries, colour-checked, kept through delete/reset/load/compile. In scene
+entries, colour-checked, kept through delete/reset/load/compile; the close
+hook (outside aitemplates) gives a Duplicate/linked copy (one entry added,
+words +0x28..+0x4C equal) the source's level/display, then per AI. In scene
 100 story mode, each HUD frame (wrap of the story boss bar `sub_0014CC80`,
 ebx = HUD block) multiplies a Boss AI's entity health +0x1CC/+0x1D8 once
 per (re)initialisation and draws up to 4 living Boss AIs (2 in split

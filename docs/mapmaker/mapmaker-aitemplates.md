@@ -25,7 +25,9 @@ screen). Rows appear just above the last row ("Done"):
 | type 5 (game mode 7 singleton) | none |
 
 - **Duplicate Story AI**: a new, independent Story AI with every setting of
-  this one (facing and patrol mode included), a fresh default name and its own
+  this one (facing and patrol mode included; the Boss level and Health
+  display of [bosses](mapmaker-bosses.md) too, set by the bosses close hook
+  outside this one), a fresh default name and its own
   colour, but **no points**: it starts unplaced, shows the "!" next to its
   icon in the Story AI list and must be placed (select its icon row, put it
   on a cell). Changed 2026-10-31 (user report "linked story AI ... acting as

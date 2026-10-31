@@ -158,7 +158,9 @@ its normal MapMaker AI behaviour, not the story boss fight. While Boss is not
 Off the screen also has **Health display: Boss bar** (the bar at the bottom
 of the screen) or, after a click, **Health display: Sub-boss bar** (a small
 health meter floating above that enemy instead, not limited to the bar distance).
-After switching Boss from Off, reopen the AI to see that row. Maps with bosses
+After switching Boss from Off, reopen the AI to see that row. **Duplicate
+Story AI** and **Add linked copy** keep the Boss and Health display settings
+(change them per AI afterwards). Maps with bosses
 load in the original game with ordinary AI. Story-only creatures (the mission 5
 ghosts and worms) are not deployable yet. *Automated tests only.*
 Details: [bosses](mapmaker-bosses.md).
