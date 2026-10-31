@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,701 @@
+@@ -844,6 +844,819 @@
      sub_002FA720_gen();
  #endif
  }
@@ -140,13 +140,23 @@
 +}
 +
 +extern void sub_003006C0_gen(void);
-+void sub_003006C0(void)
++static void sub_003006C0_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("container","pc_mapmaker_container_compile")) pc_mapmaker_container_compile(sub_003006C0_gen);
 +    else sub_003006C0_gen();
 +#else
 +    sub_003006C0_gen();
++#endif
++}
++
++void sub_003006C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_compile")) pc_mapmaker_aitemplates_compile(sub_003006C0_layer0);
++    else sub_003006C0_layer0();
++#else
++    sub_003006C0_layer0();
 +#endif
 +}
 +
@@ -283,7 +293,7 @@
 +}
 +
 +extern void sub_00301A90_gen(void);
-+void sub_00301A90(void)
++static void sub_00301A90_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_load")) pc_mapmaker_editor_load(sub_00301A90_gen);
@@ -293,14 +303,34 @@
 +#endif
 +}
 +
++void sub_00301A90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_load")) pc_mapmaker_aitemplates_load(sub_00301A90_layer0);
++    else sub_00301A90_layer0();
++#else
++    sub_00301A90_layer0();
++#endif
++}
++
 +extern void sub_00240C50_gen(void);
-+void sub_00240C50(void)
++static void sub_00240C50_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_level_load")) pc_mapmaker_editor_level_load(sub_00240C50_gen);
 +    else sub_00240C50_gen();
 +#else
 +    sub_00240C50_gen();
++#endif
++}
++
++void sub_00240C50(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_level")) pc_mapmaker_aitemplates_level(sub_00240C50_layer0);
++    else sub_00240C50_layer0();
++#else
++    sub_00240C50_layer0();
 +#endif
 +}
 +
@@ -697,6 +727,94 @@
 +    else sub_002D2C70_gen();
 +#else
 +    sub_002D2C70_gen();
++#endif
++}
++
++extern void sub_000784A0_gen(void);
++void sub_000784A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_rows")) pc_mapmaker_aitemplates_rows(sub_000784A0_gen);
++    else sub_000784A0_gen();
++#else
++    sub_000784A0_gen();
++#endif
++}
++
++extern void sub_0031CAC0_gen(void);
++void sub_0031CAC0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_close")) pc_mapmaker_aitemplates_close(sub_0031CAC0_gen);
++    else sub_0031CAC0_gen();
++#else
++    sub_0031CAC0_gen();
++#endif
++}
++
++extern void sub_0031CB90_gen(void);
++void sub_0031CB90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_open")) pc_mapmaker_aitemplates_open(sub_0031CB90_gen);
++    else sub_0031CB90_gen();
++#else
++    sub_0031CB90_gen();
++#endif
++}
++
++extern void sub_0031C8B0_gen(void);
++void sub_0031C8B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_delete")) pc_mapmaker_aitemplates_delete(sub_0031C8B0_gen);
++    else sub_0031C8B0_gen();
++#else
++    sub_0031C8B0_gen();
++#endif
++}
++
++extern void sub_0033E560_gen(void);
++void sub_0033E560(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_event")) pc_mapmaker_aitemplates_event(sub_0033E560_gen);
++    else sub_0033E560_gen();
++#else
++    sub_0033E560_gen();
++#endif
++}
++
++extern void sub_00163780_gen(void);
++void sub_00163780(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_remove")) pc_mapmaker_aitemplates_remove(sub_00163780_gen);
++    else sub_00163780_gen();
++#else
++    sub_00163780_gen();
++#endif
++}
++
++extern void sub_0033E620_gen(void);
++void sub_0033E620(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_spawn_gate")) pc_mapmaker_aitemplates_spawn_gate(sub_0033E620_gen);
++    else sub_0033E620_gen();
++#else
++    sub_0033E620_gen();
++#endif
++}
++
++extern void sub_00339600_gen(void);
++void sub_00339600(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_alert")) pc_mapmaker_aitemplates_alert(sub_00339600_gen);
++    else sub_00339600_gen();
++#else
++    sub_00339600_gen();
 +#endif
 +}
  

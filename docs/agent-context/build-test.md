@@ -278,6 +278,11 @@ model of the original's 32-entry array and argmin on random lists.
 the gate wrappers with mutations, the table bytes, and (with the private XBE)
 that every `cmp byte [0x0078ADAE],2` in game code is patched or reviewed.
 
+`tests/test_mapmaker_aitemplates.py` (Story AI duplicate/linked copies,
+mutations) and `tests/test_mapmaker_aitemplates_classified.py` (decode checks of
+the edit-screen row site, menu table 0x0052E088 and the unused chunk bytes
++0x32/+0x33) are in the same CI list.
+
 Site inventories must come from the lifter's decoder, not from
 `private/pipeline/disasm/asm/text.asm`: the listing elides the byte column of
 long instructions, which once hid a room id and crashed a story level.

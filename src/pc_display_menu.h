@@ -93,6 +93,17 @@ void pc_mapmaker_story_char_roster(void (*original)(void));
 void pc_mapmaker_story_char_preview(void (*original)(void));
 void pc_mapmaker_story_char_confirm(void (*original)(void));
 void pc_mapmaker_story_char_config(void (*original)(void));
+void pc_mapmaker_aitemplates_rows(void (*original)(void));
+void pc_mapmaker_aitemplates_close(void (*original)(void));
+void pc_mapmaker_aitemplates_open(void (*original)(void));
+void pc_mapmaker_aitemplates_delete(void (*original)(void));
+void pc_mapmaker_aitemplates_compile(void (*original)(void));
+void pc_mapmaker_aitemplates_load(void (*original)(void));
+void pc_mapmaker_aitemplates_level(void (*original)(void));
+void pc_mapmaker_aitemplates_event(void (*original)(void));
+void pc_mapmaker_aitemplates_remove(void (*original)(void));
+void pc_mapmaker_aitemplates_spawn_gate(void (*original)(void));
+void pc_mapmaker_aitemplates_alert(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));

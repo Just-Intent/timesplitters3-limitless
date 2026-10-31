@@ -52,6 +52,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_rooms.inc"
 #include "pc_mapmaker_actors.inc"
 #include "pc_mapmaker_story_character.inc"
+#include "pc_mapmaker_aitemplates.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
@@ -675,6 +676,17 @@ void pc_mapmaker_story_char_roster(void (*original)(void)) { original(); }
 void pc_mapmaker_story_char_preview(void (*original)(void)) { original(); }
 void pc_mapmaker_story_char_confirm(void (*original)(void)) { original(); }
 void pc_mapmaker_story_char_config(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_rows(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_close(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_open(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_delete(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_load(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_level(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_event(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_remove(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_spawn_gate(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_alert(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
