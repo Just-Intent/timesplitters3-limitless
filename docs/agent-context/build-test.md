@@ -258,6 +258,10 @@ include `pc_display_menu.c` or `pc_menu_mouse_guest.inc` (`menu_mouse.c`,
 `fov_settings.c`) need a `sub_0003DFA0` stub for the stage A allocator.
 `tests/test_menu_mouse.py` also covers the MapMaker map browser click
 (`map_browser_tests`; mutation `late-map-confirm` removes the input-hook click).
+`tests/test_mapmaker_grid.py` covers stacked items with the per-frame valid
+bit hook `pc_mapmaker_stack_valid` (`sub_003348C0`, return 0x003070A7) and
+the always-run `sub_00308260` original (`stack-valid-*`, `stack-find-*`
+mutations).
 
 ## Guest-code patch table
 
