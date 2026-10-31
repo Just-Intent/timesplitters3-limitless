@@ -8,7 +8,55 @@ namespace TimeSplitters.Launcher
 {
     public static class CrashReports
     {
-        static readonly string[] Names = { "report.txt", "report.json", "crash.dmp", "game-log-tail.txt", "native-stack.txt" };
+        public static bool ExtendedForNextLaunch;
+        static readonly string[] Names = { "report.txt", "report.json", "crash.dmp", "game-log-tail.txt", "native-stack.txt", "breadcrumbs.txt", "guest-memory.bin", "model-tree.bin", "diagnostics.json", "model-history.txt", "allocation-history.txt" };
+        // Fixed summaries only: never include paths, arbitrary errors or raw metadata.
+        public static string CaptureHealth(string root)
+        {
+            const string prefix="Capture health: ";
+            try {
+                string game=Core.PathIn(root,LauncherPlatform.GamePath(root));
+                if(!File.Exists(game))return prefix+"Game not installed.";
+                string area=Core.PathIn(root,"Logs/Crashes");
+                try {
+                    Directory.CreateDirectory(area);
+                    string probe=Core.PathIn(root,"Logs/Crashes/"+Path.GetRandomFileName());
+                    using(var output=new FileStream(probe,FileMode.CreateNew,FileAccess.Write,FileShare.None,1,FileOptions.DeleteOnClose)) {
+                        output.WriteByte(0);output.Flush(true);
+                    }
+                } catch {return prefix+"Report storage unavailable. Capture may fail; check folder permissions and free space.";}
+#if !MACOS
+                if(!File.Exists(Path.Combine(Path.GetDirectoryName(game),"tsfp_crash_helper.exe")))
+                    return prefix+"Crash helper missing. Native crash and freeze capture unavailable; session summaries may still work.";
+#endif
+                var session=GameSessions.CaptureSession(root);
+                if(session==null)return prefix+"Report storage writable; no tracked game running. Native support is verified when a game starts.";
+                string path=Core.PathIn(root,"Logs/Crashes/capture-health.json");
+                if(!File.Exists(path))return prefix+"Unverified: this game has not confirmed capture support. Older builds may not support health reporting.";
+                if(new FileInfo(path).Length>2048)return prefix+"Unverified: health record is invalid.";
+                var health=Json.Object(File.ReadAllText(path));
+                if(Json.String(health,"schema")!="1" || Json.String(health,"session_id")!=Json.String(session,"session_id") ||
+                    Json.String(health,"pid")!=Json.String(session,"game_pid"))
+                    return prefix+"Unverified: no matching health record for this game session.";
+                DateTime written=File.GetLastWriteTimeUtc(path),now=DateTime.UtcNow;
+                if(written>now.AddSeconds(2) || now-written>TimeSpan.FromSeconds(15))
+                    return prefix+"Degraded: capture helper heartbeat is stale. New reports may not be captured.";
+                int pid;long gameStarted;
+                if(!Int32.TryParse(Json.String(health,"helper_pid"),out pid) || pid<=0 ||
+                    !Int64.TryParse(Json.String(session,"game_started_ticks"),out gameStarted))
+                    return prefix+"Unverified: health record is invalid.";
+                try {
+                    using(var helper=System.Diagnostics.Process.GetProcessById(pid)) {
+                        DateTime started=helper.StartTime.ToUniversalTime();
+                        if(helper.HasExited || started.Ticks<gameStarted || started>written)
+                            return prefix+"Degraded: the recorded capture helper is no longer running.";
+                    }
+                } catch {return prefix+"Degraded: capture helper identity could not be confirmed.";}
+                object armed;
+                if(!health.TryGetValue("armed",out armed) || !(armed is bool))return prefix+"Unverified: health record is invalid.";
+                return prefix+"Helper responding; report storage writable. "+((bool)armed?"Freeze monitoring armed (normal focus/modal grace applies).":"Waiting for guest startup or game shutting down.");
+            } catch {return prefix+"Unverified: session or health information unavailable. Existing reports are retained.";}
+        }
         public static string Latest(string root)
         {
             try {
@@ -34,6 +82,23 @@ namespace TimeSplitters.Launcher
             Core.Require(name != null && Regex.IsMatch(name,@"^crash-\d{8}-\d{9}-\d{10}-\d{6}$"), "Invalid crash report.");
             return Core.PathIn(root,"Logs/Crashes/"+name);
         }
+        static string Evidence(string root,string name)
+        {
+            string folder=Folder(root,name);
+            string quality="";
+            string info=Core.PathIn(root,"Logs/Crashes/"+name+"/diagnostics.json");
+            if(File.Exists(info)&&new FileInfo(info).Length<=8192) {
+                try {
+                    var data=Json.Object(File.ReadAllText(info));
+                    if(Json.String(data,"guest_capture_status")=="process-memory-access-denied")quality="\nMemory detail unavailable: macOS denied process access.";
+                    if(Object.Equals(data.ContainsKey("extended")?data["extended"]:null,true))quality+="\nCapture mode: extended.";
+                    if(Object.Equals(data.ContainsKey("guest_is_cached")?data["guest_is_cached"]:null,true))quality+="\nGuest registers are cached from the last completed frame.";
+                } catch {quality="\nCapture details unreadable; original files retained.";}
+            }
+            Func<string,string> available=file=>File.Exists(Core.PathIn(root,"Logs/Crashes/"+name+"/"+file))?"included":"not captured";
+            return "\nRecent events: "+available("breadcrumbs.txt")+"\nGuest memory: "+available("guest-memory.bin")+
+                "\nModel traversal: "+available("model-history.txt")+quality+"\nRoot cause: not automatically determined.\nExport report ZIP to share these files. Nothing uploads automatically.";
+        }
         public static string Summary(string root)
         {
             try {
@@ -47,10 +112,10 @@ namespace TimeSplitters.Launcher
                     return name+"\nType: Unexpected exit\n"+detail+"\nMinidump: not captured for this session\nAn interrupted launcher, forced closure or reboot can also leave an unfinished session.";
                 }
                 string code = Json.String(metadata,"exception_code"), hash = Json.String(metadata,"executable_sha256");
-                if(Json.String(metadata,"platform")=="macos-arm64")return name+"\nType: "+(Json.String(metadata,"kind")=="suspected_hang"?"Suspected hang (the game was left running)":"Fatal native signal "+Json.String(metadata,"signal"))+"\nNative context: "+(metadata.ContainsKey("native_capture_saved")&&Object.Equals(metadata["native_capture_saved"],true)?"saved":"unavailable")+"\nExecutable SHA-256: "+(Regex.IsMatch(hash,@"^[0-9a-f]{64}$")?hash:"unavailable");
+                if(Json.String(metadata,"platform")=="macos-arm64")return name+"\nType: "+(Json.String(metadata,"kind")=="suspected_hang"?"Suspected hang (the game was left running)":"Fatal native signal "+Json.String(metadata,"signal"))+"\nNative context: "+(metadata.ContainsKey("native_capture_saved")&&Object.Equals(metadata["native_capture_saved"],true)?"saved":"unavailable")+"\nExecutable SHA-256: "+(Regex.IsMatch(hash,@"^[0-9a-f]{64}$")?hash:"unavailable")+Evidence(root,name);
                 if (!Regex.IsMatch(code,@"^0x[0-9A-Fa-f]{8}$")) code="unknown";
                 if (!Regex.IsMatch(hash,@"^[0-9a-f]{64}$")) hash="unavailable";
-                return name+(Json.String(metadata,"kind")=="suspected_hang"?"\nType: Suspected hang (the game was left running)":"\nException: "+code)+"\nMinidump: "+(metadata.ContainsKey("dump_saved") && Object.Equals(metadata["dump_saved"],true)?"saved":"unavailable; summary retained")+"\nExecutable SHA-256: "+hash;
+                return name+(Json.String(metadata,"kind")=="suspected_hang"?"\nType: Suspected hang (the game was left running)":"\nException: "+code)+"\nMinidump: "+(metadata.ContainsKey("dump_saved") && Object.Equals(metadata["dump_saved"],true)?"saved":"unavailable; summary retained")+"\nExecutable SHA-256: "+hash+Evidence(root,name);
             } catch { return "Crash reports unavailable; files retained."; }
         }
         public static bool IsHang(string root,string name)
@@ -103,7 +168,7 @@ namespace TimeSplitters.Launcher
                 foreach (string file in Names) {
                     string path=Core.PathIn(root,"Logs/Crashes/"+name+"/"+file);
                     if (!File.Exists(path)) continue;
-                    long limit=file=="crash.dmp"?16*1024*1024:file=="native-stack.txt"?262144:file=="game-log-tail.txt"?65536:8192;
+                    long limit=file=="guest-memory.bin"?1024*1024:file=="model-tree.bin"?65536:file=="crash.dmp"?16*1024*1024:file=="native-stack.txt"?262144:file=="game-log-tail.txt"?65536:8192;
                     using (var input=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read)) {
                         Core.Require(input.Length<=limit,"Crash report file exceeds its size limit.");
                         using (var entry=zip.CreateEntry(file,CompressionLevel.Fastest).Open()) input.CopyTo(entry);

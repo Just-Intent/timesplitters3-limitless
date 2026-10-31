@@ -3,8 +3,11 @@
 #include "xbox_watchpoint.h"
 #include "recomp_config.h"
 #include "crash_posix.h"
-#include "../pc_discord.h"
-#include "../pc_native_rate.h"
+#include "../diagnostics/pc_breadcrumbs.h"
+#include "../network/pc_discord.h"
+#include "../network/pc_online.h"
+#include "../gameplay/pc_native_rate.h"
+#include "../runtime/guest_extension.h"
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +36,9 @@ static void capture_guest(uint32_t r[8]){r[0]=g_eax;r[1]=g_ecx;r[2]=g_edx;r[3]=g
 int main(int argc, char **argv)
 {
     int helper_result=tsfp_native_crash_helper(argc,argv);if(helper_result>=0)return helper_result;
+    if(argc==2 && strcmp(argv[1],"--online-self-test")==0) {
+        extern int pc_online_self_test(void);return pc_online_self_test();
+    }
     if(argc==2 && strcmp(argv[1],"--renderer-self-test")==0) {
         extern int tsfp_native_renderer_test(void);
         return tsfp_native_renderer_test();
@@ -50,6 +56,8 @@ int main(int argc, char **argv)
     (void)argc; (void)argv;
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
+    extern void xbox_SetAllocationObserver(void (*observer)(uint32_t,uint32_t,uint32_t));
+    xbox_SetAllocationObserver(pc_capture_allocation);
     tsfp_native_crash_init(capture_guest);
     struct sigaction sa = {0};
     sa.sa_sigaction = fault;
@@ -86,11 +94,22 @@ int main(int argc, char **argv)
     fclose(f);
     printf("[NATIVE-BOOT] TimeSplitters: Future Perfect — macOS ARM64\n");
     printf("[NATIVE-BOOT] XBE loaded: %ld bytes; saves: %s\n", size, saves);
+    tsfp_guest_extension_reserve();
     if (!xbox_MemoryLayoutInit(data, (size_t)size)) {
         fprintf(stderr, "[NATIVE-BOOT] Xbox memory initialization failed\n");
         free(data); return 1;
     }
+    {
+        uint32_t extension_va, extension_size;
+        if (!tsfp_guest_extension_ready(&extension_va, &extension_size)) {
+            fprintf(stderr, "[NATIVE-BOOT] Guest memory extension is at 0x%08X (%u bytes), "
+                    "but the game code was generated for 0x%08X\n",
+                    extension_va, extension_size, (unsigned)TSFP_GUEST_EXTENSION_VA);
+            free(data); return 1;
+        }
+    }
     g_xbox_mem_offset = xbox_GetMemoryOffset();
+    tsfp_native_crash_memory((uint64_t)g_xbox_mem_offset);
     printf("[NATIVE-BOOT] Xbox memory offset: %p\n", (void *)g_xbox_mem_offset);
     xbox_kernel_init();
     xbox_path_init(game, saves);
@@ -119,6 +138,7 @@ int main(int argc, char **argv)
     if (!recomp_dispatch_init()) fprintf(stderr, "[NATIVE-BOOT] Dispatch uses binary search\n");
     xbox_WatchdogStart();
     printf("[NATIVE-BOOT] Entering translated Xbox entry 0038024D; ESP=%08x\n", g_esp);
+    atexit(pc_online_disconnect);
     pc_discord_start();
     tsfp_native_crash_armed(1);
     xbe_entry_point();
