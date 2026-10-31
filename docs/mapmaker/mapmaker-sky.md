@@ -273,14 +273,27 @@ doorframe or pillar modelled that way would stay.
   `xbox_HeapAlloc`.
 - Names (CONFIRMED): the palette has no per-item text; the caption under
   the preview is the tile name, `sub_0003D7B0(catalogue[tile] +8)` for the
-  tile `[palette+0x90]` (`0x0032E5C8..0x0032E5CF`), and the selected piece's
-  name comes from `sub_00317C40` (`0x00317C54..0x00317C5B`, piece `editor
-  +0x2F18`). Tile 8's name is text 0x0A3F, "Small Open" (the English names
-  use suffixes such as "S", "Alt.", "Mirrored", "Pillars"; no tile carries a
-  number). The text hook answers 0x0A3F at exactly those two return
-  addresses, in the editor, with "Small Open (No Roof)" / "Small Open (Open
-  Air)" (64 bytes from `xbox_HeapAlloc`) for a highlighted open entry or a
-  selected open piece; every other lookup is the stock one.
+  tile `[palette+0x90]` (`0x0032E5C8..0x0032E5CF`); the label over the grid
+  is the name of the piece under the cursor (`editor+0x2F18`, else the held
+  piece `+0x2F7C`; `0x0031165C..0x00311718`); the selected piece's name comes
+  from `sub_00317C40` (`0x00317C54..0x00317C5B`). Tile 8's name is text
+  0x0A3F, "Small Open". The text hook answers 0x0A3F at exactly those three
+  return addresses (`0x0032E5D4`, `0x0031171D`, `0x00317C60`), in the
+  editor, with "Small Open (No Roof)" / "Small Open (Open Air)" (64 bytes
+  from `xbox_HeapAlloc`) for a highlighted open entry or an open piece; every
+  other lookup is the stock one.
+- Numbers (CONFIRMED, the v0.4.0-mapmaker.7 report): the number in front of
+  a name is catalogue `+4`, 1..45 in palette order (tile 8 = 1). The caption
+  draws it with `sub_0032D9F0` (eax number, -1 = none in the 3-category
+  palette, ecx name; `"%d. "` at `0x0049F838`, call `0x0032E5DE`), the grid
+  label with `sub_00151030("%d.%s", number, name)` (`0x0049F7C0`, call
+  `0x00311724`). `pc_mapmaker_roof_caption` / `pc_mapmaker_roof_format`
+  replace the number with **46 / 47** when the name is one of the open
+  labels (only those two call sites, by return address). The stock formats
+  are kept: the palette reads "46. Small Open (No Roof)" / "47. Small Open
+  (Open Air)", the grid label "46.Small Open (No Roof)" like the stock
+  "1.Small Open" (no space there in stock either); the selected piece's name
+  has no number in stock and gets none.
 - **Why not a new tile id:** every tile id indexes fixed 45-entry tables:
   `0x00783F40` (filled by `sub_003089E0`, counter `0x00783FF4` follows),
   `0x00785000`, `0x00789440` (`sub_00330DF0`), `0x00785080 + (tileset*45 +
@@ -336,10 +349,24 @@ doorframe or pillar modelled that way would stay.
   `sub_0032A770`, `sub_0008A780`, `sub_00085920`); the compiler zeroes the
   container first (`0x0030070D`); `+0x24` (size word, `0x00300D76`) is
   preserved.
-- Load (`sub_00301A90`, also the undo reload `sub_00337600`): each marked
-  record is matched to an unmarked editor piece with the same tile, x, y, z
-  and rotation; an unmatched mark is logged (`[mapmaker] roof: an open tile
-  in the map has no loaded piece`).
+- **Record walk (the v0.4.0-mapmaker.7 bug, CONFIRMED).** `+0x24` is only
+  `0x28 + pads*8` (`0x00300D60`); the piece's items (word `+0x1E` of them,
+  each `(byte +0x14 * 4 + 0x1B) & ~3` bytes: writer `0x00300D93..0x0030116E`,
+  loader `0x00302260..0x003023F8`) follow the pads. The first build stepped
+  by `+0x24` alone, so the walk lost its place at the first piece carrying a
+  start point or weapon and stored no `+0x26` mark after it. Play was still
+  open (the writer's own `sub_002FC680` call is hooked), but returning to the
+  editor reloads the map (editor start `sub_00302A60`: reset `0x0030302B`,
+  then `sub_00301A90([0x00784014], 2)` at `0x00303076`; the editor heap and
+  piece pool are new, so piece pointers do not survive a play) and found no
+  marks; the next rebuild (copying a tile, playing again) closed every tile.
+  The walk now skips the items too, so the marks survive the round trip.
+- Load (`sub_00301A90`: the editor start after a play, Load map
+  `0x0032B49F`/`0x0032BB69` and the undo/redo reloads in `sub_00337600`,
+  whose snapshots are rebuilds and so carry the marks): each marked record is
+  matched to an unmarked editor piece with the same tile, x, y, z and
+  rotation; an unmatched mark is logged (`[mapmaker] roof: an open tile in
+  the map has no loaded piece`).
 - Play: `sub_0008A780` takes record `+8` unchanged (`0x0008A91D`) and calls
   none of the editor mask builders, so the saved open mask is what the
   per-room table (`sub_00085710`) and `inst+0x30` get; no play hook.
@@ -405,11 +432,16 @@ INFERRED.
     WRAP sub_00308120 -> pc_mapmaker_roof_copy
     WRAP sub_00308480 -> pc_mapmaker_roof_piece_free
     WRAP sub_0003D7B0 -> pc_mapmaker_roof_text
+    WRAP sub_00151030 -> pc_mapmaker_roof_format
+    WRAP sub_0032D9F0 -> pc_mapmaker_roof_caption
 
 All but the text hook call their original exactly once (no
 `MAPMAKER_GUEST_RET`); `pc_mapmaker_roof_text` returns its string with
-`MAPMAKER_GUEST_RET` for the two tile-name call sites and otherwise calls
-the original. `sub_0003D7B0` is already wrapped (realbosses text); chain
+`MAPMAKER_GUEST_RET` for the three tile-name call sites and otherwise calls
+the original. `sub_00151030` (sprintf into `0x00749368`, 204 callers) and
+`sub_0032D9F0` (3 callers) are new, unwrapped targets; both hooks only
+change the number argument (stack word / eax) before the original and test
+a pointer first, so they cost one compare per call. `sub_0003D7B0` is already wrapped (realbosses text); chain
 the layers in either order (each handles a different id). Chains:
 `sub_003006C0` (container, aitemplates, sky compile) and `sub_00301A90`
 (editor, aitemplates) and `sub_002FEBF0` (sky reset) already have layers; the
@@ -428,17 +460,23 @@ function.
 1. Build with the wrappers; `TSFP_MAPMAKER_LIMITS=1`.
 2. Editor, any tileset: open the tile list, go to the last category (the
    one with tiles 15/30): it ends with two more 1x1 tiles. Highlight them:
-   the caption reads "Small Open (No Roof)" and "Small Open (Open Air)"; the
-   Open Air preview has no walls. Repeat in another tileset.
+   the caption reads "46. Small Open (No Roof)" and "47. Small Open (Open
+   Air)" (stock tiles 1..45 keep theirs); the Open Air preview has no walls.
+   Point at a placed open tile: the label reads "46.Small Open (No Roof)" /
+   "47.Small Open (Open Air)" (stock style "1.Small Open"). Repeat in another
+   tileset.
 3. Place an Open air tile in the middle of a floor of normal tiles and one at
    the map edge; place an Open roof tile; in the 3D view the open-air tile
    shows a floor without walls (log: `roof: open air tile picked`, no `roof:`
    warning). Move one with pick-up/drop and copy one: both stay open.
    Undo/redo once.
+   Put a start point on a normal tile placed before the open tiles.
 4. Save, back to the main menu, load the map: still open (log has no
    `roof:` warning). Play: look up and around (sky, neighbours' walls over the
    edge), with weather on (rain inside the open tiles only), 2-4 player split
-   screen.
+   screen. Quit the match back to the editor: the open tiles still show
+   without walls and keep their 46/47 labels (no `roof:` warning); copy one
+   and play again: every open tile (the copy too) is still open.
 5. Walk through the open sides into neighbouring tiles; at the map edge walk
    out (expect a fall); fire a rocket straight up from inside; let AI path
    through.
@@ -460,9 +498,12 @@ function.
 - `tests/mapmaker/test_mapmaker_roof.py` (fixture `tests/mapmaker/mapmaker_roof.c`): Open
   roof / Open air: limits and scene gates, palette table patched only during
   the build and restored, items by pointer, hover/pick preview, masks, record
-  mark and mask, load matching, forget on reset/reuse, record walk bounds
-  (29 mutations); plus XBE data (category tables, descriptor, tile 8) and
-  decoder checks (record word +0x26 unused, hook sites, node-mask tests).
+  mark and mask, load matching, forget on reset/reuse, record walk bounds,
+  items after the pads, play -> editor reload -> copy -> play round trip,
+  grid label and numbers 46/47 (55 mutations); plus XBE data (category
+  tables, descriptor, tile 8, tile numbers 1..45, both formats) and decoder
+  checks (record word +0x26 unused, hook and label sites, record sizes,
+  editor start load, node-mask tests).
 - `tests/mapmaker/test_mapmaker_skymask.py` (fixture `tests/mapmaker/mapmaker_skymask.c`): the
   room mask switch: off by default, scene 100 only, after the original, the
   relocated table only, build record untouched, 256-entry bound, one summary per

@@ -66,6 +66,23 @@ MUTATIONS = {
     'text-in-play': (' || !mapmaker_roof_editor()) { original();return; }\n    g_eax=', ') { original();return; }\n    g_eax='),
     'caption-not-reset': ('    mapmaker_roof.preview_mode=mode;\n', ''),
     'piece-name-ignored': ('    else if(ret==MAPMAKER_ROOF_RET_PIECE_NAME', '    else if(0'),
+    # Grid label and list numbers (v0.4.0-mapmaker.7 report).
+    'hover-not-named': ('    else if(ret==MAPMAKER_ROOF_RET_HOVER', '    else if(0'),
+    'hover-no-held': ('((piece=WORD_AT(editor+0x2F18u))!=0 || (piece=WORD_AT(editor+0x2F7Cu))!=0)',
+                      '(piece=WORD_AT(editor+0x2F18u))!=0'),
+    'format-any-caller': ('WORD_AT(g_esp)==MAPMAKER_ROOF_RET_HOVER_FORMAT &&', ''),
+    'format-any-format': ('       WORD_AT(g_esp+4u)==MAPMAKER_ROOF_HOVER_FORMAT && ', '       '),
+    'format-stock-number': ('        WORD_AT(g_esp+8u)=MAPMAKER_ROOF_NUMBER+mode-1u;', '        (void)mode;'),
+    'format-pops-twice': ('        WORD_AT(g_esp+8u)=MAPMAKER_ROOF_NUMBER+mode-1u;\n    original();',
+                          '        WORD_AT(g_esp+8u)=MAPMAKER_ROOF_NUMBER+mode-1u;\n    original();g_esp+=4u;'),
+    'numbers-off-by-one': ('#define MAPMAKER_ROOF_NUMBER 46u', '#define MAPMAKER_ROOF_NUMBER 45u'),
+    'caption-stock-number': ('        g_eax=MAPMAKER_ROOF_NUMBER+mode-1u;', '        (void)mode;'),
+    'caption-numbers-unnumbered': ('       (int32_t)g_eax>=0 && ', '       '),
+    'caption-any-caller': ('WORD_AT(g_esp)==MAPMAKER_ROOF_RET_CAPTION_DRAW &&', ''),
+    # Records carry the piece's items after the pads (play -> editor round trip).
+    'items-not-skipped': ('for(at=r+length,k=0;k<items;k++) {', 'for(at=r+length,k=items;k<items;k++) {'),
+    'item-size-fixed': ('bytes=((WORD_AT(at+0x14u)&0xFFu)*4u+0x1Bu)&~3u;', 'bytes=MAPMAKER_ROOF_ITEM_MIN;'),
+    'item-count-wrong-word': ('items=WORD_AT(r+0x1Cu)>>16', 'items=WORD_AT(r+0x1Cu)&0xFFFFu'),
 }
 
 
@@ -213,6 +230,59 @@ def test_copy_sites():
     assert not targets & {0x002FC680, 0x002FC470, 0x00311C00}
 
 
+def test_tile_numbers_and_formats():
+    """The number in front of a tile name is catalogue +4: 1..45 in palette
+    order (tile 8 "Small Open" is 1), so the open entries are 46 and 47. The
+    palette caption draws "%d. " (with a space), the grid label "%d.%s"."""
+    read = _xbe()
+    numbers = [struct.unpack('<I', read(0x00529510 + t * 0x140 + 4, 4))[0] for t in range(45)]
+    assert sorted(numbers) == list(range(1, 46))
+    full = [struct.unpack('<3I', read(0x0052DAC0 + i * 12, 12)) for i in range(8)]
+    order = [x for _, ptr, c in full for x in struct.unpack(f'<{c}I', read(ptr, c * 4))]
+    assert [numbers[t] for t in order] == list(range(1, 46))   # numbered in list order
+    assert numbers[8] == 1
+    assert read(0x0049F7C0, 6) == b'%d.%s\0'
+    assert read(0x0049F838, 5) == b'%d. \0'
+
+
+def test_label_sites():
+    """Grid label (sub_00311xxx): name of piece editor +0x2F18, else the held
+    piece +0x2F7C, through sub_0003D7B0 at 0x00311718, then
+    sub_00151030("%d.%s", byte catalogue +4, name). Palette caption:
+    sub_0032D9F0(eax = catalogue +4 or -1, ecx = name) at 0x0032E5DE, which
+    prints "%d. " (0x0032DA29). Records: +0x24 = 0x28 + pads*8, items after."""
+    from mapmaker_decoded import decoded
+    insns = decoded()
+    at = {i.address: i for i in insns}
+    assert at[0x0031165C].text == 'eax, dword ptr [ecx + 0x2f18]'
+    assert at[0x003116C0].text == 'eax, dword ptr [ecx + 0x2f7c]'
+    assert at[0x0031170B].text == 'edx, dword ptr [ecx + 0x2f7c]' and at[0x003116B8].text == 'edx, dword ptr [ecx + 0x2f18]'
+    assert at[0x00311714].text == 'ecx, dword ptr [eax + 8]'
+    assert 'call' in at[0x00311718].mnemonic and at[0x00311718].ops[0][1] == 0x0003D7B0
+    assert at[0x0031171D].text == 'eax' and at[0x0031171E].text == 'esi'
+    assert at[0x0031171F].ops[0] == ('imm', 0x0049F7C0)
+    assert 'call' in at[0x00311724].mnemonic and at[0x00311724].ops[0][1] == 0x00151030
+    assert at[0x00311698].ops[1][4] == 0x00529514 and at[0x003116EB].ops[1][4] == 0x00529514
+    assert at[0x0032E5AB].text == 'esi, byte ptr [esi + 4]' and at[0x0032E5B1].text == 'esi, 0xffffffff'
+    assert at[0x0032E5DA].text == 'eax, esi' and at[0x0032E5D7].text == 'ecx, eax'
+    assert 'call' in at[0x0032E5DE].mnemonic and at[0x0032E5DE].ops[0][1] == 0x0032D9F0
+    assert at[0x0032DA29].ops[0] == ('imm', 0x0049F838)
+    assert {i.address for i in insns if i.call and any(op == ('imm', 0x0032D9F0) for op in i.ops)} == \
+        {0x0032E5DE, 0x0032E714, 0x0032E734}
+    # Record sizes: writer and loader.
+    assert at[0x00300D60].text == 'eax, [ecx*8 + 0x28]'
+    assert at[0x0030115C].text == 'eax, [edx*4 + 0x1b]' and at[0x00301163].text == 'eax, 0xfffffffc'
+    assert at[0x0030224D].text == 'esi, [esi + edi*8 + 0x28]'
+    assert at[0x003023EA].text == 'eax, [edx*4 + 0x1b]'
+    # Editor start: reset, then load of the kept map with flags 2.
+    assert 'call' in at[0x0030302B].mnemonic and at[0x0030302B].ops[0][1] == 0x002FEBF0
+    assert 'call' in at[0x00303076].mnemonic and at[0x00303076].ops[0][1] == 0x00301A90
+    assert at[0x00303066].text == 'eax, dword ptr [0x784014]'
+    # Play hand-over: rebuild of the kept map (mode 3), then the play level.
+    assert at[0x00312DFC].text == 'eax, dword ptr [0x784014]'
+    assert 'call' in at[0x00312E05].mnemonic and at[0x00312E05].ops[0][1] == 0x003006C0
+
+
 def test_wrappers_documented():
     doc = (ROOT / 'docs/mapmaker/mapmaker-sky.md').read_text(encoding='utf-8')
     text = ROOF.read_text(encoding='utf-8')
@@ -220,6 +290,7 @@ def test_wrappers_documented():
                          ('002FEBF0', 'reset'), ('003006C0', 'compile'), ('00301A90', 'load'),
                          ('00316B50', 'menu_init'), ('000792B0', 'menu_add'), ('00316920', 'menu_hover'),
                          ('00316500', 'menu_pick'), ('002F95E0', 'move'), ('00308120', 'copy'),
-                         ('00308480', 'piece_free'), ('0003D7B0', 'text')):
+                         ('00308480', 'piece_free'), ('0003D7B0', 'text'), ('00151030', 'format'),
+                         ('0032D9F0', 'caption')):
         assert f'WRAP sub_{target} -> pc_mapmaker_roof_{name}' in doc, name
         assert f'void pc_mapmaker_roof_{name}(void (*original)(void))' in text, name
