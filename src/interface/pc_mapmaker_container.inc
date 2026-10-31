@@ -133,6 +133,7 @@ static int mapmaker_container_over_chunks(uint32_t c)
     for(p=c+8,steps=0;p+8u<=end && steps<0x40000u;steps++) {
         uint32_t tag=WORD_AT(p),size=WORD_AT(p+4),next=p+8u+size;
         if(tag==0x00C7766Au || next<=p || next>end) break;
+        if(tag==0x00C776F5u) return 1;   /* character slots 11-20 (pc_mapmaker_sets.inc) */
         if(tag==0x00C77668u && size>=8u && WORD_AT(p+8u+4u)>MAPMAKER_CONTAINER_STOCK_PIECES &&
            (int32_t)WORD_AT(p+8u+4u)>0) return 1;          /* header piece count */
         for(i=0;i<MAPMAKER_CONTAINER_STOCK_CHUNKS;i++)

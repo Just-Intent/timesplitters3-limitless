@@ -63,6 +63,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_roof.inc"
 #include "pc_mapmaker_bosses.inc"
 #include "pc_mapmaker_characters.inc"
+#include "pc_mapmaker_sets.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
@@ -753,6 +754,17 @@ void pc_mapmaker_bosses_hud(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_health_rows(void (*original)(void)) { original(); }
 void pc_mapmaker_characters_eligible(void (*original)(void)) { original(); }
 void pc_mapmaker_characters_preload(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_load(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_changed(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_screen(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_set_ptr(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_editor_set(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_store(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_sai_choice(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_play_set(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_preload(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }

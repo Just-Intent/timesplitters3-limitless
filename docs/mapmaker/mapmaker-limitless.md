@@ -175,6 +175,19 @@ characters that Arcade itself can use are offered; story-only creatures are
 not. Maps using them load and play in the original game too. *Automated tests
 only.* Details: [characters](mapmaker-characters.md).
 
+### 20 character slots (`LIMITS`)
+
+The custom character set has 20 slots instead of 10. In **Map Settings**,
+open the custom set: the title shows **(1-10)**; press Down on the last row
+to see slots **(11-20)** and Up on the first row to go back. New slots start
+empty. A Story AI's character choice lists all 20 slots. Arcade bots and
+players still use slots 1-10. A map that uses slots 11-20 needs this fork:
+the original game and System Link refuse it; other maps are saved as before.
+An AI set to an empty slot plays as the first filled slot. More different
+characters use more memory. Weapon sets stay at 6 slots: each weapon slot is
+its own pickup item (Weapon 1-6, Ammo 1-6). *Automated tests only.* Details:
+[sets](mapmaker-sets.md).
+
 ### Clouds per map (`LIMITS`)
 
 **Map Settings** gains a **Clouds** checkbox beside the sky choice. Clouds are
