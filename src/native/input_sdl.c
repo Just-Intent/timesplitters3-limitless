@@ -9,6 +9,7 @@
 #include "pc_camera.h"
 #include "pc_terminal.h"
 #include "pc_mounted.h"
+#include "pc_scope_wheel.h"
 #include "pc_mapmaker_pointer.h"
 #include "pc_debug.h"
 #include "pc_input.h"
@@ -40,6 +41,7 @@ static unsigned menu_button_block;
 static float menu_wheel_remainder;
 static Uint64 menu_wheel_at;
 static PcTextInput text_input;
+static PcScopeWheel scope_wheel; /* under camera_lock: wheel zoom while scoped */
 void pc_controls_text_mode(uint32_t owner) {
     pthread_mutex_lock(&camera_lock);
     if(text_input.owner!=owner) {
@@ -61,6 +63,7 @@ void pc_controls_menu_mode(int active) {
         menu_button_block=(menu_pointer_state.left?1u:0u)|(menu_pointer_state.right?2u:0u);
         menu_pointer_state.wheel=0;menu_wheel_remainder=0;
         camera_input.dx=camera_input.dy=0;
+        pc_scope_wheel_reset(&scope_wheel);
         atomic_store(&menu_active,!!active);
         atomic_store(&menu_capture_request,active?1:2);
     }
@@ -154,17 +157,28 @@ static void release_all(void) {
     pthread_mutex_lock(&camera_lock);
     menu_pointer_state.valid=menu_pointer_state.left=menu_pointer_state.right=menu_pointer_state.wheel=0;
     menu_button_block=0;menu_wheel_remainder=0;
+    pc_scope_wheel_reset(&scope_wheel);
     text_input.head=text_input.count=0;
     pthread_mutex_unlock(&camera_lock);
 }
 void tsfp_native_settings_release_input(SDL_Window *window) {release_all();set_capture(window,0);}
 int tsfp_native_input_focused(void) {return atomic_load(&focused);}
+static int native_key_state(int vk);
 int tsfp_native_key_down(int vk) {
     if(!atomic_load(&focused)||vk<=0||vk>255)return 0;
     pthread_mutex_lock(&camera_lock);
     int typing=text_input.owner && pc_text_key((unsigned)vk);
     pthread_mutex_unlock(&camera_lock);
     if(typing)return 0;
+    int down=native_key_state(vk);
+    /* Scoped: the weapon-switch wheel keys stay up and a notch holds zoom. */
+    pthread_mutex_lock(&camera_lock);
+    down=pc_scope_wheel_key(&scope_wheel,vk,down,!atomic_load(&menu_active) && !text_input.owner,
+                            SDL_GetTicks());
+    pthread_mutex_unlock(&camera_lock);
+    return down;
+}
+static int native_key_state(int vk) {
     if(vk==1 || vk==2) {
         pthread_mutex_lock(&camera_lock);
         int blocked=atomic_load(&menu_active) || (menu_button_block&(vk==1?1u:2u));
@@ -278,8 +292,13 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
     }
     if(e->type==SDL_EVENT_MOUSE_WHEEL && captured && !atomic_load(&menu_active) && atomic_load(&focused)) {
         if(e->wheel.y)pc_prompts_keyboard();
-        if(e->wheel.y>0)atomic_store(&keys[0x86],1);
-        if(e->wheel.y<0)atomic_store(&keys[0x87],1);
+        /* In a zoomable scope, notches bound to weapon switching zoom instead. */
+        int steps=e->wheel.y>0?1:e->wheel.y<0?-1:0;
+        pthread_mutex_lock(&camera_lock);
+        steps=pc_scope_wheel_input(&scope_wheel,steps,SDL_GetTicks());
+        pthread_mutex_unlock(&camera_lock);
+        if(steps>0)atomic_store(&keys[0x86],1);
+        if(steps<0)atomic_store(&keys[0x87],1);
     }
     if(e->type==SDL_EVENT_MOUSE_MOTION && captured && !atomic_load(&menu_active) && atomic_load(&focused)) {
         if(e->motion.xrel || e->motion.yrel)pc_prompts_keyboard();
@@ -325,7 +344,12 @@ int pc_controls_terminal_click(void) {
 }
 void pc_controls_apply_mouse(uint32_t player,uint32_t fov_object,ptrdiff_t offset) {
     float *yaw,*pitch,fov;
+    /* Read bindings and guest scope state before taking camera_lock. */
+    int bound[PC_ACTION_COUNT][PC_BINDING_SLOTS],have_bound=pc_settings_bound_keys(bound);
+    int scope=pc_scope_view(player,fov_object,offset);
     pthread_mutex_lock(&camera_lock);
+    pc_scope_wheel_bindings(&scope_wheel,have_bound?(const int (*)[PC_BINDING_SLOTS])bound:NULL);
+    pc_scope_wheel_state(&scope_wheel,scope,SDL_GetTicks());
     camera_input.focused=atomic_load(&focused)&&atomic_load(&mouse_enabled)&&!atomic_load(&menu_active);
     int terminal=pc_terminal_mouse(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),player,offset);
     pc_input_terminal_context(&camera_input,terminal>=0,atomic_load(&keys[1]));

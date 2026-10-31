@@ -121,6 +121,24 @@ int pc_settings_prompt_keys(int keys[PC_ACTION_COUNT])
     return available;
 }
 
+/* Every key bound on player 1, by action and slot: the mouse-wheel scope
+   zoom (pc_scope_wheel.h) redirects only a wheel bound to weapon switching. */
+int pc_settings_bound_keys(int keys[PC_ACTION_COUNT][PC_BINDING_SLOTS])
+{
+    int i,j,available=0;
+    recomp_bindings_init();
+    memset(keys,0,PC_ACTION_COUNT*sizeof *keys);
+    AcquireSRWLockShared(&g_pc_bindings_lock);
+    for(i=0;i<CONTROL_COUNT;i++) for(j=0;j<g_ctl[0].bind[i].count && j<PC_BINDING_SLOTS;j++) {
+        if(g_ctl[0].bind[i].src[j].kind==SRC_KEY) {
+            keys[i][j]=g_ctl[0].bind[i].src[j].arg;
+            available=1;
+        }
+    }
+    ReleaseSRWLockShared(&g_pc_bindings_lock);
+    return available;
+}
+
 /* Find a value in a JSON object without touching unrelated members. The
    runtime JSON walker also handles strings, escapes and nested arrays. */
 static const char *pc_member(const char *object, const char *wanted, const char **end)
