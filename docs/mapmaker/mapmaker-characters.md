@@ -77,6 +77,9 @@ A stock game loading such a map plays it as a fully unlocked stock profile
 no fork-only form is needed. Opening the set in a stock editor shows the
 names; re-picking there only offers its unlocked rows.
 
+Slots 11-20 of the custom set (area `sets`) are stored in a fork-only chunk:
+see [mapmaker-sets.md](mapmaker-sets.md).
+
 ## Hooks (WRAP lines for the integrator, area `characters`)
 
 ```

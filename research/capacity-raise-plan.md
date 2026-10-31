@@ -62,6 +62,11 @@ overrides at lift time) plus function wrappers.
   out of the Level heap, a larger extension block, rooms 512, Story AI 1023
   (menu pool and editor heap unmeasured).
 
+- Character set slots 10 -> 20 implemented 2026-10-31 (not built or
+  played; `docs/mapmaker/mapmaker-sets.md`): fork-only chunk for slots
+  11-20, paged slot screen, 20 Story AI character choices, play copy and
+  preload. Weapon sets stay at 6 slots (each slot is a pickup item type).
+
 ## Stages (in order)
 
 1. **Item and object quick wins.** Keycards, movers, props and other category
