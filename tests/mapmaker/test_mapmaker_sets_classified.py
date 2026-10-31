@@ -9,8 +9,8 @@ work-copy end pointer in them is either relied on / handled by
 pc_mapmaker_sets.inc or reviewed below (compares against game-mode bytes are
 classified automatically). A new unclassified site fails the test.
 
-Also records why weapon sets are not raised: the six weapon slots are bound
-to six weapon and six ammo item types.
+Also records that the six stock weapon slots are bound to six weapon and six
+ammo item types (the weaponset area adds slots 7-20 by a record byte).
 """
 from mapmaker_decoded import decoded, refs_functions, reviewed, unclassified
 
@@ -127,7 +127,7 @@ def test_every_slot_constant_is_classified():
 
 
 def test_weapon_slots_are_item_types():
-    """Weapon sets keep 6 slots: each slot is an item type (see docs/mapmaker/mapmaker-sets.md)."""
+    """The 6 stock weapon slots are item types (docs/mapmaker/mapmaker-weaponset.md)."""
     a = {i.address: i for i in decoded()}
     # sub_002FE840 / sub_00303350: item ids 0x11..0x16 weapon slot id-0x11, 0x17..0x1C ammo slot id-0x17
     assert ('imm', 6) in a[0x002FE84B].ops and a[0x002FE845].mnemonic == 'lea'

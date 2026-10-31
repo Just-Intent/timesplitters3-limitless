@@ -66,6 +66,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_realbosses.inc"
 #include "pc_mapmaker_sets.inc"
 #include "pc_mapmaker_matchbots.inc"
+#include "pc_mapmaker_weaponset.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
@@ -794,6 +795,24 @@ void pc_mapmaker_matchbots_match_start(void (*original)(void)) { original(); }
 void pc_mapmaker_matchbots_screen(void (*original)(void)) { original(); }
 void pc_mapmaker_matchbots_open(void (*original)(void)) { original(); }
 void pc_mapmaker_matchbots_store(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_load(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_changed(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_held(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_build(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_screen(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_get(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_set(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_options(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_title(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_sai_choice(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_play_set(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_weapon_veto(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_ammo_veto(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_pickup(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_preload(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }

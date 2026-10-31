@@ -71,4 +71,15 @@ void sub_00069640(void) {}
 #endif
 void sub_002BE600(void) {}
 void sub_002BE270(void) {}
+/* weaponset (pc_mapmaker_weaponset.inc) */
+void sub_00064E70(void) {}
+void sub_0006B2D0(void) {}
+void sub_000716D0(void) {}
+void sub_00074460(void) {}
+void sub_000783D0(void) {}
+void sub_00078590(void) {}
+void sub_00079DE0(void) {}
+void sub_0007D4A0(void) {}
+void sub_000BE860(void) {}
+void sub_00303350(void) {}
 #endif

@@ -1,4 +1,4 @@
-# MapMaker custom sets: 20 character slots (weapon sets stay at 6)
+# MapMaker custom sets: 20 character slots
 
 Status 2026-10-31: character slots implemented in
 `src/interface/pc_mapmaker_sets.inc` (area `sets`), fixture-tested
@@ -6,7 +6,7 @@ Status 2026-10-31: character slots implemented in
 facts; `tests/mapmaker/test_mapmaker_sets_classified.py`: every slot
 constant around the set classified). Not built or played. No guest-code
 table (`config/guest-code-patches/sets.json` does not exist; wrappers only).
-Weapon sets are not raised (see the end).
+Weapon sets have their own area: [mapmaker-weaponset.md](mapmaker-weaponset.md).
 
 User request (2026-10-31): "Add many more slots to the custom mapmaker bot and
 weapon sets. I'd like at least twenty. The additional slots can default as
@@ -182,18 +182,11 @@ All cdecl, plain `ret`; every hook calls its original once. Include the
 `sub_000D7780` (preload) is the characters area's log-only wrapper; the extra
 preloads return elsewhere and are not logged by it.
 
-## Weapon sets: not raised (CONFIRMED why)
+## Weapon sets
 
-A weapon set is 0x44 bytes: name, count, 15 ids (`rep movsd` 0x11 at
-0x0006A76F; System Link copy to 0x00761388 at 0x002D39F6). Map info stores 6
-(0x003008D6, editor +0x1190C). But a weapon slot is an item type: catalogue
-0x00524F58 items 0x11..0x16 are weapon slots 1-6 and 0x17..0x1C ammo slots
-1-6 (row +8 = slot; `sub_002FE840` `id - 0x11 < 6`, `id - 0x17 < 6`;
-`sub_00303350` table 0x003033FC), and the editor's weapon check walks six
-slots (`sub_003004E0`, +8..+0x20). Slots 7-20 would need 28 new item types
-past the 80-entry catalogue (editor palette, every `id < 0x50` check, item
-records, the category maxima, the stock-max save check) and a larger set
-struct everywhere it is copied. That is a separate feature, not a slot raise.
+Raised to 20 slots by the `weaponset` area without new item types (a slot
+byte on the weapon/ammo pickup records, fork chunk 0x00C776F6):
+[mapmaker-weaponset.md](mapmaker-weaponset.md).
 
 ## User test steps
 
