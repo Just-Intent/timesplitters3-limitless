@@ -55,7 +55,7 @@ are not in the launcher.
 | `TSFP_MAPMAKER_PROBE=<flags>` | Off | Read-only diagnostic log; see the [probe guide](mapmaker-meter-probe.md). Flag 32 also shows how much memory is left for a larger arena. | Developer use |
 | `TSFP_MAPMAKER_ARENA_MB=0..16` | 0 (off) | Gives the game's heap that many more MB in every scene (also story levels), taken from the same 64 MB block as textures. Measure with probe flag 32 first; see [memory](mapmaker-memory.md). | Not tested in game |
 | `TSFP_MAPMAKER_BOSS_RANGE=<units>` | 30 | How close you must be for a Boss Story AI's health bar to show (1..100000 game units). | Automated tests only |
-| `TSFP_MAPMAKER_REAL_BOSS=0` | Story behaviour on | With `LIMITS`: the giant trophy monster fights like a normal bot instead of with its story behaviour. See [real bosses](mapmaker-realbosses.md). | Automated tests only |
+| `TSFP_MAPMAKER_REAL_BOSS=0` | Story behaviour on | With `LIMITS`: the giant trophy monster and the giant skeleton fight like normal bots instead of with its story behaviour. See [real bosses](mapmaker-realbosses.md). | Automated tests only |
 | `TSFP_MAPMAKER_CREATURE_PROBE=1` | Off | Read-only log of the characters each level spawns and whether story-only creature models can load; write it to a file with `TSFP_MAPMAKER_CREATURE_PROBE_LOG=<file>`. See [bosses](mapmaker-bosses.md). | Developer use |
 
 ## Raised limits (`TSFP_MAPMAKER_LIMITS=1`)
@@ -207,12 +207,24 @@ even if you left the screen on (11-20).
 The custom character set's picker also ends with **Giant Trophy Monster**: the
 large creature from the mansion mission, not the Arcade trophy monster. Put it
 in a Story AI; in MapMaker Story play it uses its story behaviour (roars,
-charges and head-butts) and its own health bar. Give it the **Boss** row for a
-single bar with the AI's name and more health; with **Health display:
-Sub-boss bar** it shows the meter on its back instead of a bottom bar. `TSFP_MAPMAKER_REAL_BOSS=0`
+charges and head-butts). With **Boss** Off no health is shown for it; give it
+the **Boss** row for a single bar with the AI's name and more health; with
+**Health display: Sub-boss bar** it shows the meter on its back instead of a
+bottom bar. `TSFP_MAPMAKER_REAL_BOSS=0`
 keeps the big model but makes it fight like a normal bot. The original game
 plays such a map with the bot behaviour and shows an empty name in the editor.
 *Automated tests only.* Details: [real bosses](mapmaker-realbosses.md).
+
+### The giant skeleton from story mission 5 (`LIMITS`)
+
+The picker's next row is **Giant Skeleton**: the mansion boss that rises out
+of the ground. Put it in one Story AI; in MapMaker Story play it rises where
+that AI spawns, then stamps, swipes, bites and throws at you, and dies with its
+own animation. Its death does not trigger your map's logic. Only one per map
+gets the boss behaviour (others fight like bots and look wrong). Boss row and
+Health display work as for the trophy monster (Off = no health shown). The
+dust clouds of the original fight are not shown. *Not yet built or played.*
+Details: [real bosses](mapmaker-realbosses.md).
 
 ### Clouds per map (`LIMITS`)
 
