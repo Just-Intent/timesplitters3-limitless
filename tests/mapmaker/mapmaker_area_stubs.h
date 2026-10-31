@@ -63,4 +63,5 @@ void sub_00074670(void) {}
 void sub_002BE650(void) {}
 void sub_002BFFD0(void) {}
 void sub_000D7780(void) {}
+void sub_002C0310(void) {}
 #endif
