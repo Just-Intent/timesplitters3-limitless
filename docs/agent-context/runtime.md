@@ -975,3 +975,4 @@ Realbosses (giant trophy monster) wraps the picker, text, model request, anim mo
 Realbosses also wraps `sub_0013A400` (Story overhead meter; skipped only for the real trophy monster at return 0x0014D264).
 Sets also wraps `sub_002D2C70` (match start; editor Test map bots from slots 1-10), chained with the story character hook.
 Sky also wraps piece move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`) to carry open-roof marks, and text `sub_0003D7B0` (chained with realbosses).
+Bosses also wraps `sub_0014D1F0` (HUD per viewport) to draw Sub-boss overhead meters via `sub_0013A400` before the stock loop.
