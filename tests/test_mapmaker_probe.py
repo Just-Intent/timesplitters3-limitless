@@ -25,6 +25,14 @@ MUTATIONS = {
     'heap-no-minimum': ('    if(free_now<mapmaker_probe_heap_state.min_free) mapmaker_probe_heap_state.min_free=free_now;\n', ''),
     'heap-unthrottled': ('    if(mapmaker_probe_heap_state.last && now-mapmaker_probe_heap_state.last<MAPMAKER_PROBE_HEAP_INTERVAL) return;\n', ''),
     'uncapped': ('if(mapmaker_probe.written+length>MAPMAKER_PROBE_CAP) {', 'if(0) {'),
+    'rooms-without-flag': ('if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_ROOMS) || ', 'if('),
+    'rooms-any-scene': ('if((int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_PROBE_SCENE_PLAY) {', 'if(0) {'),
+    'rooms-no-window-end': ('if(mapmaker_probe_rooms.open && now-mapmaker_probe_rooms.start>=MAPMAKER_PROBE_ROOM_WINDOW)', 'if(0)'),
+    'rooms-no-period': ('now-mapmaker_probe_rooms.start>=MAPMAKER_PROBE_ROOM_PERIOD) {', '0) {'),
+    'rooms-no-dedupe': ('mapmaker_probe_rooms.seen[i][2]==b) return 0;', 'mapmaker_probe_rooms.seen[i][2]==b) break;'),
+    'rooms-writes-guest': ('inst=WORD_AT(prop+4u);model=', 'inst=WORD_AT(prop+4u);WORD_AT(prop+0x28u)|=0x800000u;model='),
+    'rooms-unscoped-draws': ('if(mapmaker_probe_rooms.depth && mapmaker_probe_rooms.open && ', 'if(mapmaker_probe_rooms.open && '),
+    'rooms-relocated-table-ignored': ('#define MAPMAKER_PROBE_ROOM_COUNTS 0x008C7000u', '#define MAPMAKER_PROBE_ROOM_COUNTS 0x007B54E0u'),
 }
 
 

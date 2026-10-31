@@ -246,7 +246,9 @@ personal environment cannot enable it. Asset-free coverage:
 `tests/test_mapmaker_probe.py` (registered in the native CI list; fixed case,
 four mutations and patch shape) and `tests/test_testing_profile.py`.
 Fixture success is not evidence of in-game meter behaviour.
-Probe flags are 1..127 (64 = AI pool counts in scene 100). The MapMaker
+Probe flags are 1..255 (64 = AI pool counts, 128 = room prop draws, both in
+scene 100). `tests/test_mapmaker_sky.py` (MapMaker clouds) also checks the
+stock sky data against the local XBE and skips that check without it. The MapMaker
 pointer, memory budget and stage A limits fixtures
 (`tests/test_mapmaker_pointer.py`, `tests/test_mapmaker_budget.py`,
 `tests/test_mapmaker_limits.py`) are in the same CI list. Fixtures that

@@ -149,6 +149,12 @@ layout after the original runs (before its context checks, so rejected menus
 are logged too), and the click after hit testing. No guest regeneration. It must never write guest memory or registers;
 `tests/test_mapmaker_probe.py` enforces this with mutations. Usage and the
 experiment protocol: `docs/mapmaker-meter-probe.md`. Mac: MAC-060.
+Flag 128 (scene 100, 5 s windows every 30 s) logs room draws, their props and
+the model draws inside them through two further wrappers,
+`pc_mapmaker_probe_room_draw` (`sub_000A2900`) and
+`pc_mapmaker_probe_prop_draw` (`sub_0008F950`, every model draw, inert outside
+a window); it reads the per-room prop tables at their `rooms.json` locations
+(`0x008C7000`/`0x008C7C00`). See `docs/mapmaker-sky.md`.
 
 ## MapMaker level memory budget (opt-in)
 
@@ -202,7 +208,14 @@ stack-array AI pickers (`sub_0027BA40` in two passes), a side table at
 from a copy at 0x00901600 (ids >= 32 have no route); `pc_network_bots_revive`
 writes the moved AI table; `TSFP_MAPMAKER_ALIVE=1..64` lowers it; sites and
 risks in `docs/mapmaker-actors.md`).
-Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`.
+Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`. `sky` (no table; not yet
+wired) adds a per-map cloud layer with `TSFP_MAPMAKER_LIMITS=1`: a "Clouds"
+checkbox after the stock sky row of Map Settings (the 11-sky choice itself is
+stock, editor `+0x220` -> info `+0x10`), stored as info flag 0x40000, applied
+in scene 100 by copying sky record 5's cloud fields into the map's MapMaker
+sky record (58..67) around `sub_0011C9F0`. Four hooks (`sub_0011C9F0`,
+`sub_00078560`, `sub_002FEBF0`, `sub_003006C0` chained after the container
+hook); details and test steps in `docs/mapmaker-sky.md`.
 
 ## MapMaker editor mouse controls
 
