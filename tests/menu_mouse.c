@@ -516,8 +516,15 @@ static void character_tests(void)
         cursor.left=0;run(parent);character_capture(child);cursor.left=1;run(parent);
         CHECK((early_source&0x80u) && character_previews==previews && WORD_AT(0x78a248)==2);
         run(parent);CHECK(!(early_source&0x80u));
+        /* The previewed portrait gives way to the 3D model: a click anywhere
+         * off the portraits and footer Back confirms the previewed character. */
+        cursor.left=0;run(parent);character_capture(child);cursor.x=width*.5f+150;cursor.left=1;run(parent);
+        CHECK(early_source&0x80u);CHECK(!(early_source&0x100u));
+        CHECK(character_previews==previews);CHECK(WORD_AT(0x78a248)==2);
+        cursor.left=0;cursor.x=width*.5f-210;run(parent);
         cursor.left=0;run(parent);character_capture(child);cursor.x=width*.5f-140;
         cursor.left=1;run(parent);CHECK(WORD_AT(0x78a150)==1 && WORD_AT(0x78a140)==13 && WORD_AT(0x78a144)==1);
+        CHECK(!(early_source&0x80u)); /* another portrait previews, never confirms */
         cursor.left=0;run(parent);character_capture(child);cursor.wheel=-1;run(parent);
         CHECK(WORD_AT(0x78a248)==0); /* wheel wraps and never confirms */
         cursor.wheel=1;run(parent);CHECK(WORD_AT(0x78a248)==2 && WORD_AT(0x78a150)==1);
