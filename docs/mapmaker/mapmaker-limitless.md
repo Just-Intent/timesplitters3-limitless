@@ -153,7 +153,11 @@ when you are within about 30 units of a living boss
 range, up to four bars stack upward (nearest at the bottom; two in split
 screen); a story boss bar of the game itself keeps the bottom place. Any character in the map's
 character set can be a boss (for example the giant robot or Khallos); it keeps
-its normal MapMaker AI behaviour, not the story boss fight. Maps with bosses
+its normal MapMaker AI behaviour, not the story boss fight. While Boss is not
+Off the screen also has **Health display: Boss bar** (the bar at the bottom
+of the screen) or, after a click, **Health display: Sub-boss bar** (a small
+health meter floating above that enemy instead, not limited to the bar distance).
+After switching Boss from Off, reopen the AI to see that row. Maps with bosses
 load in the original game with ordinary AI. Story-only creatures (the mission 5
 ghosts and worms) are not deployable yet. *Automated tests only.*
 Details: [bosses](mapmaker-bosses.md).
@@ -204,7 +208,8 @@ The custom character set's picker also ends with **Giant Trophy Monster**: the
 large creature from the mansion mission, not the Arcade trophy monster. Put it
 in a Story AI; in MapMaker Story play it uses its story behaviour (roars,
 charges and head-butts) and its own health bar. Give it the **Boss** row for a
-single bar with the AI's name and more health. `TSFP_MAPMAKER_REAL_BOSS=0`
+single bar with the AI's name and more health; with **Health display:
+Sub-boss bar** it shows the meter on its back instead of a bottom bar. `TSFP_MAPMAKER_REAL_BOSS=0`
 keeps the big model but makes it fight like a normal bot. The original game
 plays such a map with the bot behaviour and shows an empty name in the editor.
 *Automated tests only.* Details: [real bosses](mapmaker-realbosses.md).

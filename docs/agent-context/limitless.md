@@ -362,7 +362,17 @@ entries; Tough Guy = 20.0 in 0x004DACF4). The focus field +0xFF4 and the `sub_00
 read-only `TSFP_MAPMAKER_CREATURE_PROBE=1` (log
 `TSFP_MAPMAKER_CREATURE_PROBE_LOG`) listing story-only character model
 resource slots per level and every new live character's id, AI class,
-record, model and skeleton. Not yet built or played.
+record, model and skeleton. Health display (2026-10-31): a second row
+"Health display: Boss bar / Sub-boss bar" (id 0x424F5302, built only while
+Boss is not Off; same close-callback mechanics) sets +0x29 bit 2 (0xB4 |
+level-1; mask 0xF8). Sub-boss AIs get no bottom bar; WRAP `sub_0014D1F0` ->
+`pc_mapmaker_bosses_meters` draws `sub_0013A400(actor,0,0x7F,0x6E)` before
+the original for each living Sub-boss AI whose entity has no +0x268 record
+(one with a record is the stock loop's). Records are not created:
+`sub_0012C800` is a 17-slot bump pool reset only at 0x0014853D and +0x268
+has ~100 readers. The meter sits 0.4..0.6 units above model node
+[[[entity+4]+0x8C]+0x18] (+0x34 of its matrix), so it already follows the
+model's skeleton; no extra scaling.
 
 Custom character set (area `characters`, `src/interface/pc_mapmaker_characters.inc`,
 `docs/mapmaker/mapmaker-characters.md`, `TSFP_MAPMAKER_LIMITS=1`): the Map
@@ -396,7 +406,8 @@ over every AI-list actor whose entity has a +0x268 damage record, in scene
 100 story only (0x0014D21C/0x0014D225; mission 5 is scene 1); the deerbeast
 handler makes that record (0x002811A3), MapMaker AIs never do. WRAP
 `sub_0013A400` -> `pc_mapmaker_realbosses_meter` skips it for noted real
-bosses (char 0x15 / model 0x5BE). No save byte; the handler cannot reach
+bosses (char 0x15 / model 0x5BE) unless their Story AI chose the Sub-boss
+bar (then the stock meter shows and the stock bar is hidden too). No save byte; the handler cannot reach
 `sub_002274C0` (decode call graph). `tests/mapmaker/test_mapmaker_realbosses.py`.
 Only the creature itself played (v0.4.0-mapmaker.5); the meter fix is not built.
 
@@ -675,7 +686,8 @@ the edit-screen row site, menu table 0x0052E088 and the unused chunk bytes
 `tests/mapmaker/test_mapmaker_bosses.py` (Boss row, editor table, chunk +0x29,
 health scaling, stacked boss bars, stronger health options, read-only probe;
 mutations; decode checks of chunk bytes +0x29/+0x21, the Health row and
-tables, and the `sub_0014CC80`/`sub_00139740` bar sites) is too.
+tables, the `sub_0014CC80`/`sub_00139740` bar sites and the `sub_0013A400`
+meter contract) is too.
 
 `tests/mapmaker/test_mapmaker_grid.py` (fixture `tests/mapmaker/mapmaker_grid.c`) checks that
 `grid.json` redirects exactly the decoded editor reads of the grid constants

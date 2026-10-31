@@ -23,7 +23,7 @@
  *
  * Save format. Story AI chunk (tag 0x00C7766C) data byte +0x29: 0 = no
  * boss (every stock map), 0xB0 | (level - 1) = boss with health x1, x2, x4,
- * x8. The compiler zeroes the container (rep stosd 0x0030070D); the chunk
+ * x8 and the Boss bar; 0xB4 | (level - 1) = the same with the Sub-boss bar. The compiler zeroes the container (rep stosd 0x0030070D); the chunk
  * writer (0x003013E1..0x003015DF) stores byte +0x28 and word +0x2A but
  * never +0x29; the editor loader (0x00302428..0x0030267A) and every play
  * reader of the chunk (sub_0023F390, sub_00240590, sub_00240C50,
@@ -72,6 +72,11 @@
  *   fade +0x172C is lowered as sub_0014B090 lowers the live one (dt x
  *   [0x00475D10] per HUD block clock +0x2C), else the bar never drains. Coordinates
  *   stay guest 640x480, so widescreen keeps them in the 4:3 HUD box.
+ * - Health display (row "Health display: Boss bar / Sub-boss bar", built
+ *   only while Boss is not Off; +0x29 bit 2 = Sub-boss): a Sub-boss AI gets
+ *   no bottom bar; instead the meters hook (sub_0014D1F0) draws the stock
+ *   MapMaker overhead meter sub_0013A400 for it (see that hook). A real
+ *   trophy monster's own meter/bar follow the same choice (realbosses).
  *
  * Stronger health (same switch). The stock Health row of the edit screen
  * (text 0xC0D, options 0xC0E..0xC12 = Weakling, Low, Normal, High, Tough Guy,
@@ -126,6 +131,7 @@
 #define BOS_CLOSE 0x0031CAC0u           /* edit screen close, also the row callback */
 #define BOS_ROWS_AT 0x0031D083u         /* return from sub_000784A0 before "Done" */
 #define BOS_ROW 0x424F5301u
+#define BOS_ROW_DISPLAY 0x424F5302u     /* "Health display:" row, only while Boss is not Off */
 #define BOS_TYPE 0x34u
 #define BOS_COLOUR 0x60u
 #define BOS_ENTRY_INDEX 0x24u           /* loader: chunk +0x22 -> entry +0x24 */
@@ -137,8 +143,9 @@
 #define BOS_CHUNK_INDEX 0x22u
 #define BOS_CHUNK_FLAG 0x29u
 #define BOS_CHUNK_MIN 0x44u             /* fixed part of a Story AI chunk */
-#define BOS_FLAG_MARK 0xB0u             /* +0x29 = 0xB0 | (level - 1) */
-#define BOS_FLAG_MASK 0xFCu
+#define BOS_FLAG_MARK 0xB0u             /* +0x29 = 0xB0 | sub-boss bit | (level - 1) */
+#define BOS_FLAG_MASK 0xF8u
+#define BOS_FLAG_SUB 0x04u              /* bit 2: Sub-boss bar (overhead meter), else the Boss bar */
 #define BOS_LEVELS 4u                   /* 1..4: health x1, x2, x4, x8 */
 #define BOS_LEVEL_SLOTS 1024u           /* play-time index bound (= aitemplates) */
 #define BOS_NAME 32u
@@ -150,7 +157,8 @@
 #define BOS_CHUNK_EXTRA 0x21u           /* 0xA0 | extra level */
 #define BOS_EXTRA_MARK 0xA0u
 #define BOS_EXTRA_MASK 0xF8u
-#define BOS_TEXTS (1u+BOS_BARS_MAX+BOS_HEALTH_EXTRA)   /* row label, HUD labels, health options */
+#define BOS_TEXT_DISPLAY (1u+BOS_BARS_MAX+BOS_HEALTH_EXTRA)
+#define BOS_TEXTS (2u+BOS_BARS_MAX+BOS_HEALTH_EXTRA)   /* row label, HUD labels, health options, display row */
 
 #define BOS_PLAYER 0x007B0C7Cu          /* current player: +4 index, +0x14 entity */
 #define BOS_HUD 0x007A6160u             /* HUD block per player, 0x0014F0CC */
@@ -169,6 +177,8 @@
 #define BOS_ENT_MODEL 0x94u
 #define BOS_ENT_HEALTH 0x1CCu
 #define BOS_ENT_MAX 0x1D8u
+#define BOS_ENT_RECORD 0x268u           /* damage-stage record: the stock loop draws the meter (0x0014D249) */
+#define BOS_ENT_INST 4u                 /* model instance: +0x8C skeleton header, +0x10 node matrices */
 #define BOS_RANGE 30.0f                 /* game units; TSFP_MAPMAKER_BOSS_RANGE */
 #define BOS_BARS_MAX 4u                 /* boss bars per viewport, stock bar included */
 #define BOS_BARS_SPLIT 2u               /* with more than one human player */
@@ -189,12 +199,13 @@
 
 #define BOS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
-extern void sub_00079D60(void),sub_00139740(void),sub_00071800(void);
+extern void sub_00079D60(void),sub_00139740(void),sub_00071800(void),sub_0013A400(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
 static struct {
     uint32_t editor;                    /* editor object the table belongs to */
     uint8_t level[BOS_CAP];             /* 0 off, 1..4 */
+    uint8_t sub[BOS_CAP];               /* 1: Sub-boss bar (only with a level) */
     uint16_t colour[BOS_CAP];
     uint32_t text;                      /* guest: BOS_TEXTS labels of 32 B */
     unsigned logged, dropped, bad_flags, bad_extra;
@@ -204,6 +215,8 @@ static struct {
     int active;
     uint8_t level[BOS_LEVEL_SLOTS];     /* boss level 0..4 */
     uint8_t extra[BOS_LEVEL_SLOTS];     /* stronger health 0..4 */
+    uint8_t sub[BOS_LEVEL_SLOTS];       /* 1: Sub-boss bar: overhead meter, no bottom bar */
+    unsigned subs, meters;
     char name[BOS_LEVEL_SLOTS][BOS_NAME];
     struct { uint32_t actor, record, max_bits; } scaled[BOS_LIST_MAX];
     struct { uint32_t hud, entity, frame, state[3], timed; float clock; } smooth[BOS_SMOOTH];
@@ -228,6 +241,8 @@ static unsigned bos_decode(uint32_t flag)
     if((flag&BOS_FLAG_MASK)!=BOS_FLAG_MARK) { bos.bad_flags++;bos_log("unknown chunk +0x29 value ignored",flag,0);return 0; }
     return (flag&3u)+1u;
 }
+/* 1 when a valid boss flag asks for the Sub-boss bar (bit 2); no second log. */
+static unsigned bos_decode_sub(uint32_t flag) { return (flag&BOS_FLAG_MASK)==BOS_FLAG_MARK && (flag&BOS_FLAG_SUB)?1u:0u; }
 /* Chunk +0x21: 0 or 0xA0 | 1..4 with the stock health byte at Tough Guy. */
 static unsigned bos_decode_extra(uint32_t flag,uint32_t health)
 {
@@ -256,16 +271,19 @@ static unsigned bos_get(uint32_t e,uint32_t i)
     if(e!=bos.editor || i>=bos_count(e) || !bos.level[i]) return 0;
     if(bos.colour[i]!=bos_colour_of(e,i)) {
         bos.dropped++;bos_log("boss setting dropped: entry changed",i,bos.colour[i]);
-        bos.level[i]=0;
+        bos.level[i]=0;bos.sub[i]=0;
         return 0;
     }
     return bos.level[i];
 }
-static void bos_set(uint32_t e,uint32_t i,unsigned level)
+static unsigned bos_get_sub(uint32_t e,uint32_t i) { return bos_get(e,i)?bos.sub[i]:0u; }
+/* A Sub-boss choice is kept only with a level (Off clears it, as the save does). */
+static void bos_set(uint32_t e,uint32_t i,unsigned level,unsigned sub)
 {
-    if(bos.editor!=e) { memset(bos.level,0,sizeof bos.level);bos.editor=e; }
+    if(bos.editor!=e) { memset(bos.level,0,sizeof bos.level);memset(bos.sub,0,sizeof bos.sub);bos.editor=e; }
     if(i>=BOS_CAP) return;
     bos.level[i]=(uint8_t)(level<=BOS_LEVELS?level:0u);
+    bos.sub[i]=(uint8_t)(bos.level[i] && sub?1u:0u);
     bos.colour[i]=bos_colour_of(e,i);
 }
 static uint32_t bos_text(unsigned which)
@@ -294,18 +312,28 @@ static uint32_t bos_label(unsigned level)
     if(text) bos_put_text(text,label[level<=BOS_LEVELS?level:0u]);
     return text;
 }
+/* The "Health display" row label (its own buffer, also rewritten in place). */
+static uint32_t bos_display_label(unsigned level,unsigned sub)
+{
+    uint32_t text=bos_text(BOS_TEXT_DISPLAY);
+    if(text) bos_put_text(text,!level?"Health display: (Boss off)":sub?"Health display: Sub-boss bar":"Health display: Boss bar");
+    return text;
+}
 
 /* sub_000784A0(spacing): the edit screen calls it once at 0x0031D07E, just
  * before its "Done" row whose callback is the builder's second argument. */
 void pc_mapmaker_bosses_rows(void (*original)(void))
 {
     uint32_t r=0,cb=0,e,s,text;
+    unsigned level;
     if(MAPMAKER_STACK_OK(0x28)) { r=WORD_AT(g_esp);cb=WORD_AT(g_esp+0x24u); } /* [esp+0x20] after the return */
     original();
     if(r!=BOS_ROWS_AT || cb!=BOS_CLOSE || !bos_on() || WORD_AT(BOS_SCENE)!=102u || !(e=bos_editor())) return;
     s=bos_selected();
     if(s>=bos_count(e) || WORD_AT(bos_entry(e,s)+BOS_TYPE)==5u) return;
-    if((text=bos_label(bos_get(e,s)))!=0) guest_call(sub_00079D60,6,text,BOS_ROW,0u,0u,BOS_CLOSE,0u);
+    if((text=bos_label(level=bos_get(e,s)))!=0) guest_call(sub_00079D60,6,text,BOS_ROW,0u,0u,BOS_CLOSE,0u);
+    if(text && level && (text=bos_display_label(level,bos_get_sub(e,s)))!=0)
+        guest_call(sub_00079D60,6,text,BOS_ROW_DISPLAY,0u,0u,BOS_CLOSE,0u);
 }
 
 /* sub_00078590(&field): binds the current list row to a field and selects its
@@ -331,14 +359,17 @@ void pc_mapmaker_bosses_health_rows(void (*original)(void))
 void pc_mapmaker_bosses_close(void (*original)(void))
 {
     uint32_t menu=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,e,row,s;
-    unsigned level;
+    unsigned level,sub;
     if(!bos_on() || !(e=bos_editor())) { original();return; }
     row=menu && MAPMAKER_PTR_OK(menu,0x190u)?WORD_AT(menu+0x18Cu):0u;
     s=bos_selected();
-    if(row!=BOS_ROW || s>=bos_count(e) || WORD_AT(bos_entry(e,s)+BOS_TYPE)==5u) { original();return; }
-    level=(bos_get(e,s)+1u)%(BOS_LEVELS+1u);
-    bos_set(e,s,level);
+    if((row!=BOS_ROW && row!=BOS_ROW_DISPLAY) || s>=bos_count(e) || WORD_AT(bos_entry(e,s)+BOS_TYPE)==5u) { original();return; }
+    level=bos_get(e,s);sub=bos_get_sub(e,s);
+    if(row==BOS_ROW) level=(level+1u)%(BOS_LEVELS+1u);
+    else if(level) sub=!sub;                      /* Boss bar <-> Sub-boss bar; nothing while Off */
+    bos_set(e,s,level,sub);
     bos_label(level);
+    bos_display_label(level,bos_get_sub(e,s));
     MAPMAKER_GUEST_RET();                         /* sub_0031CAC0: ret; the screen stays open */
 }
 
@@ -352,8 +383,9 @@ void pc_mapmaker_bosses_delete(void (*original)(void))
     after=bos_count(e);
     if(e!=bos.editor || i>=before || after+1u!=before) return;
     memmove(bos.level+i,bos.level+i+1u,before-i-1u);
+    memmove(bos.sub+i,bos.sub+i+1u,before-i-1u);
     memmove(bos.colour+i,bos.colour+i+1u,(before-i-1u)*sizeof bos.colour[0]);
-    bos.level[before-1u]=0;
+    bos.level[before-1u]=0;bos.sub[before-1u]=0;
 }
 
 /* sub_002FEBF0: editor map reset (new map; the loader calls it first). */
@@ -361,6 +393,7 @@ void pc_mapmaker_bosses_reset(void (*original)(void))
 {
     original();
     memset(bos.level,0,sizeof bos.level);
+    memset(bos.sub,0,sizeof bos.sub);
 }
 
 /* Visit each Story AI chunk's data in order; stops at the end tag, a malformed
@@ -389,7 +422,7 @@ static void bos_compile_chunk(uint32_t data,unsigned ordinal,void *ctx)
     uint32_t e=*(const uint32_t *)ctx,i=bos_get16(data+BOS_CHUNK_INDEX);
     unsigned level=bos_get(e,i),extra=0;
     (void)ordinal;
-    BOS_B(data+BOS_CHUNK_FLAG)=(uint8_t)(level?BOS_FLAG_MARK|(level-1u):0u);
+    BOS_B(data+BOS_CHUNK_FLAG)=(uint8_t)(level?BOS_FLAG_MARK|(bos_get_sub(e,i)?BOS_FLAG_SUB:0u)|(level-1u):0u);
     if(i<bos_count(e)) {
         uint32_t health=WORD_AT(bos_entry(e,i)+BOS_HEALTH);
         if(health>BOS_HEALTH_TOUGH) {
@@ -438,7 +471,7 @@ void pc_mapmaker_bosses_load(void (*original)(void))
             bos.dropped++;bos_log("boss setting dropped at load",k,x.flag[k]);
             level=0;
         }
-        bos_set(e,base+k,level);
+        bos_set(e,base+k,level,bos_decode_sub(x.flag[k]));
         if(extra) {
             if(same && WORD_AT(entry+BOS_HEALTH)==BOS_HEALTH_TOUGH) WORD_AT(entry+BOS_HEALTH)=BOS_HEALTH_TOUGH+extra;
             else { bos.dropped++;bos_log("health setting dropped at load",k,x.extra[k]); }
@@ -450,13 +483,15 @@ void pc_mapmaker_bosses_load(void (*original)(void))
 static void bos_level_chunk(uint32_t data,unsigned ordinal,void *ctx)
 {
     uint32_t i=bos_get16(data+BOS_CHUNK_INDEX);
-    unsigned level=bos_decode(BOS_B(data+BOS_CHUNK_FLAG)),*n=(unsigned *)ctx;
+    unsigned level=bos_decode(BOS_B(data+BOS_CHUNK_FLAG)),sub=bos_decode_sub(BOS_B(data+BOS_CHUNK_FLAG)),*n=(unsigned *)ctx;
     unsigned extra=bos_decode_extra(BOS_B(data+BOS_CHUNK_EXTRA),BOS_B(data+BOS_CHUNK_HEALTH));
     (void)ordinal;
     if(!level && !extra) return;
     if(i>=BOS_LEVEL_SLOTS) { bos_log("boss index out of range in play",i,0);return; }
     bos_play.level[i]=(uint8_t)level;
     bos_play.extra[i]=(uint8_t)extra;
+    bos_play.sub[i]=(uint8_t)(level && sub);
+    if(level && sub) bos_play.subs++;
     memcpy(bos_play.name[i],(const char *)((uintptr_t)(data+BOS_CHUNK_NAME)+g_xbox_mem_offset),BOS_NAME-1u);
     bos_play.name[i][BOS_NAME-1u]=0;
     ++*n;
@@ -540,7 +575,7 @@ static unsigned bos_nearest(uint32_t player,uint32_t *ents,uint32_t *index,unsig
         float dx,dy,dz,d;
         if(s>=BOS_LEVEL_SLOTS) continue;
         bos_scale(a,ent,rec,bos_factor(s));
-        if(!bos_play.level[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;
+        if(!bos_play.level[s] || bos_play.sub[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;   /* Sub-boss: meter only */
         dx=bos_getf(ent+BOS_ENT_POS)-px;dy=bos_getf(ent+BOS_ENT_POS+4u)-py;dz=bos_getf(ent+BOS_ENT_POS+8u)-pz;
         d=dx*dx+dy*dy+dz*dz;
         if(!(d<=bos_play.range2)) continue;
@@ -637,6 +672,43 @@ void pc_mapmaker_bosses_hud(void (*original)(void))
     WORD_AT(BOS_MARGIN)=margin;
     bos_smooth_io(hud,stock,1);                   /* the stock bar's own state */
     if(any) WORD_AT(hud+BOS_HUD_FLAGS)|=1u;      /* as the stock bar (0x0014D0D5) */
+}
+
+/* sub_0014D1F0 (HUD, per viewport): its scene-100 story loop draws the
+ * overhead meter sub_0013A400(actor, 0, 0x7F, 0x6E) for actors whose entity
+ * has a damage-stage record (+0x268, 0x0014D249). Ordinary Story AIs never
+ * get one, and making one (sub_0012C800: 17-slot bump pool 0x00745938, never
+ * freed until 0x0014853D; +0x268 has ~100 readers incl. the damage flash
+ * sub_0014D3A0) is not safe, so before the original (the loop runs first
+ * thing, no state set before it) this draws the same meter for each living
+ * Sub-boss AI without a record; one with a record is left to the stock loop.
+ * sub_0013A400 only draws (cdecl, plain ret; reads actor +0xC68 fade, entity
+ * +0x10 visibility, +0x64..+0x6C, [entity+4] +0x8C/+0x10 node matrices). */
+void pc_mapmaker_bosses_meters(void (*original)(void))
+{
+    uint32_t player,pe,count,humans,i;
+    GuestRegisters r;
+    if(!bos_play.subs || !mapmaker_limits.limits || WORD_AT(BOS_SCENE)!=100u || BOS_B(BOS_MODE)!=10u
+       || !MAPMAKER_STACK_OK(0x400)) { original();return; }
+    player=WORD_AT(BOS_PLAYER);
+    if(!MAPMAKER_PTR_OK(player,0x18u) || (int32_t)WORD_AT(player+4u)<0) { original();return; }   /* 0x0014D1FB/0x0014D206 */
+    pe=WORD_AT(player+0x14u);
+    count=WORD_AT(BOS_LIST_COUNT);humans=WORD_AT(BOS_HUMANS);
+    if(count>BOS_LIST_MAX) count=BOS_LIST_MAX;
+    save_registers(&r);
+    for(i=humans<count?humans:count;i<count;i++) {
+        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec),inst;
+        if(s>=BOS_LEVEL_SLOTS || !bos_play.level[s] || !bos_play.sub[s]) continue;
+        if(ent==pe || !MAPMAKER_PTR_OK(ent,BOS_ENT_RECORD+4u) || WORD_AT(ent+BOS_ENT_RECORD)) continue;
+        if(!(bos_getf(ent+BOS_ENT_HEALTH)>0.0f) || !(bos_getf(ent+BOS_ENT_MAX)>0.0f)) continue;
+        inst=WORD_AT(ent+BOS_ENT_INST);
+        if(!MAPMAKER_PTR_OK(inst,0x90u) || !MAPMAKER_PTR_OK(WORD_AT(inst+0x8Cu),0x1Cu) || !MAPMAKER_PTR_OK(WORD_AT(inst+0x10u),0x40u)) continue;
+        guest_call(sub_0013A400,4,a,0u,0x7Fu,0x6Eu);
+        restore_registers(&r);
+        bos_play.meters++;
+    }
+    restore_registers(&r);
+    original();
 }
 
 /* ---- creature probe (read-only) ------------------------------------------ */

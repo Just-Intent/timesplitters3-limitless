@@ -339,6 +339,33 @@ int main(void)
     BYTE_AT(0x007DE455u)=10u;
     WORD_AT(0x0079094Cu)=1u;
     CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* story level scene */
+    WORD_AT(0x0079094Cu)=100u;
+
+    /* ---- play: health display choice (chunk +0x29 bit 2 = Sub-boss bar) ---- */
+    {
+        static const uint8_t boss_sub[]={0,0xB5}, boss_bad[]={0,0xB9};
+        container(0xC,with,3,boss_sub,2);
+        actor(0,0x15,0x5BE,1);
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+        CHECK(rbs.real[0].record==REC(0) && rbs.real[0].boss==2);
+        CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* Sub-boss: meter kept */
+        CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);        /* and no stock bottom bar */
+        CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(0));
+        container(0xC,with,3,boss_on,2);                                     /* Boss bar: meter hidden */
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+        CHECK(rbs.real[0].boss==1);
+        CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
+        container(0xC,with,3,boss_off,2);                                    /* no Boss flag: hidden, stock bar */
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+        CHECK(rbs.real[0].boss==0);
+        CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
+        CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+        CHECK(seen_focus==ENT(0));
+        container(0xC,with,3,boss_bad,2);                                    /* unknown value: no Boss flag */
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+        CHECK(rbs.real[0].boss==0);
+        CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
+    }
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);        /* not in play */
     CHECK(seen_focus==ENT(0));
