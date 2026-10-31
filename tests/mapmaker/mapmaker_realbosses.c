@@ -180,12 +180,50 @@ static void container(uint32_t set_index,const uint16_t *ids,unsigned n,const ui
     }
     WORD_AT(c)=0x00C7766Au;WORD_AT(c+4u)=0;
 }
+/* the sets area's chunk for slots 11-20 (0x00C776F5), inserted before the terminator */
+static void container_extra(const uint16_t *ids,unsigned n)
+{
+    uint32_t c=CONT+8u,k;
+    while(WORD_AT(c)!=0x00C7766Au) c+=8u+WORD_AT(c+4u);
+    WORD_AT(c)=0x00C776F5u;WORD_AT(c+4u)=0x30u;
+    HALF_AT(c+8u)=1u;BYTE_AT(c+10u)=10u;BYTE_AT(c+11u)=(uint8_t)n;
+    for(k=0;k<n;k++) HALF_AT(c+12u+k*4u)=ids[k];
+    c+=8u+0x30u;
+    WORD_AT(c)=0x00C7766Au;WORD_AT(c+4u)=0;
+}
 static void actor(unsigned i,uint32_t id,uint32_t model,uint32_t index)
 {
     WORD_AT(A(i))=ENT(i);HALF_AT(A(i)+0x48u)=(uint16_t)id;WORD_AT(A(i)+0xBF0u)=REC(i);
     WORD_AT(ENT(i)+0x7Cu)=A(i);HALF_AT(ENT(i)+0x94u)=(uint16_t)model;
     WORD_AT(REC(i))=0x11000000u;WORD_AT(REC(i)+4u)=0;WORD_AT(REC(i)+8u)=R+index+1u;
 }
+
+/* One level with a set: anims, level init, then a skeleton (actor 6) and a
+ * trophy monster (actor 7) start. expect: 3 both real bosses, 2 skeleton
+ * only, 1 trophy only, 0 neither. */
+static void level_with(uint32_t index,const uint16_t *ids,unsigned n,const uint16_t *extra,unsigned ne,int expect,int line)
+{
+    static const uint8_t none[]={0,0};
+    unsigned m=nmount,al=nalloc;
+    int fails=failures;
+    container(index,ids,n,none,2);
+    if(extra) container_extra(extra,ne);
+    pak_mounted=skel_mounted=0;WORD_AT(0x006D7880u)=10u;
+    WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10u;
+    call(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1,line);
+    call(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1,line);
+    actor(6,0x28,0x5E9,0);actor(7,0x15,0x5BE,1);
+    call(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(6),0,0,1,line);
+    CHECK(seen_class[1]==((expect&2)?0x20000u:0u));
+    call(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(7),0,0,1,line);
+    CHECK(seen_class[1]==((expect&1)?0x80u:0u));
+    CHECK(skel_mounted==!!(expect&2) && pak_mounted==!!(expect&1));
+    CHECK(nmount-m==(unsigned)(!!(expect&2)+!!(expect&1)));
+    CHECK(nalloc-al==(unsigned)!!(expect&2) && (rbs_skel.state==SKST)==!!(expect&2));
+    CHECK(((expect&2)?rbs_skel.record==REC(6):!rbs_skel.record));
+    if(failures!=fails) fprintf(stderr,"  (level_with from line %d)\n",line);
+}
+#define LEVEL_WITH(i,ids,n,ex,ne,e) level_with(i,ids,n,ex,ne,e,__LINE__)
 
 int main(void)
 {
@@ -210,7 +248,7 @@ int main(void)
     orig_eax=0x1234u;
     CHECK(CALL(pc_mapmaker_realbosses_text,fake,0x0014CED5u,0xDCCu,0,0,1)==0x1234u);
     WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10u;
-    container(0xC,with,3,boss_off,2);
+    container(0x11,with,3,boss_off,2);
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==0);
     actor(0,0x15,0x5BE,1);pak_mounted=1;
@@ -290,7 +328,7 @@ int main(void)
     CHECK(CALL(pc_mapmaker_realbosses_text,fake,0x0014CED5u,0xDCCu,0,0,1)==0x1234u);   /* not in play */
     CALL(pc_mapmaker_realbosses_model_request,fake,0x000D77AFu,0x5BEu,0,0,1);           /* log only */
     /* editor scene: nothing of play runs */
-    container(0xC,with,3,boss_off,2);
+    container(0x11,with,3,boss_off,2);
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==0);
 
@@ -299,13 +337,13 @@ int main(void)
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==0);
     BYTE_AT(0x007DE455u)=10u;
-    container(0xC,without,2,boss_off,2);
+    container(0x11,without,2,boss_off,2);
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==0);
     container(3,with,3,boss_off,2);                                      /* preset set: stale members */
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==0);
-    container(0xC,with,3,boss_off,2);
+    container(0x11,with,3,boss_off,2);
     WORD_AT(0x006D7880u)=29u;                                            /* table nearly full */
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==0);
@@ -322,7 +360,7 @@ int main(void)
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==3 && skel_mounted && pak_mounted);                     /* both, skeleton first */
     skel_mounted=0;
-    container(0xC,with,3,boss_on,2);
+    container(0x11,with,3,boss_on,2);
 
     /* ---- play: class at AI start ----------------------------------------- */
     pak_mounted=0;
@@ -405,24 +443,24 @@ int main(void)
     /* ---- play: health display choice (chunk +0x29 bit 2 = Sub-boss bar) ---- */
     {
         static const uint8_t boss_sub[]={0,0xB5}, boss_bad[]={0,0xB9};
-        container(0xC,with,3,boss_sub,2);
+        container(0x11,with,3,boss_sub,2);
         actor(0,0x15,0x5BE,1);
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
         CHECK(rbs.real[0].record==REC(0) && rbs.real[0].boss==2);
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* Sub-boss: meter kept */
         CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);        /* and no stock bottom bar */
         CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(0));
-        container(0xC,with,3,boss_on,2);                                     /* Boss bar: meter hidden */
+        container(0x11,with,3,boss_on,2);                                     /* Boss bar: meter hidden */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
         CHECK(rbs.real[0].boss==1);
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
-        container(0xC,with,3,boss_off,2);                                    /* Boss Off: no meter, no bar */
+        container(0x11,with,3,boss_off,2);                                    /* Boss Off: no meter, no bar */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
         CHECK(rbs.real[0].boss==0);
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
         CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
         CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(0));
-        container(0xC,with,3,boss_bad,2);                                    /* unknown value: no Boss flag */
+        container(0x11,with,3,boss_bad,2);                                    /* unknown value: no Boss flag */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
         CHECK(rbs.real[0].boss==0);
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
@@ -437,7 +475,7 @@ int main(void)
         for(k=0;k<8u;k++) WORD_AT(0x005208B8u+k*4u)=actions[k];
         WORD_AT(0x005208B8u+8u*4u)=6u;                                       /* past the table */
         /* anims: lv1_6.pak for a custom set holding 0x28 */
-        container(0xC,skel,2,none3,3);
+        container(0x11,skel,2,none3,3);
         m=nmount;skel_mounted=0;pak_mounted=0;
         WORD_AT(0x006D7880u)=29u;
         CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
@@ -447,23 +485,23 @@ int main(void)
         CHECK(nmount==m+1u && mount_arg==0x0049D6FCu && skel_mounted && !pak_mounted);
         CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
         CHECK(nmount==m+1u);                                                 /* already mounted */
-        container(0xC,both,2,none3,3);skel_mounted=0;
+        container(0x11,both,2,none3,3);skel_mounted=0;
         CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
         CHECK(nmount==m+3u && skel_mounted && pak_mounted);                  /* both bosses: both paks */
-        container(0xC,without,2,none3,3);skel_mounted=0;
+        container(0x11,without,2,none3,3);skel_mounted=0;
         CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
         CHECK(!skel_mounted);
         /* level: the stock state allocation */
-        container(0xC,skel,2,none3,3);
+        container(0x11,skel,2,none3,3);
         WORD_AT(0x0078B1ECu)=0x00BAD000u;WORD_AT(0x0078B0D0u)=0x00BAD100u;   /* an earlier level's */
         BYTE_AT(0x007DE455u)=9u;
         CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
         CHECK(nalloc==0 && !rbs_skel.state);
         BYTE_AT(0x007DE455u)=10u;
-        container(0xC,without,2,none3,3);
+        container(0x11,without,2,none3,3);
         CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
         CHECK(nalloc==0 && !rbs_skel.state && WORD_AT(0x0078B1ECu)==0x00BAD000u);
-        container(0xC,skel,2,none3,3);
+        container(0x11,skel,2,none3,3);
         set_env("TSFP_MAPMAKER_REAL_BOSS","0");
         CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
         CHECK(nalloc==0);
@@ -550,23 +588,23 @@ int main(void)
         WORD_AT(PLAYER+0xFF4u)=ENT(3);
         CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
         CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(3) && nbar==0);
-        container(0xC,skel,2,bar3,3);                                        /* Boss flag: bosses draws */
+        container(0x11,skel,2,bar3,3);                                        /* Boss flag: bosses draws */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
         CHECK(rbs.real[1].record==REC(3) && rbs.real[1].boss==1);
         CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
         CHECK(seen_focus==0 && nbar==0 && WORD_AT(PLAYER+0xFF4u)==ENT(3));
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(3),0,0x7Fu,0);  /* meter hidden */
-        container(0xC,skel,2,sub3,3);                                        /* Sub-boss: the meter */
+        container(0x11,skel,2,sub3,3);                                        /* Sub-boss: the meter */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
         CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
         CHECK(seen_focus==0 && nbar==0);
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(3),0,0x7Fu,1);
-        container(0xC,skel,2,none3,3);
+        container(0x11,skel,2,none3,3);
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(3),0,0x7Fu,0);  /* no flag: hidden */
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(4),0,0x7Fu,1);  /* the extra keeps it */
         /* the next level forgets this one */
-        container(0xC,without,2,none3,3);
+        container(0x11,without,2,none3,3);
         CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
         CHECK(!rbs_skel.record && !rbs_skel.state);
         CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(3),0,0,1);
@@ -574,6 +612,39 @@ int main(void)
         CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,1);
         CHECK(nshot==1);
         WORD_AT(PLAYER+0xFF4u)=ENT(0);
+    }
+    /* ---- play: both real bosses in one set, any slot 1-20, any order ------ */
+    {   /* stock map-info form: count 10, empty slots -1 */
+#define E 0xFFFFu
+        static const uint16_t skel_trophy[10]={0x28,0x15,E,E,E,E,E,E,E,E}, trophy_skel[10]={0x15,0x28,E,E,E,E,E,E,E,E};
+        static const uint16_t plain[10]={0x0C,0xA8,E,E,E,E,E,E,E,E}, last2[10]={0x0C,E,E,E,E,E,E,E,0x15,0x28};
+        static const uint16_t trophy0[10]={0x15,E,E,E,E,E,E,E,E,E}, skel0[10]={0x28,E,E,E,E,E,E,E,E,E};
+        static const uint16_t x_skel_trophy[10]={0x28,0x15,E,E,E,E,E,E,E,E}, x_trophy_skel[10]={E,E,E,0x15,E,E,E,E,E,0x28};
+        static const uint16_t x_skel[10]={0x28,E,E,E,E,E,E,E,E,E}, x_trophy[2]={E,0x15}, x_plain[10]={0xA8,E,E,E,E,E,E,E,E,E};
+        LEVEL_WITH(0x11,skel_trophy,10,NULL,0,3);          /* the user's set: skeleton slot 1, trophy slot 2 */
+        LEVEL_WITH(0x11,trophy_skel,10,NULL,0,3);          /* reversed */
+        LEVEL_WITH(0x11,last2,10,NULL,0,3);                /* slots 9 and 10 */
+        LEVEL_WITH(0x11,plain,10,x_skel_trophy,10,3);      /* slots 11 and 12 */
+        LEVEL_WITH(0x11,plain,10,x_trophy_skel,10,3);      /* slots 14 and 20, reversed */
+        LEVEL_WITH(0x11,trophy0,10,x_skel,10,3);           /* trophy slot 1, skeleton slot 11 */
+        LEVEL_WITH(0x11,skel0,10,x_trophy,2,3);            /* skeleton slot 1, trophy slot 12 (short chunk) */
+        LEVEL_WITH(0x11,plain,10,x_skel,10,2);             /* skeleton only, slot 11 */
+        LEVEL_WITH(0x11,plain,10,x_trophy,2,1);            /* trophy only, slot 12 */
+        LEVEL_WITH(0x11,plain,10,x_plain,10,0);            /* neither */
+        LEVEL_WITH(0x0C,skel_trophy,10,x_skel_trophy,10,0); /* a profile set index: the members are not played */
+        LEVEL_WITH(0x11,plain,10,x_skel_trophy,0,0);       /* chunk with count 0: not the sets area's */
+        container(0x11,plain,10,boss_off,2);container_extra(x_skel,10);
+        {   /* a wrong chunk header is ignored as by sets_take */
+            uint32_t c=CONT+8u;
+            while(WORD_AT(c)!=0x00C776F5u) c+=8u+WORD_AT(c+4u);
+            BYTE_AT(c+10u)=9u;
+            CHECK(rbs_map_has(0x28)==0);
+            BYTE_AT(c+10u)=10u;HALF_AT(c+8u)=2u;
+            CHECK(rbs_map_has(0x28)==0);
+            HALF_AT(c+8u)=1u;
+            CHECK(rbs_map_has(0x28)==1 && rbs_map_has(0x15)==0);
+        }
+#undef E
     }
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);        /* not in play */

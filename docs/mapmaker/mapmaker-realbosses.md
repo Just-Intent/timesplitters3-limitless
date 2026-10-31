@@ -2,7 +2,7 @@
 
 Status: implemented in `src/interface/pc_mapmaker_realbosses.inc` (area
 `realbosses`), fixture-tested (`tests/mapmaker/test_mapmaker_realbosses.py`:
-83 mutations, plus decode and US XBE data checks of every site below). The
+92 mutations, plus decode and US XBE data checks of every site below). The
 creature was played in v0.4.0-mapmaker.5 (user: working); the floating-meter
 fix, the health display choice, "Boss Off = no health" and the giant
 skeleton ([below](#the-giant-skeleton-mansion-boss)) are not built or played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
@@ -47,7 +47,7 @@ drops this id's variant; the pick stores -1 to match.
 
 | WRAP | what it does |
 |---|---|
-| `sub_001C8540` -> `pc_mapmaker_realbosses_anims` | after the original (`sub_0005C420` calls it at 0x0005C501, then registers every mounted anim pak's names with `sub_001CA2F0` at 0x0005C558): when the map's custom set (map-info chunk 0x00C77668: +0x14 >= 0xC, members +0x18) holds id 0x15, or the container cannot be read, and lv1_3.pak is not mounted (`sub_00062260`), mount it with `sub_0005A130` (= `sub_000622D0(path,1,1)`, the stock per-level anim pak call) |
+| `sub_001C8540` -> `pc_mapmaker_realbosses_anims` | after the original (`sub_0005C420` calls it at 0x0005C501, then registers every mounted anim pak's names with `sub_001CA2F0` at 0x0005C558): when the map's custom set (map-info chunk 0x00C77668: +0x14 == 0x11, members +0x18 = slots 1-10; slots 11-20 in the sets chunk 0x00C776F5, [below](#which-bosses-the-set-holds-fixed-after-v040-mapmaker12)) holds id 0x15, or the container cannot be read, and lv1_3.pak is not mounted (`sub_00062260`), mount it with `sub_0005A130` (= `sub_000622D0(path,1,1)`, the stock per-level anim pak call) |
 | `sub_0015B830` -> `pc_mapmaker_realbosses_ai_start` | before the original (which copies spawn record +0/+4 to AI +0x10/+0x14 in story mode, 0x0015B9A3): pool entry a with character a+0x48 == 0x15 (or entity [a]+0x94 == 0x5BE), and lv1_3.pak mounted: record +0 = 0, +4 = 0x80 |
 | `sub_0014CC80` -> `pc_mapmaker_realbosses_hud` | chain INSIDE `pc_mapmaker_bosses_hud`: see the boss bar |
 
@@ -144,6 +144,38 @@ the ground, as a Story AI. CONFIRMED (decode and US XBE data,
 | animations | `pak/stream/lv1/anim/lv1_6.pak` (0x0049D6FC, registered at 0x001CAE61, table 0x0048C738, 18 names `princess_start` 0x19C .. `princess_eyeoverwrite` 0x1A9; no id shared with lv1_3) |
 | per-level state | `sub_00287E00`: `[0x0078B1EC]` = level heap 0x4C7C, `sub_002A62C0`: `[0x0078B0D0]` = 0x7D00 (800 x 0x28 particles), then `sub_00287860` initialises the fields; stock only from `sub_0025F720` in scenes 1 and 17 (`sub_0015E7C0` 0x0015E818, story mode only) |
 
+### Which bosses the set holds (fixed after v0.4.0-mapmaker.12)
+
+User log (mapmaker.12): the editor logged `slot set to the giant trophy
+monster (0x0, 0x15)`, `... giant skeleton (0x0, 0x28)`, `... trophy monster
+(0x1, 0x15)`; in play only `mounted lv1_3.pak`, no lv1_6 mount and no
+`giant skeleton state allocated`, then `lv1_6.pak not mounted: giant skeleton
+with bot behaviour`. The characters area's preload log named 0x15 but not
+0x28, so 0x28 was not among the map-info members.
+
+Cause (CONFIRMED by the code and the fixture): the slot number in the pick
+log is the work-copy row (0..9); on the slot screen's page 2 those rows are
+slots 11-20 (`pc_mapmaker_sets.inc`). Slots 11-20 are saved in the sets
+area's own chunk 0x00C776F5, which the play copy (`sub_0033EBF0` hook) and
+the preload use, but the realbosses set check read only the map-info chunk
+(slots 1-10). A boss in slots 11-20 spawned with the bot class and without
+its pak or state; the other boss in slots 1-10 worked.
+
+Fix: `rbs_set_scan` reads both chunks (the sets chunk with the header checks
+of `sets_take`: word 1, first 10, count 1..10, members word id at +4 + 4k)
+and is shared by the anim pak mount and the level init, so both bosses get
+their pak, the skeleton its state, whatever their slots (1-20) or order. It
+also requires set index 0x11, the one stock play takes the map's members for
+(`sub_00240C50` 0x00240DAD..0x00240DBE, preload `sub_0023F390`
+0x0023F462..0x0023F46D; other indices >= 0xC are profile sets); the old test
+`>= 0xC` read stale members for those. Both hooks log what they found:
+`anim pak set check found: giant trophy monster slot 2, giant skeleton slot
+11` (or `none 0`, `not the map's own set`, `map container unreadable`). The
+fixture plays the user's set (skeleton slot 1, trophy slot 2), reversed,
+slots 9/10, 11/12, 14/20, mixed 1/11 and 1/12, single bosses, a profile
+index and bad sets-chunk headers (`test_custom_set_sites` checks the stock
+sites).
+
 No arena coordinates: the fight reads its own entity position, bone matrices
 and the players; the particle shape `sub_002A62F0(3, 1.5, 0, ..)` is local to
 a bone. The emergence is the animation `princess_start` (state 1 waits for
@@ -153,7 +185,7 @@ should rise through the floor (unplayed).
 
 | WRAP | what it does (scene 100 story, switch on) |
 |---|---|
-| `sub_001C8540` (anims) | also mounts lv1_6.pak (>= 2 of 30 slots free) when the custom set holds 0x28; both paks when both bosses are in the set |
+| `sub_001C8540` (anims) | also mounts lv1_6.pak (>= 2 of 30 slots free) when the custom set (slots 1-20, index 0x11) holds 0x28; both paks when both bosses are in the set |
 | `sub_0025F720` -> `pc_mapmaker_realbosses_level` | after the original: forget the last level; when the set holds 0x28 (or the container is unreadable), clear the two pointers and call the stock `sub_00287E00` (52.6 KB, freed with the level heap like the stock blocks); a failed allocation is logged and the skeleton keeps the bot AI |
 | `sub_0015B830` (ai_start) | char 0x28 / model 0x5E9: class 0/0x20000 when lv1_6 is mounted and this level's state is in place; only the first spawn record per level (extras logged, keep the bot AI and look wrong: human animations on a non-human rig) |
 | `sub_0029FE00` -> `pc_mapmaker_realbosses_princess` | that boss in scene 100: call `sub_0029CEF0` directly (it pops the caller's return address, exactly the lifted tail jump) |
@@ -299,6 +331,12 @@ stubs). No extension memory.
    change. Boss Off: no health; Boss x4: one bar with the name; Sub-boss
    bar: the meter. A second Giant Skeleton AI: `only one giant skeleton per
    map` and it fights as a bot. Mission 5 and 6 still play stock.
+   Both bosses in one set: put the Giant Skeleton and the Giant Trophy
+   Monster in any two slots (also on the slot screen's page 11-20, and in
+   either order), one Story AI each, play in Story: stderr shows `set check
+   found: giant trophy monster slot N, giant skeleton slot M` with the slots
+   you used, `mounted lv1_6.pak`, `mounted lv1_3.pak`, `giant skeleton state
+   allocated` and both "gets the ... AI" lines.
 8. Whole height: put the Giant Skeleton in a tile next to an open area and
    watch it rise from a neighbouring tile and from further away: the whole
    body shows above the tile walls (stderr `real boss drawn over the whole

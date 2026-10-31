@@ -47,10 +47,18 @@ MUTATIONS = {
     'mount-before-original': ('    int has;\n    uint32_t mounted;\n    original();\n    if(!rbs_play() || rbs.optout) return;',
                               '    int has;\n    uint32_t mounted;\n    if(!rbs_play() || rbs.optout) { original();return; }\n    guest_call(sub_0005A130,1,RBS_PAK);original();'),
     'mount-any-map': ('    if((has=rbs_map_has(RBS_ID))==0) return;\n', '    has=1;\n'),
-    'mount-preset': ('            if(RBS_H(d+RBS_INFO_SET)<0xCu) return 0;          /* a preset set */\n', ''),
+    'mount-preset': ('    if(RBS_H(info+RBS_INFO_SET)!=RBS_SET_MAP) return 0;   /* a preset or profile set */\n', ''),
+    'set-any-custom-index': ('!=RBS_SET_MAP) return 0;   /* a preset', '<0xCu) return 0;   /* a preset'),
+    'set-skips-slots-11-20': ('    for(k=0;extra && k<RBS_B(extra+3u);k++) {', '    for(k=0;0 && extra && k<RBS_B(extra+3u);k++) {'),
+    'set-skips-slot-1': ('    for(k=0;k<n;k++) {\n        id=RBS_H(info', '    for(k=1;k<n;k++) {\n        id=RBS_H(info'),
+    'set-first-boss-only': ('        if(id==RBS_SKEL_ID && !*s) *s=k+1u;\n    }\n', '        if(id==RBS_SKEL_ID && !*s) *s=k+1u;\n        if(*t || *s) break;\n    }\n'),
+    'set-extra-offset': ('        id=RBS_H(extra+4u+k*4u);', '        id=RBS_H(extra+2u+k*4u);'),
+    'set-extra-any-header': ('!extra && RBS_H(d)==1u && RBS_B(d+2u)==RBS_INFO_SLOTS &&', '!extra &&'),
+    'set-extra-only-trophy': ('        if(id==RBS_SKEL_ID && !*s) *s=RBS_INFO_SLOTS+k+1u;\n', ''),
+    'set-info-only-trophy': ('        if(id==RBS_SKEL_ID && !*s) *s=k+1u;\n', ''),
     'mount-twice': ('    if(rbs_pak_mounted()) return;\n    if((mounted', '    if((mounted'),
     'mount-fills-table': ('#define RBS_MOUNT_KEEP 2u', '#define RBS_MOUNT_KEEP 0u'),
-    'mount-ignores-optout': ('    if(!rbs_play() || rbs.optout) return;\n    if((has', '    if(!rbs_play()) return;\n    if((has'),
+    'mount-ignores-optout': ('    if(!rbs_play() || rbs.optout) return;\n    rbs_set_report("anim pak");', '    if(!rbs_play()) return;\n    rbs_set_report("anim pak");'),
     'wrong-pak': ('#define RBS_PAK 0x0049D77Cu', '#define RBS_PAK 0x0047E624u'),
     'class-after-original': ('        WORD_AT(rec)=RBS_CLASS_LO;WORD_AT(rec+4u)=RBS_CLASS_HI;\n',
                              '        original();WORD_AT(rec)=RBS_CLASS_LO;WORD_AT(rec+4u)=RBS_CLASS_HI;g_esp-=4u;\n'),
@@ -93,8 +101,9 @@ MUTATIONS = {
     'skel-level-any-map': ('(has=rbs_map_has(RBS_SKEL_ID))==0) return;\n    WORD_AT', '(has=1)==0) return;\n    WORD_AT'),
     'skel-level-keeps': ('    memset(&rbs_skel,0,sizeof rbs_skel);              /* a new level: nothing of the last one */\n', ''),
     'skel-stale-pointer': ('    WORD_AT(RBS_SKEL_STATE)=0;WORD_AT(RBS_SKEL_PARTS)=0;', '   '),
-    'skel-level-any-mode': ('    if(!rbs_play() || rbs.optout || (has=rbs_map_has(RBS_SKEL_ID))==0) return;',
-                            '    if(!rbs_on() || rbs.optout || (has=rbs_map_has(RBS_SKEL_ID))==0) return;'),
+    'skel-level-any-mode': ('    if(!rbs_play() || rbs.optout) return;\n    rbs_set_report("level init");',
+                            '    if(!rbs_on() || rbs.optout) return;\n    rbs_set_report("level init");'),
+    'skel-level-trophy-gate': ('(has=rbs_map_has(RBS_SKEL_ID))==0) return;\n    WORD_AT', '(has=rbs_map_has(RBS_ID))==0) return;\n    WORD_AT'),
     'skel-class': ('#define RBS_SKEL_CLASS 0x20000u', '#define RBS_SKEL_CLASS 0x80u'),
     'skel-two-bosses': ('        else if(rbs_skel.record && rbs_skel.record!=rec) {', '        else if(0) {'),
     'skel-without-state': ('        else if(!rbs_skel.state || WORD_AT(RBS_SKEL_STATE)!=rbs_skel.state)\n', '        else if(0)\n'),
@@ -514,3 +523,18 @@ def test_skeleton_events_and_bar():
     # the dust particles are drawn by the frame only in scenes 1 and 17
     assert {i.address for i in decoded() if i.call and target(i) == 0x0029CE00} == {0x001CEE31, 0x001CEE42}
     assert ('imm', 1) in a[0x001CEE1D].ops and ('imm', 0x11) in a[0x001CEE38].ops
+
+
+def test_custom_set_sites():
+    """The map's members are played only for set index 0x11; map-info holds 10 of them."""
+    a = by_address()
+    # sub_00240C50: index word +0x14 >= 0xC and - 0xC == 5 -> sub_0033EBF0(play set, +0x16)
+    assert mem(a[0x00240DAD])[0][4] == 0x14 and ('imm', 0xC) in a[0x00240DAD].ops
+    assert ('imm', 5) in a[0x00240DBB].ops and a[0x00240DBE].mnemonic == 'jne'
+    assert target(a[0x00240DCE]) == 0x0033EBF0 and ends(a, 0x00240DCE) == 0x00240DD3
+    # sub_0023F390: the same test chooses the custom preload sub_0023F320 (ebx = +0x16)
+    assert ('imm', 0xC) in a[0x0023F462].ops and ('imm', 5) in a[0x0023F46A].ops
+    assert target(a[0x0023F472]) == 0x0023F320 and ends(a, 0x0023F472) == 0x0023F477
+    # sub_003006C0 (compile): count byte 10 at data +0x16, members data +0x18 (container +0x10 = data)
+    assert mem(a[0x00300884])[0][4] == 0x26 and ('imm', 0xA) in a[0x00300884].ops
+    assert mem(a[0x003007B5])[0][4] == 0x24 and mem(a[0x003007AE])[0][4] == 0x00784024
