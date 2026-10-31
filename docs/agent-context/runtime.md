@@ -214,4 +214,7 @@ tables in the generated code point into it. Operand entries may also redirect a
 read to a C-written value there: `grid.json` points eight MapMaker editor
 constant reads at the 16-byte settings block 0x00903600
 (`src/pc_mapmaker_grid.h`), written by the grid hooks before the editor runs.
+With `TSFP_MAPMAKER_STACK_ITEMS=1` the grid hook on `sub_003348C0` (return
+0x003070A7) also sets placement-valid bit 4 of editor `+0x25C` when an allowed
+pickup is held over a cell that already has an item, so the stock drop path runs.
 Tests: `tests/test_guest_code_patches.py`, `tests/test_recomp_generation.py`.
