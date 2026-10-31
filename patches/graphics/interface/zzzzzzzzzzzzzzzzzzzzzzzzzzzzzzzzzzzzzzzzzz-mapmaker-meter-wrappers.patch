@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,1244 @@
+@@ -1037,6 +1037,1255 @@
      sub_002FA720_gen();
  #endif
  }
@@ -845,6 +845,17 @@
 +    else sub_00339600_gen();
 +#else
 +    sub_00339600_gen();
++#endif
++}
++
++extern void sub_000715E0_gen(void);
++void sub_000715E0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_menu_item")) pc_mapmaker_aitemplates_menu_item(sub_000715E0_gen);
++    else sub_000715E0_gen();
++#else
++    sub_000715E0_gen();
 +#endif
 +}
 +
