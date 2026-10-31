@@ -728,3 +728,8 @@ previous pin named the moving `latest` asset, which BtbN rebuilds daily, so its
 checksum stopped matching; month-end builds are retained. Without
 `third_party/ffmpeg/include` the runtime builds without `XMV_HAVE_FFMPEG`
 (no XMV movie playback), so fetch FFmpeg before a release build.
+
+A `--local-preview` package of a compile-only (unsealed) build gets its
+`Support/Online/network-build.json` stamp written into the staged copy only
+(`local_preview: true`); `build/windows/generated` stays unsealed and
+BUILD.json keeps `network_sealed: false`.

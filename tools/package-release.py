@@ -115,7 +115,7 @@ def main():
     ]:
         copy(upstream / source, 'Licenses/' + dest)
     copy(ROOT / 'tools/launcher/GameMonogram.NOTICE.txt', 'Licenses/Game-icon-lettering.txt')
-    online = bundle(ROOT, stage, copy)
+    online = bundle(ROOT, stage, copy, local_preview=preview is not None)
     # Include the exact local source edits used for this test package, since
     # those may not yet exist at the source_commit recorded below.
     source_dir = stage/'Source'
