@@ -29,7 +29,7 @@ def bundle_standard_library(base, runtime, version):
         shutil.copy2(path, runtime/path.name)
 
 
-def bundle(root, stage, copy):
+def bundle(root, stage, copy, local_preview=False):
     base = Path(sys.base_prefix)
     if sys.platform != 'win32' or sys.maxsize <= 2**32 or not (base/'tcl').is_dir():
         raise RuntimeError('Package with x64 Windows CPython including Tcl/Tk.')
@@ -73,7 +73,17 @@ def bundle(root, stage, copy):
     manifest = json.loads((root/'build/windows/generated/network-identity.json').read_text())
     manifest['files'] = [entry for entry in manifest['files'] if entry[0].startswith('game/')]
     (stage/'Support/Online/network-identity.json').write_text(json.dumps(manifest, indent=2)+'\n')
-    copy(root/'build/windows/generated/network-build.json', 'Support/Online/network-build.json')
+    sealed = root/'build/windows/generated/network-build.json'
+    if sealed.is_file() or not local_preview:
+        copy(sealed, 'Support/Online/network-build.json')
+    else:
+        # TEST-ONLY local preview of a compile-only build, which is never
+        # sealed: stamp the staged copy only (BUILD.json says network_sealed
+        # false), leaving build/windows/generated unsealed.
+        exe = root/'build/windows/Release/futureperfect_recomp.exe'
+        stamp = dict(compatibility=manifest['compatibility'],
+                     executable_sha256=hashlib.sha256(exe.read_bytes()).hexdigest(), local_preview=True)
+        (stage/'Support/Online/network-build.json').write_text(json.dumps(stamp, indent=2)+'\n')
     copy(base/'LICENSE.txt', 'Licenses/Python.txt')
     (stage/'Licenses/Online-dependencies.txt').write_text(
         'CPython and Tcl/Tk: Support/Python/LICENSE.txt (includes third-party notices).\n'
