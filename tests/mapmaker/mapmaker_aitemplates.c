@@ -112,6 +112,8 @@ static const char *text_of(uint32_t a) { return (const char *)((uintptr_t)a+g_xb
 /* ---- fake originals ------------------------------------------------------ */
 static unsigned orig_calls;
 static void fake_plain(void) { orig_calls++;g_esp+=4u; }
+static uint32_t menu_item_result;
+static void fake_menu_item(void) { g_eax=menu_item_result;orig_calls++;g_esp+=4u; }  /* sub_000715E0 */
 static void fake_close(void)                     /* sub_0031CAC0: stock point clamp */
 {
     uint32_t s=WORD_AT(0x00762F94u)&0xFFu,e=E(s),t=WORD_AT(e+0x34u);
@@ -199,6 +201,14 @@ static void make_ai(uint32_t i,uint32_t type,uint32_t weapon,uint32_t points,con
     WORD_AT(e+0x5Cu)=1;WORD_AT(e+0x60u)=i;
     for(k=0;k<points;k++) { WORD_AT(e+0x64u+16u*k)=0x00500000u+0x100u*i+k;WORD_AT(e+0x68u+16u*k)=0x00010002u*(k+1u); }
 }
+/* no points: +0x58 == 0 and the whole point array +0x64..+0xE3 zero */
+static int unplaced(uint32_t a)
+{
+    uint32_t o;
+    if(WORD_AT(E(a)+0x58u)) return 0;
+    for(o=0x64u;o<0xE4u;o+=4u) if(WORD_AT(E(a)+o)) return 0;
+    return 1;
+}
 static int same_points(uint32_t a,uint32_t b)
 {
     return WORD_AT(E(a)+0x58u)==WORD_AT(E(b)+0x58u) &&
@@ -258,8 +268,10 @@ int main(void)
     press(0x41540001u);select_ai(0);orig_calls=0;name_counter=0;
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
     CHECK(orig_calls==1 && WORD_AT(ED+0x280u)==2);
-    for(i=0x28u;i<0x60u;i+=4u) if(i!=0x50u) CHECK(WORD_AT(E(1)+i)==WORD_AT(E(0)+i));
-    CHECK(same_points(0,1) && WORD_AT(E(1)+0x50u)==0 && WORD_AT(E(0)+0x50u)==0);
+    for(i=0x28u;i<0x60u;i+=4u) if(i!=0x50u && i!=0x58u) CHECK(WORD_AT(E(1)+i)==WORD_AT(E(0)+i));
+    /* the duplicate starts unplaced ("!" in the list); the source keeps its path */
+    CHECK(unplaced(1) && WORD_AT(E(0)+0x58u)==2u && WORD_AT(E(0)+0x64u)==0x00500000u);
+    CHECK(WORD_AT(E(1)+0x50u)==0 && WORD_AT(E(0)+0x50u)==0);
     CHECK(!strcmp(name_of(1),"Story AI 1") && WORD_AT(E(1)+0x60u)==1u && !strcmp(name_of(0),"Guard"));
     /* back: menu+0x18C = -1 */
     press(0xFFFFFFFFu);orig_calls=0;
@@ -294,7 +306,8 @@ int main(void)
     CHECK(orig_calls==1 && WORD_AT(ED+0x280u)==3u && room_bytes==0x78u);
     CHECK(WORD_AT(E(0)+0x50u)==0 && WORD_AT(E(2)+0x50u)==1u && WORD_AT(E(1)+0x50u)==0);
     CHECK(!strcmp(name_of(2),"Guard 2") && !strcmp(name_of(0),"Guard") && WORD_AT(E(2)+0x60u)==2u);
-    CHECK(same_points(0,2) && WORD_AT(E(2)+0x54u)==WORD_AT(E(0)+0x54u) && WORD_AT(E(2)+0x48u)==3u);
+    CHECK(unplaced(2) && WORD_AT(E(0)+0x58u)==2u && WORD_AT(E(2)+0x54u)==WORD_AT(E(0)+0x54u) && WORD_AT(E(2)+0x48u)==3u);
+    CHECK(WORD_AT(E(2)+0x5Cu)==WORD_AT(E(0)+0x5Cu));
     rows_for(0,0x0031D083u,0x0031CAC0u);                         /* leader */
     CHECK(nrows==3 && rows[0].id==0x41540002u && rows[1].id==0x41540004u && rows[2].id==0x41540003u);
     CHECK(!strcmp(text_of(rows[1].text),"Logic means: this AI") && !strcmp(text_of(rows[2].text),"Unlink (next copy leads)"));
@@ -305,17 +318,17 @@ int main(void)
     /* linked copy of a copy: same leader, next number */
     press(0x41540002u);select_ai(2);
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(WORD_AT(ED+0x280u)==4u && WORD_AT(E(3)+0x50u)==1u && same_points(2,3) && !strcmp(name_of(3),"Guard 3"));
+    CHECK(WORD_AT(ED+0x280u)==4u && WORD_AT(E(3)+0x50u)==1u && unplaced(3) && !strcmp(name_of(3),"Guard 3"));
     /* from the leader again, with "Guard 4" taken by an unrelated AI */
     snprintf((char *)name_of(1),32,"Guard 4");
     press(0x41540002u);select_ai(0);
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(WORD_AT(ED+0x280u)==5u && WORD_AT(E(4)+0x50u)==1u && same_points(0,4) && !strcmp(name_of(4),"Guard 5"));
+    CHECK(WORD_AT(ED+0x280u)==5u && WORD_AT(E(4)+0x50u)==1u && unplaced(4) && !strcmp(name_of(4),"Guard 5"));
     snprintf((char *)name_of(1),32,"Story AI 1");
     /* duplicate of a linked copy (not offered, still safe): an independent AI */
     press(0x41540001u);select_ai(3);
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(WORD_AT(ED+0x280u)==6u && WORD_AT(E(5)+0x50u)==0 && same_points(3,5) && WORD_AT(E(3)+0x50u)==1u);
+    CHECK(WORD_AT(ED+0x280u)==6u && WORD_AT(E(5)+0x50u)==0 && unplaced(5) && WORD_AT(E(3)+0x50u)==1u);
     WORD_AT(ED+0x280u)=5u;
     /* group logic: a leader's toggle; nothing on a copy */
     press(0x41540004u);select_ai(0);orig_calls=0;
@@ -335,6 +348,7 @@ int main(void)
     WORD_AT(ED+0x280u)=5u;
 
     /* ---- propagation on close: edit copy 3 ---- */
+    WORD_AT(E(2)+0x58u)=2u;WORD_AT(E(3)+0x58u)=2u;               /* the copies placed with a 2-point path */
     select_ai(3);
     HOOK(pc_mapmaker_aitemplates_open,fake_plain,MENU);
     WORD_AT(E(3)+0x48u)=9u;WORD_AT(E(3)+0x34u)=0u;WORD_AT(E(3)+0x54u)=6u;
@@ -510,11 +524,16 @@ int main(void)
     make_ai(0,1,1,1,"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123");WORD_AT(ED+0x280u)=1u;
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
     CHECK(!strcmp(name_of(1),"ABCDEFGHIJKLMNOPQRSTUVWXYZ0 2"));
-    /* a copy made from a member without points takes the leader's points */
+    /* a copy made from a member without points never takes the leader's points */
     make_ai(0,1,1,2,"P");make_ai(1,1,1,0,"P 2");WORD_AT(ED+0x280u)=2u;WORD_AT(E(1)+0x50u)=1u;
     press(0x41540002u);select_ai(1);
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(WORD_AT(ED+0x280u)==3u && same_points(0,2) && WORD_AT(E(2)+0x50u)==1u && !strcmp(name_of(2),"P 3"));
+    CHECK(WORD_AT(ED+0x280u)==3u && unplaced(2) && WORD_AT(E(0)+0x58u)==2u && WORD_AT(E(2)+0x50u)==1u && !strcmp(name_of(2),"P 3"));
+    /* a copy of a placed patrol member with all 8 points: still unplaced, every point slot clear */
+    make_ai(0,1,1,8,"Q");WORD_AT(ED+0x280u)=1u;
+    press(0x41540002u);select_ai(0);
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(WORD_AT(ED+0x280u)==2u && unplaced(1) && WORD_AT(E(0)+0x58u)==8u && WORD_AT(E(1)+0x50u)==1u);
 
     /* ---- play: level start builds the table ---- */
     WORD_AT(0x0079094Cu)=100u;WORD_AT(0x00783A50u)=R;WORD_AT(0x00784014u)=CONT;
@@ -635,6 +654,20 @@ int main(void)
     CHECK(!ait_level.active);
     nseen=0;HOOK(pc_mapmaker_aitemplates_remove,fake_remove,R+1u);
     CHECK(nseen==1);
+
+    /* ---- menu item pool (sub_000715E0): counted when full, in the editor only ---- */
+    WORD_AT(0x006FE920u)=0xC00u;
+    WORD_AT(0x0079094Cu)=102u;menu_item_result=0x00600000u;orig_calls=0;
+    HOOK(pc_mapmaker_aitemplates_menu_item,fake_menu_item,0);
+    CHECK(orig_calls==1 && g_eax==0x00600000u && ait_menu_full==0u);
+    menu_item_result=0;
+    HOOK(pc_mapmaker_aitemplates_menu_item,fake_menu_item,0);
+    HOOK(pc_mapmaker_aitemplates_menu_item,fake_menu_item,0);
+    CHECK(orig_calls==3 && g_eax==0u && ait_menu_full==2u);
+    WORD_AT(0x0079094Cu)=101u;
+    HOOK(pc_mapmaker_aitemplates_menu_item,fake_menu_item,0);
+    CHECK(orig_calls==4 && g_eax==0u && ait_menu_full==2u);
+    WORD_AT(0x0079094Cu)=102u;
 
     if(failures || esp_errors) { fprintf(stderr,"%d failures, %d esp errors\n",failures,esp_errors);return 1; }
     puts("mapmaker aitemplates ok");

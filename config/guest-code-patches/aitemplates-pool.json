@@ -1,0 +1,14 @@
+{
+  "patches": [
+    {
+      "id": "aitemplates-menu-item-pool",
+      "kind": "operand",
+      "function": "0x00070DB0",
+      "address": "0x00070DC3",
+      "original_hex": "b898030000",
+      "operand": 1,
+      "value": "0x00000C00",
+      "reason": "menu item pool in the MapMaker editor (scene 102 branch of sub_00070DB0 only; scene 101 and every other scene compute 650/200 at 0x00070DCA..0x00070DDF): 920 -> 3072 items. The count [0x006FE920] sizes both Level-heap allocations (items x 0x10C at 0x00070DF5, ring x 0x18 at 0x00070E14) and every user reads it (0x00070EDF, 0x000715E0, 0x00074F81, 0x00078C24), so nothing else changes. The stock 920 was sized for 50 Story AI (up to 18 list rows each); +0.63 MB in the editor"
+    }
+  ]
+}

@@ -526,8 +526,33 @@ static void test_stack_sai(void)
     CHECK(g_eax==1u);
     hold_sai(-1);                                                                             /* empty hands: pick-up */
     CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,5u|(5u<<16),0u);
-    CHECK(g_eax==1u);
-    WORD_AT(ED+0x2F34u)=5;                                                                    /* an item held */
+    CHECK(g_eax==1u && mapmaker_grid.stack_newest==0u);
+    /* shared cell (1,2,0): AI 0 point 0, AI 1 point 0, AI 3 point 2; newest first */
+    WORD_AT(ED+0x280u)=4;point(3,0,p,8,8,0);point(3,1,q,1,2,0);point(3,2,p,1,2,0);
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,1u|(2u<<16),0u);
+    CHECK(orig_calls==1 && g_eax==((3u<<16)|2u) && mapmaker_grid.stack_newest==1u);
+    WORD_AT(SAI(3)+0x58u)=2;                                                                  /* AI 3 lifted: AI 1 next */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,1u|(2u<<16),0u);
+    CHECK(g_eax==(1u<<16) && mapmaker_grid.stack_newest==2u);
+    WORD_AT(SAI(1)+0x58u)=0;                                                                  /* only AI 0 left: stock answer */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,1u|(2u<<16),0u);
+    CHECK(g_eax==0u && mapmaker_grid.stack_newest==2u);
+    WORD_AT(SAI(1)+0x58u)=1;WORD_AT(SAI(3)+0x58u)=3;
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,0x00300000u,p,1u|(2u<<16),0u);         /* other caller: stock */
+    CHECK(g_eax==0u);
+    WORD_AT(SAI(3)+0x58u)=9;                                                                  /* past 8 points: capped */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,1u|(2u<<16),0u);
+    CHECK(g_eax==((3u<<16)|2u));
+    WORD_AT(SAI(3)+0x58u)=0xFFFFFFFFu;                                                        /* corrupt count: no points */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,1u|(2u<<16),0u);
+    CHECK(g_eax==(1u<<16));
+    WORD_AT(SAI(3)+0x58u)=3;WORD_AT(ED+0x280u)=3;                                             /* AI 3 past the count */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,1u|(2u<<16),0u);
+    CHECK(g_eax==(1u<<16));
+    WORD_AT(ED+0x280u)=4;WORD_AT(ED+0x2F34u)=5;                                               /* an item held: stock */
+    CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,1u|(2u<<16),0u);
+    CHECK(g_eax==0u);
+    WORD_AT(ED+0x280u)=3;WORD_AT(SAI(3)+0x58u)=0;
     CALL(pc_mapmaker_stack_sai_point,orig_sai_point,MAPMAKER_STACK_RET_SAI_POINT,p,5u|(5u<<16),0u);
     CHECK(g_eax==1u);
     hold_sai(2);WORD_AT(SCENE)=100u;
