@@ -71,6 +71,7 @@ are not in the launcher.
 | Teleporters | 2 per colour | 8 per colour |
 | Story AI | 50 | 511 |
 | Characters alive at once (MapMaker Story, local play) | 32, with about 20 AI | 64 (63 AI with one player) |
+| Bots per MapMaker Arcade match (local play) | 10 (16 characters) | 20 (24 characters) |
 | Logic operations / nodes / records | 30 / 130 / 100 | 120 / 520 / 400 |
 | Free-standing objects | 40 / 30 / 100 | 160 / 120 / 400 |
 | Pads / pad links / pad groups | 2400 / 4400 / 300 | 4800 / 8800 / 600 |
@@ -181,8 +182,8 @@ only.* Details: [characters](mapmaker-characters.md).
 The custom character set has 20 slots instead of 10. In **Map Settings**,
 open the custom set: the title shows **(1-10)**; press Down on the last row
 to see slots **(11-20)** and Up on the first row to go back. New slots start
-empty. A Story AI's character choice lists all 20 slots. Arcade bots and
-players still use slots 1-10. A map that uses slots 11-20 needs this fork:
+empty. A Story AI's character choice lists all 20 slots. Players still use
+slots 1-10; Arcade bots can use 11-20 (see 20 bots below). A map that uses slots 11-20 needs this fork:
 the original game and System Link refuse it; other maps are saved as before.
 An AI set to an empty slot plays as the first filled slot. More different
 characters use more memory. Weapon sets stay at 6 slots: each weapon slot is
@@ -190,13 +191,21 @@ its own pickup item (Weapon 1-6, Ammo 1-6). *Automated tests only.* Details:
 [sets](mapmaker-sets.md).
 
 The **Bots** screen of an Arcade match setup (front end and the in-game pause
-menu's setup, when you play a MapMaker map in Arcade) looks like the same
-screen, but its rows are that match's bots: it stays at 10 rows, as in the
-original game (a match holds at most 16 players and bots). Choosing the map's
-own character set there fills those bots from slots 1-10; slots 11-20 are for
-Story AI characters. In the editor the Test map setup's Bots screen edits the
-map's set and pages like Map Settings, and the test's bots are slots 1-10
-even if you left the screen on (11-20).
+menu's setup) has its own page 2 when you play a MapMaker map: see the next
+section. In the editor the Test map setup's Bots screen edits the map's set
+and pages like Map Settings; the test's bots are slots 1-10 plus any used
+slots 11-20.
+
+### 20 bots in MapMaker Arcade (`LIMITS`)
+
+A MapMaker Arcade match (and the editor's Test map) can have **20 bots and
+24 characters** (4 players + 20 bots) instead of 10 and 16. On the Bots
+screen press Down on the last row to see bots **(11-20)**; Up on the first
+row goes back. With the map's own character set, rows 11-20 start as the
+map's slots 11-20; otherwise they start empty and are kept until you quit
+the game (they are not saved in your profile). Ordinary Arcade maps and
+System Link keep 10 bots. *Automated tests only.* Details:
+[matchbots](mapmaker-matchbots.md).
 
 ### The giant trophy monster from story mission 5 (`LIMITS`)
 

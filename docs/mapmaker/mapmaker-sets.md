@@ -109,7 +109,7 @@ limit.
   guard logs `[mapmaker] heap full: ...` on an overrun; with many distinct
   big characters, watch it and the probe's free-memory figure.
 
-## Pause and Arcade Bots screen (2026-10-31, not paged)
+## Pause and Arcade Bots screen (2026-10-31; paged by the matchbots area)
 
 User report: 20 slots in the editor, but the pause menu's screen for the
 custom MapMaker bot set shows 10. CONFIRMED path: pause -> game setup
@@ -142,12 +142,12 @@ differs:
   0xA0-byte match block 0x0078AD58). The actors table 0x004D239C allows 14 or
   16 actors (mode row 0x10: 14, 14, 16, 16).
 
-So paging this screen to 20 would show bots that cannot exist: at most 16
-players + bots, at most 10 rows in the work copy shared with the front end.
-Slots 11-20 of a map's set are Story AI characters only. More Arcade bots
-(up to 15 with one player) would be a separate feature: work copy and the
-profile's per-row arrays beyond 10, the fill/store/match-start loop bounds
-and System Link's copy of the match block; not done here.
+So paging this screen to 20 needed more than the set: at most 16 players +
+bots, at most 10 rows in the work copy shared with the front end. That is
+now the matchbots area ([mapmaker-matchbots.md](mapmaker-matchbots.md)):
+with `TSFP_MAPMAKER_LIMITS=1` this screen pages in MapMaker Arcade (rows
+11-20 kept by its hooks, the map set's slots 11-20 as their default) and
+the match gets up to 20 bots / 24 characters; System Link stays at 10.
 
 What changed: the editor's Test map setup Bots screen (scene 102) is paged by
 the existing hooks, and its rows become the test's bots. A match start after
@@ -212,6 +212,6 @@ struct everywhere it is copied. That is a separate feature, not a slot raise.
 5. Without the switch: no paging, 10 choices; the map from step 2 still loads
    and plays with its 20 slots.
 6. Editor -> Test map setup -> Bots: pages like Map Settings. Leave it on
-   "(11-20)", back out and start the test (Arcade type): the bots are slots
-   1-10. Front end / in-game pause -> setup -> Bots on a MapMaker map: 10
-   rows, stock (see "Pause and Arcade Bots screen").
+   "(11-20)", back out and start the test (Arcade type): rows 1-10 are the
+   first ten bots, slots 11-20 more bots (matchbots area). Front end /
+   in-game pause -> setup -> Bots on a MapMaker map: paged too (matchbots).
