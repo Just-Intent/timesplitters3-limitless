@@ -152,6 +152,8 @@ void pc_mapmaker_roof_move(void (*original)(void));
 void pc_mapmaker_roof_copy(void (*original)(void));
 void pc_mapmaker_roof_piece_free(void (*original)(void));
 void pc_mapmaker_roof_text(void (*original)(void));
+void pc_mapmaker_roof_format(void (*original)(void));
+void pc_mapmaker_roof_caption(void (*original)(void));
 void pc_mapmaker_realbosses_picker_end(void (*original)(void));
 void pc_mapmaker_realbosses_pick(void (*original)(void));
 void pc_mapmaker_realbosses_highlight(void (*original)(void));
