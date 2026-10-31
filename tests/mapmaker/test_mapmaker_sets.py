@@ -47,7 +47,14 @@ MUTATIONS = {
     'no-title': ('    if(MAPMAKER_PTR_OK(menu,0x208u)) sets_title(menu);\n', ''),
     'choice-any-caller': ('WORD_AT(g_esp)!=SETS_CHOICE_RET || !sets_custom()', '0 || !sets_custom()'),
     'choice-ignores-switch': ('    if(!sets_on() && !(MAPMAKER_PTR_OK(value,4)', '    if(0 && !(MAPMAKER_PTR_OK(value,4)'),
-    'choice-empty-name': ('        if(SETS_H(m)==-1) text=guest_call(sub_0003D7B0,1,0xD7Cu);', '        if(0) text=0;'),
+    'choice-empty-name': ('    if(id==-1) return guest_call(sub_0003D7B0,1,0xD7Cu);', '    if(0) return 0;'),
+    'choice-no-realboss-row': ('    if(row==0xFFFFFFFFu && id==(int32_t)SETS_RBS_ID) row=SETS_RBS_ROW;\n', ''),
+    'choice-variant-lost': ('row=guest_call(sub_002BE600,2,(uint32_t)id,(uint32_t)(int32_t)SETS_H(m+6u));',
+                            'row=guest_call(sub_002BE600,2,(uint32_t)id,0u);'),
+    'icon-skips': ('WORD_AT(g_esp+4u)=item-SETS_STOCK;', '(void)item;'),
+    'icon-any-caller': ('        if(ret==SETS_ICON_LIST_RET || ret==SETS_ICON_MAP_RET) {', '        if(ret) {'),
+    'icon-one-caller': ('        if(ret==SETS_ICON_LIST_RET || ret==SETS_ICON_MAP_RET) {', '        if(ret==SETS_ICON_LIST_RET) {'),
+    'icon-range': ('item<SETS_SLOT_ITEM+SETS_SLOTS)', 'item<=SETS_SLOT_ITEM+SETS_SLOTS)'),
     'play-count': ('    WORD_AT(dst)=SETS_SLOTS;\n', ''),
     'play-empty-ai': ('            SETS_H(SETS_MEMBER(dst,k))=SETS_H(SETS_MEMBER(dst,first));\n', ''),
     'play-any-caller': ('WORD_AT(g_esp)!=SETS_PLAY_RET) { original();return; }', '0) { original();return; }'),
@@ -192,6 +199,35 @@ def test_slot_screen_and_choice():
     assert ('imm', 0xD7C) in a[0x0031CD0A].ops and '0x71800' in a[0x0031CD18].text
     # item ids 0x38 + k name slot k (sub_00303350 case 3: id*8 - 0x1BC = +4 + 8*(id-0x38))
     assert mem(a[0x003033A9])[0][4] == (-0x1BC) & 0xFFFFFFFF and mem(a[0x003033B1])[0][4] == (-0x1B6) & 0xFFFFFFFF
+
+
+def test_story_ai_item_icon_and_name():
+    """A Story AI is drawn as item 0x38 + slot; slot names come from sub_002BE600 -> sub_002BE300."""
+    a = by_address()
+    # sub_0031D3E0 (AI -> item: 9 for type 5, else slot +0x28 plus 0x38), only for the overview marker
+    assert ('imm', 9) in a[0x0031D3FD].ops and mem(a[0x0031D403])[0][4] == 0x28
+    assert a[0x0031D406].mnemonic == 'add' and ('imm', 0x38) in a[0x0031D406].ops
+    callers = {i.address for i in decoded() if i.call and '0x31d3e0' in i.text}
+    assert callers == {0x00309ABC}
+    assert ret_of(a, 0x00309AC2, 0x315d20) == 0x00309AC7 and a[0x00309AC2].function == 0x00309A80
+    # the Story AI list's icon row callback sub_0031D410 inlines it (AI +0x28 = editor +0x2B0)
+    assert mem(a[0x0031D43B])[0][4] == 0x2B0 and ('imm', 0x38) in a[0x0031D442].ops
+    assert ret_of(a, 0x0031D45B, 0x315d20) == 0x0031D460 and a[0x0031D45B].function == 0x0031D410
+    assert ('imm', 0x0031D410) in a[0x0031D532].ops        # pushed as the row draw callback by sub_0031D4C0
+    # sub_00315D20: catalogue +0xB4 icon, +0xB8 flag 0x400; its other callers draw catalogue items
+    assert mem(a[0x00315D2A])[0][4] == 0x00525010 and mem(a[0x00315D35])[0][4] == 0x0052500C
+    callers = {i.address for i in decoded() if (i.call or i.branch) and '0x315d20' in i.text}
+    assert callers == {0x00309AC2, 0x0030DA35, 0x0031D45B, 0x00320545, 0x003362AB}
+    # sub_002BE650 = sub_002BE300(sub_002BE600(id, variant)); sub_00303350 case 3 calls it at 0x003033BB
+    assert '0x2be600' in a[0x002BE65A].text and '0x2be300' in a[0x002BE660].text
+    assert ret_of(a, 0x003033BB, 0x2be650) == 0x003033C0
+    rd = xbe_reader()
+    row = lambda item: rd(0x00524F58 + item * 0xC4, 0xC4)
+    slot_icons = {struct.unpack_from('<2I', row(item), 0xB4) for item in range(0x38, 0x42)}
+    assert slot_icons == {(0x42, 1)}                     # the ten slot items share one icon
+    for item in range(0x42, 0x4C):                       # what slots 11-20 would be drawn as
+        assert struct.unpack_from('<2I', row(item), 0xB4) != (0x42, 1)
+    assert struct.unpack_from('<I', row(0x42), 0xB4)[0] == 0x45
 
 
 def test_pause_bots_screen_is_the_arcade_roster():

@@ -794,6 +794,7 @@ void pc_mapmaker_sets_sai_choice(void (*original)(void)) { original(); }
 void pc_mapmaker_sets_play_set(void (*original)(void)) { original(); }
 void pc_mapmaker_sets_preload(void (*original)(void)) { original(); }
 void pc_mapmaker_sets_match_start(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_icon(void (*original)(void)) { original(); }
 void pc_mapmaker_matchbots_live(void (*original)(void)) { original(); }
 void pc_mapmaker_matchbots_restart(void (*original)(void)) { original(); }
 void pc_mapmaker_matchbots_match_start(void (*original)(void)) { original(); }
