@@ -270,6 +270,10 @@ in `actors-list.json` keeps its offset in the moved table, and that the
 perception slice in `objects.json` matches the actors and objects constants;
 its enemy-picker case compares the two-pass `sub_0027BA40` hook against a
 model of the original's 32-entry array and argmin on random lists.
+`tests/test_mapmaker_grid.py` (fixture `tests/mapmaker_grid.c`) checks that
+`grid.json` redirects exactly the decoded editor reads of the grid constants
+(skipped without the private XBE) and that the settings block holds the
+image constants in stock mode.
 
 Site inventories must come from the lifter's decoder, not from
 `private/pipeline/disasm/asm/text.asm`: the listing elides the byte column of

@@ -201,7 +201,14 @@ stack-array AI pickers (`sub_0027BA40` in two passes), a side table at
 (256, bounded) with the radar loop at 64, the per-death effect lists 0x0075F670/0x0075F5F8 at 64 (0x00903400/0x00903200, stock 30 outside wide play), and the patrol table 0x00520C38 read
 from a copy at 0x00901600 (ids >= 32 have no route); `pc_network_bots_revive`
 writes the moved AI table; `TSFP_MAPMAKER_ALIVE=1..64` lowers it; sites and
-risks in `docs/mapmaker-actors.md`).
+risks in `docs/mapmaker-actors.md`), and `grid` (editor only: with
+`TSFP_MAPMAKER_LIMITS=1` floors -2..4 and an 80x80x8 occupancy grid, the five
+grid functions `sub_00307C20/CC0/CF0/DA0/E60` reimplemented, a placement
+guard above the top level; `TSFP_MAPMAKER_OVERLAP=1` overlapping tiles and
+`TSFP_MAPMAKER_STACK_ITEMS=1` several items per cell, both env-only; a
+16-byte settings block at 0x00903500 (`src/pc_mapmaker_grid.h`) that
+`grid.json` redirects the editor's 40.0/5.0/60.0/(1/60) reads to; save format
+unchanged; `docs/mapmaker-grid.md`).
 Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`.
 
 ## MapMaker editor mouse controls
@@ -237,7 +244,8 @@ toolbar clicks do nothing and A/D switch categories; a click switch made of
 generated B and A presses was tried and removed (it never opened the clicked
 category reliably). Prompts show T for the right trigger in the
 editor (`pc_controls_mapmaker_editor_active`). On the editor screen right-drag and the window edge pan the view the
-way `sub_00309160` + `sub_002F9F70` do (skipped when `editor+0x25C &
+way `sub_00309160` + `sub_002F9F70` do (centre clamp from the grid settings
+block: 40, or 80 with the limits) (skipped when `editor+0x25C &
 0x0C044088`), and the right button no longer sends the menu Back action
 there (a right click without a drag sends it on release, which the editor
 uses to rotate). The logic list keeps a passive description panel open as

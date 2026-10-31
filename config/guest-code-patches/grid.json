@@ -1,0 +1,94 @@
+{
+  "patches": [
+    {
+      "id": "grid-floor-bars",
+      "kind": "operand",
+      "function": "0x0030BE60",
+      "address": "0x0030BF3F",
+      "original_hex": "c744241805000000",
+      "operand": 1,
+      "value": "0x7",
+      "reason": "floor menu loop count 5 -> 7 bars (floors -2..4); without TSFP_MAPMAKER_LIMITS the bars for floors 3 and 4 are moved off screen by pc_mapmaker_grid_floor_bar"
+    },
+    {
+      "id": "grid-floor-panel",
+      "kind": "operand",
+      "function": "0x0030BE60",
+      "address": "0x0030BEDD",
+      "original_hex": "f30f591dcc604700",
+      "operand": 1,
+      "value": "0x00903500",
+      "reason": "floor panel extent and click rectangle: 5.0 [0x004760CC] -> settings block (5.0 stock, 7.0 with the limits)"
+    },
+    {
+      "id": "grid-place-bound",
+      "kind": "operand",
+      "function": "0x002F8DE0",
+      "address": "0x002F8ED2",
+      "original_hex": "f30f1025b8884700",
+      "operand": 1,
+      "value": "0x00903504",
+      "reason": "placement x+W / y+D bound: 40.0 [0x004788B8] -> settings block (40.0 / 80.0)"
+    },
+    {
+      "id": "grid-centre-x",
+      "kind": "operand",
+      "function": "0x002F9F70",
+      "address": "0x002F9FBC",
+      "original_hex": "f30f101db8884700",
+      "operand": 1,
+      "value": "0x00903504",
+      "reason": "view centre clamp x: 40.0 -> settings block"
+    },
+    {
+      "id": "grid-centre-y",
+      "kind": "operand",
+      "function": "0x002F9F70",
+      "address": "0x002F9FE3",
+      "original_hex": "f30f101db8884700",
+      "operand": 1,
+      "value": "0x00903504",
+      "reason": "view centre clamp y: 40.0 -> settings block"
+    },
+    {
+      "id": "grid-shade-a",
+      "kind": "operand",
+      "function": "0x0030A550",
+      "address": "0x0030A974",
+      "original_hex": "d905b8884700",
+      "operand": 0,
+      "value": "0x00903504",
+      "reason": "out-of-grid shading edge: 40.0 -> settings block"
+    },
+    {
+      "id": "grid-shade-b",
+      "kind": "operand",
+      "function": "0x0030A550",
+      "address": "0x0030AB90",
+      "original_hex": "d905b8884700",
+      "operand": 0,
+      "value": "0x00903504",
+      "reason": "out-of-grid shading edge: 40.0 -> settings block"
+    },
+    {
+      "id": "grid-zoom-min-scale",
+      "kind": "operand",
+      "function": "0x00306460",
+      "address": "0x003075E2",
+      "original_hex": "f30f592594834700",
+      "operand": 1,
+      "value": "0x0090350C",
+      "reason": "widest zoom, pixels per cell = width * 1/60 [0x00478394] -> settings block (1/60 / 1/100)"
+    },
+    {
+      "id": "grid-zoom-max-cells",
+      "kind": "operand",
+      "function": "0x00306460",
+      "address": "0x0030764D",
+      "original_hex": "f30f593dac604700",
+      "operand": 1,
+      "value": "0x00903508",
+      "reason": "widest zoom in cells: 60.0 [0x004760AC] -> settings block (60 / 100)"
+    }
+  ]
+}

@@ -11,7 +11,7 @@
 #include "pc_menu_mouse.h"
 #include "pc_mapmaker_pointer.h"
 
-static uint32_t memory[0x800000/4];
+static uint32_t memory[0xA00000/4];  /* includes the grid settings block 0x00903500 */
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -266,6 +266,14 @@ int main(void)
           NEAR(FLOAT_AT(0x00783DC0u),31.f) && NEAR(FLOAT_AT(0x00783DCCu),27.f) && (WORD_AT(ED+0x25c)&2u));
     CHECK(mapmaker_pointer_pan(100.f,-100.f));               /* centre stays on the grid */
     CHECK(NEAR(FLOAT_AT(0x00783DD8u),30.f) && NEAR(FLOAT_AT(0x00783CC0u),-7.5f));
+    /* 80x80 grid (TSFP_MAPMAKER_LIMITS=1): the clamp follows the settings block. */
+    FLOAT_AT(MAPMAKER_GRID_CFG_EXTENT)=80.f;
+    FLOAT_AT(0x00783DD8u)=10.f;FLOAT_AT(0x00783CC0u)=10.f;
+    CHECK(mapmaker_pointer_pan(100.f,-100.f));
+    CHECK(NEAR(FLOAT_AT(0x00783DD8u),70.f) && NEAR(FLOAT_AT(0x00783CC0u),-7.5f));
+    FLOAT_AT(MAPMAKER_GRID_CFG_EXTENT)=1000.f;               /* nonsense: stock 40 */
+    FLOAT_AT(0x00783DD8u)=10.f;CHECK(mapmaker_pointer_pan(100.f,0.f) && NEAR(FLOAT_AT(0x00783DD8u),30.f));
+    FLOAT_AT(MAPMAKER_GRID_CFG_EXTENT)=0.f;
     FLOAT_AT(0x00783DD8u)=10.f;FLOAT_AT(0x00783CC0u)=10.f;
     WORD_AT(ED+0x25c)=0x00004000u;                           /* a state the editor does not pan in */
     CHECK(!mapmaker_pointer_pan(1.f,1.f) && FLOAT_AT(0x00783DD8u)==10.f);
