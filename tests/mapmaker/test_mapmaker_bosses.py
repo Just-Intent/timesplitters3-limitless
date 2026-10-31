@@ -10,6 +10,7 @@ helper sub_00139740 work as the hook assumes.
 """
 import os
 from pathlib import Path
+import struct
 import subprocess
 import pytest
 
@@ -38,7 +39,7 @@ MUTATIONS = {
     'wrong-byte': ('#define BOS_CHUNK_FLAG 0x29u', '#define BOS_CHUNK_FLAG 0x28u'),
     'wrong-mark': ('#define BOS_FLAG_MARK 0xB0u', '#define BOS_FLAG_MARK 0x80u'),
     'accept-any-flag': ('    if((flag&BOS_FLAG_MASK)!=BOS_FLAG_MARK) {', '    if(0) {'),
-    'load-no-index-check': ('if(level && WORD_AT(bos_entry(e,base+k)+BOS_ENTRY_INDEX)!=x.index[k]) {', 'if(0) {'),
+    'load-no-index-check': ('if(level && !same) {', 'if(0) {'),
     'compile-off-too': ('    if(!bos_on() || !(e=bos_editor())) return;\n    bos_walk(container,bos_count(e),bos_compile_chunk,&e);',
                         '    if(!(e=bos_editor())) return;\n    bos_walk(container,bos_count(e),bos_compile_chunk,&e);'),
     'multiplier-linear': ('return level?1u<<(level-1u):1u;', 'return level?level:1u;'),
@@ -47,17 +48,52 @@ MUTATIONS = {
                    '    if(bos_play.scaled[k].record==rec) return;'),
     'cur-not-scaled': ('    if(cur<=max*1.0001f) cur*=m;', ''),
     'range-2d': ('d=dx*dx+dy*dy+dz*dz;', 'd=dx*dx+dy*dy;'),
-    'farthest': ('(best && d>=best_d)', '(best && d<=best_d)'),
-    'dead-shown': ("        if(!(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;\n", ''),
+    'farthest': ('k>0 && dist[k-1u]>d;', 'k>0 && dist[k-1u]<d;'),
+    'dead-shown': ('if(!bos_play.level[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;',
+                   'if(!bos_play.level[s]) continue;'),
     'humans-included': ('for(i=humans<count?humans:count;i<count;i++)', 'for(i=0;i<count;i++)'),
     'no-entity-check': (' || WORD_AT(ent+BOS_ENT_AI)!=a || ', ' || '),
-    'over-stock-bar': ("    if(!ent || (WORD_AT(hud+BOS_HUD_FLAGS)&1u) ||", '    if(!ent ||'),
+    'over-stock-bar': ('slot=(WORD_AT(hud+BOS_HUD_FLAGS)&1u)?1u:0u;', 'slot=0;'),
     'any-mode': (" || BOS_B(BOS_MODE)!=10u) return;", ') return;'),
     'any-hud': (' || hud!=BOS_HUD+p*BOS_HUD_STRIDE) return;', ') return;'),
-    'no-restore': ('    drawn=WORD_AT(buf+0x40u);\n    restore_registers(&r);', '    drawn=WORD_AT(buf+0x40u);\n    g_esp=r.sp;'),
-    'no-flag': ('    if(drawn) WORD_AT(hud+BOS_HUD_FLAGS)|=1u;', ''),
-    'flag-always': ('    if(drawn) WORD_AT(hud+BOS_HUD_FLAGS)|=1u;', '    WORD_AT(hud+BOS_HUD_FLAGS)|=1u;'),
-    'no-name': ('bos_play.name[index][0]?bos_play.name[index]:"Boss"', '"Boss"'),
+    'no-restore': ('        drawn=WORD_AT(buf+0x40u);\n        restore_registers(&r);',
+                   '        drawn=WORD_AT(buf+0x40u);\n        g_esp=r.sp;'),
+    'no-flag': ('    if(any) WORD_AT(hud+BOS_HUD_FLAGS)|=1u;', ''),
+    'flag-always': ('    if(any) WORD_AT(hud+BOS_HUD_FLAGS)|=1u;', '    WORD_AT(hud+BOS_HUD_FLAGS)|=1u;'),
+    'no-name': ('bos_play.name[index[k]][0]?bos_play.name[index[k]]:"Boss"', '"Boss"'),
+    # several bars
+    'one-bar': ('for(k=0;k<n && slot<cap;k++)', 'for(k=0;k<n && k<1u;k++)'),
+    'no-stack': ('WORD_AT(BOS_MARGIN)=margin+(uint32_t)(step*(int)slot);', 'WORD_AT(BOS_MARGIN)=margin;'),
+    'margin-not-restored': ('    WORD_AT(BOS_MARGIN)=margin;\n    bos_smooth_io', '    bos_smooth_io'),
+    'step-unscaled': ('return (int)(BOS_BAR_STEP*scale+0.5f);', 'return (int)(BOS_BAR_STEP+0.5f);'),
+    'scale-unclamped': ('    if(!(scale>=0.25f && scale<=4.0f)) scale=1.0f;', ''),
+    'shared-smoothing': ('        bos_smooth_io(hud,bos_play.smooth[s].state,1);', ''),
+    'smoothing-not-saved': ('        bos_smooth_io(hud,bos_play.smooth[s].state,0);', ''),
+    'stock-smoothing-lost': ("    bos_smooth_io(hud,stock,1);", ''),
+    'no-split-cap': ('cap=WORD_AT(BOS_HUMANS)>1u?BOS_BARS_SPLIT:BOS_BARS_MAX;', 'cap=BOS_BARS_MAX;'),
+    'slot-on-undrawn': ('if(drawn) { any=1;slot++; }', 'any|=drawn!=0;slot++;'),
+    'one-label': ('uint32_t text=bos_text(1u+k),buf,drawn;', 'uint32_t text=bos_text(1u),buf,drawn;'),
+    # stronger health
+    'health-no-rows': ('            guest_call(sub_00071800,2,text,BOS_HEALTH_TOUGH+1u+k);', ''),
+    'health-values': ('guest_call(sub_00071800,2,text,BOS_HEALTH_TOUGH+1u+k);', 'guest_call(sub_00071800,2,text,BOS_HEALTH_TOUGH+k);'),
+    'health-any-return': ('if(r==BOS_HEALTH_ROW_AT && bos_on()', 'if(bos_on()'),
+    'health-any-field': (' && field==bos_entry(e,s)+BOS_HEALTH)', ')'),
+    'health-any-scene': ('bos_on() && WORD_AT(BOS_SCENE)==102u && (e=bos_editor())!=0', 'bos_on() && (e=bos_editor())!=0'),
+    'compile-stock-unsafe': ('            BOS_B(data+BOS_CHUNK_HEALTH)=(uint8_t)BOS_HEALTH_TOUGH;   /* the stock table has 5 entries */', ''),
+    'compile-no-extra': ('    BOS_B(data+BOS_CHUNK_EXTRA)=(uint8_t)(extra?BOS_EXTRA_MARK|extra:0u);', '    (void)extra;'),
+    'compile-garbage-extra': ('if(health<=BOS_HEALTH_TOUGH+BOS_HEALTH_EXTRA) extra=health-BOS_HEALTH_TOUGH;',
+                              'if(1) extra=health-BOS_HEALTH_TOUGH;'),
+    'wrong-extra-byte': ('#define BOS_CHUNK_EXTRA 0x21u', '#define BOS_CHUNK_EXTRA 0x31u'),
+    'load-no-extra': ('if(same && WORD_AT(entry+BOS_HEALTH)==BOS_HEALTH_TOUGH) WORD_AT(entry+BOS_HEALTH)=BOS_HEALTH_TOUGH+extra;',
+                      'if(same && WORD_AT(entry+BOS_HEALTH)==BOS_HEALTH_TOUGH) (void)extra;'),
+    'load-extra-no-index-check': ('if(same && WORD_AT(entry+BOS_HEALTH)==BOS_HEALTH_TOUGH)', 'if(WORD_AT(entry+BOS_HEALTH)==BOS_HEALTH_TOUGH)'),
+    'extra-any-health': (' || health!=BOS_HEALTH_TOUGH) {', ') {'),
+    'extra-accept-any': ('if((flag&BOS_EXTRA_MASK)!=BOS_EXTRA_MARK ||', 'if(0 ||'),
+    'extra-range': (' || (flag&7u)>BOS_HEALTH_EXTRA', ''),
+    'extra-not-multiplied': ('return bos_multiplier(bos_play.level[i])<<bos_play.extra[i];', 'return bos_multiplier(bos_play.level[i]);'),
+    'extra-additive': ('<<bos_play.extra[i];', '+bos_play.extra[i];'),
+    'extra-gets-bar': ('if(!bos_play.level[s] || !(', 'if(!('),
+    'extra-not-active': ('    if(!level && !extra) return;', '    if(!level) return;'),
     'range-ignored': ('        if(f>=1.0f && f<=100000.0f) r=f;', ''),
     'range-unclamped': ('        if(f>=1.0f && f<=100000.0f) r=f;', '        r=f;'),
     'level-keeps-active': ('    memset(&bos_play,0,sizeof bos_play);\n    if(!bos_on()) return;',
@@ -162,6 +198,109 @@ def test_sai_chunk_byte_0x29_unused():
     assert mem(a[0x00301459])[0][4] == 0x28 and mem(a[0x00301459])[0][5] == 1
     assert mem(a[0x0030146A])[0][4] == 0x2A and mem(a[0x0030146A])[0][5] == 2
     assert mem(a[0x0030143F])[0][4] == 0x22 and mem(a[0x0030143F])[0][5] == 2    # writer: loop index
+
+
+def touches(op, byte):
+    """A memory operand covering chunk byte `byte` (disp..disp+size-1)."""
+    return op[4] <= byte < op[4] + max(op[5], 1)
+
+
+def test_sai_chunk_byte_0x21_unused():
+    """Chunk +0x21 (stronger health): the writer stores byte +0x20 (type) and
+    word +0x22, never +0x21; no loader or play reader touches it."""
+    insns = decoded()
+    writer = [i for i in insns if WRITER[0] <= i.address < WRITER[1]]
+    loader = [i for i in insns if LOADER[0] <= i.address < LOADER[1]]
+    for i in writer:
+        for op in mem(i):
+            if {op[1], op[2]} == {'ebx', 'esi'}:
+                assert not touches(op, 0x21), hex(i.address)
+    for i in loader:
+        for op in mem(i):
+            if op[1] == 'ebx' and not op[2]:
+                assert not touches(op, 0x21), hex(i.address)
+    for start, end in CHUNK_READERS:
+        for i in (i for i in insns if start <= i.address < end):
+            if i.mnemonic == 'lea':
+                continue
+            for op in mem(i):
+                # sub_00240C50's chunk data is ebp; its eax/ecx/edx stores fill
+                # the spawn tables (e.g. 0x00241E8D dword [eax+0x20])
+                if op[1] != 'esp' and (start != 0x00241DB9 or op[1] == 'ebp'):
+                    assert not touches(op, 0x21), hex(i.address)
+    a = by_address()
+    assert mem(a[0x00301460])[0][4] == 0x20 and mem(a[0x00301460])[0][5] == 1    # type byte
+    assert mem(a[0x003014A2])[0][4] == 0x30 and mem(a[0x003014A2])[0][5] == 1    # health byte
+    assert mem(a[0x0030149F])[0][1] == 'edi' and mem(a[0x0030149F])[0][4] == 0x4C
+
+
+def test_health_row_and_tables():
+    """Stock Health row (text 0xC0D, options 0xC0E..0xC12 = values 0..4) bound
+    to entry +0x4C at 0x0031CFD2; play maps chunk +0x30 through 0x0052E060 to
+    record +0x4E and the scene-100 health table 0x004DACF4."""
+    a = by_address()
+    assert ('imm', 0xC0D) in a[0x0031CF30].ops
+    for site, text, value in ((0x0031CF5B, 0xC0E, 0), (0x0031CF73, 0xC0F, 1), (0x0031CF8B, 0xC10, 2),
+                              (0x0031CFA3, 0xC11, 3), (0x0031CFBB, 0xC12, 4)):
+        assert ('imm', text) in a[site].ops, hex(site)
+    assert a[0x0031CFB9].mnemonic == 'push' and ('imm', 4) in a[0x0031CFB9].ops
+    lea = a[0x0031CFCE]
+    assert lea.mnemonic == 'lea' and mem(lea)[0][1] == 'esi' and mem(lea)[0][4] == 0x4C
+    call = a[0x0031CFD2]
+    assert call.call and call.function == 0x0031CB90 and '0x78590' in call.text
+    assert 0x0031CFD7 in a and a[0x0031CFD7].mnemonic == 'add'
+    # editor loader: chunk +0x30 byte -> entry +0x4C (0x288 + 0x4C), unclamped
+    assert mem(a[0x0030260A])[0][4] == 0x30 and mem(a[0x0030260A])[0][5] == 1
+    assert mem(a[0x00302614])[0][4] == 0x2D4
+    # play: movzx [ebp+0x30] -> sub_0031BA70 -> record +0x4E
+    assert mem(a[0x00242356])[0][1] == 'ebp' and mem(a[0x00242356])[0][4] == 0x30
+    assert a[0x0024235B].call and '0x31ba70' in a[0x0024235B].text
+    assert mem(a[0x00242360])[0][4] == 0x4E
+    assert mem(a[0x0031BA74])[0][4] == 0x0052E060
+    assert a[0x000B9A46].mnemonic == 'movzx' and mem(a[0x000B9A46])[0][4] == 0x4E
+    assert ('imm', 0x64) in a[0x000B9A30].ops                     # scene 100 only
+    assert mem(a[0x000B9A4A])[0][4] == 0x004DACF4
+    read = _xbe()
+    assert struct.unpack('<5i', read(0x0052E060, 20)) == (14, 10, 6, 3, 0)
+    table = struct.unpack('<15f', read(0x004DACF4, 60))
+    assert table[0] == 20.0 and table[3] == 11.0 and table[6] == 4.5 and table[10] == 2.75 and table[14] == 1.5
+
+
+def test_bar_position_sites():
+    """sub_00139740 places the box at the viewport bottom minus the int HUD
+    margin [0x007A614C], height 45 x [0x004E68F8]; smoothing +0x171C/+0x1724/+0x172C."""
+    a = by_address()
+    assert mem(a[0x00139873])[0][4] == 0x18                      # viewport bottom
+    assert mem(a[0x00139876])[0][4] == 0x007A614C and mem(a[0x00139876])[0][5] == 4
+    assert a[0x00139884].mnemonic == 'sub'
+    assert mem(a[0x0013987C])[0][4] == 0x004E68F8
+    assert mem(a[0x0013988C])[0][4] == 0x00478900
+    disps = {op[4] for i in decoded() if i.function == 0x00139740 for op in mem(i) if op[1] == 'esi'}
+    assert disps == {0x171C, 0x1724, 0x172C}
+    read = _xbe()
+    assert struct.unpack('<f', read(0x00478900, 4))[0] == 45.0
+    assert [round(struct.unpack('<f', read(v, 4))[0], 3) for v in (0x0047DA00, 0x00475CD0, 0x00475C78)] == [0.933, 0.8, 1.0]
+
+
+def _xbe():
+    path = ROOT / 'private/game/default.xbe'
+    if not path.exists() and ROOT.parent.name == 'worktrees':
+        path = ROOT.parents[2] / 'private/game/default.xbe'
+    if not path.exists():
+        pytest.skip('US XBE not available locally')
+    data = path.read_bytes()
+    base = struct.unpack_from('<I', data, 0x104)[0]
+    count, headers = struct.unpack_from('<II', data, 0x11C)
+    sections = [struct.unpack_from('<IIIII', data, headers - base + i * 0x38) for i in range(count)]
+
+    def read(va, n):
+        for _, start, vsize, raw, rsize in sections:
+            if start <= va < start + vsize:
+                off = va - start
+                chunk = data[raw + off:raw + min(off + n, rsize)]
+                return chunk + bytes(n - len(chunk))
+        raise KeyError(hex(va))
+    return read
 
 
 def test_edit_screen_rows_site():

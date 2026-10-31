@@ -147,13 +147,24 @@ Maps with groups load in the original game as ordinary, separate Story AI.
 The Story AI edit screen also has a **Boss** row. Each click cycles **Off,
 On, health x2, x4, x8**. In MapMaker Story play a Boss AI has that much more
 health, and the story boss health bar, labelled with the AI's name, appears
-when you are within about 30 units of the nearest living boss
-(`TSFP_MAPMAKER_BOSS_RANGE` changes the distance). Any character in the map's
+when you are within about 30 units of a living boss
+(`TSFP_MAPMAKER_BOSS_RANGE` changes the distance). With several bosses in
+range, up to four bars stack upward (nearest at the bottom; two in split
+screen); a story boss bar of the game itself keeps the bottom place. Any character in the map's
 character set can be a boss (for example the giant robot or Khallos); it keeps
 its normal MapMaker AI behaviour, not the story boss fight. Maps with bosses
 load in the original game with ordinary AI. Story-only creatures (the mission 5
 ghosts and worms) are not deployable yet. *Automated tests only.*
 Details: [bosses](mapmaker-bosses.md).
+
+### Stronger Story AI health (`LIMITS`)
+
+The Story AI **Health** choice (Weakling, Low, Normal, High, Tough Guy) has
+four more settings after Tough Guy: **Brute** (2x Tough Guy's health),
+**Juggernaut** (4x), **Titan** (8x) and **Colossus** (16x). They combine with
+the Boss setting: a Colossus boss at health x8 has 128 times Tough Guy's
+health. Without the switch, or in the original game, such an AI loads as
+Tough Guy. *Automated tests only.*
 
 ### Every character in the custom character set (`LIMITS`)
 

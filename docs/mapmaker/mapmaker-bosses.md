@@ -1,8 +1,14 @@
 # MapMaker Story AI bosses and the story creature probe
 
 Status: implemented in `src/interface/pc_mapmaker_bosses.inc` (area `bosses`),
-fixture-tested (`tests/mapmaker/test_mapmaker_bosses.py`: 39 mutations plus
+fixture-tested (`tests/mapmaker/test_mapmaker_bosses.py`: 76 mutations plus
 decode checks of every guest site). Not built or played yet.
+
+Later requests (2026-10-31): "If in range of multiple bosses, multiple boss
+health bars should be visible on screen" and "Add multiple additional story
+AI health settings in mapmaker that are stronger than the "Tough Guy"
+setting" - see [Several boss bars](#several-boss-bars) and
+[Stronger health](#stronger-health).
 Research basis: `logs/limits/features/story-enemies.md` (main checkout, ignored).
 No guest-code table entry.
 
@@ -24,12 +30,12 @@ The setting is per AI: duplicates and linked copies start with Off and a
 group does not share it.
 
 In play (MapMaker Story, scene 100, story mode): every Boss AI's health is
-multiplied by its factor when it spawns (and again after a respawn). The
-nearest living Boss AI within 30 game units (`TSFP_MAPMAKER_BOSS_RANGE=<1..100000>`,
+multiplied by its factor when it spawns (and again after a respawn). Each
+living Boss AI within 30 game units (`TSFP_MAPMAKER_BOSS_RANGE=<1..100000>`,
 3D distance, no line-of-sight test) shows the story boss health bar with the
-AI's name as its label ("Boss" when unnamed). It disappears when the boss is
-out of range or dead and switches to whichever boss is nearest. In split
-screen each viewport shows its own nearest boss, except that the stock bar
+AI's name as its label ("Boss" when unnamed), up to four stacked bars,
+nearest at the bottom. A bar disappears when its boss is out of range or
+dead. In split screen each viewport shows its own nearest two bosses, except that the stock bar
 code hides it for player 2 in story split screen (sub_00139740 0x0013974C).
 
 Good boss candidates already in the Arcade roster (via the map's character
@@ -85,8 +91,8 @@ per-level state MapMaker never creates (`sub_0025F720`) and is out of scope.
   focus entity `[[0x007B0C7C]+0xFF4]` model word +0x94 and draws known story
   bosses with `sub_00139740` (esi = HUD block, edi = entity; stack text,
   fraction, int *drawn), then sets HUD block +8 bit 0 (0x0014D0D5) or clears
-  it (0x0014D0DD). The hook runs the original first; if no stock bar was
-  drawn it calls `sub_00139740` itself for the nearest Boss AI, with the
+  it (0x0014D0DD). The hook runs the original first, then calls `sub_00139740` itself
+  for each Boss AI in range (see Several boss bars), with the
   label in a 32-byte guest buffer and the out slot on the guest stack, and
   sets bit 0 like the stock path. `sub_00139740` reads the fraction from
   +0x1CC/+0x1D8 (0x001398B8/0x001398C0) and smooths it in HUD block
@@ -97,6 +103,81 @@ per-level state MapMaker never creates (`sub_0025F720`) and is out of scope.
   (player 1's AI +0x9E0 against the focus's a+0x28 threshold, fed by
   `sub_000B8C60`, which kills the player at the threshold via
   `sub_000A0D30`), and forcing a+0xC = 4 would change that logic.
+
+## Several boss bars
+
+Up to `BOS_BARS_MAX` = 4 bars per viewport (2 when more than one human
+plays, `[0x00790950]` > 1; INFERRED to fit a half-height viewport), stock
+bar included, for the living Boss AIs within range, nearest first; the
+farther ones wait for a free place.
+
+- Position (CONFIRMED, `sub_00139740`): x is centred between the viewport
+  `[[0x007E71C8]+0]`/`+4` and the side margins `[0x007A6140]`/`[0x007A6148]`;
+  the box bottom is `[[0x007E71C8]+0x18]` minus the int HUD margin
+  `[0x007A614C]` (0x0013986E..0x001398AB); height 45 (0x00478900) x
+  `[0x004E68F8]` x 1 / 0.933 / 0.8; `sub_00130400` draws the frame 6 x
+  `[0x004E68F8]` above the box and the label inside it (INFERRED from its
+  `(top + bottom - text height) / 2`). The HUD frame rewrites the margin
+  (0x0014B084, 0x0014BB3F, 0x0014D4CC).
+- The hook raises `[0x007A614C]` by slot x round(57 x `[0x004E68F8]`)
+  (45 + 6 frame + 6 gap; a scale outside 0.25..4 counts as 1) around each
+  `sub_00139740` call and puts the old value back. Slot 0 is the bottom (the
+  stock position); a stock story bar drawn by the original (HUD block +8 bit
+  0) keeps slot 0 and ours start at slot 1, so nothing overlaps it. A bar the
+  game did not draw (`*drawn` = 0, e.g. player 2 in story split screen) uses
+  no slot.
+- `sub_00139740` smooths the drain in HUD block +0x171C/+0x1724/+0x172C (the
+  only esi fields it uses, decode check). Each boss gets its own copy
+  (16-entry table keyed by HUD block and entity, oldest reused) swapped in
+  before and out after its call; the stock values are restored at the end,
+  so a stock bar keeps its own animation.
+- Widescreen: the coordinates are the guest's 640x480 HUD space like every
+  stock HUD draw, so the renderer keeps all bars inside the centred 4:3 HUD
+  box ([widescreen](mapmaker-widescreen.md)).
+
+## Stronger health
+
+Stock (CONFIRMED): the Story AI edit screen's **Health** row is text 0xC0D
+with options 0xC0E..0xC12 (Weakling, Low, Normal, High, Tough Guy; English
+text read from the MapMaker level pak's table, ids 3085..3090), values 0..4,
+bound to editor entry +0x4C (`lea ecx,[esi+0x4C]; call sub_00078590` at
+0x0031CFCE/0x0031CFD2). The writer copies the byte to chunk +0x30
+(0x0030149F/0x003014A2), the loader back unclamped (0x0030260A/0x00302614).
+At map start `sub_00240C50` maps it through `sub_0031BA70` = table
+0x0052E060 {14, 10, 6, 3, 0} (5 entries, then unrelated data) into spawn
+record +0x4E (0x00242356..0x00242360); in scene 100 story mode health is
+`0x004DACF4[record+0x4E]` x the character base (`sub_000B9A30` via
+`sub_000B9A90`): Weakling 1.5, Low 2.75, Normal 4.5, High 11, Tough Guy 20.
+
+New (`TSFP_MAPMAKER_LIMITS=1`):
+
+| Setting | Entry +0x4C | Health | Saved chunk +0x30 / +0x21 |
+|---|---|---|---|
+| Tough Guy (stock) | 4 | 20 | 4 / 0 |
+| Brute | 5 | 40 (x2) | 4 / 0xA1 |
+| Juggernaut | 6 | 80 (x4) | 4 / 0xA2 |
+| Titan | 7 | 160 (x8) | 4 / 0xA3 |
+| Colossus | 8 | 320 (x16) | 4 / 0xA4 |
+
+- Editor: WRAP `sub_00078590` acts only for the return 0x0031CFD7 with the
+  selected entry's +0x4C as argument and appends the four options with
+  `sub_00071800(text, value)` before the binding, so the list shows and
+  stores 5..8 natively (groups share +0x4C through aitemplates as before).
+  Labels are guest strings from `xbox_HeapAlloc`.
+- Compile: a value 5..8 is saved as Tough Guy (+0x30 = 4) plus +0x21 =
+  0xA0 | (value - 4); a value above 8 is saved as Tough Guy and logged. A
+  stock game therefore reads Tough Guy and never indexes past 0x0052E060.
+  Chunk byte +0x21 is decode-proven free: the writer stores byte +0x20 and
+  word +0x22 only, the loader and every chunk reader never cover +0x21
+  (`test_sai_chunk_byte_0x21_unused`).
+- Load: +0x21 = 0xA1..0xA4 with +0x30 = 4 and a matching index sets entry
+  +0x4C to 4 + extra; other values are ignored and logged
+  (`unknown chunk +0x21 health value ignored`, `health setting dropped at
+  load`).
+- Play: the level hook records the extra level per Story AI index; the HUD
+  hook multiplies the entity health of every such AI (boss or not) by
+  2^extra x the Boss factor, once per (re)initialisation, with the same
+  table as the boss scaling.
 
 ## Story creature probe (`TSFP_MAPMAKER_CREATURE_PROBE=1`)
 
@@ -136,13 +217,14 @@ WRAP sub_003006C0 -> pc_mapmaker_bosses_compile    (chained: OUTSIDE pc_mapmaker
 WRAP sub_00301A90 -> pc_mapmaker_bosses_load       (chained: OUTSIDE pc_mapmaker_editor_load; order vs aitemplates free)
 WRAP sub_00240C50 -> pc_mapmaker_bosses_level      (chained: OUTSIDE pc_mapmaker_editor_level_load; order vs aitemplates free)
 WRAP sub_0014CC80 -> pc_mapmaker_bosses_hud        (new; every HUD frame, ebx = HUD block)
+WRAP sub_00078590 -> pc_mapmaker_bosses_health_rows (new; list binder, acts only for return 0x0031CFD7)
 ```
 
 `pc_mapmaker_bosses_close` returns without calling its original for its own
 row; inside aitemplates' close, aitemplates would flush its pending group
 snapshot after the click, so bosses goes outside. Include the `.inc` after
-`pc_mapmaker_aitemplates.inc`; link stub `sub_00139740` added to
-`tests/mapmaker/mapmaker_area_stubs.h`.
+`pc_mapmaker_aitemplates.inc`; link stubs `sub_00139740` and `sub_00071800`
+are in `tests/mapmaker/mapmaker_area_stubs.h`.
 
 ## Limits and not done
 
@@ -167,10 +249,18 @@ snapshot after the click, so bosses goes outside. Include the `.inc` after
 2. Play: walk toward it; within about 30 units the boss bar appears with
    its name; it drains as you shoot (four times the hits of a normal AI);
    walk away: it hides; kill it: it hides.
-3. Two Boss AIs at different distances: the nearer one's bar shows.
-4. Without the switch, load and play the same map: ordinary AIs, no bar.
-5. Mission 6 Princess / mission 10 giant robot still show their own bars.
-6. Probe: set `TSFP_MAPMAKER_CREATURE_PROBE=1` and
+3. Two or more Boss AIs in range: one bar each, nearest at the bottom,
+   stacked upward without overlap (at most four; two in split screen),
+   each draining on its own. Also on a 16:9 display: inside the 4:3 HUD area.
+   Check the label sits inside each box and bars do not cover other HUD.
+4. Health: open a Story AI, Health now lists Brute, Juggernaut, Titan,
+   Colossus after Tough Guy. Pick Titan; save, reload: still Titan. In play
+   it takes about 8x the hits of a Tough Guy (16x with Colossus; times the
+   Boss factor when both are set).
+5. Without the switch, load and play the same map: ordinary AIs, no bar,
+   Titan/Colossus AIs read Tough Guy.
+6. Mission 6 Princess / mission 10 giant robot still show their own bars.
+7. Probe: set `TSFP_MAPMAKER_CREATURE_PROBE=1` and
    `TSFP_MAPMAKER_CREATURE_PROBE_LOG=<path>\creature-probe.log`, play
    mission 5 until the ghosts and worms have appeared, then a MapMaker
    Story map; send `creature-probe.log`.
