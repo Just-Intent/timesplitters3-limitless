@@ -692,6 +692,8 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 
 ### MAC-001 — Direct-camera mouse look
 
+- **Mounted/vehicle gun mouse aim (worktree branch off mapmaker-recon 93ee03b6, not yet merged):** `src/pc_mounted.h` (port of main #182/#405/#412) routes mouse counts to the bound gun angles in player modes `0x80` and `0x400` (Scotland the Brave truck gun); both `src/pc_controls.c` and `src/native/input_sdl.c` call it before ordinary look. Windows fixture `tests/test_mounted_mouse.py` passes; Windows live turret, Mac compile and physical Mac aiming are pending.
+
 - **Issue #7 follow-up (2026-10-16):** `src/pc_terminal.h`
   on `7-breaking-and-entering-camera-turret-not-working` routes relative mouse
   counts to the active terminal's logical pointer in
