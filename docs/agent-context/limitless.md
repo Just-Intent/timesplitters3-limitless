@@ -418,6 +418,21 @@ bosses (char 0x15 / model 0x5BE) unless their Story AI chose the Sub-boss
 bar (then the stock meter shows and the stock bar is hidden too). No save byte; the handler cannot reach
 `sub_002274C0` (decode call graph). `tests/mapmaker/test_mapmaker_realbosses.py`.
 Only the creature itself played (v0.4.0-mapmaker.5); the meter fix is not built.
+Boss Off = no health (user, 2026-10-31): `pc_mapmaker_realbosses_hud` clears
+the focus for the stock call for every noted real boss (Boss flag or not);
+Boss bar = bosses' bar, Sub-boss = meter, Off = nothing.
+Giant skeleton (mansion boss, id 0x28, model 0x5E9, picker row 151 "Giant
+Skeleton", preview Arcade id 0xA6): `sub_001C8540` also mounts lv1_6.pak
+(0x0049D6FC); WRAP `sub_0025F720` -> `pc_mapmaker_realbosses_level` calls the
+stock `sub_00287E00` ([0x0078B1EC] 0x4C7C + [0x0078B0D0] 0x7D00, level heap;
+stock only scenes 1/17) after clearing both pointers; ai_start gives one spawn
+record per level class 0/0x20000; WRAPs `sub_0029FE00` -> `_princess` (direct
+`sub_0029CEF0` call = tail jump), `sub_002875F0` -> `_risen` (scene-1 answer
+`sub_00059DB0(ent, 0x19C)`), `sub_00287E20` -> `_throw` (action type 6: aim
+with scene word 1 around the original, fire = stock `sub_000EA9C0` args +
+`sub_0010EB90`, phase 2), `sub_002274C0` -> `_event` (drops ret 0x0029E068,
+event 3). Dust particles (`sub_0029CE00`, scenes 1/17 only) not drawn. Not
+built or played.
 
 ### MapMaker and System Link bug fixes
 
