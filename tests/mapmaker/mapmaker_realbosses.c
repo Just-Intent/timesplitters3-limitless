@@ -10,16 +10,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00800000/4], g_eax, g_ecx, g_edx, g_esp;
+static uint32_t memory[0x00800000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define BYTE_AT(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define HALF_AT(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
-typedef struct GuestRegisters { uint32_t a,c,d,sp; } GuestRegisters;
-static void save_registers(GuestRegisters *r) { r->a=g_eax;r->c=g_ecx;r->d=g_edx;r->sp=g_esp; }
-static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r->d;g_esp=r->sp; }
+typedef struct GuestRegisters { uint32_t a,c,d,sp,b,si,di; } GuestRegisters;
+static void save_registers(GuestRegisters *r) { r->a=g_eax;r->c=g_ecx;r->d=g_edx;r->sp=g_esp;r->b=g_ebx;r->si=g_esi;r->di=g_edi; }
+static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r->d;g_esp=r->sp;g_ebx=r->b;g_esi=r->si;g_edi=r->di; }
 
 #define HEAP 0x00300000u
 #define ITEM 0x00340000u
@@ -30,6 +30,8 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 #define PLAYER 0x00500000u
 #define ESP0 0x00600000u
 #define R 10u
+#define SKST 0x00700100u                /* fake skeleton state (0x4C7C) */
+#define SKPT 0x00710000u                /* fake particle block (0x7D00) */
 #define A(i) (POOL+(uint32_t)(i)*0xEA0u)
 #define ENT(i) (ENTS+(uint32_t)(i)*0x400u)
 #define REC(i) (RECS+(uint32_t)(i)*0x100u)
@@ -41,6 +43,15 @@ void sub_00071630(void) { g_ecx=3; }
 void sub_00071C70(void) { g_ecx=4; }
 void sub_0005A130(void) { g_ecx=5; }
 void sub_00062260(void) { g_ecx=6; }
+void sub_00287E00(void) { g_ecx=7; }
+void sub_00059DB0(void) { g_ecx=8; }
+void sub_000EA9C0(void) { g_ecx=9; }
+void sub_0010EB90(void) { g_ecx=10; }
+void sub_00139740(void) { g_ecx=11; }
+void sub_002E4B80(void) { g_ecx=12; }
+static unsigned nprincess;
+static uint32_t princess_ent;
+void sub_0029CEF0(void) { nprincess++;princess_ent=WORD_AT(g_esp+4u);g_esp+=4u; }   /* pops like the lifted callee */
 static uint32_t heap_next=HEAP;
 static int heap_fail;
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment) { uint32_t p;(void)alignment;if(heap_fail)return 0;p=heap_next;heap_next+=(bytes+15u)&~15u;return p; }
@@ -50,14 +61,17 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)hook;ret
 static unsigned nrows, nenable, nmount;
 static struct { uint32_t text, id, flags, cb; char label[32]; } rows[8];
 static uint32_t enable_item, enable_flag=0xEEu, mount_arg;
-static int pak_mounted, mount_ok=1;
+static int pak_mounted, skel_mounted, mount_ok=1, alloc_ok=1, player_dead;
+static unsigned nalloc, nstart, nshot, neffect, nbar;
+static uint32_t start_args[2], shot_args[12], effect_args[2], bar_args[3], bar_esi, bar_edi, alloc_scene;
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
-    uint32_t x[8]={0};
+    uint32_t x[12]={0};
     int i;
+    if(n>12) { fprintf(stderr,"guest_call with %d args\n",n);exit(3); }
     va_start(a,n);
-    for(i=0;i<n && i<8;i++) x[i]=va_arg(a,uint32_t);
+    for(i=0;i<n && i<12;i++) x[i]=va_arg(a,uint32_t);
     va_end(a);
     if(f==sub_00079D60) {
         if(nrows<8) {
@@ -67,9 +81,26 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         nrows++;return ITEM;
     }
     if(f==sub_00071630) return ITEM;
-    if(f==sub_00071C70) { nenable++;enable_item=x[0];enable_flag=x[1];return 0; }
-    if(f==sub_00062260) return (x[0]==0x0049D77Cu && pak_mounted)?3u:0xFFFFFFFFu;
-    if(f==sub_0005A130) { nmount++;mount_arg=x[0];if(mount_ok) pak_mounted=1;return mount_ok?1u:0u; }
+    if(f==sub_00071C70) { enable_flag=(nenable++?enable_flag:0u)|x[1];enable_item=x[0];return 0; }   /* any row disabled shows */
+    if(f==sub_00062260) return ((x[0]==0x0049D77Cu && pak_mounted) || (x[0]==0x0049D6FCu && skel_mounted))?3u:0xFFFFFFFFu;
+    if(f==sub_0005A130) {
+        nmount++;mount_arg=x[0];
+        if(mount_ok) { if(x[0]==0x0049D6FCu) skel_mounted=1; else pak_mounted=1; }
+        return mount_ok?1u:0u;
+    }
+    if(f==sub_00287E00) {   /* sub_0003DFA0 twice, then sub_00287860 */
+        nalloc++;alloc_scene=WORD_AT(0x0079094Cu);
+        if(alloc_ok) { WORD_AT(0x0078B1ECu)=SKST;WORD_AT(0x0078B0D0u)=SKPT;WORD_AT(SKST+0x4160u)=0; }
+        return 0;
+    }
+    if(f==sub_00059DB0) { nstart++;start_args[0]=x[0];start_args[1]=x[1];return x[1]==0x19Cu?0x77u:0x66u; }
+    if(f==sub_000EA9C0) { nshot++;memcpy(shot_args,x,sizeof shot_args);return 0x1234u; }
+    if(f==sub_0010EB90) { neffect++;effect_args[0]=x[0];effect_args[1]=x[1];return 0; }
+    if(f==sub_00139740) {
+        nbar++;memcpy(bar_args,x,sizeof bar_args);bar_esi=g_esi;bar_edi=g_edi;
+        WORD_AT(x[2])=1u;return 0;
+    }
+    if(f==sub_002E4B80) return (uint32_t)player_dead;
     return 0;
 }
 #include "pc_mapmaker_budget.inc"
@@ -81,12 +112,24 @@ static int failures, originals;
 static uint32_t orig_eax, seen_class[2], seen_focus;
 static void fake(void) { originals++;g_eax=orig_eax;g_esp+=4u; }
 static void fake_ai(void) { originals++;seen_class[0]=WORD_AT(REC(0));seen_class[1]=WORD_AT(REC(0)+4u);g_esp+=4u; }
+static void fake_ai_any(void)
+{
+    uint32_t rec=WORD_AT(WORD_AT(g_esp+4u)+0xBF0u);
+    originals++;seen_class[0]=WORD_AT(rec);seen_class[1]=WORD_AT(rec+4u);g_esp+=4u;
+}
 static void fake_hud(void) { originals++;seen_focus=WORD_AT(PLAYER+0xFF4u);g_esp+=4u; }
 static void fake_pick(void)
 {   /* the stock callback stores data read past the Arcade table for row 150 */
     originals++;WORD_AT(0x0075FD90u+2u*0x1Cu)=0x12345u;WORD_AT(0x0075FD90u+2u*0x1Cu+0x14u)=150u;
     WORD_AT(0x0075FD90u+2u*0x1Cu+0x18u)=7u;g_esp+=4u;
 }
+static void fake_pick_skel(void)
+{
+    originals++;WORD_AT(0x0075FD90u+4u*0x1Cu)=0x54321u;WORD_AT(0x0075FD90u+4u*0x1Cu+0x14u)=151u;
+    WORD_AT(0x0075FD90u+4u*0x1Cu+0x18u)=9u;g_esp+=4u;
+}
+static uint32_t seen_scene;
+static void fake_scene(void) { originals++;seen_scene=WORD_AT(0x0079094Cu);g_esp+=4u; }
 static void fake_highlight(void) { originals++;WORD_AT(0x0078AEA8u)=WORD_AT(0x00700000u);g_esp+=4u; }
 /* Calls hook fn with return address ret and up to three args; checks esp and
  * how often the original ran. */
@@ -117,6 +160,7 @@ static void arcade_table(void)
     unsigned i;
     for(i=0;i<150u;i++) WORD_AT(0x00521A18u+i*0x30u+4u)=0x30u+i%64u;
     WORD_AT(0x00521A18u+43u*0x30u+4u)=0xA7u;                 /* trophy monster row */
+    WORD_AT(0x00521A18u+144u*0x30u+4u)=0xA6u;                /* skeleton cowboy row */
     for(i=0;i<43u;i++) if(WORD_AT(0x00521A18u+i*0x30u+4u)==0xA7u) WORD_AT(0x00521A18u+i*0x30u+4u)=0x20u;
 }
 /* map container: map-info chunk (custom set), then Story AI chunks */
@@ -189,9 +233,10 @@ int main(void)
     CHECK(nrows==0);
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_picker_end,fake,0x002C1FA5u,0,0,0,1);
-    CHECK(nrows==1 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
+    CHECK(nrows==2 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
     CHECK(!strcmp(rows[0].label,"Giant Trophy Monster"));
-    CHECK(nenable==1 && enable_item==ITEM && enable_flag==0);
+    CHECK(rows[1].id==151u && rows[1].flags==0x20900u && rows[1].cb==0x002C1C90u && !strcmp(rows[1].label,"Giant Skeleton"));
+    CHECK(nenable==2 && enable_item==ITEM && enable_flag==0);
     /* pick: row 150 -> id 0x15, variant -1; other slots untouched */
     for(k=0;k<10u;k++) { WORD_AT(0x0075FD90u+k*0x1Cu)=0x40u+k;WORD_AT(0x0075FD90u+k*0x1Cu+0x14u)=k;WORD_AT(0x0075FD90u+k*0x1Cu+0x18u)=0; }
     CALL(pc_mapmaker_realbosses_pick,fake_pick,0x00077000u,0x00330000u,0,0,1);
@@ -199,10 +244,16 @@ int main(void)
     CHECK(WORD_AT(0x0075FD90u+2u*0x1Cu+0x14u)==150u);
     CHECK(WORD_AT(0x0075FD90u+3u*0x1Cu)==0x43u && WORD_AT(0x0075FD90u+3u*0x1Cu+0x18u)==0);
     CHECK(WORD_AT(0x0075FD90u+9u*0x1Cu)==0x49u);
+    CALL(pc_mapmaker_realbosses_pick,fake_pick_skel,0x00077000u,0x00330000u,0,0,1);
+    CHECK(WORD_AT(0x0075FD90u+4u*0x1Cu)==0x28u && WORD_AT(0x0075FD90u+4u*0x1Cu+0x18u)==0xFFFFFFFFu);
+    CHECK(WORD_AT(0x0075FD90u+2u*0x1Cu)==0x15u);
     /* highlight: the preview row never becomes 150 */
     WORD_AT(0x00700000u)=150u;
     CALL(pc_mapmaker_realbosses_highlight,fake_highlight,0x00077000u,0x00330000u,0,0,1);
     CHECK(WORD_AT(0x0078AEA8u)==43u);
+    WORD_AT(0x00700000u)=151u;
+    CALL(pc_mapmaker_realbosses_highlight,fake_highlight,0x00077000u,0x00330000u,0,0,1);
+    CHECK(WORD_AT(0x0078AEA8u)==144u);
     WORD_AT(0x00700000u)=12u;
     CALL(pc_mapmaker_realbosses_highlight,fake_highlight,0x00077000u,0x00330000u,0,0,1);
     CHECK(WORD_AT(0x0078AEA8u)==12u);
@@ -214,12 +265,19 @@ int main(void)
     CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C1805u,0x15u,0xFFFFFFFFu,0,0)==43u);
     CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C1814u,0x15u,0xFFFFFFFFu,0,0)==43u);
     CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x000668F5u,0x15u,0xFFFFFFFFu,0,1)==0xFFFFFFFFu);
+    CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C054Cu,0x28u,0xFFFFFFFFu,0,0)==151u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002BE65Fu,0x28u,0xFFFFFFFFu,0x003033C0u,0)==151u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C1805u,0x28u,0xFFFFFFFFu,0,0)==144u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x000668F5u,0x28u,0xFFFFFFFFu,0,1)==0xFFFFFFFFu);
     orig_eax=7u;
     CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C054Cu,0xA8u,0xFFFFFFFFu,0,1)==7u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C054Cu,0x29u,0xFFFFFFFFu,0,1)==7u);
     CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C054Cu,0x16u,0xFFFFFFFFu,0,1)==7u);
     /* names */
     orig_eax=0;
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,150u,0,0,0)==0x52420015u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,151u,0,0,0)==0x52420028u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,152u,0,0,1)==0);
     orig_eax=0xE20u;
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,149u,0,0,1)==0xE20u);
     orig_eax=0;
@@ -227,6 +285,7 @@ int main(void)
     orig_eax=0x1234u;
     k=CALL(pc_mapmaker_realbosses_text,fake,0x002C090Du,0x52420015u,0,0,0);
     CHECK(k==rows[0].text);
+    CHECK(CALL(pc_mapmaker_realbosses_text,fake,0x002C090Du,0x52420028u,0,0,0)==rows[1].text);
     CHECK(CALL(pc_mapmaker_realbosses_text,fake,0x002C090Du,0xE20u,0,0,1)==0x1234u);
     CHECK(CALL(pc_mapmaker_realbosses_text,fake,0x0014CED5u,0xDCCu,0,0,1)==0x1234u);   /* not in play */
     CALL(pc_mapmaker_realbosses_model_request,fake,0x000D77AFu,0x5BEu,0,0,1);           /* log only */
@@ -261,7 +320,8 @@ int main(void)
     CHECK(nmount==1);
     pak_mounted=0;WORD_AT(0x00784014u)=0;                                /* container unreadable */
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
-    CHECK(nmount==2);
+    CHECK(nmount==3 && skel_mounted && pak_mounted);                     /* both, skeleton first */
+    skel_mounted=0;
     container(0xC,with,3,boss_on,2);
 
     /* ---- play: class at AI start ----------------------------------------- */
@@ -298,16 +358,17 @@ int main(void)
     CHECK(CALL(pc_mapmaker_realbosses_text,fake,0x0014CEDAu,0xDCCu,0,0,1)==0x1234u);
     CHECK(CALL(pc_mapmaker_realbosses_text,fake,0x0014CED5u,0xDCDu,0,0,1)==0x1234u);
     WORD_AT(0x007B0C7Cu)=PLAYER;WORD_AT(PLAYER+0xFF4u)=ENT(0);
-    CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);        /* no Boss flag: stock bar */
-    CHECK(seen_focus==ENT(0) && WORD_AT(PLAYER+0xFF4u)==ENT(0));
+    CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);        /* Boss Off: no bar at all */
+    CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(0));
     actor(0,0x15,0x5BE,1);
     CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);        /* Boss flag: bosses draws */
     CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(0));
-    bosses_area=0;                                                        /* no bosses area: keep stock */
+    bosses_area=0;                                                        /* no bosses area: as Boss Off */
     CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(rbs.real[0].boss==0);
     CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
-    CHECK(seen_focus==ENT(0));
+    CHECK(seen_focus==0);
     bosses_area=1;
     CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     HALF_AT(ENT(0)+0x94u)=0x572u;                                        /* focus is another model */
@@ -355,16 +416,164 @@ int main(void)
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
         CHECK(rbs.real[0].boss==1);
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
-        container(0xC,with,3,boss_off,2);                                    /* no Boss flag: hidden, stock bar */
+        container(0xC,with,3,boss_off,2);                                    /* Boss Off: no meter, no bar */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
         CHECK(rbs.real[0].boss==0);
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
         CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
-        CHECK(seen_focus==ENT(0));
+        CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(0));
         container(0xC,with,3,boss_bad,2);                                    /* unknown value: no Boss flag */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
         CHECK(rbs.real[0].boss==0);
         CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
+    }
+    /* ---- play: the giant skeleton (id 0x28, model 0x5E9) ------------------ */
+    {
+        static const uint16_t skel[]={0x0C,0x28}, both[]={0x15,0x28};
+        static const uint8_t none3[]={0,0,0}, bar3[]={0,0,0xB1}, sub3[]={0,0,0xB5};
+        static const uint32_t actions[8]={8,0,6,3,7,4,2,5};
+        unsigned m;
+        WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10u;
+        for(k=0;k<8u;k++) WORD_AT(0x005208B8u+k*4u)=actions[k];
+        WORD_AT(0x005208B8u+8u*4u)=6u;                                       /* past the table */
+        /* anims: lv1_6.pak for a custom set holding 0x28 */
+        container(0xC,skel,2,none3,3);
+        m=nmount;skel_mounted=0;pak_mounted=0;
+        WORD_AT(0x006D7880u)=29u;
+        CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
+        CHECK(nmount==m && !skel_mounted);                                   /* table nearly full */
+        WORD_AT(0x006D7880u)=10u;
+        CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
+        CHECK(nmount==m+1u && mount_arg==0x0049D6FCu && skel_mounted && !pak_mounted);
+        CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
+        CHECK(nmount==m+1u);                                                 /* already mounted */
+        container(0xC,both,2,none3,3);skel_mounted=0;
+        CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
+        CHECK(nmount==m+3u && skel_mounted && pak_mounted);                  /* both bosses: both paks */
+        container(0xC,without,2,none3,3);skel_mounted=0;
+        CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
+        CHECK(!skel_mounted);
+        /* level: the stock state allocation */
+        container(0xC,skel,2,none3,3);
+        WORD_AT(0x0078B1ECu)=0x00BAD000u;WORD_AT(0x0078B0D0u)=0x00BAD100u;   /* an earlier level's */
+        BYTE_AT(0x007DE455u)=9u;
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(nalloc==0 && !rbs_skel.state);
+        BYTE_AT(0x007DE455u)=10u;
+        container(0xC,without,2,none3,3);
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(nalloc==0 && !rbs_skel.state && WORD_AT(0x0078B1ECu)==0x00BAD000u);
+        container(0xC,skel,2,none3,3);
+        set_env("TSFP_MAPMAKER_REAL_BOSS","0");
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(nalloc==0);
+        set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);
+        alloc_ok=0;
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(nalloc==1 && !rbs_skel.state && WORD_AT(0x0078B1ECu)==0);       /* failure seen */
+        alloc_ok=1;
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(nalloc==2 && alloc_scene==100u && rbs_skel.state==SKST && rbs_skel.parts==SKPT);
+        /* ai_start: the class, one per map */
+        actor(3,0x28,0x5E9,2);actor(4,0x28,0x5E9,1);
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);    /* no lv1_6 */
+        CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && !rbs_skel.record);
+        skel_mounted=1;
+        WORD_AT(0x0078B1ECu)=SKST+0x10u;                                     /* someone else's state */
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
+        CHECK(seen_class[1]==0 && !rbs_skel.record);
+        WORD_AT(0x0078B1ECu)=SKST;
+        set_env("TSFP_MAPMAKER_REAL_BOSS","0");
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
+        CHECK(seen_class[1]==0 && !rbs_skel.record);
+        set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
+        CHECK(seen_class[0]==0 && seen_class[1]==0x20000u && rbs_skel.record==REC(3));   /* before the original */
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(4),0,0,1);         /* a second one */
+        CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && rbs_skel.record==REC(3) && rbs_skel.extras==1);
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);         /* same one again */
+        CHECK(seen_class[1]==0x20000u && rbs_skel.record==REC(3));
+        actor(5,0x0C,0x5E9,0);                                               /* by model */
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(5),0,0,1);
+        CHECK(seen_class[1]==0 && rbs_skel.extras==2);
+        /* princess: the mansion variant */
+        k=nprincess;
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(3),0,0,0);
+        CHECK(nprincess==k+1u && princess_ent==ENT(3));
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(4),0,0,1);
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,0,0,0,1);
+        WORD_AT(0x0079094Cu)=1u;                                             /* mission 5 itself */
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(3),0,0,1);
+        WORD_AT(0x0079094Cu)=100u;
+        WORD_AT(0x0078B1ECu)=SKST+0x10u;                                     /* state replaced: not ours */
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(3),0,0,1);
+        WORD_AT(0x0078B1ECu)=SKST;
+        CHECK(nprincess==k+1u);
+        /* risen: the entrance animation 0x19C */
+        orig_eax=0;
+        CHECK(CALL(pc_mapmaker_realbosses_risen,fake,0x0029D4A4u,ENT(3),0,0,0)==0x77u);
+        CHECK(nstart==1 && start_args[0]==ENT(3) && start_args[1]==0x19Cu);
+        CHECK(CALL(pc_mapmaker_realbosses_risen,fake,0x0029D4A4u,ENT(4),0,0,1)==0);
+        WORD_AT(0x0079094Cu)=17u;
+        CHECK(CALL(pc_mapmaker_realbosses_risen,fake,0x0029D4A4u,ENT(3),0,0,1)==0);
+        WORD_AT(0x0079094Cu)=100u;
+        /* throw: aim with scene 1, fire in the real scene, then done */
+        WORD_AT(A(3)+0x9DCu)=1u;                                             /* action type 0 */
+        CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,1);
+        CHECK(seen_scene==100u);
+        WORD_AT(A(3)+0x9DCu)=2u;WORD_AT(SKST+0x4160u)=0;                     /* type 6: aim */
+        CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,1);
+        CHECK(seen_scene==1u && WORD_AT(0x0079094Cu)==100u);
+        WORD_AT(SKST+0x4160u)=1u;WORD_AT(SKST+0x413Cu+0x18u)=0x00ABC000u;WORD_AT(ENT(3)+0x34u)=0x5151u;
+        CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,0);   /* fire */
+        CHECK(nshot==1 && WORD_AT(SKST+0x4160u)==2u);
+        CHECK(shot_args[0]==0x34u && shot_args[1]==SKST+0x413Cu && shot_args[2]==SKST+0x4148u && shot_args[3]==0x3E99999Au);
+        CHECK(shot_args[4]==ENT(3) && shot_args[5]==A(3) && shot_args[6]==2u && shot_args[7]==1u && shot_args[8]==0x5151u);
+        CHECK(shot_args[9]==0xEu && shot_args[10]==0xCu && shot_args[11]==0x3DCCCCCDu);
+        CHECK(neffect==1 && effect_args[0]==0x00ABC000u && effect_args[1]==0);
+        CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,0);   /* done */
+        CHECK(nshot==1 && WORD_AT(SKST+0x4160u)==2u);
+        WORD_AT(A(3)+0x9DCu)=8u;                                             /* past the table */
+        CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,1);
+        WORD_AT(A(4)+0x9DCu)=2u;WORD_AT(SKST+0x4160u)=1u;
+        CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(4),0x00600F00u,0,1);   /* not the boss */
+        CHECK(nshot==1 && seen_scene==100u);
+        /* event: its death marker is dropped */
+        CALL(pc_mapmaker_realbosses_event,fake,0x0029E068u,3u,0,0,0);
+        CHECK(rbs_skel.events==1);
+        CALL(pc_mapmaker_realbosses_event,fake,0x00227000u,3u,0,0,1);        /* map logic */
+        WORD_AT(0x0079094Cu)=1u;
+        CALL(pc_mapmaker_realbosses_event,fake,0x0029E068u,3u,0,0,1);        /* mission 5 */
+        WORD_AT(0x0079094Cu)=100u;
+        CHECK(rbs_skel.events==1);
+        /* bar: Boss Off = no health shown; the stock call never sees the focus */
+        WORD_AT(PLAYER+0xFF4u)=ENT(3);
+        CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+        CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(3) && nbar==0);
+        container(0xC,skel,2,bar3,3);                                        /* Boss flag: bosses draws */
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
+        CHECK(rbs.real[1].record==REC(3) && rbs.real[1].boss==1);
+        CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+        CHECK(seen_focus==0 && nbar==0 && WORD_AT(PLAYER+0xFF4u)==ENT(3));
+        CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(3),0,0x7Fu,0);  /* meter hidden */
+        container(0xC,skel,2,sub3,3);                                        /* Sub-boss: the meter */
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
+        CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+        CHECK(seen_focus==0 && nbar==0);
+        CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(3),0,0x7Fu,1);
+        container(0xC,skel,2,none3,3);
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
+        CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(3),0,0x7Fu,0);  /* no flag: hidden */
+        CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(4),0,0x7Fu,1);  /* the extra keeps it */
+        /* the next level forgets this one */
+        container(0xC,without,2,none3,3);
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(!rbs_skel.record && !rbs_skel.state);
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(3),0,0,1);
+        CALL(pc_mapmaker_realbosses_risen,fake,0x0029D4A4u,ENT(3),0,0,1);
+        CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,1);
+        CHECK(nshot==1);
+        WORD_AT(PLAYER+0xFF4u)=ENT(0);
     }
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);        /* not in play */

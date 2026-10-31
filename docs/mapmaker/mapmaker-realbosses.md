@@ -1,10 +1,11 @@
-# MapMaker real story bosses: the giant trophy monster
+# MapMaker real story bosses: the giant trophy monster and the giant skeleton
 
 Status: implemented in `src/interface/pc_mapmaker_realbosses.inc` (area
 `realbosses`), fixture-tested (`tests/mapmaker/test_mapmaker_realbosses.py`:
-49 mutations, plus decode and US XBE data checks of every site below). The
+83 mutations, plus decode and US XBE data checks of every site below). The
 creature was played in v0.4.0-mapmaker.5 (user: working); the floating-meter
-fix and the health display choice below are not built or played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
+fix, the health display choice, "Boss Off = no health" and the giant
+skeleton ([below](#the-giant-skeleton-mansion-boss)) are not built or played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
 `TSFP_MAPMAKER_REAL_BOSS=0` keeps the creature on the normal bot AI (stage 1).
 
 User report (2026-10-31): the trophy monster from story mission 5 is much
@@ -73,7 +74,11 @@ bosses (mansion boss, tank, jetpack) need one (research section 1.5).
 (>= 0xD87), so in scene 100 the text hook returns "Giant Trophy Monster" for
 that one call instead.
 
-- No Boss flag: one bar, the stock one (the creature's own health).
+- No Boss flag (Boss Off): no health shown at all (user, 2026-10-31: "The
+  giant trophy monster also now has boss health visible even if boss is set
+  to off for its AI. This shouldn't be the case."). The hud hook clears the
+  focus for the stock call for every noted real boss, so its own bar is
+  never drawn, and the meter stays hidden.
 - Boss flag on (Story AI chunk +0x29 = 0xB0 | level, area `bosses`): the
   realbosses HUD hook clears the focus for the stock call only (restored
   after), so the stock bar is not drawn and `pc_mapmaker_bosses_hud` draws the
@@ -83,9 +88,9 @@ that one call instead.
 - Boss flag with **Health display: Sub-boss bar** (+0x29 bit 2): the focus
   is cleared as for the Boss bar, the bosses area draws no bottom bar for it,
   and the overhead meter below is kept: the meter instead of any bar.
-- Several deerbeasts: the stock focus holds one at a time; give the others the
-  Boss flag for their own bars.
-- With the `bosses` area switched off the stock bar always stays.
+- Several deerbeasts: give each the Boss flag for its own bar.
+- With the `bosses` area switched off there is no Boss row: as Boss Off, no
+  health is shown.
 
 ## The floating health meter (fixed after v0.4.0-mapmaker.5)
 
@@ -120,10 +125,53 @@ read it. With `TSFP_MAPMAKER_REAL_BOSS=0` (bot class) the creature never gets
 a record (INFERRED from the caller list), so there is no meter to hide.
 Narrowest gate by design: other actors that legitimately carry a record keep
 their meter. Per real boss (ai_start notes 0 / Boss bar / Sub-boss bar from
-chunk +0x29): no Boss flag = stock bottom bar, meter hidden; Boss bar = the
+chunk +0x29): no Boss flag = no bar, meter hidden; Boss bar = the
 bosses area's bar, meter hidden; Sub-boss bar = meter shown, no bottom bar.
 The meter's height comes from the model's own skeleton node, not a fixed
 human offset ([bosses: Health display](mapmaker-bosses.md#health-display)).
+
+## The giant skeleton (mansion boss)
+
+User request (2026-10-31): the giant skeleton of mission 5 that rises out of
+the ground, as a Story AI. CONFIRMED (decode and US XBE data,
+`test_skeleton_*`):
+
+| | value |
+|---|---|
+| character id | 0x28 (model 0x5E9 `CHR_MANSION_MANSIONBOSS`, no LOD; no Arcade row) |
+| picker | synthetic row 151 "Giant Skeleton", text 0x52420028; preview stand-in the Arcade skeleton cowboy (id 0xA6, row 144) |
+| behaviour | class 0x20000: `sub_0027D590` 0x0027DD54 -> `sub_0029FE00(entity)` (call 0x0027DDD3), which tail-jumps to the mansion variant `sub_0029CEF0` in scene 1 and to the catacombs variant `sub_0029E0A0` elsewhere |
+| animations | `pak/stream/lv1/anim/lv1_6.pak` (0x0049D6FC, registered at 0x001CAE61, table 0x0048C738, 18 names `princess_start` 0x19C .. `princess_eyeoverwrite` 0x1A9; no id shared with lv1_3) |
+| per-level state | `sub_00287E00`: `[0x0078B1EC]` = level heap 0x4C7C, `sub_002A62C0`: `[0x0078B0D0]` = 0x7D00 (800 x 0x28 particles), then `sub_00287860` initialises the fields; stock only from `sub_0025F720` in scenes 1 and 17 (`sub_0015E7C0` 0x0015E818, story mode only) |
+
+No arena coordinates: the fight reads its own entity position, bone matrices
+and the players; the particle shape `sub_002A62F0(3, 1.5, 0, ..)` is local to
+a bone. The emergence is the animation `princess_start` (state 1 waits for
+it), so the skeleton rises at its Story AI's spawn point. INFERRED: the
+animation starts below the floor, as in the courtyard; on a MapMaker tile it
+should rise through the floor (unplayed).
+
+| WRAP | what it does (scene 100 story, switch on) |
+|---|---|
+| `sub_001C8540` (anims) | also mounts lv1_6.pak (>= 2 of 30 slots free) when the custom set holds 0x28; both paks when both bosses are in the set |
+| `sub_0025F720` -> `pc_mapmaker_realbosses_level` | after the original: forget the last level; when the set holds 0x28 (or the container is unreadable), clear the two pointers and call the stock `sub_00287E00` (52.6 KB, freed with the level heap like the stock blocks); a failed allocation is logged and the skeleton keeps the bot AI |
+| `sub_0015B830` (ai_start) | char 0x28 / model 0x5E9: class 0/0x20000 when lv1_6 is mounted and this level's state is in place; only the first spawn record per level (extras logged, keep the bot AI and look wrong: human animations on a non-human rig) |
+| `sub_0029FE00` -> `pc_mapmaker_realbosses_princess` | that boss in scene 100: call `sub_0029CEF0` directly (it pops the caller's return address, exactly the lifted tail jump) |
+| `sub_002875F0` -> `pc_mapmaker_realbosses_risen` | state 1 "entrance done": stock is `sub_00059DB0(entity, 0x19C)` only in scene 1 (0x23B in 17, else 0: stuck rising); scene 1's answer for the boss |
+| `sub_00287E20` -> `pc_mapmaker_realbosses_throw` | the feeble throw (action type 6, 0x005208B8[a+0x9DC]; phase +0x4160 0 aim / 1 fire / 2 done) only runs in scene 1, else every frame resets it. Aim: the original with the scene word 1 (its only scene read is its first instruction; its callees read none, decode). Fire: the stock `sub_000EA9C0(0x34, s, s+0xC, 0.3, entity, a, 2, 1, entity+0x34, 0xE, 0xC, 0.1)` (s = state+0x413C), `sub_0010EB90([s+0x18], 0)`, phase 2, in the real scene. Done: return, as scene 1 |
+| `sub_002274C0` -> `pc_mapmaker_realbosses_event` | the death's level event 3 (call 0x0029E063, ret 0x0029E068) would fire the map's own logic marker 3: dropped and logged. It is the only level event the fight and its callbacks (`sub_000BC470`, `sub_00286430`, `sub_00289690`, `sub_00288BD0`) can reach |
+| `sub_0014CC80` (hud) | the HUD case 0x5E9 draws a bar only in scene 1 (0x0014CF05; else a catacombs meter when entity +0x1A0 == 1): the focus is cleared for the stock call as for the deerbeast |
+| `sub_0013A400` (meter) | the fight makes a +0x268 record (0x0029D101): hidden unless Sub-boss bar |
+
+Health: the fight sets 40/40 at its start (0x0029D0E5); the Boss row's
+multiplier is re-applied by the bosses area when the maximum changes. Boss
+Off: no health shown; Boss bar: the bosses bar; Sub-boss bar: the meter.
+
+Not done in scene 100: the dust particles (`sub_0029CE00`, drawn by the frame
+`sub_001CEBC0` only in scenes 1 and 17, 0x001CEE31/0x001CEE42). Risks: the
+spoofed scene during aiming, the fight's untraced reliance on mansion script
+state, the throw target point (state +0x4164, filled by `sub_00159150`),
+collision on tiles.
 
 ## Save format and stock games
 
@@ -152,12 +200,19 @@ WRAP sub_001C8540 -> pc_mapmaker_realbosses_anims          (new; level load)
 WRAP sub_0015B830 -> pc_mapmaker_realbosses_ai_start       (new; AI start)
 WRAP sub_0014CC80 -> pc_mapmaker_realbosses_hud            (already wrapped by bosses: chain INSIDE pc_mapmaker_bosses_hud)
 WRAP sub_0013A400 -> pc_mapmaker_realbosses_meter          (new; overhead meter, per frame per recorded actor)
+WRAP sub_0025F720 -> pc_mapmaker_realbosses_level          (new; story level init, after the original)
+WRAP sub_0029FE00 -> pc_mapmaker_realbosses_princess       (new; class 0x20000 dispatch, per AI frame)
+WRAP sub_002875F0 -> pc_mapmaker_realbosses_risen          (new; per skeleton frame in state 1)
+WRAP sub_00287E20 -> pc_mapmaker_realbosses_throw          (new; per skeleton frame)
+WRAP sub_002274C0 -> pc_mapmaker_realbosses_event          (new; level events, return-address test first)
 ```
 
 Include the `.inc` after `pc_mapmaker_bosses.inc` / `pc_mapmaker_characters.inc`
 (it uses `pc_mapmaker_area_enabled`, declared in the file and defined later in
 `pc_menu_mouse_guest.inc`). Link stubs for `sub_0005A130`, `sub_00062260`,
-`sub_00071630` and `sub_00071C70` are in `tests/mapmaker/mapmaker_area_stubs.h`.
+`sub_00071630`, `sub_00071C70`, `sub_00287E00`, `sub_0029CEF0`, `sub_00059DB0`,
+`sub_000EA9C0` and `sub_0010EB90` are in `tests/mapmaker/mapmaker_area_stubs.h`;
+the off-build no-op hooks are in `pc_menu_mouse_guest.inc`, prototypes in `pc_display_menu.h`.
 No extension memory.
 
 ## User test steps
@@ -170,11 +225,11 @@ No extension memory.
    (the preview shows the Arcade trophy monster).
 3. Play the map in Story: stderr shows `mounted lv1_3.pak ...` and `giant
    trophy monster gets the story monster AI`. It is the large mission 5
-   model, roars, charges and head-butts, has its own bar labelled "Giant
-   Trophy Monster", and dies with its death animation. Logic objectives in
+   model, roars, charges and head-butts and dies with its death
+   animation. With Boss Off no health bar or meter is shown. Logic objectives in
    the map still behave.
    No health meter floats above its back (stderr: `overhead health meter
-   hidden on the giant trophy monster`, once).
+   hidden on a real story boss`, once).
 4. Set its **Boss** row to x4: a single bar with the AI's name and four times
    the health. Two deerbeasts with Boss: two bars. Reopen it and set
    **Health display: Sub-boss bar**: in play no bottom bar, the meter on its
@@ -185,3 +240,13 @@ No extension memory.
 6. Unknown and worth watching: movement on MapMaker pads, collision size,
    whether the creature expects the mansion script, the text of bar/name in
    other languages (the label is English only).
+7. Giant skeleton: the picker's row after it is **Giant Skeleton** (preview:
+   the skeleton cowboy). One Story AI with it, play in Story: stderr shows
+   `mounted lv1_6.pak`, `giant skeleton state allocated`, `giant skeleton
+   gets the mansion boss AI`. It rises out of the floor at its spawn point
+   (or note if it floats/clips), then stamps, swipes, bites and throws
+   (stderr `feeble throw fired` once); dies with its animation; stderr
+   `level event dropped`, and map logic markers (e.g. objective 3) do not
+   change. Boss Off: no health; Boss x4: one bar with the name; Sub-boss
+   bar: the meter. A second Giant Skeleton AI: `only one giant skeleton per
+   map` and it fights as a bot. Mission 5 and 6 still play stock.
