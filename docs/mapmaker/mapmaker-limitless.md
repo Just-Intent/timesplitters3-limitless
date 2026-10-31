@@ -53,6 +53,8 @@ are not in the launcher.
 | `TSFP_MAPMAKER_POOLS=0` | Pools on | Restores the original AI navigation pools in MapMaker play. This also turns `LIMITS` off. Troubleshooting only. | - |
 | `TSFP_MAPMAKER_ROOM_MASK_CLEAR=<hex>` | Off | Developer test for open-air (sky) tiles. Not a player feature. | Work in progress |
 | `TSFP_MAPMAKER_PROBE=<flags>` | Off | Read-only diagnostic log; see the [probe guide](mapmaker-meter-probe.md). | Developer use |
+| `TSFP_MAPMAKER_BOSS_RANGE=<units>` | 30 | How close you must be for a Boss Story AI's health bar to show (1..100000 game units). | Automated tests only |
+| `TSFP_MAPMAKER_CREATURE_PROBE=1` | Off | Read-only log of the characters each level spawns and whether story-only creature models can load; write it to a file with `TSFP_MAPMAKER_CREATURE_PROBE_LOG=<file>`. See [bosses](mapmaker-bosses.md). | Developer use |
 
 ## Raised limits (`TSFP_MAPMAKER_LIMITS=1`)
 
@@ -132,6 +134,19 @@ Open a Story AI from the Story AI list. New rows appear above **Done**:
 
 Maps with groups load in the original game as ordinary, separate Story AI.
 *Checked in game (2026-10-31).*
+
+### Story AI bosses (`LIMITS`)
+
+The Story AI edit screen also has a **Boss** row. Each click cycles **Off,
+On, health x2, x4, x8**. In MapMaker Story play a Boss AI has that much more
+health, and the story boss health bar, labelled with the AI's name, appears
+when you are within about 30 units of the nearest living boss
+(`TSFP_MAPMAKER_BOSS_RANGE` changes the distance). Any character in the map's
+character set can be a boss (for example the giant robot or Khallos); it keeps
+its normal MapMaker AI behaviour, not the story boss fight. Maps with bosses
+load in the original game with ordinary AI. Story-only creatures (the mission 5
+ghosts and worms) are not deployable yet. *Automated tests only.*
+Details: [bosses](mapmaker-bosses.md).
 
 ### Clouds per map (`LIMITS`)
 

@@ -275,6 +275,25 @@ logic-picker entry was rejected: Story AI ids are R + index + 1 and the object
 ids start at R + count (0x0031DA9B). Compile/load/level-start hooks chain
 outside the container/editor ones. Not yet built or played.
 
+Story AI bosses (area `bosses`, `src/interface/pc_mapmaker_bosses.inc`,
+`docs/mapmaker/mapmaker-bosses.md`, `TSFP_MAPMAKER_LIMITS=1`): a "Boss:
+Off/On/health x2/x4/x8" row on the same edit screen (same `sub_000784A0`
+site; the click cycles in place and keeps the screen open). Saved in Story
+AI chunk byte +0x29 (0xB0 | level-1; decode-proven unused by the writer,
+loader and every chunk walker); in the editor a C table indexed like the
+entries, colour-checked, kept through delete/reset/load/compile. In scene
+100 story mode, each HUD frame (wrap of the story boss bar `sub_0014CC80`,
+ebx = HUD block) multiplies a Boss AI's entity health +0x1CC/+0x1D8 once
+per (re)initialisation and, when no stock bar was drawn (HUD block +8 bit
+0), draws the nearest living Boss AI within `TSFP_MAPMAKER_BOSS_RANGE`
+(default 30 units) through `sub_00139740` (esi HUD block, edi entity) with
+the AI's saved name. The focus field +0xFF4 and the `sub_0014F0B0`
+0x0014FAE3 meter (a different, player-drain bar) are untouched. Same file:
+read-only `TSFP_MAPMAKER_CREATURE_PROBE=1` (log
+`TSFP_MAPMAKER_CREATURE_PROBE_LOG`) listing story-only character model
+resource slots per level and every new live character's id, AI class,
+record, model and skeleton. Not yet built or played.
+
 ### MapMaker and System Link bug fixes
 
 Area `bugfix` (`src/interface/pc_mapmaker_bugfix.inc`, `src/interface/pc_mapmaker_validate.inc`,
@@ -511,6 +530,9 @@ that every `cmp byte [0x0078ADAE],2` in game code is patched or reviewed.
 numbered names, group-logic toggle, promotion, old-format migration, mutations) and `tests/mapmaker/test_mapmaker_aitemplates_classified.py` (decode checks of
 the edit-screen row site, menu table 0x0052E088 and the unused chunk bytes
 +0x32/+0x33) are in the same CI list.
+`tests/mapmaker/test_mapmaker_bosses.py` (Boss row, editor table, chunk +0x29,
+health scaling, nearest-boss bar, read-only probe; mutations; decode checks of
+chunk byte +0x29 and the `sub_0014CC80`/`sub_00139740` bar sites) is too.
 
 `tests/mapmaker/test_mapmaker_grid.py` (fixture `tests/mapmaker/mapmaker_grid.c`) checks that
 `grid.json` redirects exactly the decoded editor reads of the grid constants
