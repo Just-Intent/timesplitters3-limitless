@@ -435,7 +435,7 @@ missing-store mutation fails. Private-XBE cases skip CI. `display_memory.c`
 tests real host protection/bounds, multi-page spans and the production display
 adapter; retaining its snapshot across calls must fail. Win guard is included.
 `guest_span.c` checks private/mapped pages, permission changes, cold/cross-page
-fallback and released mappings. Windows additionally checks failed page queries
+fallback and released mappings. Windows also checks failed page queries
 and disabled-fast-path/write-permission/page-boundary negative controls.
 Registered projection/cutscene suites cover both hosts; query savings alone
 do not establish FPS improvement.
@@ -986,7 +986,7 @@ fixture (`vehicle_mouse_guest.c`) runs original seat dispatch, gun update and ca
 math, and rejects the old mouse route. This is separate from live mission acceptance;
 see [mounted and vehicle mouse contracts](mounted-mouse.md).
 
-The mounted original-vehicle fixture additionally runs 1730E0 track output and
+The mounted original-vehicle fixture also runs 1730E0 track output and
 link restoration across camera headings, forward/reverse and steering. Original
 CA040 camera coverage now includes nonzero driver pitch; its original custom
 ABI saves ESI, while the pitch branch uses other registers as scratch. Existing
@@ -1030,4 +1030,4 @@ Crossplay rotation/lock/recycle: `test_crossplay_peer.py`; Online interpreter:
 Markers: test_ui_layout.py; test_patch_updates.py checks 2290/2291 after migration.
 
 Mech input: test_mounted_mouse.py; [scope](mounted-mouse.md#battle-mech-mouse-425).
-MapMaker: limitless.md.
+MapMaker (also char sets): limitless.md.
