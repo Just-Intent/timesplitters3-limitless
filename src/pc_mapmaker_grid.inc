@@ -43,7 +43,14 @@
  * nor uncounts the item already in the cell (sub_00308260 answers "none" at
  * returns 0x003034AD/0x00303696), and the validity test sub_00334770 does
  * not refuse an occupied cell (matching items' x word hidden as 0x7FFF for
- * the call and restored). Only for allowed categories (weapons, ammo,
+ * the call and restored). The per-frame "placement valid" bit (editor
+ * +0x25C value 4; clear = red X, and the drop refuses with 0x1576) has a
+ * second occupancy test in sub_00306460: after sub_003348C0 passes for a
+ * held item (return 0x003070A7) it is set only when no item is under the
+ * cursor ([editor+0x2F1C] at 0x003070B4); that hook sets it itself when
+ * the held item may stack. Holding an item, the button always drops
+ * (pick-up of the item under the cursor runs only with empty hands,
+ * sub_00304C30 0x00304D7D). Only for allowed categories (weapons, ammo,
  * keycards, health, armour, power-ups, special pickups, props); starts,
  * flags, teleporters, turrets, movers, markers, the single item and unknown
  * categories keep the stock one-per-cell rule.
@@ -77,12 +84,13 @@
 #define MAPMAKER_GRID_RET_BAR 0x0030BFB5u
 #define MAPMAKER_STACK_RET_COUNT 0x003034ADu
 #define MAPMAKER_STACK_RET_REPLACE 0x00303696u
+#define MAPMAKER_STACK_RET_VALID 0x003070A7u
 #define MAPMAKER_STACK_HIDE 0x7FFFu
 #define MAPMAKER_GRID_U16(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 static struct {
     int initialized, wide, overlap, stack;
-    unsigned refused, overlaps, stacked, reregistered;
+    unsigned refused, overlaps, stacked, reregistered, stack_valid;
     uint32_t allocated;   /* the grid this hook allocated (wide mode) */
 } mapmaker_grid;
 
@@ -367,21 +375,42 @@ static int mapmaker_stack_allowed(int32_t id)
     category=(int16_t)MAPMAKER_GRID_U16(a);
     return category>=0 && category<37 && allowed[category];
 }
-/* sub_00308260(piece, cell, id): the item already in the cell. In
- * sub_00303460 (place) answer none, so nothing is replaced or uncounted. */
+/* sub_00308260(piece, cell, id): the item already in the cell (a pure
+ * list walk). In sub_00303460 (place) answer none, so nothing is replaced
+ * or uncounted; the original still runs, so only a real stack is logged. */
 void pc_mapmaker_stack_find(void (*original)(void))
 {
     uint32_t ret,held;
     mapmaker_grid_read();
-    ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;
-    if(!mapmaker_grid.stack || (ret!=MAPMAKER_STACK_RET_COUNT && ret!=MAPMAKER_STACK_RET_REPLACE) ||
-       !mapmaker_grid_editor() || !MAPMAKER_PTR_OK(g_ebp+0x14u,4)) { original();return; }
+    ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;  /* before the original pops it */
+    original();
+    if(!g_eax || !mapmaker_grid.stack || (ret!=MAPMAKER_STACK_RET_COUNT && ret!=MAPMAKER_STACK_RET_REPLACE) ||
+       !mapmaker_grid_editor() || !MAPMAKER_PTR_OK(g_ebp+0x14u,4)) return;
     held=WORD_AT(g_ebp+0x14u);                /* sub_00303460's held item node */
-    if(!MAPMAKER_PTR_OK(held,4) || !mapmaker_stack_allowed((int32_t)WORD_AT(held))) { original();return; }
+    if(!MAPMAKER_PTR_OK(held,4) || !mapmaker_stack_allowed((int32_t)WORD_AT(held))) return;
     if(ret==MAPMAKER_STACK_RET_REPLACE && mapmaker_grid.stacked++<3u)
         fprintf(stderr,"[mapmaker] stack: item added to an occupied cell\n");
     g_eax=0;
-    MAPMAKER_GUEST_RET();
+}
+/* sub_003348C0(cell): per-frame item validity, called by sub_00306460. At
+ * 0x003070A2 (an item held) a pass still leaves the valid bit clear when an
+ * item is under the cursor (0x003070B4: [editor+0x2F1C] != 0 -> 0x003070C2,
+ * which for every allowed category reaches 0x00307175 without setting it).
+ * Set the bit here for an allowed held item; nothing later in the frame
+ * clears it (the only clear, 0x00306EA1, runs before). */
+void pc_mapmaker_stack_valid(void (*original)(void))
+{
+    uint32_t ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u,editor;
+    original();
+    if(ret!=MAPMAKER_STACK_RET_VALID || !(g_eax&0xFFu)) return;
+    mapmaker_grid_read();
+    if(!mapmaker_grid.stack || !mapmaker_grid_editor()) return;
+    editor=WORD_AT(MAPMAKER_GRID_EDITOR);
+    if(!MAPMAKER_PTR_OK(editor,0x2F38) || !WORD_AT(editor+0x2F1Cu) ||
+       !mapmaker_stack_allowed((int32_t)WORD_AT(editor+0x2F34u))) return;
+    WORD_AT(editor+0x25Cu)|=4u;
+    if(mapmaker_grid.stack_valid++<3u)
+        fprintf(stderr,"[mapmaker] stack: drop allowed over an existing item\n");
 }
 /* sub_00334770(piece, x, y, z words): may the held item go in this cell?
  * Hide the piece's items in the cell from refusal 4 for the call. */
