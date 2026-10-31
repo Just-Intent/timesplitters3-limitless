@@ -35,8 +35,8 @@ what has and has not been tested. Technical notes for each area are in the
 | Switch | Default | What it does | Tested |
 | --- | --- | --- | --- |
 | `TSFP_MAPMAKER_LIMITS=1` | Off | The main switch: the raised editor limits below, seven floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, and the Clouds checkbox. | See each feature below |
-| `TSFP_MAPMAKER_OVERLAP=1` | Off | Tiles can be placed over other tiles. | Automated tests only |
-| `TSFP_MAPMAKER_STACK_ITEMS=1` | Off | Several items can share one grid cell. | Reported working by the maintainer |
+| `TSFP_MAPMAKER_OVERLAP=1` | Off | Tiles can be placed over other tiles. | Checked in game (2026-10-31) |
+| `TSFP_MAPMAKER_STACK_ITEMS=1` | Off | Several items can share one grid cell. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_MEMORY_SCALE=2..8` | 8 with `LIMITS` | How far the editor's memory estimate is relaxed. Lower it if large maps run short of memory. | Used in the capacity play test |
 | `TSFP_MAPMAKER_ALIVE=1..64` | 64 | Most characters alive at once in a local MapMaker Story map. 32 or 24 can help a slow PC; 20 matches the original game. | Automated tests only |
 | `TSFP_MAPMAKER_POINTER=0` | Mouse on | Turns the editor mouse controls off. | Editor mouse checked in game |
@@ -80,14 +80,14 @@ lets you place.
 The floor menu has seven floors instead of five, and the grid is 80 x 80 cells
 instead of 40 x 40. Old maps open where they were. Pieces placed beyond the
 original grid still play, but the original editor cannot select them.
-*Automated tests only.*
+*Checked in game (2026-10-31).*
 
 ### Overlapping tiles (`OVERLAP`)
 
 Tiles can be placed on top of each other. Expect visual seams, gaps in the
 sky, one-way walls and AI that cannot path between overlapping pieces; the
 result depends on placement order. Removing a tile restores the cells of the
-tiles underneath it. *Automated tests only.*
+tiles underneath it. *Checked in game (2026-10-31).*
 
 ### Stacked items (`STACK_ITEMS`)
 
@@ -95,14 +95,14 @@ Weapons, ammo, keycards, health, armour, power-ups, special pickups and props
 can share one cell. With an item held, the place button always drops it; with
 empty hands it picks up the oldest item in the cell first. Teleporters, start
 points and flags never stack. Stacked items spawn on the same spot in play.
-*Reported working by the maintainer.*
+*Checked in game (2026-10-31).*
 
 ### Any unlocked character in MapMaker Story (`LIMITS`)
 
 When a MapMaker map is played in Story, the character screen offers every
 character your profile has unlocked (the Arcade roster) instead of Cortez only.
 The choice is remembered in your profile, as in Arcade. Campaign story, Arcade,
-challenges and System Link are unchanged. *Automated tests only; HUD portraits
+challenges and System Link are unchanged. *Checked in game: every unlocked character is offered (2026-10-31). HUD portraits
 and end screens with unusual characters are unchecked.*
 
 ### Story AI: Duplicate and linked copies (`LIMITS`)
@@ -121,7 +121,7 @@ Open a Story AI from the Story AI list. New rows appear above **Done**:
   Deleting or unlinking a leader makes its first copy the new leader.
 
 Maps with groups load in the original game as ordinary, separate Story AI.
-*Reported working by the maintainer.*
+*Checked in game (2026-10-31).*
 
 ### Clouds per map (`LIMITS`)
 
