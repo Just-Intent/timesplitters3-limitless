@@ -382,6 +382,27 @@ static int mapmaker_pointer_row_click(void)
     return 1;
 }
 
+/* Right click in an open list is the menu Back action (+0xC4 |= 0x20). The
+ * shared hook sets it in the row layout (sub_00073750, 0x0007ADC5), which most
+ * editor lists act on there: the dispatcher calls their Back callback +0x1C0
+ * (sub_002FB090; 0x0007B1A9..0x0007B1E4). The lighting list (descriptor
+ * 0x0052DFF0, toolbar table 0x0052CD50 slot 2) and its colour sub-lists
+ * (0x0052E000, 0x0052E020, 0x0052E030, 0x0052E040) have no Back callback and
+ * no pop flag (+0x40 & 0x2000): their shared tick sub_0031AF80 reads Back
+ * itself (0x0031B172, closing via sub_0031A500), at 0x0007AD76, before the row
+ * layout, and the dispatcher clears +0xC4 each frame (0x0007AA12). So for those
+ * menus Back is set here, right after the input read, as the B button sets it.
+ * Returns 1 when it did (the shared hook must not set it again). */
+static int mapmaker_pointer_tick_back(uint32_t menu)
+{
+    uint32_t d;
+    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu)) return 0;
+    d=WORD_AT(menu+4);
+    if(d!=0x0052DFF0u && d!=0x0052E000u && d!=0x0052E020u && d!=0x0052E030u && d!=0x0052E040u) return 0;
+    WORD_AT(menu+0xc4)|=0x20u;
+    return 1;
+}
+
 /* Called after the original sub_00073870 for every dispatched menu. */
 static void mapmaker_pointer_input(uint32_t menu)
 {

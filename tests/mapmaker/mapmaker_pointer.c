@@ -377,6 +377,32 @@ int main(void)
     WORD_AT(PANEL+4)=0;WORD_AT(PANEL+0x178)=0;
     row_presses=0;
 
+    /* Right click in the lighting list and its colour sub-lists: Back right
+     * after the input read (their tick reads it); other lists keep the shared
+     * row hook's Back (their +0x1C0 callback). */
+    {
+        static const uint32_t own[]={0x0052DFF0u,0x0052E000u,0x0052E020u,0x0052E030u,0x0052E040u};
+        static const uint32_t shared[]={0x0052DDFCu,0x0052DE0Cu,0x0052E078u,0x0052E9F8u,0x0052E9D8u,0x0052E088u,0x0052E010u,0};
+        for(unsigned i=0;i<5;i++) {
+            WORD_AT(SM+4)=own[i];WORD_AT(SM+0xc4)=0x10000u;
+            CHECK(mapmaker_pointer_tick_back(SM) && WORD_AT(SM+0xc4)==0x10020u);
+        }
+        for(unsigned i=0;i<8;i++) {
+            WORD_AT(SM+4)=shared[i];WORD_AT(SM+0xc4)=0;
+            CHECK(!mapmaker_pointer_tick_back(SM) && !WORD_AT(SM+0xc4));
+        }
+        WORD_AT(SM+4)=0x0052DFF0u;WORD_AT(SM+0xc4)=0;
+        WORD_AT(0x0079094Cu)=101;                       /* other scenes */
+        CHECK(!mapmaker_pointer_tick_back(SM) && !WORD_AT(SM+0xc4));
+        WORD_AT(0x0079094Cu)=102;
+        set_enabled("0");                               /* pointer off: original input */
+        CHECK(!mapmaker_pointer_tick_back(SM) && !WORD_AT(SM+0xc4));
+        set_enabled("1");
+        WORD_AT(MENU+4)=0x0052DFF0u;WORD_AT(MENU+0xc4)=0; /* editor screen keeps rotate/clear */
+        CHECK(!mapmaker_pointer_tick_back(MENU) && !WORD_AT(MENU+0xc4));
+        WORD_AT(MENU+4)=0;WORD_AT(SM+4)=0;
+    }
+
     /* Editor menu rows: a real A press instead of the menu confirm, scene 102 only. */
     set_enabled("0");
     CHECK(!mapmaker_pointer_row_click() && row_presses==0);
