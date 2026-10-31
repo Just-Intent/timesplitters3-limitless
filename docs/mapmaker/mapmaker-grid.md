@@ -100,9 +100,15 @@ launchers.
   `pc_mapmaker_stack_cell` now also hides the Story AI points in the cell
   (x word = 0x7FFF) except the held AI's own points, whether an allowed item
   or a Story AI is held; `pc_mapmaker_stack_sai_point` (on `sub_002F8B40`,
-  return 0x0030723F only) answers -1 while a Story AI is held (with empty
-  hands the point is found, so pick-up takes the AIs apart lowest index
-  first). No other Story AI limit applies per cell (the add check
+  return 0x0030723F only) answers -1 while a Story AI is held. With empty
+  hands (no item and no Story AI held) it answers the HIGHEST-index AI with a
+  point in the cell (its arguments piece/x/y/z are read at entry; the
+  function is cdecl, caller `add esp,0xC` at 0x0030724B), so pick-up takes a
+  shared cell apart newest first: on maps saved while linked copies were
+  born on their leader's points (fixed 2026-10-31, mapmaker-aitemplates.md)
+  the copy comes off before the leader. Logged the first 3 times
+  (`[mapmaker] stack: pick-up takes the newest story AI on a shared cell`).
+  With an item in hand the stock lowest-index answer stays. No other Story AI limit applies per cell (the add check
   `sub_0031BE70` counts AIs, not cells). A Story AI's own points still may not
   share a cell. Points beyond 8 in an entry (only from damaged files) are left
   to the original, which then refuses.
