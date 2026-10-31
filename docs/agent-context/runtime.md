@@ -232,6 +232,11 @@ constant reads at the 16-byte settings block 0x00903600
 With `TSFP_MAPMAKER_STACK_ITEMS=1` the grid hook on `sub_003348C0` (return
 0x003070A7) also sets placement-valid bit 4 of editor `+0x25C` when an allowed
 pickup is held over a cell that already has an item, so the stock drop path runs.
+The sky area also wraps the editor neighbour-mask builders (`sub_002FC680`,
+`sub_002FC470`), piece creation (`sub_00307FD0`) and the tile palette menu
+(`sub_00316B50`, `sub_000792B0`, `sub_00316920`, `sub_00316500`) for the Open roof /
+Open air tiles (`src/pc_mapmaker_roof.inc`); compile, load and reset add a further
+layer to their existing chains. Contract: `docs/mapmaker-sky.md`.
 Its hook on `sub_002F8B40` (return 0x0030723F, Story AI mode) answers -1 while
 a Story AI is held, the value `[editor+0x2F20]` already has for "no point under
 the cursor", so a Story AI can be dropped on another one's cell.
