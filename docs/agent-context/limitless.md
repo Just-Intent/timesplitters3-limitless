@@ -432,7 +432,10 @@ record per level class 0/0x20000; WRAPs `sub_0029FE00` -> `_princess` (direct
 with scene word 1 around the original, fire = stock `sub_000EA9C0` args +
 `sub_0010EB90`, phase 2), `sub_002274C0` -> `_event` (drops ret 0x0029E068,
 event 3). Dust particles (`sub_0029CE00`, scenes 1/17 only) not drawn. Not
-built or played.
+built or played. Set gate (mapmaker.12 log: skeleton in slot 11+ not seen,
+no lv1_6 mount/state): `rbs_set_scan` reads slots 1-10 (map-info +0x18) and
+11-20 (sets chunk 0x00C776F5), only for set index 0x11 (stock play sites
+0x00240DBB/0x0023F46A); anims and level log "set check found".
 Whole height (area `bigdraw`, `src/interface/pc_mapmaker_bigdraw.inc`, user:
 skeleton cut at ~2 floors in mapmaker.11): a prop's scissor (+0x118..+0x124,
 `sub_000862C0`, only caller 0x000A246B ret 0x000A2470) is the union of the
