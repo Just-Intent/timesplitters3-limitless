@@ -442,6 +442,15 @@ the cursor", so a Story AI can be dropped on another one's cell.
 Tests: `tests/compiler/test_guest_code_patches.py`, `tests/compiler/test_recomp_generation.py`,
 `tests/compiler/test_guest_image.py` (image loader contract).
 
+### Wrappers shared with upstream patches
+
+Where an upstream patch already defines a guest wrapper (today `sub_000A5CE0`, wrapped by
+`patches/gameplay/timing/0460-native-wind-history.patch`), the generated MapMaker chain is
+exported as `sub_<addr>_mapmaker` and
+`patches/graphics/interface/zzz…-mapmaker-meter-wrappers-chain.patch` makes the upstream
+wrapper call it (upstream outermost, MapMaker inside, original innermost). Add new
+collisions to the generator's `CHAIN_ONTO` set and to the chain patch.
+
 ## Build and test (extends [build-test.md](build-test.md))
 
 ### MapMaker probe runs and tests
