@@ -49,6 +49,10 @@ settings; `TexturePack.cs`/`TextureDownload.cs`: optional textures.
 `pc-frame-rate.ini` and exports `TSFP_NATIVE_FPS`; it needs a compatible game
 build and does not revive interpolation or change the console interrupt clock.
 Legacy144 sidecars load as120 without writes; explicit save uses the new preset.
+`GameSettings.MapMaker*` (Settings → MapMaker tab, both hosts) stores
+`launcher.mapmaker_limits/overlap/stack_items/alive` in pc-controls.json and
+`MapMakerEnvironment()` adds only the chosen `TSFP_MAPMAKER_*` after StartInfo's
+inherited-variable strip; `tools/playable-launch.ps1` mirrors it.
 Launcher version and game version are separate. A source commit is not a
 published release. Use `tools/ci/launcher-compatibility.py --local` for API-free
 shared checks, plus affected host lifecycle/build checks. Never start publishing
@@ -362,6 +366,26 @@ PR #303 restored the references from the live published release API; the bad
 refresh's upstream empty response has not been independently attributed.
 `repo-context.py` exempts only valid version data inside both existing AUTO blocks;
 question/schema, marker, publisher and workflow changes still require guides.
+
+## MapMaker Limitless switches (2026-10-31)
+
+The shared `SettingsPage` adds a fourth **MapMaker** tab (index 3, after
+Discord) with `MapMakerLimits`, `MapMakerOverlap`, `MapMakerStackItems`
+checkboxes and a `MapMakerAlive` choice (64 default, 48, 32, 24, 20; any saved
+1-64 value is kept). `GameSettings` reads/writes strict booleans and an integer
+under `launcher.mapmaker_*` in pc-controls.json through the existing
+transactional Save (backup, outside-change refusal, unknown-key preservation);
+invalid types/ranges refuse loading. `StartInfo` still strips inherited
+`TSFP_*`/`RECOMP_*`, then applies `MapMakerEnvironment()`: `LIMITS`, `OVERLAP`,
+`STACK_ITEMS` = `1` only when on and `ALIVE` only when not 64. The normal Play,
+crash/hang-test (`LaunchGame`) and Mac `NativeWindow` paths all use StartInfo.
+`MEMORY_SCALE`, `POINTER`, `POOLS`, `ROOM_MASK_CLEAR` and `PROBE` remain
+developer environment-only (source runs). Packaged `Launch.ps1`
+(`tools/playable-launch.ps1`) applies the same saved keys. Tests:
+`tests/launcher/launcher_settings.cs` (defaults, round-trip, unknown keys, inherited strip,
+invalid values, UI save), `NativeTests.cs` (Mac routing),
+`tests/launcher/test_launcher_startup.py::test_script_mapmaker_switches`. Mac compile and
+runtime of this tab are pending validation (`MAC_PORT_BACKLOG.md`).
 
 ## Weapon-slot bindings
 

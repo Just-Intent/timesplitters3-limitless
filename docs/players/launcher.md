@@ -236,6 +236,17 @@ The repository's developer **Play.cmd** starts an existing local build. Follow
 the [build guide](../development/building.md) if you are working from source; downloading the
 source repository alone does not install a playable game.
 
+## MapMaker Limitless switches
+
+Open **Game settings → MapMaker** (Windows and Mac) to turn on **Raised
+MapMaker limits**, **Overlapping tiles** or **Stacked items**, or to lower
+**Characters alive at once** from 64. Save, then Play. Everything is off by
+default, matching the original game. The launcher ignores `TSFP_MAPMAKER_*`
+variables set in your shell and passes only these saved choices; they are kept
+in the installation's `Settings/pc-controls.json` across updates. Overlapping
+tiles can cause visual and AI-pathing artefacts, and maps beyond the original
+limits need this fork. See the [MapMaker Limitless guide](../mapmaker/mapmaker-limitless.md).
+
 ## Native frame-rate selection (upcoming launcher update)
 
 Open **Game settings → Graphics & resolution → Frame rate** to select

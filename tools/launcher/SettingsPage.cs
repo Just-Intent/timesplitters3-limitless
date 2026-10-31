@@ -49,8 +49,8 @@ namespace TimeSplitters.Launcher
         string savedDraft;
         readonly Slider fov;
         readonly TextBox sensitivity, width, height, discordId;
-        readonly CheckBox enabled, invert, fullscreen, vrr, fps, skipSplashes, discordEnabled, enhancedTextures;
-        readonly ComboBox device, resolution, aspect, scale, filtering, frameRate;
+        readonly CheckBox enabled, invert, fullscreen, vrr, fps, skipSplashes, discordEnabled, enhancedTextures, mapMakerLimits, mapMakerOverlap, mapMakerStackItems;
+        readonly ComboBox device, resolution, aspect, scale, filtering, frameRate, mapMakerAlive;
         readonly TextBlock performanceAdvice;
         readonly Button[,] bindingButtons = new Button[GameSettings.Actions.Length,GameSettings.BindingSlots];
         static readonly string[] Devices = { "keyboard", "gamepad:0", "gamepad:1", "gamepad:2", "gamepad:3", "none" };
@@ -262,6 +262,19 @@ namespace TimeSplitters.Launcher
             presence.Children.Add(Text("Keep Discord open with activity sharing enabled. Applies on your next launch with a compatible game build.",12));
             PageTheme.Details(presence,"Set up Discord activity",discordHelp).Name="DiscordSetupDetails";
             tabs.Items.Add(new TabItem { Header="Discord",Content=Scroll(discord) });
+            var mapmaker=new StackPanel();
+            var limitless=PageTheme.Section(mapmaker,"MapMaker Limitless","Optional MapMaker extensions from this fork. All off keeps the original editor.");
+            mapMakerLimits=Check("Raised MapMaker limits",model.MapMakerLimits);mapMakerLimits.Name="MapMakerLimits";limitless.Children.Add(mapMakerLimits);
+            limitless.Children.Add(Hint("More tiles, items, Story AI, keycards, props, turrets, teleporters and logic; seven floors on an 80×80 grid; any unlocked character in MapMaker Story; Story AI duplicates and linked copies; and the Clouds checkbox."));
+            mapMakerOverlap=Check("Overlapping tiles",model.MapMakerOverlap);mapMakerOverlap.Name="MapMakerOverlap";limitless.Children.Add(mapMakerOverlap);
+            limitless.Children.Add(Hint("Tiles can be placed over other tiles. Expect visual seams, gaps in the sky, one-way walls and AI pathing problems where pieces overlap."));
+            mapMakerStackItems=Check("Stacked items",model.MapMakerStackItems);mapMakerStackItems.Name="MapMakerStackItems";limitless.Children.Add(mapMakerStackItems);
+            limitless.Children.Add(Hint("Several pickups or props can share one grid cell and spawn on the same spot. Teleporters, start points and flags never stack."));
+            mapMakerAlive=Choices(GameSettings.MapMakerAliveChoices.Select(GameSettings.MapMakerAliveLabel).ToArray(),GameSettings.MapMakerAliveLabel(model.MapMakerAlive));
+            mapMakerAlive.Name="MapMakerAlive";Field(limitless,"Characters alive at once (MapMaker Story)",mapMakerAlive);
+            limitless.Children.Add(Hint("Lower this if large MapMaker Story maps run slowly. 20 matches the original game."));
+            limitless.Children.Add(Text("Maps beyond the original limits need this fork and cannot be sent over System Link. Keep backups of maps you care about. Changes apply on your next game launch.",12));
+            tabs.Items.Add(new TabItem { Header="MapMaker",Content=Scroll(mapmaker) });
             var audioPanel=new StackPanel();
             var audio=PageTheme.Section(audioPanel,"Enhanced Audio","Optional positional audio and ambience improvements.");
             enhancedAudio=Check("Enhanced Audio (Beta)",model.EnhancedAudio);enhancedAudio.Name="EnhancedAudio";audio.Children.Add(enhancedAudio);
@@ -270,8 +283,8 @@ namespace TimeSplitters.Launcher
             audio.Children.Add(Text("Defaults OFF. Shares the in-game Audio Options preference. Save before launch; you can also switch it live from the game's audio menu.",12));
             tabs.Items.Add(new TabItem {Header="Audio",Content=Scroll(audioPanel)});
             foreach(var entry in new[]{sensitivity,width,height,discordId})Ui.TextChanged(entry,RefreshSaveState);
-            foreach(var check in new[]{enabled,invert,fullscreen,vrr,fps,skipSplashes,discordEnabled,enhancedTextures,enhancedAudio})Ui.CheckedChanged(check,RefreshSaveState);
-            foreach(var choice in new[]{device,scale,filtering,frameRate})choice.SelectionChanged+=(s,e)=>RefreshSaveState();
+            foreach(var check in new[]{enabled,invert,fullscreen,vrr,fps,skipSplashes,discordEnabled,enhancedTextures,enhancedAudio,mapMakerLimits,mapMakerOverlap,mapMakerStackItems})Ui.CheckedChanged(check,RefreshSaveState);
+            foreach(var choice in new[]{device,scale,filtering,frameRate,mapMakerAlive})choice.SelectionChanged+=(s,e)=>RefreshSaveState();
             Ui.ValueChanged(fov,RefreshSaveState);
         }
         string Draft()
@@ -279,6 +292,7 @@ namespace TimeSplitters.Launcher
             return Json.Encode(new object[]{sensitivity.Text,width.Text,height.Text,discordId.Text,
                 enabled.IsChecked,invert.IsChecked,fullscreen.IsChecked,vrr.IsChecked,fps.IsChecked,
                 skipSplashes.IsChecked,discordEnabled.IsChecked,enhancedTextures.IsChecked,enhancedAudio.IsChecked,
+                mapMakerLimits.IsChecked,mapMakerOverlap.IsChecked,mapMakerStackItems.IsChecked,mapMakerAlive.SelectedIndex,
                 device.SelectedIndex,scale.SelectedIndex,filtering.SelectedIndex,frameRate.SelectedIndex,
                 (int)Math.Round(fov.Value),Enumerable.Range(0,GameSettings.Actions.Length).Select(i=>model.Binding(i)).ToArray()});
         }
@@ -289,6 +303,7 @@ namespace TimeSplitters.Launcher
             status.Foreground=save.IsEnabled?Muted:Accent;
             status.Text=save.IsEnabled?"Unsaved changes. Save to apply on your next launch.":"Settings saved. Changes apply on your next launch.";
         }
+        static TextBlock Hint(string text) { var hint=Text(text,12);hint.Foreground=Muted;hint.Margin=new Thickness(28,0,0,8);return hint; }
         static string KeyName(string token) { return GameSettings.BindingLabel(token); }
         void RefreshBindings() { for(int i=0;i<GameSettings.Actions.Length;i++) { var keys=model.Binding(i); for(int j=0;j<GameSettings.BindingSlots;j++) { bindingButtons[i,j].Content=KeyName(keys[j]);bindingButtons[i,j].Foreground=KeyName(keys[j])=="Unbound"?Muted:Ink; } } RefreshSaveState(); }
         public void SelectTab(int index) { tabs.SelectedIndex=index; }
@@ -426,6 +441,11 @@ namespace TimeSplitters.Launcher
                 model.EnhancedTextures=enhancedTextures.IsChecked==true;
                 model.EnhancedAudio=enhancedAudio.IsChecked==true;
                 model.SkipStartupSplashes=skipSplashes.IsChecked==true;
+                model.MapMakerLimits=mapMakerLimits.IsChecked==true;model.MapMakerOverlap=mapMakerOverlap.IsChecked==true;model.MapMakerStackItems=mapMakerStackItems.IsChecked==true;
+                var aliveLabel=Convert.ToString(mapMakerAlive.SelectedItem,CultureInfo.InvariantCulture);
+                int alive=GameSettings.MapMakerAliveDefault;
+                for(int n=GameSettings.MapMakerAliveMin;n<=GameSettings.MapMakerAliveMax;n++) if(GameSettings.MapMakerAliveLabel(n)==aliveLabel) alive=n;
+                model.MapMakerAlive=alive;
                 model.DiscordEnabled=discordEnabled.IsChecked==true;model.DiscordApplicationId=discordId.Text.Trim();
                 model.Scale=Int32.Parse((string)scale.SelectedItem); model.Anisotropy=Int32.Parse((string)filtering.SelectedItem);
                 model.Save();UpdateTextureDetails();savedDraft=Draft();RefreshSaveState();
