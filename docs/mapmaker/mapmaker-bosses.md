@@ -152,8 +152,9 @@ farther ones wait for a free place.
   tick, so its fade stayed 1 and the bar stayed full ("not showing health
   decreasing"). Now each copy is faded by the clock time since its own last
   draw (same rule; a clock that went back counts as no time), so a hit drains
-  to the new length in 0.5 s like the stock bar. A real trophy monster
-  without the Boss flag keeps the stock bar and its live state.
+  to the new length in 0.5 s like the stock bar. A real story boss (giant
+  trophy monster, giant skeleton) without the Boss flag shows no health at
+  all (user, 2026-10-31): its own stock bar is suppressed.
 - Widescreen: the coordinates are the guest's 640x480 HUD space like every
   stock HUD draw, so the renderer keeps all bars inside the centred 4:3 HUD
   box ([widescreen](mapmaker-widescreen.md)).
@@ -164,9 +165,9 @@ farther ones wait for a free place.
 |---|---|---|
 | Boss, Boss bar | yes (stacked, in range) | no |
 | Boss, Sub-boss bar | no | yes, while alive (any distance, like stock) |
-| real trophy monster, no Boss flag | its stock bar | hidden ([real bosses](mapmaker-realbosses.md)) |
-| real trophy monster, Boss bar | the Boss bar | hidden |
-| real trophy monster, Sub-boss bar | none | its stock meter |
+| real story boss (trophy monster, skeleton), Boss Off | none | hidden ([real bosses](mapmaker-realbosses.md)) |
+| real story boss, Boss bar | the Boss bar | hidden |
+| real story boss, Sub-boss bar | none | its stock meter |
 
 - The meter is the stock MapMaker story overhead meter `sub_0013A400`
   (CONFIRMED by decode, `test_overhead_meter_draw_contract`): cdecl
