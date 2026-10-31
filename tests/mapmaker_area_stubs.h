@@ -38,4 +38,7 @@ void sub_003C85D4(void) {}
 /* aitemplates */
 void sub_0031BE70(void) {}
 void sub_00079D60(void) {}
+/* sky (sub_00078560 becomes a wrapper dispatcher) */
+void sub_00078560(void) {}
+void sub_0007D4F0(void) {}
 #endif

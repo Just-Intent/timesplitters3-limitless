@@ -122,6 +122,12 @@ void pc_mapmaker_bugfix_bot_goal(void (*original)(void));
 void pc_mapmaker_bugfix_hud(void (*original)(void));
 void pc_mapmaker_bugfix_hud_turret(void (*original)(void));
 void pc_mapmaker_validate_level(void (*original)(void));
+void pc_mapmaker_sky_clouds(void (*original)(void));
+void pc_mapmaker_sky_settings(void (*original)(void));
+void pc_mapmaker_sky_reset(void (*original)(void));
+void pc_mapmaker_sky_compile(void (*original)(void));
+void pc_mapmaker_probe_room_draw(void (*original)(void));
+void pc_mapmaker_probe_prop_draw(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));

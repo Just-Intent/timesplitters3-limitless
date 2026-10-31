@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x800000/4],g_esp,g_ecx;
+static uint32_t memory[0x900000/4],g_esp,g_ecx;
 static uintptr_t g_xbox_mem_offset;
 static unsigned long long tick=1000;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -98,6 +98,39 @@ static void call_meter(void)
     push(0x00401234u); /* return address */
     pc_display_mapmaker_meter(meter_original);
     CHECK(g_esp==sp-20 && g_ecx==ecx);
+    g_esp=sp;
+}
+
+/* Flag 128: a fake room draw (sub_000A2900) whose original pops its return
+ * address and draws two layers of the room's geometry prop through the
+ * sub_0008F950 hook, as 0x000A2AC5 does. */
+#define ROOM_PROP 0x00350000u
+#define ROOM_INST 0x00351000u
+#define ROOM_OTHER 0x00352000u
+#define ROOM_LIST 0x00353000u
+static unsigned room_originals,draw_originals;
+static void draw_original(void) { draw_originals++;g_esp+=4u; }
+static void draw_model(uint32_t inst,uint32_t pass,uint32_t layer)
+{
+    uint32_t sp=g_esp;
+    push(layer);push(pass);push(inst);push(0x000A2ACAu);
+    pc_mapmaker_probe_prop_draw(draw_original);
+    CHECK(g_esp==sp-12u);
+    g_esp=sp;
+}
+static void room_original(void)
+{
+    room_originals++;
+    g_esp+=4u;
+    draw_model(ROOM_INST,WORD_AT(g_esp+4u),1u);
+    draw_model(ROOM_INST,WORD_AT(g_esp+4u),2u);
+}
+static void call_room(uint32_t ret,uint32_t room,uint32_t pass)
+{
+    uint32_t sp=g_esp;
+    push(pass);push(room);push(ret);
+    pc_mapmaker_probe_room_draw(room_original);
+    CHECK(g_esp==sp-8u);  /* the original popped its return address */
     g_esp=sp;
 }
 
@@ -327,6 +360,74 @@ int main(int argc,char **argv)
     mapmaker_probe_pools();
     read_log();
     CHECK(count("pools ")==1);
+    WORD_AT(0x0079094Cu)=0;
+
+    /* Flag 128: room prop draws in scene 100, read-only, windowed, deduplicated. */
+    WORD_AT(MAPMAKER_PROBE_ROOM_COUNTS+5u*4u)=2u;WORD_AT(MAPMAKER_PROBE_ROOM_LISTS+5u*4u)=ROOM_LIST;
+    WORD_AT(ROOM_LIST)=ROOM_PROP;WORD_AT(ROOM_LIST+4u)=ROOM_OTHER;
+    WORD_AT(ROOM_PROP+4u)=ROOM_INST;WORD_AT(ROOM_PROP+0x94u)=0x0000090Cu;WORD_AT(ROOM_PROP+0x28u)=0x00400000u;
+    WORD_AT(ROOM_PROP+0x20u)=0x80u;WORD_AT(ROOM_PROP+0x0Cu)=1u;WORD_AT(ROOM_PROP+0x30u)=0x00010000u;WORD_AT(ROOM_PROP+0x34u)=5u;
+    WORD_AT(ROOM_INST+0x30u)=0x02000000u;WORD_AT(ROOM_INST+0x1F4u)=0x00080000u;
+    WORD_AT(ROOM_OTHER+4u)=0x00354000u;WORD_AT(ROOM_OTHER+0x94u)=0x00000123u;WORD_AT(ROOM_OTHER+0x34u)=5u;
+    WORD_AT(0x0079094Cu)=100;
+    set_probe("128");
+    room_originals=draw_originals=0;
+    before=checksum();
+    call_room(0x00086BDEu,5u,0u);
+    call_room(0x00086BDEu,5u,0u);                        /* same draw: counted, not logged again */
+    CHECK(room_originals==2 && draw_originals==4);
+    CHECK(checksum()==before);
+    read_log();
+    CHECK(strstr(log_text,"rooms-window begin n=1 tables=0x008C7000/0x008C7C00\n")!=NULL);
+    CHECK(count("room-draw ret=0x00086BDE room=5 pass=0 props=2\n")==1);
+    CHECK(strstr(log_text,"  prop room=5 index=0 at=0x00350000 model=0x90C geometry=1 type(+20)=0x80 flags(+28)=0x00400000"
+                          " mask(+0C)=0x00000001 +31=0 +32=1 room(+34)=5 inst=0x00351000 inst+30=0x02000000 inst+1F4=0x00080000\n")!=NULL);
+    CHECK(strstr(log_text,"  prop room=5 index=1 at=0x00352000 model=0x123 geometry=0 ")!=NULL);
+    CHECK(count("  prop room=5 ")==2);
+    CHECK(count("  draw ret=0x000A2ACA inst=0x00351000 pass=0 layer=")==2);
+    CHECK(strstr(log_text,"  draw ret=0x000A2ACA inst=0x00351000 pass=0 layer=2 room=5 model=0x90C\n")!=NULL);
+    call_room(0x00086BDEu,5u,1u);                        /* another pass is a distinct draw */
+    read_log();
+    CHECK(count("room-draw ")==2 && count("  prop room=5 ")==2);
+    draw_model(ROOM_INST,0u,3u);                         /* outside a room draw: not logged */
+    read_log();
+    CHECK(count("  draw ")==2 && draw_originals==7);
+    for(i=0;i<MAPMAKER_PROBE_ROOM_WINDOW/1000u;i++) {   /* drawn every second; the window closes */
+        tick+=1000u;
+        call_room(0x00086BDEu,5u,0u);
+    }
+    read_log();
+    CHECK(strstr(log_text,"rooms-window end n=1 room-draws=7 props=4 draws=14 unlogged=0\n")!=NULL);
+    CHECK(count("rooms-window begin")==1);
+    CHECK(count("room-draw ")==2 && count("  draw ")==2);
+    for(i=0;i<(MAPMAKER_PROBE_ROOM_PERIOD-MAPMAKER_PROBE_ROOM_WINDOW)/1000u-1u;i++) {
+        tick+=1000u;                                     /* drawn every second: still between windows */
+        call_room(0x00086BDEu,5u,0u);
+    }
+    read_log();
+    CHECK(count("rooms-window begin")==1 && count("room-draw ")==2);
+    tick+=1000u;
+    call_room(0x00086BDEu,5u,0u);                        /* 30 s after the first: a new window */
+    read_log();
+    CHECK(strstr(log_text,"rooms-window begin n=2 ")!=NULL && count("room-draw ")==3);
+    WORD_AT(0x0079094Cu)=102;                            /* editor: closed and not logged */
+    tick+=100u;
+    call_room(0x00086BDEu,5u,0u);
+    read_log();
+    CHECK(count("room-draw ")==3 && strstr(log_text,"rooms-window end n=2 ")!=NULL);
+    WORD_AT(0x0079094Cu)=100;                            /* back in play: a new window at once */
+    call_room(0x00086BDEu,6u,0u);                        /* empty room */
+    read_log();
+    CHECK(strstr(log_text,"rooms-window begin n=3 ")!=NULL && strstr(log_text,"room-draw ret=0x00086BDE room=6 pass=0 props=0\n")!=NULL);
+    WORD_AT(MAPMAKER_PROBE_ROOM_COUNTS+7u*4u)=3u;WORD_AT(MAPMAKER_PROBE_ROOM_LISTS+7u*4u)=0x0FFFFFF0u; /* bad list */
+    call_room(0x00086BDEu,7u,0u);
+    call_room(0x00086BDEu,0x1000u,0u);                   /* past the id tables */
+    read_log();
+    CHECK(strstr(log_text,"room=7 pass=0 props=0\n")!=NULL && strstr(log_text,"room=4096 pass=0 props=0\n")!=NULL);
+    set_probe("64");                                     /* without flag 128: nothing */
+    call_room(0x00086BDEu,5u,0u);
+    read_log();
+    CHECK(strstr(log_text,"room-draw")==NULL && strstr(log_text,"rooms-window")==NULL && strstr(log_text,"  draw ")==NULL);
     WORD_AT(0x0079094Cu)=0;
 
     /* Output is capped. */
