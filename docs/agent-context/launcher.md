@@ -285,3 +285,29 @@ preview series policy is unchanged. Maintenance branches still need a Stable
 ancestor. Launcher tags, drafts, future versions and nonancestor previews are
 excluded. tests/test_publish_release.py verifies baseline selection and generated
 notes payload/range through the existing release test route. No host adapters change.
+
+## Release repository and test-only local source
+
+`ReleaseClient.Repository` is `JustinDent/timesplitters3-limitless`: game and
+launcher release checks, self-update, news, known issues, texture manifest,
+Support/issue/Ideas links and `ValidateDownloadUrl` all follow it.
+`ReleaseClient.UpstreamRepository` (`TheDoffman/timesplitters-future-perfect-pc`)
+is credit only. Python tools share `tools/project_repository.py`; PowerShell
+reads `config/project-repository.json`; the standalone-installed
+`tools/compatibility-worker.py` keeps a matching inline constant.
+`config/launcher-artwork.json` still pins the original project's immutable
+launcher-v1.2.18 artwork asset (hash-verified; the fork has no copy).
+
+`LocalReleaseSource` (in `ReleaseClient.cs`, both hosts) is a hidden TEST-ONLY
+`HttpMessageHandler`. Only when `TSFP_LAUNCHER_RELEASE_SOURCE=<folder>` is set,
+`new ReleaseClient()` answers this repository's GitHub API/download URLs from
+`<folder>/releases.json` and `<folder>/<tag>/<asset>` (byte ranges supported);
+every other URL gets 404 with no network request. Selection, URL validation,
+digest/`.sha256` checks, resumable transfer, extraction, install and repair are
+unchanged. `SetStatus`/Mac `Status` prefix `[TEST ONLY: local release source …]`
+and the version labels say `TEST-ONLY LOCAL RELEASE SOURCE`.
+`tools/make-local-release.py` builds the folder via
+`tools/package-release.py --local-preview`, which keeps the compile-only build
+record in BUILD.json `preview` (validated false) instead of a network seal.
+Tests: `tests/launcher_downloads.cs` (local source group),
+`tests/package_launcher.py`, `tests/test_make_local_release.py`.

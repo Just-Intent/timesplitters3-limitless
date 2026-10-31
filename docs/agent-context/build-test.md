@@ -707,3 +707,14 @@ identities remain readable for baselines without joining Beta's series. Publishe
 fixtures now use beta.N, with explicit legacy rejection/history and independent
 Beta baseline tests. Existing generic semantic-version ordering tests still cover
 alpha/beta ordering separately from the new publication policy.
+
+### Local test release folder
+
+`tools/package-release.py` accepts `--build-root <checkout>` (build/windows and
+external runtime from another checkout, e.g. from a source-only worktree) and
+the hidden `--local-preview` used by `tools/make-local-release.py`. Local preview
+skips the network seal, checks the executable hash against
+`build/windows/compile-only-build.json`, builds the launcher without private
+artwork/test run, and records BUILD.json `preview` (validated false) plus a
+README warning. It is never a published release. Tests:
+`tests/package_launcher.py`, `tests/test_make_local_release.py`.

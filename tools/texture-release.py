@@ -17,7 +17,10 @@ import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-REPO = 'TheDoffman/timesplitters-future-perfect-pc'
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from project_repository import REPOSITORY  # noqa: E402  shared release source
+REPO = REPOSITORY
 BUDGET = 6 * 1024**3
 PART_LIMIT = 64 * 1024**2
 RAW_PART_LIMIT = 48 * 1024**2

@@ -28,7 +28,7 @@ namespace TimeSplitters.Launcher
             AvaloniaXamlLoader.Load(this);Artwork();
             Find<ContentControl>("GameChannelPickerHost").Content=channelPicker.View;
             channelPicker.SetReleases(Array.Empty<Release>(),GameChannels.Read(root),GameChannels.ReadPreviewTrack(root));
-            Label("LauncherVersionLabel","LAUNCHER "+LauncherVersion.Value+"  /  macOS ARM64");
+            Label("LauncherVersionLabel","LAUNCHER "+LauncherVersion.Value+"  /  macOS ARM64"+(LocalReleaseSource.Active?"  /  TEST-ONLY LOCAL RELEASE SOURCE":""));
             Click("HomeNav",()=>Page("CommandCenter"));Click("SettingsNav",ShowSettings);Click("NewsNav",()=>Run(News));
             Click("RepairNav",()=>Maintenance());Click("SupportNav",()=>NativeHost.Open("https://github.com/"+ReleaseClient.Repository+"/issues"));
             Click("SavesNav",()=>OpenFolder(LauncherPlatform.Saves(root)));Click("LogsButton",()=>OpenFolder("logs"));
@@ -56,7 +56,7 @@ namespace TimeSplitters.Launcher
         T Find<T>(string name) where T:Control { return this.FindControl<T>(name)??throw new InvalidOperationException("Missing launcher control: "+name); }
         void Click(string name,Action action){Find<Button>(name).Click+=(s,e)=>{try{action();}catch(Exception ex){Status(ex.Message);}};}
         void Label(string name,string value){Find<TextBlock>(name).Text=value;}
-        void Status(string message){Label("StatusText",message);if(!render)LauncherLog.Write(root,message);}
+        void Status(string message){Label("StatusText",LocalReleaseSource.Decorate(message));if(!render)LauncherLog.Write(root,message);}
         internal bool GameRunning { get { return gameRunning; } }
         readonly GameChannelPickerPage channelPicker=new GameChannelPickerPage();
         string SelectedGameChannel=>channelPicker.Selected;

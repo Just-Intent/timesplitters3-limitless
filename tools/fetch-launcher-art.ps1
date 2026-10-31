@@ -9,7 +9,12 @@ $project = Split-Path -Parent $PSScriptRoot
 if (!$Output) { $Output = Join-Path $project 'build\launcher-art' }
 $Output = [IO.Path]::GetFullPath($Output)
 $pin = Get-Content -Raw (Join-Path $project 'config\launcher-artwork.json') | ConvertFrom-Json
-if ($pin.url -notmatch '^https://github\.com/TheDoffman/timesplitters-future-perfect-pc/releases/download/') { throw 'Unexpected artwork source.' }
+# The pin may name this fork's releases or the original project's immutable
+# launcher-v1.2.18 asset (where the artwork was first published); both are
+# hash-verified below. Repositories come from the shared config.
+$repositories = Get-Content -Raw (Join-Path $project 'config\project-repository.json') | ConvertFrom-Json
+$origins = @($repositories.repository, $repositories.upstream_repository) | ForEach-Object { 'https://github.com/' + $_ + '/releases/download/' }
+if (-not ($origins | Where-Object { $pin.url.StartsWith($_, [StringComparison]::Ordinal) })) { throw 'Unexpected artwork source.' }
 New-Item -ItemType Directory -Force $Output | Out-Null
 $archive = Join-Path $Output 'artwork-source.zip'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

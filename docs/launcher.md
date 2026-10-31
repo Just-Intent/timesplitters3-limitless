@@ -2,7 +2,7 @@
 
 [Back to the README](../README.md)
 
-Open the [latest Windows launcher release](https://github.com/TheDoffman/timesplitters-future-perfect-pc/releases/latest)
+Open the [latest Windows launcher release](https://github.com/JustinDent/timesplitters3-limitless/releases/latest)
 and download its `TimeSplitters-Launcher-…-windows-x64.zip` asset. Extract it
 completely into a writable folder and open **TimeSplitters Launcher.exe**.
 Keep the companion files in `Bin` and `Support` with it. Windows 10/11 x64 and
@@ -161,9 +161,9 @@ PowerShell; use **Play Game** in the launcher.
 
 ## Report a problem or request an improvement
 
-Use the [bug report form](https://github.com/TheDoffman/timesplitters-future-perfect-pc/issues/new?template=01-bug-report.yml)
-for problems or [start an Ideas discussion](https://github.com/TheDoffman/timesplitters-future-perfect-pc/discussions/new?category=ideas)
-for enhancements. Search existing issues or [Ideas](https://github.com/TheDoffman/timesplitters-future-perfect-pc/discussions/categories/ideas)
+Use the [bug report form](https://github.com/JustinDent/timesplitters3-limitless/issues/new?template=01-bug-report.yml)
+for problems or [start an Ideas discussion](https://github.com/JustinDent/timesplitters3-limitless/discussions/new?category=ideas)
+for enhancements. Search existing issues or [Ideas](https://github.com/JustinDent/timesplitters3-limitless/discussions/categories/ideas)
 first and report one problem or suggestion at a time.
 
 For a bug report, the version and platform text fields start empty and require
