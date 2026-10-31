@@ -1,0 +1,13 @@
+{
+  "patches": [
+    {
+      "id": "bugfix-0006d115-match-bound",
+      "kind": "code",
+      "function": "0x0006D0B0",
+      "address": "0x0006D115",
+      "original_hex": "83fd50",
+      "new_hex": "83fd4f",
+      "reason": "sub_0006D0B0 stores [esp+ebp*4+0x14] before its cmp ebp,0x50 / jge: the 81st match wrote [esp+0x154], the return address (frame 0x144 + 4 pushes). cmp ebp,0x4F keeps every store in the 80-slot array (slot 79 is overwritten once 79 are counted; at most 79 used)"
+    }
+  ]
+}

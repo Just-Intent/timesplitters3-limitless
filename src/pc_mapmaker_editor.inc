@@ -188,6 +188,7 @@ static void mapmaker_hide_run(uint32_t first,uint32_t limit_end,const MapMakerCa
 }
 
 /* ---- editor map loader ------------------------------------------------ */
+int pc_mapmaker_validate_editor_load(uint32_t container,void (*original)(void)); /* pc_mapmaker_validate.inc */
 void pc_mapmaker_editor_load(void (*original)(void))
 {
     uint32_t container=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u;
@@ -195,6 +196,7 @@ void pc_mapmaker_editor_load(void (*original)(void))
         original();
         return;
     }
+    if(!pc_mapmaker_validate_editor_load(container,original)) return; /* refused the stock way */
     mapmaker_hide_run(container+8u,container+MAPMAKER_CONTAINER_LIMIT,mapmaker_editor_caps,
                       MAPMAKER_EDITOR_CAPS,original);
 }
