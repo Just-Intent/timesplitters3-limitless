@@ -7,7 +7,10 @@
  * back; reused pieces and resets forget them; placing/picking up copies a
  * piece and the mark follows it to the copy (place -> save -> play reads +8
  * -> reload); freed pieces forget it; the open entries and pieces get their
- * own names; every hook pops only its return address. */
+ * own names and the next list numbers 46 / 47 (palette caption "%d. ",
+ * grid label "%d.%s"); records with item sub-records (start points) are
+ * walked whole, so a play -> editor reload -> copy -> play round trip keeps
+ * every open tile; every hook pops only its return address. */
 #define TSFP_MAPMAKER_ROOF_TEST 1
 #include <stdarg.h>
 #include <stdint.h>
@@ -165,8 +168,12 @@ static void mask_original(void) { g_eax=mask_value;g_esp+=4u; }
 static uint32_t mask(uint32_t p) { mask_value=0xFFFFFFFFu;hook(pc_mapmaker_roof_mask,mask_original,0x00300CA9u,p,0);return g_eax; }
 static uint32_t reduced(uint32_t p) { mask_value=0x0B000000u;hook(pc_mapmaker_roof_reduced,mask_original,0x00300BFBu,p,0);return g_eax; }
 
-/* sub_003006C0: writes one record per list piece (with item sub-records). */
+/* sub_003006C0: writes one record per list piece: 0x28 bytes + pads*8
+ * (+0x24, here tile % 3 pads) + the piece's items (count +0x1E; here the
+ * fixture's piece word +0x3C), item k being ((k+1)*4 + 0x1B) & ~3 bytes of
+ * junk with its count byte +0x14 = k+1 (0x00300D60, 0x00300D93..0x0030116E). */
 static int skew;
+#define ITEM_BYTES(k) ((((k)+1u)*4u+0x1Bu)&~3u)
 static void compile_original(void)
 {
     uint32_t c=WORD_AT(g_esp+4),p=WORD_AT(0x0078400Cu),r=c+0x10u,start,first=p;
@@ -175,13 +182,19 @@ static void compile_original(void)
     WORD_AT(c+8)=0x00C77668u;WORD_AT(c+12)=0;              /* (empty) info chunk */
     WORD_AT(r)=0x00C77669u;start=r+8u;r=start;
     for(;p;p=WORD_AT(p+0x40)) {
-        uint32_t items=WORD_AT(p+0x10)%3u;
+        uint32_t pads=WORD_AT(p+0x10)%3u,items=WORD_AT(p+0x3C),k;
         WORD_AT(r)=WORD_AT(p+0x10)+(skew && p==first?1u:0u);
         WORD_AT(r+4)=((uint32_t)(int32_t)FLOAT_AT(p)&0xFFu)|((uint32_t)(int32_t)FLOAT_AT(p+4)&0xFFu)<<8|
                      ((uint32_t)(int32_t)FLOAT_AT(p+8)&0xFFu)<<16|(WORD_AT(p+0xC)&0xFFu)<<24;
         WORD_AT(r+8)=0x03FFFFFFu;
-        WORD_AT(r+0x24)=0x28u+items*8u;
-        r+=0x28u+items*8u;
+        WORD_AT(r+0x1C)=items<<16;
+        WORD_AT(r+0x24)=0x28u+pads*8u;
+        r+=0x28u+pads*8u;
+        for(k=0;k<items;k++) {
+            memset((char *)memory+r,0x77,ITEM_BYTES(k));
+            *((unsigned char *)memory+r+0x14)=(unsigned char)(k+1u);
+            r+=ITEM_BYTES(k);
+        }
     }
     WORD_AT(start-4)=r-start;
     WORD_AT(r)=0x00C7766Au;
@@ -191,8 +204,25 @@ static void compile(void) { hook(pc_mapmaker_roof_compile,compile_original,0x003
 static uint32_t record(unsigned n)
 {
     uint32_t r=C+0x18u;
-    while(n--) r+=WORD_AT(r+0x24)&0xFFFFu;
+    while(n--) {
+        uint32_t items=WORD_AT(r+0x1C)>>16,k;
+        r+=WORD_AT(r+0x24)&0xFFFFu;
+        for(k=0;k<items;k++) r+=ITEM_BYTES(k);
+    }
     return r;
+}
+/* The editor start after a play (sub_00302A60 -> sub_00301A90 at
+ * 0x00303076): a new heap, so new piece pointers, made in record order. */
+static void reload_pieces(unsigned base,unsigned n)
+{
+    unsigned i;
+    for(i=0;i<n;i++) {
+        uint32_t r=record(i),xyz=WORD_AT(r+4);
+        make_piece(base+i,WORD_AT(r),(int8_t)(xyz&0xFFu),(int8_t)(xyz>>8&0xFFu),(int8_t)(xyz>>16&0xFFu),
+                   (int8_t)(xyz>>24),i+1u<n?piece(base+i+1u):0u);
+        WORD_AT(piece(base+i)+0x3C)=WORD_AT(r+0x1C)>>16;
+    }
+    WORD_AT(0x0078400Cu)=piece(base);
 }
 
 static void plain_original(void) { g_esp+=4u; }
@@ -228,6 +258,29 @@ static const char *text(uint32_t ret,uint32_t id)
     hook(pc_mapmaker_roof_text,text_original,ret,id,0);
     return g_eax>=STOCK_TEXT?"stock":(const char *)memory+g_eax;
 }
+static uint32_t text_ptr(uint32_t ret) { hook(pc_mapmaker_roof_text,text_original,ret,0xA3Fu,0);return g_eax; }
+
+/* sub_00151030(format, ...) at 0x00311724: "%d.%s" with the tile number and
+ * the name; returns the number it printed. */
+static uint32_t printed;
+static void format_original(void) { printed=WORD_AT(g_esp+8);g_esp+=4u; }
+static uint32_t format(uint32_t ret,uint32_t fmt,uint32_t number,uint32_t name)
+{
+    g_esp=ESP0;WORD_AT(ESP0)=ret;WORD_AT(ESP0+4)=fmt;WORD_AT(ESP0+8)=number;WORD_AT(ESP0+12)=name;
+    pc_mapmaker_roof_format(format_original);
+    if(g_esp!=ESP0+4u) { fprintf(stderr,"esp %+d after the format hook\n",(int)(g_esp-ESP0));esp_errors++; }
+    g_esp=ESP0;
+    return printed;
+}
+/* sub_0032D9F0 (eax number or -1, ecx name) at 0x0032E5DE: "%d. " + name. */
+static uint32_t drawn;
+static void caption_original(void) { drawn=g_eax;g_esp+=4u; }
+static uint32_t caption(uint32_t ret,uint32_t number,uint32_t name)
+{
+    g_eax=number;g_ecx=name;
+    hook(pc_mapmaker_roof_caption,caption_original,ret,0,0);
+    return drawn;
+}
 
 int main(void)
 {
@@ -237,6 +290,7 @@ int main(void)
     WORD_AT(0x007844A8u)=ED;WORD_AT(0x00784014u)=C;WORD_AT(ED+0x200)=1;
     WORD_AT(0x00778D34u)=PAL;WORD_AT(PAL+0x84)=PROP;WORD_AT(PROP+4)=INST;WORD_AT(INST+0x30)=STOCK_PREVIEW;
     make_piece(0,3,1,1,0,0,piece(1));make_piece(1,MAPMAKER_ROOF_BASE_TILE,2,1,0,1,piece(2));make_piece(2,7,3,1,1,2,0);
+    WORD_AT(piece(0)+0x3C)=2u;                              /* a start point and a weapon on the first tile */
     WORD_AT(0x0078400Cu)=piece(0);
 
     /* ---- limits off: stock ---- */
@@ -295,6 +349,22 @@ int main(void)
     WORD_AT(0x0079094Cu)=102u;
     hover(stock_item);
     CHECK(!strcmp(text(MAPMAKER_ROOF_RET_CAPTION,0xA3Fu),"stock"));
+    /* the caption's number: 46 / 47 after the stock 1..45; none stays none */
+    {
+        uint32_t roof_name=mapmaker_roof.labels,air_name=mapmaker_roof.labels+MAPMAKER_ROOF_LABEL_BYTES;
+        CHECK(caption(MAPMAKER_ROOF_RET_CAPTION_DRAW,1u,roof_name)==46u);
+        CHECK(caption(MAPMAKER_ROOF_RET_CAPTION_DRAW,1u,air_name)==47u);
+        CHECK(caption(MAPMAKER_ROOF_RET_CAPTION_DRAW,1u,STOCK_TEXT+0xA3Fu)==1u);
+        CHECK(caption(MAPMAKER_ROOF_RET_CAPTION_DRAW,0xFFFFFFFFu,roof_name)==0xFFFFFFFFu); /* 3-category palette */
+        CHECK(caption(0x0032E719u,7u,air_name)==7u);                                   /* another row */
+        CHECK(format(MAPMAKER_ROOF_RET_HOVER_FORMAT,MAPMAKER_ROOF_HOVER_FORMAT,1u,roof_name)==46u);
+        CHECK(format(MAPMAKER_ROOF_RET_HOVER_FORMAT,MAPMAKER_ROOF_HOVER_FORMAT,1u,air_name)==47u);
+        CHECK(format(MAPMAKER_ROOF_RET_HOVER_FORMAT,MAPMAKER_ROOF_HOVER_FORMAT,1u,STOCK_TEXT+0xA3Fu)==1u);
+        CHECK(format(0x00311000u,MAPMAKER_ROOF_HOVER_FORMAT,1u,roof_name)==1u);         /* another caller */
+        CHECK(format(MAPMAKER_ROOF_RET_HOVER_FORMAT,0x0049F838u,1u,roof_name)==1u);     /* another format */
+        CHECK(!strcmp((const char *)memory+roof_name,"Small Open (No Roof)") &&
+              !strcmp((const char *)memory+air_name,"Small Open (Open Air)"));
+    }
 
     /* pick: the stock code sees the stock preview; the held piece is marked */
     hover(air_item);
@@ -404,6 +474,62 @@ int main(void)
     new_result=piece(1);
     hook(pc_mapmaker_roof_piece_new,new_original,0x003021C6u,3u,0);
     CHECK(mapmaker_roof_mode(piece(1))==0);
+
+    /* ---- play -> editor -> copy -> play (v0.4.0-mapmaker.7 report) ----
+     * A start point (items) on the first tile, open tiles after it, one
+     * open tile with an item of its own. */
+    hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+    make_piece(40,3,0,0,0,0,piece(41));WORD_AT(piece(40)+0x3C)=3u;
+    make_piece(41,MAPMAKER_ROOF_BASE_TILE,1,0,0,0,piece(42));
+    make_piece(42,MAPMAKER_ROOF_BASE_TILE,2,0,0,1,piece(43));WORD_AT(piece(42)+0x3C)=1u;
+    make_piece(43,7,3,0,0,0,0);
+    WORD_AT(0x0078400Cu)=piece(40);
+    mapmaker_roof_set(piece(41),MAPMAKER_ROOF_OPEN_ROOF);mapmaker_roof_set(piece(42),MAPMAKER_ROOF_OPEN_AIR);
+    {
+        unsigned long long mism=mapmaker_roof.mismatch;
+        uint32_t roof_name=mapmaker_roof.labels,air_name=mapmaker_roof.labels+MAPMAKER_ROOF_LABEL_BYTES;
+        compile();                                          /* Play: the hand-over (sub_00312DF0) */
+        CHECK(mapmaker_roof.mismatch==mism);
+        CHECK((WORD_AT(record(1)+0x24)>>16)==0x5201u && (WORD_AT(record(2)+0x24)>>16)==0x5202u);
+        CHECK((WORD_AT(record(0)+0x24)>>16)==0 && (WORD_AT(record(3)+0x24)>>16)==0);
+        CHECK(play_mask(1)==(0x03FFFFFFu&~0x02000000u) && play_mask(2)==0x01000000u && play_mask(3)==0x03FFFFFFu);
+        /* back to the editor: new pieces from the records */
+        hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+        reload_pieces(50,4);
+        load();
+        CHECK(mapmaker_roof_mode(piece(51))==MAPMAKER_ROOF_OPEN_ROOF && mapmaker_roof_mode(piece(52))==MAPMAKER_ROOF_OPEN_AIR);
+        CHECK(mapmaker_roof_mode(piece(50))==0 && mapmaker_roof_mode(piece(53))==0);
+        CHECK(mapmaker_roof_mode(piece(41))==0 && mapmaker_roof_mode(piece(42))==0);
+        /* the label over the grid: the piece under the cursor, else the held one */
+        WORD_AT(ED+0x2F18)=piece(51);WORD_AT(ED+0x2F7C)=0;
+        CHECK(text_ptr(MAPMAKER_ROOF_RET_HOVER)==roof_name);
+        CHECK(!strcmp(text(MAPMAKER_ROOF_RET_HOVER,0xA3Fu),"Small Open (No Roof)"));
+        CHECK(!strcmp(text(MAPMAKER_ROOF_RET_HOVER,0xA40u),"stock"));
+        WORD_AT(ED+0x2F18)=piece(50);
+        CHECK(!strcmp(text(MAPMAKER_ROOF_RET_HOVER,0xA3Fu),"stock"));
+        /* copy the open-air tile: a held copy, placed as a new piece */
+        copy_piece(piece(52),piece(54));WORD_AT(ED+0x2F7C)=piece(54);WORD_AT(ED+0x2F18)=0;
+        CHECK(text_ptr(MAPMAKER_ROOF_RET_HOVER)==air_name);
+        CHECK(format(MAPMAKER_ROOF_RET_HOVER_FORMAT,MAPMAKER_ROOF_HOVER_FORMAT,1u,text_ptr(MAPMAKER_ROOF_RET_HOVER))==47u);
+        WORD_AT(ED+0x2F7C)=0;
+        CHECK(!strcmp(text(MAPMAKER_ROOF_RET_HOVER,0xA3Fu),"stock"));    /* nothing under the cursor */
+        move_piece(piece(54),piece(55));free_piece(piece(54));
+        FLOAT_AT(piece(55))=4.0f;WORD_AT(piece(53)+0x40)=piece(55);WORD_AT(piece(55)+0x40)=0;
+        CHECK(mapmaker_roof_mode(piece(55))==MAPMAKER_ROOF_OPEN_AIR && mapmaker_roof_mode(piece(52))==MAPMAKER_ROOF_OPEN_AIR);
+        compile();                                          /* Play again */
+        CHECK(mapmaker_roof.mismatch==mism);
+        CHECK((WORD_AT(record(1)+0x24)>>16)==0x5201u && (WORD_AT(record(2)+0x24)>>16)==0x5202u &&
+              (WORD_AT(record(4)+0x24)>>16)==0x5202u);
+        CHECK(play_mask(1)==(0x03FFFFFFu&~0x02000000u) && play_mask(2)==0x01000000u && play_mask(4)==0x01000000u);
+        CHECK(play_mask(0)==0x03FFFFFFu && play_mask(3)==0x03FFFFFFu);
+        /* and back once more (undo and Load map reload through the same loader) */
+        hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+        reload_pieces(60,5);
+        load();
+        CHECK(mapmaker_roof_mode(piece(61))==MAPMAKER_ROOF_OPEN_ROOF && mapmaker_roof_mode(piece(62))==MAPMAKER_ROOF_OPEN_AIR &&
+              mapmaker_roof_mode(piece(64))==MAPMAKER_ROOF_OPEN_AIR && mapmaker_roof_mode(piece(60))==0 && mapmaker_roof_mode(piece(63))==0);
+        CHECK(mapmaker_roof_records(C,count_record,NULL)==5);
+    }
 
     /* allocation failure: no entries, counted */
     mapmaker_roof.list=0;heap_result=0;

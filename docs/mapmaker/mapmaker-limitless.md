@@ -222,13 +222,16 @@ without the switch, just without clouds. *Automated tests only.*
 
 ### Open-sky tiles (`LIMITS`)
 
-The last tile category of every tileset ends with two extra 1x1 tiles:
-**Small Open (No Roof)** (the Small Open tile without its ceiling, so you see
-the sky) and **Small Open (Open Air)** (floor only: no ceiling and no walls).
-The name shows under the palette preview and when the placed tile is
-selected. The editor never draws ceilings, so No Roof looks like Small Open
-there; Open Air shows its walls gone. Placed, moved and copied tiles keep
-their type, and a saved map reloads them. In play the open tiles show the sky
+The last tile category of every tileset ends with two extra 1x1 tiles,
+numbered after the stock 45: **46. Small Open (No Roof)** (the Small Open
+tile without its ceiling, so you see the sky) and **47. Small Open (Open
+Air)** (floor only: no ceiling and no walls). The name shows under the
+palette preview, in the label over a placed tile ("46.Small Open (No Roof)",
+like the stock "1.Small Open") and when the placed tile is selected. The
+editor never draws ceilings, so No Roof looks like Small Open there; Open Air
+shows its walls gone. Placed, moved and copied tiles keep their type, also
+after playing the map and returning to the editor, and a saved map reloads
+them. In play the open tiles show the sky
 and let weather in. Hidden walls and ceilings have no collision: rockets leave
 through the top, and you can walk out of an Open Air tile's sides, so keep it
 away from the map edge. The original game plays the map open too, but
