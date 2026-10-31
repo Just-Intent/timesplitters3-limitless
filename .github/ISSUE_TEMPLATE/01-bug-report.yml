@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Tell us what went wrong. Check [existing reports](https://github.com/TheDoffman/timesplitters-future-perfect-pc/issues) first.
+        Tell us what went wrong. Check [existing reports](https://github.com/JustinDent/timesplitters3-limitless/issues) first.
         Enter the versions you have installed. If you cannot find one, type **I don't know** rather than guessing.
   - type: markdown
     attributes:

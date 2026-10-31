@@ -1,42 +1,123 @@
 <div align="center">
 
-# TimeSplitters: Future Perfect
+# TimeSplitters 3 Limitless
 
-Direct mouse aiming · 4K & ultrawide · Custom controls · Windows Online & LAN
+A MapMaker-focused fork of the TimeSplitters: Future Perfect PC port
 
-<a href="https://github.com/TheDoffman/timesplitters-future-perfect-pc/releases/latest"><img src="docs/assets/download-windows-launcher.svg" alt="Download the latest Windows launcher (x64)" width="280" height="52"></a>
-<a href="https://github.com/TheDoffman/timesplitters-future-perfect-pc/releases/latest"><img src="docs/assets/download-mac-launcher.svg" alt="Download the latest Mac launcher (Apple Silicon)" width="280" height="52"></a>
+MapMaker limits raised many times over · New MapMaker tools · PC mouse and control fixes · Bug fixes
 
-<sub>Direct ZIP downloads · Automatically follow the latest stable launcher release · <a href="https://github.com/TheDoffman/timesplitters-future-perfect-pc/releases/latest">Release notes & checksums</a></sub>
+<a href="https://github.com/JustinDent/timesplitters3-limitless/releases/latest"><img src="docs/assets/download-windows-launcher.svg" alt="Windows launcher downloads for this fork (no fork release published yet)" width="280" height="52"></a>
+<a href="https://github.com/JustinDent/timesplitters3-limitless/releases/latest"><img src="docs/assets/download-mac-launcher.svg" alt="Mac launcher downloads for this fork (no fork release published yet)" width="280" height="52"></a>
 
-**[Windows setup](#windows)** · **[Mac setup](#mac-apple-silicon)** · [Launcher guides](#guides--support) · [Multiplayer](docs/multiplayer.md) · [Build from source](docs/building.md)
+<sub><strong>No release of this fork has been published yet.</strong> Build from source for now · <a href="https://github.com/JustinDent/timesplitters3-limitless/releases">Fork releases</a></sub>
 
-<sub>Windows 10/11 x64 · Native Apple Silicon Mac · Experimental port · Supported US Xbox game required</sub>
+**[MapMaker Limitless](#mapmaker-limitless)** · [Player guide](docs/mapmaker-limitless.md) · [Build from source](docs/building.md) · [Windows setup](#windows) · [Mac setup](#mac-apple-silicon) · [Credits](#credits)
+
+<sub>Windows 10/11 x64 · Experimental fork · Supported US Xbox game required</sub>
 
 </div>
 
-![TimeSplitters launcher v1.2.18 with the updated banner, aligned sidebar, Play Game, game versions and update controls](docs/assets/launcher-preview.png)
+## What this is
 
-<p align="center"><sub>Launcher v1.2.18 interface preview. The game version and channel shown are sample data; choose <strong>Preview</strong> to install current game prereleases.</sub></p>
+**TimeSplitters 3 Limitless** is an experimental fork of
+**[TheDoffman/timesplitters-future-perfect-pc](https://github.com/TheDoffman/timesplitters-future-perfect-pc)**,
+the native PC/Mac port of *TimeSplitters: Future Perfect* built on the
+**[nemonicicon/ts3FPrecomp](https://github.com/nemonicicon/ts3FPrecomp)** static
+recompilation toolkit. Everything the original port provides (native Windows
+and Apple Silicon builds, mouse aiming, widescreen, the launcher, Online and
+LAN play) comes from that project; see [Credits](#credits).
+
+This fork adds:
+
+- **MapMaker capacity raised many times over** behind one opt-in switch
+  (`TSFP_MAPMAKER_LIMITS=1`): 241 tiles, 200 items, up to 255 Story AI, up to
+  64 characters alive in a MapMaker Story map, more movable objects, keycards,
+  turrets, teleporters and logic, a 512 KB map file and an 8x memory budget.
+- **New MapMaker features:** seven floors on an 80x80 grid, optional
+  overlapping tiles and stacked items, any unlocked character in MapMaker Story,
+  Story AI duplicates and linked copies, and a per-map Clouds option.
+- **PC control fixes:** MapMaker editor mouse controls, click-to-load in the map
+  browser, click-to-confirm on the character screen and mouse aiming for mounted
+  and vehicle guns.
+- **Bug fixes** for MapMaker and System Link memory-safety problems, listed in
+  [the bug-fix notes](docs/mapmaker-bugfix.md).
+
+### Status: experimental, not a validated release
+
+- Development builds are compile-only Windows builds tested by the maintainer
+  on a separate Windows 11 PC. The combined capacity play test is recorded in
+  [STATUS.md](STATUS.md) (2026-10-30). Several newer features have only
+  automated fixture tests so far; the [MapMaker Limitless table](#mapmaker-limitless)
+  marks each one.
+- No fork release has been published. The download buttons point to this
+  fork's [releases page](https://github.com/JustinDent/timesplitters3-limitless/releases),
+  which stays empty until a release is made.
+- Not yet tested with the fork's changes: System Link, splitscreen, native Mac
+  and most story levels.
+- MapMaker work lives on the `mapmaker-recon` branch, which is based on the
+  original project's `main` at `141f440a`. Later fixes to the original port
+  are merged when needed.
 
 > [!IMPORTANT]
-> You need your own supported **US Xbox ISO or extracted game data**. Import it
-> through the Windows launcher, or follow the [Mac game-data setup](docs/macos.md).
-> Original game files are not included. Neither version needs an emulator.
-> Windows has a downloadable game runtime; Mac currently requires a source build.
+> You need your own legally obtained **US Xbox** copy of the game (title ID
+> `45410066`; `default.xbe` SHA-256
+> `3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc`), as an
+> ISO or extracted game data. Original game files are not included and are
+> never distributed by this project. No emulator is needed.
+
+## MapMaker Limitless
+
+The switches are environment variables read when the game starts. Without
+them the editor keeps the original limits and features; the always-on bug
+fixes, mouse controls and larger play-time capacity remain active. Set them in the PowerShell window you launch from;
+`tsfp.ps1 -Action Run` passes them on to the game:
+
+```powershell
+$env:TSFP_MAPMAKER_LIMITS = '1'
+$env:TSFP_MAPMAKER_STACK_ITEMS = '1'   # optional
+.\tsfp.ps1 -Action Run
+```
+
+| Switch | Default | Effect | Status |
+| --- | --- | --- | --- |
+| `TSFP_MAPMAKER_LIMITS=1` | Off | Raised editor limits: 241 tiles, 200 items, 255 Story AI, x4 keycards, movers and props, more turrets, teleporters, logic and free-standing objects, 512 KB maps and an x8 memory budget. The larger play-time capacity behind them (for example 64 characters alive in a local MapMaker Story map) is always present. Also turns on seven floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, and the Clouds checkbox. | Capacity play-tested on Windows (236 tiles, 200 items, 102+ Story AI, 64 characters; see [STATUS.md](STATUS.md)). Story AI duplicates and linked copies: reported working by the maintainer. Grid, Story character and Clouds: fixture-tested, no recorded play test yet. |
+| `TSFP_MAPMAKER_OVERLAP=1` | Off | Tiles may be placed over other tiles. Overlapping maps can show visual and pathing artefacts by design. | Fixture-tested |
+| `TSFP_MAPMAKER_STACK_ITEMS=1` | Off | Several pickups or props in one grid cell. Stacked items spawn on the same spot. | Reported working by the maintainer |
+| `TSFP_MAPMAKER_MEMORY_SCALE=2..8` | 8 with `LIMITS`, otherwise off | Divides the editor's play-time memory estimate. | Part of the capacity play test |
+| `TSFP_MAPMAKER_ALIVE=1..64` | 64 | Lowers the number of characters alive at once (20 = original) for slower PCs. | Fixture-tested |
+| `TSFP_MAPMAKER_POINTER=0` | Mouse on | Turns off the MapMaker editor mouse controls. | Editor mouse checked in game |
+| `TSFP_MAPMAKER_POOLS=0` | Pools on | Restores the original AI navigation pools in MapMaker play; also disables `LIMITS`. | Troubleshooting only |
+| `TSFP_MAPMAKER_ROOM_MASK_CLEAR=<hex>` | Off | Developer test switch for open-air (sky) tiles. | Work in progress, developer use only |
+| `TSFP_MAPMAKER_PROBE=<flags>` | Off | Read-only diagnostic logging ([probe guide](docs/mapmaker-meter-probe.md)). | Developer use |
+
+Maps that fit the original limits save in the original format. Larger maps
+are refused for System Link and need this fork to load. Full details, known
+limits and test notes: **[MapMaker Limitless guide](docs/mapmaker-limitless.md)**.
+
+**Mouse and control fixes in this fork** (no switch needed): MapMaker editor
+mouse controls (pointer, menus, scrollbars, wheel zoom and panning); click a
+map in **MapMaker → Load map** to load it; on the character screen, click
+anywhere other than another portrait to confirm the previewed character; and
+mouse aiming for mounted and vehicle guns (for example the truck gun in
+*Scotland the Brave*). Planned, not yet merged: mouse-wheel scope zoom.
 
 ## Start playing
 
-Use the Windows or Mac download button above to get the latest stable launcher
-ZIP for your computer, then follow its setup steps below. See the
-[latest launcher release](https://github.com/TheDoffman/timesplitters-future-perfect-pc/releases/latest)
-for release notes and checksums.
+There is no fork release yet. To play the Limitless features, build the game
+from source with the [build guide](docs/building.md) (Windows: `setup.ps1`,
+then `tsfp.ps1 -Action Build`; where Smart App Control blocks locally built
+test programs, `tsfp.ps1 -Action Build -CompileOnly`).
+
+The launcher steps below are inherited from the original PC port. Launcher
+downloads from this fork will appear on the
+[fork releases page](https://github.com/JustinDent/timesplitters3-limitless/releases)
+once published; until then the launcher cannot install a Limitless game runtime.
 
 ### Windows
 
 | Step | Installation |
 | :---: | --- |
-| **01** | **[Download the Windows launcher](https://github.com/TheDoffman/timesplitters-future-perfect-pc/releases/latest).** On the release page, choose **Download Windows x64**. |
+| **01** | **[Download the Windows launcher](https://github.com/JustinDent/timesplitters3-limitless/releases).** On a fork release page, choose **Download Windows x64** (none published yet). |
 | **02** | **Extract and open.** Extract the whole ZIP to a writable folder, keeping `Bin` and `Support` together. Open **TimeSplitters Launcher.exe**. |
 | **03** | **Install the game runtime.** Set **Update channel → Preview**, then choose **Install release**. The launcher downloads and verifies the published PC runtime. |
 | **04** | **Import your game once.** Choose **Locate ISO**, or **Use extracted files** for a folder containing `default.xbe`, `pak` and `xmv`. |
@@ -84,12 +165,12 @@ to open. Intel Macs are not supported by this native build.
 
 | Step | Installation |
 | :---: | --- |
-| **01** | **[Download the Mac launcher](https://github.com/TheDoffman/timesplitters-future-perfect-pc/releases/latest).** On the release page, choose **Download Mac (Apple Silicon)**. Extract the whole ZIP and keep **TimeSplitters Launcher.app** beside its **Support** folder. |
+| **01** | **[Download the Mac launcher](https://github.com/JustinDent/timesplitters3-limitless/releases).** On a fork release page (none published yet), choose **Download Mac (Apple Silicon)**. Extract the whole ZIP and keep **TimeSplitters Launcher.app** beside its **Support** folder. |
 | **02** | **Set up the native game.** Follow the [Mac source-build guide](docs/macos.md) for developer tools, your supported US Xbox game data and the native build. Keep `default.xbe`, `pak` and `xmv` together in the checkout's `private/game` folder. |
 | **03** | **Open the launcher for your checkout.** Use the command below, replacing both example paths with your extracted app and checkout folders. Then choose **Play Game**. |
 
 ```sh
-open '/path/to/TimeSplitters Launcher.app' --args --root '/path/to/timesplitters-future-perfect-pc'
+open '/path/to/TimeSplitters Launcher.app' --args --root '/path/to/timesplitters3-limitless'
 ```
 
 For an existing native checkout, `./Play-Native-Mac.command` is also available;
@@ -123,10 +204,14 @@ Rendering and simulation use the original **60 FPS / 60 Hz** path on both hosts.
 Full campaign completion, save/load and complete rendering/audio fidelity remain
 unverified. Movie playback, native multiplayer and standalone game delivery
 remain unfinished. [Track remaining Mac work →](MAC_PORT_BACKLOG.md)
+The Mac status above is the original port's. The fork's MapMaker changes are
+shared source but have not been built or run on a Mac (backlog MAC-060 and later).
 
 ## PC features
 
-Feature availability depends on the platform and installed game build. The
+The features in this section come from the original PC port
+([TheDoffman/timesplitters-future-perfect-pc](https://github.com/TheDoffman/timesplitters-future-perfect-pc))
+and are described as of the source this fork is based on. Feature availability depends on the platform and installed game build. The
 Windows details below do not establish Mac parity; see [current Mac status](#mac-apple-silicon).
 
 Current source uses fixed 60 FPS on Windows and Mac. Experimental interpolation,
@@ -335,10 +420,10 @@ for source ownership, patch/symbol lookup, subsystem guides and context maintena
 | [Mac quick start](#mac-apple-silicon) — download and current support | [Project rules](AGENTS.md) — reproducibility and data preservation |
 | [Mac renderer development](docs/macos.md#common-renderer-development-probe) — shared game renderer and asset-free checks | [Shared PC/Mac architecture](docs/shared-platform.md) — common code and adapters |
 
-**[Report a bug](https://github.com/TheDoffman/timesplitters-future-perfect-pc/issues/new?template=01-bug-report.yml)**
-or **[suggest an enhancement in Ideas](https://github.com/TheDoffman/timesplitters-future-perfect-pc/discussions/new?category=ideas)**.
+**[Report a bug](https://github.com/JustinDent/timesplitters3-limitless/issues/new?template=01-bug-report.yml)**
+or **[suggest an enhancement in Ideas](https://github.com/JustinDent/timesplitters3-limitless/discussions/new?category=ideas)**.
 For bugs, enter your installed versions and platform, then describe the problem. For an
-improvement, check [existing Ideas](https://github.com/TheDoffman/timesplitters-future-perfect-pc/discussions/categories/ideas)
+improvement, check [existing Ideas](https://github.com/JustinDent/timesplitters3-limitless/discussions/categories/ideas)
 and start a separate discussion for each suggestion. Screenshots and logs
 are optional. The bug form's published version references stay up to date
 automatically, and bug reports receive labels automatically.
@@ -360,7 +445,17 @@ See [testing profile setup and isolation](docs/testing-profile.md).
 
 ### Credits
 
-Built on **[nemonicicon/ts3FPrecomp](https://github.com/nemonicicon/ts3FPrecomp)**,
+- **Original PC port:** [TheDoffman/timesplitters-future-perfect-pc](https://github.com/TheDoffman/timesplitters-future-perfect-pc)
+  by TheDoffman and contributors: the Windows and native Mac ports, launcher,
+  controls, display, multiplayer, textures and most of this repository's code
+  and documentation. TimeSplitters 3 Limitless is a fork of that project.
+- **Recompilation toolkit:** [nemonicicon/ts3FPrecomp](https://github.com/nemonicicon/ts3FPrecomp)
+  and its contributors.
+- **This fork:** [JustinDent/timesplitters3-limitless](https://github.com/JustinDent/timesplitters3-limitless)
+  adds the MapMaker capacity raise, MapMaker features, control and bug fixes
+  described [above](#mapmaker-limitless).
+
+The port is built on ts3FPrecomp
 with local runtime patches and platform adapters. This community project
 statically recompiles the Xbox executable into native code; it does not recover
 the original C/C++ source. [Pinned upstream and licensing →](docs/building.md#upstream-and-licensing)
