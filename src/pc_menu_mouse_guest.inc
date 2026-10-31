@@ -53,6 +53,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_actors.inc"
 #include "pc_mapmaker_story_character.inc"
 #include "pc_mapmaker_aitemplates.inc"
+#include "pc_mapmaker_grid.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
@@ -79,13 +80,16 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook)
         if(p[-1]==',' && p[n]==',') { enabled=0;break; }
     /* The container, actors and story code patches assume their hooks (buffer
      * sizes, the AI cap in code is 63 and only the hook keeps 30, the Story
-     * character gate byte is 0 = choose freely until a hook sets it), so those
-     * areas cannot be switched off; the request is ignored and said so once. */
-    if(!enabled && (!strcmp(area,"container") || !strcmp(area,"actors") || !strcmp(area,"story"))) {
-        static int warned_container,warned_actors,warned_story;
-        int *warned=area[0]=='c'?&warned_container:area[0]=='a'?&warned_actors:&warned_story;
-        if(!*warned) { *warned=1;fprintf(stderr,"[mapmaker-area] %s cannot be switched off; ignored\n",area);fflush(stderr); }
-        enabled=1;
+     * character gate byte is 0 = choose freely until a hook sets it, the grid
+     * settings block is empty until its hook writes it), so those areas cannot
+     * be switched off; the request is ignored and said so once. */
+    if(!enabled) {
+        static const char *const fixed[]={"container","actors","story","grid"};
+        static int warned[sizeof fixed/sizeof fixed[0]];
+        for(unsigned i=0;i<sizeof fixed/sizeof fixed[0];i++) if(!strcmp(area,fixed[i])) {
+            if(!warned[i]) { warned[i]=1;fprintf(stderr,"[mapmaker-area] %s cannot be switched off; ignored\n",area);fflush(stderr); }
+            enabled=1;break;
+        }
     }
     if(trace) {
         uint32_t ret=guest_writable(g_esp,4)?WORD_AT(g_esp):0u;
@@ -687,6 +691,17 @@ void pc_mapmaker_aitemplates_event(void (*original)(void)) { original(); }
 void pc_mapmaker_aitemplates_remove(void (*original)(void)) { original(); }
 void pc_mapmaker_aitemplates_spawn_gate(void (*original)(void)) { original(); }
 void pc_mapmaker_aitemplates_alert(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_alloc(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_insert(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_remove(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_lookup(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_placement(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_floor_sound(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_floor_bar(void (*original)(void)) { original(); }
+void pc_mapmaker_overlap_cell(void (*original)(void)) { original(); }
+void pc_mapmaker_stack_find(void (*original)(void)) { original(); }
+void pc_mapmaker_stack_cell(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}

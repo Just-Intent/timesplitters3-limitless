@@ -283,6 +283,11 @@ mutations) and `tests/test_mapmaker_aitemplates_classified.py` (decode checks of
 the edit-screen row site, menu table 0x0052E088 and the unused chunk bytes
 +0x32/+0x33) are in the same CI list.
 
+`tests/test_mapmaker_grid.py` (fixture `tests/mapmaker_grid.c`) checks that
+`grid.json` redirects exactly the decoded editor reads of the grid constants
+(skipped without the private XBE) and that the settings block holds the
+image constants in stock mode.
+
 Site inventories must come from the lifter's decoder, not from
 `private/pipeline/disasm/asm/text.asm`: the listing elides the byte column of
 long instructions, which once hid a room id and crashed a story level.
