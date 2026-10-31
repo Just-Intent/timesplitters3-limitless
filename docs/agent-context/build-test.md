@@ -334,7 +334,10 @@ stock sky data against the local XBE and skips that check without it.
 `tests/test_mapmaker_skymask.py` (fixture `tests/mapmaker_skymask.c`, dev
 switch `TSFP_MAPMAKER_ROOM_MASK_CLEAR`) compares the exact stderr text and
 runs 15 mutations; its decoder check of the per-room mask table's references
-skips without the private XBE. Both are in the native CI list. The MapMaker
+skips without the private XBE. Both are in the native CI list, as is
+`tests/test_mapmaker_roof.py` (fixture `tests/mapmaker_roof.c`, the Open
+roof / Open air palette tiles: 29 mutations; its XBE data, record word +0x26
+and hook-site decoder checks skip without the private XBE). The MapMaker
 pointer, memory budget and stage A limits fixtures
 (`tests/test_mapmaker_pointer.py`, `tests/test_mapmaker_budget.py`,
 `tests/test_mapmaker_limits.py`) are in the same CI list, as is
