@@ -179,6 +179,7 @@ void sub_000814B0(void) { uint32_t b=WORD_AT(g_esp+4);memcpy(&drawn,&b,4);g_esp+
 void sub_00154FE0(void) { g_eax=WORD_AT(g_esp+4);g_esp+=4; }
 void sub_00079B70(void) { returned++;g_esp+=4; }
 void sub_0003DFA0(void) {}
+#define TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* sub_001CD040, sub_0003D7B0 stubbed above */
 #include "mapmaker_area_stubs.h"
 void sub_00079D60_gen(void) {
     unsigned id=WORD_AT(g_esp+8);CHECK(id<32);
