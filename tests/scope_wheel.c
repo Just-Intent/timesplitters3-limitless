@@ -18,8 +18,8 @@ static void defaults(int keys[PC_ACTION_COUNT][PC_BINDING_SLOTS])
 {
     memset(keys,0,sizeof(int)*PC_ACTION_COUNT*PC_BINDING_SLOTS);
     keys[9][0]=1;                                    /* Fire: Mouse 1 */
-    keys[10][0]=K_UP;keys[10][1]=K_PRIOR;keys[10][2]='Q';  /* zoom in */
-    keys[11][0]=K_DOWN;keys[11][1]=K_NEXT;keys[11][2]='V'; /* zoom out */
+    keys[10][0]=K_UP;keys[10][1]='Q';                    /* zoom in (two slots per action) */
+    keys[11][0]=K_DOWN;keys[11][1]='V';                  /* zoom out */
     keys[12][0]=K_LEFT;keys[12][1]=DOWN;             /* previous weapon */
     keys[13][0]=K_RIGHT;keys[13][1]=UP;              /* next weapon */
     keys[23][0]=2;                                   /* Aim: Mouse 2 */
@@ -115,7 +115,7 @@ int main(void)
     defaults(keys);keys[3][0]=UP;                          /* also bound to Y action */
     pc_scope_wheel_bindings(&w,(const int (*)[PC_BINDING_SLOTS])keys);
     CHECK(!w.route_up && w.route_down);
-    defaults(keys);keys[13][1]=0;keys[12][1]=0;keys[12][2]=UP;keys[13][2]=DOWN; /* swapped */
+    defaults(keys);keys[13][1]=0;keys[12][1]=0;keys[12][1]=UP;keys[13][1]=DOWN; /* swapped */
     pc_scope_wheel_bindings(&w,(const int (*)[PC_BINDING_SLOTS])keys);
     CHECK(w.route_up && w.route_down);
     /* No zoom key bound: the notch is swallowed rather than switching. */
