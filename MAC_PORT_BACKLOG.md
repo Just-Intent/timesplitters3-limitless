@@ -202,6 +202,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-065 | MapMaker editor mouse controls (on by default) | Awaiting validation |
 | MAC-066 | MapMaker raised level memory budget (opt-in) | Awaiting validation |
 | MAC-067 | MapMaker capacity stage A: AI pools and editor limits | Awaiting validation |
+| MAC-068 | Launcher MapMaker settings tab | Awaiting validation |
 
 ### MAC-048 - Companion vehicle zero-flag joins (#100)
 
@@ -4672,6 +4673,29 @@ Windows loopback evidence in `STATUS.md` does not establish native execution.
 - **Mac adaptation needed:** None identified (guest regeneration on first build).
 - **Mac acceptance checks:** Native Mac build; with limits on, place past 300
   pad groups; play with probe flags 96 and check counts and free memory.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-068 — Launcher MapMaker settings tab
+
+- **Status:** Awaiting validation
+- **PC behavior:** Game settings gains a **MapMaker** tab: Raised MapMaker
+  limits, Overlapping tiles, Stacked items (off by default) and Characters
+  alive at once (64 default). Choices persist as `launcher.mapmaker_*` in the
+  install's pc-controls.json. Launch strips inherited `TSFP_*`/`RECOMP_*` as
+  before, then exports only the chosen `TSFP_MAPMAKER_*` switches.
+- **PC source:** Branch `launcher-mapmaker-settings` (uncommitted to main);
+  `tools/launcher/GameSettings.cs`, `tools/launcher/SettingsPage.cs`,
+  `tools/playable-launch.ps1`; tests `tests/launcher_settings.cs`,
+  `tests/test_launcher_startup.py`, Mac `tools/launcher/macos/NativeTests.cs`.
+- **PC validation:** Windows launcher and its test program compile; running the
+  compiled tests was not possible on the maintainer PC (unsigned executables
+  are blocked). In-game check pending.
+- **Existing Mac support:** Shared model, page and StartInfo; the Avalonia
+  launcher compiles the same `SettingsPage.cs`. On a checkout the keys go to
+  `config/pc-controls.json` beside the existing launcher keys.
+- **Mac adaptation needed:** None identified.
+- **Mac acceptance checks:** Native launcher build and `--test`; open Settings →
+  MapMaker, save, confirm the keys and that Play exports only chosen switches.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
 ## Shared uncertainties, not confirmed Mac-only omissions
