@@ -87,12 +87,29 @@
  *    name, health multiplier, stacking). Without the Boss flag the stock bar
  *    stays (one bar). The Boss/health multipliers act on entity +0x1CC/+0x1D8
  *    as for any Story AI.
+ *  - meter (sub_0013A400, the overhead health meter): stock MapMaker story
+ *    play draws it in sub_0014D1F0 (HUD, called at 0x001CEF19) only when the
+ *    scene is 100 (0x0014D21C) and the mode byte is story (0x0014D225), for
+ *    every AI-list actor (0x007A3580, filled with entity +0x7C by
+ *    sub_0015BCA0) from index [0x00790950] to [0x0074C37C] whose entity has a
+ *    damage-stage record at +0x268 and is not the player's own entity
+ *    ([[0x007B0C7C]+0x14]): call sub_0013A400(actor, 0, 0x7F, 0x6E) at
+ *    0x0014D25F, its only caller. MapMaker's own Story AIs never get such a
+ *    record; the deerbeast handler makes one in its intro state
+ *    (sub_0012C800 at 0x002811A3, stored at 0x002811AA), so in MapMaker the
+ *    real boss gets a floating meter (placed for a human-sized actor, i.e.
+ *    on its back). Mission 5 is scene 1: the scene test skips the loop. The
+ *    hook skips the draw (sub_0013A400 only draws: billboard quads through
+ *    sub_0001AC50, plain ret) for actors noted by ai_start whose character
+ *    is 0x15 or entity model 0x5BE; every other actor, scene and caller runs
+ *    the original. The record itself stays (sub_0014CC80 and the damage
+ *    flash in sub_0014D3A0 read it).
  *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax,
  * g_xbox_mem_offset, xbox_HeapAlloc, pc_mapmaker_area_enabled and
  * pc_mapmaker_limits.inc (mapmaker_limits, MAPMAKER_GUEST_RET,
  * MAPMAKER_PTR_OK). Hot hooks (text: every text lookup; hud: every HUD
- * frame) test fixed values first and use MAPMAKER_PTR_OK only. */
+ * frame; meter: per frame per recorded actor) test fixed values first and use MAPMAKER_PTR_OK only. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -155,6 +172,7 @@
 #define RBS_PLAYER 0x007B0C7Cu
 #define RBS_FOCUS 0xFF4u
 #define RBS_REAL_MAX 16u
+#define RBS_RET_METER 0x0014D264u       /* sub_0014D1F0: call sub_0013A400 at 0x0014D25F */
 #define RBS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBS_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -165,7 +183,7 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 static struct {
     int read, optout;
     uint32_t label;
-    unsigned logged;
+    unsigned logged, meters;
     struct { uint32_t record; uint8_t boss; } real[RBS_REAL_MAX];
 } rbs;
 
@@ -407,4 +425,21 @@ void pc_mapmaker_realbosses_hud(void (*original)(void))
     WORD_AT(player+RBS_FOCUS)=0;                     /* the Boss bar replaces the stock one */
     original();
     WORD_AT(player+RBS_FOCUS)=focus;
+}
+
+/* WRAP sub_0013A400 (cdecl actor, 0, 0x7F, 0x6E; MapMaker story overhead
+ * meter, per frame per actor with a +0x268 record): no meter on a real boss. */
+void pc_mapmaker_realbosses_meter(void (*original)(void))
+{
+    uint32_t a,ent,rec;
+    unsigned k;
+    if(!rbs.real[0].record || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=RBS_RET_METER) { original();return; }
+    a=WORD_AT(g_esp+4u);
+    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) { original();return; }
+    if(RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL) { original();return; }
+    rec=WORD_AT(a+RBS_ACTOR_RECORD);
+    for(k=0;k<RBS_REAL_MAX && rbs.real[k].record!=rec;k++) {}
+    if(k==RBS_REAL_MAX || !rbs_play()) { original();return; }
+    if(!rbs.meters++) rbs_log("overhead health meter hidden on the giant trophy monster",a,ent);
+    MAPMAKER_GUEST_RET();                            /* cdecl: the caller pops the four args */
 }

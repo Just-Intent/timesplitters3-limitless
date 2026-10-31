@@ -67,6 +67,16 @@ MUTATIONS = {
     'hud-keeps-cleared': ('    original();\n    WORD_AT(player+RBS_FOCUS)=focus;\n', '    original();\n'),
     'hud-always-clears': ('    if(k==RBS_REAL_MAX || !rbs.real[k].boss) { original();return; }', '    if(k==RBS_REAL_MAX) { original();return; }'),
     'hud-any-model': ('       RBS_H(focus+RBS_ENT_MODEL)!=RBS_MODEL || !rbs_play()', '       !rbs_play()'),
+    'meter-any-caller': ('WORD_AT(g_esp)!=RBS_RET_METER) { original();return; }', '0) { original();return; }'),
+    'meter-no-ret': ('    MAPMAKER_GUEST_RET();                            /* cdecl: the caller pops the four args */\n', ''),
+    'meter-kept': ('    MAPMAKER_GUEST_RET();                            /* cdecl: the caller pops the four args */\n',
+                   '    original();\n'),
+    'meter-any-character': ('    if(RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL) { original();return; }\n', ''),
+    'meter-model-only': ('    if(RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL)',
+                         '    if(RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL)'),
+    'meter-any-actor': ('    if(k==RBS_REAL_MAX || !rbs_play()) { original();return; }', '    if(!rbs_play()) { original();return; }'),
+    'meter-any-mode': ('    if(k==RBS_REAL_MAX || !rbs_play()) { original();return; }', '    if(k==RBS_REAL_MAX || !rbs_on()) { original();return; }'),
+    'meter-wrong-return': ('#define RBS_RET_METER 0x0014D264u', '#define RBS_RET_METER 0x0014D25Fu'),
 }
 
 
@@ -278,3 +288,33 @@ def test_monster_cannot_fire_level_events():
     assert 0x002274C0 not in seen
     # control: a boss that does fire events reaches it (the train jetpack, 0x001EEC6D)
     assert 0x002274C0 in graph.get(0x001EEBD0, set())
+
+
+def test_overhead_meter_sites():
+    """The floating meter: MapMaker story play only, actors with a +0x268 record, one caller."""
+    a = by_address()
+    # sub_0014D1F0: scene 100 and story mode, else the actor loop is skipped (story levels, mission 5)
+    assert mem(a[0x0014D21C])[0][4] == 0x0079094C and ('imm', 0x64) in a[0x0014D21C].ops
+    assert a[0x0014D223].mnemonic == 'jne' and '0x14d277' in a[0x0014D223].text
+    assert mem(a[0x0014D225])[0][4] == 0x007DE455 and ('imm', 0xA) in a[0x0014D225].ops
+    assert a[0x0014D22C].mnemonic == 'jne' and '0x14d277' in a[0x0014D22C].text
+    # loop: actors 0x007A3580[[0x00790950] .. [0x0074C37C]); entity +0x268 record, not the player's entity
+    assert mem(a[0x0014D22E])[0][4] == 0x00790950 and mem(a[0x0014D234])[0][4] == 0x0074C37C
+    assert mem(a[0x0014D240])[0][4] == 0x007A3580 and mem(a[0x0014D249])[0][4] == 0x268
+    assert mem(a[0x0014D253])[0][4] == 0x14
+    assert ('imm', 0x6E) in a[0x0014D258].ops and ('imm', 0x7F) in a[0x0014D25A].ops
+    assert a[0x0014D25F].call and target(a[0x0014D25F]) == 0x0013A400 and ends(a, 0x0014D25F) == 0x0014D264
+    assert a[0x0014D25F].function == 0x0014D1F0 and ('imm', 0x10) in a[0x0014D26A].ops   # cdecl
+    callers = {i.address for i in decoded() if i.call and target(i) == 0x0013A400}
+    assert callers == {0x0014D25F}
+    assert {i.function for i in decoded() if i.call and target(i) == 0x0014D1F0} == {0x001CEBC0}
+    # sub_0013A400 reads the entity from the actor, health +0x1CC, ends in a plain ret
+    assert a[0x0013A41E].mnemonic == 'mov' and mem(a[0x0013AAA5])[0][4] == 0x1CC
+    assert target(a[0x0013AAEF]) == 0x0001AC50 and a[0x0013AB00].mnemonic == 'ret' and not a[0x0013AB00].ops
+    # the list holds entity +0x7C (the actor pool entry)
+    assert mem(a[0x0015BCA4])[0][4] == 0x7C and mem(a[0x0015BCAC])[0][4] == 0x007A3580
+    # the deerbeast handler creates the record; MapMaker's own AI setup never does
+    assert target(a[0x002811A3]) == 0x0012C800 and mem(a[0x002811AA])[0][4] == 0x268
+    makers = {i.function for i in decoded() if i.call and target(i) == 0x0012C800}
+    assert 0x00280FA0 in makers and 0x000D2FD0 in makers
+    assert not makers & {0x00240C50, 0x0015B830, 0x0015F8C0}
