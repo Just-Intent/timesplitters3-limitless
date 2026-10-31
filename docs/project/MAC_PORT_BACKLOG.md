@@ -3572,6 +3572,12 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   host adapter of its own; it reaches Mac wherever the shared menu input hook
   runs. Acceptance: load by double click, keyboard/controller unchanged,
   damaged maps ignored; untested in game on either host.
+  The Story mission briefing (0x005238C0) and Arcade League / Challenge event
+  briefing (0x00523870) confirm on any fresh left click off the footer
+  (`src/interface/pc_menu_briefing.inc`, branch `menu-briefing-click`, uncommitted
+  PR). Shared source in the same input hook, no host adapter; acceptance: click
+  starts the mission / opens character select, footer Back and right-click go
+  back; untested in game on either host.
 - **Issue #115 follow-up** (`115-bug-audio-menu-sliders-cannot-be-adjusted-with-mouse-pointer`): Windows Music/Sound volume bars now
   accept click-to-set and held dragging in main and paused Audio/Video Options.
   `src/interface/pc_menu_sliders.inc` captures both original painter layouts, reuses the
