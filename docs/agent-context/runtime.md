@@ -965,3 +965,4 @@ the first outline draw's projected midpoint. Shared PcUiWorldAnchor retains that
 anchor for labels and resets at placement boundaries; viewport/scissor share it.
 Both common backends and legacy GL consume the helper. Original world projection,
 visibility and objective logic remain guest-owned (Refs #338).
+`0460-native-wind-history` wraps `sub_000A5CE0`; its policy calls the MapMaker chain ([limitless](limitless.md)).
