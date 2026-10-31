@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,1649 @@
+@@ -1037,6 +1037,1692 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1364,6 +1364,60 @@
 +#endif
 +}
 +
++extern void sub_002F95E0_gen(void);
++void sub_002F95E0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_move")) pc_mapmaker_roof_move(sub_002F95E0_gen);
++    else sub_002F95E0_gen();
++#else
++    sub_002F95E0_gen();
++#endif
++}
++
++extern void sub_00308120_gen(void);
++void sub_00308120(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_copy")) pc_mapmaker_roof_copy(sub_00308120_gen);
++    else sub_00308120_gen();
++#else
++    sub_00308120_gen();
++#endif
++}
++
++extern void sub_00308480_gen(void);
++void sub_00308480(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_piece_free")) pc_mapmaker_roof_piece_free(sub_00308480_gen);
++    else sub_00308480_gen();
++#else
++    sub_00308480_gen();
++#endif
++}
++
++extern void sub_0003D7B0_gen(void);
++static void sub_0003D7B0_layer0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_text")) pc_mapmaker_roof_text(sub_0003D7B0_gen);
++    else sub_0003D7B0_gen();
++#else
++    sub_0003D7B0_gen();
++#endif
++}
++
++void sub_0003D7B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_text")) pc_mapmaker_realbosses_text(sub_0003D7B0_layer0);
++    else sub_0003D7B0_layer0();
++#else
++    sub_0003D7B0_layer0();
++#endif
++}
++
 +extern void sub_000781A0_gen(void);
 +void sub_000781A0(void)
 +{
@@ -1416,17 +1470,6 @@
 +    else sub_002BE300_gen();
 +#else
 +    sub_002BE300_gen();
-+#endif
-+}
-+
-+extern void sub_0003D7B0_gen(void);
-+void sub_0003D7B0(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_text")) pc_mapmaker_realbosses_text(sub_0003D7B0_gen);
-+    else sub_0003D7B0_gen();
-+#else
-+    sub_0003D7B0_gen();
 +#endif
 +}
 +

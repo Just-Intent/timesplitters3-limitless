@@ -4,8 +4,10 @@
  * menu is built; hover shows the open mask and the pick sees the stock one;
  * the picked piece's masks lose the ceiling (and side) bits; rebuilds store
  * the mark in record word +0x26 and the open mask in +8; loads put the marks
- * back; reused pieces and resets forget them; every hook pops only its return
- * address. */
+ * back; reused pieces and resets forget them; placing/picking up copies a
+ * piece and the mark follows it to the copy (place -> save -> play reads +8
+ * -> reload); freed pieces forget it; the open entries and pieces get their
+ * own names; every hook pops only its return address. */
 #define TSFP_MAPMAKER_ROOF_TEST 1
 #include <stdarg.h>
 #include <stdint.h>
@@ -27,9 +29,10 @@ static uint32_t heap_result=0x00300000u;
 static int heap_calls;
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment)
 {
+    uint32_t p=heap_result;
     (void)alignment;heap_calls++;
-    if(heap_result) memset((char *)memory+heap_result,0xCD,bytes);
-    return heap_result;
+    if(p) { memset((char *)memory+p,0xCD,bytes);heap_result+=0x1000u; }
+    return p;
 }
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
@@ -199,6 +202,33 @@ static int count_record(uint32_t r,void *ctx) { (void)r;(void)ctx;return 1; }
 static uint32_t new_result;
 static void new_original(void) { g_eax=new_result;g_esp+=4u; }
 
+/* sub_003037A0 / pickup: the editor copies the 0x48 bytes into a new piece,
+ * then sub_002F95E0(old, new) (move) or sub_00308120(src, dst) (copy), and
+ * frees the old one with sub_00308480. */
+static void copy_bytes(uint32_t from,uint32_t to) { memcpy((char *)memory+to,(char *)memory+from,0x48); }
+static void move_piece(uint32_t from,uint32_t to)
+{
+    copy_bytes(from,to);
+    hook(pc_mapmaker_roof_move,plain_original,0x00303883u,from,to);
+}
+static void copy_piece(uint32_t from,uint32_t to)
+{
+    copy_bytes(from,to);
+    hook(pc_mapmaker_roof_copy,plain_original,0x002F9BBBu,from,to);
+}
+static void free_piece(uint32_t p) { hook(pc_mapmaker_roof_piece_free,plain_original,0x00308579u,p,0); }
+/* sub_0008A780 0x0008A91D: play takes the record's +8 as the room mask. */
+static uint32_t play_mask(unsigned n) { return WORD_AT(record(n)+8); }
+
+/* sub_0003D7B0: the stock text lookup. */
+#define STOCK_TEXT 0x00400000u
+static void text_original(void) { g_eax=STOCK_TEXT+WORD_AT(g_esp+4);g_esp+=4u; }
+static const char *text(uint32_t ret,uint32_t id)
+{
+    hook(pc_mapmaker_roof_text,text_original,ret,id,0);
+    return g_eax>=STOCK_TEXT?"stock":(const char *)memory+g_eax;
+}
+
 int main(void)
 {
     uint32_t h0,roof_item,air_item,stock_item,p;
@@ -213,7 +243,7 @@ int main(void)
     set_env("TSFP_MAPMAKER_LIMITS",NULL);set_env("TSFP_MAPMAKER_POOLS",NULL);
     WORD_AT(0x0079094Cu)=102u;
     build_menu();
-    CHECK(seen_count==45u && tables_sum()==h0 && heap_calls==0);
+    CHECK(seen_count==45u && tables_sum()==h0 && heap_calls==0 && !mapmaker_roof.labels);
     CHECK(!mapmaker_roof.item[0] && !mapmaker_roof.item[1]);
     mapmaker_roof_set(piece(1),MAPMAKER_ROOF_OPEN_AIR);   /* even a stale mark does nothing */
     CHECK(mask(piece(1))==0xFFFFFFFFu && reduced(piece(1))==0x0B000000u);
@@ -224,7 +254,7 @@ int main(void)
     /* ---- limits on, editor: the palette ---- */
     set_env("TSFP_MAPMAKER_LIMITS","1");
     build_menu();
-    CHECK(seen_count==47u && tables_sum()==h0 && heap_calls==1);
+    CHECK(seen_count==47u && tables_sum()==h0 && heap_calls==2 && mapmaker_roof.labels);
     CHECK(WORD_AT(seen_list[45]+0x14)==MAPMAKER_ROOF_BASE_TILE && WORD_AT(seen_list[46]+0x14)==MAPMAKER_ROOF_BASE_TILE);
     CHECK(WORD_AT(seen_list[44]+0x14)==71u);                /* the last stock entry stays in place */
     CHECK(mapmaker_roof.item[0]==seen_list[45] && mapmaker_roof.item[1]==seen_list[46]);
@@ -233,7 +263,7 @@ int main(void)
     CHECK(mapmaker_roof.item[0]==roof_item && mapmaker_roof.item[1]==air_item);
     WORD_AT(ED+0x200)=0;                                    /* the 3-category palette */
     build_menu();
-    CHECK(seen_count==18u && tables_sum()==h0 && heap_calls==1);
+    CHECK(seen_count==18u && tables_sum()==h0 && heap_calls==2);
     CHECK(mapmaker_roof.item[0]==seen_list[16] && mapmaker_roof.item[1]==seen_list[17]);
     WORD_AT(ED+0x200)=1;
     build_menu();
@@ -252,6 +282,19 @@ int main(void)
     highlight(seen_list[0]+0x10000u);WORD_AT(MENU+0x18C)=MAPMAKER_ROOF_BASE_TILE;  /* id 8 elsewhere */
     hook(pc_mapmaker_roof_menu_hover,hover_original,0x00074500u,MENU,0);
     CHECK(WORD_AT(INST+0x30)==STOCK_PREVIEW+8u);            /* restored for the stock tile 8 */
+
+    /* names: the palette caption of a highlighted open entry */
+    hover(air_item);
+    CHECK(!strcmp(text(MAPMAKER_ROOF_RET_CAPTION,0xA3Fu),"Small Open (Open Air)"));
+    CHECK(!strcmp(text(0x0032E5D9u,0xA3Fu),"stock"));          /* another caller */
+    CHECK(!strcmp(text(MAPMAKER_ROOF_RET_CAPTION,0xA40u),"stock")); /* another tile */
+    hover(roof_item);
+    CHECK(!strcmp(text(MAPMAKER_ROOF_RET_CAPTION,0xA3Fu),"Small Open (No Roof)"));
+    WORD_AT(0x0079094Cu)=100u;
+    CHECK(!strcmp(text(MAPMAKER_ROOF_RET_CAPTION,0xA3Fu),"stock"));
+    WORD_AT(0x0079094Cu)=102u;
+    hover(stock_item);
+    CHECK(!strcmp(text(MAPMAKER_ROOF_RET_CAPTION,0xA3Fu),"stock"));
 
     /* pick: the stock code sees the stock preview; the held piece is marked */
     hover(air_item);
@@ -273,6 +316,52 @@ int main(void)
     CHECK(mask(p)==0xFFFFFFFFu && reduced(p)==0x0B000000u);
     WORD_AT(0x0079094Cu)=102u;
 
+    /* place: the held piece is copied into a new list piece; the mark moves
+     * with it, the freed held piece forgets it (reused pointer stays closed) */
+    {
+        uint32_t held=WORD_AT(ED+0x2F7C),placed=piece(30),dup=piece(31),list=WORD_AT(0x0078400Cu);
+        move_piece(held,placed);
+        CHECK(mapmaker_roof_mode(placed)==MAPMAKER_ROOF_OPEN_ROOF);
+        free_piece(held);
+        CHECK(mapmaker_roof_mode(held)==0 && mapmaker_roof.freed==1u);
+        CHECK(mask(placed)==~0x02000000u);
+        WORD_AT(piece(2)+0x40)=placed;WORD_AT(placed+0x40)=0;
+        FLOAT_AT(placed)=4.0f;FLOAT_AT(placed+4)=2.0f;
+        WORD_AT(ED+0x2F18)=placed;                             /* selected piece's name */
+        CHECK(!strcmp(text(MAPMAKER_ROOF_RET_PIECE_NAME,0xA3Fu),"Small Open (No Roof)"));
+        WORD_AT(ED+0x2F18)=piece(0);
+        CHECK(!strcmp(text(MAPMAKER_ROOF_RET_PIECE_NAME,0xA3Fu),"stock"));
+        /* save (rebuild, here the hand-over in scene 100): marker and open
+         * mask in the record; play reads +8 */
+        WORD_AT(0x0079094Cu)=100u;compile();WORD_AT(0x0079094Cu)=102u;
+        CHECK((WORD_AT(record(3)+0x24)>>16)==0x5201u);
+        CHECK(play_mask(3)==(0x03FFFFFFu&~0x02000000u) && (play_mask(3)&0x01000000u));
+        CHECK(play_mask(0)==0x03FFFFFFu && play_mask(1)==0x03FFFFFFu && play_mask(2)==0x03FFFFFFu);
+        /* copy (pick up a copy): both keep the mark */
+        copy_piece(placed,dup);
+        CHECK(mapmaker_roof_mode(dup)==MAPMAKER_ROOF_OPEN_ROOF && mapmaker_roof_mode(placed)==MAPMAKER_ROOF_OPEN_ROOF);
+        free_piece(dup);
+        CHECK(mapmaker_roof_mode(dup)==0 && mapmaker_roof_mode(placed)==MAPMAKER_ROOF_OPEN_ROOF);
+        copy_piece(piece(0),dup);                              /* a closed source marks nothing */
+        CHECK(mapmaker_roof_mode(dup)==0);
+        /* reload: the reset forgets, the load matches the record again */
+        hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+        CHECK(mapmaker_roof_mode(placed)==0);
+        load();
+        CHECK(mapmaker_roof_mode(placed)==MAPMAKER_ROOF_OPEN_ROOF);
+        compile();
+        CHECK((WORD_AT(record(3)+0x24)>>16)==0x5201u && play_mask(3)==(0x03FFFFFFu&~0x02000000u));
+        /* open air through the same path: walls and ceiling gone, floor kept */
+        mapmaker_roof_set(placed,MAPMAKER_ROOF_OPEN_AIR);
+        move_piece(placed,dup);free_piece(placed);
+        CHECK(mapmaker_roof_mode(dup)==MAPMAKER_ROOF_OPEN_AIR && mapmaker_roof_mode(placed)==0);
+        WORD_AT(piece(2)+0x40)=dup;
+        compile();
+        CHECK((WORD_AT(record(3)+0x24)>>16)==0x5202u && play_mask(3)==0x01000000u);
+        WORD_AT(piece(2)+0x40)=0;WORD_AT(0x0078400Cu)=list;
+        mapmaker_roof_set(dup,0);
+    }
+
     /* rebuild: the placed list piece 1 is open air */
     mapmaker_roof_set(piece(1),MAPMAKER_ROOF_OPEN_AIR);
     compile();
@@ -291,7 +380,7 @@ int main(void)
     CHECK(mapmaker_roof.marked==0u && mapmaker_roof_mode(piece(1))==0);
     load();
     CHECK(mapmaker_roof_mode(piece(1))==MAPMAKER_ROOF_OPEN_AIR && mapmaker_roof_mode(piece(0))==0 && mapmaker_roof_mode(piece(2))==0);
-    CHECK(mapmaker_roof.restored==1u);
+    CHECK(mapmaker_roof.restored==2u);                       /* 1 from the place test */
     hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
     FLOAT_AT(piece(1)+4)=9.0f;                              /* moved: no match */
     load();
@@ -307,7 +396,7 @@ int main(void)
     CHECK(mapmaker_roof_mode(piece(1))==MAPMAKER_ROOF_OPEN_ROOF);
     CHECK(mapmaker_roof_records(C,count_record,NULL)==3);
     WORD_AT(record(0)+0x24)=0x0010u;load();                 /* malformed record size: stops */
-    CHECK(mapmaker_roof.restored==2u && mapmaker_roof_records(C,count_record,NULL)==-1);
+    CHECK(mapmaker_roof.restored==3u && mapmaker_roof_records(C,count_record,NULL)==-1);
     WORD_AT(record(0)+0x24)=0x1000u;
     CHECK(mapmaker_roof_records(C,count_record,NULL)==-1);  /* past the chunk */
 

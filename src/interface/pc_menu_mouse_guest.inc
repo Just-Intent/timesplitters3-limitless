@@ -744,6 +744,10 @@ void pc_mapmaker_roof_menu_init(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_menu_add(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_menu_hover(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_menu_pick(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_move(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_copy(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_piece_free(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_text(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_picker_end(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_pick(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_highlight(void (*original)(void)) { original(); }

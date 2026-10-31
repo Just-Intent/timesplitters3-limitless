@@ -974,3 +974,4 @@ The sets area (20-slot custom character set) wraps the set screen, store, play c
 Realbosses (giant trophy monster) wraps the picker, text, model request, anim mount `sub_001C8540` and AI start `sub_0015B830`; its HUD layer sits inside bosses. See [limitless](limitless.md).
 Realbosses also wraps `sub_0013A400` (Story overhead meter; skipped only for the real trophy monster at return 0x0014D264).
 Sets also wraps `sub_002D2C70` (match start; editor Test map bots from slots 1-10), chained with the story character hook.
+Sky also wraps piece move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`) to carry open-roof marks, and text `sub_0003D7B0` (chained with realbosses).
