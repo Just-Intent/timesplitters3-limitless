@@ -3,7 +3,7 @@
 Keep in sync with ReleaseClient.Repository (tools/launcher/ReleaseClient.cs) and
 config/project-repository.json (PowerShell). UPSTREAM_REPOSITORY is credit and
 attribution for the original project only; it is never a release source.
-tools/compatibility-worker.py is installed as a standalone copy, so it keeps
+tools/ci/compatibility-worker.py is installed as a standalone copy, so it keeps
 its own matching constant.
 """
 
