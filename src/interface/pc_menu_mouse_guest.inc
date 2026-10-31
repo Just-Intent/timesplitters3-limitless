@@ -64,6 +64,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_bosses.inc"
 #include "pc_mapmaker_characters.inc"
 #include "pc_mapmaker_realbosses.inc"
+#include "pc_mapmaker_bigdraw.inc"
 #include "pc_mapmaker_sets.inc"
 #include "pc_mapmaker_matchbots.inc"
 #include "pc_mapmaker_weaponset.inc"
@@ -770,6 +771,7 @@ void pc_mapmaker_realbosses_princess(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_risen(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_throw(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_event(void (*original)(void)) { original(); }
+void pc_mapmaker_bigdraw_rect(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_rows(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_close(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_delete(void (*original)(void)) { original(); }

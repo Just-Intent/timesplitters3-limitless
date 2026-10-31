@@ -433,6 +433,16 @@ with scene word 1 around the original, fire = stock `sub_000EA9C0` args +
 `sub_0010EB90`, phase 2), `sub_002274C0` -> `_event` (drops ret 0x0029E068,
 event 3). Dust particles (`sub_0029CE00`, scenes 1/17 only) not drawn. Not
 built or played.
+Whole height (area `bigdraw`, `src/interface/pc_mapmaker_bigdraw.inc`, user:
+skeleton cut at ~2 floors in mapmaker.11): a prop's scissor (+0x118..+0x124,
+`sub_000862C0`, only caller 0x000A246B ret 0x000A2470) is the union of the
+portal rects (view +0x3BC) of the visible rooms its box touches
+(`sub_0009FBE0`, <= 10); only the camera's room gets the whole viewport
+`[0x007E71C8]` (0x00089BD9). Tiles/portals are one floor high, so a boss in
+another tile is cut at the portal top; mission 5's arena is the camera's room.
+WRAP `sub_000862C0` -> `pc_mapmaker_bigdraw_rect`: character, model
+0x5E9/0x5BE, scene 100, switch on, non-empty rect -> whole viewport (depth
+still occludes). `tests/mapmaker/test_mapmaker_bigdraw.py`. Not built or played.
 
 ### MapMaker and System Link bug fixes
 
