@@ -1,79 +1,126 @@
-# MapMaker Story AI templates (duplicate and linked copies)
+# MapMaker Story AI groups (duplicate, leader and numbered linked copies)
 
 Status: implemented in `src/pc_mapmaker_aitemplates.inc`, fixture-tested
-(`tests/test_mapmaker_aitemplates.py`, 46 mutations; decode checks in
+(`tests/test_mapmaker_aitemplates.py`, 70 mutations; decode checks in
 `tests/test_mapmaker_aitemplates_classified.py`). Not built or played yet.
 Opt-in: `TSFP_MAPMAKER_LIMITS=1`; with it off every hook only runs its
 original. No guest-code table entry (`config/guest-code-patches/` unchanged).
 Research basis: `logs/limits/features/ai-templates.md` (main checkout, ignored).
+The area keeps its name `aitemplates` (hooks, files) although the earlier
+"All X" template entry is gone (user feedback 2026-10-31: it added two list
+entries; the user chose "Leader + numbered copies").
 
 ## What the player gets
 
 In the MapMaker editor, open a Story AI from the Story AI list (its edit
-screen). Two rows appear just above the last row ("Done"):
+screen). Rows appear just above the last row ("Done"):
 
 | Story AI is | Rows |
 |---|---|
-| not linked (or a template) | **Duplicate Story AI**, **Add linked copy** |
+| not linked | **Duplicate Story AI**, **Add linked copy** |
+| a group leader | **Add linked copy**, **Logic means: this AI** / **Logic means: whole group**, **Unlink (next copy leads)** |
 | a linked copy | **Add linked copy**, **Unlink copy** |
 | type 5 (game mode 7 singleton) | none |
 
 - **Duplicate Story AI**: a new, independent Story AI with every setting and
   every point (path) of this one, a fresh default name and its own colour.
   It starts on the same pad(s); move its point if needed.
-- **Add linked copy**: the first time, on an unlinked AI "Guard", it creates
-  a template **"All Guard"** (same settings, no points, so it never spawns) and
-  a copy of Guard at Guard's points, and links Guard and the copy to the
-  template. Further "Add linked copy" (on any member or on the template) adds
-  one more copy (points from the AI used, or from the first copy with points
-  when used on the template).
-- **Unlink copy**: the AI keeps its settings but leaves the group.
+- **Add linked copy**: on an unlinked AI "Guard" it makes Guard the group
+  leader (no extra entry) and adds **"Guard 2"** at Guard's points; on any
+  member it adds the next copy ("Guard 3", ...). The number is the smallest
+  >= 2 that no Story AI name uses as "Guard N". When the leader itself is
+  numbered (a promoted "Guard 2" next to "Guard 3") the base is "Guard"; a
+  leader whose own name merely ends in a number with no numbered member
+  ("Story AI 3") keeps it ("Story AI 3 2"). Names longer than 27 characters are
+  cut before the number. A copy made from a member without points takes the
+  first member's points that has some.
+- Story AI list, as previewed: `Guard`, `Guard 2`, `Guard 3`, `Sniper`.
+  No "(leader)" / "(linked)" markers: the list label is the AI's saved 32-byte
+  name (entry +0x00), so a marker would have to be written into the saved
+  name; the list's row builder was not hooked (INFERRED: it shows the name
+  directly). The edit screen's rows show the role instead.
+- **Logic means** (leader only): toggles group logic; the label shows the
+  current state. Off (default): logic on the leader means the leader only, as
+  stock. On: logic on the leader means any member (see Logic). Logic on a copy
+  always means that copy.
+- **Unlink copy**: the copy keeps its settings and leaves the group.
+  **Unlink (next copy leads)** on the leader: the leader leaves, its first copy
+  (lowest list position) becomes the leader of the others, with group logic
+  off (its own logic keeps meaning "this AI"). A group left with one member
+  dissolves (its group logic is cleared).
+- Deleting the leader promotes the first copy the same way (stock logic
+  fix-up removes logic on the deleted AI); deleting anything renumbers links.
 - Linked AIs share character, variant (+0x2C), the on/off toggle (+0x30), type,
   spawn count, spawn delay, team (+0x44), weapon and behaviour. Changing any
-  of these on one member (or the template) changes the whole group when its
-  edit screen closes (list) or at the next save/compile, edit screen or delete
-  (map path). Name, colour, points, facing (+0x54) and patrol mode (+0x5C)
-  stay per AI.
+  of these on one member changes the whole group when its edit screen closes
+  (list) or at the next save/compile, edit screen or delete (map path). Name,
+  colour, points, facing (+0x54) and patrol mode (+0x5C) stay per AI.
 - At the 255 limit or without container room the stock messages appear on the
-  edit screen, which stays open. A first linked copy needs two free slots.
-- Deleting the template unlinks its copies; deleting anything renumbers links.
+  edit screen, which stays open. Every copy needs one free slot. The other
+  rows close the edit screen (back to the list), like "Done".
 
-Logic: every AI keeps its own entry in the logic picker, so logic on a copy is
-"this copy" exactly as before. Logic on the template ("All Guard") means "any
-linked copy" in play (scene 100):
+## Logic: "whole group" targeting
 
-| Logic on the template | Effect |
+Chosen: the per-leader toggle row, stored in a byte the stock game leaves
+zero. Rejected: an extra logic-picker entry "Guard [group]". Story AI logic ids
+are by index, `[0x00783A50]` + index + 1 (R = `sub_0031DA60`), and the next id
+class (objects) starts at `[0x00783A18]` = R + Story AI count (`sub_0031DA90`,
+0x0031DA9B, CONFIRMED). A picker entry without a real AI record would need an
+index >= the count, which is an object id in play; a stock game (or the switch
+off) would run such logic on an object, and the editor's delete fix-up
+(`sub_00323330`) would renumber it as an AI. The toggle keeps every saved
+logic node a plain AI reference.
+
+With group logic on the leader, in play (scene 100):
+
+| Logic on the leader | Effect |
 |---|---|
-| trigger 0xB (event-style, flag 2 from `sub_0033E560`) | fires when the event happens to any copy |
-| trigger 0x14 (poll `sub_00339600`, actor flag 4, then a delay) | fires when any copy qualifies |
-| action 2 (`sub_00163780`, `sub_000BD090` on each live actor) | applies to every copy |
-| action 0x11 (spawn gate `sub_0033E620`, types 2/3/4) | holds every copy until it fires (a copy's own 0x11 action still applies too) |
+| trigger 0xB (event-style, flag 2 from `sub_0033E560`) | fires when the event happens to any member |
+| trigger 0x14 (poll `sub_00339600`, actor flag 4, then a delay) | fires when any member qualifies |
+| action 2 (`sub_00163780`, `sub_000BD090` on each live actor) | applies to every member |
+| action 0x11 (spawn gate `sub_0033E620`, types 2/3/4) | holds every member until it fires (a copy's own 0x11 action still applies too) |
 
 The trigger/action names (kill, remove, spawn, ...) are inferred from code
-paths; text ids for them were not read. Whether the logic AI picker lists a
-point-less AI is inferred (it lists editor entries) and must be checked.
+paths; text ids for them were not read.
 
 ## Save format and compatibility
 
 - Editor entry +0x50 (dword, never addressed by the game: no access in the
-  editor tracker's site list, logs/limits/ai-logic.md section A) = template
-  index + 1, 0 = none.
-- Story AI chunk (tag 0x00C7766C) data +0x32 (word) = the same value. The
-  compiler zeroes the container first (`rep stosd` at 0x0030070D) and the
-  writer (0x003013E1..0x003015DF) never stores +0x32/+0x33; the loader
-  (0x00302428..0x0030267A) never reads them (both checked in the decode). The
-  writer stores the loop index at +0x22 (0x0030143F) and writes every entry,
-  so chunk ordinal = editor index = save index.
-- Stock game / `TSFP_MAPMAKER_LIMITS` off: the copies are ordinary independent
-  AIs; the template is an AI without points (the play builder drops it,
-  0x00241DDD); logic on the template never fires; re-saving drops the links.
+  editor tracker's site list, logs/limits/ai-logic.md section A): low word =
+  leader index + 1 on a copy, 0 otherwise; bit 16 = group logic on a leader.
+- Story AI chunk (tag 0x00C7766C) data +0x32 (word): copy = 0x4000 | leader
+  ordinal + 1; leader = 0x4000 | 0x8000 when group logic is on; 0 otherwise.
+  0x4000 marks this format. The compiler zeroes the container first
+  (`rep stosd` at 0x0030070D) and the writer (0x003013E1..0x003015DF) never
+  stores +0x32/+0x33; the loader (0x00302428..0x0030267A) never reads them
+  (both checked in the decode, `test_sai_chunk_bytes_0x32_unused`; the flag
+  bits live in +0x33, inside the same verified word). The writer stores the
+  loop index at +0x22 (0x0030143F) and writes every entry, so chunk ordinal =
+  editor index = save index.
+- Stock game / `TSFP_MAPMAKER_LIMITS` off: every member is an ordinary
+  independent AI (the leader is a normal AI with its points); group logic does
+  nothing, logic on the leader means the leader; re-saving drops the links.
 - Old maps: +0x32 is 0, nothing linked. Loader robustness: a link is kept only
-  if it names another chunk of the same load that is itself unlinked, and the
-  loaded entry holds its chunk's saved index (+0x24 = +0x22); otherwise it is
-  dropped and logged (`[mapmaker] story AI templates: link dropped at load`).
-  Stale +0x50 values (the loader does not write +0x50) are always overwritten.
+  if it names another chunk of the same load whose word has no link, the word
+  has no group bit, and the loaded entry holds its chunk's saved index
+  (+0x24 = +0x22); otherwise it is dropped and logged
+  (`[mapmaker] story AI groups: link dropped at load`). A group bit on an AI
+  without copies is cleared. Stale +0x50 values are always overwritten.
+- Migration of the earlier template format (plain link word without 0x4000 to
+  a point-less "All Guard" entry): at editor load the template's first linked
+  member (lowest index, normally the original Guard) becomes the leader, the
+  other members link to it, group logic off; the template is left in place as
+  an unlinked point-less AI (logged `old template group converted`). It is not
+  deleted: deleting at load would run the stock logic fix-up (removing its
+  logic nodes) and shift every later index. A point-less AI is harmless (the
+  play builder drops it, 0x00241DDD) and the user can delete it. Logic on the
+  old template does nothing once the map is re-saved; move it to the leader
+  and turn on "Logic means: whole group". An old-format map played without
+  re-saving keeps the old meaning (logic on the template = any copy).
 
 ## Hooks (WRAP lines for the integrator)
+
+Unchanged by the leader rework (same functions, same hook names):
 
 ```
 WRAP sub_000784A0 -> pc_mapmaker_aitemplates_rows        (generic menu spacer; acts only for return 0x0031D083)
@@ -99,7 +146,7 @@ loaded and are skipped by count). Include the `.inc` after
 `MAPMAKER_PTR_OK`); it does not depend on `pc_mapmaker_editor.inc`.
 Declarations go between the area hook markers in `src/pc_display_menu.h`,
 no-op stubs between the stub markers in `pc_menu_mouse_guest.inc`.
-`xbox_HeapAlloc` (96 bytes once, the row labels) is the same allocator the
+`xbox_HeapAlloc` (192 bytes once, the six row labels) is the same allocator the
 quit menu uses; whole-chain fixtures need it (menu_mouse.c/fov_settings.c get
 it from `tests/mapmaker_area_stubs.h` if missing there).
 
@@ -119,7 +166,7 @@ it from `tests/mapmaker_area_stubs.h` if missing there).
   (0x0007AF66); A (menu+0xC4 bit 0x10 / 0x100000) calls the row callback
   (0x0007B0F6); B (bit 0x20) stores menu+0x1E8 (initialised to -1 at
   0x0007763A) into menu+0x18C and calls the back callback (0x0007B1D7..0x0007B1E4,
-  decode). The rows use ids 0x41540001..3.
+  decode). The rows use ids 0x41540001..4.
 - Close `sub_0031CAC0(menu)`: clamps points for types other than 1/3, compares
   the entry with the scratch copy (change flag, `sub_003370A0(0x13)`), clears
   the scratch, `sub_0007A7A0(menu)`; plain `ret`.
@@ -128,6 +175,9 @@ it from `tests/mapmaker_area_stubs.h` if missing there).
   stock: 0xBB0 with the limit (`sub_003C85D4` into the editor object) and
   0x9B6 via `sub_0007A270(menu, text, 0)`.
 - Delete `sub_0031C8B0(i)`: `sub_00323330(i)` logic fix-up, memmove, count-1.
+- Id classes: `sub_0031DA60` sets R = `[0x00783A50]` = editor+0xDD10;
+  `sub_0031DA90` sets the object base `[0x00783A18]` = R + editor+0x280
+  (Story AI count, 0x0031DA9B).
 - Ids: `sub_003396E0`/`sub_00339780` build trigger/action ids as
   `[0x00783A50] + node+0xE + 1`; kind-2 handlers: triggers 0xB -> 0x003395E0,
   0x14 -> 0x00339600; actions 2 -> 0x00339750 (`sub_00163780`), 0x11 ->
@@ -137,19 +187,24 @@ it from `tests/mapmaker_area_stubs.h` if missing there).
 
 ## Risks and open items
 
-- A duplicate starts on the same pad as its source; two AIs on one pad in play
+- A copy starts on the same pad as its source; two AIs on one pad in play
   is untested (move the copy's point).
-- The edit screen gains two rows; if a type 2/3/4 AI's screen is already full,
-  the bottom rows might not fit (check the layout).
+- A leader's edit screen gains three rows; if a type 2/3/4 AI's screen is
+  already full, the bottom rows might not fit (check the layout).
+- The toggle closes the edit screen; reopen it to see the new label (whether
+  the menu copies row text was not checked, so the label is not rewritten in
+  place).
 - Shared-field propagation from the map path (`sub_002FB3C0` close) happens at
   the next save/compile, edit screen open or delete, not immediately.
 - A remembered edit is matched by editor object, index and colour id; a
   different AI with the same colour at the same index after a reset could
   receive a stale propagation (only if it is itself in a group).
-- System Link: each machine applies the template logic only if it runs this
-  build with the switch on.
-- Trigger 0x14 on a template polls each copy in turn; its delay state is the
-  template trigger's own.
+- Turning group logic on changes the meaning of logic already placed on the
+  leader (it then means any member); promotion leaves it off for that reason.
+- System Link: each machine applies group logic only if it runs this build
+  with the switch on.
+- Trigger 0x14 on a group leader polls each copy in turn; its delay state is
+  the leader trigger's own.
 
 ## Test steps (user)
 
@@ -158,26 +213,35 @@ Run with `TSFP_MAPMAKER_LIMITS=1`.
 1. Duplicate: place a Story AI "Guard" (type 1 patrol with 3 points; then a
    respawner type 2). Story AI list -> Guard -> **Duplicate Story AI**. A new
    AI appears (default name, other colour) with the same settings and path.
-   Show in Map on the copy. Try on a mode 7 type 5 AI: no rows.
-2. Limits: at 255 AIs (or with the map memory full) Duplicate shows the stock
-   "limit"/"no room" message and stays on the edit screen.
-3. Linked copies: Guard -> **Add linked copy**: "All Guard" (no points) and a
-   copy appear; add two more copies from a copy and from "All Guard". Move the
-   copies' points apart.
-4. Edit the template (or any copy): change weapon/character, close: all
-   members change; names, colours and points do not. Unlink one copy and
-   change the template again: the unlinked one keeps its old settings.
-5. Logic, one copy: a logic trigger on one copy (e.g. killed -> objective):
-   killing another copy does not fire it.
-6. Logic, any copy: the same trigger on "All Guard": killing any copy fires it.
-   An action on "All Guard" (remove/kill style) affects every copy; a spawn
-   action on "All Guard" releases every held type 2/3/4 copy. Trigger 0x14
-   style (alert) on the template fires for any copy.
-7. Save, reload (editor): groups kept (edit the template again to check).
-   Delete a copy, then the template: links fixed, no crash; logic on the
-   deleted template removed as stock.
-8. Undo after "Add linked copy" and after a template edit.
-9. Without the switch (or a stock build if available): load the saved map; the
-   copies are independent AIs, "All Guard" is a point-less AI; play it: the
-   template never spawns, per-copy logic works, template logic does nothing.
-10. A story level and an arcade/MapMaker map without links behave as before.
+   Try on a mode 7 type 5 AI: no rows.
+2. Linked copies: Guard -> **Add linked copy**: only **Guard 2** is added (no
+   "All Guard"). From Guard 2 add another (**Guard 3**), and one from Guard
+   (**Guard 4**). Move the copies' points apart. Rename an unrelated AI to
+   "Guard 5" and add a copy: it is named "Guard 6".
+3. Rows: Guard shows Add linked copy / Logic means: this AI / Unlink (next
+   copy leads); Guard 2 shows Add linked copy / Unlink copy; an unlinked AI
+   shows Duplicate / Add linked copy.
+4. Edit any member (weapon, character), close: all members change; names,
+   colours and points do not. Unlink Guard 4 and edit Guard again: Guard 4
+   keeps its old settings.
+5. Logic, one AI: a trigger on Guard 2 (e.g. killed -> objective): killing
+   Guard 3 does not fire it. The same trigger on Guard with "Logic means: this
+   AI": only killing Guard fires it.
+6. Logic, whole group: Guard -> **Logic means: this AI** (screen closes);
+   reopen: it reads **Logic means: whole group**. Now a trigger on Guard fires
+   when any member is killed; an action on Guard (remove/kill style) affects
+   every member; a spawn action on Guard releases every held type 2/3/4 member;
+   an alert-style (0x14) trigger on Guard fires for any member.
+7. Promotion: Guard -> **Unlink (next copy leads)**: Guard 2 now shows the
+   leader rows (logic "this AI"), Guard 3 still follows it. Delete Guard 2:
+   Guard 3 leads the rest. Unlink the last copy: no leader rows remain.
+8. Save, reload (editor): groups and the group-logic setting kept. Undo after
+   "Add linked copy", after a toggle and after a group edit.
+9. An old map saved with the previous build (it has "All Guard"): load it in
+   the editor: Guard leads Guard's copies, "All Guard" is an ordinary
+   point-less AI (stderr: `old template group converted`); delete it if
+   wanted. Before re-saving, playing it still treats logic on "All Guard" as
+   any copy.
+10. Without the switch (or a stock build if available): load the saved map;
+    every member is an independent AI; group logic does nothing.
+11. A story level and an arcade/MapMaker map without links behave as before.
