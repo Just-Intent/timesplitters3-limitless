@@ -36,7 +36,9 @@
  *   gathers teleporter pads into two 10-slot stack arrays without a bound
  *   (sub_0023FD10); this reads the same container walk into larger arrays,
  *   bounded, and pairs each teleporter with the next one of the same colour
- *   exactly as the original, skipping a nav link when the link pool is full.
+ *   exactly as the original, skipping a nav link when the link pool is full
+ *   and the self link pad -> pad of a pair stacked on one cell (the stock
+ *   sub_0009A5B0 would add it; TSFP_MAPMAKER_STACK_ITEMS makes such maps).
  * - pc_mapmaker_objects_tag (sub_002402B0): when every tag slot is used the
  *   original writes at index -1; the object is then registered without a tag
  *   slot (tag field and serial written as the original).
@@ -236,6 +238,7 @@ void pc_mapmaker_objects_twin_pool(void (*original)(void))
 /* ---- teleporters ------------------------------------------------------ */
 static uint32_t mapmaker_objects_tele_pad[MAPMAKER_OBJECTS_TELEPORTER_CAP];
 static uint32_t mapmaker_objects_tele_colour[MAPMAKER_OBJECTS_TELEPORTER_CAP];
+static unsigned mapmaker_objects_self_links;
 /* sub_0023FD10's walk of the map container [0x00784014], bounded. */
 static unsigned mapmaker_objects_teleporters_read(void)
 {
@@ -298,6 +301,12 @@ void pc_mapmaker_objects_teleporters(void (*original)(void))
             uint32_t b;
             if(mapmaker_objects_tele_colour[j]!=mapmaker_objects_tele_colour[i]) continue;
             b=guest_call(sub_0009CC40,1,mapmaker_objects_tele_pad[j]);
+            if(a==b) {                                 /* stacked pair on one pad: no self link */
+                if(mapmaker_objects_self_links++<3u) {
+                    fprintf(stderr,"[mapmaker] teleporter pair on one pad 0x%X: no nav link\n",a);fflush(stderr);
+                }
+                break;
+            }
             g_edi=a;                                   /* sub_0009A2C0(edi = a, b): link exists? */
             if(!guest_call(sub_0009A2C0,1,b) && WORD_AT(0x007B6660u)<links) {
                 g_ebx=a;g_edi=b;                       /* sub_0009A5B0: link ebx -> edi */

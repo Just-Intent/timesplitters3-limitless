@@ -217,4 +217,7 @@ constant reads at the 16-byte settings block 0x00903600
 With `TSFP_MAPMAKER_STACK_ITEMS=1` the grid hook on `sub_003348C0` (return
 0x003070A7) also sets placement-valid bit 4 of editor `+0x25C` when an allowed
 pickup is held over a cell that already has an item, so the stock drop path runs.
+Its hook on `sub_002F8B40` (return 0x0030723F, Story AI mode) answers -1 while
+a Story AI is held, the value `[editor+0x2F20]` already has for "no point under
+the cursor", so a Story AI can be dropped on another one's cell.
 Tests: `tests/test_guest_code_patches.py`, `tests/test_recomp_generation.py`.

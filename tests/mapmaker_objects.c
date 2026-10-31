@@ -306,6 +306,20 @@ int main(void)
     WORD_AT(0x00784014u)=0;WORD_AT(0x007B6660u)=0;                     /* no container: nothing */
     HOOK(pc_mapmaker_objects_teleporters,fake_original);
     CHECK(nlinks==0 && originals==1);
+    /* a pair stacked on one cell shares the pad: no pad -> pad link, the chain goes on */
+    {
+        uint32_t chunk;
+        WORD_AT(0x00784014u)=CONTAINER;q=CONTAINER+8;
+        WORD_AT(q)=0x00C77668u;WORD_AT(q+4)=8;WORD_AT(q+8)=0;WORD_AT(q+12)=1;q+=16;  /* 1 piece */
+        WORD_AT(q)=0x00C77669u;chunk=q;piece=q+8;
+        WORD_AT(piece)=5;WORD_AT(piece+0x1C)=4u<<16;q=piece+0x38;
+        q=item(q,0x0A,20,1);q=item(q,0x0A,20,1);q=item(q,0x0A,22,1);q=item(q,0x0B,30,1);
+        WORD_AT(chunk+4)=q-(chunk+8);WORD_AT(q)=0x00C7766Au;
+        WORD_AT(0x007B6660u)=0;nlinks=0;existing[0]=existing[1]=0;
+        HOOK(pc_mapmaker_objects_teleporters,fake_original);
+        CHECK(nlinks==1 && links[0][0]==0x100u+20u && links[0][1]==0x100u+22u);
+        CHECK(mapmaker_objects_self_links==1u && originals==1);
+    }
 
     /* ---- logic tag guard ---- */
     {
