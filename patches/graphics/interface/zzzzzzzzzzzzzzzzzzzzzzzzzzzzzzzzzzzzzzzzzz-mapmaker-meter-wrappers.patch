@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -955,6 +955,1244 @@
+@@ -1037,6 +1037,1244 @@
      sub_002FA720_gen();
  #endif
  }
@@ -247,7 +247,7 @@
 +}
 +
 +extern void sub_000A5CE0_gen(void);
-+void sub_000A5CE0(void)
++void sub_000A5CE0_mapmaker(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("objects","pc_mapmaker_objects_register")) pc_mapmaker_objects_register(sub_000A5CE0_gen);
