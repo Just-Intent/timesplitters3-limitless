@@ -252,6 +252,8 @@ pointer, memory budget and stage A limits fixtures
 `tests/test_mapmaker_limits.py`) are in the same CI list. Fixtures that
 include `pc_display_menu.c` or `pc_menu_mouse_guest.inc` (`menu_mouse.c`,
 `fov_settings.c`) need a `sub_0003DFA0` stub for the stage A allocator.
+`tests/test_menu_mouse.py` also covers the MapMaker map browser click
+(`map_browser_tests`; mutation `late-map-confirm` removes the input-hook click).
 
 ## Guest-code patch table
 

@@ -410,6 +410,7 @@ static int menu_mouse_footer_hit(uint32_t menu,float x,float y,unsigned sw,unsig
 
 #include "pc_menu_team.inc"
 #include "pc_menu_characters.inc"
+#include "pc_menu_mapmaker_browser.inc"
 
 /* Footer shortcuts are handled by the menu's tick callback BEFORE row
  * navigation. Supply their edges just after original pad input is gathered. */
@@ -456,7 +457,7 @@ void pc_display_menu_mouse_input(void (*original)(void))
             WORD_AT(menu+0xc8)|=action;
             s->actions=0; /* a footer click must never also select a row */
             menu_mouse.mouse_navigation=1;
-        }
+        } else menu_map_browser_click(s,menu,x,y);
     }
     restore_registers(&r);
 }

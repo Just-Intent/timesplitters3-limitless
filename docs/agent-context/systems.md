@@ -23,7 +23,7 @@ Consult `docs/shared-platform.md` for shared versus adapter responsibilities.
 | Area | Start here (tracked root unless noted) | Useful checks/docs |
 | --- | --- | --- |
 | Bindings, input prompts | `src/pc_controls.c`, `pc_input.c`, `pc_bindings.inc`, `pc_prompts.c` | `tests/pc_controls.c`, `tests/pc_prompts.c`, `docs/windows-settings.md` |
-| Mouse/menu handling | `src/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc` | `tests/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
+| Mouse/menu handling | `src/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_mapmaker_browser.inc` | `tests/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
 | Auto-look / camera / cutscene | `src/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py` |
 | Display model and native UI | `src/pc_display.c`, `pc_display_*.inc`, `pc_settings.c`, `src/native/` | `tests/test_pc_display_modes.py`, `test_debug_settings_model.py` |
 | GPU clear / screen copies / sampling | `src/pc_clear_rhi.inc`, `src/graphics/`, runtime `src/d3d/` | `tests/test_rhi_menu_sampling.py`, `tests/rhi/`, `docs/shared-platform.md` |
@@ -203,6 +203,23 @@ from a copy at 0x00901600 (ids >= 32 have no route); `pc_network_bots_revive`
 writes the moved AI table; `TSFP_MAPMAKER_ALIVE=1..64` lowers it; sites and
 risks in `docs/mapmaker-actors.md`).
 Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`.
+
+## MapMaker map browser mouse
+
+Main menu > MapMaker > Load map is an ordinary menu (descriptor `0x0052EA88`,
+construct `sub_0032BEA0`, tick `sub_0032BDD0`) whose type-7 rows carry the
+index of the enumerated file list `[0x00778D38]` (count `+8`, 0x6C-byte
+entries at `+0xC`). Its tick loads the highlighted row when the active menu's
+`+0xC4` has Confirm (0x10), but `sub_0007A7B0` runs the tick (0x0007AD76)
+before the row hook `sub_00073750` (0x0007ADC5), so the shared row click was
+too late. `src/pc_menu_mapmaker_browser.inc`, called from
+`pc_display_menu_mouse_input` after the footer test (scene 101 only), makes a
+fresh left click on a row highlight it (`sub_00076EF0`) and a click on the
+highlighted row Confirm (raw pad A plus `+0xC4`/`+0xC8` bit 0x10, as the
+footer). Rows flagged `+0x28 & 5` or with an id past the count are ignored;
+hover and the wheel keep the shared row behaviour. No patch or regeneration.
+Fixture: `map_browser_tests` in `tests/menu_mouse.c` (mutation
+`late-map-confirm`).
 
 ## MapMaker editor mouse controls
 

@@ -2459,6 +2459,13 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   browsing and Select/Back/right-click cancellation; cover clipped/invisible
   portraits, focus loss, resize, stale draws and other players. Local Windows
   System Link portrait/variant selection and confirm/cancel were verified.
+  The MapMaker map browser (main menu > MapMaker > Load map, descriptor
+  0x0052EA88; `src/pc_menu_mapmaker_browser.inc`, branch `mapmaker-load-mouse`) acts on
+  a row click in the shared input hook, before its tick: a click highlights a
+  map and a click on the highlighted map loads it. It is shared source with no
+  host adapter of its own; it reaches Mac wherever the shared menu input hook
+  runs. Acceptance: load by double click, keyboard/controller unchanged,
+  damaged maps ignored; untested in game on either host.
 - **Issue #115 follow-up** (`115-bug-audio-menu-sliders-cannot-be-adjusted-with-mouse-pointer`): Windows Music/Sound volume bars now
   accept click-to-set and held dragging in main and paused Audio/Video Options.
   `src/pc_menu_sliders.inc` captures both original painter layouts, reuses the
