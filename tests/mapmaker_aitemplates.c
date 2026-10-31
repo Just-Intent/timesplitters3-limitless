@@ -1,6 +1,7 @@
 /* Asset-free contract for src/pc_mapmaker_aitemplates.inc: Story AI
- * duplicate / linked copies in the editor (rows, actions, propagation,
- * delete, save and load of the link) and "any linked copy" logic in play.
+ * duplicate / leader groups in the editor (rows, actions, numbered names,
+ * group-logic toggle, propagation, promotion on unlink/delete, save and load
+ * of the link, old template format) and "whole group" logic in play.
  * Fake guest memory; fake originals pop their return address like the lifted
  * callees, and every hook call checks esp. */
 #include <stdarg.h>
@@ -135,14 +136,15 @@ static void fake_compile(void)                   /* sub_003006C0: zero, one chun
     WORD_AT(p)=0x00C7766Au;WORD_AT(p+4u)=0;
     g_eax=c;g_esp+=4u;
 }
-static int load_append, load_skew;
+static int load_append;
+static uint32_t load_skew;                       /* entry index + 1 with a wrong +0x24 */
 static void fake_load(void)                      /* sub_00301A90: reset, append, +0x50 untouched */
 {
     uint32_t c=WORD_AT(g_esp+4u)+8u,n=load_append?WORD_AT(ED+0x280u):0u,first=n;
     orig_calls++;
     while(WORD_AT(c)!=0x00C7766Au) {
         if(WORD_AT(c)==0x00C7766Cu) {
-            WORD_AT(E(n)+0x24u)=(uint32_t)(int32_t)(int16_t)(WORD_AT(c+8u+0x20u)>>16)+(load_skew && n==first?1u:0u);
+            WORD_AT(E(n)+0x24u)=(uint32_t)(int32_t)(int16_t)(WORD_AT(c+8u+0x20u)>>16)+(load_skew && n==first+load_skew-1u?1u:0u);
             WORD_AT(E(n)+0x34u)=WORD_AT(c+8u+0x20u)&0xFFu;
             WORD_AT(E(n)+0x50u)=0xBADu;n++;
         }
@@ -272,9 +274,13 @@ int main(void)
     WORD_AT(ED+0x280u)=255u;messages=0;orig_calls=0;
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
     CHECK(orig_calls==0 && messages==1 && last_sprintf_value==255u && last_message_menu==MENU && WORD_AT(ED+0x280u)==255u);
-    WORD_AT(ED+0x280u)=254u;press(0x41540002u);messages=0;     /* a first linked copy needs 2 */
+    press(0x41540002u);messages=0;                                /* a linked copy too */
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(orig_calls==0 && messages==1 && WORD_AT(ED+0x280u)==254u);
+    CHECK(orig_calls==0 && messages==1 && WORD_AT(ED+0x280u)==255u);
+    WORD_AT(ED+0x280u)=254u;messages=0;                           /* one slot is enough */
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(orig_calls==1 && messages==0 && WORD_AT(ED+0x280u)==255u && WORD_AT(E(254)+0x50u)==1u);
+    WORD_AT(E(254)+0x50u)=0;orig_calls=0;press(0x41540001u);
     WORD_AT(ED+0x280u)=2u;
     /* no container room */
     has_room=0;press(0x41540001u);messages=0;
@@ -282,31 +288,51 @@ int main(void)
     CHECK(orig_calls==0 && messages==1 && last_message_text==0x00700000u+0x9B6u && WORD_AT(ED+0x280u)==2u);
     has_room=1;
 
-    /* ---- first linked copy of 0: template 2 (no points), copy 3 ---- */
+    /* ---- first linked copy of 0: 0 leads, copy 2 "Guard 2" ---- */
     press(0x41540002u);select_ai(0);orig_calls=0;
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(orig_calls==1 && WORD_AT(ED+0x280u)==4u && room_bytes==2u*0x78u);
-    CHECK(WORD_AT(E(2)+0x58u)==0 && WORD_AT(E(2)+0x64u)==0 && WORD_AT(E(2)+0x50u)==0 && !strcmp(name_of(2),"All Guard"));
-    CHECK(WORD_AT(E(2)+0x48u)==3u && WORD_AT(E(2)+0x28u)==7u && WORD_AT(E(2)+0x34u)==1u);
-    CHECK(WORD_AT(E(0)+0x50u)==3u && WORD_AT(E(3)+0x50u)==3u && WORD_AT(E(1)+0x50u)==0);
-    CHECK(same_points(0,3) && WORD_AT(E(3)+0x54u)==WORD_AT(E(0)+0x54u));
-    rows_for(3,0x0031D083u,0x0031CAC0u);
+    CHECK(orig_calls==1 && WORD_AT(ED+0x280u)==3u && room_bytes==0x78u);
+    CHECK(WORD_AT(E(0)+0x50u)==0 && WORD_AT(E(2)+0x50u)==1u && WORD_AT(E(1)+0x50u)==0);
+    CHECK(!strcmp(name_of(2),"Guard 2") && !strcmp(name_of(0),"Guard") && WORD_AT(E(2)+0x60u)==2u);
+    CHECK(same_points(0,2) && WORD_AT(E(2)+0x54u)==WORD_AT(E(0)+0x54u) && WORD_AT(E(2)+0x48u)==3u);
+    rows_for(0,0x0031D083u,0x0031CAC0u);                         /* leader */
+    CHECK(nrows==3 && rows[0].id==0x41540002u && rows[1].id==0x41540004u && rows[2].id==0x41540003u);
+    CHECK(!strcmp(text_of(rows[1].text),"Logic means: this AI") && !strcmp(text_of(rows[2].text),"Unlink (next copy leads)"));
+    rows_for(2,0x0031D083u,0x0031CAC0u);                         /* copy */
     CHECK(nrows==2 && rows[0].id==0x41540002u && rows[1].id==0x41540003u && !strcmp(text_of(rows[1].text),"Unlink copy"));
-    rows_for(2,0x0031D083u,0x0031CAC0u);                         /* template: not a copy */
+    rows_for(1,0x0031D083u,0x0031CAC0u);                         /* unlinked */
     CHECK(nrows==2 && rows[0].id==0x41540001u);
-    /* linked copy of a copy: same template */
-    press(0x41540002u);select_ai(3);
-    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(WORD_AT(ED+0x280u)==5u && WORD_AT(E(4)+0x50u)==3u && same_points(3,4) && room_bytes==0x78u);
-    /* linked copy of the template: points from its first copy with points */
+    /* linked copy of a copy: same leader, next number */
     press(0x41540002u);select_ai(2);
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(WORD_AT(ED+0x280u)==6u && WORD_AT(E(5)+0x50u)==3u && same_points(0,5));
+    CHECK(WORD_AT(ED+0x280u)==4u && WORD_AT(E(3)+0x50u)==1u && same_points(2,3) && !strcmp(name_of(3),"Guard 3"));
+    /* from the leader again, with "Guard 4" taken by an unrelated AI */
+    snprintf((char *)name_of(1),32,"Guard 4");
+    press(0x41540002u);select_ai(0);
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(WORD_AT(ED+0x280u)==5u && WORD_AT(E(4)+0x50u)==1u && same_points(0,4) && !strcmp(name_of(4),"Guard 5"));
+    snprintf((char *)name_of(1),32,"Story AI 1");
     /* duplicate of a linked copy (not offered, still safe): an independent AI */
     press(0x41540001u);select_ai(3);
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(WORD_AT(ED+0x280u)==7u && WORD_AT(E(6)+0x50u)==0 && same_points(3,6) && WORD_AT(E(3)+0x50u)==3u);
-    WORD_AT(ED+0x280u)=6u;
+    CHECK(WORD_AT(ED+0x280u)==6u && WORD_AT(E(5)+0x50u)==0 && same_points(3,5) && WORD_AT(E(3)+0x50u)==1u);
+    WORD_AT(ED+0x280u)=5u;
+    /* group logic: a leader's toggle; nothing on a copy */
+    press(0x41540004u);select_ai(0);orig_calls=0;
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(orig_calls==1 && WORD_AT(E(0)+0x50u)==0x10000u && WORD_AT(ED+0x280u)==5u);
+    rows_for(0,0x0031D083u,0x0031CAC0u);
+    CHECK(nrows==3 && !strcmp(text_of(rows[1].text),"Logic means: whole group"));
+    rows_for(2,0x0031D083u,0x0031CAC0u);                         /* the flag does not break the link */
+    CHECK(nrows==2 && rows[1].id==0x41540003u);
+    press(0x41540004u);select_ai(2);
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(WORD_AT(E(2)+0x50u)==1u && WORD_AT(E(0)+0x50u)==0x10000u);
+    /* a leader with group logic gets further copies */
+    press(0x41540002u);select_ai(3);
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(WORD_AT(ED+0x280u)==6u && WORD_AT(E(5)+0x50u)==1u && !strcmp(name_of(5),"Guard 4"));
+    WORD_AT(ED+0x280u)=5u;
 
     /* ---- propagation on close: edit copy 3 ---- */
     select_ai(3);
@@ -315,10 +341,11 @@ int main(void)
     press(0xFFFFFFFFu);
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
     CHECK(WORD_AT(E(3)+0x58u)==1u);                               /* stock clamp of the edited one */
-    CHECK(WORD_AT(E(0)+0x48u)==9u && WORD_AT(E(2)+0x48u)==9u && WORD_AT(E(4)+0x48u)==9u && WORD_AT(E(5)+0x48u)==9u);
-    CHECK(WORD_AT(E(0)+0x34u)==0u && WORD_AT(E(0)+0x58u)==1u && WORD_AT(E(2)+0x58u)==0u);
+    CHECK(WORD_AT(E(0)+0x48u)==9u && WORD_AT(E(2)+0x48u)==9u && WORD_AT(E(4)+0x48u)==9u);
+    CHECK(WORD_AT(E(0)+0x34u)==0u && WORD_AT(E(0)+0x58u)==1u && WORD_AT(E(2)+0x58u)==1u);
     CHECK(WORD_AT(E(0)+0x54u)==4u && WORD_AT(E(1)+0x48u)==3u);  /* facing per copy; unrelated AI */
-    CHECK(!strcmp(name_of(0),"Guard") && WORD_AT(E(0)+0x60u)==0u);
+    CHECK(!strcmp(name_of(0),"Guard") && !strcmp(name_of(2),"Guard 2") && WORD_AT(E(0)+0x60u)==0u);
+    CHECK(WORD_AT(E(0)+0x50u)==0x10000u && WORD_AT(E(2)+0x50u)==1u);
     /* no change: nothing copied */
     WORD_AT(E(4)+0x4Cu)=5u;                                       /* out of step on purpose */
     select_ai(0);
@@ -327,116 +354,205 @@ int main(void)
     CHECK(WORD_AT(E(4)+0x4Cu)==5u);
     WORD_AT(E(4)+0x4Cu)=1u;
     /* map path: open, edit, then compile (undo/save) with the screen open, twice */
-    select_ai(5);
+    select_ai(4);
     HOOK(pc_mapmaker_aitemplates_open,fake_plain,MENU);
-    WORD_AT(E(5)+0x4Cu)=4u;
+    WORD_AT(E(4)+0x4Cu)=4u;
     HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
     CHECK(WORD_AT(E(0)+0x4Cu)==4u && WORD_AT(E(2)+0x4Cu)==4u);
-    WORD_AT(E(5)+0x4Cu)=3u;
+    WORD_AT(E(4)+0x4Cu)=3u;
     HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
-    CHECK(WORD_AT(E(0)+0x4Cu)==3u && WORD_AT(E(4)+0x4Cu)==3u);
+    CHECK(WORD_AT(E(0)+0x4Cu)==3u && WORD_AT(E(3)+0x4Cu)==3u);
     /* a different entry at the remembered index (new map): ignored */
-    select_ai(5);
+    select_ai(4);
     HOOK(pc_mapmaker_aitemplates_open,fake_plain,MENU);
-    WORD_AT(E(5)+0x60u)=40u;WORD_AT(E(5)+0x4Cu)=2u;
+    WORD_AT(E(4)+0x60u)=40u;WORD_AT(E(4)+0x4Cu)=2u;
     HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
     CHECK(WORD_AT(E(0)+0x4Cu)==3u);
-    WORD_AT(E(5)+0x60u)=5u;WORD_AT(E(5)+0x4Cu)=3u;
+    WORD_AT(E(4)+0x60u)=4u;WORD_AT(E(4)+0x4Cu)=3u;
     HOOK(pc_mapmaker_aitemplates_open,fake_plain,MENU);           /* forget it */
 
-    /* ---- save: chunk +0x32 = link ---- */
+    /* ---- save: chunk +0x32 = 0x4000 | leader + 1, leader 0x4000 | 0x8000 ---- */
     HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
-    CHECK(sai_data(5) && !sai_data(6));
-    CHECK(saved_link(0)==3u && saved_link(1)==0 && saved_link(2)==0 && saved_link(3)==3u && saved_link(4)==3u && saved_link(5)==3u);
+    CHECK(sai_data(4) && !sai_data(5));
+    CHECK(saved_link(0)==0xC000u && saved_link(1)==0 && saved_link(2)==0x4001u && saved_link(3)==0x4001u && saved_link(4)==0x4001u);
     CHECK(WORD_AT(CONT+8u)==0x00C77668u && WORD_AT(CONT+0x10u)==0 && WORD_AT(CONT+0x1Cu)==0); /* other chunk untouched */
-    /* invalid links are not saved: chained, self, type 5 */
-    WORD_AT(E(1)+0x50u)=4u;                                       /* -> 3, itself a copy */
+    WORD_AT(E(0)+0x50u)=0;                                        /* leader without group logic */
     HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
-    CHECK(saved_link(1)==0 && saved_link(0)==3u);
+    CHECK(saved_link(0)==0x4000u && saved_link(2)==0x4001u);
+    WORD_AT(E(0)+0x50u)=0x10000u;
+    /* invalid links are not saved: chained, self, type 5, a lone group flag */
+    WORD_AT(E(1)+0x50u)=3u;                                       /* -> 2, itself a copy */
+    HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
+    CHECK(saved_link(1)==0 && saved_link(2)==0x4001u);
     WORD_AT(E(1)+0x50u)=2u;                                       /* itself */
     HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
     CHECK(saved_link(1)==0);
-    WORD_AT(E(1)+0x50u)=3u;WORD_AT(E(1)+0x34u)=5u;               /* type 5 */
+    WORD_AT(E(1)+0x50u)=1u;WORD_AT(E(1)+0x34u)=5u;               /* type 5 */
     HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
     CHECK(saved_link(1)==0);
-    WORD_AT(E(1)+0x50u)=0;WORD_AT(E(1)+0x34u)=1u;
+    WORD_AT(E(1)+0x50u)=0x10000u;WORD_AT(E(1)+0x34u)=1u;         /* no copies */
+    HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
+    CHECK(saved_link(1)==0);
+    WORD_AT(E(1)+0x50u)=0;
 
     /* ---- load: links back from the chunks; stale +0x50 cleared ---- */
     HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
-    for(i=0;i<6;i++) WORD_AT(E(i)+0x50u)=0x77u;
+    for(i=0;i<5;i++) WORD_AT(E(i)+0x50u)=0x77u;
     HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);
-    CHECK(WORD_AT(ED+0x280u)==6u);
-    CHECK(WORD_AT(E(0)+0x50u)==3u && WORD_AT(E(1)+0x50u)==0 && WORD_AT(E(2)+0x50u)==0 &&
-          WORD_AT(E(3)+0x50u)==3u && WORD_AT(E(4)+0x50u)==3u && WORD_AT(E(5)+0x50u)==3u);
-    /* odd data: chained link, past the count */
-    set_saved_link(1,1u);                                         /* 1 -> 0, a copy */
-    set_saved_link(3,40u);
+    CHECK(WORD_AT(ED+0x280u)==5u);
+    CHECK(WORD_AT(E(0)+0x50u)==0x10000u && WORD_AT(E(1)+0x50u)==0 && WORD_AT(E(2)+0x50u)==1u &&
+          WORD_AT(E(3)+0x50u)==1u && WORD_AT(E(4)+0x50u)==1u);
+    /* odd data: chained link, past the count, group bit on a copy, lone group flag */
+    set_saved_link(3,0x4003u);                                    /* 3 -> 2, a copy */
+    set_saved_link(4,0x4000u|40u);
+    set_saved_link(1,0xC000u);
     ait.dropped_links=0;
     HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);
-    CHECK(WORD_AT(E(1)+0x50u)==0 && WORD_AT(E(3)+0x50u)==0 && WORD_AT(E(0)+0x50u)==3u && ait.dropped_links==2u);
-    set_saved_link(1,0);set_saved_link(3,3u);
-    /* an entry that does not hold its chunk's saved index */
-    load_skew=1;
+    CHECK(WORD_AT(E(3)+0x50u)==0 && WORD_AT(E(4)+0x50u)==0 && WORD_AT(E(2)+0x50u)==1u && ait.dropped_links==2u);
+    CHECK(WORD_AT(E(0)+0x50u)==0x10000u && WORD_AT(E(1)+0x50u)==0);
+    set_saved_link(4,0xC001u);                                    /* a copy word with the group bit */
     HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);
-    CHECK(WORD_AT(E(0)+0x50u)==0 && WORD_AT(E(3)+0x50u)==3u);
+    CHECK(WORD_AT(E(4)+0x50u)==0 && ait.dropped_links==4u);
+    set_saved_link(3,0x4001u);set_saved_link(4,0x4001u);set_saved_link(1,0);
+    /* the group flag goes when no copy survives the load */
+    set_saved_link(2,0);set_saved_link(3,0);set_saved_link(4,0);
+    HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);
+    CHECK(WORD_AT(E(0)+0x50u)==0);
+    set_saved_link(2,0x4001u);set_saved_link(3,0x4001u);set_saved_link(4,0x4001u);
+    /* an entry that does not hold its chunk's saved index */
+    load_skew=3u;                                                 /* entry 2 */
+    HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);
+    CHECK(WORD_AT(E(2)+0x50u)==0 && WORD_AT(E(3)+0x50u)==1u);
     load_skew=0;
     /* appended after entries already there: links point into the loaded run */
     WORD_AT(ED+0x280u)=2u;load_append=1;
     HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);
-    CHECK(WORD_AT(ED+0x280u)==8u && WORD_AT(E(2)+0x50u)==5u && WORD_AT(E(5)+0x50u)==5u && WORD_AT(E(4)+0x50u)==0);
+    CHECK(WORD_AT(ED+0x280u)==7u && WORD_AT(E(2)+0x50u)==0x10000u && WORD_AT(E(4)+0x50u)==3u &&
+          WORD_AT(E(6)+0x50u)==3u && WORD_AT(E(3)+0x50u)==0);
     load_append=0;
+    /* the old template format: 1 = "All Guard", 0/2/3 linked to it */
+    set_saved_link(0,2u);set_saved_link(1,0);set_saved_link(2,2u);set_saved_link(3,2u);set_saved_link(4,0);
+    ait.converted=0;
     HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);
-    CHECK(WORD_AT(ED+0x280u)==6u && WORD_AT(E(0)+0x50u)==3u);
-    for(i=0;i<6;i++) WORD_AT(E(i)+0x24u)=0;
+    CHECK(WORD_AT(ED+0x280u)==5u && ait.converted==1u);
+    CHECK(WORD_AT(E(0)+0x50u)==0 && WORD_AT(E(1)+0x50u)==0 && WORD_AT(E(2)+0x50u)==1u &&
+          WORD_AT(E(3)+0x50u)==1u && WORD_AT(E(4)+0x50u)==0);
+    set_saved_link(0,0);set_saved_link(1,0);set_saved_link(2,4u);set_saved_link(3,0);set_saved_link(4,4u);
+    HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);              /* template 3 after its first copy */
+    CHECK(WORD_AT(E(2)+0x50u)==0 && WORD_AT(E(3)+0x50u)==0 && WORD_AT(E(4)+0x50u)==3u && WORD_AT(E(0)+0x50u)==0);
+    set_saved_link(0,4u);
+    HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);              /* the lowest copy leads */
+    CHECK(WORD_AT(E(0)+0x50u)==0 && WORD_AT(E(2)+0x50u)==1u && WORD_AT(E(4)+0x50u)==1u && WORD_AT(E(3)+0x50u)==0);
+    /* back to: leader 0 (group logic), copies 2, 3, 4 */
+    set_saved_link(0,0xC000u);set_saved_link(1,0);set_saved_link(2,0x4001u);set_saved_link(3,0x4001u);set_saved_link(4,0x4001u);
+    HOOK(pc_mapmaker_aitemplates_load,fake_load,CONT);
+    CHECK(WORD_AT(E(0)+0x50u)==0x10000u && WORD_AT(E(4)+0x50u)==1u);
+    for(i=0;i<5;i++) WORD_AT(E(i)+0x24u)=0;
 
-    /* ---- unlink ---- */
+    /* ---- unlink a copy ---- */
     press(0x41540003u);select_ai(4);orig_calls=0;
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(orig_calls==1 && WORD_AT(E(4)+0x50u)==0 && WORD_AT(ED+0x280u)==6u);
+    CHECK(orig_calls==1 && WORD_AT(E(4)+0x50u)==0 && WORD_AT(ED+0x280u)==5u && WORD_AT(E(0)+0x50u)==0x10000u);
     select_ai(0);
     HOOK(pc_mapmaker_aitemplates_open,fake_plain,MENU);
     WORD_AT(E(0)+0x48u)=11u;press(0xFFFFFFFFu);
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(WORD_AT(E(3)+0x48u)==11u && WORD_AT(E(4)+0x48u)==9u);
+    CHECK(WORD_AT(E(3)+0x48u)==11u && WORD_AT(E(2)+0x48u)==11u && WORD_AT(E(4)+0x48u)==9u);
+    /* ---- unlink the leader: copy 2 leads, group logic off ---- */
+    press(0x41540003u);select_ai(0);
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(WORD_AT(E(0)+0x50u)==0 && WORD_AT(E(2)+0x50u)==0 && WORD_AT(E(3)+0x50u)==3u);
+    rows_for(2,0x0031D083u,0x0031CAC0u);
+    CHECK(nrows==3 && rows[1].id==0x41540004u);
+    /* the last copy leaves: the group dissolves */
+    WORD_AT(E(2)+0x50u)=0x10000u;
+    press(0x41540003u);select_ai(3);
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(WORD_AT(E(3)+0x50u)==0 && WORD_AT(E(2)+0x50u)==0);
+    /* a one-copy group whose leader unlinks: both independent */
+    WORD_AT(E(3)+0x50u)=3u;
+    press(0x41540003u);select_ai(2);
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(WORD_AT(E(3)+0x50u)==0 && WORD_AT(E(2)+0x50u)==0);
 
-    /* ---- delete: 1 (below the template), then the template ---- */
+    /* ---- delete: the leader (2 of 0, 3), a lower AI, then the last copy ---- */
+    WORD_AT(E(2)+0x50u)=0x10000u;WORD_AT(E(0)+0x50u)=3u;WORD_AT(E(3)+0x50u)=3u;
+    HOOK(pc_mapmaker_aitemplates_delete,fake_delete,2u);
+    CHECK(WORD_AT(ED+0x280u)==4u && !strcmp(name_of(2),"Guard 3"));
+    CHECK(WORD_AT(E(0)+0x50u)==0 && WORD_AT(E(2)+0x50u)==1u && WORD_AT(E(1)+0x50u)==0 && WORD_AT(E(3)+0x50u)==0);
+    WORD_AT(E(0)+0x50u)=0x10000u;
+    WORD_AT(E(3)+0x50u)=3u;                                       /* 3 -> 2, a copy (ignored) */
     HOOK(pc_mapmaker_aitemplates_delete,fake_delete,1u);
-    CHECK(WORD_AT(ED+0x280u)==5u && !strcmp(name_of(1),"All Guard"));
-    CHECK(WORD_AT(E(0)+0x50u)==2u && WORD_AT(E(2)+0x50u)==2u && WORD_AT(E(3)+0x50u)==0 && WORD_AT(E(4)+0x50u)==2u);
+    CHECK(WORD_AT(ED+0x280u)==3u && WORD_AT(E(1)+0x50u)==1u && WORD_AT(E(0)+0x50u)==0x10000u && WORD_AT(E(2)+0x50u)==2u);
+    WORD_AT(E(2)+0x50u)=0;
     HOOK(pc_mapmaker_aitemplates_delete,fake_delete,1u);
-    CHECK(WORD_AT(ED+0x280u)==4u);
-    for(i=0;i<4;i++) CHECK(WORD_AT(E(i)+0x50u)==0);
+    CHECK(WORD_AT(ED+0x280u)==2u && WORD_AT(E(0)+0x50u)==0 && WORD_AT(E(1)+0x50u)==0);
+    /* renumbering keeps the group flag of a leader above the deleted AI */
+    make_ai(0,1,1,1,"X");make_ai(1,1,1,1,"L");make_ai(2,1,1,1,"L 2");WORD_AT(ED+0x280u)=3u;
+    WORD_AT(E(1)+0x50u)=0x10000u;WORD_AT(E(2)+0x50u)=2u;
+    HOOK(pc_mapmaker_aitemplates_delete,fake_delete,0u);
+    CHECK(WORD_AT(E(0)+0x50u)==0x10000u && WORD_AT(E(1)+0x50u)==1u);
+    /* deleting a copy: a stray link to it is cleared, the lone leader dissolves */
+    make_ai(0,1,1,1,"X");make_ai(1,1,1,1,"L");make_ai(2,1,1,1,"L 2");WORD_AT(ED+0x280u)=3u;
+    WORD_AT(E(1)+0x50u)=0x10000u;WORD_AT(E(2)+0x50u)=2u;WORD_AT(E(0)+0x50u)=3u;  /* 0 -> 2, a copy */
+    HOOK(pc_mapmaker_aitemplates_delete,fake_delete,2u);
+    CHECK(WORD_AT(ED+0x280u)==2u && WORD_AT(E(0)+0x50u)==0 && WORD_AT(E(1)+0x50u)==0);
+
+    /* ---- names: a promoted "Guard 2" leading "Guard 3"; default and long names ---- */
+    make_ai(0,1,1,1,"Guard 2");make_ai(1,1,1,1,"Guard 3");WORD_AT(ED+0x280u)=2u;
+    WORD_AT(E(1)+0x50u)=1u;
+    press(0x41540002u);select_ai(0);
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(WORD_AT(ED+0x280u)==3u && !strcmp(name_of(2),"Guard 4") && WORD_AT(E(2)+0x50u)==1u);
+    make_ai(0,1,1,1,"Story AI 3");WORD_AT(ED+0x280u)=1u;
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(!strcmp(name_of(1),"Story AI 3 2"));
+    make_ai(0,1,1,1,"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123");WORD_AT(ED+0x280u)=1u;
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(!strcmp(name_of(1),"ABCDEFGHIJKLMNOPQRSTUVWXYZ0 2"));
+    /* a copy made from a member without points takes the leader's points */
+    make_ai(0,1,1,2,"P");make_ai(1,1,1,0,"P 2");WORD_AT(ED+0x280u)=2u;WORD_AT(E(1)+0x50u)=1u;
+    press(0x41540002u);select_ai(1);
+    HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
+    CHECK(WORD_AT(ED+0x280u)==3u && same_points(0,2) && WORD_AT(E(2)+0x50u)==1u && !strcmp(name_of(2),"P 3"));
 
     /* ---- play: level start builds the table ---- */
     WORD_AT(0x0079094Cu)=100u;WORD_AT(0x00783A50u)=R;WORD_AT(0x00784014u)=CONT;
-    make_ai(0,0,1,0,"All A");make_ai(1,0,1,1,"A1");make_ai(2,0,1,1,"A2");
-    make_ai(3,2,1,1,"B");make_ai(4,2,1,1,"B1");make_ai(5,0,1,1,"C");
-    WORD_AT(ED+0x280u)=6u;
-    WORD_AT(E(1)+0x50u)=1u;WORD_AT(E(2)+0x50u)=1u;WORD_AT(E(4)+0x50u)=4u;
+    make_ai(0,0,1,1,"A");make_ai(1,0,1,1,"A 2");make_ai(2,0,1,1,"A 3");
+    make_ai(3,2,1,1,"B");make_ai(4,2,1,1,"B 2");make_ai(5,0,1,1,"C");
+    make_ai(6,0,1,1,"D");make_ai(7,0,1,1,"D 2");
+    WORD_AT(ED+0x280u)=8u;
+    WORD_AT(E(0)+0x50u)=0x10000u;WORD_AT(E(3)+0x50u)=0x10000u;
+    WORD_AT(E(1)+0x50u)=1u;WORD_AT(E(2)+0x50u)=1u;WORD_AT(E(4)+0x50u)=4u;WORD_AT(E(7)+0x50u)=7u;
     WORD_AT(0x0079094Cu)=102u;
     HOOK(pc_mapmaker_aitemplates_compile,fake_compile,CONT);
     WORD_AT(0x0079094Cu)=100u;
-    set_saved_link(5,2u);                                         /* 5 -> 1, a copy: ignored */
+    CHECK(saved_link(6)==0x4000u && saved_link(7)==0x4007u);
+    set_saved_link(5,0x4002u);                                    /* 5 -> 1, a copy: ignored */
     memset(&ait_level,0x55,sizeof ait_level);
     HOOK(pc_mapmaker_aitemplates_level,fake_plain,0);
     CHECK(ait_level.active && ait_level.template_of[1]==0 && ait_level.template_of[2]==0 &&
-          ait_level.template_of[4]==3 && ait_level.template_of[5]==-1 && ait_level.template_of[0]==-1);
-    CHECK(ait_level.is_template[0] && ait_level.is_template[3] && !ait_level.is_template[1] && !ait_level.is_template[5]);
+          ait_level.template_of[4]==3 && ait_level.template_of[5]==-1 && ait_level.template_of[0]==-1 &&
+          ait_level.template_of[7]==6);
+    CHECK(ait_level.group[0] && ait_level.group[3] && !ait_level.group[1] && !ait_level.group[5] && !ait_level.group[6]);
 
-    /* event: a copy's event is delivered again as the template's */
+    /* event: a copy's event is delivered again as the leader's */
     {
         uint32_t actor=ACTORS,a=ACTORS+0x100u,rec=ACTORS+0x2000u;
         WORD_AT(actor+0x7Cu)=a;WORD_AT(a+0xBF0u)=rec;
         WORD_AT(rec+8u)=R+3u;nseen=0;                             /* index 2 */
         HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
         CHECK(nseen==2 && seen[0]==R+3u && seen[1]==R+1u && WORD_AT(rec+8u)==R+3u);
-        WORD_AT(rec+8u)=R+5u;nseen=0;                             /* index 4 -> template 3 */
+        WORD_AT(rec+8u)=R+5u;nseen=0;                             /* index 4 -> leader 3 */
         HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
         CHECK(nseen==2 && seen[1]==R+4u && WORD_AT(rec+8u)==R+5u);
-        WORD_AT(rec+8u)=R+4u;nseen=0;                             /* the template's own actor */
+        WORD_AT(rec+8u)=R+4u;nseen=0;                             /* the leader's own actor */
         HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
         CHECK(nseen==1);
         WORD_AT(rec+8u)=R+6u;nseen=0;                             /* not linked */
+        HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
+        CHECK(nseen==1);
+        WORD_AT(rec+8u)=R+8u;nseen=0;                             /* a copy, leader without group logic */
         HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
         CHECK(nseen==1);
         WORD_AT(rec+8u)=500u;nseen=0;                             /* an object id */
@@ -450,14 +566,16 @@ int main(void)
         HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
         CHECK(nseen==1);
     }
-    /* remove (action 2) on the template id: every copy too */
+    /* remove (action 2) on the leader id: every copy too */
     nseen=0;HOOK(pc_mapmaker_aitemplates_remove,fake_remove,R+1u);
     CHECK(nseen==3 && seen[0]==R+1u && seen[1]==R+2u && seen[2]==R+3u);
     nseen=0;HOOK(pc_mapmaker_aitemplates_remove,fake_remove,R+2u);
     CHECK(nseen==1);
     nseen=0;HOOK(pc_mapmaker_aitemplates_remove,fake_remove,R+4u);
     CHECK(nseen==2 && seen[1]==R+5u);
-    /* spawn gate: a copy also waits for the template's spawn action */
+    nseen=0;HOOK(pc_mapmaker_aitemplates_remove,fake_remove,R+7u);  /* no group logic */
+    CHECK(nseen==1);
+    /* spawn gate: a copy also waits for the leader's spawn action */
     memset(gate_open,0,sizeof gate_open);
     gate_open[3]=1;gate_open[1]=0;nseen=0;
     HOOK(pc_mapmaker_aitemplates_spawn_gate,fake_gate,R+3u);
@@ -471,7 +589,10 @@ int main(void)
     gate_open[6]=1;gate_open[1]=0;nseen=0;
     HOOK(pc_mapmaker_aitemplates_spawn_gate,fake_gate,R+6u);
     CHECK(g_eax==1 && nseen==1);
-    /* trigger 0x14 on the template: any copy */
+    gate_open[8]=1;gate_open[7]=0;nseen=0;                        /* no group logic */
+    HOOK(pc_mapmaker_aitemplates_spawn_gate,fake_gate,R+8u);
+    CHECK(g_eax==1 && nseen==1);
+    /* trigger 0x14 on the leader: any copy */
     {
         uint32_t t=ACTORS+0x3000u;
         memset(found,0,sizeof found);now=100u;
@@ -493,8 +614,22 @@ int main(void)
         WORD_AT(t+0x14u)=R+2u;WORD_AT(t+0x18u)=3u;found[2]=0;nseen=0; /* a copy's own trigger */
         HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
         CHECK(nseen==1);
+        WORD_AT(t+0x14u)=R+7u;WORD_AT(t+0x18u)=3u;nseen=0;        /* leader without group logic */
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(nseen==1);
     }
+    /* an old-format map played without re-saving: the template means any copy */
+    set_saved_link(6,0);set_saved_link(7,7u);
+    HOOK(pc_mapmaker_aitemplates_level,fake_plain,0);
+    CHECK(ait_level.group[6] && ait_level.template_of[7]==6 && ait_level.group[0]);
+    nseen=0;HOOK(pc_mapmaker_aitemplates_remove,fake_remove,R+7u);
+    CHECK(nseen==2 && seen[1]==R+8u);
+    /* no group logic anywhere: nothing active */
+    set_saved_link(0,0x4000u);set_saved_link(3,0x4000u);set_saved_link(7,0x4007u);
+    HOOK(pc_mapmaker_aitemplates_level,fake_plain,0);
+    CHECK(!ait_level.active && ait_level.template_of[1]==0);
     /* limits off at level start: no table */
+    set_saved_link(0,0xC000u);
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
     HOOK(pc_mapmaker_aitemplates_level,fake_plain,0);
     CHECK(!ait_level.active);
