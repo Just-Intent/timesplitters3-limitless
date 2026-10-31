@@ -25,7 +25,7 @@ static volatile uint32_t stub_ran;
 STUB(sub_0003DFA0,1) STUB(sub_00064E70,2) STUB(sub_00069640,3) STUB(sub_000BE860,4) STUB(sub_0006B2D0,5)
 STUB(sub_00333700,6) STUB(sub_002FDF50,7) STUB(sub_00074460,8) STUB(sub_0003D7B0,9) STUB(sub_00071800,10)
 STUB(sub_00079DE0,11) STUB(sub_0007D4A0,12) STUB(sub_000716D0,13) STUB(sub_00078590,14) STUB(sub_000783D0,15)
-STUB(sub_00303350,16)
+STUB(sub_00303350,16) STUB(sub_00071940,17)
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -37,6 +37,7 @@ STUB(sub_00303350,16)
 #define PROFILE 0x00302000u
 #define PICKUP 0x00303000u
 #define TEXTS 0x00700000u
+#define SETITEM 0x00304000u             /* the pane's set list item (value -5), choice +0xC8 */
 #define FILTERED 0x2Au                  /* sub_00064E70 removes this weapon */
 
 static int failures;
@@ -63,6 +64,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         snprintf((char *)((uintptr_t)r+g_xbox_mem_offset),16,"T%X",(unsigned)x[0]);
     }
     else if(f==sub_00303350) r=0x00710000u+x[0];
+    else if(f==sub_00071940) r=x[0]==PANE && x[1]==0xFFFFFFFBu?SETITEM:0u;
     else if(f==sub_00071800) { if(noptions<32u) { options[noptions][0]=x[0];options[noptions][1]=x[1]; } noptions++; }
     if(f==sub_00079DE0 || f==sub_0007D4A0 || f==sub_000716D0 || f==sub_00078590 || f==sub_000783D0 || f==sub_00071800) {
         if(ncalls<64u) {
@@ -311,15 +313,16 @@ static void frame(int32_t value,uint32_t input)
     WORD_AT(PANE+0x18Cu)=(uint32_t)value;WORD_AT(PANE+0xC4u)=input;WORD_AT(PANE+0xC8u)=input&0xFu;
     CALL(pc_mapmaker_weaponset_screen,fake_plain,0x0007AD7Bu,PANE,0u);
 }
-static uint32_t row(uint32_t r)
+static uint32_t get_at(uint32_t ret,uint32_t r)
 {
     uint32_t sp=g_esp;
-    g_esp-=8u;WORD_AT(g_esp)=0x002D3D8Cu;WORD_AT(g_esp+4u)=r;
+    g_esp-=8u;WORD_AT(g_esp)=ret;WORD_AT(g_esp+4u)=r;
     pc_mapmaker_weaponset_get(fake_get);
     if(g_esp!=sp-4u) { fprintf(stderr,"row esp\n");failures++; }
     g_esp=sp;
     return g_eax;
 }
+static uint32_t row(uint32_t r) { return get_at(0x002D3D8Cu,r); }
 static void screen_tests(void)
 {
     clear_ed();
@@ -328,7 +331,7 @@ static void screen_tests(void)
     CALL(pc_mapmaker_weaponset_build,fake_plain,0x0007A000u,0x00300000u,0u);
     CHECK(ws.page==0);
     CALL(pc_mapmaker_weaponset_title,fake_title,0x002D4254u,0xE86u,0u);
-    CHECK(g_eax==WS_TITLE && !strcmp(title_text(),"Weapons  (1-6)"));
+    CHECK(g_eax==WS_TITLE && !strcmp(title_text(),"Weapons  (1-6 of 20)"));
     CALL(pc_mapmaker_weaponset_title,fake_title,0x002D4259u,0xE86u,0u);
     CHECK(g_eax!=WS_TITLE);
     /* page 1 rows are stock */
@@ -336,8 +339,19 @@ static void screen_tests(void)
     /* Down on row 6 -> slots 7-12, cursor on row 1 */
     nselect=0;frame(5,0x00020002u);
     CHECK(ws.page==1 && nselect==1u && selected[0]==0u && WORD_AT(PANE+0x18Cu)==0u && (WORD_AT(PANE+0xC4u)&0x000F000Fu)==0u);
-    CHECK(!strcmp(title_text(),"Weapons  (7-12)"));
+    CHECK(!strcmp(title_text(),"Weapons  (7-12 of 20)"));
     CHECK(row(0)==0x20u && row(5)==0x25u);
+    /* the highlighted weapon's model follows the page; the set list's stays stock */
+    CHECK(get_at(0x002D410Fu,3u)==0x23u);
+    originals=0;CHECK(get_at(0x002D40CBu,0u)==0x99u && originals==1u);
+    /* Right / Left turn the page on any row, wrapping, cursor kept */
+    nselect=0;frame(2,0x00080008u);
+    CHECK(ws.page==2 && nselect==1u && selected[0]==2u && (WORD_AT(PANE+0xC4u)&0x000F000Fu)==0u && row(0)==0x26u);
+    frame(2,0x00080008u);frame(2,0x00080008u);CHECK(ws.page==0 && !strcmp(title_text(),"Weapons  (1-6 of 20)"));
+    frame(4,0x00040004u);CHECK(ws.page==3 && selected[0]==4u);
+    frame(4,0x00040004u);frame(4,0x00040004u);CHECK(ws.page==1);
+    /* not on the set list row (its own choice) */
+    frame(-5,0x00080008u);CHECK(ws.page==1 && WORD_AT(PANE+0xC4u)==0x00080008u);
     /* a pick and an X clear land in slots 7-12 */
     CALL(pc_mapmaker_weaponset_set,fake_set,0x002BF95Au,2u,0x33u);
     CHECK(ws.ed[2]==0x33);
@@ -346,15 +360,15 @@ static void screen_tests(void)
     got=0;CALL(pc_mapmaker_weaponset_set,fake_set,0x002BF95Bu,1u,7u);   /* other caller: stock */
     CHECK(got==(1u<<16|7u) && ws.ed[1]==0x21);
     /* pages 3 and 4 (15-20), no page 5 */
-    frame(5,0x00020002u);CHECK(ws.page==2 && row(0)==0x26u && !strcmp(title_text(),"Weapons  (13-18)"));
-    frame(5,0x00020002u);CHECK(ws.page==3 && row(0)==0x28u && row(5)==0x2Du && !strcmp(title_text(),"Weapons  (15-20)"));
+    frame(5,0x00020002u);CHECK(ws.page==2 && row(0)==0x26u && !strcmp(title_text(),"Weapons  (13-18 of 20)"));
+    frame(5,0x00020002u);CHECK(ws.page==3 && row(0)==0x28u && row(5)==0x2Du && !strcmp(title_text(),"Weapons  (15-20 of 20)"));
     CALL(pc_mapmaker_weaponset_set,fake_set,0x002BF95Au,5u,0x3Fu);CHECK(ws.ed[13]==0x3F);
     nselect=0;frame(5,0x00020002u);CHECK(ws.page==3 && nselect==0u && WORD_AT(PANE+0xC4u)==0x00020002u);
     /* the selector row and middle rows: stock */
     frame(-5,0x00020002u);frame(3,0x00010001u);CHECK(ws.page==3 && WORD_AT(PANE+0xC4u)==0x00010001u);
     /* Up on row 1 -> back, cursor on row 6 */
     frame(0,0x00010001u);CHECK(ws.page==2 && selected[0]==5u && WORD_AT(PANE+0x18Cu)==5u);
-    frame(0,0x00010001u);frame(0,0x00010001u);CHECK(ws.page==0 && !strcmp(title_text(),"Weapons  (1-6)"));
+    frame(0,0x00010001u);frame(0,0x00010001u);CHECK(ws.page==0 && !strcmp(title_text(),"Weapons  (1-6 of 20)"));
     frame(0,0x00010001u);CHECK(ws.page==0 && WORD_AT(PANE+0xC4u)==0x00010001u);
     originals=0;CHECK(row(1)==0x99u && originals==1u);
     /* reopening resets */
@@ -555,6 +569,47 @@ static void play_tests(void)
     }
 }
 
+/* ---- front end: the MapMaker set in the Arcade setup's weapon screen ---- */
+static void frontend_screen_tests(void)
+{
+    play_map(0xF);                                  /* container with slots 7-20 */
+    clear_ed();
+    WORD_AT(0x0079094Cu)=101u;WORD_AT(0x0078AD2Cu)=9u;BYTE_AT(0x007DE455u)=3u;WORD_AT(0x0076B108u)=0;
+    WORD_AT(PROFILE+0x6A4u)=0xFu;WORD_AT(SETITEM+0xC8u)=0xFu;
+    CALL(pc_mapmaker_weaponset_build,fake_plain,0x0007A000u,0x00300000u,0u);
+    CALL(pc_mapmaker_weaponset_title,fake_title,0x002D4254u,0xE86u,0u);
+    CHECK(g_eax==WS_TITLE && !strcmp(title_text(),"Weapons  (1-6 of 20)") && ws.view==2);
+    originals=0;CHECK(row(1)==0x99u && originals==1u);
+    frame(5,0x00820002u);
+    CHECK(ws.page==1 && row(2)==0x21u && row(5)==(uint32_t)FILTERED && row(0)==0u);   /* raw map ids, as stock shows slots 1-6 */
+    CHECK(!strcmp(title_text(),"Weapons  (7-12 of 20)"));
+    /* read-only: no X clear on pages 2-4, picks stay stock */
+    frame(1,0x00800000u);CHECK(WORD_AT(PANE+0xC4u)==0u);
+    got=0;CALL(pc_mapmaker_weaponset_set,fake_set,0x002D41C7u,1u,0u);CHECK(got==(1u<<16));
+    frame(1,0x00080008u);CHECK(ws.page==2 && row(3)==0x22u);
+    frame(1,0x00080008u);CHECK(ws.page==3 && row(5)==0x30u);
+    /* another set picked in the list: stock rows and title */
+    WORD_AT(SETITEM+0xC8u)=0xBu;frame(1,0x00080008u);
+    CHECK(ws.page==0 && ws.view==0 && WORD_AT(PANE+0xC4u)==0x00080008u && !strcmp(title_text(),"Weapons"));
+    originals=0;CHECK(row(1)==0x99u && originals==1u);
+    WORD_AT(SETITEM+0xC8u)=0xFu;frame(1,0x00080008u);CHECK(ws.page==1 && !strcmp(title_text(),"Weapons  (7-12 of 20)"));
+    /* ordinary Arcade, System Link, story type, switch off: stock */
+    WORD_AT(0x0078AD2Cu)=6u;frame(5,0x00020002u);CHECK(ws.page==0 && WORD_AT(PANE+0xC4u)==0x00020002u);
+    WORD_AT(0x0078AD2Cu)=9u;WORD_AT(0x0076B108u)=1u;frame(5,0x00020002u);CHECK(ws.page==0);
+    WORD_AT(0x0076B108u)=0;BYTE_AT(0x007DE455u)=10u;frame(5,0x00020002u);CHECK(ws.page==0);
+    BYTE_AT(0x007DE455u)=3u;
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);frame(5,0x00020002u);CHECK(ws.page==0 && WORD_AT(PANE+0xC4u)==0x00020002u);
+    set_env("TSFP_MAPMAKER_LIMITS","1");
+    /* a profile set selected at opening: stock title until the MapMaker set is chosen */
+    WORD_AT(PROFILE+0x6A4u)=0xBu;
+    CALL(pc_mapmaker_weaponset_build,fake_plain,0x0007A000u,0x00300000u,0u);
+    CALL(pc_mapmaker_weaponset_title,fake_title,0x002D4254u,0xE86u,0u);
+    CHECK(g_eax==WS_TITLE && !strcmp(title_text(),"Weapons"));
+    /* the in-play pause (scene 100): no paging */
+    WORD_AT(0x0079094Cu)=100u;frame(5,0x00020002u);CHECK(ws.page==0);
+    WORD_AT(0x0079094Cu)=102u;WORD_AT(0x0078AD2Cu)=0u;
+}
+
 int main(void)
 {
     g_xbox_mem_offset=(uintptr_t)memory;
@@ -568,6 +623,7 @@ int main(void)
     screen_tests();
     choice_tests();
     play_tests();
+    frontend_screen_tests();
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
     printf("mapmaker weaponset ok\n");
     return 0;
