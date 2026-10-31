@@ -496,7 +496,7 @@ namespace TimeSplitters.Launcher
     // Release selection, URL validation, digest/.sha256 verification, resumable
     // transfer, extraction, installation and repair run unchanged. Every other URL
     // receives 404 without a network request. Inactive unless the variable is set;
-    // tools/make-local-release.py builds the folder.
+    // tools/release/make-local-release.py builds the folder.
     public sealed class LocalReleaseSource : HttpMessageHandler
     {
         public const string Variable = "TSFP_LAUNCHER_RELEASE_SOURCE";

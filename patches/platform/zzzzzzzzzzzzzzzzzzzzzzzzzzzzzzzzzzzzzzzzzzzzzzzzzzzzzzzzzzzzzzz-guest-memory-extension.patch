@@ -1,0 +1,40 @@
+diff --git a/titles/futureperfect/src/main.c b/titles/futureperfect/src/main.c
+--- a/titles/futureperfect/src/main.c
++++ b/titles/futureperfect/src/main.c
+@@ -44,6 +44,9 @@
+ /* xboxrecomp runtime headers */
+ #include <xbox/xboxrecomp.h>
+ #include "xbox_watchpoint.h"
++/* Guest memory extension for tables relocated by the project's
++ * config/guest-code-patches tables (src/runtime/guest_extension.h). */
++#include "guest_extension.h"
+ 
+ /*
+  * If xboxrecomp.h is not an umbrella header in your setup, include
+@@ -600,6 +603,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+ 
+     /* Step 2: Initialize Xbox memory layout */
+     printf("Initializing Xbox memory layout...\n");
++    tsfp_guest_extension_reserve();
+     if (!xbox_MemoryLayoutInit(xbe_data, xbe_size)) {
+         MessageBoxA(NULL, "Failed to initialize Xbox memory layout.\n"
+                     "The required virtual address range may be unavailable.",
+@@ -610,6 +614,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+ 
+     g_xbox_mem_offset = xbox_GetMemoryOffset();
+     printf("Xbox memory mapped. Offset: 0x%llX\n", (unsigned long long)g_xbox_mem_offset);
++    {
++        uint32_t extension_va, extension_size;
++        if (!tsfp_guest_extension_ready(&extension_va, &extension_size)) {
++            char message[256];
++            snprintf(message, sizeof message, "The guest memory extension is at 0x%08X "
++                     "(%u bytes), but the game code was generated for 0x%08X.",
++                     extension_va, extension_size, (unsigned)TSFP_GUEST_EXTENSION_VA);
++            MessageBoxA(NULL, message, "Timesplitters - Future Perfect", MB_ICONERROR);
++            free(xbe_data);
++            return 1;
++        }
++    }
+ 
+     /* Step 3: Initialize Xbox kernel */
+     printf("Initializing Xbox kernel replacement...\n");

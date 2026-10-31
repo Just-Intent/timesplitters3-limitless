@@ -8,8 +8,8 @@ yet; this file lists what is known, the candidate limits, and how to test each.
 
 - CONFIRMED: `sub_0030C210` draws the MapMaker capacity bar through
   `sub_000814B0`, whose first stack argument is the fill fraction (float)
-  (`STATUS.md:2552-2556`; `src/pc_menu_sliders.inc:55-69`;
-  `src/pc_display_menu.c:547`). The meter is display-only in the PC port.
+  (`STATUS.md:2552-2556`; `src/interface/pc_menu_sliders.inc:55-69`;
+  `src/interface/pc_display_menu.c:547`). The meter is display-only in the PC port.
 - COMMUNITY: the in-game label is "FREE"; items cost more than tiles; using many
   different tile/item types costs more than repeating one; Future Perfect has
   about 190-200 "tile units"; separate pools are reported for tiles, items,
@@ -185,7 +185,7 @@ unless noted.
 | Header byte +9 (`sub_00300630`) | Spawn points required | Validity check | Not a budget | n/a |
 
 Other: the save signature is HMAC-SHA1 with a zero key over the body (same
-as `tools/testing_profile.py`) and the body ends with a zlib CRC-32 at
+as `tools/testing/testing_profile.py`) and the body ends with a zlib CRC-32 at
 `used`; System Link sends the map in 239-byte fragments with byte indices
 (max 60,945 bytes) and no receive bound check.
 
@@ -194,7 +194,7 @@ compare or pool-size immediate needs either that feature or a wrapper that
 reimplements the function (practical for `sub_0009A140` and `sub_002FA720`).
 
 **Stage A (implemented, 2026-10-23, UNVERIFIED in play).** Wrappers in
-`patches/*-mapmaker-meter-stagea.patch`, policy `src/pc_mapmaker_limits.inc`:
+`patches/*-mapmaker-meter-stagea.patch`, policy `src/interface/pc_mapmaker_limits.inc`:
 
 - `sub_0009A140` in scene 100 (on by default, `TSFP_MAPMAKER_POOLS=0` restores
   it): pads 4800x32 B, links 8800x20 B, AI data 4800x44 B, cover 1536x32 B
@@ -262,7 +262,7 @@ describes what could break.
 ## 5. Next measurements (in order)
 
 1. E1 (read-only meter probe, implemented; run it per
-   `docs/mapmaker-meter-probe.md`): record the meter fraction while placing one tile, one item, one light, etc. in an empty
+   `docs/mapmaker/mapmaker-meter-probe.md`): record the meter fraction while placing one tile, one item, one light, etc. in an empty
    map. Each category's cost and whether costs depend on type variety follow
    directly.
 2. Trace the fraction to its counters and capacity constants (offline, local
