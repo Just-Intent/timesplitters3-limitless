@@ -1,5 +1,5 @@
 /* Asset-free contract for src/interface/pc_mapmaker_editor.inc: the story AI add
- * action (stock 50 unless TSFP_MAPMAKER_LIMITS=1, then 255), the editor
+ * action (stock 50 unless TSFP_MAPMAKER_LIMITS=1, then 511), the editor
  * loader and level-start capacity guards (chunks past capacity hidden for the
  * duration of the original call and restored). */
 #include <stdarg.h>
@@ -38,7 +38,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     va_end(a);
     if(f==sub_00300670) r=has_room && x[0]==0x58u;
     else if(f==sub_0031BB60) {                        /* stock add: colour id 50 when exhausted */
-        uint32_t c=WORD_AT(ED+0x280u),e=ED+0x11950u+c*0xE4u;
+        uint32_t c=WORD_AT(ED+0x280u),e=ED+0x58390u+c*0xE4u;
         WORD_AT(e+0x60u)=c<50u?c:50u;WORD_AT(ED+0x280u)=c+1u;adds++;r=0x1234u;
         WORD_AT(ED+0x238u)|=0x40u;                     /* stock: scroll the list to the new row */
     } else if(f==sub_0003D7B0) { last_text=x[0];r=0x00700000u+x[0]; }
@@ -149,7 +149,7 @@ int main(void)
     CHECK(adds==1 && messages==2 && last_text==0x9B6u && last_message_text==0x00700000u+0x9B6u);
     has_room=1;
 
-    /* ---- opted in: up to 255 ---- */
+    /* ---- opted in: up to 511 ---- */
     set_env("TSFP_MAPMAKER_LIMITS","1");
     WORD_AT(ED+0x280u)=50;
     WORD_AT(ED+0x238u)=0x1001u;
@@ -159,14 +159,14 @@ int main(void)
     HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(WORD_AT(ED+0x280u)==51 && WORD_AT(ED+0x238u)==0x40u);
     has_room=1;WORD_AT(ED+0x238u)=0;
-    for(i=0;i<204;i++) HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
-    CHECK(WORD_AT(ED+0x280u)==255 && adds==206 && !(WORD_AT(ED+0x238u)&0x40u));
+    for(i=0;i<460;i++) HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
+    CHECK(WORD_AT(ED+0x280u)==511 && adds==462 && !(WORD_AT(ED+0x238u)&0x40u));
     /* colours: entries past 50 get index mod 50 instead of the stock 50 */
-    CHECK(WORD_AT(ED+0x11950u+50u*0xE4u+0x60u)==0u && WORD_AT(ED+0x11950u+123u*0xE4u+0x60u)==123u%50u);
-    CHECK(WORD_AT(ED+0x11950u+254u*0xE4u+0x60u)==254u%50u);
+    CHECK(WORD_AT(ED+0x58390u+50u*0xE4u+0x60u)==0u && WORD_AT(ED+0x58390u+123u*0xE4u+0x60u)==123u%50u);
+    CHECK(WORD_AT(ED+0x58390u+254u*0xE4u+0x60u)==254u%50u && WORD_AT(ED+0x58390u+510u*0xE4u+0x60u)==510u%50u);
     HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
-    CHECK(WORD_AT(ED+0x280u)==255 && adds==206 && last_sprintf_value==255u);
-    has_room=0;WORD_AT(ED+0x280u)=255;
+    CHECK(WORD_AT(ED+0x280u)==511 && adds==462 && last_sprintf_value==511u);
+    has_room=0;WORD_AT(ED+0x280u)=511;
     HOOK(pc_mapmaker_editor_sai_add,fake_original_sai);
     CHECK(last_text==0x9B6u);
     has_room=1;
@@ -175,7 +175,7 @@ int main(void)
     c=0x00200000u;
     WORD_AT(c)=0x00C77667u;WORD_AT(c+4)=0x12Du;
     end=put_chunks(c+8u,0x00C77669u,5,0x40u);
-    end=put_chunks(end,0x00C7766Cu,300,0x50u);   /* SAI: 255 fit */
+    end=put_chunks(end,0x00C7766Cu,600,0x50u);   /* SAI: 511 fit */
     end=put_chunks(end,0x00C7766Bu,700,0x0Cu);   /* free objects 680 */
     end=put_chunks(end,0x00C7766Du,600,0xC0u);   /* nodes 520 */
     for(i=0;i<20;i++) {                          /* ops: 20 kind-1 (8 fit) then 110 kind-0 */
@@ -189,10 +189,10 @@ int main(void)
     original_calls=0;
     HOOK(pc_mapmaker_editor_load,count_chunks);
     CHECK(original_calls==1 && g_eax==1);
-    CHECK(seen_by_original[1]==255 && seen_by_original[0]==680 && seen_by_original[2]==520 &&
+    CHECK(seen_by_original[1]==511 && seen_by_original[0]==680 && seen_by_original[2]==520 &&
           seen_by_original[3]==118 && seen_by_original[4]==400 && seen_by_original[5]==5);
-    CHECK(hidden_by_original==45u+20u+80u+12u+50u);
-    CHECK(count_tag(c+8u,0x00C7766Cu)==300 && count_tag(c+8u,0x00C7766Bu)==700 &&
+    CHECK(hidden_by_original==89u+20u+80u+12u+50u);
+    CHECK(count_tag(c+8u,0x00C7766Cu)==600 && count_tag(c+8u,0x00C7766Bu)==700 &&
           count_tag(c+8u,0x00C7766Eu)==130 && count_tag(c+8u,0x00C7766Fu)==450 && count_tag(c+8u,0)==0);
     /* more than 120 ops of kind 0: the total applies */
     end=put_chunks(c+8u,0x00C7766Eu,125,0x220u);WORD_AT(end)=0x00C7766Au;

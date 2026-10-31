@@ -87,12 +87,12 @@
 #endif
 
 #define BOS_EDITOR_PTR 0x007844A8u
-#define BOS_EDITOR_SIZE 0x58390u
-#define BOS_SAI 0x11950u                /* editor.json: 255 x 0xE4 */
+#define BOS_EDITOR_SIZE 0x74C00u
+#define BOS_SAI 0x58390u                /* editor.json: 511 x 0xE4 */
 #define BOS_STRIDE 0xE4u
 #define BOS_COUNT 0x280u
-#define BOS_CAP 255u
-#define BOS_SELECTED 0x00762F94u        /* byte: entry being edited */
+#define BOS_CAP 511u
+#define BOS_SELECTED 0x00762F94u        /* entry being edited (word: sai-index.json) */
 #define BOS_SCENE 0x0079094Cu
 #define BOS_MODE 0x007DE455u            /* byte: 10 = story */
 #define BOS_CONTAINER 0x00784014u
@@ -191,7 +191,7 @@ static uint32_t bos_editor(void)
 }
 static uint32_t bos_count(uint32_t e) { uint32_t c=WORD_AT(e+BOS_COUNT); return c<=BOS_CAP?c:0u; }
 static uint32_t bos_entry(uint32_t e,uint32_t i) { return e+BOS_SAI+i*BOS_STRIDE; }
-static uint32_t bos_selected(void) { return WORD_AT(BOS_SELECTED)&0xFFu; }
+static uint32_t bos_selected(void) { return WORD_AT(BOS_SELECTED)&0xFFFFu; }
 static uint16_t bos_colour_of(uint32_t e,uint32_t i) { return (uint16_t)WORD_AT(bos_entry(e,i)+BOS_COLOUR); }
 /* The entry's boss level; a stale slot (other editor, other colour) is 0. */
 static unsigned bos_get(uint32_t e,uint32_t i)

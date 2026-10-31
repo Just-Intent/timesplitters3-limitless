@@ -21,7 +21,8 @@ TABLE = ROOT / 'config/guest-code-patches/editor.json'
 MUTATIONS = {
     'sai-limit-always': ('limit=mapmaker_limits.limits?MAPMAKER_EDITOR_SAI_LIMIT:MAPMAKER_EDITOR_SAI_STOCK;',
                          'limit=MAPMAKER_EDITOR_SAI_LIMIT;'),
-    'sai-limit-stock': ('#define MAPMAKER_EDITOR_SAI_LIMIT 255u', '#define MAPMAKER_EDITOR_SAI_LIMIT 50u'),
+    'sai-limit-stock': ('#define MAPMAKER_EDITOR_SAI_LIMIT 511u', '#define MAPMAKER_EDITOR_SAI_LIMIT 50u'),
+    'sai-limit-round2': ('#define MAPMAKER_EDITOR_SAI_LIMIT 511u', '#define MAPMAKER_EDITOR_SAI_LIMIT 255u'),
     'sai-no-room-check': ('if((int32_t)count<(int32_t)limit && room) {', 'if((int32_t)count<(int32_t)limit) {'),
     'sai-message-stock': ('guest_call(sub_003C85D4,3,editor,guest_call(sub_0003D7B0,1,0xBB0u),limit);',
                           'guest_call(sub_003C85D4,3,editor,guest_call(sub_0003D7B0,1,0xBB0u),50u);'),
@@ -96,7 +97,7 @@ def test_mapmaker_editor(tmp_path, mutation):
 # ---- guest-code table ------------------------------------------------------
 # name: (old offset, stride, old count, new offset, new count)
 LAYOUT = {
-    'sai': (0x288, 0xE4, 50, 0x11950, 255),
+    'sai': (0x288, 0xE4, 50, 0x58390, 511),   # round 3: moved to the end for 511
     'ops': (0x41E4, 0x220, 30, 0x1FC70, 120),
     'nodes': (0x81A8, 0xB4, 130, 0x2FB70, 520),
     'recs': (0xDD14, 0x8C, 100, 0x46910, 400),
@@ -104,7 +105,7 @@ LAYOUT = {
     'clip': (0x3870, 12, 170, 0x563B0, 680),
 }
 CLIP_COUNTS = (0x3868, 0x5048)   # clipboard counts move so set+8+delta works for both sets
-SIZE = 0x58390
+SIZE = 0x74C00
 # array references incl. folded ones; see docs/mapmaker/mapmaker-editor.md for the cross-checks
 EXPECTED_SITES = {'sai': 136, 'ops': 96, 'nodes': 154, 'recs': 137, 'free': 95, 'clip': 5, 'clip-counts': 19}
 
@@ -201,7 +202,7 @@ def test_array_rewrites_follow_the_layout():
 def test_sai_sizes_and_stack_frames():
     by_id = {e['id']: e for e in table()}
     sizes = [e for e in table() if e['reason'].startswith('sai clear size')]
-    assert len(sizes) == 2 and all(int(e['value'], 16) == 255 * 0xE4 // 4 for e in sizes)
+    assert len(sizes) == 2 and all(int(e['value'], 16) == LAYOUT['sai'][4] * 0xE4 // 4 for e in sizes)
     # sub_00240590: 50 slots at frame+0x1C; 1024 slots after the change
     assert int(by_id['ed-load-frame']['value'], 16) == 0x1C + 4 * 1024
     assert int(by_id['ed-load-arg']['value'], 16) == 0xF0 + 4 * (1024 - 50)
@@ -210,7 +211,8 @@ def test_sai_sizes_and_stack_frames():
     text = EDITOR.read_text(encoding='utf-8')
     assert '#define MAPMAKER_LEVEL_SAI_SLOTS 1024u' in text
     # sub_00323220: slots at frame+4 must hold every editor SAI
-    assert (int(by_id['ed-sai-frame']['value'], 16) - 4) // 4 >= 255
+    assert (int(by_id['ed-sai-frame']['value'], 16) - 4) // 4 >= LAYOUT['sai'][4]
+    assert LAYOUT['sai'][4] < 1024                       # sub_00240590's 1024 slots
     assert by_id['ed-sai-frame']['value'] == by_id['ed-sai-frame-end']['value']
 
 

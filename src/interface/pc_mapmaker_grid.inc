@@ -437,9 +437,9 @@ void pc_mapmaker_stack_valid(void (*original)(void))
     if(mapmaker_grid.stack_valid++<3u)
         fprintf(stderr,"[mapmaker] stack: drop allowed over an existing item\n");
 }
-/* Story AI array as editor.json relocates it (0x288 -> 0x11950). */
-#define MAPMAKER_STACK_SAI 0x11950u /* editor.json: 0x288 -> 0x11950 */
-#define MAPMAKER_STACK_SAI_CAP 255u
+/* Story AI array as editor.json relocates it (0x288 -> 0x58390, round 3). */
+#define MAPMAKER_STACK_SAI 0x58390u /* editor.json: 0x288 -> 0x58390 */
+#define MAPMAKER_STACK_SAI_CAP 511u
 #define MAPMAKER_STACK_SAI_POINTS 8u /* 0x64 + 8 x 0x10 fills the 0xE4 entry */
 /* sub_002F8B40(piece, x|y<<16, z) cdecl (caller add esp,0xC at 0x0030724B):
  * the story AI point in the cell, (sai << 16) | point, or -1 (a pure walk
@@ -501,7 +501,8 @@ void pc_mapmaker_stack_sai_point(void (*original)(void))
  * editor.json, count +0x280), except the held story AI's own points.
  * Starts, flags, turrets, movers and markers stay visible, so nothing
  * joins them and they join nothing. */
-#define MAPMAKER_STACK_MAX 2304u    /* 256 items + 255 story AI x 8 points */
+#define MAPMAKER_STACK_ITEMS 512u   /* items of one piece in one cell (500 items in all) */
+#define MAPMAKER_STACK_MAX (MAPMAKER_STACK_ITEMS+MAPMAKER_STACK_SAI_CAP*MAPMAKER_STACK_SAI_POINTS) /* 4600 */
 void pc_mapmaker_stack_cell(void (*original)(void))
 {
     static uint32_t hidden[MAPMAKER_STACK_MAX];
@@ -517,7 +518,7 @@ void pc_mapmaker_stack_cell(void (*original)(void))
     x=MAPMAKER_GRID_U16(g_esp+8u);y=MAPMAKER_GRID_U16(g_esp+10u);z=MAPMAKER_GRID_U16(g_esp+12u);
     if(MAPMAKER_PTR_OK(piece,0x40)) {
         item=WORD_AT(piece+0x3Cu);
-        for(i=0;item && i<4096u && n<256u && MAPMAKER_PTR_OK(item,0x18);i++,item=WORD_AT(item+0x14u))
+        for(i=0;item && i<4096u && n<MAPMAKER_STACK_ITEMS && MAPMAKER_PTR_OK(item,0x18);i++,item=WORD_AT(item+0x14u))
             if(MAPMAKER_GRID_U16(item+0xCu)==x && MAPMAKER_GRID_U16(item+0xEu)==y && MAPMAKER_GRID_U16(item+0x10u)==z &&
                mapmaker_stack_allowed((int32_t)WORD_AT(item))) {
                 MAPMAKER_GRID_U16(item+0xCu)=MAPMAKER_STACK_HIDE;

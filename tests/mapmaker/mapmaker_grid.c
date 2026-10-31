@@ -111,7 +111,7 @@ static void orig_find(void)  /* first item of the piece with the cell */
 static void orig_valid(void) { g_eax=(g_eax&~0xFFu)|(valid_result&0xFFu);orig_calls++;g_esp+=4u; }
 /* Story AI array as editor.json relocates it: editor+0x11950, 0xE4 each,
  * point count +0x58, points {piece, x, y, z} x 0x10 from +0x64. */
-#define SAI(s) (ED+0x11950u+(uint32_t)(s)*0xE4u)
+#define SAI(s) (ED+0x58390u+(uint32_t)(s)*0xE4u)
 static void orig_cell(void)  /* refusals 3.1.4 and 3.1.5 (0x0033482A..0x00334893), plus an injected other refusal */
 {
     uint32_t piece=WORD_AT(g_esp+4u),item=WORD_AT(piece+0x3Cu),s,k;

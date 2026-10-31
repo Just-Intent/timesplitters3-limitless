@@ -12,6 +12,10 @@ static unsigned long long tick=1000;
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
 static unsigned long long GetTickCount64(void) { return tick; }
+/* Host allocation counters (pc_crash.c / crash_posix.c in the game). */
+static uint32_t fake_extent, fake_usage[6];
+uint32_t xbox_ContiguousAllocatedBytes(void) { return fake_extent; }
+void pc_capture_allocation_usage(uint32_t out[6]) { memcpy(out,fake_usage,sizeof fake_usage); }
 #define TSFP_MAPMAKER_PROBE_TEST
 #include "pc_mapmaker_probe.inc"
 
@@ -301,7 +305,7 @@ int main(int argc,char **argv)
         call_meter();
         CHECK(checksum()==before);
         read_log();
-        CHECK(strstr(log_text,"  budgets container=1948/32736 cost0=15/2400 cost1=14/1024 cost2=47/4400"
+        CHECK(strstr(log_text,"  budgets container=1948/524256 cost0=15/2400 cost1=14/1024 cost2=47/4400"
                                " global=15/300 pieces=2/200 deep=1+7/50 e270=0.2500 e274=0.0500\n")!=NULL);
         set_probe("1");                                   /* without 16: no budgets line */
         call_meter();
@@ -311,8 +315,16 @@ int main(int argc,char **argv)
         WORD_AT(c+4)=0x12Eu;                              /* unknown version: container not read */
         call_meter();
         read_log();
-        CHECK(strstr(log_text,"budgets container=0/32736")!=NULL);
+        CHECK(strstr(log_text,"budgets container=0/524256")!=NULL);
         WORD_AT(c+4)=0x12Du;
+        /* A map past 32 KB: the info chunk behind a 32 KB chunk is still found. */
+        WORD_AT(info)=0x00C7766Du;WORD_AT(info+4)=0x8000u;
+        WORD_AT(info+8+0x8000u)=0x00C77668u;WORD_AT(info+8+0x8000u+4)=0x3DCu;WORD_AT(info+8+0x8000u+8+0x248)=40000u;
+        tick+=1000u;
+        call_meter();
+        read_log();
+        CHECK(strstr(log_text,"budgets container=40000/524256")!=NULL);
+        WORD_AT(info)=0x00C77668u;WORD_AT(info+4)=0x3DCu;
         WORD_AT(0x00784014u)=0;WORD_AT(0x0078400Cu)=0;WORD_AT(0x007844A8u)=0;
     }
 
@@ -328,7 +340,28 @@ int main(int argc,char **argv)
     CHECK(checksum()==before);
     read_log();
     CHECK(strstr(log_text,"heap scene=100 arena=0x00500000+47104000 level=0x00600000..0x00700000 end=0x00710000"
-                          " free=1000000 min_free=1000000 eternal=0x00510000 free=4096 display=768000 peak=500000 reserves=3\n")!=NULL);
+                          " free=1000000 min_free=1000000 eternal=0x00510000 free=4096 display=768000 peak=500000 reserves=3"
+                          " host contig_extent=0 contig_extent_peak=0 contig_live=0 contig_live_peak=0 contig_free_min=66977792"
+                          " runtime_heap_live=0 runtime_heap_peak=0 runtime_heap_free_min=0\n")!=NULL);
+    /* Host side: window extent peak (kept when the extent drops), observer
+     * counters and the headroom at those peaks. */
+    fake_extent=0x03000000u;
+    fake_usage[0]=0x00100000u;fake_usage[1]=0x00200000u;fake_usage[2]=0x03C00000u;  /* heap live/peak/end */
+    fake_usage[3]=0x02E00000u;fake_usage[4]=0x02F00000u;fake_usage[5]=0x83100000u;  /* window live/peak/end */
+    tick+=MAPMAKER_PROBE_HEAP_INTERVAL;
+    mapmaker_probe_heap();
+    fake_extent=0x02000000u;fake_usage[5]=0x82000000u;
+    tick+=MAPMAKER_PROBE_HEAP_INTERVAL;
+    mapmaker_probe_heap();
+    CHECK(checksum()==before);
+    read_log();
+    CHECK(strstr(log_text," host contig_extent=50331648 contig_extent_peak=50331648 contig_live=48234496 contig_live_peak=49283072"
+                          " contig_free_min=15597568 runtime_heap_live=1048576 runtime_heap_peak=2097152 runtime_heap_free_min=4194304\n")!=NULL);
+    CHECK(strstr(log_text," host contig_extent=33554432 contig_extent_peak=50331648 ")!=NULL);
+    CHECK(count("] t=")==3);
+    memset(fake_usage,0,sizeof fake_usage);fake_extent=0;
+    set_probe("32");
+    mapmaker_probe_heap();                               /* a fresh first record */
     WORD_AT(0x006B8384u)=(uint32_t)-5000;                 /* overlap: free goes negative */
     mapmaker_probe_heap();                               /* within the second: not written, but tracked */
     WORD_AT(0x006B8384u)=200000u;

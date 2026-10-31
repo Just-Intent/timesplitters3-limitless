@@ -54,11 +54,11 @@ screen). Rows appear just above the last row ("Done"):
 - Story AI list length: the list is one menu built from the global menu item
   pool. Each AI costs 2 rows (unplaced or a non-patrol type) up to 18 (a
   type 1/3 patrol with 8 points); the stock editor pool of 920 items fits
-  ~50 AIs at worst. `aitemplates-pool.json` raises it to 3072 items (0x0C00,
-  +0.63 MB of Level heap in the editor): every AI unplaced or non-patrol
-  (2 rows x 255), or ~170 full 8-point patrols. Rows past a full pool
-  silently vanish from the list; stderr then shows `[mapmaker] menu item
-  pool full (3072 items)` once.
+  ~50 AIs at worst. `aitemplates-pool.json` raises it to 6144 items (0x1800,
+  +1.53 MB of Level heap in the editor; round 2: 3072): every AI unplaced or
+  non-patrol (2 rows x 511), or ~340 full 8-point patrols. Rows past a full
+  pool silently vanish from the list; stderr then shows `[mapmaker] menu item
+  pool full (6144 items)` once.
 - Story AI list, as previewed: `Guard`, `Guard 2`, `Guard 3`, `Sniper`.
   No "(leader)" / "(linked)" markers: the list label is the AI's saved 32-byte
   name (entry +0x00), so a marker would have to be written into the saved
