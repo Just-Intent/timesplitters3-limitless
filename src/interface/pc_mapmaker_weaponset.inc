@@ -23,7 +23,9 @@
  *    +0xC (0 = the item's own slot 1-6, 7..20 = an extra slot): the pickup
  *    record +0x10, the play vetoes and the preload follow it;
  *  - editor: the weapon set screen pages (1-6, 7-12, 13-18, 15-20) with
- *    Down/Up at its ends; the Story AI weapon choice lists 20 slots; a placed
+ *    Down/Up at its ends and Right/Left on any row, its title "(1-6 of 20)";
+ *    the front end's setup shows the MapMaker set's pages read-only (as
+ *    stock shows its slots 1-6); the Story AI weapon choice lists 20 slots; a placed
  *    weapon/ammo pickup's options get a "Weapon" slot choice, kept in node
  *    +0x30 (tagged 'WS'; no stock code writes it) and matched to the saved
  *    records by piece and item position on save and load.
@@ -86,6 +88,9 @@
 /* return addresses (call site + length, checked in the decode test) */
 #define WS_RANDOM_RET 0x002B50D5u       /* sub_002B4C70: AI random weapon from the set */
 #define WS_ROW_RET 0x002D3D8Cu          /* sub_002D3D30: weapon slot row draw, sub_002D3B00(row) */
+#define WS_PREVIEW_RET 0x002D410Fu      /* sub_002D40A0: highlighted row's weapon model, sub_002D3B00(value) */
+#define WS_NET 0x0076B108u              /* System Link session (sub_003533F0) */
+#define WS_LIST_MAP 0xFu                /* front-end set list value: the MapMaker map's set (mode 9 only) */
 #define WS_PICK_RET 0x002BF95Au         /* sub_002BF910: weapon picked for row */
 #define WS_CLEAR_RET 0x002D41C7u        /* sub_002D40A0: X clears the row */
 #define WS_TITLE_RET 0x002D4254u        /* sub_002D4220: title text 0xE86 */
@@ -100,13 +105,15 @@
 extern void sub_00064E70(void),sub_00069640(void),sub_000BE860(void),sub_0006B2D0(void),
     sub_00333700(void),sub_002FDF50(void),sub_00074460(void),sub_0003D7B0(void),sub_00071800(void),
     sub_00079DE0(void),sub_0007D4A0(void),sub_000716D0(void),sub_00078590(void),sub_000783D0(void),
-    sub_00303350(void);
+    sub_00303350(void),sub_00071940(void);
 
 static const uint8_t ws_page_first[4]={0u,6u,12u,14u};
 static struct {
-    int page,title_ok;
+    int page,title_ok,view;          /* view: 1 editor custom set, 2 front-end map set (read-only) */
     unsigned title_len;
+    char title_orig[0x2A];
     int16_t ed[WS_EXTRA];            /* editor: slots 7-20 */
+    int16_t fe[WS_EXTRA];            /* front end: the loaded map's slots 7-20 */
     /* play cache (scene 100) */
     int valid,filter_ok;
     uint32_t info;
@@ -370,76 +377,124 @@ void pc_mapmaker_weaponset_held(void (*original)(void))
 }
 
 /* ---- weapon set screen paging ------------------------------------------ */
+/* The pane 0x005236EC is reached only through screen 0x0052371C (builder
+ * sub_002D44D0): from the editor's Map Settings (sub_003128F0, scene 102) or
+ * its Test map setup, and from the front end's setup Weapons item
+ * (sub_002C7710, scene 101). The in-play pause setup has no Weapons item
+ * (sub_002C78F0 skips it when its second argument is 1, 0x002C808A). */
 static int ws_custom(void)
 {
     return WORD_AT(WS_SCENE)==102u && (int32_t)WORD_AT(WS_EINDEX)>=10;
+}
+static int ws_fe_scene(void)
+{
+    return WORD_AT(WS_SCENE)==101u && WORD_AT(WS_GAMETYPE)==9u && WS_B(WS_TYPEBYTE)!=10u && !WORD_AT(WS_NET);
+}
+/* 1: the editor's custom set (editable), 2: the front end showing the
+ * MapMaker map's set (stock: read-only, 0x002D415B / 0x002D406F), else 0. */
+static int ws_view(uint32_t pane)
+{
+    uint32_t item;
+    if(ws_custom()) return 1;
+    if(!ws_fe_scene()) return 0;
+    item=guest_call(sub_00071940,2,pane,0xFFFFFFFBu);           /* the set list item, value -5 */
+    return item && MAPMAKER_PTR_OK(item,0xCCu) && WORD_AT(item+0xC8u)==WS_LIST_MAP?2:0;
+}
+static int ws_view_live(void)
+{
+    return ws.view==1?ws_custom():ws.view==2 && ws_fe_scene();
 }
 static void ws_title_suffix(void)
 {
     char *t=(char *)((uintptr_t)WS_TITLE+g_xbox_mem_offset);
     unsigned a=ws_page_first[ws.page]+1u,b=a+5u;
-    if(ws.title_ok) snprintf(t+ws.title_len,0x40u-ws.title_len,"  (%u-%u)",a,b);
+    if(!ws.title_ok) return;
+    memcpy(t,ws.title_orig,ws.title_len);
+    if(ws.view) snprintf(t+ws.title_len,0x40u-ws.title_len,"  (%u-%u of %u)",a,b,WS_SLOTS);
+    else t[ws.title_len]=0;
 }
 /* WRAP sub_002D4220 (cdecl menu): builder of the weapon slot pane 0x005236EC;
  * the screen opens on slots 1-6. */
 void pc_mapmaker_weaponset_build(void (*original)(void))
 {
-    ws.page=0;ws.title_ok=0;
+    ws.page=0;ws.title_ok=0;ws.view=0;
     original();
 }
 /* WRAP sub_0003D7B0 (cdecl text id; returns the text): the pane's title
- * (0xE86) gets the page, kept in a buffer the flip rewrites. */
+ * (0xE86) gets the page and the slot count, kept in a buffer the update
+ * rewrites (INFERRED: the item keeps the pointer). */
 void pc_mapmaker_weaponset_title(void (*original)(void))
 {
     uint32_t ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;
     original();
-    if(ret!=WS_TITLE_RET || !g_eax || !ws_custom() || !ws_on() || !MAPMAKER_PTR_OK(g_eax,1)) return;
+    if(ret!=WS_TITLE_RET || !g_eax || !(ws_custom() || ws_fe_scene()) || !ws_on() || !MAPMAKER_PTR_OK(g_eax,1)) return;
     {
         const char *o=(const char *)((uintptr_t)g_eax+g_xbox_mem_offset);
         size_t n=strnlen(o,0x2Au);
+        uint32_t p;
         if(n>=0x2Au) return;                      /* too long to extend: stock title */
-        memcpy((char *)((uintptr_t)WS_TITLE+g_xbox_mem_offset),o,n);
+        memcpy(ws.title_orig,o,n);
         ws.title_len=(unsigned)n;ws.title_ok=1;
+        if(ws_custom()) ws.view=1;
+        else {                                    /* the set list starts on profile +0x6A4 (sub_002BF8F8) */
+            p=guest_call(sub_00069640,0);
+            ws.view=MAPMAKER_PTR_OK(p,0x6A8u) && WORD_AT(p+0x6A4u)==WS_LIST_MAP?2:0;
+        }
         ws_title_suffix();
         g_eax=WS_TITLE;
     }
 }
-/* WRAP sub_002D40A0 (cdecl pane): update of the weapon slot pane. Its rows
- * have values 0..5 (the set selector -5), the highlighted value is +0x18C,
- * input +0xC4. Down on row 6 shows the next six slots, Up on row 1 the
- * previous ones (cursor on the near row, sub_00074460 as the pick does). */
+/* WRAP sub_002D40A0 (cdecl pane): update of the weapon slot pane, called by
+ * the pane tick before its own Up/Down handling (0x0007AD76 vs 0x0007AE2E).
+ * Its rows have values 0..5 (the set list -5), the highlighted value is
+ * +0x18C, input +0xC4. Down on row 6 shows the next six slots, Up on row 1
+ * the previous ones (cursor on the near row, sub_00074460 as the pick does);
+ * Right / Left on any row turn the page (wrapping; stock moves only choice
+ * items with them, 0x0007AFB1). In the front end the MapMaker set's pages
+ * 2-4 are read-only as its page 1 is in stock (no X clear there). */
 void pc_mapmaker_weaponset_screen(void (*original)(void))
 {
     uint32_t pane,in;
     int32_t v;
-    if(!ws_custom() || !MAPMAKER_STACK_OK(8) || !ws_on()) { ws.page=0;original();return; }
-    pane=WORD_AT(g_esp+4u);
-    if(MAPMAKER_PTR_OK(pane,0x200u)) {
-        v=(int32_t)WORD_AT(pane+0x18Cu);in=WORD_AT(pane+0xC4u);
-        if((v==(int32_t)WS_STOCK-1 && ws.page<3 && (in&0x00020002u)) || (v==0 && ws.page>0 && (in&0x00010001u))) {
-            uint32_t to=v?0u:WS_STOCK-1u;
-            ws.page+=v?1:-1;
-            WORD_AT(pane+0xC4u)&=~0x000F000Fu;WORD_AT(pane+0xC8u)&=~0xFu;
-            WORD_AT(pane+0x18Cu)=to;
-            guest_call(sub_00074460,3,pane,to,0u);
-            ws_title_suffix();
-        }
+    int view,step=0;
+    if(!MAPMAKER_STACK_OK(8) || !ws_on() || !MAPMAKER_PTR_OK(pane=WORD_AT(g_esp+4u),0x200u) || !(view=ws_view(pane))) {
+        ws.page=0;
+        if(ws.view) { ws.view=0;ws_title_suffix(); }
+        original();return;
     }
+    ws.view=view;                                 /* a page is kept only while a view lasts (above) */
+    if(view==2) ws_extras(ws_chunk(WORD_AT(WS_CONTAINER)),ws.fe);
+    v=(int32_t)WORD_AT(pane+0x18Cu);in=WORD_AT(pane+0xC4u);
+    if(v>=0 && v<(int32_t)WS_STOCK) {
+        if(v==(int32_t)WS_STOCK-1 && ws.page<3 && (in&0x00020002u)) step=1;
+        else if(v==0 && ws.page>0 && (in&0x00010001u)) step=-1;
+        else if(in&0x00080008u) step=2;
+        else if(in&0x00040004u) step=-2;
+    }
+    if(step) {
+        uint32_t to=step==1?0u:step==-1?WS_STOCK-1u:(uint32_t)v;
+        ws.page=(ws.page+(step>0?1:3))%4;
+        WORD_AT(pane+0xC4u)&=~0x000F000Fu;WORD_AT(pane+0xC8u)&=~0xFu;
+        WORD_AT(pane+0x18Cu)=to;
+        guest_call(sub_00074460,3,pane,to,0u);
+    }
+    if(view==2 && ws.page) WORD_AT(pane+0xC4u)&=~0x00800000u;   /* X clear writes the profile (0x002D41D5) */
+    ws_title_suffix();
     original();
 }
 static int ws_paged(uint32_t ret,uint32_t want)
 {
-    return ret==want && ws.page && ws_custom();
+    return ret==want && ws.page && ws_view_live();
 }
-/* WRAP sub_002D3B00 (cdecl slot; returns the weapon id): the row draw shows
- * slot row + page start. */
+/* WRAP sub_002D3B00 (cdecl slot; returns the weapon id): the row draw and
+ * the highlighted weapon's model show slot row + page start. */
 void pc_mapmaker_weaponset_get(void (*original)(void))
 {
     uint32_t ret=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp):0u,s;
-    if(!ws_paged(ret,WS_ROW_RET)) { original();return; }
+    if(!ws_paged(ret,WS_ROW_RET) && !ws_paged(ret,WS_PREVIEW_RET)) { original();return; }
     s=WORD_AT(g_esp+4u)+ws_page_first[ws.page];
     if(s<WS_STOCK || s>=WS_SLOTS) { original();return; }
-    g_eax=(uint32_t)(int32_t)ws.ed[s-WS_STOCK];
+    g_eax=(uint32_t)(int32_t)(ws.view==2?ws.fe:ws.ed)[s-WS_STOCK];
     MAPMAKER_GUEST_RET();
 }
 /* WRAP sub_00312AE0 (cdecl slot, weapon): editor set store from the pick and
@@ -447,7 +502,7 @@ void pc_mapmaker_weaponset_get(void (*original)(void))
 void pc_mapmaker_weaponset_set(void (*original)(void))
 {
     uint32_t ret=MAPMAKER_STACK_OK(12)?WORD_AT(g_esp):0u,s;
-    if(!ws_paged(ret,WS_PICK_RET) && !ws_paged(ret,WS_CLEAR_RET)) { original();return; }
+    if(ws.view!=1 || (!ws_paged(ret,WS_PICK_RET) && !ws_paged(ret,WS_CLEAR_RET))) { original();return; }
     s=WORD_AT(g_esp+4u)+ws_page_first[ws.page];
     if(s<WS_STOCK || s>=WS_SLOTS) { original();return; }
     ws.ed[s-WS_STOCK]=(int16_t)WORD_AT(g_esp+8u);

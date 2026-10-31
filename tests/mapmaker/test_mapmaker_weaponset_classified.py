@@ -46,7 +46,7 @@ REVIEWED = reviewed("""
 0x002B504D [0x007DE470] value 0xF in the AI weapon choice, not a slot
 0x002D3A67 game type [0x0078AD2C] 6 held in eax
 0x002D3B32 game type [0x0078AD2C] 6 held in eax
-0x002D415B weapon set index 0xF = the map's set in MapMaker Arcade (not editable there); editor paging needs index >= 10
+0x002D415B weapon set index 0xF = the map's set in MapMaker Arcade (not editable there); its pages 2-4 are shown read-only from the map (front-end view 2), editor paging needs index >= 10
 0x003022ED item ids 5/6 (starts) in the editor loader
 0x003022F6 item ids 5/6 (starts) in the editor loader
 0x00356519 [0x0077419C] value 6 (network state) in the System Link setup, not a slot
