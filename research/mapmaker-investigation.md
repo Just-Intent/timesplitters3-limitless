@@ -18,12 +18,12 @@ Evidence labels:
 
 | Fact | Evidence | Label |
 | --- | --- | --- |
-| MapMaker's Arcade table entry uses **scene 100** (most likely playing a map; unverified). The current scene is the int32 at `0x0079094C`; scenes 0..100 are active play, >100 is frontend. | `src/pc_discord_guest.h:49-53, 128`; `src/pc_menu_mouse_guest.inc:51-53` | CONFIRMED (Discord presence verified live, `STATUS.md` ~11430-11460) |
+| MapMaker's Arcade table entry uses **scene 100** (most likely playing a map; unverified). The current scene is the int32 at `0x0079094C`; scenes 0..100 are active play, >100 is frontend. | `src/network/pc_discord_guest.h:49-53, 128`; `src/interface/pc_menu_mouse_guest.inc:51-53` | CONFIRMED (Discord presence verified live, `STATUS.md` ~11430-11460) |
 | The MapMaker **editor** runs as **scene 102**. | First Windows meter-probe run (2026-10-22): all 634 meter draws reported `scene=102` | CONFIRMED (one run) |
-| MapMaker is a row in the 17-row Arcade map table at `0x004D2390` (stride 0x3C, scene id at +0, name id at −8, network capacity at +0xC+col*4). | `src/pc_discord_guest.h:119-133` | CONFIRMED |
-| `sub_0030C210` draws the noninteractive **MapMaker capacity meter** using the shared bar primitive `sub_000814B0`. | `STATUS.md:2552-2556` (US audit of the four original callers of `sub_000814B0`); `src/pc_menu_sliders.inc:55` | CONFIRMED |
-| `sub_000814B0` takes 9 stack arguments: fill fraction (float), x, y, w, h, colours. It is already wrapped by `pc_display_menu_slider_bar`, which acts only for return address `0x002EA3E0` (sensitivity). | `patches/*-menu-setting-sliders.patch:17-23`; `src/pc_menu_sliders.inc:58-69`; `src/pc_display_menu.c:547`; `tests/fov_settings.c:98` | CONFIRMED |
-| MapMaker tileset textures live in archives whose path contains `/tileset/`. | `tools/texture-inventory.py:45-46`; `STATUS.md:8397` | CONFIRMED |
+| MapMaker is a row in the 17-row Arcade map table at `0x004D2390` (stride 0x3C, scene id at +0, name id at −8, network capacity at +0xC+col*4). | `src/network/pc_discord_guest.h:119-133` | CONFIRMED |
+| `sub_0030C210` draws the noninteractive **MapMaker capacity meter** using the shared bar primitive `sub_000814B0`. | `STATUS.md:2552-2556` (US audit of the four original callers of `sub_000814B0`); `src/interface/pc_menu_sliders.inc:55` | CONFIRMED |
+| `sub_000814B0` takes 9 stack arguments: fill fraction (float), x, y, w, h, colours. It is already wrapped by `pc_display_menu_slider_bar`, which acts only for return address `0x002EA3E0` (sensitivity). | `patches/*-menu-setting-sliders.patch:17-23`; `src/interface/pc_menu_sliders.inc:58-69`; `src/interface/pc_display_menu.c:547`; `tests/graphics/fov_settings.c:98` | CONFIRMED |
+| MapMaker tileset textures live in archives whose path contains `/tileset/`. | `tools/textures/texture-inventory.py:45-46`; `STATUS.md:8397` | CONFIRMED |
 | MapMaker map naming goes through the shared on-screen keyboard (`0x0007DB20` character rows), so physical typing already reaches it. | `docs/agent-context/systems.md` (#136); `MAC_PORT_BACKLOG.md:3085` | CONFIRMED for the shared keyboard; MapMaker name dialog specifically pending validation |
 | MapMaker controls and mouse navigation have **never been validated** on PC. | `STATUS.md:6862`; `MAC_PORT_BACKLOG.md:3125` | CONFIRMED (as a gap) |
 
@@ -66,12 +66,12 @@ CONFIRMED by code:
   shown; only generic menu rows clickable). The original analysis below
   applies to scene 100 only.
 - `menu_mouse_context()` is false for scene 100 unless the player-1 pause flag
-  (`*0x00761C48` bit 0) is set (`src/pc_menu_mouse_guest.inc:49-54`). So while
+  (`*0x00761C48` bit 0) is set (`src/interface/pc_menu_mouse_guest.inc:49-54`). So while
   editing, the PC layer is in **gameplay mode**: the mouse is captured, left
   button = Fire binding (right trigger), right button = right-thumb click,
   wheel = D-pad left/right (`config/pc-controls.default.json`).
 - Mouse movement only changes camera yaw/pitch of the player at `*0x007B0C7C`,
-  applied inside `sub_000D2B80` (`patches/pc-controls.patch:229`). It never
+  applied inside `sub_000D2B80` (`patches/input/0230-pc-controls.patch:229`). It never
   produces right-stick values.
 - Keyboard bindings produce a normal Xbox pad, so the editor is already usable
   as "keyboard as a controller".
@@ -128,7 +128,7 @@ from the budget counters.
 
 CONFIRMED: saves are plain host files under `RECOMP_SAVE_DIR/UserData/45410066/`
 written by the game's own lifted XAPI code; there is no FATX or quota layer
-(`docs/architecture.md` §6).
+(`docs/development/architecture.md` §6).
 
 HYPOTHESES:
 
@@ -136,7 +136,7 @@ HYPOTHESES:
 | --- | --- | --- |
 | H-SV1 | Each saved map is its own XAPI save directory beside the profile directory, not part of `tsftrpft`. | Disposable save root: snapshot `UserData/45410066/`, save one map, diff. |
 | H-SV2 | A map file is a fixed-size image of the editor's in-memory arrays, so the stored capacity equals the budget limits. | Save an empty map and a full map; compare sizes. Community attachments of ~4 KiB to ~100 KiB are inconclusive (unknown platform). |
-| H-SV3 | Map files carry an HMAC with the runtime's zero key like profiles, so an external editor must re-sign. | Inspect the save tail after H-SV1; compare with `tools/testing_profile.py` signing. |
+| H-SV3 | Map files carry an HMAC with the runtime's zero key like profiles, so an external editor must re-sign. | Inspect the save tail after H-SV1; compare with `tools/testing/testing_profile.py` signing. |
 | H-SV4 | The save routine is reachable from guest file-create calls on `U:` during "Save Map". | `RECOMP_TRACE_ONLY`/file logging around `NtCreateFile` during a save; take the guest caller chain. |
 
 ## 6. Reverse-engineering plan for phase 2 (needs Windows host + local XBE)
@@ -146,7 +146,7 @@ HYPOTHESES:
    `sub_000814B0`'s first argument. Record the globals and struct offsets it
    reads.
 2. Offline: lift `sub_0030C210` and its callers with the existing
-   original-routine harness pattern (`tests/test_crane_overlay.py:21-48`).
+   original-routine harness pattern (`tests/graphics/test_crane_overlay.py:21-48`).
 3. Runtime, read-only: log the meter fraction and candidate counters in
    MapMaker while placing tiles/items (see roadmap experiment E1).
 4. Runtime: `RECOMP_WATCH_WRITE` on the counters to find the placement and
