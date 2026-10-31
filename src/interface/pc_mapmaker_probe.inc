@@ -22,7 +22,13 @@
  *      arena base/size, Level heap low/top/end pointers, shared free count
  *      (signed) and its minimum since the scene started, Eternal heap pointer
  *      and free, per-frame display buffer size and peak, and the two reserve
- *      flags (research/capacity-constraints.md, play-time memory)
+ *      flags (research/capacity-constraints.md, play-time memory); also the
+ *      host side of the same memory: the contiguous window's extent now and
+ *      its peak (xbox_ContiguousAllocatedBytes; the game arena, textures,
+ *      vertex/push buffers and the MapMaker container live there), live and
+ *      peak bytes and the highest end of the window and of the runtime heap
+ *      (xbox_HeapAlloc) from the allocation observer, and the headroom left
+ *      at those peaks (window top 0x83FE0000, heap top 0x04000000)
  *  64  while a MapMaker map is played (scene 100), the AI navigation counts
  *      once a second when they changed: regular pads [0x007B6664], links
  *      [0x007B6660], cover pads [0x007B65C0], pad groups [0x007B666C] and the
@@ -218,10 +224,11 @@ static uint32_t mapmaker_probe_container_used(void)
     uint32_t c,off,tag,size;
     if(!guest_writable(0x00784014u,4)) return 0;
     c=WORD_AT(0x00784014u);
-    if(!guest_writable(c,0x7FE0) || WORD_AT(c)!=0x00C77667u || WORD_AT(c+4)!=0x12Du) return 0;
-    for(off=8;off+8<=0x7FE0;off+=8+size) {
+    /* The container is 512 KB (config/guest-code-patches/container.json). */
+    if(!guest_writable(c,0x7FFE0) || WORD_AT(c)!=0x00C77667u || WORD_AT(c+4)!=0x12Du) return 0;
+    for(off=8;off+8<=0x7FFE0;off+=8+size) {
         tag=WORD_AT(c+off);size=WORD_AT(c+off+4);
-        if(tag==0x00C7766Au || size>0x7FE0) return 0;
+        if(tag==0x00C7766Au || size>0x7FFE0) return 0;
         if(tag==0x00C77668u) return size>=0x24C ? WORD_AT(c+off+8+0x248) : 0;
     }
     return 0;
@@ -254,7 +261,7 @@ static void mapmaker_probe_budgets(MapMakerProbeText *k)
         extra=WORD_AT(editor+0x306e)&0xFFFFu;
         e270=FLOAT_AT(editor+0x270);e274=FLOAT_AT(editor+0x274);
     }
-    mapmaker_probe_append(k,"  budgets container=%u/32736 cost0=%u/2400 cost1=%u/1024 cost2=%u/4400"
+    mapmaker_probe_append(k,"  budgets container=%u/524256 cost0=%u/2400 cost1=%u/1024 cost2=%u/4400"
         " global=%d/300 pieces=%u/200 deep=%u+%u/50 e270=%.4f e274=%.4f\n",
         mapmaker_probe_container_used(),sum[0],sum[1],sum[2],(int)global,pieces,deep,extra,
         (double)e270,(double)e274);
@@ -267,16 +274,28 @@ static void mapmaker_probe_budgets(MapMakerProbeText *k)
  * allocator does not stop); Eternal heap (2) [0x006B8370], free
  * [0x006B8378]; display buffer size [0x006B83AC], peak [0x006B83B0];
  * reserves [0x004C81B4] (0x266000) and [0x007DE398]&0x40 (0x131800). */
+/* Host allocation counters (src/diagnostics/pc_breadcrumbs.h, kept in step
+ * by tests/mapmaker/test_mapmaker_probe.py). */
+#ifndef TSFP_PC_BREADCRUMBS_H
+enum { PC_USAGE_HEAP_LIVE, PC_USAGE_HEAP_PEAK, PC_USAGE_HEAP_END_PEAK,
+       PC_USAGE_PHYS_LIVE, PC_USAGE_PHYS_PEAK, PC_USAGE_PHYS_END_PEAK,
+       PC_USAGE_WORDS };
+void pc_capture_allocation_usage(uint32_t out[PC_USAGE_WORDS]);
+#endif
+extern uint32_t xbox_ContiguousAllocatedBytes(void);
+#define MAPMAKER_PROBE_CONTIG_BASE 0x80000000u
+#define MAPMAKER_PROBE_CONTIG_TOP 0x83FE0000u   /* 64 MB window less the 128 KB GPU instance */
+#define MAPMAKER_PROBE_HEAP_TOP 0x04000000u     /* runtime heap ends at the end of guest RAM */
 static struct {
     int32_t scene, min_free;
     int have;
     unsigned long long last;
-    uint32_t key[12];
+    uint32_t key[20], extent_peak;
 } mapmaker_probe_heap_state;
 static uint32_t mapmaker_probe_word(uint32_t a) { return guest_writable(a,4)?WORD_AT(a):0u; }
 static void mapmaker_probe_heap(void)
 {
-    uint32_t key[12];
+    uint32_t key[20],usage[PC_USAGE_WORDS],extent,contig_end,heap_end;
     int32_t scene,free_now;
     unsigned long long now;
     if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_HEAP)) return;
@@ -296,12 +315,33 @@ static void mapmaker_probe_heap(void)
     key[9]=mapmaker_probe_word(0x006B83ACu);key[10]=mapmaker_probe_word(0x006B83B0u);
     key[11]=(mapmaker_probe_word(0x004C81B4u)?1u:0u)|((mapmaker_probe_word(0x007DE398u)&0x40u)?2u:0u);
     now=GetTickCount64();
-    if(!memcmp(key,mapmaker_probe_heap_state.key,sizeof key)) return;
+    /* Throttled before the host reads: the window extent takes the
+     * allocator's lock and walks its blocks. */
     if(mapmaker_probe_heap_state.last && now-mapmaker_probe_heap_state.last<MAPMAKER_PROBE_HEAP_INTERVAL) return;
+    /* Host side: never reset per scene, these are peaks of the whole run
+     * (the observer's end peaks catch what a once-a-second sample misses). */
+    memset(usage,0,sizeof usage);
+    pc_capture_allocation_usage(usage);
+    extent=xbox_ContiguousAllocatedBytes();
+    if(extent>mapmaker_probe_heap_state.extent_peak) mapmaker_probe_heap_state.extent_peak=extent;
+    contig_end=MAPMAKER_PROBE_CONTIG_BASE+mapmaker_probe_heap_state.extent_peak;
+    if(usage[PC_USAGE_PHYS_END_PEAK]>contig_end) contig_end=usage[PC_USAGE_PHYS_END_PEAK];
+    heap_end=usage[PC_USAGE_HEAP_END_PEAK];
+    key[12]=extent;key[13]=mapmaker_probe_heap_state.extent_peak;
+    key[14]=usage[PC_USAGE_PHYS_LIVE];key[15]=usage[PC_USAGE_PHYS_PEAK];
+    key[16]=MAPMAKER_PROBE_CONTIG_TOP-contig_end;
+    key[17]=usage[PC_USAGE_HEAP_LIVE];key[18]=usage[PC_USAGE_HEAP_PEAK];
+    key[19]=heap_end?MAPMAKER_PROBE_HEAP_TOP-heap_end:0u;
+    if(!memcmp(key,mapmaker_probe_heap_state.key,sizeof key)) return;
     mapmaker_probe_write("[mapmaker-probe] t=%llu heap scene=%d arena=0x%08X+%u level=0x%08X..0x%08X end=0x%08X"
-        " free=%d min_free=%d eternal=0x%08X free=%u display=%u peak=%u reserves=%u\n",
+        " free=%d min_free=%d eternal=0x%08X free=%u display=%u peak=%u reserves=%u"
+        /* Headroom for TSFP_MAPMAKER_ARENA_MB: the arena comes from the window,
+         * so contig_free_min is what a larger arena could take (keep a margin). */
+        " host contig_extent=%u contig_extent_peak=%u contig_live=%u contig_live_peak=%u contig_free_min=%d"
+        " runtime_heap_live=%u runtime_heap_peak=%u runtime_heap_free_min=%d\n",
         now,(int)scene,key[0],key[1],key[2],key[3],key[4],(int32_t)key[5],(int32_t)key[6],
-        key[7],key[8],key[9],key[10],key[11]);
+        key[7],key[8],key[9],key[10],key[11],
+        key[12],key[13],key[14],key[15],(int32_t)key[16],key[17],key[18],(int32_t)key[19]);
     memcpy(mapmaker_probe_heap_state.key,key,sizeof key);
     mapmaker_probe_heap_state.last=now;
 }

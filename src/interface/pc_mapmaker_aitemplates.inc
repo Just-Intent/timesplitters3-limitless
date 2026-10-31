@@ -17,7 +17,7 @@
  *   linked copy:  "Add linked copy" and "Unlink copy".
  * Type 5 (game mode 7 singleton) gets no rows. A copy is made with the
  * guest's own add, sub_0031BE70 (the editor area's limit/colour policy), then
- * the fields are copied; at the limit (255) or without container room the
+ * the fields are copied; at the limit (511) or without container room the
  * stock messages appear on the edit screen, which stays open.
  *
  * Groups. The first "Add linked copy" on an unlinked AI "Guard" makes it the
@@ -69,12 +69,12 @@
 #endif
 
 #define AIT_EDITOR_PTR 0x007844A8u
-#define AIT_EDITOR_SIZE 0x58390u
-#define AIT_SAI 0x11950u                /* editor.json: 255 x 0xE4 */
+#define AIT_EDITOR_SIZE 0x74C00u
+#define AIT_SAI 0x58390u                /* editor.json: 511 x 0xE4 */
 #define AIT_STRIDE 0xE4u
 #define AIT_COUNT 0x280u
-#define AIT_CAP 255u
-#define AIT_SELECTED 0x00762F94u        /* byte: entry being edited */
+#define AIT_CAP 511u
+#define AIT_SELECTED 0x00762F94u        /* entry being edited (word: sai-index.json) */
 #define AIT_SCENE 0x0079094Cu
 #define AIT_CONTAINER 0x00784014u
 #define AIT_SAI_BASE 0x00783A50u        /* R: Story AI ids are R + index + 1 */
@@ -143,7 +143,7 @@ static uint32_t ait_editor(void)
 }
 static uint32_t ait_count(uint32_t e) { uint32_t c=WORD_AT(e+AIT_COUNT); return c<=AIT_CAP?c:0u; }
 static uint32_t ait_entry(uint32_t e,uint32_t i) { return e+AIT_SAI+i*AIT_STRIDE; }
-static uint32_t ait_selected(void) { return WORD_AT(AIT_SELECTED)&0xFFu; }
+static uint32_t ait_selected(void) { return WORD_AT(AIT_SELECTED)&0xFFFFu; }
 static uint32_t ait_type(uint32_t e,uint32_t i) { return WORD_AT(ait_entry(e,i)+AIT_TYPE); }
 static uint32_t ait_raw(uint32_t e,uint32_t i) { return WORD_AT(ait_entry(e,i)+AIT_LINK)&AIT_LINK_MASK; }
 static const char *ait_name(uint32_t e,uint32_t i) { return (const char *)((uintptr_t)ait_entry(e,i)+g_xbox_mem_offset); }
@@ -666,7 +666,7 @@ void pc_mapmaker_aitemplates_alert(void (*original)(void))
 
 /* sub_000715E0(): the first free item of the menu item pool [0x007BB1DC]
  * (count [0x006FE920], sized by sub_00070DB0; aitemplates-pool.json raises
- * the editor's 920 to 3072), or 0 when every item is in use (0x00071603).
+ * the editor's 920 to 6144), or 0 when every item is in use (0x00071603).
  * The row builder sub_00078FF0 (0x0007906C) does not test it, so that row
  * and every later one silently vanish from the menu. Diagnostic only, in
  * the editor (scene 102), whatever TSFP_MAPMAKER_LIMITS says: the pool

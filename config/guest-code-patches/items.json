@@ -6,8 +6,8 @@
       "function": "0x00302A60",
       "address": "0x00302FFC",
       "original_hex": "68407c0000",
-      "new_hex": "68e8f00100",
-      "reason": "MapMaker editor sub-entry (item) pool 530 -> 2120 nodes of 0x3C B: allocation 0x7C40 -> 0x1F0E8"
+      "new_hex": "6830da0400",
+      "reason": "MapMaker editor sub-entry (item) pool 530 -> 5300 nodes of 0x3C B (500 items, round 3): allocation 0x7C40 -> 0x4DA30 (Level heap, editor only: sub_00302A60 is the editor setup)"
     },
     {
       "id": "mm-subentry-pool-loop",
@@ -15,8 +15,8 @@
       "function": "0x00307C20",
       "address": "0x00307C81",
       "original_hex": "3dfc7b0000",
-      "new_hex": "3da4f00100",
-      "reason": "free-list init loop end (N-1)*0x3C: 0x7BFC -> 0x1F0A4"
+      "new_hex": "3df4d90400",
+      "reason": "free-list init loop end (N-1)*0x3C: 0x7BFC -> 0x4D9F4"
     },
     {
       "id": "mm-subentry-pool-end",
@@ -24,8 +24,8 @@
       "function": "0x00307C20",
       "address": "0x00307C8D",
       "original_hex": "8990107c0000",
-      "new_hex": "8990b8f00100",
-      "reason": "last node's next pointer at (N-1)*0x3C+0x14: 0x7C10 -> 0x1F0B8"
+      "new_hex": "899008da0400",
+      "reason": "last node's next pointer at (N-1)*0x3C+0x14: 0x7C10 -> 0x4DA08"
     },
     {
       "id": "mm-subentry-pool-count",
@@ -33,8 +33,8 @@
       "function": "0x00307C20",
       "address": "0x00307CAF",
       "original_hex": "c705c02c760012020000",
-      "new_hex": "c705c02c760048080000",
-      "reason": "free count 0x212 -> 0x848"
+      "new_hex": "c705c02c7600b4140000",
+      "reason": "free count 0x212 -> 0x14B4 (5300)"
     }
   ]
 }

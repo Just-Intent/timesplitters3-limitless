@@ -29,7 +29,7 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 #define ESP0 0x00600000u
 #define RESTAB 0x00680000u
 #define R 10u
-#define E(i) (ED+0x11950u+(uint32_t)(i)*0xE4u)
+#define E(i) (ED+0x58390u+(uint32_t)(i)*0xE4u)
 #define A(i) (POOL+(uint32_t)(i)*0xEA0u)
 #define ENT(i) (ENTS+(uint32_t)(i)*0x400u)
 #define REC(i) (RECS+(uint32_t)(i)*0x100u)

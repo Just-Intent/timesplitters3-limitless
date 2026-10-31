@@ -45,6 +45,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
 /* MapMaker capacity area includes (begin) */
+#include "pc_mapmaker_memory.inc"
 #include "pc_mapmaker_pads.inc"
 #include "pc_mapmaker_container.inc"
 #include "pc_mapmaker_objects.inc"

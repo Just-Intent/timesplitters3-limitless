@@ -26,7 +26,7 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 #define ACTORS 0x00400000u
 #define ESP0 0x00600000u
 #define R 10u
-#define E(i) (ED+0x11950u+(uint32_t)(i)*0xE4u)
+#define E(i) (ED+0x58390u+(uint32_t)(i)*0xE4u)
 
 /* distinct bodies: identical ones may be folded */
 void sub_0003DFA0(void) { g_ecx=1; }
@@ -48,7 +48,7 @@ static unsigned guest_calls;
 static void fake_add(void)   /* sub_0031BE70 -> editor sai_add -> sub_0031BB60(0, 0) */
 {
     uint32_t c=WORD_AT(ED+0x280u),e=E(c);
-    if(c>=255u) return;
+    if(c>=511u) return;
     memset((void *)((uintptr_t)e+g_xbox_mem_offset),0,0xE4);
     snprintf((char *)((uintptr_t)e+g_xbox_mem_offset),32,"Story AI %d",++name_counter);
     WORD_AT(e+0x20u)=1;WORD_AT(e+0x30u)=1;WORD_AT(e+0x38u)=1;WORD_AT(e+0x40u)=0xFFFFFFFFu;
@@ -283,16 +283,16 @@ int main(void)
     CHECK(orig_calls==1 && WORD_AT(ED+0x280u)==2);
     WORD_AT(E(0)+0x34u)=1u;WORD_AT(E(0)+0x58u)=2u;                /* undo the stock clamp */
     /* limit: message on the edit screen, which stays open */
-    WORD_AT(ED+0x280u)=255u;messages=0;orig_calls=0;
+    WORD_AT(ED+0x280u)=511u;messages=0;orig_calls=0;
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(orig_calls==0 && messages==1 && last_sprintf_value==255u && last_message_menu==MENU && WORD_AT(ED+0x280u)==255u);
+    CHECK(orig_calls==0 && messages==1 && last_sprintf_value==511u && last_message_menu==MENU && WORD_AT(ED+0x280u)==511u);
     press(0x41540002u);messages=0;                                /* a linked copy too */
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(orig_calls==0 && messages==1 && WORD_AT(ED+0x280u)==255u);
-    WORD_AT(ED+0x280u)=254u;messages=0;                           /* one slot is enough */
+    CHECK(orig_calls==0 && messages==1 && WORD_AT(ED+0x280u)==511u);
+    WORD_AT(ED+0x280u)=510u;messages=0;                           /* one slot is enough */
     HOOK(pc_mapmaker_aitemplates_close,fake_close,MENU);
-    CHECK(orig_calls==1 && messages==0 && WORD_AT(ED+0x280u)==255u && WORD_AT(E(254)+0x50u)==1u);
-    WORD_AT(E(254)+0x50u)=0;orig_calls=0;press(0x41540001u);
+    CHECK(orig_calls==1 && messages==0 && WORD_AT(ED+0x280u)==511u && WORD_AT(E(510)+0x50u)==1u);
+    WORD_AT(E(510)+0x50u)=0;orig_calls=0;press(0x41540001u);
     WORD_AT(ED+0x280u)=2u;
     /* no container room */
     has_room=0;press(0x41540001u);messages=0;

@@ -180,16 +180,16 @@ int main(void)
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     WORD_AT(ED+0x278)=(90u*10000u+1000u)/8u;
-    /* Items do not cost cover pads (measured in play): 150 items with tile cover 909. */
-    WORD_AT(ED+0x306c)=150u<<16;
+    /* Items do not cost cover pads (measured in play): 400 items with tile cover 909. */
+    WORD_AT(ED+0x306c)=400u<<16;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    CHECK(NEAR(FLOAT_AT(ED+0x270),150.f/200.f));                      /* meter: items, no cover */
+    CHECK(NEAR(FLOAT_AT(ED+0x270),400.f/500.f));                      /* meter: items (above groups 400/600), no cover */
     WORD_AT(ED+0x306c)=0;
-    /* The item limit itself, with cost-free tiles: 200 allowed, 201 refused. */
+    /* The item limit itself, with cost-free tiles: 500 allowed, 501 refused. */
     WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,10);
     WORD_AT(ED+0x2f7c)=0;
-    WORD_AT(ED+0x306c)=200u<<16;
+    WORD_AT(ED+0x306c)=500u<<16;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
     CHECK(NEAR(FLOAT_AT(ED+0x270),1.0f));
@@ -213,8 +213,9 @@ int main(void)
     WORD_AT(0x00524CD4u)=99;                                           /* red keycard: not stock */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(0x00524CD4u)==99);
-    CHECK(WORD_AT(0x00524CECu)==8 && WORD_AT(0x00524D04u)==8 && WORD_AT(0x00524D1Cu)==8);
-    CHECK(WORD_AT(0x00524E3Cu)==80 && WORD_AT(0x00524E54u)==80 && WORD_AT(0x00524CA4u)==128);
+    CHECK(WORD_AT(0x00524CECu)==16 && WORD_AT(0x00524D04u)==16 && WORD_AT(0x00524D1Cu)==16); /* keycards x8 */
+    CHECK(WORD_AT(0x00524E3Cu)==160 && WORD_AT(0x00524E54u)==160 && WORD_AT(0x00524EE4u)==160); /* movers/props/markers x8 */
+    CHECK(WORD_AT(0x00524CA4u)==128);
     CHECK(WORD_AT(0x00524E6Cu)==24 && WORD_AT(0x00524E84u)==24 && WORD_AT(0x00524E9Cu)==24); /* turrets: 72 <= 80 */
     CHECK(WORD_AT(0x00524D34u)==8 && WORD_AT(0x00524D4Cu)==8 && WORD_AT(0x00524D64u)==8 &&
           WORD_AT(0x00524D7Cu)==8 && WORD_AT(0x00524D94u)==8);          /* teleporters x4 */

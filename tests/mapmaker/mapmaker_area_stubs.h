@@ -9,6 +9,10 @@
 void sub_000827B0(void) {} void sub_000827F0(void) {} void sub_0035E960(void) {}
 void sub_00025280(void) {} void sub_00336600(void) {}
 uint32_t xbox_ContiguousAlloc(uint32_t size, uint32_t alignment) { (void)size; (void)alignment; return 0; }
+/* memory, probe (host allocation counters) */
+int xbox_ContiguousFree(uint32_t address) { (void)address; return 0; }
+uint32_t xbox_ContiguousAllocatedBytes(void) { return 0; }
+void pc_capture_allocation_usage(uint32_t out[6]) { for (unsigned i = 0; i < 6; i++) out[i] = 0; }
 /* objects */
 void sub_0009A2C0(void) {}
 void sub_0009A5B0(void) {}

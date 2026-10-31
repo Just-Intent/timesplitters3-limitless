@@ -41,11 +41,14 @@ The editor object (`sub_002FE360`, Level heap, pointer `[0x007844A8]`) was
 0x11950 bytes with every array packed against the next field. editor.json
 makes it 0x58390 bytes (`push 0x11950` at `0x002FE363`, and the clear at
 `0x002FE37A` now zeroes all of it) and moves each array behind +0x11950.
-Count fields stay where they were.
+Count fields stay where they were. Round 3 (2026-10-31, 511 Story AI) moved
+the Story AI array again, to the end: the object is 0x74C00 bytes, the
+array +0x58390 (delta 0x58108; the same 136 sites re-valued), the old
++0x11950 block is unused; see `docs/mapmaker/mapmaker-memory.md`.
 
 | Array | Stock | Enlarged | Delta |
 |---|---|---|---|
-| Story AI | +0x288, 50 x 0xE4 | +0x11950, 255 | +0x116C8 |
+| Story AI | +0x288, 50 x 0xE4 | +0x58390, 511 (round 2: +0x11950, 255) | +0x58108 |
 | Logic ops | +0x41E4, 30 x 0x220 | +0x1FC70, 120 | +0x1BA8C |
 | Logic nodes | +0x81A8, 130 x 0xB4 | +0x2FB70, 520 | +0x279C8 |
 | Logic records | +0xDD14, 100 x 0x8C | +0x46910, 400 | +0x38BFC |
@@ -94,7 +97,7 @@ array at +0x4068 with index-1, not the clipboard.
 
 Folded sites: `0x003024F9` `add edx, 3` then `imul edx, 0xE4` then
 `mov [edx+eax], ecx` (SAI[count]+0x24, loader). The delta is not a multiple
-of 0xE4, so the store at `0x00302502` gets displacement 0x116C8 (an operand
+of 0xE4, so the store at `0x00302502` gets displacement 0x58108 (round 2: 0x116C8; an operand
 override may set a displacement the encoding does not have).
 
 ## Story AI (stage 1)
@@ -108,12 +111,14 @@ override may set a displacement the encoding does not have).
   `0x0052CE00`, assigned by `sub_0031BB60`) is 50 for every story AI past
   the palette (stock behaviour, reads past the table); the wrapper gives
   those index mod 50.
-- The byte index `[0x00762F94]` is not widened: 255 is its ceiling and every
-  reader zero-extends it (`0x0031BAC0`, `0x0031BB30`, `0x0031CAC0`,
-  `0x0031CB91` movzx; `sub_0031BA80`'s `al` goes to `sub_0031BAA0`, which
-  movzx's its argument). CONFIRMED.
+- The byte index `[0x00762F94]` capped round 2 at 255 (every reader
+  zero-extends it: `0x0031BAC0`, `0x0031BB30`, `0x0031CAC0`, `0x0031CB91`
+  movzx; `sub_0031BA80`'s `al` goes to `sub_0031BAA0`, which movzx's its
+  argument; CONFIRMED). Round 3 widens it to a word with
+  `config/guest-code-patches/sai-index.json` (11 same-length rewrites) and
+  raises the limit and loader cap to 511.
 - `sub_00323220` (editor) fills an unread 50-slot stack array per story AI
-  (`0x00323300`): frame 0xCC -> 0x4CC (306 slots).
+  (`0x00323300`): frame 0xCC -> 0x84C (530 slots; round 2: 0x4CC, 306).
 - `sub_00240590` (map start, count pass) keeps one stack pointer per story AI
   chunk at frame+0x1C with no bound (`0x00240776`): frame 0xE4 -> 0x101C,
   1024 slots; its argument read `[esp+0xF0]` moves with the frame

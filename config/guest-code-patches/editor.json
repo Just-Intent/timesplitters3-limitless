@@ -7,8 +7,8 @@
       "address": "0x002FE363",
       "original_hex": "6850190100",
       "operand": 0,
-      "value": "0x58390",
-      "reason": "editor object 0x11950 -> 0x58390 B (arrays appended)"
+      "value": "0x74C00",
+      "reason": "editor object 0x11950 -> 0x74C00 B (arrays appended; Story AI last, 511 entries)"
     },
     {
       "id": "ed-alloc-zero",
@@ -17,8 +17,8 @@
       "address": "0x002FE37A",
       "original_hex": "b952460000",
       "operand": 1,
-      "value": "0x160E4",
-      "reason": "zero the whole object: 0x160e4 dwords"
+      "value": "0x1D300",
+      "reason": "zero the whole object: 0x1d300 dwords"
     },
     {
       "id": "ed-002f8b55",
@@ -27,10 +27,10 @@
       "address": "0x002F8B55",
       "original_hex": "8db0e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (esi, [eax + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (esi, [eax + 0x2e0])"
     },
     {
       "id": "ed-002f8c00",
@@ -39,10 +39,10 @@
       "address": "0x002F8C00",
       "original_hex": "8d8c0188020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (ecx, [ecx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (ecx, [ecx + eax + 0x288])"
     },
     {
       "id": "ed-002f9600",
@@ -51,10 +51,10 @@
       "address": "0x002F9600",
       "original_hex": "8b8437e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (eax, dword ptr [edi + esi + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (eax, dword ptr [edi + esi + 0x2e0])"
     },
     {
       "id": "ed-002f9607",
@@ -63,10 +63,10 @@
       "address": "0x002F9607",
       "original_hex": "8d9437e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (edx, [edi + esi + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (edx, [edi + esi + 0x2e0])"
     },
     {
       "id": "ed-002f9614",
@@ -75,10 +75,10 @@
       "address": "0x002F9614",
       "original_hex": "8d8437ec020000",
       "operand": 1,
-      "value": "0x119B4",
+      "value": "0x583F4",
       "array": "sai",
       "old": "0x2ec",
-      "reason": "sai array reference: 0x2ec -> 0x119b4 (eax, [edi + esi + 0x2ec])"
+      "reason": "sai array reference: 0x2ec -> 0x583f4 (eax, [edi + esi + 0x2ec])"
     },
     {
       "id": "ed-002fec32",
@@ -87,10 +87,10 @@
       "address": "0x002FEC32",
       "original_hex": "81c788020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edi, 0x288)"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edi, 0x288)"
     },
     {
       "id": "ed-002ff125",
@@ -99,10 +99,10 @@
       "address": "0x002FF125",
       "original_hex": "8db40a88020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [edx + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [edx + ecx + 0x288])"
     },
     {
       "id": "ed-002ff207",
@@ -111,10 +111,10 @@
       "address": "0x002FF207",
       "original_hex": "8db40888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-003013e5",
@@ -123,10 +123,10 @@
       "address": "0x003013E5",
       "original_hex": "8dbc0188020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edi, [ecx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edi, [ecx + eax + 0x288])"
     },
     {
       "id": "ed-0030243d",
@@ -135,10 +135,10 @@
       "address": "0x0030243D",
       "original_hex": "8db401ec020000",
       "operand": 1,
-      "value": "0x119B4",
+      "value": "0x583F4",
       "array": "sai",
       "old": "0x2ec",
-      "reason": "sai array reference: 0x2ec -> 0x119b4 (esi, [ecx + eax + 0x2ec])"
+      "reason": "sai array reference: 0x2ec -> 0x583f4 (esi, [ecx + eax + 0x2ec])"
     },
     {
       "id": "ed-003024a1",
@@ -147,10 +147,10 @@
       "address": "0x003024A1",
       "original_hex": "899401e0020000",
       "operand": 0,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (dword ptr [ecx + eax + 0x2e0], edx)"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (dword ptr [ecx + eax + 0x2e0], edx)"
     },
     {
       "id": "ed-003024bd",
@@ -159,10 +159,10 @@
       "address": "0x003024BD",
       "original_hex": "899401e4020000",
       "operand": 0,
-      "value": "0x119AC",
+      "value": "0x583EC",
       "array": "sai",
       "old": "0x2e4",
-      "reason": "sai array reference: 0x2e4 -> 0x119ac (dword ptr [ecx + eax + 0x2e4], edx)"
+      "reason": "sai array reference: 0x2e4 -> 0x583ec (dword ptr [ecx + eax + 0x2e4], edx)"
     },
     {
       "id": "ed-003024d7",
@@ -171,10 +171,10 @@
       "address": "0x003024D7",
       "original_hex": "8d940288020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [edx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [edx + eax + 0x288])"
     },
     {
       "id": "ed-00302502",
@@ -183,11 +183,11 @@
       "address": "0x00302502",
       "original_hex": "890c02",
       "operand": 0,
-      "value": "0x116C8",
+      "value": "0x58108",
       "array": "sai",
       "old": "0x0",
       "folded": true,
-      "reason": "sai folded index (count+k)*stride at 0x3024f9: disp 0 -> 0x116c8 (dword ptr [edx + eax], ecx)"
+      "reason": "sai folded index (count+k)*stride at 0x3024f9: disp 0 -> 0x58108 (dword ptr [edx + eax], ecx)"
     },
     {
       "id": "ed-00302519",
@@ -196,10 +196,10 @@
       "address": "0x00302519",
       "original_hex": "899401c0020000",
       "operand": 0,
-      "value": "0x11988",
+      "value": "0x583C8",
       "array": "sai",
       "old": "0x2c0",
-      "reason": "sai array reference: 0x2c0 -> 0x11988 (dword ptr [ecx + eax + 0x2c0], edx)"
+      "reason": "sai array reference: 0x2c0 -> 0x583c8 (dword ptr [ecx + eax + 0x2c0], edx)"
     },
     {
       "id": "ed-00302534",
@@ -208,10 +208,10 @@
       "address": "0x00302534",
       "original_hex": "899401c4020000",
       "operand": 0,
-      "value": "0x1198C",
+      "value": "0x583CC",
       "array": "sai",
       "old": "0x2c4",
-      "reason": "sai array reference: 0x2c4 -> 0x1198c (dword ptr [ecx + eax + 0x2c4], edx)"
+      "reason": "sai array reference: 0x2c4 -> 0x583cc (dword ptr [ecx + eax + 0x2c4], edx)"
     },
     {
       "id": "ed-00302550",
@@ -220,10 +220,10 @@
       "address": "0x00302550",
       "original_hex": "898c02c8020000",
       "operand": 0,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (dword ptr [edx + eax + 0x2c8], ecx)"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (dword ptr [edx + eax + 0x2c8], ecx)"
     },
     {
       "id": "ed-0030256c",
@@ -232,10 +232,10 @@
       "address": "0x0030256C",
       "original_hex": "898c02b0020000",
       "operand": 0,
-      "value": "0x11978",
+      "value": "0x583B8",
       "array": "sai",
       "old": "0x2b0",
-      "reason": "sai array reference: 0x2b0 -> 0x11978 (dword ptr [edx + eax + 0x2b0], ecx)"
+      "reason": "sai array reference: 0x2b0 -> 0x583b8 (dword ptr [edx + eax + 0x2b0], ecx)"
     },
     {
       "id": "ed-00302588",
@@ -244,10 +244,10 @@
       "address": "0x00302588",
       "original_hex": "898c02b4020000",
       "operand": 0,
-      "value": "0x1197C",
+      "value": "0x583BC",
       "array": "sai",
       "old": "0x2b4",
-      "reason": "sai array reference: 0x2b4 -> 0x1197c (dword ptr [edx + eax + 0x2b4], ecx)"
+      "reason": "sai array reference: 0x2b4 -> 0x583bc (dword ptr [edx + eax + 0x2b4], ecx)"
     },
     {
       "id": "ed-003025a4",
@@ -256,10 +256,10 @@
       "address": "0x003025A4",
       "original_hex": "898c02b8020000",
       "operand": 0,
-      "value": "0x11980",
+      "value": "0x583C0",
       "array": "sai",
       "old": "0x2b8",
-      "reason": "sai array reference: 0x2b8 -> 0x11980 (dword ptr [edx + eax + 0x2b8], ecx)"
+      "reason": "sai array reference: 0x2b8 -> 0x583c0 (dword ptr [edx + eax + 0x2b8], ecx)"
     },
     {
       "id": "ed-003025c0",
@@ -268,10 +268,10 @@
       "address": "0x003025C0",
       "original_hex": "898c02bc020000",
       "operand": 0,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (dword ptr [edx + eax + 0x2bc], ecx)"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (dword ptr [edx + eax + 0x2bc], ecx)"
     },
     {
       "id": "ed-003025dd",
@@ -280,10 +280,10 @@
       "address": "0x003025DD",
       "original_hex": "898c02d0020000",
       "operand": 0,
-      "value": "0x11998",
+      "value": "0x583D8",
       "array": "sai",
       "old": "0x2d0",
-      "reason": "sai array reference: 0x2d0 -> 0x11998 (dword ptr [edx + eax + 0x2d0], ecx)"
+      "reason": "sai array reference: 0x2d0 -> 0x583d8 (dword ptr [edx + eax + 0x2d0], ecx)"
     },
     {
       "id": "ed-003025f8",
@@ -292,10 +292,10 @@
       "address": "0x003025F8",
       "original_hex": "899401dc020000",
       "operand": 0,
-      "value": "0x119A4",
+      "value": "0x583E4",
       "array": "sai",
       "old": "0x2dc",
-      "reason": "sai array reference: 0x2dc -> 0x119a4 (dword ptr [ecx + eax + 0x2dc], edx)"
+      "reason": "sai array reference: 0x2dc -> 0x583e4 (dword ptr [ecx + eax + 0x2dc], edx)"
     },
     {
       "id": "ed-00302614",
@@ -304,10 +304,10 @@
       "address": "0x00302614",
       "original_hex": "898c02d4020000",
       "operand": 0,
-      "value": "0x1199C",
+      "value": "0x583DC",
       "array": "sai",
       "old": "0x2d4",
-      "reason": "sai array reference: 0x2d4 -> 0x1199c (dword ptr [edx + eax + 0x2d4], ecx)"
+      "reason": "sai array reference: 0x2d4 -> 0x583dc (dword ptr [edx + eax + 0x2d4], ecx)"
     },
     {
       "id": "ed-00302630",
@@ -316,10 +316,10 @@
       "address": "0x00302630",
       "original_hex": "898c02cc020000",
       "operand": 0,
-      "value": "0x11994",
+      "value": "0x583D4",
       "array": "sai",
       "old": "0x2cc",
-      "reason": "sai array reference: 0x2cc -> 0x11994 (dword ptr [edx + eax + 0x2cc], ecx)"
+      "reason": "sai array reference: 0x2cc -> 0x583d4 (dword ptr [edx + eax + 0x2cc], ecx)"
     },
     {
       "id": "ed-0030264c",
@@ -328,10 +328,10 @@
       "address": "0x0030264C",
       "original_hex": "898c02c8020000",
       "operand": 0,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (dword ptr [edx + eax + 0x2c8], ecx)"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (dword ptr [edx + eax + 0x2c8], ecx)"
     },
     {
       "id": "ed-00302668",
@@ -340,10 +340,10 @@
       "address": "0x00302668",
       "original_hex": "898c02e8020000",
       "operand": 0,
-      "value": "0x119B0",
+      "value": "0x583F0",
       "array": "sai",
       "old": "0x2e8",
-      "reason": "sai array reference: 0x2e8 -> 0x119b0 (dword ptr [edx + eax + 0x2e8], ecx)"
+      "reason": "sai array reference: 0x2e8 -> 0x583f0 (dword ptr [edx + eax + 0x2e8], ecx)"
     },
     {
       "id": "ed-00303b40",
@@ -352,10 +352,10 @@
       "address": "0x00303B40",
       "original_hex": "8b8c02e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (ecx, dword ptr [edx + eax + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (ecx, dword ptr [edx + eax + 0x2e0])"
     },
     {
       "id": "ed-00303b47",
@@ -364,10 +364,10 @@
       "address": "0x00303B47",
       "original_hex": "8d940288020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [edx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [edx + eax + 0x288])"
     },
     {
       "id": "ed-0030529c",
@@ -376,10 +376,10 @@
       "address": "0x0030529C",
       "original_hex": "8db40288020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [edx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [edx + eax + 0x288])"
     },
     {
       "id": "ed-00305464",
@@ -388,10 +388,10 @@
       "address": "0x00305464",
       "original_hex": "8d840288020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (eax, [edx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (eax, [edx + eax + 0x288])"
     },
     {
       "id": "ed-003054c1",
@@ -400,10 +400,10 @@
       "address": "0x003054C1",
       "original_hex": "8db40188020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [ecx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [ecx + eax + 0x288])"
     },
     {
       "id": "ed-003055b7",
@@ -412,10 +412,10 @@
       "address": "0x003055B7",
       "original_hex": "8db40188020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [ecx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [ecx + eax + 0x288])"
     },
     {
       "id": "ed-00308b00",
@@ -424,10 +424,10 @@
       "address": "0x00308B00",
       "original_hex": "8b9408e8020000",
       "operand": 1,
-      "value": "0x119B0",
+      "value": "0x583F0",
       "array": "sai",
       "old": "0x2e8",
-      "reason": "sai array reference: 0x2e8 -> 0x119b0 (edx, dword ptr [eax + ecx + 0x2e8])"
+      "reason": "sai array reference: 0x2e8 -> 0x583f0 (edx, dword ptr [eax + ecx + 0x2e8])"
     },
     {
       "id": "ed-00309ab0",
@@ -436,10 +436,10 @@
       "address": "0x00309AB0",
       "original_hex": "8db40788020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [edi + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [edi + eax + 0x288])"
     },
     {
       "id": "ed-00309af6",
@@ -448,10 +448,10 @@
       "address": "0x00309AF6",
       "original_hex": "8b940fe8020000",
       "operand": 1,
-      "value": "0x119B0",
+      "value": "0x583F0",
       "array": "sai",
       "old": "0x2e8",
-      "reason": "sai array reference: 0x2e8 -> 0x119b0 (edx, dword ptr [edi + ecx + 0x2e8])"
+      "reason": "sai array reference: 0x2e8 -> 0x583f0 (edx, dword ptr [edi + ecx + 0x2e8])"
     },
     {
       "id": "ed-00309c11",
@@ -460,10 +460,10 @@
       "address": "0x00309C11",
       "original_hex": "8b9407e8020000",
       "operand": 1,
-      "value": "0x119B0",
+      "value": "0x583F0",
       "array": "sai",
       "old": "0x2e8",
-      "reason": "sai array reference: 0x2e8 -> 0x119b0 (edx, dword ptr [edi + eax + 0x2e8])"
+      "reason": "sai array reference: 0x2e8 -> 0x583f0 (edx, dword ptr [edi + eax + 0x2e8])"
     },
     {
       "id": "ed-00310cec",
@@ -472,10 +472,10 @@
       "address": "0x00310CEC",
       "original_hex": "8b840abc020000",
       "operand": 1,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (eax, dword ptr [edx + ecx + 0x2bc])"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (eax, dword ptr [edx + ecx + 0x2bc])"
     },
     {
       "id": "ed-00310cf5",
@@ -484,10 +484,10 @@
       "address": "0x00310CF5",
       "original_hex": "8d940a88020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [edx + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [edx + ecx + 0x288])"
     },
     {
       "id": "ed-00310d2b",
@@ -496,10 +496,10 @@
       "address": "0x00310D2B",
       "original_hex": "8d940888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-0031623e",
@@ -508,10 +508,10 @@
       "address": "0x0031623E",
       "original_hex": "81c1fc020000",
       "operand": 1,
-      "value": "0x119C4",
+      "value": "0x58404",
       "array": "sai",
       "old": "0x2fc",
-      "reason": "sai array reference: 0x2fc -> 0x119c4 (ecx, 0x2fc)"
+      "reason": "sai array reference: 0x2fc -> 0x58404 (ecx, 0x2fc)"
     },
     {
       "id": "ed-00317c1d",
@@ -520,10 +520,10 @@
       "address": "0x00317C1D",
       "original_hex": "8d840888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (eax, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (eax, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-0031bab1",
@@ -532,10 +532,10 @@
       "address": "0x0031BAB1",
       "original_hex": "8d840888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (eax, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (eax, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-0031bad3",
@@ -544,10 +544,10 @@
       "address": "0x0031BAD3",
       "original_hex": "8db40188020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [ecx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [ecx + eax + 0x288])"
     },
     {
       "id": "ed-0031bb44",
@@ -556,10 +556,10 @@
       "address": "0x0031BB44",
       "original_hex": "8dbc0288020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edi, [edx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edi, [edx + eax + 0x288])"
     },
     {
       "id": "ed-0031bb9a",
@@ -568,10 +568,10 @@
       "address": "0x0031BB9A",
       "original_hex": "8dbc1688020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edi, [esi + edx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edi, [esi + edx + 0x288])"
     },
     {
       "id": "ed-0031bbb8",
@@ -580,10 +580,10 @@
       "address": "0x0031BBB8",
       "original_hex": "8d940e88020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [esi + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [esi + ecx + 0x288])"
     },
     {
       "id": "ed-0031bbed",
@@ -592,10 +592,10 @@
       "address": "0x0031BBED",
       "original_hex": "8d940e88020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [esi + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [esi + ecx + 0x288])"
     },
     {
       "id": "ed-0031bc0f",
@@ -604,10 +604,10 @@
       "address": "0x0031BC0F",
       "original_hex": "899c06a8020000",
       "operand": 0,
-      "value": "0x11970",
+      "value": "0x583B0",
       "array": "sai",
       "old": "0x2a8",
-      "reason": "sai array reference: 0x2a8 -> 0x11970 (dword ptr [esi + eax + 0x2a8], ebx)"
+      "reason": "sai array reference: 0x2a8 -> 0x583b0 (dword ptr [esi + eax + 0x2a8], ebx)"
     },
     {
       "id": "ed-0031bc1c",
@@ -616,10 +616,10 @@
       "address": "0x0031BC1C",
       "original_hex": "89ac0ebc020000",
       "operand": 0,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (dword ptr [esi + ecx + 0x2bc], ebp)"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (dword ptr [esi + ecx + 0x2bc], ebp)"
     },
     {
       "id": "ed-0031bc2e",
@@ -628,10 +628,10 @@
       "address": "0x0031BC2E",
       "original_hex": "899406cc020000",
       "operand": 0,
-      "value": "0x11994",
+      "value": "0x583D4",
       "array": "sai",
       "old": "0x2cc",
-      "reason": "sai array reference: 0x2cc -> 0x11994 (dword ptr [esi + eax + 0x2cc], edx)"
+      "reason": "sai array reference: 0x2cc -> 0x583d4 (dword ptr [esi + eax + 0x2cc], edx)"
     },
     {
       "id": "ed-0031bc3b",
@@ -640,10 +640,10 @@
       "address": "0x0031BC3B",
       "original_hex": "c7840ed402000002000000",
       "operand": 0,
-      "value": "0x1199C",
+      "value": "0x583DC",
       "array": "sai",
       "old": "0x2d4",
-      "reason": "sai array reference: 0x2d4 -> 0x1199c (dword ptr [esi + ecx + 0x2d4], 2)"
+      "reason": "sai array reference: 0x2d4 -> 0x583dc (dword ptr [esi + ecx + 0x2d4], 2)"
     },
     {
       "id": "ed-0031bc4c",
@@ -652,10 +652,10 @@
       "address": "0x0031BC4C",
       "original_hex": "c78416c8020000ffffffff",
       "operand": 0,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (dword ptr [esi + edx + 0x2c8], 0xffffffff)"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (dword ptr [esi + edx + 0x2c8], 0xffffffff)"
     },
     {
       "id": "ed-0031bc5c",
@@ -664,10 +664,10 @@
       "address": "0x0031BC5C",
       "original_hex": "89bc06e0020000",
       "operand": 0,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (dword ptr [esi + eax + 0x2e0], edi)"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (dword ptr [esi + eax + 0x2e0], edi)"
     },
     {
       "id": "ed-0031bc69",
@@ -676,10 +676,10 @@
       "address": "0x0031BC69",
       "original_hex": "899c0ec0020000",
       "operand": 0,
-      "value": "0x11988",
+      "value": "0x583C8",
       "array": "sai",
       "old": "0x2c0",
-      "reason": "sai array reference: 0x2c0 -> 0x11988 (dword ptr [esi + ecx + 0x2c0], ebx)"
+      "reason": "sai array reference: 0x2c0 -> 0x583c8 (dword ptr [esi + ecx + 0x2c0], ebx)"
     },
     {
       "id": "ed-0031bc76",
@@ -688,10 +688,10 @@
       "address": "0x0031BC76",
       "original_hex": "89bc16c4020000",
       "operand": 0,
-      "value": "0x1198C",
+      "value": "0x583CC",
       "array": "sai",
       "old": "0x2c4",
-      "reason": "sai array reference: 0x2c4 -> 0x1198c (dword ptr [esi + edx + 0x2c4], edi)"
+      "reason": "sai array reference: 0x2c4 -> 0x583cc (dword ptr [esi + edx + 0x2c4], edi)"
     },
     {
       "id": "ed-0031bc82",
@@ -700,10 +700,10 @@
       "address": "0x0031BC82",
       "original_hex": "899c06b8020000",
       "operand": 0,
-      "value": "0x11980",
+      "value": "0x583C0",
       "array": "sai",
       "old": "0x2b8",
-      "reason": "sai array reference: 0x2b8 -> 0x11980 (dword ptr [esi + eax + 0x2b8], ebx)"
+      "reason": "sai array reference: 0x2b8 -> 0x583c0 (dword ptr [esi + eax + 0x2b8], ebx)"
     },
     {
       "id": "ed-0031bc8f",
@@ -712,10 +712,10 @@
       "address": "0x0031BC8F",
       "original_hex": "89bc0ed0020000",
       "operand": 0,
-      "value": "0x11998",
+      "value": "0x583D8",
       "array": "sai",
       "old": "0x2d0",
-      "reason": "sai array reference: 0x2d0 -> 0x11998 (dword ptr [esi + ecx + 0x2d0], edi)"
+      "reason": "sai array reference: 0x2d0 -> 0x583d8 (dword ptr [esi + ecx + 0x2d0], edi)"
     },
     {
       "id": "ed-0031bc9e",
@@ -724,10 +724,10 @@
       "address": "0x0031BC9E",
       "original_hex": "8d841688020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (eax, [esi + edx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (eax, [esi + edx + 0x288])"
     },
     {
       "id": "ed-0031bccc",
@@ -736,10 +736,10 @@
       "address": "0x0031BCCC",
       "original_hex": "8d87e8020000",
       "operand": 1,
-      "value": "0x119B0",
+      "value": "0x583F0",
       "array": "sai",
       "old": "0x2e8",
-      "reason": "sai array reference: 0x2e8 -> 0x119b0 (eax, [edi + 0x2e8])"
+      "reason": "sai array reference: 0x2e8 -> 0x583f0 (eax, [edi + 0x2e8])"
     },
     {
       "id": "ed-0031bcfc",
@@ -748,10 +748,10 @@
       "address": "0x0031BCFC",
       "original_hex": "89ac3ee8020000",
       "operand": 0,
-      "value": "0x119B0",
+      "value": "0x583F0",
       "array": "sai",
       "old": "0x2e8",
-      "reason": "sai array reference: 0x2e8 -> 0x119b0 (dword ptr [esi + edi + 0x2e8], ebp)"
+      "reason": "sai array reference: 0x2e8 -> 0x583f0 (dword ptr [esi + edi + 0x2e8], ebp)"
     },
     {
       "id": "ed-0031bd81",
@@ -760,10 +760,10 @@
       "address": "0x0031BD81",
       "original_hex": "05e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (eax, 0x2e0)"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (eax, 0x2e0)"
     },
     {
       "id": "ed-0031bdc2",
@@ -772,10 +772,10 @@
       "address": "0x0031BDC2",
       "original_hex": "81c1bc020000",
       "operand": 1,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (ecx, 0x2bc)"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (ecx, 0x2bc)"
     },
     {
       "id": "ed-0031be02",
@@ -784,10 +784,10 @@
       "address": "0x0031BE02",
       "original_hex": "81c1bc020000",
       "operand": 1,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (ecx, 0x2bc)"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (ecx, 0x2bc)"
     },
     {
       "id": "ed-0031bf1e",
@@ -796,10 +796,10 @@
       "address": "0x0031BF1E",
       "original_hex": "8db40188020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [ecx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [ecx + eax + 0x288])"
     },
     {
       "id": "ed-0031bfb8",
@@ -808,10 +808,10 @@
       "address": "0x0031BFB8",
       "original_hex": "8b8c16b0020000",
       "operand": 1,
-      "value": "0x11978",
+      "value": "0x583B8",
       "array": "sai",
       "old": "0x2b0",
-      "reason": "sai array reference: 0x2b0 -> 0x11978 (ecx, dword ptr [esi + edx + 0x2b0])"
+      "reason": "sai array reference: 0x2b0 -> 0x583b8 (ecx, dword ptr [esi + edx + 0x2b0])"
     },
     {
       "id": "ed-0031c126",
@@ -820,10 +820,10 @@
       "address": "0x0031C126",
       "original_hex": "8d940e88020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [esi + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [esi + ecx + 0x288])"
     },
     {
       "id": "ed-0031c171",
@@ -832,10 +832,10 @@
       "address": "0x0031C171",
       "original_hex": "8d940e88020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [esi + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [esi + ecx + 0x288])"
     },
     {
       "id": "ed-0031c1a7",
@@ -844,10 +844,10 @@
       "address": "0x0031C1A7",
       "original_hex": "8bb416bc020000",
       "operand": 1,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (esi, dword ptr [esi + edx + 0x2bc])"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (esi, dword ptr [esi + edx + 0x2bc])"
     },
     {
       "id": "ed-0031c396",
@@ -856,10 +856,10 @@
       "address": "0x0031C396",
       "original_hex": "8b8416e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (eax, dword ptr [esi + edx + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (eax, dword ptr [esi + edx + 0x2e0])"
     },
     {
       "id": "ed-0031c3e9",
@@ -868,10 +868,10 @@
       "address": "0x0031C3E9",
       "original_hex": "0fbf9406f0020000",
       "operand": 1,
-      "value": "0x119B8",
+      "value": "0x583F8",
       "array": "sai",
       "old": "0x2f0",
-      "reason": "sai array reference: 0x2f0 -> 0x119b8 (edx, word ptr [esi + eax + 0x2f0])"
+      "reason": "sai array reference: 0x2f0 -> 0x583f8 (edx, word ptr [esi + eax + 0x2f0])"
     },
     {
       "id": "ed-0031c3f1",
@@ -880,10 +880,10 @@
       "address": "0x0031C3F1",
       "original_hex": "8d8c06ec020000",
       "operand": 1,
-      "value": "0x119B4",
+      "value": "0x583F4",
       "array": "sai",
       "old": "0x2ec",
-      "reason": "sai array reference: 0x2ec -> 0x119b4 (ecx, [esi + eax + 0x2ec])"
+      "reason": "sai array reference: 0x2ec -> 0x583f4 (ecx, [esi + eax + 0x2ec])"
     },
     {
       "id": "ed-0031c408",
@@ -892,10 +892,10 @@
       "address": "0x0031C408",
       "original_hex": "0fbf9406f2020000",
       "operand": 1,
-      "value": "0x119BA",
+      "value": "0x583FA",
       "array": "sai",
       "old": "0x2f2",
-      "reason": "sai array reference: 0x2f2 -> 0x119ba (edx, word ptr [esi + eax + 0x2f2])"
+      "reason": "sai array reference: 0x2f2 -> 0x583fa (edx, word ptr [esi + eax + 0x2f2])"
     },
     {
       "id": "ed-0031c4a9",
@@ -904,10 +904,10 @@
       "address": "0x0031C4A9",
       "original_hex": "8b9c17e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (ebx, dword ptr [edi + edx + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (ebx, dword ptr [edi + edx + 0x2e0])"
     },
     {
       "id": "ed-0031c4f7",
@@ -916,10 +916,10 @@
       "address": "0x0031C4F7",
       "original_hex": "8b8411ec020000",
       "operand": 1,
-      "value": "0x119B4",
+      "value": "0x583F4",
       "array": "sai",
       "old": "0x2ec",
-      "reason": "sai array reference: 0x2ec -> 0x119b4 (eax, dword ptr [ecx + edx + 0x2ec])"
+      "reason": "sai array reference: 0x2ec -> 0x583f4 (eax, dword ptr [ecx + edx + 0x2ec])"
     },
     {
       "id": "ed-0031c5a8",
@@ -928,10 +928,10 @@
       "address": "0x0031C5A8",
       "original_hex": "8b8401ec020000",
       "operand": 1,
-      "value": "0x119B4",
+      "value": "0x583F4",
       "array": "sai",
       "old": "0x2ec",
-      "reason": "sai array reference: 0x2ec -> 0x119b4 (eax, dword ptr [ecx + eax + 0x2ec])"
+      "reason": "sai array reference: 0x2ec -> 0x583f4 (eax, dword ptr [ecx + eax + 0x2ec])"
     },
     {
       "id": "ed-0031c671",
@@ -940,10 +940,10 @@
       "address": "0x0031C671",
       "original_hex": "83bc0ee002000008",
       "operand": 0,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (dword ptr [esi + ecx + 0x2e0], 8)"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (dword ptr [esi + ecx + 0x2e0], 8)"
     },
     {
       "id": "ed-0031c78b",
@@ -952,10 +952,10 @@
       "address": "0x0031C78B",
       "original_hex": "ff8408e4020000",
       "operand": 0,
-      "value": "0x119AC",
+      "value": "0x583EC",
       "array": "sai",
       "old": "0x2e4",
-      "reason": "sai array reference: 0x2e4 -> 0x119ac (dword ptr [eax + ecx + 0x2e4])"
+      "reason": "sai array reference: 0x2e4 -> 0x583ec (dword ptr [eax + ecx + 0x2e4])"
     },
     {
       "id": "ed-0031c798",
@@ -964,10 +964,10 @@
       "address": "0x0031C798",
       "original_hex": "8b9408e4020000",
       "operand": 1,
-      "value": "0x119AC",
+      "value": "0x583EC",
       "array": "sai",
       "old": "0x2e4",
-      "reason": "sai array reference: 0x2e4 -> 0x119ac (edx, dword ptr [eax + ecx + 0x2e4])"
+      "reason": "sai array reference: 0x2e4 -> 0x583ec (edx, dword ptr [eax + ecx + 0x2e4])"
     },
     {
       "id": "ed-0031c7ac",
@@ -976,10 +976,10 @@
       "address": "0x0031C7AC",
       "original_hex": "899408e4020000",
       "operand": 0,
-      "value": "0x119AC",
+      "value": "0x583EC",
       "array": "sai",
       "old": "0x2e4",
-      "reason": "sai array reference: 0x2e4 -> 0x119ac (dword ptr [eax + ecx + 0x2e4], edx)"
+      "reason": "sai array reference: 0x2e4 -> 0x583ec (dword ptr [eax + ecx + 0x2e4], edx)"
     },
     {
       "id": "ed-0031c858",
@@ -988,10 +988,10 @@
       "address": "0x0031C858",
       "original_hex": "8b8416e4020000",
       "operand": 1,
-      "value": "0x119AC",
+      "value": "0x583EC",
       "array": "sai",
       "old": "0x2e4",
-      "reason": "sai array reference: 0x2e4 -> 0x119ac (eax, dword ptr [esi + edx + 0x2e4])"
+      "reason": "sai array reference: 0x2e4 -> 0x583ec (eax, dword ptr [esi + edx + 0x2e4])"
     },
     {
       "id": "ed-0031c8ca",
@@ -1000,10 +1000,10 @@
       "address": "0x0031C8CA",
       "original_hex": "8b940fbc020000",
       "operand": 1,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (edx, dword ptr [edi + ecx + 0x2bc])"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (edx, dword ptr [edi + ecx + 0x2bc])"
     },
     {
       "id": "ed-0031c8fc",
@@ -1012,10 +1012,10 @@
       "address": "0x0031C8FC",
       "original_hex": "8db4076c030000",
       "operand": 1,
-      "value": "0x11A34",
+      "value": "0x58474",
       "array": "sai",
       "old": "0x36c",
-      "reason": "sai array reference: 0x36c -> 0x11a34 (esi, [edi + eax + 0x36c])"
+      "reason": "sai array reference: 0x36c -> 0x58474 (esi, [edi + eax + 0x36c])"
     },
     {
       "id": "ed-0031c903",
@@ -1024,10 +1024,10 @@
       "address": "0x0031C903",
       "original_hex": "8dbc0788020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edi, [edi + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edi, [edi + eax + 0x288])"
     },
     {
       "id": "ed-0031c969",
@@ -1036,10 +1036,10 @@
       "address": "0x0031C969",
       "original_hex": "8db40888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-0031cad5",
@@ -1048,10 +1048,10 @@
       "address": "0x0031CAD5",
       "original_hex": "8dbc0888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edi, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edi, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-0031cba8",
@@ -1060,10 +1060,10 @@
       "address": "0x0031CBA8",
       "original_hex": "8db40888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-0031d24a",
@@ -1072,10 +1072,10 @@
       "address": "0x0031D24A",
       "original_hex": "8d8c37f8020000",
       "operand": 1,
-      "value": "0x119C0",
+      "value": "0x58400",
       "array": "sai",
       "old": "0x2f8",
-      "reason": "sai array reference: 0x2f8 -> 0x119c0 (ecx, [edi + esi + 0x2f8])"
+      "reason": "sai array reference: 0x2f8 -> 0x58400 (ecx, [edi + esi + 0x2f8])"
     },
     {
       "id": "ed-0031d326",
@@ -1084,10 +1084,10 @@
       "address": "0x0031D326",
       "original_hex": "8db7bc020000",
       "operand": 1,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (esi, [edi + 0x2bc])"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (esi, [edi + 0x2bc])"
     },
     {
       "id": "ed-0031d349",
@@ -1096,10 +1096,10 @@
       "address": "0x0031D349",
       "original_hex": "8d843988020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (eax, [ecx + edi + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (eax, [ecx + edi + 0x288])"
     },
     {
       "id": "ed-0031d375",
@@ -1108,10 +1108,10 @@
       "address": "0x0031D375",
       "original_hex": "81c6e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (esi, 0x2e0)"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (esi, 0x2e0)"
     },
     {
       "id": "ed-0031d3f0",
@@ -1120,10 +1120,10 @@
       "address": "0x0031D3F0",
       "original_hex": "8d840888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (eax, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (eax, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-0031d429",
@@ -1132,10 +1132,10 @@
       "address": "0x0031D429",
       "original_hex": "83bc0ebc02000005",
       "operand": 0,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (dword ptr [esi + ecx + 0x2bc], 5)"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (dword ptr [esi + ecx + 0x2bc], 5)"
     },
     {
       "id": "ed-0031d43b",
@@ -1144,10 +1144,10 @@
       "address": "0x0031D43B",
       "original_hex": "8bbc0eb0020000",
       "operand": 1,
-      "value": "0x11978",
+      "value": "0x583B8",
       "array": "sai",
       "old": "0x2b0",
-      "reason": "sai array reference: 0x2b0 -> 0x11978 (edi, dword ptr [esi + ecx + 0x2b0])"
+      "reason": "sai array reference: 0x2b0 -> 0x583b8 (edi, dword ptr [esi + ecx + 0x2b0])"
     },
     {
       "id": "ed-0031d485",
@@ -1156,10 +1156,10 @@
       "address": "0x0031D485",
       "original_hex": "8b840ee0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (eax, dword ptr [esi + ecx + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (eax, dword ptr [esi + ecx + 0x2e0])"
     },
     {
       "id": "ed-0031d4da",
@@ -1168,10 +1168,10 @@
       "address": "0x0031D4DA",
       "original_hex": "8dbc0888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edi, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edi, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-0031d690",
@@ -1180,10 +1180,10 @@
       "address": "0x0031D690",
       "original_hex": "8b8c06e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (ecx, dword ptr [esi + eax + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (ecx, dword ptr [esi + eax + 0x2e0])"
     },
     {
       "id": "ed-0031d69d",
@@ -1192,10 +1192,10 @@
       "address": "0x0031D69D",
       "original_hex": "8dac06e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (ebp, [esi + eax + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (ebp, [esi + eax + 0x2e0])"
     },
     {
       "id": "ed-0031d6aa",
@@ -1204,10 +1204,10 @@
       "address": "0x0031D6AA",
       "original_hex": "8dbc06bc020000",
       "operand": 1,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (edi, [esi + eax + 0x2bc])"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (edi, [esi + eax + 0x2bc])"
     },
     {
       "id": "ed-0031db98",
@@ -1216,10 +1216,10 @@
       "address": "0x0031DB98",
       "original_hex": "8b8c11bc020000",
       "operand": 1,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (ecx, dword ptr [ecx + edx + 0x2bc])"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (ecx, dword ptr [ecx + edx + 0x2bc])"
     },
     {
       "id": "ed-0031e9e9",
@@ -1228,10 +1228,10 @@
       "address": "0x0031E9E9",
       "original_hex": "8b8411e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (eax, dword ptr [ecx + edx + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (eax, dword ptr [ecx + edx + 0x2e0])"
     },
     {
       "id": "ed-00320235",
@@ -1240,10 +1240,10 @@
       "address": "0x00320235",
       "original_hex": "8b8c10e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (ecx, dword ptr [eax + edx + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (ecx, dword ptr [eax + edx + 0x2e0])"
     },
     {
       "id": "ed-0032036b",
@@ -1252,10 +1252,10 @@
       "address": "0x0032036B",
       "original_hex": "8b9401e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (edx, dword ptr [ecx + eax + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (edx, dword ptr [ecx + eax + 0x2e0])"
     },
     {
       "id": "ed-00320c40",
@@ -1264,10 +1264,10 @@
       "address": "0x00320C40",
       "original_hex": "8d8888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (ecx, [eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (ecx, [eax + 0x288])"
     },
     {
       "id": "ed-00320d66",
@@ -1276,10 +1276,10 @@
       "address": "0x00320D66",
       "original_hex": "8d9088020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [eax + 0x288])"
     },
     {
       "id": "ed-00321bd0",
@@ -1288,10 +1288,10 @@
       "address": "0x00321BD0",
       "original_hex": "8d8688020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (eax, [esi + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (eax, [esi + 0x288])"
     },
     {
       "id": "ed-00321c64",
@@ -1300,10 +1300,10 @@
       "address": "0x00321C64",
       "original_hex": "81c788020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edi, 0x288)"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edi, 0x288)"
     },
     {
       "id": "ed-0032201b",
@@ -1312,10 +1312,10 @@
       "address": "0x0032201B",
       "original_hex": "8db188020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [ecx + 0x288])"
     },
     {
       "id": "ed-003232f2",
@@ -1324,10 +1324,10 @@
       "address": "0x003232F2",
       "original_hex": "8d8e88020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (ecx, [esi + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (ecx, [esi + 0x288])"
     },
     {
       "id": "ed-0032524e",
@@ -1336,10 +1336,10 @@
       "address": "0x0032524E",
       "original_hex": "8d9188020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (edx, [ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (edx, [ecx + 0x288])"
     },
     {
       "id": "ed-003253bf",
@@ -1348,10 +1348,10 @@
       "address": "0x003253BF",
       "original_hex": "8b8402bc020000",
       "operand": 1,
-      "value": "0x11984",
+      "value": "0x583C4",
       "array": "sai",
       "old": "0x2bc",
-      "reason": "sai array reference: 0x2bc -> 0x11984 (eax, dword ptr [edx + eax + 0x2bc])"
+      "reason": "sai array reference: 0x2bc -> 0x583c4 (eax, dword ptr [edx + eax + 0x2bc])"
     },
     {
       "id": "ed-00328f09",
@@ -1360,10 +1360,10 @@
       "address": "0x00328F09",
       "original_hex": "8d88a8020000",
       "operand": 1,
-      "value": "0x11970",
+      "value": "0x583B0",
       "array": "sai",
       "old": "0x2a8",
-      "reason": "sai array reference: 0x2a8 -> 0x11970 (ecx, [eax + 0x2a8])"
+      "reason": "sai array reference: 0x2a8 -> 0x583b0 (ecx, [eax + 0x2a8])"
     },
     {
       "id": "ed-00328f17",
@@ -1372,10 +1372,10 @@
       "address": "0x00328F17",
       "original_hex": "0588020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (eax, 0x288)"
+      "reason": "sai array reference: 0x288 -> 0x58390 (eax, 0x288)"
     },
     {
       "id": "ed-00331260",
@@ -1384,10 +1384,10 @@
       "address": "0x00331260",
       "original_hex": "83bc06e002000001",
       "operand": 0,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (dword ptr [esi + eax + 0x2e0], 1)"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (dword ptr [esi + eax + 0x2e0], 1)"
     },
     {
       "id": "ed-0033126e",
@@ -1396,10 +1396,10 @@
       "address": "0x0033126E",
       "original_hex": "0fbf9406f0020000",
       "operand": 1,
-      "value": "0x119B8",
+      "value": "0x583F8",
       "array": "sai",
       "old": "0x2f0",
-      "reason": "sai array reference: 0x2f0 -> 0x119b8 (edx, word ptr [esi + eax + 0x2f0])"
+      "reason": "sai array reference: 0x2f0 -> 0x583f8 (edx, word ptr [esi + eax + 0x2f0])"
     },
     {
       "id": "ed-00331276",
@@ -1408,10 +1408,10 @@
       "address": "0x00331276",
       "original_hex": "8b8c06ec020000",
       "operand": 1,
-      "value": "0x119B4",
+      "value": "0x583F4",
       "array": "sai",
       "old": "0x2ec",
-      "reason": "sai array reference: 0x2ec -> 0x119b4 (ecx, dword ptr [esi + eax + 0x2ec])"
+      "reason": "sai array reference: 0x2ec -> 0x583f4 (ecx, dword ptr [esi + eax + 0x2ec])"
     },
     {
       "id": "ed-0033128a",
@@ -1420,10 +1420,10 @@
       "address": "0x0033128A",
       "original_hex": "0fbf9406f2020000",
       "operand": 1,
-      "value": "0x119BA",
+      "value": "0x583FA",
       "array": "sai",
       "old": "0x2f2",
-      "reason": "sai array reference: 0x2f2 -> 0x119ba (edx, word ptr [esi + eax + 0x2f2])"
+      "reason": "sai array reference: 0x2f2 -> 0x583fa (edx, word ptr [esi + eax + 0x2f2])"
     },
     {
       "id": "ed-003312a4",
@@ -1432,10 +1432,10 @@
       "address": "0x003312A4",
       "original_hex": "0fbf9406f4020000",
       "operand": 1,
-      "value": "0x119BC",
+      "value": "0x583FC",
       "array": "sai",
       "old": "0x2f4",
-      "reason": "sai array reference: 0x2f4 -> 0x119bc (edx, word ptr [esi + eax + 0x2f4])"
+      "reason": "sai array reference: 0x2f4 -> 0x583fc (edx, word ptr [esi + eax + 0x2f4])"
     },
     {
       "id": "ed-003312c4",
@@ -1444,10 +1444,10 @@
       "address": "0x003312C4",
       "original_hex": "3b8c02ec020000",
       "operand": 1,
-      "value": "0x119B4",
+      "value": "0x583F4",
       "array": "sai",
       "old": "0x2ec",
-      "reason": "sai array reference: 0x2ec -> 0x119b4 (ecx, dword ptr [edx + eax + 0x2ec])"
+      "reason": "sai array reference: 0x2ec -> 0x583f4 (ecx, dword ptr [edx + eax + 0x2ec])"
     },
     {
       "id": "ed-00331396",
@@ -1456,10 +1456,10 @@
       "address": "0x00331396",
       "original_hex": "8b9408c8020000",
       "operand": 1,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (edx, dword ptr [eax + ecx + 0x2c8])"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (edx, dword ptr [eax + ecx + 0x2c8])"
     },
     {
       "id": "ed-003313e9",
@@ -1468,10 +1468,10 @@
       "address": "0x003313E9",
       "original_hex": "8b9408c8020000",
       "operand": 1,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (edx, dword ptr [eax + ecx + 0x2c8])"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (edx, dword ptr [eax + ecx + 0x2c8])"
     },
     {
       "id": "ed-0033143f",
@@ -1480,10 +1480,10 @@
       "address": "0x0033143F",
       "original_hex": "8b9408c8020000",
       "operand": 1,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (edx, dword ptr [eax + ecx + 0x2c8])"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (edx, dword ptr [eax + ecx + 0x2c8])"
     },
     {
       "id": "ed-00331495",
@@ -1492,10 +1492,10 @@
       "address": "0x00331495",
       "original_hex": "8b9408c8020000",
       "operand": 1,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (edx, dword ptr [eax + ecx + 0x2c8])"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (edx, dword ptr [eax + ecx + 0x2c8])"
     },
     {
       "id": "ed-003314eb",
@@ -1504,10 +1504,10 @@
       "address": "0x003314EB",
       "original_hex": "8b9408c8020000",
       "operand": 1,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (edx, dword ptr [eax + ecx + 0x2c8])"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (edx, dword ptr [eax + ecx + 0x2c8])"
     },
     {
       "id": "ed-00331545",
@@ -1516,10 +1516,10 @@
       "address": "0x00331545",
       "original_hex": "8b9408c8020000",
       "operand": 1,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (edx, dword ptr [eax + ecx + 0x2c8])"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (edx, dword ptr [eax + ecx + 0x2c8])"
     },
     {
       "id": "ed-00331598",
@@ -1528,10 +1528,10 @@
       "address": "0x00331598",
       "original_hex": "8b9408c8020000",
       "operand": 1,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (edx, dword ptr [eax + ecx + 0x2c8])"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (edx, dword ptr [eax + ecx + 0x2c8])"
     },
     {
       "id": "ed-003315ee",
@@ -1540,10 +1540,10 @@
       "address": "0x003315EE",
       "original_hex": "8bb410c8020000",
       "operand": 1,
-      "value": "0x11990",
+      "value": "0x583D0",
       "array": "sai",
       "old": "0x2c8",
-      "reason": "sai array reference: 0x2c8 -> 0x11990 (esi, dword ptr [eax + edx + 0x2c8])"
+      "reason": "sai array reference: 0x2c8 -> 0x583d0 (esi, dword ptr [eax + edx + 0x2c8])"
     },
     {
       "id": "ed-00331868",
@@ -1552,10 +1552,10 @@
       "address": "0x00331868",
       "original_hex": "83b8e002000001",
       "operand": 0,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (dword ptr [eax + 0x2e0], 1)"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (dword ptr [eax + 0x2e0], 1)"
     },
     {
       "id": "ed-0033187e",
@@ -1564,10 +1564,10 @@
       "address": "0x0033187E",
       "original_hex": "8b88ec020000",
       "operand": 1,
-      "value": "0x119B4",
+      "value": "0x583F4",
       "array": "sai",
       "old": "0x2ec",
-      "reason": "sai array reference: 0x2ec -> 0x119b4 (ecx, dword ptr [eax + 0x2ec])"
+      "reason": "sai array reference: 0x2ec -> 0x583f4 (ecx, dword ptr [eax + 0x2ec])"
     },
     {
       "id": "ed-00331888",
@@ -1576,10 +1576,10 @@
       "address": "0x00331888",
       "original_hex": "660390f0020000",
       "operand": 1,
-      "value": "0x119B8",
+      "value": "0x583F8",
       "array": "sai",
       "old": "0x2f0",
-      "reason": "sai array reference: 0x2f0 -> 0x119b8 (dx, word ptr [eax + 0x2f0])"
+      "reason": "sai array reference: 0x2f0 -> 0x583f8 (dx, word ptr [eax + 0x2f0])"
     },
     {
       "id": "ed-00331894",
@@ -1588,10 +1588,10 @@
       "address": "0x00331894",
       "original_hex": "6603b0f4020000",
       "operand": 1,
-      "value": "0x119BC",
+      "value": "0x583FC",
       "array": "sai",
       "old": "0x2f4",
-      "reason": "sai array reference: 0x2f4 -> 0x119bc (si, word ptr [eax + 0x2f4])"
+      "reason": "sai array reference: 0x2f4 -> 0x583fc (si, word ptr [eax + 0x2f4])"
     },
     {
       "id": "ed-003318a5",
@@ -1600,10 +1600,10 @@
       "address": "0x003318A5",
       "original_hex": "660390f2020000",
       "operand": 1,
-      "value": "0x119BA",
+      "value": "0x583FA",
       "array": "sai",
       "old": "0x2f2",
-      "reason": "sai array reference: 0x2f2 -> 0x119ba (dx, word ptr [eax + 0x2f2])"
+      "reason": "sai array reference: 0x2f2 -> 0x583fa (dx, word ptr [eax + 0x2f2])"
     },
     {
       "id": "ed-00331d86",
@@ -1612,10 +1612,10 @@
       "address": "0x00331D86",
       "original_hex": "8db0e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (esi, [eax + 0x2e0])"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (esi, [eax + 0x2e0])"
     },
     {
       "id": "ed-0033485f",
@@ -1624,10 +1624,10 @@
       "address": "0x0033485F",
       "original_hex": "81c6e0020000",
       "operand": 1,
-      "value": "0x119A8",
+      "value": "0x583E8",
       "array": "sai",
       "old": "0x2e0",
-      "reason": "sai array reference: 0x2e0 -> 0x119a8 (esi, 0x2e0)"
+      "reason": "sai array reference: 0x2e0 -> 0x583e8 (esi, 0x2e0)"
     },
     {
       "id": "ed-00336c65",
@@ -1636,10 +1636,10 @@
       "address": "0x00336C65",
       "original_hex": "8db40888020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (esi, [eax + ecx + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (esi, [eax + ecx + 0x288])"
     },
     {
       "id": "ed-00337dbc",
@@ -1648,10 +1648,10 @@
       "address": "0x00337DBC",
       "original_hex": "8d9c0188020000",
       "operand": 1,
-      "value": "0x11950",
+      "value": "0x58390",
       "array": "sai",
       "old": "0x288",
-      "reason": "sai array reference: 0x288 -> 0x11950 (ebx, [ecx + eax + 0x288])"
+      "reason": "sai array reference: 0x288 -> 0x58390 (ebx, [ecx + eax + 0x288])"
     },
     {
       "id": "ed-002fec2d",
@@ -1660,8 +1660,8 @@
       "address": "0x002FEC2D",
       "original_hex": "b9220b0000",
       "operand": 1,
-      "value": "0x38C7",
-      "reason": "sai clear size 0xb22 -> 0x38c7 dwords (255 entries)"
+      "value": "0x71C7",
+      "reason": "sai clear size 0xb22 -> 0x71c7 dwords (511 entries)"
     },
     {
       "id": "ed-00321c6a",
@@ -1670,8 +1670,8 @@
       "address": "0x00321C6A",
       "original_hex": "b9220b0000",
       "operand": 1,
-      "value": "0x38C7",
-      "reason": "sai clear size 0xb22 -> 0x38c7 dwords (255 entries)"
+      "value": "0x71C7",
+      "reason": "sai clear size 0xb22 -> 0x71c7 dwords (511 entries)"
     },
     {
       "id": "ed-load-frame",
@@ -1730,8 +1730,8 @@
       "address": "0x0032322C",
       "original_hex": "81eccc000000",
       "operand": 1,
-      "value": "0x4CC",
-      "reason": "sub_00323220 frame 0xCC -> 0x4cc: SAI pointer array 50 -> 306 slots"
+      "value": "0x84C",
+      "reason": "sub_00323220 frame 0xCC -> 0x84c: SAI pointer array 50 -> 530 slots"
     },
     {
       "id": "ed-sai-frame-end",
@@ -1740,8 +1740,8 @@
       "address": "0x00323321",
       "original_hex": "81c4cc000000",
       "operand": 1,
-      "value": "0x4CC",
-      "reason": "sub_00323220 epilogue frame 0xCC -> 0x4cc"
+      "value": "0x84C",
+      "reason": "sub_00323220 epilogue frame 0xCC -> 0x84c"
     },
     {
       "id": "ed-00301690",

@@ -52,7 +52,8 @@ are not in the launcher.
 | `TSFP_MAPMAKER_POINTER=0` | Mouse on | Turns the editor mouse controls off. | Editor mouse checked in game |
 | `TSFP_MAPMAKER_POOLS=0` | Pools on | Restores the original AI navigation pools in MapMaker play. This also turns `LIMITS` off. Troubleshooting only. | - |
 | `TSFP_MAPMAKER_ROOM_MASK_CLEAR=<hex>` | Off | Developer test for open-air (sky) tiles. Not a player feature. | Work in progress |
-| `TSFP_MAPMAKER_PROBE=<flags>` | Off | Read-only diagnostic log; see the [probe guide](mapmaker-meter-probe.md). | Developer use |
+| `TSFP_MAPMAKER_PROBE=<flags>` | Off | Read-only diagnostic log; see the [probe guide](mapmaker-meter-probe.md). Flag 32 also shows how much memory is left for a larger arena. | Developer use |
+| `TSFP_MAPMAKER_ARENA_MB=0..16` | 0 (off) | Gives the game's heap that many more MB in every scene (also story levels), taken from the same 64 MB block as textures. Measure with probe flag 32 first; see [memory](mapmaker-memory.md). | Not tested in game |
 | `TSFP_MAPMAKER_BOSS_RANGE=<units>` | 30 | How close you must be for a Boss Story AI's health bar to show (1..100000 game units). | Automated tests only |
 | `TSFP_MAPMAKER_CREATURE_PROBE=1` | Off | Read-only log of the characters each level spawns and whether story-only creature models can load; write it to a file with `TSFP_MAPMAKER_CREATURE_PROBE_LOG=<file>`. See [bosses](mapmaker-bosses.md). | Developer use |
 
@@ -61,13 +62,13 @@ are not in the launcher.
 | Limit | Original | Limitless |
 | --- | --- | --- |
 | Tiles (pieces) | 200 | 241 |
-| Items | 50 | 200 |
-| Keycards | 2 per colour | 8 per colour |
+| Items | 50 | 500 |
+| Keycards | 2 per colour | 16 per colour |
 | Pickups (weapons, ammo, health, armour, power-ups) | original per-type maxima | x4 |
-| Movable objects and props | 20 | 80 |
+| Movable objects, props and markers | 20 each | 160 each |
 | Turrets | 8 per type | 24 per type |
 | Teleporters | 2 per colour | 8 per colour |
-| Story AI | 50 | 255 |
+| Story AI | 50 | 511 |
 | Characters alive at once (MapMaker Story, local play) | 32, with about 20 AI | 64 (63 AI with one player) |
 | Logic operations / nodes / records | 30 / 130 / 100 | 120 / 520 / 400 |
 | Free-standing objects | 40 / 30 / 100 | 160 / 120 / 400 |
@@ -80,6 +81,12 @@ are not in the launcher.
 team deathmatch and the first story mission. No crashes; at least 5.56 MB of
 memory stayed free. Not tested: System Link, splitscreen, Mac, other story
 levels.
+
+**Round 3 (2026-10-31, not yet tested in game):** items 500, keycards 16 per
+colour, movers/props/markers 160, Story AI 511. Maps that hold more of
+anything than the original game allows are now always saved in a form the
+original game refuses to load (instead of crashing it). Every heap overrun
+is logged once as `[mapmaker] heap full: ...`.
 
 The extra play-time capacity (more characters alive, larger object pools)
 is always present in MapMaker play; the switch decides how much the editor
