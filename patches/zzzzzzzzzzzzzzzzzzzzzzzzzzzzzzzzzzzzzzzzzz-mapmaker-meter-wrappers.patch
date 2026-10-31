@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,1017 @@
+@@ -844,6 +844,1082 @@
      sub_002FA720_gen();
  #endif
  }
@@ -150,13 +150,23 @@
 +#endif
 +}
 +
-+void sub_003006C0(void)
++static void sub_003006C0_layer1(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("aitemplates","pc_mapmaker_aitemplates_compile")) pc_mapmaker_aitemplates_compile(sub_003006C0_layer0);
 +    else sub_003006C0_layer0();
 +#else
 +    sub_003006C0_layer0();
++#endif
++}
++
++void sub_003006C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_sky_compile")) pc_mapmaker_sky_compile(sub_003006C0_layer1);
++    else sub_003006C0_layer1();
++#else
++    sub_003006C0_layer1();
 +#endif
 +}
 +
@@ -1013,6 +1023,61 @@
 +    else sub_0006D7A0_gen();
 +#else
 +    sub_0006D7A0_gen();
++#endif
++}
++
++extern void sub_0011C9F0_gen(void);
++void sub_0011C9F0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_sky_clouds")) pc_mapmaker_sky_clouds(sub_0011C9F0_gen);
++    else sub_0011C9F0_gen();
++#else
++    sub_0011C9F0_gen();
++#endif
++}
++
++extern void sub_00078560_gen(void);
++void sub_00078560(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_sky_settings")) pc_mapmaker_sky_settings(sub_00078560_gen);
++    else sub_00078560_gen();
++#else
++    sub_00078560_gen();
++#endif
++}
++
++extern void sub_002FEBF0_gen(void);
++void sub_002FEBF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_sky_reset")) pc_mapmaker_sky_reset(sub_002FEBF0_gen);
++    else sub_002FEBF0_gen();
++#else
++    sub_002FEBF0_gen();
++#endif
++}
++
++extern void sub_000A2900_gen(void);
++void sub_000A2900(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_probe_room_draw")) pc_mapmaker_probe_room_draw(sub_000A2900_gen);
++    else sub_000A2900_gen();
++#else
++    sub_000A2900_gen();
++#endif
++}
++
++extern void sub_0008F950_gen(void);
++void sub_0008F950(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_probe_prop_draw")) pc_mapmaker_probe_prop_draw(sub_0008F950_gen);
++    else sub_0008F950_gen();
++#else
++    sub_0008F950_gen();
 +#endif
 +}
  

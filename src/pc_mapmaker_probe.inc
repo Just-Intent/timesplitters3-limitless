@@ -28,6 +28,12 @@
  *      [0x007B6660], cover pads [0x007B65C0], pad groups [0x007B666C] and the
  *      pool pointers (gaps give each pool's size), engine objects taken
  *      [0x007B4FAC] of the pool capacity [0x0072F5E4], logic tags [0x0075EA90]
+ * 128  while a MapMaker map is played (scene 100), for 5 s after the map's
+ *      first room draw and again every 30 s: each distinct room draw
+ *      (sub_000A2900 caller, room, pass), each prop in that room (model id,
+ *      +0x28 flags, the instance's +0x30/+0x1F4 flags) and each model draw
+ *      sub_0008F950 made inside it (caller, instance, layer), to find a bit
+ *      that hides a tile's geometry prop (docs/mapmaker-sky.md, "sky tile")
  * Output: TSFP_MAPMAKER_PROBE_LOG (binary, truncated per process), else stderr.
  * Records are emitted when their content changes, at most four per second,
  * with the number of unchanged repeats; the file is capped at 4 MiB.
@@ -49,7 +55,8 @@
 #define MAPMAKER_PROBE_BUDGETS 16u
 #define MAPMAKER_PROBE_HEAP 32u
 #define MAPMAKER_PROBE_POOLS 64u
-#define MAPMAKER_PROBE_ALL 127u
+#define MAPMAKER_PROBE_ROOMS 128u
+#define MAPMAKER_PROBE_ALL 255u
 #define MAPMAKER_PROBE_HEAP_INTERVAL 1000u
 #define MAPMAKER_PROBE_MENU_SLOTS 16u
 #define MAPMAKER_PROBE_MENU_ITEMS 64u
@@ -448,10 +455,151 @@ static void mapmaker_probe_click(uint32_t menu,float x,float y,uint32_t hit,unsi
         known?(int)WORD_AT(menu+0x194):0);
 }
 
+/* Flag 128, read-only, scene 100. Room draw sub_000A2900(room, pass) (callers
+ * 0x0008658F..0x00086B80 and 0x001B920B..0x001B924D) walks the room's props:
+ * count [0x007B54E0+room*4], list [0x007B5F00+room*4] (relocated by
+ * config/guest-code-patches/rooms.json to 0x008C7000 / 0x008C7C00). It skips a
+ * prop whose +0x34 is a real room and whose +0x28 has 0x800000 (0x000A2945),
+ * or whose instance [prop+4] has byte +0x1F6 bit 3 (0x000A2951), and draws the
+ * rest with sub_0008F950(instance, pass, layer) (0x000A2AC5). Prop +0x94 is the
+ * model id (0x000A6F4F); a room's geometry is model 0x908 + room - 1
+ * (sub_00085CC0, 0x00085D6B). Hot path: cheap pointer checks only. */
+#define MAPMAKER_PROBE_ROOM_COUNTS 0x008C7000u
+#define MAPMAKER_PROBE_ROOM_LISTS 0x008C7C00u
+#define MAPMAKER_PROBE_ROOM_IDS 0xFFu
+#define MAPMAKER_PROBE_ROOM_PROPS 64u
+#define MAPMAKER_PROBE_ROOM_WINDOW 5000u
+#define MAPMAKER_PROBE_ROOM_PERIOD 30000u
+#define MAPMAKER_PROBE_ROOM_GAP 2000u
+#define MAPMAKER_PROBE_ROOM_SEEN 1024u
+#define MAPMAKER_PROBE_MODEL_ROOMS 0x908u
+#define MAPMAKER_PROBE_MODEL_ROOMS_END 0xA00u
+#define MAPMAKER_PROBE_PTR_OK(p,n) ((((uint32_t)(p))>=0x00010000u && ((uint32_t)(p))<0x04000000u-(uint32_t)(n)) || \
+                                    (((uint32_t)(p))>=0x80000000u && ((uint32_t)(p))<0x84000000u-(uint32_t)(n)))
+static struct {
+    int in_play, open;
+    unsigned long long start, last, windows, room_draws, props, draws, unlogged;
+    unsigned depth, seen_count;
+    uint32_t room, pass;
+    uint32_t seen[MAPMAKER_PROBE_ROOM_SEEN][3];
+} mapmaker_probe_rooms;
+
+/* 1 if (kind,a,b) is new in this window; 0 if seen or the set is full. */
+static int mapmaker_probe_rooms_first(uint32_t kind,uint32_t a,uint32_t b)
+{
+    unsigned i;
+    for(i=0;i<mapmaker_probe_rooms.seen_count;i++)
+        if(mapmaker_probe_rooms.seen[i][0]==kind && mapmaker_probe_rooms.seen[i][1]==a && mapmaker_probe_rooms.seen[i][2]==b) return 0;
+    if(mapmaker_probe_rooms.seen_count==MAPMAKER_PROBE_ROOM_SEEN) { mapmaker_probe_rooms.unlogged++;return 0; }
+    mapmaker_probe_rooms.seen[i][0]=kind;mapmaker_probe_rooms.seen[i][1]=a;mapmaker_probe_rooms.seen[i][2]=b;
+    mapmaker_probe_rooms.seen_count++;
+    return 1;
+}
+static void mapmaker_probe_rooms_close(unsigned long long now)
+{
+    if(!mapmaker_probe_rooms.open) return;
+    mapmaker_probe_write("[mapmaker-probe] t=%llu rooms-window end n=%llu room-draws=%llu props=%llu draws=%llu unlogged=%llu\n",
+        now,mapmaker_probe_rooms.windows,mapmaker_probe_rooms.room_draws,mapmaker_probe_rooms.props,
+        mapmaker_probe_rooms.draws,mapmaker_probe_rooms.unlogged);
+    mapmaker_probe_rooms.open=0;
+}
+/* Is a capture window open? Opens at the first room draw of a play session
+ * (scene 100 after another scene or a 2 s pause in room drawing), then every
+ * 30 s, for 5 s each. */
+static int mapmaker_probe_rooms_window(void)
+{
+    unsigned long long now=GetTickCount64();
+    if((int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_PROBE_SCENE_PLAY) {
+        mapmaker_probe_rooms_close(now);
+        mapmaker_probe_rooms.in_play=0;
+        return 0;
+    }
+    if(!mapmaker_probe_rooms.in_play || now-mapmaker_probe_rooms.last>=MAPMAKER_PROBE_ROOM_GAP ||
+       now-mapmaker_probe_rooms.start>=MAPMAKER_PROBE_ROOM_PERIOD) {
+        mapmaker_probe_rooms_close(now);
+        mapmaker_probe_rooms.in_play=1;mapmaker_probe_rooms.open=1;mapmaker_probe_rooms.start=now;
+        mapmaker_probe_rooms.seen_count=0;mapmaker_probe_rooms.windows++;
+        mapmaker_probe_rooms.room_draws=mapmaker_probe_rooms.props=mapmaker_probe_rooms.draws=mapmaker_probe_rooms.unlogged=0;
+        mapmaker_probe_write("[mapmaker-probe] t=%llu rooms-window begin n=%llu tables=0x%08X/0x%08X\n",
+            now,mapmaker_probe_rooms.windows,MAPMAKER_PROBE_ROOM_COUNTS,MAPMAKER_PROBE_ROOM_LISTS);
+    }
+    mapmaker_probe_rooms.last=now;
+    if(mapmaker_probe_rooms.open && now-mapmaker_probe_rooms.start>=MAPMAKER_PROBE_ROOM_WINDOW)
+        mapmaker_probe_rooms_close(now);
+    return mapmaker_probe_rooms.open;
+}
+static uint32_t mapmaker_probe_room_list(uint32_t room,uint32_t *count)
+{
+    uint32_t list;
+    *count=0;
+    if(room>=MAPMAKER_PROBE_ROOM_IDS) return 0;
+    *count=WORD_AT(MAPMAKER_PROBE_ROOM_COUNTS+room*4u);
+    list=WORD_AT(MAPMAKER_PROBE_ROOM_LISTS+room*4u);
+    if((int32_t)*count<=0 || !MAPMAKER_PROBE_PTR_OK(list,*count*4u)) { *count=0;return 0; }
+    return list;
+}
+static void mapmaker_probe_rooms_room(uint32_t ret,uint32_t room,uint32_t pass)
+{
+    uint32_t count,list=mapmaker_probe_room_list(room,&count),i;
+    unsigned long long now=GetTickCount64();
+    mapmaker_probe_rooms.room_draws++;
+    if(!mapmaker_probe_rooms_first(1u,ret,room<<8|(pass&0xFFu))) return;
+    mapmaker_probe_write("[mapmaker-probe] t=%llu room-draw ret=0x%08X room=%u pass=%u props=%u\n",now,ret,room,pass,count);
+    for(i=0;i<count && i<MAPMAKER_PROBE_ROOM_PROPS;i++) {
+        uint32_t prop=WORD_AT(list+i*4u),inst,model;
+        mapmaker_probe_rooms.props++;
+        if(!MAPMAKER_PROBE_PTR_OK(prop,0x98u) || !mapmaker_probe_rooms_first(2u,prop,0u)) continue;
+        inst=WORD_AT(prop+4u);model=WORD_AT(prop+0x94u)&0xFFFFu;
+        mapmaker_probe_write("  prop room=%u index=%u at=0x%08X model=0x%X geometry=%u type(+20)=0x%X flags(+28)=0x%08X"
+            " mask(+0C)=0x%08X +31=%u +32=%u room(+34)=%d inst=0x%08X inst+30=0x%08X inst+1F4=0x%08X\n",
+            room,i,prop,model,model>=MAPMAKER_PROBE_MODEL_ROOMS && model<MAPMAKER_PROBE_MODEL_ROOMS_END,
+            WORD_AT(prop+0x20u),WORD_AT(prop+0x28u),WORD_AT(prop+0x0Cu),
+            WORD_AT(prop+0x30u)>>8&0xFFu,WORD_AT(prop+0x30u)>>16&0xFFu,(int32_t)WORD_AT(prop+0x34u),inst,
+            MAPMAKER_PROBE_PTR_OK(inst,0x1F8u)?WORD_AT(inst+0x30u):0u,
+            MAPMAKER_PROBE_PTR_OK(inst,0x1F8u)?WORD_AT(inst+0x1F4u):0u);
+    }
+    if(count>MAPMAKER_PROBE_ROOM_PROPS)
+        mapmaker_probe_write("  props truncated room=%u count=%u\n",room,count);
+}
+/* Called by the room-draw hook. Reads only; calls the original once. */
+void pc_mapmaker_probe_room_draw(void (*original)(void))
+{
+    uint32_t room,pass;
+    if(!(mapmaker_probe_flags()&MAPMAKER_PROBE_ROOMS) || !MAPMAKER_PROBE_PTR_OK(g_esp,12u) ||
+       !mapmaker_probe_rooms_window()) { original();return; }
+    room=mapmaker_probe_rooms.room;pass=mapmaker_probe_rooms.pass;
+    mapmaker_probe_rooms_room(WORD_AT(g_esp),WORD_AT(g_esp+4u),WORD_AT(g_esp+8u));
+    mapmaker_probe_rooms.room=WORD_AT(g_esp+4u);mapmaker_probe_rooms.pass=WORD_AT(g_esp+8u);
+    mapmaker_probe_rooms.depth++;
+    original();
+    mapmaker_probe_rooms.depth--;
+    mapmaker_probe_rooms.room=room;mapmaker_probe_rooms.pass=pass;
+}
+/* sub_0008F950(instance, pass, layer): every model draw in every scene; only
+ * logs inside a room draw that flag 128 is capturing. */
+void pc_mapmaker_probe_prop_draw(void (*original)(void))
+{
+    if(mapmaker_probe_rooms.depth && mapmaker_probe_rooms.open && MAPMAKER_PROBE_PTR_OK(g_esp,16u)) {
+        uint32_t ret=WORD_AT(g_esp),inst=WORD_AT(g_esp+4u),layer=WORD_AT(g_esp+12u);
+        mapmaker_probe_rooms.draws++;
+        if(mapmaker_probe_rooms_first(3u,ret^layer<<24,inst)) {
+            uint32_t count,list=mapmaker_probe_room_list(mapmaker_probe_rooms.room,&count),i,model=0xFFFFFFFFu;
+            for(i=0;i<count && i<MAPMAKER_PROBE_ROOM_PROPS;i++) {
+                uint32_t prop=WORD_AT(list+i*4u);
+                if(MAPMAKER_PROBE_PTR_OK(prop,0x98u) && WORD_AT(prop+4u)==inst) { model=WORD_AT(prop+0x94u)&0xFFFFu;break; }
+            }
+            mapmaker_probe_write("  draw ret=0x%08X inst=0x%08X pass=%u layer=%u room=%u model=0x%X\n",
+                ret,inst,WORD_AT(g_esp+8u),layer,mapmaker_probe_rooms.room,model);
+        }
+    }
+    original();
+}
+
 #ifdef TSFP_MAPMAKER_PROBE_TEST
 static void mapmaker_probe_reset(void)
 {
     if(mapmaker_probe.file)fclose(mapmaker_probe.file);
     memset(&mapmaker_probe,0,sizeof mapmaker_probe);
+    memset(&mapmaker_probe_rooms,0,sizeof mapmaker_probe_rooms);
 }
 #endif
