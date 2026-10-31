@@ -249,7 +249,9 @@ Fixture success is not evidence of in-game meter behaviour.
 Probe flags are 1..127 (64 = AI pool counts in scene 100). The MapMaker
 pointer, memory budget and stage A limits fixtures
 (`tests/test_mapmaker_pointer.py`, `tests/test_mapmaker_budget.py`,
-`tests/test_mapmaker_limits.py`) are in the same CI list. Fixtures that
+`tests/test_mapmaker_limits.py`) are in the same CI list, as is
+`tests/test_mounted_mouse.py` (mounted/vehicle gun mouse aim; compiles
+`tests/mounted_mouse.c` with `src/pc_input.c`, six header mutations must fail). Fixtures that
 include `pc_display_menu.c` or `pc_menu_mouse_guest.inc` (`menu_mouse.c`,
 `fov_settings.c`) need a `sub_0003DFA0` stub for the stage A allocator.
 `tests/test_menu_mouse.py` also covers the MapMaker map browser click
