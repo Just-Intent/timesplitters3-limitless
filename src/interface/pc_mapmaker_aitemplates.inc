@@ -210,6 +210,17 @@ static void ait_copy_all(uint32_t e,uint32_t from,uint32_t to)
     for(o=0x28u;o<0x60u;o+=4u) if(o!=AIT_LINK) WORD_AT(b+o)=WORD_AT(a+o);
     for(o=AIT_POINT0;o<AIT_STRIDE;o+=4u) WORD_AT(b+o)=WORD_AT(a+o);
 }
+/* A new copy or duplicate starts unplaced, as "New Story AI" does
+ * (sub_0031BB60 0x0031BC5C): no points, so the list draws its "!"
+ * (sub_0031D410 0x0031D485), its icon row holds it for placement
+ * (sub_0031C480 0x0031C4B4) and it spawns where it is put, not on the
+ * source's pad. Facing +0x54 and patrol mode +0x5C stay copied. */
+static void ait_unplace(uint32_t e,uint32_t to)
+{
+    uint32_t b=ait_entry(e,to),o;
+    WORD_AT(b+AIT_POINTS)=0;
+    for(o=AIT_POINT0;o<AIT_STRIDE;o+=4u) WORD_AT(b+o)=0;
+}
 static void ait_sync_from(uint32_t e,uint32_t s,uint32_t count)
 {
     int root=ait_root(e,s,count);
@@ -362,7 +373,7 @@ static int ait_add(uint32_t e)
 /* Returns 0 when refused (message shown, edit screen stays open). */
 static int ait_action(uint32_t e,uint32_t row,uint32_t s,uint32_t menu)
 {
-    uint32_t count,from,k;
+    uint32_t count,k;
     int root,c;
     ait_flush(e,0);
     count=ait_count(e);
@@ -386,17 +397,13 @@ static int ait_action(uint32_t e,uint32_t row,uint32_t s,uint32_t menu)
         return 0;
     }
     if(row==AIT_ROW_DUPLICATE) {
-        if((c=ait_add(e))>=0) ait_copy_all(e,s,(uint32_t)c);
+        if((c=ait_add(e))>=0) { ait_copy_all(e,s,(uint32_t)c);ait_unplace(e,(uint32_t)c); }
         return 1;
     }
     if(root<0) root=(int)s;                      /* first copy: s leads */
-    /* points from this AI, or from the first member that has some */
-    from=s;
-    if(!WORD_AT(ait_entry(e,s)+AIT_POINTS))
-        for(k=0;k<count;k++)
-            if(ait_root(e,k,count)==root && WORD_AT(ait_entry(e,k)+AIT_POINTS)) { from=k;break; }
     if((c=ait_add(e))<0) return 1;
-    ait_copy_all(e,from,(uint32_t)c);
+    ait_copy_all(e,s,(uint32_t)c);
+    ait_unplace(e,(uint32_t)c);
     for(k=0;k<AIT_SHARED;k++)
         WORD_AT(ait_entry(e,c)+ait_shared[k])=WORD_AT(ait_entry(e,s)+ait_shared[k]);
     WORD_AT(ait_entry(e,c)+AIT_LINK)=(uint32_t)root+1u;
@@ -655,4 +662,22 @@ void pc_mapmaker_aitemplates_alert(void (*original)(void))
         WORD_AT(trigger+0x14u)=id;
     }
     g_eax=r;
+}
+
+/* sub_000715E0(): the first free item of the menu item pool [0x007BB1DC]
+ * (count [0x006FE920], sized by sub_00070DB0; aitemplates-pool.json raises
+ * the editor's 920 to 3072), or 0 when every item is in use (0x00071603).
+ * The row builder sub_00078FF0 (0x0007906C) does not test it, so that row
+ * and every later one silently vanish from the menu. Diagnostic only, in
+ * the editor (scene 102), whatever TSFP_MAPMAKER_LIMITS says: the pool
+ * raise is unconditional. Called once per row built, not per frame. */
+#define AIT_MENU_ITEMS 0x006FE920u
+static unsigned ait_menu_full;
+void pc_mapmaker_aitemplates_menu_item(void (*original)(void))
+{
+    original();
+    if(g_eax || WORD_AT(AIT_SCENE)!=102u) return;
+    if(!ait_menu_full++)
+        fprintf(stderr,"[mapmaker] menu item pool full (%u items): later rows of this menu are missing\n",
+                (unsigned)WORD_AT(AIT_MENU_ITEMS));
 }

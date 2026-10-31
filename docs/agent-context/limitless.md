@@ -295,7 +295,15 @@ with group logic (or an unconverted old template) means "any member"
 (`sub_0033E560`, `sub_00163780`, `sub_0033E620`, `sub_00339600`). A separate
 logic-picker entry was rejected: Story AI ids are R + index + 1 and the object
 ids start at R + count (0x0031DA9B). Compile/load/level-start hooks chain
-outside the container/editor ones. Not yet built or played.
+outside the container/editor ones. New linked copies and duplicates start
+unplaced (`ait_unplace`: +0x58 = 0, +0x64..+0xE3 zero) so the list shows the
+"!" and they spawn where placed; with `TSFP_MAPMAKER_STACK_ITEMS=1` an
+empty-handed pick-up on a shared cell takes the highest-index AI first
+(`pc_mapmaker_stack_sai_point`, old maps with stacked copies). The editor's
+menu item pool (`aitemplates-pool.json`, operand 0x00070DC3 in `sub_00070DB0`,
+scene 102 branch only) is 3072 items instead of 920; WRAP `sub_000715E0` ->
+`pc_mapmaker_aitemplates_menu_item` logs once when it runs out in scene 102.
+Not yet built or played.
 
 ### MapMaker and System Link bug fixes
 
@@ -460,7 +468,8 @@ Open air tiles (`src/interface/pc_mapmaker_roof.inc`); compile, load and reset a
 layer to their existing chains. Contract: `docs/mapmaker/mapmaker-sky.md`.
 Its hook on `sub_002F8B40` (return 0x0030723F, Story AI mode) answers -1 while
 a Story AI is held, the value `[editor+0x2F20]` already has for "no point under
-the cursor", so a Story AI can be dropped on another one's cell.
+the cursor", so a Story AI can be dropped on another one's cell; with empty
+hands it answers the highest-index AI with a point in the cell (newest first).
 Tests: `tests/compiler/test_guest_code_patches.py`, `tests/compiler/test_recomp_generation.py`,
 `tests/compiler/test_guest_image.py` (image loader contract).
 
@@ -539,7 +548,8 @@ the gate wrappers with mutations, the table bytes, and (with the private XBE)
 that every `cmp byte [0x0078ADAE],2` in game code is patched or reviewed.
 
 `tests/mapmaker/test_mapmaker_aitemplates.py` (Story AI duplicate, leader groups,
-numbered names, group-logic toggle, promotion, old-format migration, mutations) and `tests/mapmaker/test_mapmaker_aitemplates_classified.py` (decode checks of
+numbered names, group-logic toggle, promotion, old-format migration, unplaced
+copies/duplicates, menu-pool diagnostic, mutations) and `tests/mapmaker/test_mapmaker_aitemplates_classified.py` (decode checks of
 the edit-screen row site, menu table 0x0052E088 and the unused chunk bytes
 +0x32/+0x33) are in the same CI list.
 
