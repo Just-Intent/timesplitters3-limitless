@@ -777,6 +777,7 @@ void pc_mapmaker_sets_store(void (*original)(void)) { original(); }
 void pc_mapmaker_sets_sai_choice(void (*original)(void)) { original(); }
 void pc_mapmaker_sets_play_set(void (*original)(void)) { original(); }
 void pc_mapmaker_sets_preload(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_match_start(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }

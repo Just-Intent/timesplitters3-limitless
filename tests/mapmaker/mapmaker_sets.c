@@ -25,6 +25,7 @@ static volatile uint32_t stub_ran;
 #define STUB(name,n) void name(void) { stub_ran=n; }
 STUB(sub_0003DFA0,1) STUB(sub_00074670,2) STUB(sub_00071970,3) STUB(sub_00076EF0,4) STUB(sub_002BFFD0,5)
 STUB(sub_0003D7B0,6) STUB(sub_002BE650,7) STUB(sub_00071800,8) STUB(sub_000D7780,9)
+STUB(sub_002C0310,10)
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -41,6 +42,9 @@ static int failures;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
 static uint32_t selected, options[32][2], preloaded[32];
 static unsigned noptions, npreloaded, stores, originals;
+static unsigned refills;
+static uint32_t refill_index;
+static void fake_refill(void);
 static void hook_store_entry(void);
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
@@ -57,6 +61,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     else if(f==sub_0003D7B0) r=0x00700000u+x[0];
     else if(f==sub_002BE650) r=0x5000u+x[0]*16u+(x[1]&0xFu);
     else if(f==sub_00071800) { if(noptions<32u) { options[noptions][0]=x[0];options[noptions][1]=x[1]; } noptions++; }
+    else if(f==sub_002C0310) fake_refill();
     else if(f==sub_000D7780) { if(npreloaded<32u && x[0]==x[1]) preloaded[npreloaded]=x[0]; npreloaded++; }
     return r;
 }
@@ -342,6 +347,52 @@ static void screen_tests(void)
     sets.page=0;
 }
 
+/* ---- match start ------------------------------------------------------ */
+/* sub_002C0310 (index in eax): rows 1-10 from the set the getter returns */
+static void fake_refill(void)
+{
+    unsigned k;
+    refills++;refill_index=g_eax;
+    CHECK(!sets.page);                          /* the getters are not shifted */
+    for(k=0;k<10u;k++) {
+        int16_t id=HALF_AT(ESET+4u+8u*k);
+        WORD_AT(WORK+k*0x1Cu)=id<=-1?0xFFFFFFFFu:(uint32_t)(int32_t)id;
+    }
+    g_eax=0x12345u;                             /* clobbered like the original */
+}
+static uint32_t roster[10];
+static void fake_match_start(void)
+{
+    unsigned k;
+    originals++;
+    for(k=0;k<10u;k++) roster[k]=WORD_AT(WORK+k*0x1Cu);
+    g_esp+=4u;
+}
+static void match_tests(void)
+{
+    editor_set(some_extras);
+    strcpy((char *)((uintptr_t)TITLE_TEXT+g_xbox_mem_offset),"Characters");
+    WORD_AT(PARENT+0x204u)=TITLE_TEXT;
+    WORD_AT(0x0079094Cu)=102u;WORD_AT(0x00784024u)=0x11u;WORD_AT(0x0078AEACu)=0;
+    frame(0,0);frame(9,0x00020002u);
+    CHECK(work_id(0)==200 && sets.page==1);
+    /* the screen closed on slots 11-20; the Test map start sees rows 1-10 */
+    refills=0;originals=0;g_eax=0x77u;
+    CALL(pc_mapmaker_sets_match_start,fake_match_start,0x002D3933u,0u,0u);
+    CHECK(refills==1u && refill_index==0x11u && originals==1u && g_eax==0x77u);
+    CHECK(roster[0]==100u && roster[9]==109u && sets.page==0);
+    CHECK(WORD_AT(0x0078AEACu)==0x11u);
+    /* page 1 left: stock */
+    refills=0;CALL(pc_mapmaker_sets_match_start,fake_match_start,0x002D3933u,0u,0u);
+    CHECK(refills==0u && originals==2u);
+    /* outside the editor: stock, the flag is dropped */
+    frame(9,0x00020002u);CHECK(sets.page==1);
+    WORD_AT(0x0079094Cu)=100u;originals=0;
+    CALL(pc_mapmaker_sets_match_start,fake_match_start,0x002D5E52u,0u,0u);
+    CHECK(refills==0u && sets.page==0 && originals==1u && work_id(0)==200);
+    WORD_AT(0x0079094Cu)=102u;
+}
+
 /* ---- Story AI choice --------------------------------------------------- */
 static void fake_choice(void) { originals++;CHECK(noptions==0u || noptions==10u);g_esp+=4u; }
 static void choice_tests(void)
@@ -421,6 +472,7 @@ int main(void)
     screen_tests();
     choice_tests();
     play_tests();
+    match_tests();
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
     printf("mapmaker sets ok\n");
     return 0;

@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,1639 @@
+@@ -1037,6 +1037,1649 @@
      sub_002FA720_gen();
  #endif
  }
@@ -800,13 +800,23 @@
 +}
 +
 +extern void sub_002D2C70_gen(void);
-+void sub_002D2C70(void)
++static void sub_002D2C70_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("story","pc_mapmaker_story_char_config")) pc_mapmaker_story_char_config(sub_002D2C70_gen);
 +    else sub_002D2C70_gen();
 +#else
 +    sub_002D2C70_gen();
++#endif
++}
++
++void sub_002D2C70(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_match_start")) pc_mapmaker_sets_match_start(sub_002D2C70_layer0);
++    else sub_002D2C70_layer0();
++#else
++    sub_002D2C70_layer0();
 +#endif
 +}
 +
