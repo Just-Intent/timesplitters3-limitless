@@ -25,8 +25,8 @@
  *    refills rows 1-10 first, since the work copy rows are its bots;
  *  - the in-game pause and Arcade setup Bots screen is the same screen, but
  *    there (scenes 100/101, MapMaker Arcade mode 9, index 0x11) its rows are
- *    the match's bot roster (at most 10 rows, 16 actors per match), so it is
- *    not paged (see the doc);
+ *    the match's bot roster (at most 10 rows, 16 actors per match); its page
+ *    2 (more bots) is pc_mapmaker_matchbots.inc;
  *  - the Story AI character choice lists slots 11-20 after the stock ten;
  *  - play: the level load's set copy (sub_0033EBF0) gets members 10..19 and
  *    count 20 (the per-member loops that use the count skip id -1), the

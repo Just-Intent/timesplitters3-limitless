@@ -78,7 +78,7 @@ REVIEWED = reviewed("""
 0x002D357F game mode 9 kept in ebp for the compare at 0x002D363D
 0x002D3641 game mode [0x0078AD2C] value 10 in eax
 0x002D370F team sub-mode 0x13: 9 - profile +0xC rows (front end)
-0x002D381C match start: the 10 work-copy rows are the match's bots (front end, pause setup, editor Test map; 16 actors 0x0078AD6C..); not paged, the editor's page 2 is refilled first (pc_mapmaker_sets_match_start)
+0x002D381C match start: the 10 work-copy rows are the match's bots (front end, pause setup, editor Test map; 16 actors 0x0078AD6C..); the editor's page 2 is refilled first (pc_mapmaker_sets_match_start); rows 11-20 become more bots after the loop (pc_mapmaker_matchbots_match_start)
 0x00300F1E item id ranges (0x33/0x34/10/14) in the compile's piece walk
 0x00300F79 item category word +2 values 8/9/0x13/0x14 (compile), not slots
 0x00300F83 item category word +2 values 8/9/0x13/0x14 (compile), not slots

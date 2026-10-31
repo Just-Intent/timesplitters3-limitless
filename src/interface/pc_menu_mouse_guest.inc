@@ -65,6 +65,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_characters.inc"
 #include "pc_mapmaker_realbosses.inc"
 #include "pc_mapmaker_sets.inc"
+#include "pc_mapmaker_matchbots.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
@@ -785,6 +786,12 @@ void pc_mapmaker_sets_sai_choice(void (*original)(void)) { original(); }
 void pc_mapmaker_sets_play_set(void (*original)(void)) { original(); }
 void pc_mapmaker_sets_preload(void (*original)(void)) { original(); }
 void pc_mapmaker_sets_match_start(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_live(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_match_start(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_screen(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_open(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_store(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }
