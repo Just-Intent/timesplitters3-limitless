@@ -18,8 +18,9 @@
  * entry's colour (+0x60) as a consistency check. It follows the entries
  * through delete (sub_0031C8B0, memmove), map reset (sub_002FEBF0), editor
  * load (sub_00301A90, also undo) and compile (sub_003006C0, save and the
- * undo shadow). A duplicate or linked copy starts with Off; the setting is
- * per AI, not shared by a group.
+ * undo shadow). A duplicate or linked copy starts with its source's Boss
+ * level and Health display (close hook); later edits stay per AI, not shared
+ * by a group.
  *
  * Save format. Story AI chunk (tag 0x00C7766C) data byte +0x29: 0 = no
  * boss (every stock map), 0xB0 | (level - 1) = boss with health x1, x2, x4,
@@ -134,6 +135,8 @@
 #define BOS_ROW_DISPLAY 0x424F5302u     /* "Health display:" row, only while Boss is not Off */
 #define BOS_TYPE 0x34u
 #define BOS_COLOUR 0x60u
+#define BOS_COPY_FIRST 0x28u            /* settings copied to a duplicate/linked copy */
+#define BOS_COPY_END 0x50u
 #define BOS_ENTRY_INDEX 0x24u           /* loader: chunk +0x22 -> entry +0x24 */
 #define BOS_TAG_SAI 0x00C7766Cu
 #define BOS_TAG_END 0x00C7766Au
@@ -355,7 +358,19 @@ void pc_mapmaker_bosses_health_rows(void (*original)(void))
     original();
 }
 
-/* sub_0031CAC0(menu): edit screen close, also the boss row's callback. */
+/* Entry c is a copy of s ("Duplicate Story AI" / "Add linked copy",
+ * aitemplates' ait_copy_all): every setting word +0x28..+0x4C equal (the
+ * link +0x50 and later fields may differ). */
+static int bos_is_copy(uint32_t e,uint32_t s,uint32_t c)
+{
+    uint32_t o;
+    for(o=BOS_COPY_FIRST;o<BOS_COPY_END;o+=4u) if(WORD_AT(bos_entry(e,s)+o)!=WORD_AT(bos_entry(e,c)+o)) return 0;
+    return 1;
+}
+/* sub_0031CAC0(menu): edit screen close, also the boss row's callback. A
+ * close that adds one entry copied from the edited AI (the aitemplates rows,
+ * chained inside this hook) gives the copy the source's Boss level and
+ * Health display; the stronger Health value is entry +0x4C, copied there. */
 void pc_mapmaker_bosses_close(void (*original)(void))
 {
     uint32_t menu=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,e,row,s;
@@ -363,7 +378,14 @@ void pc_mapmaker_bosses_close(void (*original)(void))
     if(!bos_on() || !(e=bos_editor())) { original();return; }
     row=menu && MAPMAKER_PTR_OK(menu,0x190u)?WORD_AT(menu+0x18Cu):0u;
     s=bos_selected();
-    if((row!=BOS_ROW && row!=BOS_ROW_DISPLAY) || s>=bos_count(e) || WORD_AT(bos_entry(e,s)+BOS_TYPE)==5u) { original();return; }
+    if(row!=BOS_ROW && row!=BOS_ROW_DISPLAY) {    /* aitemplates (inside) may add a copy of s */
+        uint32_t before=bos_count(e);
+        level=s<before?bos_get(e,s):0u;sub=level?bos_get_sub(e,s):0u;
+        original();
+        if(level && bos_count(e)==before+1u && bos_selected()==s && bos_is_copy(e,s,before)) bos_set(e,before,level,sub);
+        return;
+    }
+    if(s>=bos_count(e) || WORD_AT(bos_entry(e,s)+BOS_TYPE)==5u) { original();return; }
     level=bos_get(e,s);sub=bos_get_sub(e,s);
     if(row==BOS_ROW) level=(level+1u)%(BOS_LEVELS+1u);
     else if(level) sub=!sub;                      /* Boss bar <-> Sub-boss bar; nothing while Off */

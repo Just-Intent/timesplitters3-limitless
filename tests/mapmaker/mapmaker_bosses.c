@@ -175,6 +175,21 @@ static void fake_delete(void)                    /* sub_0031C8B0(i): memmove dow
     WORD_AT(ED+0x280u)=n-1u;
     g_esp+=4u;
 }
+static unsigned copy_mode;                      /* aitemplates inside the close: 1 duplicate, 2 linked, 3 not a copy */
+static void fake_copy(void)                      /* sub_0031CAC0 + aitemplates: append a copy of the selected AI */
+{
+    uint32_t n=WORD_AT(ED+0x280u),s=WORD_AT(0x00762F94u)&0xFFFFu,o;
+    orig_calls++;
+    if(copy_mode && s<n) {
+        memcpy((void *)((uintptr_t)E(n)+g_xbox_mem_offset),(const void *)((uintptr_t)E(s)+g_xbox_mem_offset),0xE4);
+        snprintf((char *)((uintptr_t)E(n)+g_xbox_mem_offset),32,"Copy %u",(unsigned)n);
+        WORD_AT(E(n)+0x50u)=copy_mode==2u?s+1u:0u;WORD_AT(E(n)+0x60u)=40u+n;
+        WORD_AT(E(n)+0x58u)=0;for(o=0x64u;o<0xE4u;o+=4u) WORD_AT(E(n)+o)=0;   /* ait_unplace */
+        if(copy_mode==3u) WORD_AT(E(n)+0x28u)^=1u;
+        WORD_AT(ED+0x280u)=n+1u;
+    }
+    g_esp+=4u;
+}
 static int stock_bar;
 static void fake_hud(void)                       /* sub_0014CC80: stock bar flag in HUD block +8 */
 {
@@ -219,6 +234,12 @@ static void click_display(uint32_t s)            /* the health display row's cal
 {
     select_ai(s);press(0x424F5302u);orig_calls=0;
     HOOK(pc_mapmaker_bosses_close,fake_plain,MENU);
+}
+
+static void copy_row(uint32_t s,uint32_t row,unsigned mode)
+{
+    select_ai(s);press(row);copy_mode=mode;orig_calls=0;
+    HOOK(pc_mapmaker_bosses_close,fake_copy,MENU);
 }
 
 /* ---- play fixtures --------------------------------------------------------- */
@@ -770,6 +791,37 @@ int main(void)
         WORD_AT(HUD0+8u)=snapshot[(HUD0+8u)/4u];
         CHECK(!memcmp(snapshot,memory,sizeof memory) && bos_probe.lines>0u);
     }
+
+    /* ---- duplicate / linked copy: the copy gets the source's boss settings ---- */
+    WORD_AT(0x0079094Cu)=102u;
+    HOOK(pc_mapmaker_bosses_reset,fake_reset,0);
+    make_ai(0,1,"Titan");make_ai(1,1,"Guard");WORD_AT(ED+0x280u)=2u;
+    WORD_AT(E(0)+0x28u)=0x15u;WORD_AT(E(0)+0x4Cu)=7u;               /* Health: Titan */
+    click(0);click(0);click(0);click_display(0);                    /* x4, Sub-boss bar */
+    CHECK(level_of(0)==3u && bos_get_sub(ED,0)==1u);
+    copy_row(0,0x41540001u,1);                                      /* Duplicate Story AI */
+    CHECK(orig_calls==1 && WORD_AT(ED+0x280u)==3u);
+    CHECK(level_of(2)==3u && bos_get_sub(ED,2)==1u && WORD_AT(E(2)+0x4Cu)==7u);
+    copy_row(0,0x41540002u,2);                                      /* Add linked copy */
+    CHECK(WORD_AT(ED+0x280u)==4u && WORD_AT(E(3)+0x50u)==1u);
+    CHECK(level_of(3)==3u && bos_get_sub(ED,3)==1u && WORD_AT(E(3)+0x4Cu)==7u);
+    click(3);                                                       /* later edits stay per AI */
+    CHECK(level_of(3)==4u && level_of(0)==3u && level_of(2)==3u);
+    copy_row(1,0x41540001u,1);                                      /* a non-boss source: Off */
+    CHECK(WORD_AT(ED+0x280u)==5u && level_of(4)==0u);
+    copy_row(0,0x41540001u,3);                                      /* not a copy of the source */
+    CHECK(WORD_AT(ED+0x280u)==6u && level_of(5)==0u);
+    copy_row(0,0x41540001u,0);                                      /* refused: nothing added */
+    CHECK(orig_calls==1 && WORD_AT(ED+0x280u)==6u && bos.level[6]==0u);
+    HOOK(pc_mapmaker_bosses_compile,fake_compile,CONT);
+    CHECK(saved_flag(2)==0xB6u && byte_at(sai_data(2)+0x21u)==0xA3u && byte_at(sai_data(2)+0x30u)==4u);
+    CHECK(saved_flag(3)==0xB7u && byte_at(sai_data(3)+0x21u)==0xA3u && saved_flag(4)==0u);
+    HOOK(pc_mapmaker_bosses_delete,fake_delete,0);                  /* delete the source */
+    CHECK(level_of(1)==3u && bos_get_sub(ED,1)==1u && level_of(2)==4u && level_of(0)==0u);
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);
+    copy_row(0,0x41540001u,1);                                      /* off: the original only */
+    CHECK(orig_calls==1 && WORD_AT(ED+0x280u)==6u && bos.level[5]==0u);
+    set_env("TSFP_MAPMAKER_LIMITS","1");
 
     if(esp_errors) { fprintf(stderr,"%d esp errors\n",esp_errors);return 1; }
     if(failures) return 1;

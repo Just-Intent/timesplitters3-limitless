@@ -115,7 +115,13 @@ MUTATIONS = {
     # health display: Boss bar / Sub-boss bar (+0x29 bit 2)
     'display-row-always': ('    if(text && level && (text=bos_display_label', '    if(text && (text=bos_display_label'),
     'display-row-missing': ('        guest_call(sub_00079D60,6,text,BOS_ROW_DISPLAY,0u,0u,BOS_CLOSE,0u);', '        (void)text;'),
-    'display-click-closes': ('if((row!=BOS_ROW && row!=BOS_ROW_DISPLAY) ||', 'if(row!=BOS_ROW ||'),
+    'display-click-closes': ('if(row!=BOS_ROW && row!=BOS_ROW_DISPLAY) {', 'if(row!=BOS_ROW) {'),
+    # a duplicate / linked copy inherits the Boss level and Health display
+    'copy-not-inherited': ('        if(level && bos_count(e)==before+1u', '        if(0 && bos_count(e)==before+1u'),
+    'copy-no-sub': ('bos_set(e,before,level,sub);', 'bos_set(e,before,level,0);'),
+    'copy-wrong-index': ('bos_set(e,before,level,sub);', 'bos_set(e,s+1u,level,sub);'),
+    'copy-any-entry': (' && bos_is_copy(e,s,before)) bos_set', ') bos_set'),
+    'copy-short-compare': ('#define BOS_COPY_FIRST 0x28u', '#define BOS_COPY_FIRST 0x2Cu'),
     'display-label-stale': ('    bos_label(level);\n    bos_display_label(level,bos_get_sub(e,s));\n', '    bos_label(level);\n'),
     'display-cycles-level': ('    if(row==BOS_ROW) level=', '    if(1) level='),
     'delete-no-sub-shift': ('    memmove(bos.sub+i,bos.sub+i+1u,before-i-1u);\n', ''),

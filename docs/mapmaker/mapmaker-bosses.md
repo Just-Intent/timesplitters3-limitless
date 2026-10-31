@@ -35,8 +35,14 @@ second row **Health display: Boss bar** follows; a click toggles it to
 the screen, so after switching Boss on from Off reopen the AI to see it;
 cycling Boss to Off clears the choice (its label reads "(Boss off)" and
 clicks do nothing until reopened).
-The setting is per AI: duplicates and linked copies start with Off and a
-group does not share it.
+**Duplicate Story AI** and **Add linked copy** (see
+[AI templates](mapmaker-aitemplates.md)) give the new AI the source's Boss
+level and Health display choice; its Health (including Brute..Colossus) is
+copied with the other settings. Changed 2026-10-31 (user report "Duplicating
+story ai set as bosses defaults the boss setting on the new AI back to No"):
+before, the copy started with Off. After that the Boss setting is per AI:
+changing it on one member of a linked group changes only that AI (Health,
+a shared group field, still follows the group).
 
 In play (MapMaker Story, scene 100, story mode): every Boss AI's health is
 multiplied by its factor when it spawns (and again after a respawn). Each
@@ -288,7 +294,13 @@ WRAP sub_0014D1F0 -> pc_mapmaker_bosses_meters     (new; HUD per viewport, scene
 
 `pc_mapmaker_bosses_close` returns without calling its original for its own
 row; inside aitemplates' close, aitemplates would flush its pending group
-snapshot after the click, so bosses goes outside. Include the `.inc` after
+snapshot after the click, so bosses goes outside. For every other row it
+remembers the edited AI's Boss level/display and the entry count, calls the
+original (aitemplates' Duplicate / Add linked copy run there) and, when
+exactly one entry was added, the selection is unchanged and the new last
+entry's words +0x28..+0x4C equal the source's (`ait_copy_all`), sets the
+same level/display for it (`bos_set`, new colour recorded). No cross-area
+call or new WRAP line. Include the `.inc` after
 `pc_mapmaker_aitemplates.inc`; link stubs `sub_00139740` and `sub_00071800`
 and `sub_0013A400` are in `tests/mapmaker/mapmaker_area_stubs.h`.
 
@@ -329,6 +341,11 @@ and `sub_0013A400` are in `tests/mapmaker/mapmaker_area_stubs.h`.
    bottom bar appears for it; a small meter floats above it and shrinks as
    it is hurt; it vanishes when it dies. Another Boss AI on **Boss bar**
    still gets its bottom bar and no meter.
+5a. Copies: on a Boss AI at **health x4**, **Sub-boss bar**, Health Titan
+   click **Duplicate Story AI**: the new AI (place it) reads **Boss: health
+   x4**, **Health display: Sub-boss bar** and Health Titan. Same with **Add
+   linked copy**. Change Boss on the copy: the source keeps x4. Save,
+   reload: kept; delete the source: the copies keep theirs.
 6. Without the switch, load and play the same map: ordinary AIs, no bar,
    Titan/Colossus AIs read Tough Guy.
 7. Mission 6 Princess / mission 10 giant robot still show their own bars.
