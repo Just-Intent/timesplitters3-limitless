@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -844,6 +844,657 @@
+@@ -844,6 +844,701 @@
      sub_002FA720_gen();
  #endif
  }
@@ -653,6 +653,50 @@
 +    else sub_002B24E0_gen();
 +#else
 +    sub_002B24E0_gen();
++#endif
++}
++
++extern void sub_002C6C80_gen(void);
++void sub_002C6C80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("story","pc_mapmaker_story_char_roster")) pc_mapmaker_story_char_roster(sub_002C6C80_gen);
++    else sub_002C6C80_gen();
++#else
++    sub_002C6C80_gen();
++#endif
++}
++
++extern void sub_002C6680_gen(void);
++void sub_002C6680(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("story","pc_mapmaker_story_char_preview")) pc_mapmaker_story_char_preview(sub_002C6680_gen);
++    else sub_002C6680_gen();
++#else
++    sub_002C6680_gen();
++#endif
++}
++
++extern void sub_002D4D00_gen(void);
++void sub_002D4D00(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("story","pc_mapmaker_story_char_confirm")) pc_mapmaker_story_char_confirm(sub_002D4D00_gen);
++    else sub_002D4D00_gen();
++#else
++    sub_002D4D00_gen();
++#endif
++}
++
++extern void sub_002D2C70_gen(void);
++void sub_002D2C70(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("story","pc_mapmaker_story_char_config")) pc_mapmaker_story_char_config(sub_002D2C70_gen);
++    else sub_002D2C70_gen();
++#else
++    sub_002D2C70_gen();
 +#endif
 +}
  

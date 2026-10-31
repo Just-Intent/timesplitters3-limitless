@@ -89,6 +89,10 @@ void pc_mapmaker_actors_deaths(void (*original)(void));
 void pc_mapmaker_actors_create(void (*original)(void));
 void pc_mapmaker_actors_blip(void (*original)(void));
 void pc_mapmaker_actors_effects(void (*original)(void));
+void pc_mapmaker_story_char_roster(void (*original)(void));
+void pc_mapmaker_story_char_preview(void (*original)(void));
+void pc_mapmaker_story_char_confirm(void (*original)(void));
+void pc_mapmaker_story_char_config(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));

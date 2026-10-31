@@ -272,6 +272,9 @@ in `actors-list.json` keeps its offset in the moved table, and that the
 perception slice in `objects.json` matches the actors and objects constants;
 its enemy-picker case compares the two-pass `sub_0027BA40` hook against a
 model of the original's 32-entry array and argmin on random lists.
+`tests/test_mapmaker_story_character.py` (also in the native CI list) checks
+the gate wrappers with mutations, the table bytes, and (with the private XBE)
+that every `cmp byte [0x0078ADAE],2` in game code is patched or reviewed.
 
 Site inventories must come from the lifter's decoder, not from
 `private/pipeline/disasm/asm/text.asm`: the listing elides the byte column of
