@@ -148,6 +148,14 @@ void pc_mapmaker_roof_menu_init(void (*original)(void));
 void pc_mapmaker_roof_menu_add(void (*original)(void));
 void pc_mapmaker_roof_menu_hover(void (*original)(void));
 void pc_mapmaker_roof_menu_pick(void (*original)(void));
+void pc_mapmaker_bosses_rows(void (*original)(void));
+void pc_mapmaker_bosses_close(void (*original)(void));
+void pc_mapmaker_bosses_delete(void (*original)(void));
+void pc_mapmaker_bosses_reset(void (*original)(void));
+void pc_mapmaker_bosses_compile(void (*original)(void));
+void pc_mapmaker_bosses_load(void (*original)(void));
+void pc_mapmaker_bosses_level(void (*original)(void));
+void pc_mapmaker_bosses_hud(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));

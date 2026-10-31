@@ -25,11 +25,15 @@ void sub_00248970(void) {}
 void sub_002FDF50(void) {}
 void sub_00333700(void) {}
 /* actors */
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines these */
 void sub_001CD040(void) {}
+#endif
 void sub_001638F0(void) {}
 void sub_003533F0(void) {}
 /* editor, rooms */
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines these */
 void sub_0003D7B0(void) {}
+#endif
 void sub_0007A270(void) {}
 void sub_00157440(void) {}
 void sub_00300670(void) {}

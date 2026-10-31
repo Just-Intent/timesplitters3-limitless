@@ -60,6 +60,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_sky.inc"
 #include "pc_mapmaker_skymask.inc"
 #include "pc_mapmaker_roof.inc"
+#include "pc_mapmaker_bosses.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
@@ -739,6 +740,14 @@ void pc_mapmaker_roof_menu_init(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_menu_add(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_menu_hover(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_menu_pick(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_rows(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_close(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_delete(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_load(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_level(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_hud(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
