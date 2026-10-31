@@ -623,11 +623,11 @@ byte +0xC (unwritten by `sub_00300800` for categories 8/9) and editor node
 +0x30 ('WS' tag; no stock writer), paired by piece/item key on save/load.
 Slots 7-20 travel in fork chunk 0x00C776F6 (only when used; over_stock ->
 64 KB tier, stock and System Link refuse). Editor: weapon set pane
-0x005236EC pages 1-6/7-12/13-18/15-20 (Down/Up at the ends, Right/Left on any
-row, title "(a-b of 20)"); the front end's setup shows the MapMaker set (list
-value 0xF, mode 9) paged read-only; the in-play pause setup has no Weapons
+0x005236EC builder replayed with 20 rows in a scroll region (`sub_000780E0`
+27.6f .. `sub_000781A0`); paging was invisible (pointer menus skip Up/Down);
+the front end shows the MapMaker set (list value 0xF, mode 9) read-only; the in-play pause setup has no Weapons
 item (`sub_002C78F0` arg 2 = 1, 0x002C808A). Story AI weapon choice (0x0031CDB7) and
-pickup options `sub_00319300` (0x003193A2) get slots 7-20. Eighteen wrappers;
+pickup options `sub_00319300` (0x003193A2) get slots 7-20. Twenty wrappers;
 extension 0x00906000..0x009064FF. Contract, WRAP lines:
 `docs/mapmaker/mapmaker-weaponset.md`; tests `tests/mapmaker/test_mapmaker_weaponset.py`,
 `..._weaponset_classified.py`.
