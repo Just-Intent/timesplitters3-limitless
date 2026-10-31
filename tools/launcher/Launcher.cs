@@ -138,7 +138,7 @@ namespace TimeSplitters.Launcher
         ComboBox Channel { get { return Find<ComboBox>("ChannelPicker"); } }
         bool PreviewChannel { get { return Channel.SelectedIndex == 1; } }
         string NewsGameVersion { get { return installed.Length>0?installed:gameInstalled?"Unversioned":""; } }
-        public void SetStatus(string value) { Text("StatusText", value); }
+        public void SetStatus(string value) { Text("StatusText", LocalReleaseSource.Decorate(value)); }
         public LauncherWindow(string path, bool preview)
             : this(path,preview,new ReleaseClient()) { }
         internal LauncherWindow(string path,bool preview,ReleaseClient releases)
@@ -155,7 +155,7 @@ namespace TimeSplitters.Launcher
             WindowTheme.Attach(Window);
             using (var icon = Assembly.GetExecutingAssembly().GetManifestResourceStream("launcher.ico"))
                 Window.Icon = BitmapFrame.Create(icon, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-            Text("LauncherVersionLabel", "TSFP  /  COMMUNITY PC PROJECT  /  LAUNCHER v" + LauncherVersion.Value);
+            Text("LauncherVersionLabel", "TSFP  /  COMMUNITY PC PROJECT  /  LAUNCHER v" + LauncherVersion.Value + (LocalReleaseSource.Active ? "  /  TEST-ONLY LOCAL RELEASE SOURCE" : ""));
             using (var logo = Assembly.GetExecutingAssembly().GetManifestResourceStream("launcher-logo.png"))
             {
                 if (logo != null)

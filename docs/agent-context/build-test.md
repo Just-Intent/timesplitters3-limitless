@@ -321,3 +321,14 @@ test requires listing it in the compile-only skipped list;
 `tests/test_compile_only_build.py` fails otherwise (static checks on every
 host, PowerShell checks on Windows). A compile-only build is never a passing
 build and is not sealed for System Link or packaging.
+
+### Local test release folder
+
+`tools/package-release.py` accepts `--build-root <checkout>` (build/windows and
+external runtime from another checkout, e.g. from a source-only worktree) and
+the hidden `--local-preview` used by `tools/make-local-release.py`. Local preview
+skips the network seal, checks the executable hash against
+`build/windows/compile-only-build.json`, builds the launcher without private
+artwork/test run, and records BUILD.json `preview` (validated false) plus a
+README warning. It is never a published release. Tests:
+`tests/package_launcher.py`, `tests/test_make_local_release.py`.

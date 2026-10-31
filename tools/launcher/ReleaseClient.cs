@@ -79,10 +79,15 @@ namespace TimeSplitters.Launcher
 
     public sealed class ReleaseClient : IDisposable
     {
-        public const string Repository = "TheDoffman/timesplitters-future-perfect-pc";
+        // Releases, update checks, self-update, news and issue links follow this
+        // fork. UpstreamRepository is credit/attribution only, never a release source.
+        public const string Repository = "JustinDent/timesplitters3-limitless";
+        public const string UpstreamRepository = "TheDoffman/timesplitters-future-perfect-pc";
         public const string ReleasesPage = "https://github.com/" + Repository + "/releases";
         readonly HttpClient http;
-        public ReleaseClient() : this(null) { }
+        // TSFP_LAUNCHER_RELEASE_SOURCE (test only) answers the same GitHub URLs from a
+        // local folder; every validation, checksum and install step is unchanged.
+        public ReleaseClient() : this(LocalReleaseSource.FromEnvironment()) { }
         internal ReleaseClient(HttpMessageHandler handler)
         {
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
@@ -347,6 +352,118 @@ namespace TimeSplitters.Launcher
                 expected = match.Groups[1].Value;
             }
             await DownloadTransfer.Run(http,release,destination,expected,cachePrefix??destination+".download",progress,token).ConfigureAwait(false);
+        }
+    }
+
+    // Hidden TEST-ONLY release source. When TSFP_LAUNCHER_RELEASE_SOURCE names a
+    // folder, requests for this repository's GitHub API and release-download URLs
+    // are answered from that folder instead of the network:
+    //   releases.json          GitHub "list releases" array (same fields)
+    //   <tag>/<asset name>     release assets, including .sha256 checksum files
+    //   texture-pack.json      optional texture manifest (404 when absent)
+    // Release selection, URL validation, digest/.sha256 verification, resumable
+    // transfer, extraction, installation and repair run unchanged. Every other URL
+    // receives 404 without a network request. Inactive unless the variable is set;
+    // tools/make-local-release.py builds the folder.
+    public sealed class LocalReleaseSource : HttpMessageHandler
+    {
+        public const string Variable = "TSFP_LAUNCHER_RELEASE_SOURCE";
+        public readonly string Folder;
+        public LocalReleaseSource(string folder) { Folder = Path.GetFullPath(folder); }
+        public static string Configured()
+        {
+            string value = Environment.GetEnvironmentVariable(Variable);
+            return String.IsNullOrWhiteSpace(value) ? null : Path.GetFullPath(value.Trim().Trim('"'));
+        }
+        public static bool Active { get { return Configured() != null; } }
+        public static LocalReleaseSource FromEnvironment()
+        { string folder = Configured(); return folder == null ? null : new LocalReleaseSource(folder); }
+        public static string Notice
+        { get { string folder = Configured(); return folder == null ? "" : "TEST ONLY: local release source " + folder + " (not an official release)"; } }
+        // Prefix UI status lines so the test-only source stays visible.
+        public static string Decorate(string status)
+        { string notice = Notice; return notice.Length == 0 ? status : "[" + notice + "] " + status; }
+        static HttpResponseMessage Reply(HttpRequestMessage request, HttpStatusCode code, HttpContent content)
+        { return new HttpResponseMessage(code) { RequestMessage = request, Content = content ?? new ByteArrayContent(new byte[0]) }; }
+        static HttpContent JsonText(string text)
+        {
+            var content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(text));
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+            return content;
+        }
+        string Releases()
+        {
+            string path = Path.Combine(Folder, "releases.json");
+            if (!File.Exists(path)) throw new IOException("Test release source " + Folder + " has no releases.json. Unset " + Variable + " to use GitHub.");
+            Core.Require(new FileInfo(path).Length <= 4 * 1024 * 1024, "The test release list is oversized.");
+            return File.ReadAllText(path);
+        }
+        static string Query(Uri uri, string key)
+        {
+            foreach (string pair in uri.Query.TrimStart('?').Split('&'))
+            {
+                int at = pair.IndexOf('=');
+                if (at > 0 && pair.Substring(0, at) == key) return Uri.UnescapeDataString(pair.Substring(at + 1));
+            }
+            return "";
+        }
+        internal HttpResponseMessage Answer(HttpRequestMessage request)
+        {
+            var uri = request.RequestUri;
+            if (request.Method != HttpMethod.Get || uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length != 0)
+                return Reply(request, HttpStatusCode.NotFound, null);
+            string path = Uri.UnescapeDataString(uri.AbsolutePath);
+            string api = "/repos/" + ReleaseClient.Repository + "/";
+            if (uri.Host == "api.github.com" && path.StartsWith(api, StringComparison.Ordinal))
+            {
+                string rest = path.Substring(api.Length), page = Query(uri, "page");
+                if (rest == "releases")
+                    return Reply(request, HttpStatusCode.OK, JsonText(page.Length == 0 || page == "1" ? Releases() : "[]"));
+                if (rest.StartsWith("releases/tags/", StringComparison.Ordinal))
+                {
+                    string tag = rest.Substring("releases/tags/".Length);
+                    var list = Json.Serializer().DeserializeObject(Releases()) as object[];
+                    Core.Require(list != null, "The test release list must be a JSON array.");
+                    var match = list.OfType<Dictionary<string, object>>().FirstOrDefault(r => Json.String(r, "tag_name") == tag);
+                    return match == null ? Reply(request, HttpStatusCode.NotFound, null) : Reply(request, HttpStatusCode.OK, JsonText(Json.Encode(match)));
+                }
+                if (rest == "issues") return Reply(request, HttpStatusCode.OK, JsonText("[]"));
+                return Reply(request, HttpStatusCode.NotFound, null);
+            }
+            if (uri.Host == "raw.githubusercontent.com" && path == "/" + ReleaseClient.Repository + "/main/config/texture-pack.json")
+            {
+                string manifest = Path.Combine(Folder, "texture-pack.json");
+                return File.Exists(manifest) ? Reply(request, HttpStatusCode.OK, JsonText(File.ReadAllText(manifest))) : Reply(request, HttpStatusCode.NotFound, null);
+            }
+            string download = "/" + ReleaseClient.Repository + "/releases/download/";
+            if (uri.Host == "github.com" && path.StartsWith(download, StringComparison.Ordinal))
+            {
+                var parts = path.Substring(download.Length).Split('/');
+                if (parts.Length != 2) return Reply(request, HttpStatusCode.NotFound, null);
+                Core.Name(parts[0]); Core.Name(parts[1]);
+                string file = Core.PathIn(Folder, parts[0] + "/" + parts[1]);
+                if (!File.Exists(file)) return Reply(request, HttpStatusCode.NotFound, null);
+                var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, true);
+                long size = stream.Length, offset = 0;
+                var range = request.Headers.Range;
+                if (range != null && range.Unit == "bytes" && range.Ranges.Count == 1 && range.Ranges.First().From.HasValue)
+                {
+                    offset = range.Ranges.First().From.Value;
+                    if (offset >= size) { stream.Dispose(); return Reply(request, HttpStatusCode.RequestedRangeNotSatisfiable, null); }
+                }
+                stream.Position = offset;
+                var content = new StreamContent(stream, 65536);
+                content.Headers.ContentLength = size - offset;
+                if (offset > 0) content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(offset, size - 1, size);
+                return Reply(request, offset > 0 ? HttpStatusCode.PartialContent : HttpStatusCode.OK, content);
+            }
+            return Reply(request, HttpStatusCode.NotFound, null);
+        }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            try { return Task.FromResult(Answer(request)); }
+            catch (Exception error) { var failed = new TaskCompletionSource<HttpResponseMessage>(); failed.SetException(error); return failed.Task; }
         }
     }
 }

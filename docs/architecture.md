@@ -14,7 +14,7 @@ MapMaker changes; see `docs/development-roadmap.md`.
 
 | Layer | Project | License / attribution |
 | --- | --- | --- |
-| Wrapper (this repo) | `TheDoffman/timesplitters-future-perfect-pc`: launcher, PC/Mac host code in `src/`, ~110 runtime patches in `patches/`, tools, tests | `LICENSE`, `NOTICE`, `LICENSES/` |
+| Wrapper (this repo) | `JustinDent/timesplitters3-limitless` (fork of `TheDoffman/timesplitters-future-perfect-pc`): launcher, PC/Mac host code in `src/`, ~110 runtime patches in `patches/`, tools, tests | `LICENSE`, `NOTICE`, `LICENSES/` |
 | Static-recompilation runtime | `nemonicicon/ts3FPrecomp` (cloned by `tsfp.ps1 -Action Setup`, `tools/build-native-mac.py`) | GPL-3.0 (`runtime:LICENSE`), plus `LICENSE.upstream-MIT`, `NOTICE`, `CONTRIBUTORS.md` |
 | Runtime submodules | SDL3, XbSymbolDatabase, others under `runtime:third_party/` | Their own licenses; not checked out unless Setup runs |
 | Game | Original Xbox US `default.xbe`, title `45410066`, SHA-256 `3cfd001a…816bc` | Proprietary; user-supplied, stays in ignored `private/game` |
