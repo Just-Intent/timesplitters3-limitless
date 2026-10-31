@@ -356,6 +356,25 @@ resource slot at the scene 100 set preload (returns 0x0023F33F/0x0023F37F).
 No save change (chunk 0xC77668 +0x18 word id, +0x1B variant). Not yet built
 or played.
 
+Real story boss: giant trophy monster (area `realbosses`,
+`src/interface/pc_mapmaker_realbosses.inc`, `docs/mapmaker/mapmaker-realbosses.md`,
+`TSFP_MAPMAKER_LIMITS=1`, opt-out `TSFP_MAPMAKER_REAL_BOSS=0`). Editor: the
+picker gets synthetic row id 150 (list end `sub_000781A0` ret 0x002C1FA5);
+WRAPs of `sub_002C1C90` (row 150 -> slot id 0x15, variant -1), `sub_002C1E10`
+and `sub_002BE600` (preview gets the Arcade trophy row; slot reload ret
+0x002C054C and edit-screen name ret 0x002BE65F/0x003033C0 get 150),
+`sub_002BE300` (150 -> text 0x52420015) and `sub_0003D7B0` (that id, and 0xDCC
+at ret 0x0014CED5 in scene 100 -> "Giant Trophy Monster"); `sub_000A5E40` logs
+editor requests of model 0x5BE. Play (scene 100 story): `sub_001C8540` mounts
+`pak/stream/lv1/anim/lv1_3.pak` (0x0049D77C, `sub_0005A130`, >= 2 of 30 slots
+free) when the map's custom set holds 0x15, before `sub_001CA2F0` registers
+anim names; `sub_0015B830` sets spawn record class 0/0x80 (`sub_00280FA0`)
+for a+0x48 == 0x15 / model 0x5BE when the pak is mounted; `sub_0014CC80`
+(INSIDE bosses) hides the stock bar when that AI has the Boss flag (+0x29),
+so one bar per actor. No save byte; the handler cannot reach `sub_002274C0`
+(decode call graph). `tests/mapmaker/test_mapmaker_realbosses.py`. Not yet
+built or played.
+
 ### MapMaker and System Link bug fixes
 
 Area `bugfix` (`src/interface/pc_mapmaker_bugfix.inc`, `src/interface/pc_mapmaker_validate.inc`,
