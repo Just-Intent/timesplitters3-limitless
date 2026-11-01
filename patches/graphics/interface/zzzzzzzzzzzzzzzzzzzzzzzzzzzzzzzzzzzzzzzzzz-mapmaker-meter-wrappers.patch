@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,2092 @@
+@@ -1037,6 +1037,2114 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2055,6 +2055,28 @@
 +    else sub_000862C0_gen();
 +#else
 +    sub_000862C0_gen();
++#endif
++}
++
++extern void sub_00071800_gen(void);
++void sub_00071800(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("tilesets","pc_mapmaker_tilesets_menu_row")) pc_mapmaker_tilesets_menu_row(sub_00071800_gen);
++    else sub_00071800_gen();
++#else
++    sub_00071800_gen();
++#endif
++}
++
++extern void sub_00338170_gen(void);
++void sub_00338170(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("tilesets","pc_mapmaker_tilesets_play_pak")) pc_mapmaker_tilesets_play_pak(sub_00338170_gen);
++    else sub_00338170_gen();
++#else
++    sub_00338170_gen();
 +#endif
 +}
 +
