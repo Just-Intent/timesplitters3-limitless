@@ -150,6 +150,7 @@ static void fake_start(uint32_t ent)
     cell=st+0x970u+(uint32_t)(i*0x28);
     SETF(ent+0x64u,F(cell+0x10u));SETF(ent+0x6Cu,F(cell+0x14u));
 }
+static uint32_t live_particles, seen_parts_on;
 static void fake_fight(void)
 {
     unsigned k;
@@ -157,6 +158,7 @@ static void fake_fight(void)
     originals++;
     for(k=0;k<7u;k++) seen_const[k]=F(cad[k]);
     seen_state=WORD_AT(a+0x20u);seen_next=WORD_AT(a+0x9D0u);
+    seen_parts_on=WORD_AT(CST+0x2E00u);WORD_AT(0x0078B0CCu)=live_particles;   /* sub_002A7D60 recounts */
     if(seen_state==0u && WORD_AT(0x0075F5E8u)==CST) fake_start(WORD_AT(g_esp+4u));
     inner(pc_mapmaker_crowe_near,fake_near,0x00290BE7u,ENT(0));
     seen_after_near=F(0x0049F3C4u);
@@ -442,13 +444,33 @@ int main(void)
     crw_lv.boss=CRW_BOSS_BAR;
     CALL(pc_mapmaker_crowe_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
 
-    /* ---- the end: removed once, focus dropped ----------------------------- */
+    /* ---- the end: effects play out without new smoke, then removed once ---- */
     WORD_AT(PLAYER+0xFF4u)=ENT(0);
     WORD_AT(A(0)+0x20u)=0x12u;
-    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,0);
-    CHECK(nremove==1 && remove_arg==ENT(0) && WORD_AT(PLAYER+0xFF4u)==0);
+    WORD_AT(CST+0x2E00u)=0x2Fu;live_particles=3u;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(nremove==0 && seen_parts_on==0 && WORD_AT(CST+0x2E00u)==0x2Fu && WORD_AT(PLAYER+0xFF4u)==ENT(0));
+    CHECK(near_eq(seen_const[0],4.0f) && consts_stock());     /* the floor still follows the spawn */
+    ndraw=0;
+    CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(ndraw==1);                                          /* still drawn while they play out */
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(nremove==0 && crw_lv.fading==2u);
+    live_particles=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(nremove==1 && remove_arg==ENT(0) && WORD_AT(PLAYER+0xFF4u)==0 && WORD_AT(CST+0x2E00u)==0x2Fu);
+    CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(ndraw==1);                                          /* gone: nothing left to freeze */
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     CHECK(nremove==1);
+    /* particles that never die out (another boss's): removed after 300 calls */
+    CHECK(level_gives_class());
+    WORD_AT(A(0)+0x20u)=0x12u;live_particles=5u;
+    for(k=0;k<299u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(nremove==1);
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(nremove==2);
+    live_particles=0;
 
     /* ---- Boss flag from the Story AI chunk; the bosses area must be on ---- */
     container(0x11,with,3,boss_bar,2);
