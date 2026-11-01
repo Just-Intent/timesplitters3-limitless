@@ -53,6 +53,8 @@ void sub_002E4B80(void) { g_ecx=12; }
 void sub_002976F0(void) { g_ecx=13; }
 void sub_0015DDA0(void) { g_ecx=14; }
 void sub_0029CCB0(void) { g_ecx=15; }
+void sub_00019D70(void) { g_ecx=16; }
+void sub_002A7F30(void) { g_ecx=17; }
 static unsigned nprincess;
 static uint32_t princess_ent;
 void sub_0029CEF0(void) { nprincess++;princess_ent=WORD_AT(g_esp+4u);g_esp+=4u; }   /* pops like the lifted callee */
@@ -75,6 +77,8 @@ static uint32_t enable_item, enable_flag=0xEEu, mount_arg;
 static int pak_mounted, skel_mounted, walk_mounted, mount_ok=1, alloc_ok=1, player_dead;
 static unsigned nwalk_alloc, nremove, nfx;
 static uint32_t remove_arg, fx_scene;
+static unsigned nfire, nrender;
+static uint32_t fire_args[2];
 static unsigned nalloc, nstart, nshot, neffect, nbar;
 static uint32_t start_args[2], shot_args[12], effect_args[2], bar_args[3], bar_esi, bar_edi, alloc_scene;
 static uint32_t guest_call(void (*f)(void),int n,...)
@@ -118,6 +122,8 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     if(f==sub_002976F0) { nwalk_alloc++;if(alloc_ok) WORD_AT(0x0078B1E8u)=WKST;WORD_AT(0x0078B0D0u)=SKPT;return 0; }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
     if(f==sub_0029CCB0) { nfx++;fx_scene=WORD_AT(0x0079094Cu);return 0; }
+    if(f==sub_00019D70) { nrender++;return 0; }
+    if(f==sub_002A7F30) { nfire++;fire_args[0]=x[0];fire_args[1]=x[1];return 0; }
     return 0;
 }
 #include "pc_mapmaker_budget.inc"
@@ -578,6 +584,23 @@ int main(void)
         CALL(pc_mapmaker_realbosses_face,fake,0x0029D075u,ENT(4),0,0,1);     /* not the boss */
         CHECK(FLOAT_AT(ENT(4)+0x68u)==3.0f);
         FLOAT_AT(ENT(3)+0x68u)=-12.5f;
+        /* fire: the mansion particle draw, once per frame step, while +0x3E88 == 1 */
+        WORD_AT(0x007B0CC0u)=0x00650000u;WORD_AT(0x00650000u+0x208u)=0x00654321u;
+        WORD_AT(SKST+0x3E88u)=0;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nfire==0);
+        WORD_AT(SKST+0x3E88u)=1u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE90u,0,0,0,1);         /* another caller */
+        CHECK(nfire==0);
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nfire==1 && nrender==1 && fire_args[0]==0x00654321u && fire_args[1]==0x40200000u);
+        WORD_AT(0x0079094Cu)=1u;                                             /* mission 5 draws it itself */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        WORD_AT(0x0079094Cu)=100u;WORD_AT(0x0078B1ECu)=SKST+0x10u;          /* not this level's state */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        WORD_AT(0x0078B1ECu)=SKST;
+        CHECK(nfire==1);
+        WORD_AT(SKST+0x3E88u)=0;
         k=nprincess;
         CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(4),0,0,1);
         CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,0,0,0,1);

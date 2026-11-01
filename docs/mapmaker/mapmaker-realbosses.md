@@ -266,6 +266,32 @@ INFERRED: the stretching came from the same mismatch (the body drawn at height
 recurs, wait more than 60 s before closing the game so the hang watchdog
 writes a report, and send the throw lines.
 
+### Fire and spawn diagnostics (after v0.4.0-mapmaker.18)
+
+User report (mapmaker.17): the skeleton's fire breath "didn't land, and I
+couldn't see its fire, though it did the animation"; the Crow walker did not
+spawn. CONFIRMED (decode): the fire is the feeble throw (the only path from
+the fight to the damage code `sub_000BABA0` is `sub_00287E20` ->
+`sub_000EA9C0` -> `sub_000E0CE0` -> `sub_00160020`); its flames are the particle
+block `[0x0078B0D0]`, emitted by `sub_002A6650` (no calls but the math helper
+`sub_002A6010`: visual only) and drawn by `sub_0029CE00` from the frame
+`sub_001CEBC0` only in scenes 1 and 17 (0x001CEE31/0x001CEE42): scene 1 draws
+when state +0x3E88 == 1 with `sub_00019D70(1)` and `sub_002A7F30([[0x007B0CC0]+
+0x208], 2.5)`.
+
+| change | what it does |
+|---|---|
+| `_fx` (`sub_00126560`, ret 0x001CEE8C) | also draws that scene-1 branch for this level's skeleton in scene 100 (logged once: `giant skeleton fire particles drawn`) |
+| `_throw` fire log | adds the projectile `sub_000EA9C0` returned (0 = none was made) |
+| WRAP `sub_000DAC30` -> `pc_mapmaker_realbosses_create` | log only: each creation of character 0x15/0x28/0x64 in MapMaker play and its object (0 = `sub_000A6F90` failed) |
+| `_ai_start` | while the Crow walker's state exists, logs the first 12 AI starts (character, model, record id) |
+
+Walker: the mapmaker.17 log shows lv81.pak mounted and its state allocated,
+but no walker AI start at all; model 0x637 `CHR_WALKERCROW` is in the scene 100
+table `prop/table/prop_all_xbas.raw` and its model file is in `pak/chr.pak`;
+its character table row equals the skeleton's except name text 0. Not
+explained yet; the logs above should show whether it is created.
+
 ## The Crow walker (story mission 13)
 
 User request (2026-11-01): the Crow walker and tank bosses next. The walker

@@ -177,6 +177,7 @@ void pc_mapmaker_realbosses_message(void (*original)(void));
 void pc_mapmaker_realbosses_tag(void (*original)(void));
 void pc_mapmaker_realbosses_fx(void (*original)(void));
 void pc_mapmaker_realbosses_face(void (*original)(void));
+void pc_mapmaker_realbosses_create(void (*original)(void));
 void pc_mapmaker_bosses_rows(void (*original)(void));
 void pc_mapmaker_bosses_close(void (*original)(void));
 void pc_mapmaker_bosses_delete(void (*original)(void));
