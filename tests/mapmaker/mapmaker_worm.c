@@ -170,6 +170,13 @@ static void fake_draw(void)
     seen_draw[0]=F(0x0049DDD8u);seen_draw[1]=F(0x0049DDD4u);seen_wall=WORD_AT(0x0049DE08u);
     before=originals;inner(pc_mapmaker_worm_props,fake,ESP1,0x001DA998u,0);seen_props=(uint32_t)(originals-before);
     before=originals;inner(pc_mapmaker_worm_extra,fake,ESP1,0x001DA9A9u,0);seen_extra=(uint32_t)(originals-before);
+    {   /* sub_001D9B80: a surfaced head at the worm, or at the fixed burst point (y 0) */
+        uint32_t head=WORD_AT(0x0078FAE0u),w=WORD_AT(0x0075B4B4u);
+        if(head && w==WST && WORD_AT(w+0x24u)>=8u) {
+            if(WORD_AT(w+0x44Cu)==2u) { SETF(head+0x64u,F(0x0049DDD8u));SETF(head+0x68u,0.0f);SETF(head+0x6Cu,F(0x0049DDD4u)); }
+            else { SETF(head+0x64u,F(w));SETF(head+0x68u,F(w+4u));SETF(head+0x6Cu,F(w+8u)); }
+        }
+    }
 }
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
@@ -463,6 +470,20 @@ int main(void)
     CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==1 && near_eq(seen_draw[0],14.136f) && near_eq(seen_draw[1],-19.85f) && seen_wall==0x7F7FFFFFu);
     CHECK(seen_props==0 && seen_extra==0 && consts_stock());
+    /* surfaced: the head at the worm (the spawn floor); after a state-2 burst the fixed point's y 0 + dy */
+    WORD_AT(W(0)+0x24u)=9u;WORD_AT(W(0)+0x44Cu)=0;
+    CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(near_eq(F(ENT(0)+0x68u),4.0f) && near_eq(F(ENT(0)+0x64u),10.0f) && wrm_lv.surfaced);
+    WORD_AT(W(0)+0x24u)=1u;
+    CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(!wrm_lv.surfaced);
+    WORD_AT(W(0)+0x24u)=9u;WORD_AT(W(0)+0x44Cu)=2u;
+    CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(near_eq(F(ENT(0)+0x68u),6.4f) && near_eq(F(ENT(0)+0x64u),14.136f) && near_eq(F(ENT(0)+0x6Cu),-19.85f));
+    CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(near_eq(F(ENT(0)+0x68u),6.4f));                    /* set by the draw each frame, offset once */
+    WORD_AT(W(0)+0x24u)=1u;WORD_AT(W(0)+0x44Cu)=0;
+    CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
     before=originals;
     CHECK(inner(pc_mapmaker_worm_props,fake,ESP2,0x001DA998u,0)==0 || 1);
     CHECK(originals-before==1);                              /* outside this area's draw: stock */
@@ -510,8 +531,10 @@ int main(void)
     w=nupdate;
     CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,1);   /* none: a bot */
     CHECK(wrm_lv.failed && !wrm_lv.ready && nupdate==w && WORD_AT(0x0075B4BCu)==0);
+    w=ndraw;
     CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
-    CHECK(ndraw==1);
+    CHECK(ndraw==w);
+    w=nupdate;
     pads(12);
     /* a spawn that is not a point */
     CHECK(level_notes());

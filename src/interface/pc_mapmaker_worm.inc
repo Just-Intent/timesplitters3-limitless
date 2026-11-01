@@ -123,6 +123,8 @@
 #define WRM_W_EMITTER 0x43Cu
 #define WRM_W_PAD 0x440u                /* current pad, +0x444 previous */
 #define WRM_GONE 4u
+#define WRM_SURFACED 8u                 /* states >= 8: the head is out (placed by the draw) */
+#define WRM_W_ROUTE_FROM 0x44Cu         /* the state the burst came from (2: the fixed burst point) */
 #define WRM_GROUND (-2.4f)              /* mission 5: the worms' start height */
 #define WRM_BOX_X (-66.45f)             /* centre of the target box (x -77.2..-55.7, z -6..39.5) */
 #define WRM_BOX_Z 16.75f
@@ -183,12 +185,12 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
     int read, optout;
-    unsigned logged, extras, ticks, hits, draws, scripts;
+    unsigned logged, extras, ticks, hits, draws, scripts, surfacings;
 } wrm;
 /* This level's worm: blocks, spawn record, pool entry, placement. */
 static struct {
     uint32_t state, scratch, effect, record, actor;
-    int ready, failed, shifted, drawing, swapped;
+    int ready, failed, shifted, drawing, swapped, surfaced;
     float dx, dy, dz;
     uint32_t pad[WRM_ROUTE_N], saved[WRM_NCONST], route[WRM_ROUTE_N], wall;
 } wrm_lv;
@@ -522,6 +524,25 @@ void pc_mapmaker_worm_hit(void (*original)(void))
         wrm_log("mansion worm hit (state before, after)",st,WORD_AT(wrm_lv.state+WRM_W_STATE));
 }
 
+/* After the draw: the surfaced head (states >= 8, placed by sub_001D9B80 at
+ * the worm's height, the garden floor -2.4 shifted to the spawn floor). After
+ * a state-2 burst (+0x44C 2) stock puts it at the fixed point (-62.31, 0,
+ * 16.9) (0x001DA94C..0x001DA969): x/z follow the shifted constants, y 0 gets
+ * the floor offset here. Each surfacing is logged against the spawn floor. */
+static void wrm_height(void)
+{
+    uint32_t w=wrm_lv.state,head=WORD_AT(WRM_HEADS);
+    if(!head || !MAPMAKER_PTR_OK(head,0x200u) || WORD_AT(w+WRM_W_STATE)<WRM_SURFACED) { wrm_lv.surfaced=0;return; }
+    if(WORD_AT(w+WRM_W_ROUTE_FROM)==2u) wrm_setf(head+WRM_ENT_X+4u,wrm_getf(head+WRM_ENT_X+4u)+wrm_lv.dy);
+    if(!wrm_lv.surfaced && wrm.surfacings++<8u) {
+        fprintf(stderr,"[mapmaker] worm: surfaced, state %u, head height %.2f, spawn floor %.2f, worm height %.2f%s\n",
+                (unsigned)WORD_AT(w+WRM_W_STATE),(double)wrm_getf(head+WRM_ENT_X+4u),(double)(WRM_GROUND+wrm_lv.dy),
+                (double)wrm_getf(w+4u),WORD_AT(w+WRM_W_ROUTE_FROM)==2u?" (state-2 burst point)":"");
+        fflush(stderr);
+    }
+    wrm_lv.surfaced=1;
+}
+
 /* WRAP sub_00126560 (frame, return 0x001CEE8C): the stock worm draw (bodies,
  * surfaced heads) in scene 100. */
 void pc_mapmaker_worm_fx(void (*original)(void))
@@ -534,6 +555,7 @@ void pc_mapmaker_worm_fx(void (*original)(void))
     guest_call(sub_001DA990,0);
     wrm_lv.drawing=0;
     wrm_shift(0,1);
+    wrm_height();
     if(!wrm.draws++) wrm_log("mansion worm drawn",wrm_lv.state,WORD_AT(WRM_ENABLE));
 }
 
