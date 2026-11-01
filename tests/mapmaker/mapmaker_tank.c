@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00800000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
+static uint32_t memory[0x00900000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -172,12 +172,14 @@ static void actor(unsigned i,uint32_t id,float x,float y,float z,float yaw)
 static void resources(int tank,int turret,int wreck,uint32_t init)
 {
     uint32_t m;
-    for(m=0;m<0x700u;m++) HALF_AT(0x0078B860u+m*2u)=0xFFFFu;
+    for(m=0;m<0xA00u;m++) HALF_AT(0x008CA000u+m*2u)=0xFFFFu;
     WORD_AT(0x00791D4Cu)=RES;
-    if(tank) { HALF_AT(0x0078B860u+0x281u*2u)=3;WORD_AT(RES+3u*0x30u+0x2Cu)=init; }
-    if(turret) HALF_AT(0x0078B860u+0x297u*2u)=4;
-    if(wreck) HALF_AT(0x0078B860u+0x298u*2u)=5;
-    HALF_AT(0x0078B860u+0x12u*2u)=6;
+    if(tank) { HALF_AT(0x008CA000u+0x281u*2u)=3;WORD_AT(RES+3u*0x30u+0x2Cu)=init; }
+    if(turret) HALF_AT(0x008CA000u+0x297u*2u)=4;
+    if(wreck) HALF_AT(0x008CA000u+0x298u*2u)=5;
+    HALF_AT(0x008CA000u+0x12u*2u)=6;
+    HALF_AT(0x0078B860u+0x281u*2u)=1;HALF_AT(0x0078B860u+0x297u*2u)=1;HALF_AT(0x0078B860u+0x298u*2u)=1;   /* the stock map: stale, never written */
+    WORD_AT(RES+1u*0x30u+0x2Cu)=0;
 }
 static void players(float x0,float z0,float h0,float x1,float z1,float h1)
 {

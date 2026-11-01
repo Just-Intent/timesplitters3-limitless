@@ -28,6 +28,7 @@ MUTATIONS = {
     'any-scene': ('return tnk_on() && WORD_AT(TNK_SCENE)==100u && TNK_B(TNK_MODE)==10u; }', 'return tnk_on() && TNK_B(TNK_MODE)==10u; }'),
     'mine-any-scene': ('obj==tnk_lv.obj && WORD_AT(TNK_SCENE)==100u && tnk_on(); }', 'obj==tnk_lv.obj && tnk_on(); }'),
     'mine-any-object': ('return tnk_lv.obj && obj==tnk_lv.obj && WORD_AT', 'return tnk_lv.obj && WORD_AT'),
+    'stale-resmap': ('#define TNK_RESMAP 0x008CA000u', '#define TNK_RESMAP 0x0078B860u'),
     # mount
     'mount-wrong-pak': ('#define TNK_PAK 0x0049DF7Cu', '#define TNK_PAK 0x0049DF98u'),
     'mount-loads-whole': ('guest_call(sub_000622D0,3,TNK_PAK,0u,1u)', 'guest_call(sub_000622D0,3,TNK_PAK,1u,1u)'),
@@ -350,6 +351,26 @@ def test_bar_text_sites():
     assert ('imm', 0x1635) in a[0x0014CD79].ops and target(a[0x0014CD7E]) == 0x0003D7B0 and ends(a, 0x0014CD7E) == 0x0014CD83
     # the update sets the story focus to the tank when the fight starts
     assert mem(a[0x002555AA])[0][4] == 0xFF4
+
+
+def test_resource_map_relocated():
+    """The rooms area moves every access of the model -> row map 0x0078B860 to
+    0x008CA000, the builder's and the spawn path's included; the tank reads it there."""
+    import json
+    patches = json.loads((ROOT / 'config/guest-code-patches/rooms.json').read_text(encoding='utf-8'))['patches']
+    moved = {int(p['address'], 16): p for p in patches if '0x78b860' in p.get('reason', '')}
+    for site in (0x002427C8, 0x00242A34, 0x000A6F94, 0x000A6EC4, 0x000A688F, 0x000A6F56):
+        assert int(moved[site]['value'], 16) == 0x008CA000, hex(site)
+    rooms = (ROOT / 'src/interface/pc_mapmaker_rooms.inc').read_text(encoding='utf-8')
+    assert '#define MAPMAKER_ROOMS_MODEL_TABLE 0x008CA000u' in rooms
+    text = INC.read_text(encoding='utf-8')
+    assert '#define TNK_RESMAP 0x008CA000u' in text and '#define TNK_RESMAP_MODELS 0xA00u' in text
+    # story scene 100 loads prop_all_xbas (sub_00065250: story and not [0x007DE458] & 0x40 -> 1)
+    a = by_address()
+    assert target(a[0x00242789]) == 0x00065250 and ('imm', 0x0049F01C) in a[0x002427D8].ops
+    assert mem(a[0x00065250])[0][4] == 0x007DE455 and ('imm', 1) in a[0x00065262].ops
+    # the builder fills the row's init (+0x2C) from 0x004FCA60[raw +0x24]
+    assert mem(a[0x00242A21])[0][4] == 0x004FCA60 and mem(a[0x00242B5E])[0][4] == 0x2C
 
 
 def test_mount_site():
