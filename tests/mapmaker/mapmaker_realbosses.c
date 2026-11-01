@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00800000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
+static uint32_t memory[0x00A00000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -33,6 +33,13 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 #define SKST 0x00700100u                /* fake skeleton state (0x4C7C) */
 #define SKPT 0x00710000u                /* fake particle block (0x7D00) */
 #define WKST 0x00720000u                /* fake Crow walker state (0x64DC) */
+/* further instances of one level (the first keeps the addresses above) */
+#define SKST_K(k) ((k)?0x00800000u+(uint32_t)(k)*0x10000u:SKST)
+#define SKPT_K(k) ((k)?0x00880000u+(uint32_t)(k)*0x8000u:SKPT)
+#define WKST_K(k) ((k)?0x00900000u+(uint32_t)(k)*0x8000u:WKST)
+#define WKPT_K(k) (0x00940000u+(uint32_t)(k)*0x8000u)
+#define WKEF_K(k) (0x00980000u+(uint32_t)(k)*0x1000u)
+static unsigned skel_seq(void), walk_seq(void);   /* instances made so far this level */
 #define A(i) (POOL+(uint32_t)(i)*0xEA0u)
 #define ENT(i) (ENTS+(uint32_t)(i)*0x400u)
 #define REC(i) (RECS+(uint32_t)(i)*0x100u)
@@ -57,10 +64,16 @@ void sub_00019D70(void) { g_ecx=16; }
 void sub_002A7F30(void) { g_ecx=17; }
 void sub_0005F460(void) { g_ecx=18; }
 static unsigned nanim;
+static uint32_t fire_parts;
 static uint32_t anim_args[4], anim_ok=1;
 static unsigned nprincess;
 static uint32_t princess_ent;
-void sub_0029CEF0(void) { nprincess++;princess_ent=WORD_AT(g_esp+4u);g_esp+=4u; }   /* pops like the lifted callee */
+static uint32_t princess_state, princess_parts;
+void sub_0029CEF0(void)                       /* pops like the lifted callee; emits a particle */
+{
+    nprincess++;princess_ent=WORD_AT(g_esp+4u);g_esp+=4u;
+    princess_state=WORD_AT(0x0078B1ECu);princess_parts=WORD_AT(0x0078B0D0u);WORD_AT(0x0078B0CCu)++;
+}
 static unsigned nmansion_msg;
 static uint32_t mansion_msg[2];
 void sub_00286D30(void)                       /* mansion message handler: death = state 6, -1 */
@@ -79,7 +92,7 @@ static struct { uint32_t text, id, flags, cb; char label[32]; } rows[12];
 static uint32_t enable_item, enable_flag=0xEEu, mount_arg;
 static int pak_mounted, skel_mounted, walk_mounted, mount_ok=1, alloc_ok=1, player_dead;
 static unsigned nwalk_alloc, nremove, nfx;
-static uint32_t remove_arg, fx_scene;
+static uint32_t remove_arg, fx_scene, fx_walk[8], fx_eff[8];
 static unsigned nfire, nrender;
 static uint32_t fire_args[2];
 static unsigned nalloc, nstart, nshot, neffect, nbar;
@@ -111,7 +124,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     }
     if(f==sub_00287E00) {   /* sub_0003DFA0 twice, then sub_00287860 */
         nalloc++;alloc_scene=WORD_AT(0x0079094Cu);
-        if(alloc_ok) { WORD_AT(0x0078B1ECu)=SKST;WORD_AT(0x0078B0D0u)=SKPT;WORD_AT(SKST+0x4160u)=0; }
+        if(alloc_ok) { unsigned q=skel_seq();WORD_AT(0x0078B1ECu)=SKST_K(q);WORD_AT(0x0078B0D0u)=SKPT_K(q);WORD_AT(SKST_K(q)+0x4160u)=0; }
         return 0;
     }
     if(f==sub_00059DB0) { nstart++;start_args[0]=x[0];start_args[1]=x[1];return x[1]==0x19Cu?0x77u:0x66u; }
@@ -122,11 +135,16 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         WORD_AT(x[2])=1u;return 0;
     }
     if(f==sub_002E4B80) return (uint32_t)player_dead;
-    if(f==sub_002976F0) { nwalk_alloc++;if(alloc_ok) WORD_AT(0x0078B1E8u)=WKST;WORD_AT(0x0078B0D0u)=SKPT;return 0; }
+    if(f==sub_002976F0) {   /* effect blocks, particles, state */
+        unsigned q=walk_seq();
+        nwalk_alloc++;if(alloc_ok) WORD_AT(0x0078B1E8u)=WKST_K(q);
+        WORD_AT(0x0078B0D0u)=q?WKPT_K(q):SKPT;WORD_AT(0x0078B090u)=WKEF_K(q);
+        return 0;
+    }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
-    if(f==sub_0029CCB0) { nfx++;fx_scene=WORD_AT(0x0079094Cu);return 0; }
+    if(f==sub_0029CCB0) { nfx++;fx_scene=WORD_AT(0x0079094Cu);fx_walk[nfx&7u]=WORD_AT(0x0078B1E8u);fx_eff[nfx&7u]=WORD_AT(0x0078B090u);return 0; }
     if(f==sub_00019D70) { nrender++;return 0; }
-    if(f==sub_002A7F30) { nfire++;fire_args[0]=x[0];fire_args[1]=x[1];return 0; }
+    if(f==sub_002A7F30) { nfire++;fire_args[0]=x[0];fire_args[1]=x[1];fire_parts=WORD_AT(0x0078B0D0u);return 0; }
     if(f==sub_0005F460) {   /* play: the controller (entity +4) gets the animation */
         nanim++;memcpy(anim_args,x,sizeof anim_args);
         if(anim_ok) WORD_AT(WORD_AT(x[0]+4u)+0xD4u)=x[1];
@@ -137,6 +155,11 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
 #include "pc_mapmaker_realbosses.inc"
+/* the first giant skeleton / Crow walker (the single-boss cases below) */
+#define rbs_skel (rbs_skels[0])
+#define rbs_walk (rbs_walks[0])
+static unsigned skel_seq(void) { return rbs_skelf.n; }
+static unsigned walk_seq(void) { return rbs_walkf.n; }
 
 static int failures, originals;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
@@ -149,6 +172,32 @@ static void fake_ai_any(void)
     originals++;seen_class[0]=WORD_AT(rec);seen_class[1]=WORD_AT(rec+4u);g_esp+=4u;
 }
 static void fake_hud(void) { originals++;seen_focus=WORD_AT(PLAYER+0xFF4u);g_esp+=4u; }
+/* a boss's own code: records the boss pointers and particle/effect blocks it sees */
+static uint32_t seen_skel, seen_walk, seen_parts, seen_eff;
+static void fake_seen(void)
+{
+    originals++;seen_skel=WORD_AT(0x0078B1ECu);seen_walk=WORD_AT(0x0078B1E8u);
+    seen_parts=WORD_AT(0x0078B0D0u);seen_eff=WORD_AT(0x0078B090u);g_esp+=4u;
+}
+/* a walker's first frame: looks up 'WELL' (sub_0023FF20 at 0x0029B32C) */
+static uint32_t well_seen;
+static void fake_fight_well(void)
+{
+    uint32_t sp=g_esp;
+    originals++;
+    g_esp-=8u;WORD_AT(g_esp)=0x0029B331u;WORD_AT(g_esp+4u)=0x57454C4Cu;orig_eax=0;
+    pc_mapmaker_realbosses_tag(fake);
+    well_seen=g_eax;g_esp=sp+4u;
+}
+/* a walker's death animation has ended: level event 2 (0x0029CB7B) */
+static void fake_fight_done(void)
+{
+    uint32_t sp=g_esp;
+    originals++;
+    g_esp-=12u;WORD_AT(g_esp)=0x0029CB80u;WORD_AT(g_esp+4u)=2u;WORD_AT(g_esp+8u)=0;
+    pc_mapmaker_realbosses_event(fake);
+    g_esp=sp+4u;
+}
 static void fake_pick(void)
 {   /* the stock callback stores data read past the Arcade table for row 150 */
     originals++;WORD_AT(0x0075FD90u+2u*0x1Cu)=0x12345u;WORD_AT(0x0075FD90u+2u*0x1Cu+0x14u)=150u;
@@ -209,10 +258,22 @@ static void container(uint32_t set_index,const uint16_t *ids,unsigned n,const ui
     for(k=0;k<nsai;k++) {
         WORD_AT(c)=0x00C7766Cu;WORD_AT(c+4u)=0x44u;
         HALF_AT(c+8u+0x22u)=(uint16_t)k;BYTE_AT(c+8u+0x29u)=boss[k];
+        BYTE_AT(c+8u+0x28u)=0xFFu;                           /* character slot: none (sai_slot sets one) */
         c+=8u+0x44u;
     }
     WORD_AT(c)=0x00C7766Au;WORD_AT(c+4u)=0;
 }
+/* the k-th Story AI chunk's character slot (+0x28) */
+static void sai_slot(unsigned k,uint32_t slot)
+{
+    uint32_t c=CONT+8u;
+    while(WORD_AT(c)!=0x00C7766Au) {
+        if(WORD_AT(c)==0x00C7766Cu && !k--) { BYTE_AT(c+8u+0x28u)=(uint8_t)slot;return; }
+        c+=8u+WORD_AT(c+4u);
+    }
+}
+#define FXW(fx,a) (*(uint32_t *)((fx)+((a)-0x0078B080u)))   /* a static in an instance's saved copy */
+static int fx_is(const uint8_t *base) { return !memcmp((void *)((uintptr_t)0x0078B080u+g_xbox_mem_offset),base,0x15Cu); }
 /* the sets area's chunk for slots 11-20 (0x00C776F5), inserted before the terminator */
 static void container_extra(const uint16_t *ids,unsigned n)
 {
@@ -594,12 +655,12 @@ int main(void)
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
         CHECK(seen_class[0]==0 && seen_class[1]==0x20000u && rbs_skel.record==REC(3));   /* before the original */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(4),0,0,1);         /* a second one */
-        CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && rbs_skel.record==REC(3) && rbs_skel.extras==1);
+        CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && rbs_skel.record==REC(3) && rbs_skelf.extras==1);
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);         /* same one again */
         CHECK(seen_class[1]==0x20000u && rbs_skel.record==REC(3));
         actor(5,0x0C,0x5E9,0);                                               /* by model */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(5),0,0,1);
-        CHECK(seen_class[1]==0 && rbs_skel.extras==2);
+        CHECK(seen_class[1]==0 && rbs_skelf.extras==2);
         /* princess: the mansion variant */
         k=nprincess;
         FLOAT_AT(ENT(3)+0x68u)=-12.5f;                                       /* spawn height: a lower floor */
@@ -687,16 +748,16 @@ int main(void)
         CHECK(nshot==1 && seen_scene==100u);
         /* event: its death marker is dropped */
         CALL(pc_mapmaker_realbosses_event,fake,0x0029E068u,3u,0,0,0);
-        CHECK(rbs_skel.events==1);
+        CHECK(rbs_skelf.events==1);
         CALL(pc_mapmaker_realbosses_event,fake,0x00227000u,3u,0,0,1);        /* map logic */
         WORD_AT(0x0079094Cu)=1u;
         CALL(pc_mapmaker_realbosses_event,fake,0x0029E068u,3u,0,0,1);        /* mission 5 */
         WORD_AT(0x0079094Cu)=100u;
-        CHECK(rbs_skel.events==1);
+        CHECK(rbs_skelf.events==1);
         /* message: the death (2) reaches the mansion handler, not the catacombs one */
         orig_eax=0;
         CHECK(CALL(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(3),2u,0x00600F00u,0)==0xFFFFFFFFu);
-        CHECK(nmansion_msg==1 && mansion_msg[0]==ENT(3) && mansion_msg[1]==2u && rbs_skel.deaths==1);
+        CHECK(nmansion_msg==1 && mansion_msg[0]==ENT(3) && mansion_msg[1]==2u && rbs_skelf.deaths==1);
         CHECK(CALL(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(3),5u,0,0)==0);   /* removal: as scene 1 */
         CHECK(nmansion_msg==2 && mansion_msg[1]==5u);
         CALL(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(4),2u,0,1);             /* not the boss */
@@ -1019,6 +1080,131 @@ int main(void)
             container(0x11,walk_set,2,walk_none,3);
             CHECK(rbs_map_has(0x64)==1 && rbs_map_has(0x28)==0);
         }
+        WORD_AT(PLAYER+0xFF4u)=ENT(0);
+    }
+    /* ---- several giant skeletons and Crow walkers in one map ------------------ */
+    {
+        static const uint16_t both[]={0x0C,0x28,0x64};
+        static const uint8_t none7[]={0,0,0,0,0,0,0};
+        uint8_t base[0x15C];
+        unsigned q,r;
+        RbsSave s1,s2,s3;
+        WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10u;
+        skel_mounted=walk_mounted=1;anim_ok=1;
+        container(0x11,both,3,none7,7);
+        sai_slot(0,1u);sai_slot(1,1u);sai_slot(2,1u);sai_slot(3,2u);sai_slot(4,2u);sai_slot(5,0u);sai_slot(6,25u);
+        for(q=0;q<0x15Cu;q+=4u) WORD_AT(0x0078B080u+q)=0xF0000000u+q;   /* another boss's statics */
+        memcpy(base,(void *)((uintptr_t)0x0078B080u+g_xbox_mem_offset),sizeof base);
+        WORD_AT(0x0078B1ECu)=0x123u;WORD_AT(0x0078B1E8u)=0x456u;
+        r=nalloc;q=nwalk_alloc;
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(rbs_skelf.n==3u && rbs_walkf.n==2u && nalloc-r==3u && nwalk_alloc-q==2u);     /* one per placed AI */
+        CHECK(rbs_skels[0].state==SKST && rbs_skels[1].state==SKST_K(1) && rbs_skels[2].state==SKST_K(2));
+        CHECK(rbs_skels[1].parts==SKPT_K(1) && FXW(rbs_skels[1].fx,0x0078B0D0u)==SKPT_K(1));
+        CHECK(rbs_walks[0].state==WKST && rbs_walks[1].state==WKST_K(1));
+        CHECK(FXW(rbs_walks[1].fx,0x0078B090u)==WKEF_K(1) && FXW(rbs_walks[1].fx,0x0078B0D0u)==WKPT_K(1));
+        CHECK(FXW(rbs_skels[2].fx,0x0078B0E0u)==0xF0000060u);                 /* each starts from the statics */
+        CHECK(FXW(rbs_skels[0].fx,0x0078B090u)==0xF0000010u);                 /* not a walker's effect block */
+        CHECK(fx_is(base));                                                   /* the statics put back */
+        CHECK(WORD_AT(0x0078B1ECu)==SKST && WORD_AT(0x0078B1E8u)==WKST);       /* home: the first of each */
+        /* AI start: one instance each, the fourth skeleton and third walker stay bots */
+        for(q=10;q<17u;q++) actor(q,q<14u?0x28u:0x64u,q<14u?0x5E9u:0x637u,q);
+        for(q=10;q<17u;q++) CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(q),0,0,1);
+        CHECK(rbs_skels[0].record==REC(10) && rbs_skels[1].record==REC(11) && rbs_skels[2].record==REC(12));
+        CHECK(WORD_AT(REC(12)+4u)==0x20000u && WORD_AT(REC(13)+4u)==0 && rbs_skelf.extras>=1u);
+        CHECK(rbs_walks[0].record==REC(14) && rbs_walks[1].record==REC(15) && rbs_walks[1].actor==A(15));
+        CHECK(WORD_AT(REC(15)+4u)==0x100000u && WORD_AT(REC(16)+4u)==0);
+        r=rbs_skelf.extras;
+        CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(11),0,0,1);   /* the same AI again */
+        CHECK(rbs_skels[1].record==REC(11) && rbs_skelf.extras==r && WORD_AT(REC(11)+4u)==0x20000u);
+        /* each skeleton's fight runs on its own state and particles; everything put back */
+        q=nprincess;
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(12),0,0,0);
+        CHECK(nprincess==q+1u && princess_state==SKST_K(2) && princess_parts==SKPT_K(2));
+        CHECK(fx_is(base) && WORD_AT(0x0078B1ECu)==SKST);
+        CHECK(FXW(rbs_skels[2].fx,0x0078B0CCu)==0xF000004Du && FXW(rbs_skels[0].fx,0x0078B0CCu)==0xF000004Cu);   /* its own count */
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(10),0,0,0);
+        CHECK(princess_state==SKST && princess_parts==SKPT && FXW(rbs_skels[0].fx,0x0078B0CCu)==0xF000004Du);
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(12),0,0,0);
+        CHECK(FXW(rbs_skels[2].fx,0x0078B0CCu)==0xF000004Eu);                 /* kept between calls */
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(13),0,0,1);   /* the bot one: stock */
+        CALL(pc_mapmaker_realbosses_skel_slot,fake_seen,0x000A5D20u,ENT(11),0,0,1);
+        CHECK(seen_skel==SKST_K(1) && seen_parts==SKPT_K(1) && WORD_AT(0x0078B1ECu)==SKST && fx_is(base));
+        CALL(pc_mapmaker_realbosses_skel_slot,fake_seen,0x000A5D20u,ENT(13),0,0,1);
+        CHECK(seen_skel==SKST && seen_parts==0xF0000050u);                    /* not one of ours: untouched */
+        WORD_AT(0x0079094Cu)=1u;
+        CALL(pc_mapmaker_realbosses_skel_slot,fake_seen,0x000A5D20u,ENT(11),0,0,1);
+        CHECK(seen_skel==SKST);                                               /* mission 5: stock */
+        WORD_AT(0x0079094Cu)=100u;
+        /* nested swaps: the same instance swaps nothing, another one is put back */
+        rbs_skel_in(&rbs_skels[1],&s1);
+        CHECK(WORD_AT(0x0078B1ECu)==SKST_K(1) && rbs_skelf.cur==&rbs_skels[1] && s1.swapped);
+        rbs_skel_in(&rbs_skels[1],&s2);
+        CHECK(!s2.swapped);
+        rbs_skel_in(&rbs_skels[2],&s3);
+        CHECK(WORD_AT(0x0078B1ECu)==SKST_K(2) && WORD_AT(0x0078B0D0u)==SKPT_K(2));
+        rbs_skel_out(&rbs_skels[2],&s3);
+        CHECK(WORD_AT(0x0078B1ECu)==SKST_K(1) && WORD_AT(0x0078B0D0u)==SKPT_K(1) && rbs_skelf.cur==&rbs_skels[1]);
+        rbs_skel_out(&rbs_skels[1],&s2);
+        CHECK(WORD_AT(0x0078B1ECu)==SKST_K(1));
+        rbs_skel_out(&rbs_skels[1],&s1);
+        CHECK(WORD_AT(0x0078B1ECu)==SKST && fx_is(base) && !rbs_skelf.cur);
+        /* fire: each burning skeleton draws its own particles */
+        WORD_AT(0x007B0CC0u)=PLAYER;WORD_AT(SKST_K(1)+0x3E88u)=1u;WORD_AT(SKST+0x3E88u)=0;WORD_AT(SKST_K(2)+0x3E88u)=0;
+        q=nfire;r=nfx;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nfire==q+1u && fire_parts==SKPT_K(1) && fx_is(base));
+        /* walkers: beams with their own state and effect blocks */
+        CHECK(nfx==r+2u && fx_walk[(r+1u)&7u]==WKST && fx_walk[(r+2u)&7u]==WKST_K(1) && fx_eff[(r+2u)&7u]==WKEF_K(1));
+        CHECK(WORD_AT(0x0078B1E8u)==WKST && fx_is(base));
+        WORD_AT(SKST_K(1)+0x3E88u)=0;
+        CALL(pc_mapmaker_realbosses_walk_fight,fake_seen,0x0027DE5Fu,ENT(15),0,0,1);
+        CHECK(seen_walk==WKST_K(1) && seen_eff==WKEF_K(1) && WORD_AT(0x0078B1E8u)==WKST && fx_is(base));
+        CALL(pc_mapmaker_realbosses_walk_message,fake_seen,0x0027D42Bu,ENT(15),2u,0,1);
+        CHECK(seen_walk==WKST_K(1));
+        WORD_AT(0x00570000u)=ENT(15);
+        CALL(pc_mapmaker_realbosses_walk_damage,fake_seen,0x0009E800u,0x00570000u,0,0,1);
+        CHECK(seen_walk==WKST_K(1) && WORD_AT(0x0078B1E8u)==WKST);
+        CALL(pc_mapmaker_realbosses_walk_slot,fake_seen,0x000A5D20u,ENT(14),0,0,1);
+        CHECK(seen_walk==WKST && seen_eff==WKEF_K(0));
+        CALL(pc_mapmaker_realbosses_walk_fight,fake_seen,0x0027DE5Fu,ENT(16),0,0,1);
+        CHECK(seen_walk==WKST && seen_eff==0xF0000010u);                     /* the bot walker: untouched */
+        WORD_AT(0x0079094Cu)=81u;
+        CALL(pc_mapmaker_realbosses_walk_fight,fake_seen,0x0027DE5Fu,ENT(15),0,0,1);
+        CHECK(seen_walk==WKST);                                               /* mission 13: stock */
+        WORD_AT(0x0079094Cu)=100u;
+        /* one WELL stand-in per walker, looked up inside its own fight */
+        CALL(pc_mapmaker_realbosses_walk_fight,fake_fight_well,0x0027DE5Fu,ENT(14),0,0,2);
+        q=well_seen;
+        CALL(pc_mapmaker_realbosses_walk_fight,fake_fight_well,0x0027DE5Fu,ENT(15),0,0,2);
+        CHECK(q && well_seen && well_seen!=q && rbs_walks[1].wells==1u);
+        CALL(pc_mapmaker_realbosses_walk_fight,fake_fight_well,0x0027DE5Fu,ENT(14),0,0,2);
+        CHECK(well_seen==q);                                                  /* reused */
+        /* the end of a walker's death removes that walker */
+        q=nremove;
+        CALL(pc_mapmaker_realbosses_walk_fight,fake_fight_done,0x0027DE5Fu,ENT(15),0,0,1);
+        CHECK(nremove==q+1u && remove_arg==ENT(15) && !rbs_walks[1].actor && rbs_walks[0].actor==A(14));
+        /* the boss pointer replaced by something else: no instance is ours any more */
+        WORD_AT(0x0078B1ECu)=0x999u;
+        CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(10),0,0,1);
+        WORD_AT(0x0078B1ECu)=SKST;
+        /* at most four of each */
+        container(0x11,both,3,none7,7);
+        for(q=0;q<7u;q++) sai_slot(q,1u);
+        r=nalloc;
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(rbs_skelf.n==4u && nalloc-r==4u && rbs_walkf.n==1u && !rbs_skels[3].record);
+        {   /* placed through a set slot 11-20 (sets chunk) */
+            static const uint16_t x2[]={0x30,0x28};
+            container(0x11,both,3,none7,7);container_extra(x2,2);
+            sai_slot(0,11u);sai_slot(1,11u);sai_slot(2,10u);
+            CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+            CHECK(rbs_skelf.n==2u);
+        }
+        alloc_ok=0;
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(rbs_skelf.n==0 && rbs_walkf.n==0 && !WORD_AT(0x0078B1ECu) && !WORD_AT(0x0078B1E8u));
+        alloc_ok=1;
         WORD_AT(PLAYER+0xFF4u)=ENT(0);
     }
     WORD_AT(0x0079094Cu)=102u;
