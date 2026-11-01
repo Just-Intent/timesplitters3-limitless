@@ -436,6 +436,11 @@ built or played. Set gate (mapmaker.12 log: skeleton in slot 11+ not seen,
 no lv1_6 mount/state): `rbs_set_scan` reads slots 1-10 (map-info +0x18) and
 11-20 (sets chunk 0x00C776F5), only for set index 0x11 (stock play sites
 0x00240DBB/0x0023F46A); anims and level log "set check found".
+Death (mapmaker.13: bar empty, no death): message 2 from `sub_0015DB20`
+goes through `sub_0028D0A0`, mansion `sub_00286D30` (state 6, anim 0x1A6)
+only in scene 1, else catacombs `sub_0028C560` swallows it (-1). WRAP
+`sub_0028D0A0` -> `pc_mapmaker_realbosses_message` calls the mansion one
+for the boss in scene 100; event 3 stays dropped, `sub_0015DDA0` removes it.
 Whole height (area `bigdraw`, `src/interface/pc_mapmaker_bigdraw.inc`, user:
 skeleton cut at ~2 floors in mapmaker.11): a prop's scissor (+0x118..+0x124,
 `sub_000862C0`, only caller 0x000A246B ret 0x000A2470) is the union of the

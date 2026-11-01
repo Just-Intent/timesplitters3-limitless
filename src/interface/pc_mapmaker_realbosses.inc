@@ -150,6 +150,10 @@
  *  - princess (sub_0029FE00(entity)): for that boss in scene 100, the mansion
  *    variant (a direct call: the callee pops the caller's return address,
  *    exactly the lifted tail jump).
+ *  - message (sub_0028D0A0(entity, msg, ..), its message handler): mansion
+ *    sub_00286D30 only in scene 1, else the catacombs sub_0028C560, which
+ *    swallows the death message 2 (sub_0015DB20): the boss never died. For
+ *    that boss in scene 100: the mansion handler (death state 6, anim 0x1A6).
  *  - risen (sub_002875F0(entity), state 1 of the fight: "has the entrance
  *    animation finished"): stock answers sub_00059DB0(entity, 0x19C) in
  *    scene 1, 0x23B in 17 and 0 elsewhere (the fight would stay in state 1);
@@ -264,12 +268,13 @@
 #define RBS_SKEL_THROW 6u               /* action type: feeble throw */
 #define RBS_SKEL_PHASE 0x4160u          /* state: 0 aim, 1 fire, 2 done */
 #define RBS_SKEL_SHOT 0x413Cu           /* state: origin (+0), direction (+0xC), effect (+0x18) */
-#define RBS_RET_EVENT 0x0029E068u       /* sub_0029CEF0: call sub_002274C0(3, 0) at 0x0029E063 */
+#define RBS_MSG_DEATH 2u                /* sub_0015DB20: message 2 = killed */
+#define RBS_RET_EVENT 0x0029E068u      /* sub_0029CEF0: call sub_002274C0(3, 0) at 0x0029E063 */
 #define RBS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBS_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 extern void sub_00079D60(void),sub_00071630(void),sub_00071C70(void),sub_0005A130(void),sub_00062260(void);
-extern void sub_00287E00(void),sub_0029CEF0(void),sub_00059DB0(void),sub_000EA9C0(void),sub_0010EB90(void);
+extern void sub_00287E00(void),sub_0029CEF0(void),sub_00286D30(void),sub_00059DB0(void),sub_000EA9C0(void),sub_0010EB90(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
@@ -281,7 +286,7 @@ static struct {
 } rbs;
 /* The giant skeleton of this level: its state blocks (0 = none this level)
  * and the one spawn record that holds the boss class. */
-static struct { uint32_t state, parts, record; unsigned extras, events, throws; } rbs_skel;
+static struct { uint32_t state, parts, record; unsigned extras, events, throws, deaths; } rbs_skel;
 
 static void rbs_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -572,6 +577,27 @@ void pc_mapmaker_realbosses_princess(void (*original)(void))
 {
     if(!rbs_skel.record || !MAPMAKER_STACK_OK(8) || !rbs_skel_boss(WORD_AT(g_esp+4u))) { original();return; }
     sub_0029CEF0();
+}
+
+/* WRAP sub_0028D0A0 (cdecl entity, message, a, b; the class 0x20000 message
+ * handler, called by sub_0027CEF0 at 0x0027D3A7 for sub_0015C310): stock
+ * tail-jumps to the mansion handler sub_00286D30 in scene 1 and to the
+ * catacombs one sub_0028C560 elsewhere, which answers -1 to messages 1 and 2
+ * and does nothing. Message 2 is the death (sub_0015DB20 at 0x0015DB34, from
+ * the damage code 0x000BB059 when health runs out): -1 skips the generic
+ * death, so in MapMaker the skeleton never died. The mansion handler sets
+ * state 6 with the death animation 0x1A6 (0x00286D7A); state 6 then drops
+ * the focus, fires level event 3 (dropped by _event) and removes the AI with
+ * sub_0015DDA0 (0x0029E069), as in mission 5. For the boss in scene 100: the
+ * mansion handler (a direct call: the callee pops the caller's return
+ * address, exactly the lifted tail jump). */
+void pc_mapmaker_realbosses_message(void (*original)(void))
+{
+    uint32_t ent;
+    if(!rbs_skel.record || !MAPMAKER_STACK_OK(20) || !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
+    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH && rbs_skel.deaths++<2u)
+        rbs_log("giant skeleton killed: the mansion death (state 6, animation 0x1A6)",ent,RBS_MSG_DEATH);
+    sub_00286D30();
 }
 
 /* WRAP sub_002875F0 (cdecl entity -> entrance finished): scene 1's answer. */

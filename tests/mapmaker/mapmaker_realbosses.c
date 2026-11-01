@@ -52,6 +52,13 @@ void sub_002E4B80(void) { g_ecx=12; }
 static unsigned nprincess;
 static uint32_t princess_ent;
 void sub_0029CEF0(void) { nprincess++;princess_ent=WORD_AT(g_esp+4u);g_esp+=4u; }   /* pops like the lifted callee */
+static unsigned nmansion_msg;
+static uint32_t mansion_msg[2];
+void sub_00286D30(void)                       /* mansion message handler: death = state 6, -1 */
+{
+    nmansion_msg++;mansion_msg[0]=WORD_AT(g_esp+4u);mansion_msg[1]=WORD_AT(g_esp+8u);
+    g_eax=mansion_msg[1]==2u?0xFFFFFFFFu:0u;g_esp+=4u;
+}
 static uint32_t heap_next=HEAP;
 static int heap_fail;
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment) { uint32_t p;(void)alignment;if(heap_fail)return 0;p=heap_next;heap_next+=(bytes+15u)&~15u;return p; }
@@ -221,6 +228,9 @@ static void level_with(uint32_t index,const uint16_t *ids,unsigned n,const uint1
     CHECK(nmount-m==(unsigned)(!!(expect&2)+!!(expect&1)));
     CHECK(nalloc-al==(unsigned)!!(expect&2) && (rbs_skel.state==SKST)==!!(expect&2));
     CHECK(((expect&2)?rbs_skel.record==REC(6):!rbs_skel.record));
+    m=nmansion_msg;                                       /* its death reaches the mansion handler */
+    call(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(6),2u,0,(expect&2)?0:1,line);
+    CHECK(nmansion_msg-m==(unsigned)!!(expect&2));
     if(failures!=fails) fprintf(stderr,"  (level_with from line %d)\n",line);
 }
 #define LEVEL_WITH(i,ids,n,ex,ne,e) level_with(i,ids,n,ex,ne,e,__LINE__)
@@ -584,6 +594,19 @@ int main(void)
         CALL(pc_mapmaker_realbosses_event,fake,0x0029E068u,3u,0,0,1);        /* mission 5 */
         WORD_AT(0x0079094Cu)=100u;
         CHECK(rbs_skel.events==1);
+        /* message: the death (2) reaches the mansion handler, not the catacombs one */
+        orig_eax=0;
+        CHECK(CALL(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(3),2u,0x00600F00u,0)==0xFFFFFFFFu);
+        CHECK(nmansion_msg==1 && mansion_msg[0]==ENT(3) && mansion_msg[1]==2u && rbs_skel.deaths==1);
+        CHECK(CALL(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(3),5u,0,0)==0);   /* removal: as scene 1 */
+        CHECK(nmansion_msg==2 && mansion_msg[1]==5u);
+        CALL(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(4),2u,0,1);             /* not the boss */
+        WORD_AT(0x0079094Cu)=1u;
+        CALL(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(3),2u,0,1);             /* mission 5: stock */
+        WORD_AT(0x0079094Cu)=17u;
+        CALL(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(3),2u,0,1);             /* catacombs: stock */
+        WORD_AT(0x0079094Cu)=100u;
+        CHECK(nmansion_msg==2);
         /* bar: Boss Off = no health shown; the stock call never sees the focus */
         WORD_AT(PLAYER+0xFF4u)=ENT(3);
         CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);
@@ -611,6 +634,8 @@ int main(void)
         CALL(pc_mapmaker_realbosses_risen,fake,0x0029D4A4u,ENT(3),0,0,1);
         CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,1);
         CHECK(nshot==1);
+        CALL(pc_mapmaker_realbosses_message,fake,0x0027D3ACu,ENT(3),2u,0,1);             /* forgotten boss */
+        CHECK(nmansion_msg==2);
         WORD_AT(PLAYER+0xFF4u)=ENT(0);
     }
     /* ---- play: both real bosses in one set, any slot 1-20, any order ------ */

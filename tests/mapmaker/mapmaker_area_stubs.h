@@ -57,6 +57,7 @@ void sub_00071630(void) {}
 void sub_00071C70(void) {}
 void sub_00287E00(void) {}
 void sub_0029CEF0(void) {}
+void sub_00286D30(void) {}
 void sub_00059DB0(void) {}
 void sub_000EA9C0(void) {}
 void sub_0010EB90(void) {}
