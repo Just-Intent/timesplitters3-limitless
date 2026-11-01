@@ -132,8 +132,8 @@ int main(void)
 
     /* Preload: log only, original exactly once, no memory written. */
     WORD_AT(0x00791D4Cu)=0x00700000u;
-    WORD_AT(0x0053A3CCu+0xA8u*0x30u+4u)=0x123u;*(int16_t *)((uintptr_t)(0x0078B860u+0x123u*2u)+g_xbox_mem_offset)=5;
-    WORD_AT(0x0053A3CCu+0x02u*0x30u+4u)=0x124u;*(int16_t *)((uintptr_t)(0x0078B860u+0x124u*2u)+g_xbox_mem_offset)=-1;
+    WORD_AT(0x0053A3CCu+0xA8u*0x30u+4u)=0x123u;*(int16_t *)((uintptr_t)(0x008CA000u+0x123u*2u)+g_xbox_mem_offset)=5;
+    WORD_AT(0x0053A3CCu+0x02u*0x30u+4u)=0x124u;*(int16_t *)((uintptr_t)(0x008CA000u+0x124u*2u)+g_xbox_mem_offset)=-1;
     WORD_AT(0x0053A3CCu+0x0Cu*0x30u+4u)=0xFFFFFFFFu;
     WORD_AT(0x0079094Cu)=100u;
     memcpy(snapshot,memory,sizeof snapshot);

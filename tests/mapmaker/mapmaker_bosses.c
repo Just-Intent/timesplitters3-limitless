@@ -760,7 +760,7 @@ int main(void)
         WORD_AT(0x0079094Cu)=1u;WORD_AT(0x007356D8u)=POOL;
         WORD_AT(0x00791D4Cu)=RESTAB;
         WORD_AT(0x0053A3CCu+0x28u*0x30u+4u)=0x5E9u;                 /* char 0x28 model */
-        *(uint16_t *)((uintptr_t)0x0078B860u+0x5E9u*2u+g_xbox_mem_offset)=3u;
+        *(uint16_t *)((uintptr_t)0x008CA000u+0x5E9u*2u+g_xbox_mem_offset)=3u;
         WORD_AT(RESTAB+3u*0x30u)=0x20000u;WORD_AT(RESTAB+3u*0x30u+0x28u)=0x2000000u;
         g_ebx=HUD0;
         memcpy(snapshot,memory,sizeof memory);

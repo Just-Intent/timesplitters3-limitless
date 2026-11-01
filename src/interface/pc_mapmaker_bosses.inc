@@ -194,7 +194,7 @@
 #define BOS_FADE_RATE 0x00475D10u       /* float 2.0: +0x172C -= dt x this, floor 0 (0x0014B24F..0x0014B276) */
 
 #define BOS_CHARS 0x0053A3CCu           /* per character id, 0x30 bytes */
-#define BOS_RES_SLOT 0x0078B860u        /* int16 per resource id < 0x9D0 */
+#define BOS_RES_SLOT 0x008CA000u        /* int16 per resource id; stock 0x0078B860, moved by the rooms area */
 #define BOS_RES_IDS 0x9D0u
 #define BOS_RES_TABLE 0x00791D4Cu       /* -> 0x30-byte entries */
 #define BOS_PROBE_LEVEL 160u
