@@ -29,6 +29,24 @@ MUTATIONS = {
     'mine-any-scene': ('obj==tnk_lv.obj && WORD_AT(TNK_SCENE)==100u && tnk_on(); }', 'obj==tnk_lv.obj && tnk_on(); }'),
     'mine-any-object': ('return tnk_lv.obj && obj==tnk_lv.obj && WORD_AT', 'return tnk_lv.obj && WORD_AT'),
     'stale-resmap': ('#define TNK_RESMAP 0x008CA000u', '#define TNK_RESMAP 0x0078B860u'),
+    # model requests at story level init
+    'request-never': ('    for(k=0;k<3u;k++) guest_call(sub_000A5E40,1,tnk_models[k]);\n', ''),
+    'request-tank-only': ('    for(k=0;k<3u;k++) guest_call(sub_000A5E40,1,tnk_models[k]);', '    for(k=0;k<1u;k++) guest_call(sub_000A5E40,1,tnk_models[k]);'),
+    'request-before-original': ('    uint32_t k;\n    original();\n    if(!tnk_play() || tnk.optout || tnk_map_has()==0) return;',
+                                '    uint32_t k;\n    if(!tnk_play() || tnk.optout || tnk_map_has()==0) { original();return; }\n    for(k=0;k<3u;k++) guest_call(sub_000A5E40,1,tnk_models[k]);\n    original();g_esp-=4u;'),
+    'request-any-map': ('    if(!tnk_play() || tnk.optout || tnk_map_has()==0) return;\n    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted at level init',
+                        '    if(!tnk_play() || tnk.optout) return;\n    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted at level init'),
+    'request-ignores-optout': ('    if(!tnk_play() || tnk.optout || tnk_map_has()==0) return;\n    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted at level init',
+                               '    if(!tnk_play() || tnk_map_has()==0) return;\n    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted at level init'),
+    'request-any-scene': ('    if(!tnk_play() || tnk.optout || tnk_map_has()==0) return;\n    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted at level init',
+                          '    if(!tnk_on() || tnk.optout || tnk_map_has()==0) return;\n    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted at level init'),
+    'request-without-pak': ('    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted at level init', '    if(0) { tnk_log("prop6.pak not mounted at level init'),
+    'request-without-rows': ('        if(!tnk_resource(tnk_models[k])) { tnk_log("no resource row', '        if(0) { tnk_log("no resource row'),
+    'ready-ignored': ('        if(m) {\n            tnk_log(tnk_lv.requested', '        if(0 && m) {\n            tnk_log(tnk_lv.requested'),
+    'ready-empty-request': ('    return r && MAPMAKER_PTR_OK(r,0x14u) && WORD_AT(r+TNK_REQ_DATA)!=0;', '    return r && MAPMAKER_PTR_OK(r,0x14u);'),
+    'ready-no-lod': ('        if((path=WORD_AT(e+TNK_RES_LOD))!=0 && !tnk_path_ready(path,req)) return tnk_models[k];\n', ''),
+    'ready-loaded-ignored': ('        if(WORD_AT(e+TNK_RES_LOADED)) continue;            /* loaded before: no file read */\n', ''),
+    'ready-tank-only': ('    for(k=0;k<3u;k++) {\n        *row=e=tnk_resource(tnk_models[k]);', '    for(k=0;k<1u;k++) {\n        *row=e=tnk_resource(tnk_models[k]);'),
     # mount
     'mount-wrong-pak': ('#define TNK_PAK 0x0049DF7Cu', '#define TNK_PAK 0x0049DF98u'),
     'mount-loads-whole': ('guest_call(sub_000622D0,3,TNK_PAK,0u,1u)', 'guest_call(sub_000622D0,3,TNK_PAK,1u,1u)'),
@@ -49,10 +67,8 @@ MUTATIONS = {
                             '!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;'),
     'spawn-before-original': ('    a=WORD_AT(g_esp+4u);\n    original();\n', '    a=WORD_AT(g_esp+4u);\n'),
     'spawn-two-tanks': ('    if(tnk_lv.obj) {\n        if(tnk_lv.extras', '    if(0) {\n        if(tnk_lv.extras'),
-    'spawn-without-pak': ('    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted', '    if(0) { tnk_log("prop6.pak not mounted'),
+    'spawn-without-pak': ('    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted: the tank', '    if(0) { tnk_log("prop6.pak not mounted: the tank'),
     'spawn-ignores-init': ('|| WORD_AT(e+TNK_RES_INIT)!=TNK_INIT ||', '||'),
-    'spawn-without-turret': ('|| !tnk_resource(TNK_TURRET) ||', '||'),
-    'spawn-without-wreck': (' || !tnk_resource(TNK_WRECK)) {', ') {'),
     'spawn-wrong-model': ('obj=guest_call(sub_000A6F90,5,TNK_MODEL,', 'obj=guest_call(sub_000A6F90,5,TNK_WRECK,'),
     'spawn-args-swapped': ('TNK_MODEL,args,args+12u,0u,0u);', 'TNK_MODEL,args+12u,args,0u,0u);'),
     'spawn-no-yaw': ('tnk_setf(args+16u,yaw);', 'tnk_setf(args+16u,0.0f);'),
@@ -371,6 +387,35 @@ def test_resource_map_relocated():
     assert mem(a[0x00065250])[0][4] == 0x007DE455 and ('imm', 1) in a[0x00065262].ops
     # the builder fills the row's init (+0x2C) from 0x004FCA60[raw +0x24]
     assert mem(a[0x00242A21])[0][4] == 0x004FCA60 and mem(a[0x00242B5E])[0][4] == 0x2C
+
+
+def test_model_load_path():
+    """A model is found only through its load request; the requests of the level
+    setup are read by the scene loop right after it; story level init runs after
+    the resource table exists."""
+    a = by_address()
+    # sub_00096410(path, model): request lookup first, its data taken without a null test
+    assert target(a[0x00096422]) == 0x000631C0 and mem(a[0x00096437])[0][4] == 0x10
+    assert a[0x0009643A].mnemonic == 'jmp' and '0x9651f' in a[0x0009643A].text and mem(a[0x0009651F])[0][4] == 4
+    # scene 100 skips the streaming branch; the fallback looks up the bare row path
+    assert ('imm', 0x64) in a[0x00096451].ops and '0x964fc' in a[0x00096454].text
+    assert target(a[0x000964FF]) == 0x00062C30 and target(a[0x00096515]) == 0x00062F00
+    # sub_000A6880 loads the row's path (+0x10) through it
+    assert mem(a[0x000A6922])[0][4] == 0x10 and target(a[0x000A6927]) == 0x00096410
+    # sub_000A5E40 requests the row path (+0x10) and second path (+0x14); sub_00063A40 builds the .xbr
+    assert mem(a[0x000A5EAD])[0][4] == 0x10 and target(a[0x000A5EB7]) == 0x00063A40
+    assert mem(a[0x000A5EBC])[0][4] == 0x14 and target(a[0x000A5EC9]) == 0x00063A40
+    assert ('imm', 0x00478354) in a[0x00063AAA].ops and mem(a[0x00063ACE])[0][4] == 0xC
+    assert target(a[0x00063A4F]) == 0x000631C0
+    # sub_0003D440: level setup, then every queued request read
+    assert target(a[0x0003D590]) == 0x001CDB80 and target(a[0x0003D5AD]) == 0x00063390
+    # sub_001CDB80: pak mounts, object system (resource table), story level init, in that order
+    assert target(a[0x001CDB85]) == 0x00062790 and target(a[0x001CDBF3]) == 0x000A5C00
+    assert target(a[0x001CDC20]) == 0x0015E7C0 and calls_to(0x0015E7C0) == {0x001CDC20}
+    assert mem(a[0x000A5CC0])[0][4] == 0x00715FAC
+    assert ('imm', 0x00242BA0) in a[0x001B5271].ops and ('imm', 1) in a[0x001B5276].ops
+    assert mem(a[0x0009E2C8])[0][4] == 0x00715FA8
+    assert a[0x00242BF8].mnemonic == 'jmp' and target(a[0x00242BF8]) == 0x00242780
 
 
 def test_mount_site():
