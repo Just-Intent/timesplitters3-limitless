@@ -208,6 +208,7 @@ void pc_mapmaker_tank_state(void (*original)(void));
 void pc_mapmaker_tank_wreck(void (*original)(void));
 void pc_mapmaker_tank_event(void (*original)(void));
 void pc_mapmaker_tank_text(void (*original)(void));
+void pc_mapmaker_tank_request(void (*original)(void));
 void pc_mapmaker_bosses_rows(void (*original)(void));
 void pc_mapmaker_bosses_close(void (*original)(void));
 void pc_mapmaker_bosses_delete(void (*original)(void));

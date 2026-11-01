@@ -111,6 +111,7 @@ void sub_00071B10(void) {} void sub_00071C50(void) {}
 /* robot, crowe, tank (pc_mapmaker_robot.inc, pc_mapmaker_crowe.inc, pc_mapmaker_tank.inc) */
 void sub_000A6F90(void) {} void sub_000EFBD0(void) {} void sub_0028D6D0(void) {} void sub_0028D710(void) {}
 void sub_00292550(void) {} void sub_00292630(void) {} void sub_002A62C0(void) {}
+void sub_000A5E40(void) {} void sub_000631C0(void) {}  /* tank: model request at level init */
 /* tilesets (pc_mapmaker_tilesets.inc: pak mount) */
 void sub_000622D0(void) {}
 #endif

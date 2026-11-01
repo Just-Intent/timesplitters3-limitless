@@ -485,7 +485,8 @@ played): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot
 0x281 from prop6.pak, mapmaker-tank.md). Wrapper lists: each doc. ORDER puts them
 after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
-`rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8.
+`rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8. Tank adds WRAP
+`sub_0015E7C0` -> `pc_mapmaker_tank_request` (models requested at level init).
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
 anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 (30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear
