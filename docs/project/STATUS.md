@@ -1,3 +1,15 @@
+## MapMaker v0.4.0-mapmaker.16: in-game checks (2026-11-01)
+
+Local preview v0.4.0-mapmaker.16 (exe SHA-256 prefix b95069b4, source cc7ee51b) on the second Windows 11 PC.
+Confirmed by the user: duplicated Story AIs keep their boss settings; the custom weapon set shows 20 slots
+and a weapon from slot 7 can be placed; the hidden Abstract tileset loads. Found: the giant skeleton
+hovers one floor above its spawn and part of its body stretches across the map; the game froze (guest
+frames stopped, no crash report; window closed before the 60 s hang watchdog) right after the skeleton's
+feeble throw fired, in a play with both real bosses in custom-set slots 11 and 12. Cause found for the
+hover: the mission 5 fight sets the boss height to 0 every frame (0x0029D06B); fixed after .16 (spawn
+height restored, see mapmaker-realbosses.md). The freeze cause is not confirmed; the next build skips a
+throw whose aim is not a finite point and logs every throw.
+
 ## MapMaker giant skeleton: in-game check (2026-10-31)
 
 Local preview v0.4.0-mapmaker.13 (exe SHA-256 prefix dc838fb3, source 1c7350ff) on the second Windows 11 PC:

@@ -61,6 +61,9 @@ void sub_00286D30(void) {}
 void sub_00059DB0(void) {}
 void sub_000EA9C0(void) {}
 void sub_0010EB90(void) {}
+void sub_002976F0(void) {}  /* realbosses: the Crow walker */
+void sub_0015DDA0(void) {}
+void sub_0029CCB0(void) {}
 /* sky (sub_00078560 becomes a wrapper dispatcher) */
 void sub_00078560(void) {}
 void sub_0007D4F0(void) {}

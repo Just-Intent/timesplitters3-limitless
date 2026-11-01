@@ -453,6 +453,21 @@ another tile is cut at the portal top; mission 5's arena is the camera's room.
 WRAP `sub_000862C0` -> `pc_mapmaker_bigdraw_rect`: character, model
 0x5E9/0x5BE, scene 100, switch on, non-empty rect -> whole viewport (depth
 still occludes). `tests/mapmaker/test_mapmaker_bigdraw.py`. Not built or played.
+Crow walker (id 0x64, model 0x637, picker row 152 "Crow Walker", preview
+Arcade 0xA8; docs section in mapmaker-realbosses.md): anims lv81.pak
+(0x0049D9A8); level WRAP calls stock `sub_002976F0` ([0x0078B1E8] 0x64DC)
+before the skeleton's; ai_start class 0/0x100000 (`sub_002998E0`, one per
+map); death needs no hook (`sub_0029CBF0`, any scene). New WRAPs:
+`sub_0023FF20` -> `pc_mapmaker_realbosses_tag` (zeroed 0x2E8 stand-in for
+the unchecked 'WELL' lookup, ret 0x0029B331) and `sub_00126560` ->
+`pc_mapmaker_realbosses_fx` (beams `sub_0029CCB0` after ret 0x001CEE8C,
+stock scene 81 only). `_event` drops events at rets 0x0029AEBE/0x0029B120
+and at 0x0029CB80 removes it (`sub_0015DDA0`). bigdraw adds 0x637. Tests
+`test_walker_*`, 34 walk mutations. Not built or played. Tank: not started.
+Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
+WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
+restores the spawn height noted by `_princess`; `_throw` skips a non-finite
+aim and logs throws. Freeze after a throw: unexplained (no hang report).
 
 ### MapMaker and System Link bug fixes
 

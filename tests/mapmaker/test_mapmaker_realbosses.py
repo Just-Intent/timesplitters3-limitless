@@ -37,9 +37,9 @@ MUTATIONS = {
     'name-any-caller': ('(ret==RBS_RET_NAME && WORD_AT(g_esp+12u)==RBS_RET_NAME_OUTER)', '(ret==RBS_RET_NAME)'),
     'preview-gets-150': ('    else if(ret==RBS_RET_PREVIEW1 || ret==RBS_RET_PREVIEW2) row=rbs_preview_row(row);\n',
                          '    else if(ret==RBS_RET_PREVIEW1 || ret==RBS_RET_PREVIEW2) {}\n'),
-    'row-of-any-id': ('((id=WORD_AT(g_esp+4u))!=RBS_ID && id!=RBS_SKEL_ID)', '((id=WORD_AT(g_esp+4u)),0)'),
+    'row-of-any-id': ('((id=WORD_AT(g_esp+4u))!=RBS_ID && id!=RBS_SKEL_ID && id!=RBS_WALK_ID)', '((id=WORD_AT(g_esp+4u)),0)'),
     'row-of-no-ret': ('    g_eax=row;\n    MAPMAKER_GUEST_RET();\n', '    g_eax=row;\n'),
-    'row-text-any': ('((row=WORD_AT(g_esp+4u))!=RBS_ROW && row!=RBS_SKEL_ROW)', '((row=WORD_AT(g_esp+4u))>RBS_SKEL_ROW)'),
+    'row-text-any': ('((row=WORD_AT(g_esp+4u))!=RBS_ROW && row!=RBS_SKEL_ROW && row!=RBS_WALK_ROW)', '((row=WORD_AT(g_esp+4u))>RBS_WALK_ROW)'),
     'text-no-ret': ('        g_eax=rbs.label?rbs.label:RBS_EMPTY_TEXT;\n        MAPMAKER_GUEST_RET();\n',
                     '        g_eax=rbs.label?rbs.label:RBS_EMPTY_TEXT;\n'),
     'bar-label-anywhere': ('id==RBS_BAR_TEXT && WORD_AT(g_esp)==RBS_RET_BAR_TEXT && rbs.label', 'id==RBS_BAR_TEXT && rbs.label'),
@@ -79,14 +79,14 @@ MUTATIONS = {
     'hud-boss-off-stock': ('    WORD_AT(player+RBS_FOCUS)=0;\n    original();\n    WORD_AT(player+RBS_FOCUS)=focus;\n}',
                            '    if(!rbs.real[k].boss) { original();return; }\n    WORD_AT(player+RBS_FOCUS)=0;\n    original();\n    WORD_AT(player+RBS_FOCUS)=focus;\n}'),
     'hud-any-actor': ('    if(k==RBS_REAL_MAX) { original();return; }\n    /* never', '    /* never'),
-    'hud-any-model': ('       (RBS_H(focus+RBS_ENT_MODEL)!=RBS_MODEL && RBS_H(focus+RBS_ENT_MODEL)!=RBS_SKEL_MODEL) || !rbs_play()', '       !rbs_play()'),
+    'hud-any-model': ('       (RBS_H(focus+RBS_ENT_MODEL)!=RBS_MODEL && RBS_H(focus+RBS_ENT_MODEL)!=RBS_SKEL_MODEL &&\n        RBS_H(focus+RBS_ENT_MODEL)!=RBS_WALK_MODEL) || !rbs_play()', '       !rbs_play()'),
     'meter-any-caller': ('WORD_AT(g_esp)!=RBS_RET_METER) { original();return; }', '0) { original();return; }'),
     'meter-no-ret': ('    MAPMAKER_GUEST_RET();                            /* cdecl: the caller pops the four args */\n', ''),
     'meter-kept': ('    MAPMAKER_GUEST_RET();                            /* cdecl: the caller pops the four args */\n',
                    '    original();\n'),
-    'meter-any-character': ('    if(RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL) { original();return; }\n', ''),
-    'meter-model-only': ('RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL)',
-                         'RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL &&\n       RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL)'),
+    'meter-any-character': ('    if(RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_WALK_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_WALK_MODEL) { original();return; }\n', ''),
+    'meter-model-only': ('RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_WALK_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_WALK_MODEL)',
+                         'RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL &&\n       RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL && RBS_H(ent+RBS_ENT_MODEL)!=RBS_WALK_MODEL)'),
     'meter-any-actor': ('    if(k==RBS_REAL_MAX || rbs.real[k].boss==RBS_BOSS_SUB || !rbs_play())', '    if(rbs.real[k].boss==RBS_BOSS_SUB || !rbs_play())'),
     'meter-any-mode': ('rbs.real[k].boss==RBS_BOSS_SUB || !rbs_play()) { original();return; }', 'rbs.real[k].boss==RBS_BOSS_SUB || !rbs_on()) { original();return; }'),
     'meter-sub-hidden': (' || rbs.real[k].boss==RBS_BOSS_SUB || !rbs_play())', ' || !rbs_play())'),
@@ -109,8 +109,15 @@ MUTATIONS = {
     'skel-without-state': ('        else if(!rbs_skel.state || WORD_AT(RBS_SKEL_STATE)!=rbs_skel.state)\n', '        else if(0)\n'),
     'skel-without-pak': ('else if(!rbs_skel_pak_mounted()) rbs_log("lv1_6', 'else if(0) rbs_log("lv1_6'),
     'skel-ignores-optout': ('    if(rbs.optout) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: giant skeleton', '    if(0) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: giant skeleton'),
-    'skel-princess-any': ('if(!rbs_skel.record || !MAPMAKER_STACK_OK(8) || !rbs_skel_boss(WORD_AT(g_esp+4u))) { original();return; }\n    sub_0029CEF0();',
-                          'if(!rbs_skel.record || !MAPMAKER_STACK_OK(8)) { original();return; }\n    sub_0029CEF0();'),
+    'skel-princess-any': ('if(!rbs_skel.record || !MAPMAKER_STACK_OK(8) || !rbs_skel_boss(WORD_AT(g_esp+4u))) { original();return; }\n    rbs_skel_floor(',
+                          'if(!rbs_skel.record || !MAPMAKER_STACK_OK(8)) { original();return; }\n    rbs_skel_floor('),
+    'skel-floor-missing': ('    rbs_setf(ent+RBS_ENT_Y,rbs_skel.floor);\n', ''),
+    'skel-floor-any-caller': ('|| WORD_AT(g_esp)!=RBS_RET_FACE || !rbs_skel_boss', '|| !rbs_skel_boss'),
+    'skel-floor-any-boss': (' || !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }\n    rbs_setf(', ' || !(ent=WORD_AT(g_esp+4u))) { original();return; }\n    rbs_setf('),
+    'skel-floor-refreshed': ('    if(rbs_skel.floor_set || !rbs_sane(y=rbs_getf(ent+RBS_ENT_Y))) return;', '    if(!rbs_sane(y=rbs_getf(ent+RBS_ENT_Y))) return;'),
+    'skel-floor-not-read': ('    rbs_skel_floor(WORD_AT(g_esp+4u));\n', ''),
+    'skel-floor-wrong-ret': ('#define RBS_RET_FACE 0x0029D075u', '#define RBS_RET_FACE 0x0029E528u'),
+    'skel-throw-unguarded': ('        if(!rbs_sane(rbs_getf(shot)) || ', '        if(0 && !rbs_sane(rbs_getf(shot)) || '),
     'skel-princess-original': ('    sub_0029CEF0();\n}', '    original();\n}'),
     'skel-boss-any-scene': ('WORD_AT(a+RBS_ACTOR_RECORD)==rbs_skel.record && WORD_AT(RBS_SCENE)==100u && rbs_on();',
                             'WORD_AT(a+RBS_ACTOR_RECORD)==rbs_skel.record && rbs_on();'),
@@ -133,7 +140,43 @@ MUTATIONS = {
     'skel-event-any': ('WORD_AT(g_esp)!=RBS_RET_EVENT || WORD_AT(RBS_SCENE)', 'WORD_AT(RBS_SCENE)'),
     'skel-event-any-scene': ('|| WORD_AT(RBS_SCENE)!=100u || !rbs_on()) { original();return; }\n    if(rbs_skel.events', '|| !rbs_on()) { original();return; }\n    if(rbs_skel.events'),
     'skel-event-no-ret': ('WORD_AT(g_esp+8u));\n    MAPMAKER_GUEST_RET();\n}', 'WORD_AT(g_esp+8u));\n}'),
-    'skel-meter-shown': (' &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL)', ')'),
+    'skel-meter-shown': (' &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL &&', ' &&'),
+    # the Crow walker (id 0x64)
+    'walk-row-missing': ('        if((text=rbs_walk_label())!=0) {', '        if(0) {'),
+    'walk-pick-id': ('else if(WORD_AT(s+0x14u)==RBS_WALK_ROW) id=RBS_WALK_ID;', 'else if(WORD_AT(s+0x14u)==RBS_WALK_ROW) id=RBS_SKEL_ID;'),
+    'walk-preview': ('if(row==RBS_WALK_ROW) return rbs_arcade_row(RBS_WALK_STANDIN);', 'if(row==RBS_WALK_ROW) return RBS_WALK_ROW;'),
+    'walk-text-missing': ('    if(id==RBS_WALK_TEXT) {', '    if(0) {'),
+    'walk-wrong-pak': ('#define RBS_WALK_PAK 0x0049D9A8u', '#define RBS_WALK_PAK 0x0049D6FCu'),
+    'walk-mount-any-map': ('    if((has=rbs_map_has(RBS_WALK_ID))!=0) {\n        rbs_walk_label();', '    if((has=1)!=0) {\n        rbs_walk_label();'),
+    'walk-set-info': ('        if(id==RBS_WALK_ID && !*w) *w=k+1u;\n', ''),
+    'walk-set-extra': ('        if(id==RBS_WALK_ID && !*w) *w=RBS_INFO_SLOTS+k+1u;\n', ''),
+    'walk-level-any-map': ('    if((has=rbs_map_has(RBS_WALK_ID))!=0) {           /*', '    if((has=1)!=0) {           /*'),
+    'walk-level-keeps': ('    memset(&rbs_walk,0,sizeof rbs_walk);\n', ''),
+    'walk-stale-pointer': ('        WORD_AT(RBS_WALK_STATE)=0;\n', ''),
+    'walk-class': ('#define RBS_WALK_CLASS 0x100000u', '#define RBS_WALK_CLASS 0x20000u'),
+    'walk-without-pak': ('else if(!rbs_walk_pak_mounted()) rbs_log("lv81', 'else if(0) rbs_log("lv81'),
+    'walk-without-state': ('        else if(!rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state)\n', '        else if(0)\n'),
+    'walk-two': ('        else if(rbs_walk.record && rbs_walk.record!=rec) {', '        else if(0) {'),
+    'walk-ignores-optout': ('    if(rbs.optout) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: Crow walker', '    if(0) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: Crow walker'),
+    'walk-not-noted': ('            rbs_walk.record=rec;rbs_walk.actor=a;\n            rbs_note(', '            rbs_walk.record=rec;rbs_walk.actor=a;\n            (void)('),
+    'walk-well-any-caller': ('WORD_AT(g_esp)!=RBS_RET_WELL || WORD_AT(g_esp+4u)!=RBS_WALK_TAG)', 'WORD_AT(g_esp+4u)!=RBS_WALK_TAG)'),
+    'walk-well-replaces-found': ('    if(g_eax || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;', '    if(WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;'),
+    'walk-well-any-scene': ('    if(g_eax || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;', '    if(g_eax || !rbs_on()) return;'),
+    'walk-well-null': ('    g_eax=rbs.well;\n', ''),
+    'walk-well-dirty': ('    memset((void *)((uintptr_t)rbs.well+g_xbox_mem_offset),0,RBS_OBJ_SIZE);\n', ''),
+    'walk-event-kept': ('        if(ret==RBS_RET_WALK_DONE) rbs_walk_remove();\n        MAPMAKER_GUEST_RET();\n        return;', '        if(ret==RBS_RET_WALK_DONE) rbs_walk_remove();\n        original();\n        return;'),
+    'walk-event-intro-kept': ('((ret=WORD_AT(g_esp))==RBS_RET_WALK_INTRO || ret==RBS_RET_WALK_INTRO2 ||', '((ret=WORD_AT(g_esp))==RBS_RET_WALK_INTRO ||'),
+    'walk-event-any-scene': ('       ret==RBS_RET_WALK_DONE) && WORD_AT(RBS_SCENE)==100u && rbs_on()) {', '       ret==RBS_RET_WALK_DONE) && rbs_on()) {'),
+    'walk-not-removed': ('        if(ret==RBS_RET_WALK_DONE) rbs_walk_remove();\n', ''),
+    'walk-remove-other': ('    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record ||', '    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) ||'),
+    'walk-remove-twice': ('    rbs_walk.actor=0;\n', ''),
+    'walk-focus-kept': ('WORD_AT(player+RBS_FOCUS)==ent) WORD_AT(player+RBS_FOCUS)=0;', 'WORD_AT(player+RBS_FOCUS)==ent) {}'),
+    'walk-fx-missing': ('    guest_call(sub_0029CCB0,0);\n', ''),
+    'walk-fx-any-caller': ('MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==RBS_RET_FX;', 'MAPMAKER_STACK_OK(4);'),
+    'walk-fx-any-scene': ('rbs_walk.state || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;\n    guest_call', 'rbs_walk.state || !rbs_on()) return;\n    guest_call'),
+    'walk-fx-stale': ('    if(!here || !rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state ||', '    if(!here || !rbs_walk.state ||'),
+    'walk-meter-shown': (' &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_WALK_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_WALK_MODEL)', ')'),
+    'walk-hud-own-bar': (' &&\n        RBS_H(focus+RBS_ENT_MODEL)!=RBS_WALK_MODEL)', ')'),
 }
 
 
@@ -565,3 +608,76 @@ def test_skeleton_death_message_sites():
     # the deerbeast's handler sub_00281620 has no scene test (it dies by the generic path)
     assert not any(op[0] == 'mem' and op[4] == 0x0079094C for x in range(0x00281620, 0x002816C8)
                    if x in a for op in a[x].ops)
+
+# ---- the Crow walker (mission 13, id 0x64) ----------------------------------
+
+def test_walker_data():
+    rd = xbe_reader()
+    voice, model, lod = struct.unpack_from('<3I', rd(0x0053A3CC + 0x64 * 0x30, 12), 0)
+    assert (voice, model, lod) == (0x00539948, 0x637, 0xFFFFFFFF)
+    ids = [struct.unpack_from('<I', rd(0x00521A18 + i * 0x30 + 4, 4))[0] for i in range(150)]
+    assert 0x64 not in ids and ids.index(0xA8) == 90                 # no Arcade row; the stand-in has one
+    assert 0x64 - 0x0A > 0x59                                        # sub_002BE270(0x64) == 0 (0x002BE277)
+    assert rd(0x0049D9A8, 30) == b'pak/stream/lv81/anim/lv81.pak\0'
+
+    def table(va, n):
+        out = {}
+        for k in range(n):
+            e = rd(va + k * 0x18, 0x18)
+            name = rd(struct.unpack_from('<I', e, 0)[0], 40).split(b'\0')[0].decode()
+            out[name] = struct.unpack_from('<H', e, 0x10)[0]
+        return out
+    lv81, lv1_6, lv1_3 = table(0x00484F68, 0x14), table(0x0048C738, 0x12), table(0x0048C1B0, 0x10)
+    assert lv81['crowewalkerdeath'] == 0x6F9 and lv81['crowewalkerwalk'] == 0x6EF
+    assert not set(lv81.values()) & (set(lv1_6.values()) | set(lv1_3.values()))   # all three may be mounted
+    # sub_0025F720: scene 81 reaches the sub_002976F0 case
+    jt = [struct.unpack_from('<I', rd(0x0025F7C0 + 4 * k, 4))[0] for k in range(6)]
+    assert jt[rd(0x0025F7D8 + 80, 1)[0]] == 0x0025F79A
+
+
+def test_walker_sites():
+    a = by_address()
+    graph, indirect = direct_graph()
+    calls = lambda f: {i.address for i in decoded() if i.call and target(i) == f}
+    # anim names registered when lv81.pak is mounted
+    assert ('imm', 0x0049D9A8) in a[0x001CA92C].ops and a[0x001CA92C].function == 0x001CA2F0
+    assert target(a[0x001CA931]) == 0x00062260 and ('imm', 0x00484F68) in a[0x001CA940].ops
+    assert target(a[0x001CA94A]) == 0x0005B980
+    # class 0x100000: sub_002998E0(entity), its only caller; message handler sub_0029CBF0
+    assert ('imm', 0x100000) in a[0x0027DD2A].ops and a[0x0027DD2A].function == 0x0027D590
+    assert calls(0x002998E0) == {0x0027DE5A} and a[0x0027DE5A].function == 0x0027D590
+    assert ('imm', 0x100000) in a[0x0027D40E].ops and calls(0x0029CBF0) == {0x0027D426}
+    assert ('imm', 0x6F9) in a[0x0029CC29].ops and not scene_readers({0x0029CBF0})   # death in any scene
+    # level state: sub_002976F0 only from sub_0025F720; 0x64DC -> [0x0078B1E8], then sub_00297690
+    assert calls(0x002976F0) == {0x0025F79A}
+    assert target(a[0x00297710]) == 0x002A62C0 and ('imm', 0x64DC) in a[0x00297717].ops
+    assert target(a[0x0029771C]) == 0x0003DFA0 and mem(a[0x00297721])[0][4] == 0x0078B1E8
+    assert a[0x0029773D].mnemonic == 'jmp' and target(a[0x0029773D]) == 0x00297690
+    # the fight reads no scene itself; its only direct callee that does is the level event
+    assert not scene_readers({0x002998E0}) and not indirect.get(0x002998E0)
+    assert scene_readers(graph[0x002998E0]) == {0x002274C0}
+    seen = reach(graph, [0x002998E0, 0x0029CBF0])
+    sites = {i.address for i in decoded() if i.call and i.function in seen and target(i) == 0x002274C0}
+    assert sites == {0x0029AEB9, 0x0029B11B, 0x0029CB7B}
+    assert [ends(a, x) for x in sorted(sites)] == [0x0029AEBE, 0x0029B120, 0x0029CB80]
+    assert ('imm', 2) in a[0x0029CB79].ops and ('imm', 1) in a[0x0029AEB7].ops
+    # 'WELL': looked up, then written without a null test (the death end too)
+    assert ('imm', 0x57454C4C) in a[0x0029B327].ops and target(a[0x0029B32C]) == 0x0023FF20
+    assert ends(a, 0x0029B32C) == 0x0029B331 and mem(a[0x0029B337])[0][4] == 0x5BC
+    assert mem(a[0x0029B343])[0][4] == 0x5BC and mem(a[0x0029B349])[0][4] == 0x28
+    assert mem(a[0x0029CB34])[0][4] == 0x5BC and mem(a[0x0029CB3A])[0][4] == 0x28
+    # beams: drawn by the frame only in scene 81, right after sub_00126560 (its only caller)
+    assert calls(0x00126560) == {0x001CEE87} and ends(a, 0x001CEE87) == 0x001CEE8C
+    assert mem(a[0x001CEE8C])[0][4] == 0x0079094C and ('imm', 0x51) in a[0x001CEE8C].ops
+    assert calls(0x0029CCB0) == {0x001CEE95} and a[0x001CEE95].function == 0x001CEBC0
+    assert mem(a[0x0029CCB0])[0][4] == 0x0078B1E8                    # null-safe: tests the state first
+
+
+def test_skeleton_floor_site():
+    """The mansion fight pins the boss to height 0 each frame, right before its facing step."""
+    a = by_address()
+    assert a[0x0029D067].mnemonic == 'xorps' and a[0x0029D06B].function == 0x0029CEF0
+    assert mem(a[0x0029D06B])[0][4] == 0x68 and 'xmm6' in a[0x0029D06B].text
+    assert a[0x0029D070].call and target(a[0x0029D070]) == 0x002895A0 and ends(a, 0x0029D070) == 0x0029D075
+    assert {i.address for i in decoded() if i.call and target(i) == 0x002895A0} == {0x0029D070, 0x0029E523}
+    assert a[0x0029E523].function == 0x0029E0A0 and ends(a, 0x0029E523) == 0x0029E528

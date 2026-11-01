@@ -96,12 +96,12 @@ static uint64_t checksum_outside(uint32_t p)
 
 int main(void)
 {
-    uint32_t skel,trophy,human,object;uint64_t before;
+    uint32_t skel,trophy,human,object,walker;uint64_t before;
     g_xbox_mem_offset=(uintptr_t)memory;g_esp=STACK;
     WORD_AT(VP_PTR)=VP;
     WORD_AT(VP)=8u;WORD_AT(VP+4u)=632u;WORD_AT(VP+0x14u)=16u;WORD_AT(VP+0x18u)=464u;
     WORD_AT(VP+8u)=0x11111111u;WORD_AT(VP+0x10u)=0x22222222u;   /* other viewport fields: not a rectangle */
-    skel=prop(0,8u,0x5E9u);trophy=prop(1,8u,0x5BEu);human=prop(2,8u,0x0634u);object=prop(3,1u,0x5E9u);
+    skel=prop(0,8u,0x5E9u);trophy=prop(1,8u,0x5BEu);human=prop(2,8u,0x0634u);object=prop(3,1u,0x5E9u);walker=prop(4,8u,0x637u);
 
     /* Switch off: stock rectangles. */
     set_limits(NULL);WORD_AT(SCENE)=100u;
@@ -117,6 +117,7 @@ int main(void)
     CHECK(whole(skel));
     CHECK(checksum_outside(skel)==before);
     call(trophy);CHECK(whole(trophy));
+    call(walker);CHECK(whole(walker));             /* the Crow walker */
     call(skel);CHECK(whole(skel));                  /* logged once */
     call(human);CHECK(stock(human));                /* a normal character */
     call(object);CHECK(stock(object));              /* the model on a non-character prop */
