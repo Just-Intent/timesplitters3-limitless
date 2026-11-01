@@ -218,6 +218,10 @@
  *    and a MapMaker map has none, so once its first frame is done (state
  *    +0x98 == 1) the walker's AI gets the request AI +0x9D0 = 2 (applied by
  *    the fight at 0x002998FA): its roar 0x6F7, then the fight (state 4).
+ *    State 2 plays the roar only after the current animation has finished
+ *    (sub_00059DD0), and a walker that was never animated never finishes,
+ *    so while its controller has no animation the wake-up starts the roar
+ *    with state 2's own call sub_0005F460(entity, 0x6F7, 0, 1.0), once.
  *  - hud, meter and the bigdraw area treat model 0x637 like the others. */
 #include <stdio.h>
 #include <stdlib.h>
@@ -336,12 +340,18 @@
 #define RBS_WALK_AI_NEXT 0x9D0u         /* AI: requested state, applied first thing by the fight (0x002998FA) */
 #define RBS_WALK_WAIT 1u                /* intro: waits for level trigger 'SPC2'/'SPC1' (0x0029B5A6) */
 #define RBS_WALK_ROAR 2u                /* stunscript 0x6F7, then the fight, state 4 (0x0029B62E) */
+#define RBS_WALK_STUN 0x6F7u            /* crowewalkerstunscript: state 2 plays it (0x0029B65E) */
+#define RBS_ANIM_CUR 0xD4u              /* animation controller (entity +4): current animation, 0 = none */
+#define RBS_ANIM_DONE 0x124u            /* its finished flag (sub_00059DD0 when +0x12C is 0) */
+#define RBS_ANIM_ALT 0x12Cu             /* blend target animation, 0 = none */
+#define RBS_ANIM_ALT_DONE 0x17Cu        /* its finished flag (sub_00059DD0 when +0x12C is set) */
+#define RBS_ANIM_SIZE 0x184u
 #define RBS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBS_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 extern void sub_00079D60(void),sub_00071630(void),sub_00071C70(void),sub_0005A130(void),sub_00062260(void);
 extern void sub_00287E00(void),sub_0029CEF0(void),sub_00286D30(void),sub_00059DB0(void),sub_000EA9C0(void),sub_0010EB90(void);
-extern void sub_002976F0(void),sub_0015DDA0(void),sub_0029CCB0(void),sub_00019D70(void),sub_002A7F30(void);
+extern void sub_002976F0(void),sub_0015DDA0(void),sub_0029CCB0(void),sub_00019D70(void),sub_002A7F30(void),sub_0005F460(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
@@ -355,7 +365,7 @@ static struct {
  * and the one spawn record that holds the boss class. */
 static struct { uint32_t state, parts, record; unsigned extras, events, throws, deaths, skipped, fire; float floor; int floor_set; } rbs_skel;
 /* The Crow walker of this level: its state block, spawn record and pool entry. */
-static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx, seen, ticks, beats, woken; } rbs_walk;
+static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx, seen, ticks, beats, woken, roars; } rbs_walk;
 
 static void rbs_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -898,13 +908,21 @@ static void rbs_skel_fire(void)
  * fight stage (state +0x98), the fight's state (AI +0x20; the entity's +0x20,
  * logged as "anim state" before mapmaker.23, is not it), its target (AI +4),
  * the aim error (state +0xE4), position, the state's health (+0x580) and the
- * AI class words (+0x10/+0x14). Log only. */
+ * AI class words (+0x10/+0x14); after mapmaker.23 also the animation
+ * controller (entity +4): current animation +0xD4, blend target +0x12C and
+ * the finished flag sub_00059DD0 reads (+0x17C or +0x124). Log only. */
 static void rbs_walk_heartbeat(void)
 {
-    uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state;
+    uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state,ctl,cur=0,alt=0,done=0;
     if(!a || !st || WORD_AT(RBS_WALK_STATE)!=st || rbs_walk.beats>=15u || (rbs_walk.ticks++%120u)) return;
     if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) return;
     rbs_walk.beats++;
+    if(MAPMAKER_PTR_OK(ctl=WORD_AT(ent+4u),RBS_ANIM_SIZE)) {
+        cur=WORD_AT(ctl+RBS_ANIM_CUR);alt=WORD_AT(ctl+RBS_ANIM_ALT);
+        done=WORD_AT(ctl+(alt?RBS_ANIM_ALT_DONE:RBS_ANIM_DONE));
+    }
+    fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: animation 0x%X (blend 0x%X, finished %u), state request %d\n",
+            rbs_walk.beats,(unsigned)cur,(unsigned)alt,(unsigned)done,(int)WORD_AT(a+RBS_WALK_AI_NEXT));
     fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: stage %u, fight state %u, target 0x%X, aim %.0f, entity +0x20 %u, at (%.1f, %.1f, %.1f), health %.1f, class 0x%X/0x%X\n",
             rbs_walk.beats,(unsigned)RBS_B(st+RBS_WALK_STAGE),(unsigned)WORD_AT(a+RBS_WALK_AI_STATE),(unsigned)WORD_AT(a+4u),
             (double)rbs_getf(st+0xE4u),(unsigned)WORD_AT(ent+0x20u),(double)rbs_getf(ent+0x64u),(double)rbs_getf(ent+0x68u),
@@ -925,15 +943,38 @@ static void rbs_walk_heartbeat(void)
  * applies first thing next frame (0x002998FA..0x00299922, as the stock state
  * changes do): state 2 waits for the animation, plays crowewalkerstunscript
  * 0x6F7 and enters the fight (state 4), whose steering turns it toward the
- * player. The 180 turns are skipped: they assume the mission's arena. */
+ * player. The 180 turns are skipped: they assume the mission's arena.
+ *
+ * The roar (user report, v0.4.0-mapmaker.23: awake, aiming at the player,
+ * but stuck in state 2 and never turning, walking or firing). State 2
+ * (0x0029B62E) first waits until sub_00059DD0(entity +4) says the current
+ * animation has finished, and only then plays 0x6F7 (sub_0005F460 at
+ * 0x0029B664); state 4 follows once 0x6F7 is current (sub_00059D20). A new
+ * animation controller has no animation and "finished" 0 (sub_00097C00:
+ * +0xD4, +0x124, +0x12C = 0), and only playing one changes that
+ * (sub_0005BC20). The walker gets its story class before its first frame and
+ * its fight plays nothing before state 2, so in MapMaker it waited for an
+ * animation that never ran (in mission 13 something else animates it
+ * first). So, in state 1 or 2 after its first frame, while its controller has
+ * never had an animation (+0xD4 and +0x12C both 0), the roar is started with
+ * the stock call state 2 itself makes: sub_0005F460(entity, 0x6F7, 0, 1.0).
+ * When it ends, state 2 sees it finished and current, and enters the fight. */
 static void rbs_walk_wake(void)
 {
-    uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state;
+    uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state,s,ctl,r;
     if(!a || !st || WORD_AT(RBS_WALK_STATE)!=st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE) || !MAPMAKER_PTR_OK(a,RBS_ACTOR) ||
        WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;
-    if(RBS_B(st+RBS_WALK_STAGE)!=1u || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_WAIT || (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)>=0) return;
-    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;
-    if(!rbs_walk.woken++) rbs_log("Crow walker woken: no SPC1/SPC2 trigger in a MapMaker map; roar, then fight",a,ent);
+    if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;
+    s=WORD_AT(a+RBS_WALK_AI_STATE);
+    if(s==RBS_WALK_WAIT && (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {
+        WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;
+        if(!rbs_walk.woken++) rbs_log("Crow walker woken: no SPC1/SPC2 trigger in a MapMaker map; roar, then fight",a,ent);
+    } else if(s!=RBS_WALK_ROAR) return;
+    if(rbs_walk.roars || !MAPMAKER_PTR_OK(ctl=WORD_AT(ent+4u),RBS_ANIM_SIZE) || WORD_AT(ctl+RBS_ANIM_CUR) || WORD_AT(ctl+RBS_ANIM_ALT)) return;
+    rbs_walk.roars++;
+    r=guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u);
+    rbs_log(r?"Crow walker had never been animated: roar started (state 2 waits for an animation to finish)":
+              "Crow walker roar refused by sub_0005F460 (animation not loaded or not allowed)",ent,r);
 }
 
 /* WRAP sub_00126560 (frame step before the scene-81 beam draw at 0x001CEE8C). */

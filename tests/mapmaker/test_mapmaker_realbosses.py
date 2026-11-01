@@ -192,13 +192,21 @@ MUTATIONS = {
     'walk-never-woken': ('    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;\n', ''),
     'walk-wake-not-called': ('    rbs_walk_wake();\n', ''),
     'walk-wake-skips-roar': ('#define RBS_WALK_ROAR 2u', '#define RBS_WALK_ROAR 4u'),
-    'walk-wake-any-state': (' || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_WAIT ||', ' ||'),
-    'walk-wake-before-setup': ('    if(RBS_B(st+RBS_WALK_STAGE)!=1u || WORD_AT', '    if(WORD_AT'),
-    'walk-wake-over-request': (' || (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)>=0) return;', ') return;'),
+    'walk-wake-any-state': ('    if(s==RBS_WALK_WAIT && (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {', '    if((int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {'),
+    'walk-wake-before-setup': ('    if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;\n', ''),
+    'walk-wake-over-request': ('    if(s==RBS_WALK_WAIT && (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {', '    if(s==RBS_WALK_WAIT) {'),
     'walk-wake-other-record': ('       WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;',
                                '       !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;'),
     'walk-wake-other-entity': ('!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;\n    if(RBS_B',
                                '!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;\n    if(RBS_B'),
+    'walk-roar-never': ('    r=guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u);', '    r=0;'),
+    'walk-roar-wrong-anim': ('#define RBS_WALK_STUN 0x6F7u', '#define RBS_WALK_STUN 0x6F6u'),
+    'walk-roar-slow': ('guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u)', 'guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F000000u)'),
+    'walk-roar-over-anim': (' || WORD_AT(ctl+RBS_ANIM_CUR) || WORD_AT(ctl+RBS_ANIM_ALT)) return;', ' || WORD_AT(ctl+RBS_ANIM_ALT)) return;'),
+    'walk-roar-over-blend': (' || WORD_AT(ctl+RBS_ANIM_CUR) || WORD_AT(ctl+RBS_ANIM_ALT)) return;', ' || WORD_AT(ctl+RBS_ANIM_CUR)) return;'),
+    'walk-roar-repeats': ('    rbs_walk.roars++;\n    r=guest_call', '    r=guest_call'),
+    'walk-roar-any-state': ('    } else if(s!=RBS_WALK_ROAR) return;\n', '    }\n'),
+    'walk-roar-only-state1': ('    } else if(s!=RBS_WALK_ROAR) return;\n', '    } else return;\n'),
     'walk-wake-sets-state': ('    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;\n', '    WORD_AT(a+RBS_WALK_AI_STATE)=RBS_WALK_ROAR;\n'),
 }
 
@@ -744,3 +752,32 @@ def test_walker_intro_waits_for_level_trigger():
     assert target(a[0x0029B664]) == 0x0005F460 and ('imm', 4) in a[0x0029CAF5].ops
     # stock state changes write the request word as well (0x0029CAFA..)
     assert mem(a[0x0029CB19])[0][4] == 0x20 and mem(a[0x0029CB1C])[0][4] == 0x9D0
+
+
+def test_walker_roar_needs_an_animation():
+    """State 2 waits for the current animation to finish before its roar; a new
+    animation controller has none and is never "finished"."""
+    a = by_address()
+    # state 2: sub_00059DD0(entity +4) == 0 -> return; 0x6F7 current -> state 4; else play 0x6F7
+    assert mem(a[0x0029B62E])[0][4] == 4 and target(a[0x0029B632]) == 0x00059DD0 and target(a[0x0029B63C]) == 0x0029CB83
+    assert ('imm', 0x6F7) in a[0x0029B642].ops and target(a[0x0029B648]) == 0x00059D20 and target(a[0x0029B652]) == 0x0029CAF5
+    assert ('imm', 0x3F800000) in a[0x0029B658].ops and ('imm', 0x6F7) in a[0x0029B65E].ops and target(a[0x0029B664]) == 0x0005F460
+    # sub_00059DD0: +0x12C set ? +0x17C : +0x124; sub_00059D20: +0xD4 or +0x12C equals the id
+    assert mem(a[0x00059DD8])[0][4] == 0x12C and mem(a[0x00059DE2])[0][4] == 0x124 and mem(a[0x00059DE9])[0][4] == 0x17C
+    assert mem(a[0x00059D2B])[0][4] == 0xD4 and mem(a[0x00059D33])[0][4] == 0x12C
+    # a new controller (sub_00097C00, ebx = 0): no animation, not finished, no blend
+    assert a[0x00097C14].mnemonic == 'xor' and a[0x00097C14].text == 'ebx, ebx'
+    assert not [i for i in decoded() if 0x00097C14 < i.address < 0x00097CD4 and i.text.startswith('ebx') and i.mnemonic != 'cmp']
+    assert mem(a[0x00097C9D])[0][4] == 0xD4 and mem(a[0x00097CC8])[0][4] == 0x124 and mem(a[0x00097CD4])[0][4] == 0x12C
+    for x in (0x00097C9D, 0x00097CC8, 0x00097CD4):
+        assert a[x].text.rstrip().endswith('ebx')
+    # playing one (sub_0005BC20) sets the current animation and clears "finished"
+    assert mem(a[0x0005BDA1])[0][4] == 0xD4 and mem(a[0x0005BE2B])[0][4] == 0x124
+    # the play call accepts any animation when the controller has none (sub_001C8C20 -> 0x001C8D5D)
+    assert mem(a[0x001C8C98])[0][4] == 0xD4 and a[0x001C8CA0].mnemonic == 'je' and target(a[0x001C8CA0]) == 0x001C8D09
+    assert a[0x001C8D30].mnemonic == 'je' and target(a[0x001C8D30]) == 0x001C8D5D
+    # 0x6F7 is the lv81 name crowewalkerstunscript, not a looping one (flags 0x10082)
+    rd = xbe_reader()
+    e = rd(0x00484F68 + 14 * 0x18, 0x18)
+    assert struct.unpack_from('<H', e, 0x10)[0] == 0x6F7 and rd(struct.unpack_from('<I', e, 0)[0], 22) == b'crowewalkerstunscript\0'
+    assert struct.unpack_from('<I', e, 8)[0] & 1 == 0
