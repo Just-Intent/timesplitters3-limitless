@@ -55,7 +55,8 @@ static int bosses_area=1;
 int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)hook;return strcmp(area,"bosses") || bosses_area; }
 
 static int pak_mounted, mount_ok=1, alloc_ok=1, parts_ok=1;
-static unsigned nmount, nalloc, nparts, ndraw, nexplode, nremove;
+static unsigned nmount, nalloc, nparts, ndraw, nexplode, nremove, alloc_idx;
+static uint32_t draw_state[8], draw_parts[8];
 static uint32_t mount_arg, draw_scene, explode_args[8], remove_arg;
 /* the stock grid: 5 x 7 cells (type 0 on even rows), outer, 14 edges (10 used).
  * The type-0 cell nearest the outer centre is column 3; 310.0 is in column 4
@@ -96,11 +97,17 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     if(f==sub_0005A130) { nmount++;mount_arg=x[0];if(mount_ok) pak_mounted=1;return mount_ok?1u:0u; }
     if(f==sub_0028D6D0) {   /* sub_002A8300, [0x0075F5E8] = alloc, sub_0028D0C0 */
         nalloc++;
-        if(alloc_ok) { WORD_AT(0x0078B090u)=0x00730000u;WORD_AT(0x0078B098u)=0x00731000u;WORD_AT(0x0075F5E8u)=CST;build_grid(CST); }
+        if(alloc_ok) {   /* boss n of this level: its own blocks */
+            WORD_AT(0x0078B090u)=0x00730000u+alloc_idx*0x2000u;WORD_AT(0x0078B098u)=0x00731000u+alloc_idx*0x2000u;
+            WORD_AT(0x0078B080u)=0xA0u+alloc_idx;WORD_AT(0x0078B0ECu)=0xB0u+alloc_idx;WORD_AT(0x0078B188u)=0xC0u+alloc_idx;
+            WORD_AT(0x0075F5E8u)=CST+alloc_idx*0x3000u;build_grid(CST+alloc_idx*0x3000u);
+        }
+        alloc_idx++;
         return 0;
     }
-    if(f==sub_002A62C0) { nparts++;WORD_AT(0x0078B0D0u)=parts_ok?PRT:0u;return 0; }
-    if(f==sub_0028D710) { ndraw++;draw_scene=WORD_AT(0x0079094Cu);return 0; }
+    if(f==sub_002A62C0) { nparts++;WORD_AT(0x0078B0D0u)=parts_ok?(alloc_idx<=1u?PRT:0x00740000u+(alloc_idx-1u)*0x8000u):0u;return 0; }
+    if(f==sub_0028D710) { if(ndraw<8u) { draw_state[ndraw]=WORD_AT(0x0075F5E8u);draw_parts[ndraw]=WORD_AT(0x0078B0D0u); }
+                          ndraw++;draw_scene=WORD_AT(0x0079094Cu);return 0; }
     if(f==sub_000EFBD0) { nexplode++;memcpy(explode_args,x,sizeof explode_args);return 0; }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
     return 0;
@@ -150,7 +157,9 @@ static void fake_start(uint32_t ent)
     cell=st+0x970u+(uint32_t)(i*0x28);
     SETF(ent+0x64u,F(cell+0x10u));SETF(ent+0x6Cu,F(cell+0x14u));
 }
-static uint32_t live_particles, seen_parts_on;
+static uint32_t live_particles, seen_parts_on, seen_state_ptr, seen_parts_ptr;
+static int prev_k;
+static unsigned w_removed;
 static void fake_fight(void)
 {
     unsigned k;
@@ -158,6 +167,7 @@ static void fake_fight(void)
     originals++;
     for(k=0;k<7u;k++) seen_const[k]=F(cad[k]);
     seen_state=WORD_AT(a+0x20u);seen_next=WORD_AT(a+0x9D0u);
+    seen_state_ptr=WORD_AT(0x0075F5E8u);seen_parts_ptr=WORD_AT(0x0078B0D0u);
     seen_parts_on=WORD_AT(CST+0x2E00u);WORD_AT(0x0078B0CCu)=live_particles;   /* sub_002A7D60 recounts */
     if(seen_state==0u && WORD_AT(0x0075F5E8u)==CST) fake_start(WORD_AT(g_esp+4u));
     inner(pc_mapmaker_crowe_near,fake_near,0x00290BE7u,ENT(0));
@@ -236,7 +246,7 @@ static void actor(unsigned i,uint32_t id,uint32_t model,uint32_t index)
 }
 static void level(void)
 {
-    pak_mounted=0;WORD_AT(0x006D7880u)=10u;
+    pak_mounted=0;WORD_AT(0x006D7880u)=10u;alloc_idx=0;
     CALL(pc_mapmaker_crowe_anims,fake,0x0005C506u,0,0,0,1);
     CALL(pc_mapmaker_crowe_level,fake,0x0015E81Du,0,0,0,1);
 }
@@ -248,6 +258,97 @@ static int level_gives_class(void)
     seen_class[1]=0xEEu;
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     return seen_class[1]==0x40000u;
+}
+
+/* entries into a boss's code: what it sees */
+static uint32_t entry_state, entry_parts, nest_before, nest_inner, nest_after;
+static void fake_entry(void) { originals++;entry_state=WORD_AT(0x0075F5E8u);entry_parts=WORD_AT(0x0078B0D0u);g_esp+=4u; }
+static void fake_fight_nest(void)   /* boss A's fight sends boss B a message */
+{
+    originals++;
+    nest_before=WORD_AT(0x0075F5E8u);
+    WORD_AT(0x0078B0CCu)=77u;                               /* A changes its live count during the call */
+    inner(pc_mapmaker_crowe_message,fake_entry,0x0027D3EEu,ENT(1));
+    nest_inner=entry_state;nest_after=WORD_AT(0x0075F5E8u);
+    CHECK(WORD_AT(0x0078B0CCu)==77u);                      /* A's values survive B's call */
+    g_esp+=4u;
+}
+static void multi(void)
+{
+    unsigned k;
+    level();
+    for(k=0;k<6u;k++) actor(k,0x46,0x5E8,k);
+    actor(4,0x0C,0x5E8,4);                                   /* by model */
+    nalloc=0;
+    WORD_AT(0x0078B090u)=0x00777000u;WORD_AT(0x0078B0D0u)=0x00778000u;WORD_AT(0x0075F5E8u)=0;   /* another boss's blocks */
+    for(k=0;k<6u;k++) CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(k),0,0,1);
+    CHECK(crw_n==4u && nalloc==3u);                        /* bosses 1-3 allocated at their AI start */
+    for(k=0;k<4u;k++) CHECK(crw_inst[k].record==REC(k) && crw_inst[k].state==CST+k*0x3000u && WORD_AT(REC(k)+4u)==0x40000u);
+    CHECK(WORD_AT(REC(4)+4u)==0 && WORD_AT(REC(4))==0x11000000u && WORD_AT(REC(5)+4u)==0);   /* the fifth and sixth: bots */
+    CHECK(WORD_AT(0x0078B090u)==0x00777000u && WORD_AT(0x0078B0D0u)==0x00778000u && WORD_AT(0x0075F5E8u)==0);
+    CHECK(crw_inst[1].win[5]==0x00732000u && crw_inst[1].win[9]==0x00748000u && crw_inst[1].win[1]==0xA1u);
+    CHECK(crw_inst[3].win[0]==CST+0x9000u && crw_inst[3].win[CRW_NWIN-1u]==0xC3u && crw_inst[2].win[10]==0xB2u);
+    CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);   /* the same record again */
+    CHECK(crw_n==4u && nalloc==3u && crw_inst[2].record==REC(2));
+    /* each fight with its own blocks; each arena under its own spawn */
+    for(k=0;k<4u;k++) { SETF(ENT(k)+0x64u,10.0f+40.0f*k);SETF(ENT(k)+0x68u,4.0f+k);SETF(ENT(k)+0x6Cu,-20.0f);WORD_AT(A(k)+0x20u)=0; }
+    for(k=0;k<4u;k++) {
+        CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(k),0,0,1);
+        CHECK(seen_state_ptr==CST+k*0x3000u && seen_parts_ptr==(k?0x00740000u+k*0x8000u:PRT));
+        CHECK(near_eq(seen_const[0],4.0f+k) && consts_stock() && crw_cur==-1);
+        CHECK(near_eq(F(CST+k*0x3000u+0x970u+18u*0x28u+0x10u),10.0f+40.0f*k));   /* its start cell at its spawn */
+        CHECK(near_eq(crw_inst[k].dy,4.0f+k-86.0f) && crw_inst[k].relocated);
+    }
+    CHECK(WORD_AT(0x0078B090u)==0x00777000u && WORD_AT(0x0078B0D0u)==0x00778000u && WORD_AT(0x0075F5E8u)==0);
+    /* a value a boss's call leaves behind is its own next time */
+    WORD_AT(A(1)+0x20u)=4u;live_particles=9u;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(1),0,0,1);
+    CHECK(crw_inst[1].win[8]==9u && WORD_AT(0x0078B0CCu)!=9u);
+    live_particles=0;
+    /* one boss's code inside another's: each sees its own, the first gets its own back */
+    WORD_AT(A(0)+0x20u)=4u;
+    CALL(pc_mapmaker_crowe_fight,fake_fight_nest,0x0027DE3Eu,ENT(0),0,0,2);   /* its original and the inner message */
+    CHECK(nest_before==CST && nest_inner==CST+0x3000u && nest_after==CST && crw_cur==-1 && crw_inst[0].win[8]==77u);
+    /* messages, the think callback, the hit callback: the boss's own */
+    CALL(pc_mapmaker_crowe_message,fake_entry,0x0027D3EEu,ENT(2),2u,0,1);
+    CHECK(entry_state==CST+0x6000u && entry_parts==0x00750000u && WORD_AT(0x0075F5E8u)==0);
+    CALL(pc_mapmaker_crowe_think,fake_entry,0x000A7760u,ENT(3),0,0,1);
+    CHECK(entry_state==CST+0x9000u);
+    WORD_AT(PLAYER+0x200u)=ENT(1);WORD_AT(PLAYER+0x204u)=ENT(5);
+    CALL(pc_mapmaker_crowe_hit,fake_entry,0x000BA3E0u,PLAYER+0x200u,0,0,1);
+    CHECK(entry_state==CST+0x3000u);
+    entry_state=0x1234u;
+    CALL(pc_mapmaker_crowe_message,fake_entry,0x0027D3EEu,ENT(5),2u,0,1);   /* a bot Crowe: stock */
+    CHECK(entry_state==0);
+    /* the draw: each boss with its own blocks */
+    ndraw=0;
+    CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(ndraw==4u);
+    for(k=0;k<4u;k++) CHECK(draw_state[k]==CST+k*0x3000u);
+    CHECK(WORD_AT(0x0078B0D0u)==0x00778000u && WORD_AT(0x0075F5E8u)==0);
+    /* one boss dies: removed alone, the others fight and are drawn */
+    WORD_AT(A(1)+0x20u)=0x12u;live_particles=0;
+    w_removed=nremove;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(1),0,0,1);
+    CHECK(nremove==w_removed+1u && remove_arg==ENT(1) && crw_inst[1].removed && !crw_inst[0].removed && !crw_inst[2].removed);
+    ndraw=0;
+    CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(ndraw==3u && draw_state[0]==CST && draw_state[1]==CST+0x6000u);
+    WORD_AT(A(2)+0x20u)=4u;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(2),0,0,1);
+    CHECK(seen_state_ptr==CST+0x6000u && nremove==w_removed+1u);
+    /* another scene: no Crowe draw */
+    WORD_AT(0x0079094Cu)=14u;ndraw=0;
+    CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(ndraw==0);
+    WORD_AT(0x0079094Cu)=100u;
+    /* the next level: no boss, the outside values live; a stale state pointer cleared */
+    WORD_AT(0x0075F5E8u)=0x00740000u;
+    level();
+    CHECK(WORD_AT(0x0075F5E8u)==0);
+    CHECK(crw_cur==-1 && crw_n==1u && !crw_inst[1].state);
+    for(k=0;k<6u;k++) actor(k,0x0C,0x200,k);
+    WORD_AT(PLAYER+0xFF4u)=0;
 }
 
 int main(void)
@@ -309,7 +410,7 @@ int main(void)
     /* TSFP_MAPMAKER_REAL_BOSS=0: no pak, no state */
     set_env("TSFP_MAPMAKER_REAL_BOSS","0");
     nmount=nalloc=0;
-    CHECK(!level_gives_class() && nmount==0 && nalloc==0 && !crw_lv.state);
+    CHECK(!level_gives_class() && nmount==0 && nalloc==0 && !crw_inst[0].state);
     set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);
 
     /* class: needs the pak and this level's state; one per map; opt-out */
@@ -317,29 +418,23 @@ int main(void)
     actor(0,0x46,0x5E8,0);actor(1,0x46,0x5E8,1);actor(2,0x0C,0x200,1);actor(3,0x0C,0x5E8,1);
     pak_mounted=0;
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(seen_class[1]==0 && !crw_lv.record);
+    CHECK(seen_class[1]==0 && !crw_inst[0].record);
     pak_mounted=1;
-    WORD_AT(0x0075F5E8u)=0x00740000u;                   /* not this level's state */
-    CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(seen_class[1]==0 && !crw_lv.record);
-    WORD_AT(0x0075F5E8u)=CST;
+    CHECK(WORD_AT(0x0075F5E8u)==0 && crw_inst[0].state==CST && crw_inst[0].win[0]==CST && crw_n==1u);   /* only its copy */
     set_env("TSFP_MAPMAKER_REAL_BOSS","0");
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(seen_class[1]==0 && !crw_lv.record);
+    CHECK(seen_class[1]==0 && !crw_inst[0].record);
     set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
     CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(seen_class[0]==0 && seen_class[1]==0x40000u && crw_lv.record==REC(0) && crw_lv.actor==A(0));
+    CHECK(seen_class[0]==0 && seen_class[1]==0x40000u && crw_inst[0].record==REC(0) && crw_inst[0].actor==A(0));
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);   /* same record again */
-    CHECK(seen_class[1]==0x40000u && crw_lv.record==REC(0));
-    CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(1),0,0,1);
-    CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && crw_lv.record==REC(0));
-    CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);   /* by model: a second one */
-    CHECK(seen_class[1]==0 && crw_lv.record==REC(0));
+    CHECK(seen_class[1]==0x40000u && crw_inst[0].record==REC(0));
+    CHECK(crw_n==1u && nalloc==1u);                       /* more split Crowes: the section below */
 
     /* ---- the fight: relocation and the floor ------------------------------ */
-    CHECK(crw_lv.boss==0);
+    CHECK(crw_inst[0].boss==0);
     SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
     WORD_AT(A(0)+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
@@ -356,10 +451,10 @@ int main(void)
     CHECK(near_eq(F(CST+0xEF8u),305.08f-299.06f) && near_eq(F(CST+0xEFCu),80.95f-98.8f) && near_eq(F(CST+0xF00u),21.63f));
     CHECK(near_eq(F(CST+0xF60u),290.0f-299.06f) && near_eq(F(CST+0xF60u+9u*0x28u+0x14u),62.5f-98.8f));
     CHECK(WORD_AT(CST+0xF60u+10u*0x28u)==0 && WORD_AT(CST+0xF60u+13u*0x28u+0x14u)==0);   /* unused edges */
-    CHECK(near_eq(crw_lv.dy,4.0f-86.0f));
+    CHECK(near_eq(crw_inst[0].dy,4.0f-86.0f));
     /* stock state 0 left the boss on the spawn point and the start cell */
     CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f) && near_eq(F(ENT(0)+0x68u),4.0f));
-    CHECK(WORD_AT(CST+0x1198u)==2u && WORD_AT(CST+0x119Cu)==4u && crw_lv.row==2u && crw_lv.col==4u && !crw_lv.place);
+    CHECK(WORD_AT(CST+0x1198u)==2u && WORD_AT(CST+0x119Cu)==4u && crw_inst[0].row==2u && crw_inst[0].col==4u && !crw_inst[0].place);
     /* during the call: the arena constants follow the floor and the grid */
     CHECK(near_eq(seen_const[0],4.0f) && near_eq(seen_const[1],86.205f-82.0f) && near_eq(seen_const[2],88.25f-82.0f));
     CHECK(near_eq(seen_const[3],88.4f-82.0f) && near_eq(seen_const[4],310.49f-299.06f) && near_eq(seen_const[5],80.95f-98.8f));
@@ -392,17 +487,17 @@ int main(void)
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     CHECK(near_eq(seen_const[0],86.0f));
     WORD_AT(0x0079094Cu)=100u;
-    WORD_AT(0x0075F5E8u)=0x00740000u;                  /* not this level's state */
+    WORD_AT(0x0075F5E8u)=0x00740000u;                  /* another value outside: the boss's own during the call */
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(near_eq(seen_const[0],86.0f));
-    WORD_AT(0x0075F5E8u)=CST;
-    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(near_eq(seen_const[0],4.0f) && consts_stock());
+    CHECK(near_eq(seen_const[0],4.0f) && consts_stock() && seen_state_ptr==CST && seen_parts_ptr==PRT);
+    CHECK(WORD_AT(0x0075F5E8u)==0x00740000u && crw_cur==-1);   /* the outside value back */
+    WORD_AT(0x0075F5E8u)=0;
     /* outside the fight the callee hooks are stock */
     inner(pc_mapmaker_crowe_sparks,fake_spark,0x00290C02u,0x42ACCCCDu);
     CHECK(near_eq(seen_spark,86.4f));
 
-    /* ---- turret, level marker, effects ------------------------------------ */
+    /* ---- turret, level marker, effects (called inside the boss's code) ---- */
+    prev_k=crw_enter(0);
     CALL(pc_mapmaker_crowe_part,fake,0x0028ECF1u,1u,0x3F800000u,0,0);
     CHECK(nexplode==1 && explode_args[0]==0x20u && explode_args[1]==0x17u && explode_args[2]==CST+0x2BFCu+0x5Cu);
     CHECK(!explode_args[3] && !explode_args[4] && !explode_args[5] && !explode_args[6] && explode_args[7]==1u);
@@ -418,6 +513,9 @@ int main(void)
     WORD_AT(0x0079094Cu)=14u;
     CALL(pc_mapmaker_crowe_event,fake,0x002923A8u,0,0,0,1);
     WORD_AT(0x0079094Cu)=100u;
+    crw_leave(prev_k);
+    CALL(pc_mapmaker_crowe_part,fake,0x0028ECF1u,1u,0,0,1);              /* outside a boss's code: stock */
+    CHECK(nexplode==1);
     ndraw=0;
     CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==1 && draw_scene==100u);
@@ -425,8 +523,8 @@ int main(void)
     CHECK(ndraw==1);
     WORD_AT(0x0075F5E8u)=0x00740000u;
     CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
-    CHECK(ndraw==1);
-    WORD_AT(0x0075F5E8u)=CST;
+    CHECK(ndraw==2 && draw_state[1]==CST && draw_parts[1]==PRT && WORD_AT(0x0075F5E8u)==0x00740000u);
+    WORD_AT(0x0075F5E8u)=0;ndraw=1;
 
     /* ---- bar and meter ---------------------------------------------------- */
     WORD_AT(PLAYER+0xFF4u)=ENT(0);
@@ -439,9 +537,9 @@ int main(void)
     CALL(pc_mapmaker_crowe_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
     CALL(pc_mapmaker_crowe_meter,fake,0x0014D264u,A(5),0,0x7Fu,1);
     CALL(pc_mapmaker_crowe_meter,fake,0x0014D25Fu,A(0),0,0x7Fu,1);
-    crw_lv.boss=CRW_BOSS_SUB;
+    crw_inst[0].boss=CRW_BOSS_SUB;
     CALL(pc_mapmaker_crowe_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);
-    crw_lv.boss=CRW_BOSS_BAR;
+    crw_inst[0].boss=CRW_BOSS_BAR;
     CALL(pc_mapmaker_crowe_meter,fake,0x0014D264u,A(0),0,0x7Fu,0);
 
     /* ---- the end: effects play out without new smoke, then removed once ---- */
@@ -455,7 +553,7 @@ int main(void)
     CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==1);                                          /* still drawn while they play out */
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(nremove==0 && crw_lv.fading==2u);
+    CHECK(nremove==0 && crw_inst[0].fading==2u);
     live_particles=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     CHECK(nremove==1 && remove_arg==ENT(0) && WORD_AT(PLAYER+0xFF4u)==0 && WORD_AT(CST+0x2E00u)==0x2Fu);
@@ -472,13 +570,16 @@ int main(void)
     CHECK(nremove==2);
     live_particles=0;
 
+    /* ---- several split Crowes: each its own blocks, arena and end -------- */
+    multi();
+
     /* ---- Boss flag from the Story AI chunk; the bosses area must be on ---- */
     container(0x11,with,3,boss_bar,2);
-    CHECK(level_gives_class() && crw_lv.boss==CRW_BOSS_BAR);
+    CHECK(level_gives_class() && crw_inst[0].boss==CRW_BOSS_BAR);
     container(0x11,with,3,boss_sub,2);
-    CHECK(level_gives_class() && crw_lv.boss==CRW_BOSS_SUB);
+    CHECK(level_gives_class() && crw_inst[0].boss==CRW_BOSS_SUB);
     bosses_area=0;
-    CHECK(level_gives_class() && crw_lv.boss==0);
+    CHECK(level_gives_class() && crw_inst[0].boss==0);
     bosses_area=1;
 
     /* ---- a spawn that is not a point keeps mission 10's coordinates ------- */
@@ -496,7 +597,7 @@ int main(void)
     /* the platform nearest the centre (cell 18, centre 312.46; cell 17 is not one) is centred on the spawn */
     CHECK(near_eq(F(CST+0x970u+18u*0x28u+0x10u),10.0f) && near_eq(F(CST+0x970u+18u*0x28u+0x14u),-20.0f));
     CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f));
-    CHECK(WORD_AT(CST+0x1198u)==2u && WORD_AT(CST+0x119Cu)==4u && !crw_lv.place && consts_stock());
+    CHECK(WORD_AT(CST+0x1198u)==2u && WORD_AT(CST+0x119Cu)==4u && !crw_inst[0].place && consts_stock());
     /* ---- the start column's nearest cell is not a platform: the nearest platform in it ---- */
     grid_gap=2;
     CHECK(level_gives_class());
@@ -506,21 +607,23 @@ int main(void)
     /* column 4: rows 0 (62.8) and 4 (94.8) are platforms; row 4 is nearer 80.95 = cell 32 */
     CHECK(near_eq(F(CST+0x970u+32u*0x28u+0x10u),10.0f) && near_eq(F(CST+0x970u+32u*0x28u+0x14u),-20.0f));
     CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f));
-    CHECK(WORD_AT(CST+0x1198u)==4u && WORD_AT(CST+0x119Cu)==4u && crw_lv.row==4u && consts_stock());
+    CHECK(WORD_AT(CST+0x1198u)==4u && WORD_AT(CST+0x119Cu)==4u && crw_inst[0].row==4u && consts_stock());
     grid_gap=0;
 
     /* ---- allocation failures --------------------------------------------- */
     alloc_ok=0;
-    CHECK(!level_gives_class() && !crw_lv.state);
-    alloc_ok=1;
+    CHECK(!level_gives_class() && !crw_inst[0].state);
+    alloc_ok=1;                                              /* no Crowe this level, even if the AI start could allocate */
+    CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(!crw_n && !crw_inst[0].record && WORD_AT(REC(0)+4u)==0);
     WORD_AT(0x0078B0D0u)=OLDPRT;parts_ok=0;
-    CHECK(!level_gives_class() && !crw_lv.state && WORD_AT(0x0078B0D0u)==OLDPRT && WORD_AT(0x0075F5E8u)==0);
+    CHECK(!level_gives_class() && !crw_inst[0].state && WORD_AT(0x0078B0D0u)==OLDPRT && WORD_AT(0x0075F5E8u)==0);
     parts_ok=1;
     /* the next level without the Crowe forgets this one */
     CHECK(level_gives_class());
     container(0x11,without,3,boss_off,2);
     level();
-    CHECK(!crw_lv.record && !crw_lv.state);
+    CHECK(!crw_inst[0].record && !crw_inst[0].state);
     WORD_AT(PLAYER+0xFF4u)=ENT(0);
     CALL(pc_mapmaker_crowe_hud,fake_hud,0x0014F25Bu,0,0,0,1);
     CHECK(seen_focus==ENT(0));

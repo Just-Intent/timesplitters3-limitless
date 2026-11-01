@@ -117,7 +117,7 @@ image constants that only it reads, so it can be moved.
 |---|---|
 | `sub_001C8540` -> `pc_mapmaker_crowe_anims` | after the original: when the map's custom set (index 0x11, slots 1-20, as realbosses reads it) holds 0x46 (or the container is unreadable) and lv14.pak is not mounted, mount it with `sub_0005A130` when >= 2 of the 30 mount slots are free |
 | `sub_0025F720` -> `pc_mapmaker_crowe_level` | after the original: forget the last level; when the set holds 0x46, clear `[0x0075F5E8]`, call the stock `sub_0028D6D0` (0x2E04 bytes of level heap plus the effect blocks), then `sub_002A62C0` for the particle block (a block another boss allocated this level stays if this one fails; otherwise the new one replaces it, which leaks 32 KB of level heap and keeps every boss working: they read the global). A failed allocation logs and keeps the bot AI |
-| `sub_0015B830` -> `pc_mapmaker_crowe_ai_start` | character 0x46 or model 0x5E8: class 0/0x40000 when lv14.pak is mounted and this level's state exists; one per map (extras keep the bot AI); notes the Story AI's Boss flag (chunk +0x29) for the HUD |
+| `sub_0015B830` -> `pc_mapmaker_crowe_ai_start` | character 0x46 or model 0x5E8: class 0/0x40000 when lv14.pak is mounted and this level's state exists; up to 4 per map, each with its own blocks ([Several split Crowes](#several-split-crowes); the fifth and later keep the bot AI); notes the Story AI's Boss flag (chunk +0x29) for the HUD |
 | `sub_0028FE30` -> `pc_mapmaker_crowe_fight` | for this boss in scene 100: **relocate** on its first frame (state 0): the start cell (the 310.0 column's cell, a type-0 platform first, nearest the outer centre in z, whose centre the stock lookup maps back to it; with no such cell, the type-0 cell nearest the outer centre) is centred on the spawn x/z, every cell, the outer and the used edge rectangles (+0/+4/+8/+0xC/+0x10/+0x14) move by the same (dx, dz), sizes and types unchanged; dy = spawn height - 86. **Intro**: state 1 becomes 2 (+0x9D4 1, +0x20 2, +0x9D0 2, +0x9D8 0). **Floor**: during the original only, the image constants 86.0 (0x0049F3C4), 86.205, 88.25, 88.4 get + dy, 310.49 and 310.0 + dx, 80.95 + dz, and the stock bits are written back after (a constant that is not stock is left alone). **Start**: after that first state-0 frame, if the boss is not on the spawn x/z or +0x1198/+0x119C are not the start cell (only possible when no cell holds 310.0), both are set; the boss starts exactly at its Story AI spawn point. **End**: in state 0x12 the original still runs (shifted constants), with +0x2E00 = 0 for the call so no new smoke is emitted; the sparks, hazards and particles play out, and once no particle is live (`[0x0078B0CC]` after the call) or after 300 calls the boss is removed with `sub_0015DDA0` (focus cleared), once |
 | `sub_0028DD50` -> `pc_mapmaker_crowe_near` | return 0x00290BE7 while shifted: 86.0 restored inside (a distance there), shifted again after |
 | `sub_002A85C0` -> `pc_mapmaker_crowe_sparks` | return 0x00290C02 while shifted: the pushed floor 86.4 + dy, the caller's slot restored |
@@ -156,10 +156,13 @@ play out`, `split Crowe defeated: removed (frames, live particles)`,
 - **Boss multiplier**: health is the sum of the parts, rewritten every frame,
   so the Boss row's x2..x8 does not make it tougher and the bar may read low
   (the bosses area scales +0x1D8). Use x1.
-- **Shared blocks**: a Crowe and a Crow walker in one map share the effect
-  system (`sub_002A8380` resets it at each boss's start): effects may look
-  wrong; a Crowe with the giant skeleton or the walker shares the particle
-  emitter. Both work (no crash expected), looks unverified.
+- **Shared blocks**: each split Crowe now has its own effect and particle
+  blocks, swapped in for its calls, so a Crowe no longer shares them with a
+  Crow walker or the giant skeleton in the same map. The walker and the
+  skeleton still share theirs with each other (their areas).
+- **Several Crowes close together**: each arena (about 43 x 40) is laid out
+  under its own spawn; arenas that overlap are not a problem for the code
+  (each boss walks its own grid), but the bosses walk through each other.
 - **Turret debris**: a shot-off turret explodes but no turret prop flies off
   (its model is only in `l_14_st.pak`).
 - **Constants**: the shift writes the game image's read-only data in guest
@@ -183,7 +186,72 @@ play out`, `split Crowe defeated: removed (frames, live particles)`,
   flat MapMaker floor, the giant robot and the Crowe together (both use
   lv14.pak; the robot's state is separate).
 
-## Save format and stock games
+## Several split Crowes
+
+User request: every placed split Crowe should fight with its story
+behaviour, not just the first.
+
+**What one Crowe's code keeps globally** (CONFIRMED; tests
+`test_multi_instance_globals`, the fixture's `multi()`):
+- `[0x0075F5E8]`: its 0x2E04-byte state, with the arena grid, the parts and
+  the hazards. Every reader (17 functions) is below the fight
+  `sub_0028FE30`, the message handler `sub_00292430`, the think callback
+  `sub_0028DA10` (slot 2, set at 0x00290EF7), the hit callback `sub_0028F730`
+  (+0x19C, set at 0x00290EEC), the draw `sub_0028D710` or the allocation
+  `sub_0028D6D0` (direct-call graph, test).
+- The effect system `0x0078B080..0x0078B098` (`sub_002A8300/8380/85C0/8FC0`):
+  two allocated blocks and their counters.
+- The particle system `0x0078B0CC..0x0078B188` (`sub_002A62C0/62F0/7D60/7F30`):
+  the block, the live count and the emitter templates.
+- These 29 words are all; the test checks them against every absolute
+  operand the code reaches. `[0x0078B1E4]` is only a temporary of one fight
+  call (written at 0x00291AF6, read at 0x00291B61). The other boss
+  singletons the graph reaches (`[0x0078B1DC]` robot, `[0x0078B1E8]` walker,
+  `[0x0078B1EC]` skeleton) go through generic code and are not the Crowe's.
+- Not per boss: the player's HUD focus (+0xFF4, the last boss to start
+  wins) and the image constants the area shifts during each call (shifted
+  per call by that boss's own offsets).
+
+**What the area does**:
+- Up to 4 bosses (`CRW_MAX`), each with its own copy of the 29 words
+  (`crw_inst[k].win`).
+- Allocation: boss 0 at level init as before, each further one at its AI
+  start (the stock `sub_0028D6D0` and `sub_002A62C0`, with the globals as
+  they were put back afterwards).
+- `crw_enter(k)` / `crw_leave(prev)` swap the copies around every entry into
+  the boss's code: the fight, the message handler, the two callbacks, and
+  each boss's draw (the fx hook draws them one by one).
+  - The same boss nested inside its own call changes nothing.
+  - Another boss inside (one Crowe's hazard hits another) keeps the first
+    one's current values.
+  - The values that are live outside every Crowe call (the stock singleton,
+    another boss's blocks) are put back after each call.
+- Everything per boss: relocation, the floor offsets, the death fade and
+  removal, the Boss flag (meter), the mission 10 constants' shift.
+- The fifth and later split Crowes keep the bot AI (logged:
+  `more than 4 split Crowes in the map`).
+- Mission 10 is untouched (every hook acts in scene 100 only).
+- Memory: about 45 KB of level heap per extra boss (state 0x2E04,
+  particles 0x7D00, effect blocks).
+
+**Would it carry over to the other one-per-map bosses?**
+Not verified beyond what is listed. The same method applies where a boss's
+state is a small set of globals reached only through hookable entry points:
+- Giant skeleton (`[0x0078B1EC]`, `pc_mapmaker_realbosses.inc`): its fight
+  uses the shared particle system too. Likely the same approach: its
+  state pointer plus the same particle window, swapped around its fight,
+  message and callbacks.
+- Crow walker (`[0x0078B1E8]`): uses the same effect and particle systems as
+  the Crowe. Likely the same.
+- Giant robot (`[0x0078B1DC]`, plus `[0x0075F5F0]`/`[0x0075F5F4]` floats):
+  the extra globals need the same inventory first.
+- Castle tank and Khallos: their state is in props or static data of their
+  own; each needs its own inventory before anyone can say.
+- Mansion worm: it is already a five-worm system in one block. More than one
+  map worm can use the stock worms 1-4, each with its own head, instead of
+  more blocks (handled in the worm area).
+
+
 
 Unchanged: a stock custom-set member (word id 0x46, sbyte variant -1). No
 Story AI chunk byte of its own (+0x29 is the bosses area's Boss flag). A
@@ -210,6 +278,9 @@ WRAP sub_002275F0 -> pc_mapmaker_crowe_event       (new; also called by sub_0023
 WRAP sub_00126560 -> pc_mapmaker_crowe_fx          (layer with realbosses_fx; per frame)
 WRAP sub_0014CC80 -> pc_mapmaker_crowe_hud         (layer INSIDE pc_mapmaker_bosses_hud, with realbosses_hud)
 WRAP sub_0013A400 -> pc_mapmaker_crowe_meter       (layer with realbosses_meter; per frame per recorded actor)
+WRAP sub_00292430 -> pc_mapmaker_crowe_message     (new; the boss's message handler, from sub_0027CEF0)
+WRAP sub_0028DA10 -> pc_mapmaker_crowe_think       (new; entity slot 2 callback)
+WRAP sub_0028F730 -> pc_mapmaker_crowe_hit         (new; entity hit callback +0x19C)
 ```
 
 Each layer: `if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_<x>"))
@@ -263,7 +334,7 @@ needs none of it):
    `defeated: removed`). Nothing should stay frozen on screen; map logic
    marker 0 does not change.
 5. Boss Off: no health shown; Boss bar (x1): one bar with the AI's name;
-   Sub-boss bar: the meter. A second Split Crowe AI fights as a bot (`only
-   one split Crowe per map`). Mission 10 still plays stock.
+   Sub-boss bar: the meter. Up to four Split Crowe AIs each fight with their own arena; a fifth fights as a bot (`more than 4
+   split Crowes in the map`). Mission 10 still plays stock.
 6. Report: where it walks relative to tile walls, whether it falls through
    or floats, hazard height, and the stderr lines.
