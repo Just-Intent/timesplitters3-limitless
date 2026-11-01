@@ -1,10 +1,49 @@
 # MapMaker castle tank (story mission 2 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_tank.inc` (area `tank`),
-fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 115 mutations, plus
+fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 127 mutations, plus
 decode, US XBE data and game-pak checks of every site below). Wired in
 v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
 No guest-code table entry of its own, no new save bytes.
+
+## Fixed after v0.4.0-mapmaker.23: the cannon did not aim at the player
+
+Playtest (v0.4.0-mapmaker.23): the tank works; the fight cycles states
+1 -> 3 -> 4 -> 3 -> 6 ..., but the user saw the tank gun not aiming at them
+when it prepared to fire. How the cannon aims (CONFIRMED, test
+`test_cannon_aim`):
+
+- Five gun records `[0x0078B560]` (from 0x0051B9C8, 0x4C each). Guns 0-3
+  are machine guns (callbacks +0x38 `sub_00251EF0`, ...); gun 4 is the
+  cannon (`sub_00251DD0`, `sub_00253F10` fire effect, `sub_00251F80` turn,
+  `sub_00251D40`).
+- `sub_002522B0` (ebx = gun, edi = tank, no arguments) turns a gun toward
+  its aim point (record +0x10..+0x18, world coordinates) at a limited rate
+  (`sub_00251F80` steps by frame time). For guns 0-3 it first calls their
+  +0x38 to refresh the aim; for the cannon it does not.
+- State 4 (0x00255803): every frame the cannon turns (0x00255894, while
+  shots are left in `[0x0078B5AC]`); when the timer `[0x0078B5A0]` runs out
+  it fires (`sub_002540B0(4)`, which reads the same aim point) and only then
+  re-aims with `sub_00251DD0` (0x00255880; also at the state 4 entry,
+  0x002554E3). So stock aims each shot where the target was at the last
+  shot.
+- `sub_00251DD0` aims at a castle cover object near the target (tags at
+  `[0x0078B56C]`, `'TCV5'..'TCV7'`; none in a map), else at the target's
+  actor +0xBB4..+0xBBC. The machine guns' `sub_00251EF0` uses that actor
+  point only for AIs: for a player (actor +8 < `[0x00790950]`) it uses the
+  player record +0xB4..+0xBC (`[0x007B0C48]` + index * 0x1584). INFERRED:
+  +0xBB4 is a body point from the character's animation update and is not
+  the player's aim point in first person.
+
+Fix: **gun** (new `WRAP sub_002522B0`): for our tank in state 4, when the
+cannon (ebx = 4) turns and the target is a player, its aim point is set to
+that player's +0xB4 point first. The cannon follows the player at its stock
+turn rate while it prepares, and each shot (which reads the aim point) goes
+at where the player is. Other guns, other states (state 7 drives at the
+cannon's aim point), AI targets and the castle are left to stock code. Log,
+each time stock picks a new cannon aim (state 4 entry and after every shot;
+32 lines per level): `cannon aim: stock (x, y, z), set to player (x, y, z),
+player at (x, y, z)`, the last being the target's position +0x64.
 
 ## Fixed after v0.4.0-mapmaker.22: the game froze when the fight started
 
@@ -153,6 +192,7 @@ heavy hit (12 s; a second bar shows the time), 10 dead.
 | death `sub_00255C20` parks the dead tank at (0, 20, 0) | a point in the open map | **wreck**: parked 50 m under its spawn point |
 | state 9 fires level event 0x16 every frame (`sub_002274C0` at 0x00255A8F) | the map's own logic marker 0x16 | **event**: dropped |
 | boss bar labels 0x165B / 0x1635 (`sub_0014CC80` case 0x281) | the MapMaker level's own text ids | **text**: "Castle Tank" / "Tank exposed" at those two call sites |
+| cannon aim `sub_00251DD0`: a castle cover object near the target, else the target's actor +0xBB4, refreshed only after each shot | no cover; for a player that point is not the aim point the machine guns use | **gun**: in state 4 the cannon aims at the player record +0xB4 before every turn |
 | tagged objects `'TKDR'` (door, 0x00255767) and `'TCV5'..'TCV7'` (`sub_00251DD0`) | absent | none needed: both null-checked by stock code (CONFIRMED) |
 
 **Castle frame.** d = spawn - (-12.05, 0, 1.5), the arena's centre (x
@@ -225,7 +265,7 @@ do; 0x12 has no Arcade row).
    placeholder AI is removed with `sub_0015DDA0` (the Crow walker's removal
    call) after checking the pool entry still holds that AI; a story focus
    on it is cleared.
-4. **wake**, **area**, **target**, **state**, **wreck**, **event**,
+4. **wake**, **area**, **target**, **gun**, **state**, **wreck**, **event**,
    **text**: as in the table above.
 
 ## Wrappers for the integrator
@@ -242,6 +282,7 @@ unchanged when the switch is off or outside scene 100.
 | `WRAP sub_00253140 -> pc_mapmaker_tank_wake` | fight start test (no args, eax) | new |
 | `WRAP sub_00251CD0 -> pc_mapmaker_tank_area` | courtyard test (ecx = point, eax) | new; behaviour changed after v0.4.0-mapmaker.22 (no wiring change) |
 | `WRAP sub_00254690 -> pc_mapmaker_tank_target` | drive target (edi = tank) | new; must see the guest `g_edi` |
+| `WRAP sub_002522B0 -> pc_mapmaker_tank_gun` | gun turn (no args; ebx = gun, edi = tank) | **new after v0.4.0-mapmaker.23**; must see the guest `g_ebx` and `g_edi` at entry; works before the original |
 | `WRAP sub_00255390 -> pc_mapmaker_tank_state` | state entry (eax = tank) | new; must see the guest `g_eax` at entry |
 | `WRAP sub_00255C20 -> pc_mapmaker_tank_wreck` | death (esi = tank) | new |
 | `WRAP sub_002274C0 -> pc_mapmaker_tank_event` | level event (cdecl) | **shared** with `pc_mapmaker_realbosses_event` (and other boss ports); order free: each matches only its own return addresses |
@@ -261,9 +302,11 @@ Also for the integrator: the editor picker row (above), and the
 
 ## Risks (not verified in game)
 
-- Played three times: v0.4.0-mapmaker.20 failed on the stale map address,
-  .21 on the missing model requests, .22 froze in the drive target search
-  (all fixed above). The fight itself has not run yet.
+- Played four times: v0.4.0-mapmaker.20 failed on the stale map address,
+  .21 on the missing model requests, .22 froze in the drive target search,
+  .23 worked with the cannon aiming off the player (all fixed above). The
+  cannon tracking has not been played yet; it makes the cannon harder to
+  dodge than the castle's (which aims where the player was at the last shot).
 - MapMaker walls or pits inside the moved courtyard: the tank's targets
   ignore them (the castle courtyard was open ground).
 - The models are read during the level load (about 380 KB from prop6.pak,

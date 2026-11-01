@@ -119,6 +119,19 @@ MUTATIONS = {
     'search-early': ('#define TNK_SEARCH_MAX 64u', '#define TNK_SEARCH_MAX 16u'),
     'search-not-reset': ('    tnk_lv.misses=0;\n    if(tnk_lv.shifted)', '    if(tnk_lv.shifted)'),
     'search-log-every': ('        if(tnk_lv.misses==TNK_SEARCH_MAX) tnk_lvlog', '        tnk_lvlog'),
+    # the cannon tracks a player target in state 4
+    'gun-never': ('    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=tnk_lv.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);\n', ''),
+    'gun-after-turn': ('    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=tnk_lv.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);\n    original();', '    original();\n    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=tnk_lv.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);'),
+    'gun-any-gun': ('    if(g_ebx!=TNK_CANNON || !tnk_mine(g_edi)', '    if(!tnk_mine(g_edi)'),
+    'gun-any-state': ('|| WORD_AT(TNK_STATE)!=TNK_STATE_GUNS ||', '||'),
+    'gun-any-object': ('    if(g_ebx!=TNK_CANNON || !tnk_mine(g_edi)', '    if(g_ebx!=TNK_CANNON || !tnk_lv.obj'),
+    'gun-ai-targets': ('(uint32_t)idx>=n || ', ''),
+    'gun-no-actor': ('    if(!act || !MAPMAKER_PTR_OK(act,0x10u)) return 0;\n', ''),
+    'gun-no-target': ('    if(!t || !MAPMAKER_PTR_OK(t,0x100u)) return 0;\n    act=', '    act='),
+    'gun-actor-point': ('#define TNK_PLAYER_AIM 0xB4u', '#define TNK_PLAYER_AIM 0xBB4u'),
+    'gun-log-every-frame': ('WORD_AT(aim)!=tnk_lv.cannon[0] || WORD_AT(aim+4u)!=tnk_lv.cannon[1] || WORD_AT(aim+8u)!=tnk_lv.cannon[2]', '1'),
+    'gun-not-remembered': ('WORD_AT(aim+i*4u)=tnk_lv.cannon[i]=WORD_AT(', 'WORD_AT(aim+i*4u)=WORD_AT('),
+    'gun-log-unbudgeted': ('        if(tnk_lv.aims<TNK_AIM_LOGS) {', '        {'),
     # fight-state lines
     'state-log-never': ('    if(s==was) return;\n', '    return;\n'),
     'state-log-every-frame': ('    if(s==was) return;\n', ''),
@@ -358,6 +371,40 @@ def test_arena_constants_and_courtyard():
     # the update's absolute height tests (not rebased): y < -1 -> state 7, y <= -2.4 keeps it
     assert mem(a[0x002556B6])[0][4] == 0x004760D0 and f32(rd, 0x004760D0) == -1.0
     assert mem(a[0x0025590D])[0][4] == 0x0049DDE4 and f32(rd, 0x0049DDE4) == pytest.approx(-2.4)
+
+
+def test_cannon_aim():
+    """The cannon (gun record 4) aims from sub_00251DD0 only; the machine guns
+    use the player record +0xB4 for players; sub_002522B0 turns gun ebx of
+    tank edi toward record +0x10."""
+    rd = xbe_reader()
+    a = by_address()
+    callbacks = [struct.unpack('<4I', rd(0x0051B9C8 + k * 0x4C + 0x38, 16)) for k in range(5)]
+    assert callbacks[:4] == [(0x00251EF0, 0x00253FC0, 0x00252150, 0x00251D90)] * 4
+    assert callbacks[4] == (0x00251DD0, 0x00253F10, 0x00251F80, 0x00251D40)
+    # sub_002522B0: record = [0x0078B560] + ebx * 0x4C; gun 4 skips its +0x38; aim read at +0x10..+0x18
+    assert ('imm', 0x4C) in a[0x002522C2].ops and 'esi, ebx' in a[0x002522C0].text
+    assert a[0x002522C7].mnemonic == 'cmp' and ('imm', 4) in a[0x002522C7].ops and target(a[0x002522E4]) == 0x002522ED
+    assert [mem(a[x])[0][4] for x in (0x0025242D, 0x00252432, 0x0025243D)] == [0x14, 0x18, 0x10]
+    assert mem(a[0x002522ED])[0][4] == 0x70                    # the tank's yaw (edi + 0x70)
+    # state 4: the cannon turns every frame while shots are left ([0x0078B5AC]),
+    # the update calls it with ebx = 4 and no arguments; fire = sub_002540B0(4), then re-aim
+    assert 'ebx, 4' in a[0x0025588F].text and target(a[0x00255894]) == 0x002522B0
+    assert target(a[0x00255873]) == 0x002540B0 and a[0x00255880].mnemonic == 'call' and mem(a[0x00255880])[0][4] == 0x38
+    assert 'ebp, 0x130' in a[0x00255809].text                   # ebp = gun record 4
+    assert {i.function for i in decoded() if i.call and target(i) == 0x002522B0} == {0x00255320, 0x00255550}
+    # the fire reads the aim point too
+    assert [mem(a[x])[0][4] for x in (0x002542EC, 0x002542F7, 0x00254302)] == [0x14, 0x18, 0x10]
+    # sub_00251DD0 falls back to the target's actor +0xBB4..+0xBBC
+    assert mem(a[0x00251EB0])[0][4] == 0x7C and mem(a[0x00251EB3])[0][4] == 0xBB4
+    assert mem(a[0x00251EBD])[0][4] == 0x10 and mem(a[0x00251ECF])[0][4] == 0x18
+    # sub_00251EF0: a player (actor +8 < [0x00790950]) aims at player record +0xB4 (0x1584 each at [0x007B0C48])
+    assert mem(a[0x00251EFD])[0][4] == 0x7C and mem(a[0x00251F04])[0][4] == 8
+    assert mem(a[0x00251F07])[0][4] == 0x00790950 and a[0x00251F0D].mnemonic == 'jge'
+    assert ('imm', 0x1584) in a[0x00251F17].ops and mem(a[0x00251F1D])[0][4] == 0xB4
+    assert mem(a[0x00251F3B])[0][4] == 0xB8 and mem(a[0x00251F54])[0][4] == 0xBC
+    # state 7 drives at the cannon's aim point: the hook leaves state 7 alone
+    assert mem(a[0x00254710])[0][4] == 0x140 and mem(a[0x00254718])[0][4] == 0x148
 
 
 def test_death_park_point():
