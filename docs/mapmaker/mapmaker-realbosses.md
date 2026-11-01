@@ -337,6 +337,41 @@ The 180° turns are skipped: they assume the mission arena's layout, and the fig
 INFERRED, needs a playtest: that state 4 onward works in a MapMaker map (the remaining risks
 below still apply). The next log should show the fight state leaving 1.
 
+### The roar never started (fixed after v0.4.0-mapmaker.23)
+
+User report (mapmaker.23): "Crow walker still isn't orienting toward me or attacking." The
+heartbeat showed the wake-up working: fight state 2, the player as target, the aim following
+the player. Then fight state 2 for the rest of the level, and the walker never turned, moved
+or fired. (Entity +0x20 = 8 is the entity's type, "character" (0x0005F514), not a state.)
+
+CONFIRMED (decode, `test_walker_roar_needs_an_animation`):
+
+- State 2 (0x0029B62E) first asks `sub_00059DD0(entity +4)` whether the current animation has
+  finished, and returns while it hasn't (0x0029B63C). Only then does it play
+  `crowewalkerstunscript` 0x6F7 (`sub_0005F460`, 0x0029B664). State 4 follows once 0x6F7 is
+  the current animation (`sub_00059D20`, 0x0029B648).
+- `sub_00059DD0` reads the animation controller's finished flag: +0x17C when a blend target
+  +0x12C is set, else +0x124. A new controller (`sub_00097C00`) starts with no animation
+  (+0xD4 = 0), +0x124 = 0 and +0x12C = 0. Only playing an animation changes that
+  (`sub_0005BC20`: +0xD4 = id, +0x124 = 0, set when it ends).
+- The walker gets its story class before its first frame (`_ai_start`), and its fight plays no
+  animation before state 2. So in MapMaker its controller never had an animation, was never
+  "finished", and state 2 waited forever. In mission 13 something else animates it first
+  (INFERRED: the level script).
+- With no current animation, the play call accepts any animation (`sub_001C8C20`:
+  0x001C8CA0 -> 0x001C8D09 -> 0x001C8D5D). The walker's animation flags match the split
+  Crowe's, whose fight plays in MapMaker.
+
+| change | what it does |
+|---|---|
+| `_fx` wake-up, roar | in fight state 1 or 2 after the first frame (state +0x98 == 1), once per level, when the controller (entity +4) has never had an animation (+0xD4 and +0x12C both 0): the stock call state 2 makes, `sub_0005F460(entity, 0x6F7, 0, 1.0)`. When the roar ends, state 2 finds it finished and current and enters the fight. Logged once: `Crow walker had never been animated: roar started ...`, or `... roar refused by sub_0005F460 ...` if the call returns 0 |
+| heartbeat | a second line per beat: the current animation (+0xD4), blend target (+0x12C), the finished flag `sub_00059DD0` reads, and the state request (AI +0x9D0) |
+
+No new wrapper. The area now calls `sub_0005F460`; its link stub is added to
+`tests/mapmaker/mapmaker_area_stubs.h`. INFERRED, needs a playtest: the next log should show
+animation 0x6F7, then the fight state reaching 4 and beyond (turns 8/9, walking, firing). If
+the roar is refused, the log names it.
+
 ## The Crow walker (story mission 13)
 
 User request (2026-11-01): the Crow walker and tank bosses next. The walker
