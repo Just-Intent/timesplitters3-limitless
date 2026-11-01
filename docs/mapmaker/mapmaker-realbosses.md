@@ -433,6 +433,44 @@ start ran only for an empty controller. CONFIRMED (decode, `test_walker_roar_nee
 The next log should show animation 0x6F7, then the fight state passing 4 -> 0x13 -> 0x12 -> 4
 and then 8/9 turns (the fight-state lines from the guns change).
 
+### Several per map (after v0.4.0-mapmaker.25)
+
+User request (2026-11-01): "Same one-per-map limit applies presently to the giant skeleton. All of
+these one-per-map limits need fixed." The giant trophy monster already allowed several (no
+per-level state: every one gets class 0x80). The giant skeleton and the Crow walker now do too.
+
+CONFIRMED (decode, `test_several_per_map_entries`):
+
+- Their fights keep everything in a per-level block (`[0x0078B1EC]` 0x4C7C, `[0x0078B1E8]`
+  0x64DC). The particle and effect code they call keeps its state in statics
+  0x0078B080..0x0078B1DB: the particle block pointer `[0x0078B0D0]`, emitter shape, counts,
+  texture, and the walker's effect blocks `[0x0078B090]`/`[0x0078B098]`. The boss pointers follow
+  at 0x0078B1DC (robot), 0x0078B1E4 (split Crowe), 0x0078B1E8 and 0x0078B1EC.
+- Every function that reads `[0x0078B1E8]` is reached from the walker's fight `sub_002998E0`, its
+  message handler `sub_0029CBF0`, its damage callback `sub_00298BA0`, its object slots 2/3
+  `sub_00299140`/`sub_00298F60` (all installed by its first frame) or the beam draw `sub_0029CCB0`.
+  The exceptions are the level init `sub_002976F0`/`sub_00297690`/`sub_00296BD0`.
+- Every function that reads `[0x0078B1EC]` is reached from the mansion fight `sub_0029CEF0`, its
+  slot-2 callback `sub_00286430` or its particle-type callback `sub_00288BD0`. The exceptions are
+  the catacombs fight and its callbacks (never run for a MapMaker skeleton), the init
+  `sub_00287E00`/`sub_00287860` and the scene 1/17 frame draw `sub_0029CE00`.
+- `sub_00288BD0` is registered once for all skeletons (`sub_00378400` keeps one entry per
+  callback) and is called with no entity. The skeleton message handler and its damage callback
+  `sub_00289690` read neither pointer nor the statics.
+
+| change | what it does |
+|---|---|
+| level | one instance per Story AI placed with the boss (Story AI chunk +0x28 slot whose set member is 0x28 / 0x64; at least 1, at most 4), each made by the stock `sub_00287E00` / `sub_002976F0` from the statics as they were. Each keeps its own copy of the statics, and the statics are put back after. The boss pointers are left on the first instance ("home") |
+| swap | around every entry above (`_princess` for the mansion fight, the new wrappers, the fire and beam draws in `_fx`), the instance's pointer and statics go in. After the call the statics are kept in the instance, and pointer and statics are put back exactly. An inner entry of the instance already in swaps nothing. A robot, split Crowe or other instance never sees this one's blocks |
+| ai_start | each skeleton / walker takes a free instance (the same one again for a restarting AI). One more than the map prepared keeps the bot class (`no giant skeleton left this level ...`) |
+| walker | heartbeat, fight-state log, wake-up, roar and guns per walker (logs say `Crow walker N`). One WELL stand-in per walker. The end of a walker's death removes that walker |
+| skeleton | floor height, throw and fire per skeleton |
+
+Not routed (INFERRED, visual only): `sub_00288BD0` always sees the first skeleton's state. Its
+particles for the other skeletons may be placed from the first one's values. Memory: about 51 KB per
+skeleton and 59 KB per walker of the level heap. The new wrappers are under
+[Integrator notes](#integrator-notes).
+
 ## The Crow walker (story mission 13)
 
 User request (2026-11-01): the Crow walker and tank bosses next. The walker
@@ -553,6 +591,22 @@ WRAP sub_00287E20 -> pc_mapmaker_realbosses_throw          (new; per skeleton fr
 WRAP sub_002274C0 -> pc_mapmaker_realbosses_event          (new; level events, return-address test first)
 WRAP sub_000862C0 -> pc_mapmaker_bigdraw_rect             (new, area bigdraw; prop draw rectangle, per frame per prop of a drawn room)
 ```
+
+Added for several giant skeletons / Crow walkers per map (after v0.4.0-mapmaker.25):
+
+```
+WRAP sub_00286430 -> pc_mapmaker_realbosses_skel_slot      (new; the mansion fight's slot-2 callback, per skeleton frame)
+WRAP sub_002998E0 -> pc_mapmaker_realbosses_walk_fight     (new; class 0x100000 dispatch, per walker frame)
+WRAP sub_0029CBF0 -> pc_mapmaker_realbosses_walk_message   (new; the walker's message handler)
+WRAP sub_00298BA0 -> pc_mapmaker_realbosses_walk_damage    (new; the walker's damage callback, cdecl damage record)
+WRAP sub_00299140 -> pc_mapmaker_realbosses_walk_slot      (new; walker slot 2)
+WRAP sub_00298F60 -> pc_mapmaker_realbosses_walk_slot      (new; walker slot 3: the same hook for both)
+```
+
+Each swaps the boss's instance in around the original and runs the original
+unchanged for anything else (no instance for the entity, another scene, the
+switch off). No new guest calls, so no new link stubs. Order with other
+wrappers of these functions: free (none exist).
 
 Include the `.inc` after `pc_mapmaker_bosses.inc` / `pc_mapmaker_characters.inc`
 (it uses `pc_mapmaker_area_enabled`, declared in the file and defined later in

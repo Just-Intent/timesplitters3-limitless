@@ -104,39 +104,18 @@ MUTATIONS = {
     'skel-pick-id': ('else if(WORD_AT(s+0x14u)==RBS_SKEL_ROW) id=RBS_SKEL_ID;', 'else if(WORD_AT(s+0x14u)==RBS_SKEL_ROW) id=RBS_ID;'),
     'skel-preview': ('if(row==RBS_SKEL_ROW) return rbs_arcade_row(RBS_SKEL_STANDIN);', 'if(row==RBS_SKEL_ROW) return RBS_SKEL_ROW;'),
     'skel-wrong-pak': ('#define RBS_SKEL_PAK 0x0049D6FCu', '#define RBS_SKEL_PAK 0x0049D77Cu'),
-    'skel-mount-any-map': ('    if((has=rbs_map_has(RBS_SKEL_ID))!=0) {', '    if((has=1)!=0) {'),
-    'skel-level-any-map': ('(has=rbs_map_has(RBS_SKEL_ID))==0) return;\n    WORD_AT', '(has=1)==0) return;\n    WORD_AT'),
-    'skel-level-keeps': ('    memset(&rbs_skel,0,sizeof rbs_skel);              /* a new level: nothing of the last one */\n', ''),
     'skel-stale-pointer': ('    WORD_AT(RBS_SKEL_STATE)=0;WORD_AT(RBS_SKEL_PARTS)=0;', '   '),
     'skel-level-any-mode': ('    if(!rbs_play() || rbs.optout) return;\n    rbs_set_report("level init");',
                             '    if(!rbs_on() || rbs.optout) return;\n    rbs_set_report("level init");'),
-    'skel-level-trophy-gate': ('(has=rbs_map_has(RBS_SKEL_ID))==0) return;\n    WORD_AT', '(has=rbs_map_has(RBS_ID))==0) return;\n    WORD_AT'),
     'skel-class': ('#define RBS_SKEL_CLASS 0x20000u', '#define RBS_SKEL_CLASS 0x80u'),
-    'skel-two-bosses': ('        else if(rbs_skel.record && rbs_skel.record!=rec) {', '        else if(0) {'),
-    'skel-without-state': ('        else if(!rbs_skel.state || WORD_AT(RBS_SKEL_STATE)!=rbs_skel.state)\n', '        else if(0)\n'),
     'skel-without-pak': ('else if(!rbs_skel_pak_mounted()) rbs_log("lv1_6', 'else if(0) rbs_log("lv1_6'),
     'skel-ignores-optout': ('    if(rbs.optout) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: giant skeleton', '    if(0) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: giant skeleton'),
-    'skel-princess-any': ('if(!rbs_skel.record || !MAPMAKER_STACK_OK(8) || !rbs_skel_boss(WORD_AT(g_esp+4u))) { original();return; }\n    rbs_skel_floor(',
-                          'if(!rbs_skel.record || !MAPMAKER_STACK_OK(8)) { original();return; }\n    rbs_skel_floor('),
-    'skel-floor-missing': ('    rbs_setf(ent+RBS_ENT_Y,rbs_skel.floor);\n', ''),
-    'skel-floor-any-caller': ('|| WORD_AT(g_esp)!=RBS_RET_FACE || !rbs_skel_boss', '|| !rbs_skel_boss'),
-    'skel-floor-any-boss': (' || !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }\n    rbs_setf(', ' || !(ent=WORD_AT(g_esp+4u))) { original();return; }\n    rbs_setf('),
-    'skel-floor-refreshed': ('    if(rbs_skel.floor_set || !rbs_sane(y=rbs_getf(ent+RBS_ENT_Y))) return;', '    if(!rbs_sane(y=rbs_getf(ent+RBS_ENT_Y))) return;'),
-    'skel-floor-not-read': ('    rbs_skel_floor(WORD_AT(g_esp+4u));\n', ''),
     'skel-floor-wrong-ret': ('#define RBS_RET_FACE 0x0029D075u', '#define RBS_RET_FACE 0x0029E528u'),
-    'skel-fire-missing': ('    if(here) rbs_skel_fire();\n', ''),
     'skel-fire-always': ('WORD_AT(st+RBS_SKEL_FIRE)!=1u ||', '0 ||'),
     'skel-fire-any-scene': ('WORD_AT(st+RBS_SKEL_FIRE)!=1u ||\n       WORD_AT(RBS_SCENE)!=100u ||', 'WORD_AT(st+RBS_SKEL_FIRE)!=1u ||\n      '),
-    'skel-fire-stale': ('    if(!rbs_skel.record || !st || WORD_AT(RBS_SKEL_STATE)!=st || WORD_AT(st+RBS_SKEL_FIRE)', '    if(!rbs_skel.record || !st || WORD_AT(st+RBS_SKEL_FIRE)'),
     'skel-fire-size': ('guest_call(sub_002A7F30,2,WORD_AT(view+0x208u),0x40200000u);', 'guest_call(sub_002A7F30,2,WORD_AT(view+0x208u),0x3FE00000u);'),
     'skel-throw-unguarded': ('        if(!rbs_sane(rbs_getf(shot)) || ', '        if(0 && !rbs_sane(rbs_getf(shot)) || '),
-    'skel-princess-original': ('    sub_0029CEF0();\n}', '    original();\n}'),
-    'skel-boss-any-scene': ('WORD_AT(a+RBS_ACTOR_RECORD)==rbs_skel.record && WORD_AT(RBS_SCENE)==100u && rbs_on();',
-                            'WORD_AT(a+RBS_ACTOR_RECORD)==rbs_skel.record && rbs_on();'),
-    'skel-boss-stale-state': ('    if(!rbs_skel.record || !rbs_skel.state || WORD_AT(RBS_SKEL_STATE)!=rbs_skel.state) return 0;',
-                              '    if(!rbs_skel.record) return 0;'),
     'skel-message-original': ('    sub_00286D30();\n}', '    original();\n}'),
-    'skel-message-any': ('|| !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }\n    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH', '|| !(ent=WORD_AT(g_esp+4u))) { original();return; }\n    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH'),
     'skel-message-only-death': ('    sub_00286D30();\n}', '    if(WORD_AT(g_esp+8u)!=RBS_MSG_DEATH) { original();return; }\n    sub_00286D30();\n}'),
     'skel-risen-anim': ('#define RBS_SKEL_START 0x19Cu', '#define RBS_SKEL_START 0x23Bu'),
     'skel-risen-no-ret': ('    g_eax=guest_call(sub_00059DB0,2,ent,RBS_SKEL_START);\n    MAPMAKER_GUEST_RET();', '    g_eax=guest_call(sub_00059DB0,2,ent,RBS_SKEL_START);'),
@@ -150,7 +129,6 @@ MUTATIONS = {
     'skel-fire-effect': ('guest_call(sub_0010EB90,2,WORD_AT(shot+0x18u),0u);', 'guest_call(sub_0010EB90,2,WORD_AT(shot+0x14u),0u);'),
     'skel-done-original': ('    MAPMAKER_GUEST_RET();                              /* done: scene 1 returns (0x00287FD7) */', '    original();'),
     'skel-event-any': ('WORD_AT(g_esp)!=RBS_RET_EVENT || WORD_AT(RBS_SCENE)', 'WORD_AT(RBS_SCENE)'),
-    'skel-event-any-scene': ('|| WORD_AT(RBS_SCENE)!=100u || !rbs_on()) { original();return; }\n    if(rbs_skel.events', '|| !rbs_on()) { original();return; }\n    if(rbs_skel.events'),
     'skel-event-no-ret': ('WORD_AT(g_esp+8u));\n    MAPMAKER_GUEST_RET();\n}', 'WORD_AT(g_esp+8u));\n}'),
     'skel-meter-shown': (' &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL &&', ' &&'),
     # the Crow walker (id 0x64)
@@ -162,41 +140,22 @@ MUTATIONS = {
     'walk-mount-any-map': ('    if((has=rbs_map_has(RBS_WALK_ID))!=0) {\n        rbs_walk_label();', '    if((has=1)!=0) {\n        rbs_walk_label();'),
     'walk-set-info': ('        if(id==RBS_WALK_ID && !*w) *w=k+1u;\n', ''),
     'walk-set-extra': ('        if(id==RBS_WALK_ID && !*w) *w=RBS_INFO_SLOTS+k+1u;\n', ''),
-    'walk-level-any-map': ('    if((has=rbs_map_has(RBS_WALK_ID))!=0) {           /*', '    if((has=1)!=0) {           /*'),
-    'walk-level-keeps': ('    memset(&rbs_walk,0,sizeof rbs_walk);\n', ''),
-    'walk-stale-pointer': ('        WORD_AT(RBS_WALK_STATE)=0;\n', ''),
     'walk-class': ('#define RBS_WALK_CLASS 0x100000u', '#define RBS_WALK_CLASS 0x20000u'),
     'walk-without-pak': ('else if(!rbs_walk_pak_mounted()) rbs_log("lv81', 'else if(0) rbs_log("lv81'),
-    'walk-without-state': ('        else if(!rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state)\n', '        else if(0)\n'),
-    'walk-two': ('        else if(rbs_walk.record && rbs_walk.record!=rec) {', '        else if(0) {'),
     'walk-ignores-optout': ('    if(rbs.optout) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: Crow walker', '    if(0) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: Crow walker'),
-    'walk-not-noted': ('            rbs_walk.record=rec;rbs_walk.actor=a;\n            rbs_note(', '            rbs_walk.record=rec;rbs_walk.actor=a;\n            (void)('),
     'walk-well-any-caller': ('WORD_AT(g_esp)!=RBS_RET_WELL || WORD_AT(g_esp+4u)!=RBS_WALK_TAG)', 'WORD_AT(g_esp+4u)!=RBS_WALK_TAG)'),
-    'walk-well-replaces-found': ('    if(g_eax || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;', '    if(WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;'),
-    'walk-well-any-scene': ('    if(g_eax || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;', '    if(g_eax || !rbs_on()) return;'),
-    'walk-well-null': ('    g_eax=rbs.well;\n', ''),
-    'walk-well-dirty': ('    memset((void *)((uintptr_t)rbs.well+g_xbox_mem_offset),0,RBS_OBJ_SIZE);\n', ''),
-    'walk-event-kept': ('        if(ret==RBS_RET_WALK_DONE) rbs_walk_remove();\n        MAPMAKER_GUEST_RET();\n        return;', '        if(ret==RBS_RET_WALK_DONE) rbs_walk_remove();\n        original();\n        return;'),
     'walk-event-intro-kept': ('((ret=WORD_AT(g_esp))==RBS_RET_WALK_INTRO || ret==RBS_RET_WALK_INTRO2 ||', '((ret=WORD_AT(g_esp))==RBS_RET_WALK_INTRO ||'),
     'walk-event-any-scene': ('       ret==RBS_RET_WALK_DONE) && WORD_AT(RBS_SCENE)==100u && rbs_on()) {', '       ret==RBS_RET_WALK_DONE) && rbs_on()) {'),
-    'walk-not-removed': ('        if(ret==RBS_RET_WALK_DONE) rbs_walk_remove();\n', ''),
-    'walk-remove-other': ('    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record ||', '    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) ||'),
-    'walk-remove-twice': ('    rbs_walk.actor=0;\n', ''),
     'walk-focus-kept': ('WORD_AT(player+RBS_FOCUS)==ent) WORD_AT(player+RBS_FOCUS)=0;', 'WORD_AT(player+RBS_FOCUS)==ent) {}'),
     'walk-fx-missing': ('    guest_call(sub_0029CCB0,0);\n', ''),
     'walk-fx-any-caller': ('MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==RBS_RET_FX;', 'MAPMAKER_STACK_OK(4);'),
-    'walk-fx-any-scene': ('rbs_walk.state || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;\n    rbs_walk_wake();', 'rbs_walk.state || !rbs_on()) return;\n    rbs_walk_wake();'),
-    'walk-fx-stale': ('    if(!here || !rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state ||', '    if(!here || !rbs_walk.state ||'),
     'walk-meter-shown': (' &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_WALK_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_WALK_MODEL)', ')'),
     'walk-hud-own-bar': (' &&\n        RBS_H(focus+RBS_ENT_MODEL)!=RBS_WALK_MODEL)', ')'),
     'walk-never-woken': ('    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;\n', ''),
-    'walk-wake-not-called': ('    rbs_walk_wake();\n', ''),
     'walk-wake-skips-roar': ('#define RBS_WALK_ROAR 2u', '#define RBS_WALK_ROAR 4u'),
     'walk-wake-any-state': ('    if(s==RBS_WALK_WAIT && (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {', '    if((int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {'),
     'walk-wake-before-setup': ('    if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;\n', ''),
     'walk-wake-over-request': ('    if(s==RBS_WALK_WAIT && (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {', '    if(s==RBS_WALK_WAIT) {'),
-    'walk-wake-other-record': ('       WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;',
-                               '       !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;'),
     'walk-wake-other-entity': ('!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;\n    rbs_walk_track',
                                '!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;\n    rbs_walk_track'),
     'walk-roar-never': ('    r=guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u);', '    r=0;'),
@@ -208,18 +167,85 @@ MUTATIONS = {
     'walk-own-range-low': ('return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }', 'return anim>RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }'),
     'walk-own-range-high': ('return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }', 'return anim>=RBS_WALK_ANIM_FIRST && anim<RBS_WALK_ANIM_LAST; }'),
     'walk-own-any': ('return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }', 'return anim!=0; }'),
-    'walk-roar-repeats': ('    rbs_walk.roars++;\n    r=guest_call', '    r=guest_call'),
     'walk-roar-any-state': ('    } else if(s!=RBS_WALK_ROAR) return;\n', '    }\n'),
     'walk-roar-only-state1': ('    } else if(s!=RBS_WALK_ROAR) return;\n', '    } else return;\n'),
     'walk-arm-never': ('    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ARM;\n', ''),
     'walk-arm-wrong-state': ('#define RBS_WALK_ARM 0x12u', '#define RBS_WALK_ARM 0x4u'),
-    'walk-arm-any-state': ('    if(rbs_walk.armed || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_STANDOFF || ', '    if(rbs_walk.armed || '),
     'walk-arm-over-request': (' || (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)>=0 ||\n', ' ||\n'),
     'walk-arm-one-gun': ('       WORD_AT(st+RBS_WALK_GUN1) || WORD_AT(st+RBS_WALK_GUN2)) return;', '       (WORD_AT(st+RBS_WALK_GUN1) && WORD_AT(st+RBS_WALK_GUN2))) return;'),
-    'walk-arm-stage2': ('    if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;\n    rbs_walk_arm(a,ent,st);\n', '    rbs_walk_arm(a,ent,st);\n    if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;\n'),
-    'walk-arm-repeats': ('    rbs_walk.armed++;\n', ''),
-    'walk-track-stuck': ('    rbs_walk.last=s;\n', ''),
     'walk-wake-sets-state': ('    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;\n', '    WORD_AT(a+RBS_WALK_AI_STATE)=RBS_WALK_ROAR;\n'),
+    # the giant skeleton (rewritten for several per map)
+    'skel-mount-any-map': ('    if((has=rbs_map_has(RBS_SKEL_ID))!=0) {\n        rbs_skel_label();', '    if((has=1)!=0) {\n        rbs_skel_label();'),
+    'skel-level-any-map': ('    if((has=rbs_map_has(RBS_SKEL_ID))!=0) {\n        n=rbs_count', '    if((has=1)!=0) {\n        n=rbs_count'),
+    'skel-level-keeps': ('    memset(rbs_skels,0,sizeof rbs_skels);memset(&rbs_skelf,0,sizeof rbs_skelf);', '    memset(&rbs_skelf,0,sizeof rbs_skelf);'),
+    'skel-level-trophy-gate': ('    if((has=rbs_map_has(RBS_SKEL_ID))!=0) {\n        n=rbs_count', '    if((has=rbs_map_has(RBS_ID))!=0) {\n        n=rbs_count'),
+    'skel-two-bosses': ('    for(k=0;k<rbs_skelf.n;k++) if(!rbs_skels[k].record && rbs_skels[k].state) return &rbs_skels[k];', '    if(rbs_skelf.n && !rbs_skels[0].record) return &rbs_skels[0];'),
+    'skel-without-state': ('        else if(!rbs_skelf.n || !rbs_skel_ours())\n', '        else if(0)\n'),
+    'skel-princess-any': ("    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(8) || !(k=rbs_skel_of(WORD_AT(g_esp+4u)))) { original();return; }\n    rbs_skel_floor(",
+                          "    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(8) || !(k=&rbs_skels[0])) { original();return; }\n    rbs_skel_floor("),
+    'skel-floor-missing': ('    rbs_setf(ent+RBS_ENT_Y,k->floor);\n', ''),
+    'skel-floor-any-caller': ('|| WORD_AT(g_esp)!=RBS_RET_FACE || !(k=rbs_skel_of', '|| !(k=rbs_skel_of'),
+    'skel-floor-any-boss': ('!(k=rbs_skel_of(ent=WORD_AT(g_esp+4u))) || !k->floor_set) { original();return; }', '!(k=&rbs_skels[0]) || !(ent=WORD_AT(g_esp+4u)) || !k->floor_set) { original();return; }'),
+    'skel-floor-refreshed': ('    if(k->floor_set || !rbs_sane(y=rbs_getf(ent+RBS_ENT_Y))) return;', '    if(!rbs_sane(y=rbs_getf(ent+RBS_ENT_Y))) return;'),
+    'skel-floor-not-read': ('    rbs_skel_floor(k,WORD_AT(g_esp+4u));\n', ''),
+    'skel-fire-missing': ('    for(k=0;k<rbs_skelf.n;k++) rbs_skel_fire(&rbs_skels[k]);\n', ''),
+    'skel-fire-stale': ('    if(!k->record || !st || !rbs_skel_ours() || WORD_AT(st+RBS_SKEL_FIRE)', '    if(!k->record || !st || WORD_AT(st+RBS_SKEL_FIRE)'),
+    'skel-princess-original': ('    rbs_skel_in(k,&s);\n    sub_0029CEF0();\n', '    rbs_skel_in(k,&s);\n    original();\n'),
+    'skel-boss-any-scene': ('    for(k=0;k<rbs_skelf.n && (!rbs_skels[k].record || rbs_skels[k].record!=rec);k++) {}\n    if(k==rbs_skelf.n || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return 0;',
+                            '    for(k=0;k<rbs_skelf.n && (!rbs_skels[k].record || rbs_skels[k].record!=rec);k++) {}\n    if(k==rbs_skelf.n || !rbs_on()) return 0;'),
+    'skel-boss-stale-state': ('    if(!rbs_skelf.n || !rbs_skel_ours()) return 0;', '    if(!rbs_skelf.n) return 0;'),
+    'skel-message-any': ('    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(20) || !rbs_skel_of(ent=WORD_AT(g_esp+4u))) { original();return; }',
+                         '    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(20) || !(ent=WORD_AT(g_esp+4u))) { original();return; }'),
+    'skel-event-any-scene': ('|| WORD_AT(RBS_SCENE)!=100u || !rbs_on()) { original();return; }\n    if(rbs_skelf.events', '|| !rbs_on()) { original();return; }\n    if(rbs_skelf.events'),
+    # the Crow walker (rewritten for several per map)
+    'walk-level-any-map': ('    if((has=rbs_map_has(RBS_WALK_ID))!=0) {\n        n=rbs_count', '    if((has=1)!=0) {\n        n=rbs_count'),
+    'walk-level-keeps': ('    memset(rbs_walks,0,sizeof rbs_walks);memset(&rbs_walkf,0,sizeof rbs_walkf);', '    memset(&rbs_walkf,0,sizeof rbs_walkf);'),
+    'walk-stale-pointer': ('            WORD_AT(RBS_WALK_STATE)=0;                 /* a stale pointer of an earlier level is not taken */\n', ''),
+    'walk-without-state': ('        else if(!rbs_walkf.n || !rbs_walk_ours())\n', '        else if(0)\n'),
+    'walk-two': ('    for(k=0;k<rbs_walkf.n;k++) if(!rbs_walks[k].record && rbs_walks[k].state) return &rbs_walks[k];', '    if(rbs_walkf.n && !rbs_walks[0].record) return &rbs_walks[0];'),
+    'walk-not-noted': ('            w->record=rec;w->actor=a;\n            rbs_note(', '            w->record=rec;w->actor=a;\n            (void)('),
+    'walk-well-replaces-found': ('    if(g_eax || !(w=rbs_walk_now()) || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;', '    if(!(w=rbs_walk_now()) || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;'),
+    'walk-well-any-scene': ('    if(g_eax || !(w=rbs_walk_now()) || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;', '    if(g_eax || !(w=rbs_walk_now()) || !rbs_on()) return;'),
+    'walk-well-null': ('    g_eax=*slot;\n', ''),
+    'walk-well-dirty': ('    memset((void *)((uintptr_t)*slot+g_xbox_mem_offset),0,RBS_OBJ_SIZE);\n', ''),
+    'walk-well-shared': ('    slot=&rbs.well[w-rbs_walks];', '    slot=&rbs.well[0];'),
+    'walk-event-kept': ('rbs_walk_remove(w);\n        MAPMAKER_GUEST_RET();\n        return;', 'rbs_walk_remove(w);\n        original();\n        return;'),
+    'walk-not-removed': ('        if(ret==RBS_RET_WALK_DONE && (w=rbs_walk_now())) rbs_walk_remove(w);\n', ''),
+    'walk-remove-other': ('    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || WORD_AT(a+RBS_ACTOR_RECORD)!=w->record ||', '    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) ||'),
+    'walk-remove-twice': ('    w->actor=0;\n    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR)', '    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR)'),
+    'walk-remove-first': ('    if(rbs_walkf.cur) return rbs_walkf.cur;\n', ''),
+    'walk-fx-any-scene': ('    if(!w->state || !rbs_walk_ours() || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;', '    if(!w->state || !rbs_walk_ours() || !rbs_on()) return;'),
+    'walk-fx-stale': ('    if(!w->state || !rbs_walk_ours() || WORD_AT(RBS_SCENE)!=100u', '    if(!w->state || WORD_AT(RBS_SCENE)!=100u'),
+    'walk-wake-not-called': ('    rbs_walk_wake(w);\n', ''),
+    'walk-wake-other-record': ('       WORD_AT(a+RBS_ACTOR_RECORD)!=w->record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;',
+                               '       !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;'),
+    'walk-roar-repeats': ('    w->roars++;\n    r=guest_call', '    r=guest_call'),
+    'walk-arm-any-state': ('    if(w->armed || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_STANDOFF || ', '    if(w->armed || '),
+    'walk-arm-stage2': ('    if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;\n    rbs_walk_arm(w,a,ent,st);\n', '    rbs_walk_arm(w,a,ent,st);\n    if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;\n'),
+    'walk-arm-repeats': ('    w->armed++;\n', ''),
+    'walk-track-stuck': ('    w->last=s;\n', ''),
+    # several per map: instances, the swap
+    'multi-count-one': ('    return n<1u?1u:n>RBS_INST_MAX?RBS_INST_MAX:n;', '    return 1u;'),
+    'multi-cap-raised': ('#define RBS_INST_MAX 4u', '#define RBS_INST_MAX 8u'),
+    'multi-count-wrong-field': ('#define RBS_SAI_SLOT 0x28u', '#define RBS_SAI_SLOT 0x29u'),
+    'multi-count-any-slot': (' && (slot=RBS_B(c+8u+RBS_SAI_SLOT))<RBS_SET_MAX && ids[slot]==id) n++;', ' && (slot=RBS_B(c+8u+RBS_SAI_SLOT))<RBS_SET_MAX) n++;'),
+    'multi-extra-slots-ignored': ('        if(ids && RBS_INFO_SLOTS+k<RBS_SET_MAX) ids[RBS_INFO_SLOTS+k]=(uint16_t)id;\n', ''),
+    'multi-shared-base': ('            memcpy(rbs_g(RBS_FX),base,RBS_FX_SIZE);\n            WORD_AT(RBS_SKEL_STATE)=0;', '            WORD_AT(RBS_SKEL_STATE)=0;'),
+    'multi-statics-left': ('    memcpy(rbs_g(RBS_FX),base,RBS_FX_SIZE);            /* the statics as they were */\n', ''),
+    'multi-no-home': ('        WORD_AT(RBS_SKEL_STATE)=rbs_skelf.n?rbs_skels[0].state:0u;\n', ''),
+    'multi-fx-not-kept': ('    if(!s->swapped) return;\n    memcpy(fx,rbs_g(RBS_FX),RBS_FX_SIZE);\n', '    if(!s->swapped) return;\n'),
+    'multi-fx-not-restored': ('    WORD_AT(global)=s->ptr;\n    memcpy(rbs_g(RBS_FX),s->fx,RBS_FX_SIZE);\n', '    WORD_AT(global)=s->ptr;\n'),
+    'multi-ptr-not-restored': ('    memcpy(fx,rbs_g(RBS_FX),RBS_FX_SIZE);\n    WORD_AT(global)=s->ptr;\n', '    memcpy(fx,rbs_g(RBS_FX),RBS_FX_SIZE);\n'),
+    'multi-fx-not-swapped': ('    WORD_AT(global)=state;\n    memcpy(rbs_g(RBS_FX),fx,RBS_FX_SIZE);\n', '    WORD_AT(global)=state;\n'),
+    'multi-nested-swaps': ('    if(rbs_skelf.cur==k) return;\n', ''),
+    'multi-cur-kept': ('    rbs_skelf.cur=(RbsSkel *)s->prev;\n', ''),
+    'multi-reuse-ignored': ('    for(k=0;k<rbs_skelf.n;k++) if(rbs_skels[k].record==rec) return &rbs_skels[k];\n', ''),
+    'multi-skel-slot-unswapped': ('    rbs_skel_in(k,&s);\n    original();\n    rbs_skel_out(k,&s);\n}\n', '    original();\n}\n'),
+    'multi-fire-unswapped': ('    rbs_skel_in(k,&s);                                 /* its own particle block and counts */\n', ''),
+    'multi-beams-unswapped': ('    rbs_walk_in(w,&s);\n    guest_call(sub_0029CCB0,0);\n', '    guest_call(sub_0029CCB0,0);\n'),
+    'multi-walk-unswapped': ('    if(!(w=rbs_walk_of(ent))) { original();return; }\n    rbs_walk_in(w,&s);\n', '    if(!(w=rbs_walk_of(ent))) { original();return; }\n'),
+    'multi-walk-damage-record': ('    rbs_walk_call(original,WORD_AT(r));', '    rbs_walk_call(original,r);'),
+    'multi-walk-fx-first-only': ('    for(k=0;k<rbs_walkf.n;k++) rbs_walk_frame(&rbs_walks[k]);', '    if(rbs_walkf.n) rbs_walk_frame(&rbs_walks[0]);'),
 }
 
 
@@ -837,3 +863,55 @@ def test_walker_guns_gate_the_fight():
     # turning: state 9/0x12 apply +0x590 as 59.5 degrees to the yaw (ebx = entity +0x70) and +0xC4
     assert struct.unpack('<f', rd(0x0049F440, 4))[0] == 59.5 and mem(a[0x0029CA51])[0][4] == 0x0049F440
     assert mem(a[0x0029A992])[0][4] == 0x70 and mem(a[0x0029CA70])[0][4] == 0xC4
+
+
+def test_several_per_map_entries():
+    """Every function that reads a skeleton's or walker's state pointer is reached
+    only from the entries the area swaps an instance in for (or from code the area
+    never runs for them); the particle/effect statics are 0x0078B080..0x0078B1DB."""
+    graph, _ = direct_graph()
+    starts = {i.function for i in decoded()}
+    for i in decoded():                                                     # tail jumps (sub_00296120 -> sub_00295530)
+        if i.mnemonic == 'jmp' and target(i) in starts and target(i) != i.function:
+            graph.setdefault(i.function, set()).add(target(i))
+    users = {}
+    for i in decoded():
+        for kind, v in i.values():
+            users.setdefault(v, set()).add(i.function)
+    # the statics the particle and effect code uses, and the boss pointers after them
+    fx = set()
+    for f in (0x002A62C0, 0x002A62E0, 0x002A62F0, 0x002A65A0, 0x002A65F0, 0x002A6650, 0x002A7090,
+              0x002A7B90, 0x002A7D60, 0x002A7F30, 0x002A8300, 0x002A8370, 0x002A8380, 0x002A85C0, 0x002A8760):
+        fx |= {v for i in decoded() if i.function == f for kind, v in i.values() if 0x0078B000 <= v < 0x0078B200}
+    assert min(fx) == 0x0078B080 and max(fx) == 0x0078B1D8                 # RBS_FX, RBS_FX_SIZE 0x15C
+    assert 0x0078B1E8 not in fx and 0x0078B1EC not in fx
+    # the walker: fight, message, damage, slots 2/3, beams; init/restart only otherwise
+    walk = reach(graph, [0x002998E0, 0x0029CBF0, 0x00298BA0, 0x00298F60, 0x00299140, 0x0029CCB0])
+    assert users[0x0078B1E8] - walk == {0x002976F0, 0x00297690, 0x00296BD0}
+    # its callbacks: damage 0x00298BA0, slot 2 0x00299140, slot 3 0x00298F60
+    a = {i.address: i for i in decoded()}
+    assert ('imm', 0x00299140) in a[0x0029B2AA].ops and ('imm', 0x00298BA0) in a[0x0029B2C3].ops
+    assert ('imm', 0x00298F60) in a[0x0029B2D1].ops and ('imm', 3) in a[0x0029B2D6].ops
+    # the skeleton: the mansion fight and its slot-2 callback; its particle callback 0x00288BD0 has no entity
+    skel = reach(graph, [0x0029CEF0, 0x00286430, 0x00288BD0])
+    rest = users[0x0078B1EC] - skel
+    # the catacombs fight (never run for a MapMaker skeleton: _princess takes the
+    # mansion variant) with the callbacks it registers (immediates in its code)
+    catacombs, todo = set(), [0x0029E0A0, 0x0028C560]
+    while todo:
+        new = reach(graph, todo) - catacombs
+        catacombs |= new
+        todo = [v for i in decoded() if i.function in new for kind, v in i.values()
+                if kind == 'imm' and v in starts and v not in catacombs]
+    assert rest - catacombs - {0x00287E00, 0x00287860, 0x0029CE00} == set()
+    assert {0x0028C2F0, 0x00288E20, 0x00289720} <= rest & catacombs               # e.g. the gas bottle's damage callback
+    assert ('imm', 0x00286430) in a[0x0029D43B].ops and ('imm', 2) in a[0x0029D440].ops
+    assert ('imm', 0x00288BD0) in a[0x0029D3D0].ops and target(a[0x0029D3D5]) == 0x00378400
+    # sub_00378400 keeps one entry per callback (0x00378410), so all skeletons share it
+    assert mem(a[0x00378410])[0][4] == 4 and a[0x00378413].mnemonic == 'je'
+    # the message handler and the damage callback read neither pointer nor the statics
+    for f in (0x00286D30, 0x00289690):
+        r = reach(graph, [f])
+        assert not any(r & users.get(v, set()) for v in fx | {0x0078B1EC, 0x0078B1E8})
+    # damage records: +0 the hit entity (0x002896E0 skeleton, 0x00298A5E walker)
+    assert mem(a[0x002896E0])[0][4] == 0 and mem(a[0x00298A5E])[0][4] == 0
