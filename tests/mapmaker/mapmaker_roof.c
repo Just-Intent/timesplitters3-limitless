@@ -34,6 +34,12 @@ void sub_0003DFA0(void) { g_ecx=6; }
 /* sub_000BD090(entity): the stock kill-now helper; here it records the call
  * and sets the health to 0 as sub_000BABA0 does. */
 void sub_000BD090(void) { g_ecx=7; }
+/* sub_00087310(box, out, max): room query; answers rooms_answer rooms and
+ * remembers the box. */
+void sub_00087310(void) { g_ecx=8; }
+static int rooms_answer=1;
+static unsigned nqueries;
+static float query_box[6];
 static uint32_t killed[8];
 static unsigned nkilled;
 static uint32_t guest_call(void (*f)(void),int n,...)
@@ -41,6 +47,11 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     va_list a;
     uint32_t x;
     va_start(a,n);x=n>0?va_arg(a,uint32_t):0u;va_end(a);
+    if(f==sub_00087310 && n==3) {
+        nqueries++;
+        memcpy(query_box,(char *)memory+x,sizeof query_box);
+        return (uint32_t)rooms_answer;
+    }
     if(f==sub_000BD090 && n==1) {
         if(nkilled<8u) killed[nkilled]=x;
         nkilled++;
@@ -751,6 +762,33 @@ int main(void)
         CHECK(nkilled==5);
         tick();
         CHECK(nkilled==6 && killed[5]==ent_of(0));
+        /* outside every room: dies after 8 room queries (every 6 ticks) that
+         * find no room, at any height; one query that finds a room resets it */
+        make_actor(20,0.0f,100.0f);FLOAT_AT(ent_of(20)+0x64)=10.0f;FLOAT_AT(ent_of(20)+0x6C)=20.0f;
+        WORD_AT(pl+0x14)=ent_of(20);
+        WORD_AT(0x00900100u)=0;WORD_AT(0x0074C37Cu)=1u;
+        nqueries=0;
+        for(k=0;k<120;k++) tick();
+        CHECK(nkilled==6 && nqueries>=20u && nqueries<=22u);              /* in a room: alive */
+        CHECK(query_box[0]==9.7f && query_box[1]==0.25f && query_box[2]==19.7f &&
+              query_box[3]==10.3f && query_box[4]==1.5f && query_box[5]==20.3f);
+        rooms_answer=0;
+        for(k=0;k<30;k++) tick();
+        rooms_answer=1;tick();tick();tick();tick();tick();tick();             /* back in a room */
+        rooms_answer=0;
+        for(k=0;k<42;k++) tick();
+        CHECK(nkilled==6);
+        for(k=0;k<6;k++) tick();
+        CHECK(nkilled==7 && killed[6]==ent_of(20) && FLOAT_AT(ent_of(20)+0x68)==0.0f);
+        /* no query memory: the room rule is off */
+        {
+            uint32_t q=mapmaker_roof_play.query;
+            mapmaker_roof_play.query=0;FLOAT_AT(ent_of(20)+0x1CC)=100.0f;
+            for(k=0;k<120;k++) tick();
+            CHECK(nkilled==7);
+            mapmaker_roof_play.query=q;
+        }
+        rooms_answer=1;
         WORD_AT(0x00790950u)=0;
     }
     /* the next map without unbounded tiles has no kill height */
@@ -758,7 +796,7 @@ int main(void)
     WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
     play();
     FLOAT_AT(ent_of(1)+0x1CC)=100.0f;tick();
-    CHECK(!mapmaker_roof_play.kill && nkilled==6);
+    CHECK(!mapmaker_roof_play.kill && nkilled==7);
     WORD_AT(0x0079094Cu)=102u;
     mapmaker_roof_set(piece(81),0);mapmaker_roof_set(piece(83),0);
 
