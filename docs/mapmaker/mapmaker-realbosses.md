@@ -300,6 +300,43 @@ The budget is now per level (reset in `_level`), and `_fx` logs a heartbeat ever
 steps, 15 times per level: stage (state +0x98), animation state (entity +0x20), position,
 health (state +0x580) and the AI class words (+0x10/+0x14). Log only.
 
+### The walker never woke (fixed after v0.4.0-mapmaker.22)
+
+User report (mapmaker.22): the Crow walker spawns and looks right but never moves or attacks.
+The heartbeat showed stage 1 and "anim state 8" unchanged for the whole level.
+
+CONFIRMED (decode, `test_walker_intro_waits_for_level_trigger`):
+
+- "anim state" was the entity's +0x20. The fight's state is the AI's +0x20 (`ebp = [entity+0x7C]`,
+  0x002998EF), switched at 0x0029B24F over the 21-entry table 0x0029CB90. The fight applies a
+  requested state, AI +0x9D0, first thing every frame (0x002998FA..0x00299922), and the stock state
+  changes write it too (0x0029CB19/0x0029CB1C).
+- Its first frame (state 0, stage 0) does the setup, sets state 1 and stage 1 (0x0029B597). Stage
+  stays 1 for the whole normal fight. Stage 2 is the low-health phase.
+- State 1 (0x0029B5A6) is the intro. It waits for its animation to end (`sub_00059DD0`), then for
+  mission 13's level trigger `SPC2` (-> `crowewalker180turnright` 0x6FB) or `SPC1` (->
+  `crowewalker180turnleft` 0x6FC), both then state 2. The triggers are looked up by `sub_00234190`
+  (level logic items `[0x0078CD90]`, count `[0x0075CCA8]`, by tag +0xAC) and tested by
+  `sub_00234270` (+0x34). With neither it returns (0x0029B609 -> 0x0029CB83). No other code uses
+  these tags.
+- The steering, walking and firing above the switch (`sub_00298270`, `sub_00297750`, `sub_00298070`,
+  `sub_00296B50`, `sub_00296120`) run only in states above 2 (0x0029A9B2). Those helpers read only
+  the walker state. They use no tag, pad or level object.
+- State 2 (0x0029B62E) waits for the animation, plays `crowewalkerstunscript` 0x6F7 and then sets
+  state 4 (0x0029CAF5), the fight.
+
+A MapMaker map has no `SPC1`/`SPC2` item, so the walker stayed in state 1 forever.
+
+| change | what it does |
+|---|---|
+| `_fx` wake-up (`rbs_walk_wake`) | at the frame step (ret 0x001CEE8C) in scene 100: when this level's walker (record and entity still match) has finished its first frame (state +0x98 == 1), waits in fight state 1 and has no request pending (AI +0x9D0 < 0), request state 2 (AI +0x9D0 = 2). The fight applies it next frame: roar, then fight. Logged once: `Crow walker woken: no SPC1/SPC2 trigger in a MapMaker map; roar, then fight` |
+| heartbeat | now logs the fight state (AI +0x20), target (AI +4), aim error (state +0xE4) and the entity's +0x20 under its own name |
+
+The 180° turns are skipped: they assume the mission arena's layout, and the fight's own steering
+(state 4 -> turn states 8/9) turns the walker toward the player. No new wrapper is needed.
+INFERRED, needs a playtest: that state 4 onward works in a MapMaker map (the remaining risks
+below still apply). The next log should show the fight state leaving 1.
+
 ## The Crow walker (story mission 13)
 
 User request (2026-11-01): the Crow walker and tank bosses next. The walker
@@ -327,7 +364,7 @@ The fight steers from the entity's own position and the players
 | `sub_0015B830` ai_start | one walker per map gets record class 0/0x100000 when lv81.pak is mounted and this level's state exists; notes it for the Boss bar, meter and HUD as the others |
 | `sub_0023FF20` -> `pc_mapmaker_realbosses_tag` | the fight's first frame looks up the level object tagged `WELL` (0x57454C4C, call 0x0029B32C, ret 0x0029B331) and writes its +0x28 without a null test (0x0029B349; again at the end of its death, 0x0029CB3A). A MapMaker map has none: that call gets a zeroed 0x2E8-byte stand-in object (heap, reused, zeroed per lookup). A real object is returned unchanged |
 | `sub_002274C0` event | level event 1 after its intro (ret 0x0029AEBE, 0x0029B120) and event 2 when the death animation ends (ret 0x0029CB80) are the map's own logic markers: dropped. At event 2 the walker is removed with `sub_0015DDA0` (the skeleton's stock death call) and a story focus on it is cleared; mission 13 runs its ending instead |
-| `sub_00126560` -> `pc_mapmaker_realbosses_fx` | the frame `sub_001CEBC0` draws the walker's beams (`sub_0029CCB0`) only in scene 81 (0x001CEE8C), right after `sub_00126560` (call 0x001CEE87, its only caller): after the original, with this level's walker state, called in scene 100 too |
+| `sub_00126560` -> `pc_mapmaker_realbosses_fx` | the frame `sub_001CEBC0` draws the walker's beams (`sub_0029CCB0`) only in scene 81 (0x001CEE8C), right after `sub_00126560` (call 0x001CEE87, its only caller): after the original, with this level's walker state, called in scene 100 too. First it wakes a walker still waiting for mission 13's `SPC1`/`SPC2` trigger (see "The walker never woke") |
 | hud, meter, bigdraw | model 0x637 like 0x5E9/0x5BE: Boss Off = no health, Boss bar = the bosses bar, Sub-boss = the meter; drawn over the whole view |
 
 Risks (INFERRED, need a playtest): movement on MapMaker tiles and pads
@@ -488,7 +525,9 @@ stubs). No extension memory.
    play in Story. stderr: `set check found: ... Crow walker slot N`,
    `mounted lv81.pak for the Crow walker`, `Crow walker state allocated`,
    `Crow walker gets its story AI (class 0x100000)`, then `no WELL object in
-   a MapMaker map; stand-in used` and `Crow walker effects drawn`. Check it
+   a MapMaker map; stand-in used`, `Crow walker effects drawn` and `Crow
+   walker woken: no SPC1/SPC2 trigger ...`; the heartbeat's fight state should
+   leave 1 (roar, then 4 and beyond). Check it
    walks, turns, jumps and fires its beams at you; with the Boss bar, empty
    it: death animation, then it disappears (`Crow walker defeated:
    removed`, `Crow walker level event dropped`), logic markers unchanged.
