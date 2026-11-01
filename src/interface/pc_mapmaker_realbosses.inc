@@ -345,7 +345,7 @@ static struct {
  * and the one spawn record that holds the boss class. */
 static struct { uint32_t state, parts, record; unsigned extras, events, throws, deaths, skipped, fire; float floor; int floor_set; } rbs_skel;
 /* The Crow walker of this level: its state block, spawn record and pool entry. */
-static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx, seen; } rbs_walk;
+static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx, seen, ticks, beats; } rbs_walk;
 
 static void rbs_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -702,6 +702,7 @@ void pc_mapmaker_realbosses_level(void (*original)(void))
     original();
     memset(&rbs_skel,0,sizeof rbs_skel);              /* a new level: nothing of the last one */
     memset(&rbs_walk,0,sizeof rbs_walk);
+    rbs.logged=0;                                      /* a log budget per level */
     if(!rbs_play() || rbs.optout) return;
     rbs_set_report("level init");
     if((has=rbs_map_has(RBS_WALK_ID))!=0) {           /* before the skeleton: both share [0x0078B0D0] */
@@ -882,6 +883,22 @@ static void rbs_skel_fire(void)
     if(!rbs_skel.fire++) rbs_log("giant skeleton fire particles drawn",st,WORD_AT(RBS_SKEL_PARTS));
 }
 
+/* Crow walker heartbeat (user report, v0.4.0-mapmaker.21: "looks right but
+ * isn't responding at all"): every 120 frame steps, 15 times per level, its
+ * fight stage (state +0x98), animation state (entity +0x20), position, the
+ * state's health (+0x580) and the AI class words (+0x10/+0x14). Log only. */
+static void rbs_walk_heartbeat(void)
+{
+    uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state;
+    if(!a || !st || WORD_AT(RBS_WALK_STATE)!=st || rbs_walk.beats>=15u || (rbs_walk.ticks++%120u)) return;
+    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) return;
+    rbs_walk.beats++;
+    fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: stage %u, anim state %u, at (%.1f, %.1f, %.1f), health %.1f, class 0x%X/0x%X\n",
+            rbs_walk.beats,(unsigned)RBS_B(st+0x98u),(unsigned)WORD_AT(ent+0x20u),(double)rbs_getf(ent+0x64u),(double)rbs_getf(ent+0x68u),
+            (double)rbs_getf(ent+0x6Cu),(double)rbs_getf(st+0x580u),(unsigned)WORD_AT(a+0x10u),(unsigned)WORD_AT(a+0x14u));
+    fflush(stderr);
+}
+
 /* WRAP sub_00126560 (frame step before the scene-81 beam draw at 0x001CEE8C). */
 void pc_mapmaker_realbosses_fx(void (*original)(void))
 {
@@ -889,6 +906,7 @@ void pc_mapmaker_realbosses_fx(void (*original)(void))
     original();
     if(here) rbs_skel_fire();
     if(!rbs_walk.record) return;
+    if(here) rbs_walk_heartbeat();
     if(!here || !rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;
     guest_call(sub_0029CCB0,0);
     if(!rbs_walk.fx++) rbs_log("Crow walker effects drawn",rbs_walk.state,0);

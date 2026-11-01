@@ -493,7 +493,8 @@ anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 `tests/mapmaker/test_mapmaker_paktable.py`.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
 of `sub_0029CE00` (+0x3E88 == 1, `sub_002A7F30`). Walker missing: log-only
-WRAP `sub_000DAC30` -> `pc_mapmaker_realbosses_create`, AI-start log.
+WRAP `sub_000DAC30` -> `pc_mapmaker_realbosses_create`, AI-start log; per-level
+log budget and a walker heartbeat in `_fx` (mapmaker.21).
 
 ### MapMaker and System Link bug fixes
 
