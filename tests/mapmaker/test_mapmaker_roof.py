@@ -21,7 +21,8 @@ MUTATIONS = {
                   '    return mapmaker_limits.limits;'),
     'air-clears-floor': ('#define MAPMAKER_ROOF_AIR 0x02FFFFFFu', '#define MAPMAKER_ROOF_AIR 0x03FFFFFFu'),
     'air-keeps-walls': ('#define MAPMAKER_ROOF_AIR 0x02FFFFFFu', '#define MAPMAKER_ROOF_AIR 0x02000000u'),
-    'roof-clears-walls': ('mode==MAPMAKER_ROOF_OPEN_ROOF?MAPMAKER_ROOF_CEILING:0u', 'mode==MAPMAKER_ROOF_OPEN_ROOF?MAPMAKER_ROOF_AIR:0u'),
+    'roof-clears-walls': ('mode==MAPMAKER_ROOF_OPEN_ROOF || mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_CEILING:0u',
+                          'mode==MAPMAKER_ROOF_OPEN_ROOF?MAPMAKER_ROOF_AIR:mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_CEILING:0u'),
     'reduced-untouched': ('    g_eax&=~MAPMAKER_ROOF_CEILING;\n}', '}'),
     'table-not-restored': ('    WORD_AT(last+4u)=list;WORD_AT(last+8u)=count;\n', ''),
     'one-entry': ('    WORD_AT(last+4u)=mapmaker_roof.list;WORD_AT(last+8u)=count+2u;',
@@ -83,6 +84,40 @@ MUTATIONS = {
     'items-not-skipped': ('for(at=r+length,k=0;k<items;k++) {', 'for(at=r+length,k=items;k<items;k++) {'),
     'item-size-fixed': ('bytes=((WORD_AT(at+0x14u)&0xFFu)*4u+0x1Bu)&~3u;', 'bytes=MAPMAKER_ROOF_ITEM_MIN;'),
     'item-count-wrong-word': ('items=WORD_AT(r+0x1Cu)>>16', 'items=WORD_AT(r+0x1Cu)&0xFFFFu'),
+    # Open air (bounded): walls saved (collision), hidden from the editor view and the play draw.
+    'bounded-saves-no-walls': ('mode==MAPMAKER_ROOF_OPEN_ROOF || mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_CEILING:0u',
+                               'mode==MAPMAKER_ROOF_OPEN_ROOF?MAPMAKER_ROOF_CEILING:mode?MAPMAKER_ROOF_AIR:0u'),
+    'bounded-view-walls': ('    return mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_AIR:mapmaker_roof_clear(mode);',
+                           '    return mapmaker_roof_clear(mode);'),
+    'view-any-caller': ('g_eax&=~(ret==MAPMAKER_ROOF_RET_VIEW?', 'g_eax&=~(ret?'),
+    'load-no-bounded': ('mode<=MAPMAKER_ROOF_OPEN_BOUNDED; }', 'mode<=MAPMAKER_ROOF_OPEN_AIR; }'),
+    'bounded-no-suffix': ('" (Open Air, Unbounded)"," (Open Air, Bounded)"}', '" (Open Air, Unbounded)",""}'),
+    'play-no-records': ('        read=mapmaker_roof_records(c,mapmaker_roof_play_record,NULL);\n', ''),
+    'rooms-no-order-check': ('    if(WORD_AT(build+0x44u)!=mapmaker_roof_play.mask[k]) {', '    if(0) {'),
+    'rooms-wrong-base': ('mapmaker_roof_play.hide[base+j]=MAPMAKER_ROOF_SIDES;', 'mapmaker_roof_play.hide[j]=MAPMAKER_ROOF_SIDES;'),
+    'rooms-one-room': ('    for(j=0;(int32_t)count>0 && j<count;j++) {', '    for(j=0;(int32_t)count>0 && j<1u;j++) {'),
+    'rooms-not-reset': ('    memset(mapmaker_roof_play.hide,0,sizeof mapmaker_roof_play.hide);\n', ''),
+    'draw-any-scene': (' || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY || !MAPMAKER_STACK_OK(8u) ||', ' || !MAPMAKER_STACK_OK(8u) ||'),
+    'draw-any-prop': ('       WORD_AT(prop+4u)!=inst || WORD_AT(prop+0x94u)!=MAPMAKER_ROOF_ROOM_MODEL+room) { original();return; }',
+                      '       WORD_AT(prop+4u)!=inst) { original();return; }'),
+    'draw-room-off-by-one': ('!(hide=mapmaker_roof_play.hide[room-1u])', '!(hide=mapmaker_roof_play.hide[room])'),
+    'draw-not-restored': ('    if(WORD_AT(inst+0x30u)==(mask&~hide)) WORD_AT(inst+0x30u)=mask;\n', ''),
+    'draw-not-hidden': ('    WORD_AT(inst+0x30u)=mask&~hide;\n', ''),
+    # Open air (unbounded): kill height below the lowest floor.
+    'kill-any-map': ('        mapmaker_roof_play.kill=mapmaker_roof_play.unbounded!=0;', '        mapmaker_roof_play.kill=1;'),
+    'kill-bounded-too': ('    if(mode==MAPMAKER_ROOF_OPEN_AIR) mapmaker_roof_play.unbounded++;', '    if(mode) mapmaker_roof_play.unbounded++;'),
+    'kill-any-scene': ('    if(!mapmaker_roof_play.kill || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY) return;',
+                       '    if(!mapmaker_roof_play.kill) return;'),
+    'kill-the-dead': ('        if(!(FLOAT_AT(ent+0x1CCu)>0.0f) || !(FLOAT_AT(ent+0x68u)<mapmaker_roof_play.kill_y)) continue;',
+                      '        if(!(FLOAT_AT(ent+0x68u)<mapmaker_roof_play.kill_y)) continue;'),
+    'kill-no-entry-check': (' || WORD_AT(ent+0x7Cu)!=actor) continue;', ') continue;'),
+    'kill-floor-ignored': ('mapmaker_roof_play.kill_y=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-MAPMAKER_ROOF_KILL_DEPTH;',
+                           'mapmaker_roof_play.kill_y=-MAPMAKER_ROOF_KILL_DEPTH;'),
+    'kill-no-margin': ('#define MAPMAKER_ROOF_KILL_DEPTH 20.0f', '#define MAPMAKER_ROOF_KILL_DEPTH 0.0f'),
+    'kill-floor-unsigned': ('    int floor=(int8_t)(WORD_AT(record+4u)>>16&0xFFu);', '    int floor=(int)(WORD_AT(record+4u)>>16&0xFFu);'),
+    'kill-unbounded-count': ('    if(n>MAPMAKER_ROOF_ACTORS_MAX) n=MAPMAKER_ROOF_ACTORS_MAX;\n', '    if(n>MAPMAKER_ROOF_ACTORS_MAX) n=2u;\n'),
+    'tick-pops-twice': ('void pc_mapmaker_roof_tick(void (*original)(void))\n{\n    uint32_t n,i,actor,ent;\n    original();',
+                        'void pc_mapmaker_roof_tick(void (*original)(void))\n{\n    uint32_t n,i,actor,ent;\n    original();g_esp+=4u;'),
 }
 
 
@@ -283,6 +318,46 @@ def test_label_sites():
     assert 'call' in at[0x00312E05].mnemonic and at[0x00312E05].ops[0][1] == 0x003006C0
 
 
+def test_bounded_and_fall_sites():
+    """Open air (bounded) and (unbounded) in play (decoder + XBE):
+    - every draw of sub_0008F5E0 (the node-mask draw) is inside sub_0008F6B0;
+    - sub_00085710 is called once per build entry, in order (edi += 0x68);
+      the entry's +0x44 comes from the record copy's +0x14 (record +8);
+    - room geometry props: model 0x907 + room, +0x34 = room;
+    - the play y of a piece is record byte +6 * 5.0;
+    - sub_0003C440 is the once-per-frame tick; sub_000BD090(entity) is the
+      stock kill-now helper (no attacker -> sub_000BABA0) and the stock loop
+      at 0x00067AF1 walks the live list with it."""
+    from mapmaker_decoded import decoded
+    insns = decoded()
+    at = {i.address: i for i in insns}
+
+    def calls(target):
+        return {i.address for i in insns if i.call and any(op[0] == 'imm' and op[1] == target for op in i.ops)}
+    draws = calls(0x0008F5E0)
+    assert draws and {at[a].function for a in draws} <= {0x0008F5E0, 0x0008F6B0}
+    assert {a for a in draws if at[a].function == 0x0008F6B0} == {
+        0x0008F853, 0x0008F85D, 0x0008F868, 0x0008F881, 0x0008F88D, 0x0008F898, 0x0008F8BC}
+    assert calls(0x00085710) == {0x0008AC71}
+    assert at[0x0008ACA6].text == 'edi, 0x68' and at[0x0008AC70].text == 'edi'
+    assert at[0x000857A3].text == 'dword ptr [edx*4 + 0x703460], eax' and at[0x0008579E].text == 'eax, dword ptr [esi + 0x44]'
+    assert at[0x00084F98].text == 'dword ptr [ebp + 0x44], edx' and at[0x00084F91].text == 'edx, dword ptr [ebx + 0x14]'
+    assert at[0x000856EB].text == 'dword ptr [ebx + 0x44], edx' and at[0x000856E4].text == 'edx, dword ptr [ecx + 0x14]'
+    assert at[0x0008A920].text == 'dword ptr [esp + 0xb4], edx'          # copy +0x14 = record +8
+    assert at[0x00085D6B].text == 'eax, [ebp + 0x907]' and at[0x00085D9F].text == 'dword ptr [eax + 0x34], ebp'
+    assert at[0x00085DD0].text == 'dword ptr [ecx + 0x30], edx'
+    assert at[0x0008A87E].text == 'ebx, byte ptr [esi + 6]'
+    assert at[0x0008A8F0].ops[1][4] == 0x004760CC
+    assert calls(0x0003C440) == {0x0003D3CA}
+    assert at[0x0003D3C5].text == 'dword ptr [0x6b7af0], eax'          # frame counter, then the tick
+    assert 'call' in at[0x000BD0E2].mnemonic and at[0x000BD0E2].ops[0][1] == 0x000BABA0
+    assert at[0x000BD0D2].text == 'dword ptr [esp + 0xc], 0'           # no attacker
+    assert at[0x00067AF1].ops[1][4] == 0x007A3580 and at[0x00067B58].ops[0][1] == 0x000BD090
+    assert at[0x00067AFE].text == 'xmm0, dword ptr [eax + 0x1cc]'
+    read = _xbe()
+    assert struct.unpack('<f', read(0x004760CC, 4))[0] == 5.0
+
+
 def test_wrappers_documented():
     doc = (ROOT / 'docs/mapmaker/mapmaker-sky.md').read_text(encoding='utf-8')
     text = ROOF.read_text(encoding='utf-8')
@@ -291,6 +366,7 @@ def test_wrappers_documented():
                          ('00316B50', 'menu_init'), ('000792B0', 'menu_add'), ('00316920', 'menu_hover'),
                          ('00316500', 'menu_pick'), ('002F95E0', 'move'), ('00308120', 'copy'),
                          ('00308480', 'piece_free'), ('0003D7B0', 'text'), ('00151030', 'format'),
-                         ('0032D9F0', 'caption')):
+                         ('0032D9F0', 'caption'), ('0008A780', 'play'), ('00085710', 'rooms'),
+                         ('0008F6B0', 'draw'), ('0003C440', 'tick')):
         assert f'WRAP sub_{target} -> pc_mapmaker_roof_{name}' in doc, name
         assert f'void pc_mapmaker_roof_{name}(void (*original)(void))' in text, name
