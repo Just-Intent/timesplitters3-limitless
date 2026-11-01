@@ -1,10 +1,11 @@
 # MapMaker real story boss: the far-future giant robot (story mission 10)
 
 Status: implemented in `src/interface/pc_mapmaker_robot.inc` (area `robot`),
-fixture-tested (`tests/mapmaker/test_mapmaker_robot.py`: 68 mutations, plus
-decode and US XBE data checks of every site below). **Not wired yet** (no
-wrapper entries, no picker row: see [Wrappers for the integrator](#wrappers-for-the-integrator)),
-not built, not played. Switch: `TSFP_MAPMAKER_LIMITS=1`;
+fixture-tested (`tests/mapmaker/test_mapmaker_robot.py`: 98 mutations, plus
+decode and US XBE data checks of every site below). Wired in mapmaker-recon;
+**up to four robots per map**, each with its own state (see
+[Several robots](#several-robots)): the four new wrappers for that are not
+wired yet (see [Wrappers for the integrator](#wrappers-for-the-integrator)). Switch: `TSFP_MAPMAKER_LIMITS=1`;
 `TSFP_MAPMAKER_REAL_BOSS=0` keeps the robot on the normal bot AI.
 
 Research basis: `logs/limits/features/real-bosses.md` section 6 (main
@@ -85,14 +86,18 @@ forward from its spawn point). 2-5 walk and attacks (projectiles through
 | WRAP | function | what it does |
 |---|---|---|
 | `sub_001C8540` | `pc_mapmaker_robot_anims` | after the original: when the map's custom set (index 0x11; slots 1-10 in map-info chunk 0x00C77668, 11-20 in the sets chunk 0x00C776F5) holds 0x42, or the container cannot be read, and lv14.pak is not mounted (`sub_00062260`; the split Crowe area may already have mounted it) and two of the 30 mount slots stay free: `sub_0005A130(lv14.pak)`, the stock per-level anim pak call (whole file into the level heap, unmounted with the level) |
-| `sub_0025F720` | `pc_mapmaker_robot_level` | before the original: `[0x0078B0D0]` = 0 (in scene 100 it can only be an earlier level's dangling block). After: forget the previous level's robot; for such a map clear `[0x0078B1DC]`, call `sub_00292630` (76 bytes) and, when no block exists yet (the realbosses skeleton/walker make one), `sub_002A62C0` (32 KB); both pointers checked |
-| `sub_0015B830` | `pc_mapmaker_robot_ai_start` | before the original: pool entry with character 0x42 (or entity model 0x5F2), lv14.pak mounted and this level's state in place: record +0/+4 = 0/0x80000. One robot per map (one shared state); others keep the MapMaker class (logged). The same record again (restart) is accepted |
+| `sub_0025F720` | `pc_mapmaker_robot_level` | before the original: `[0x0078B0D0]` = 0 (in scene 100 it can only be an earlier level's dangling block). After: forget the previous level's robots; for such a map, when no particle block exists yet (the realbosses skeleton/walker make one), `sub_002A62C0` (32 KB); then four state blocks: each time `[0x0078B1DC]` = 0 and `sub_00292630` (a fresh 76-byte block, set by `sub_00292550`), kept while the pointer is usable. Outside any robot `[0x0078B1DC]` holds the first block |
+| `sub_0015B830` | `pc_mapmaker_robot_ai_start` | before the original: pool entry with character 0x42 (or entity model 0x5F2), lv14.pak mounted and this level's state in place: record +0/+4 = 0/0x80000, and the robot gets the next free state block (its statics start at 0). Beyond the blocks made (four) a robot keeps the MapMaker class (logged). The same record again (restart) keeps its block |
+| `sub_00293730` | `pc_mapmaker_robot_handler` | the robot's AI (dispatcher 0x0027DE18, entity arg 1): runs with that robot's globals (see Several robots) |
+| `sub_00294520` | `pc_mapmaker_robot_message` | its messages (0x0027D447, entity arg 1): same |
+| `sub_002926B0` | `pc_mapmaker_robot_callback` | the slot-2 callback its door entry installs (0x002938EE, entity arg 1): same |
+| `sub_002936C0` | `pc_mapmaker_robot_damage` | its damage callback (0x00293923, hit record arg 1, entity at +0): same |
 | `sub_0009CC40` | `pc_mapmaker_robot_nav` | for the seven existence tests in the handler (returns 0x00293949, 0x00293BC9, 0x00293C10, 0x00293C2B, 0x00293C64, 0x00293C9E, 0x00293CD0) with this level's robot: -1, so the robot always walks to the player's pad. Every other caller (and the two index fetches, unreachable then) runs the original |
 | `sub_000462B0` | `pc_mapmaker_robot_music` | the death's music change (return 0x002944D9): dropped, the map keeps its track |
-| `sub_002274C0` | `pc_mapmaker_robot_event` | the death's level event 2 (return 0x002944E5) is the map's own logic marker 2 in MapMaker: dropped; the robot is removed with `sub_0015DDA0` (the skeleton's stock death call, as the walker port) and a story focus still on it is cleared. Once |
-| `sub_00126560` | `pc_mapmaker_robot_fx` | after the original (only the call returning to 0x001CEE8C): while this level's robot is dying (state +0x48 == 1) and not yet removed, and not in story split screen: `sub_00019D70(1)`, `sub_002A7F30(view, 2.5)` as `sub_00292650` |
-| `sub_0025F6A0` | `pc_mapmaker_robot_reset` | after the original, with this level's robot state: `sub_00292550` as scene 14 does, and the robot counts as not removed again |
-| `sub_0014CC80` | `pc_mapmaker_robot_hud` | chain INSIDE `pc_mapmaker_bosses_hud`: when the focus is this level's robot, the focus is cleared for the original and restored after, so the stock bar (with level text 0x163D as label) never shows; the bosses area then draws its Boss bar for a Boss-flagged robot (its name, multipliers), none otherwise |
+| `sub_002274C0` | `pc_mapmaker_robot_event` | the death's level event 2 (return 0x002944E5) is the map's own logic marker 2 in MapMaker: dropped; the robot whose code is running (the swap knows it) is removed with `sub_0015DDA0` (the skeleton's stock death call, as the walker port) and a story focus still on it is cleared. Once per robot |
+| `sub_00126560` | `pc_mapmaker_robot_fx` | after the original (only the call returning to 0x001CEE8C): while any of this level's robots is dying (its own state +0x48 == 1) and not yet removed (once a frame: one shared particle block), and not in story split screen: `sub_00019D70(1)`, `sub_002A7F30(view, 2.5)` as `sub_00292650` |
+| `sub_0025F6A0` | `pc_mapmaker_robot_reset` | after the original, with this level's state blocks: for each, `sub_00292550` on it as scene 14 does (pointer put back after), its statics cleared, and the robot counts as not removed again |
+| `sub_0014CC80` | `pc_mapmaker_robot_hud` | chain INSIDE `pc_mapmaker_bosses_hud`: when the focus is one of this level's robots, the focus is cleared for the original and restored after, so the stock bar (with level text 0x163D as label) never shows; the bosses area then draws its Boss bar for a Boss-flagged robot (its name, multipliers), none otherwise |
 
 Health display, as the other real bosses: Boss Off = no health shown; Boss
 bar = the bosses area's bottom bar; Sub-boss bar = nothing (the robot has no
@@ -104,6 +109,39 @@ Save format: unchanged. The robot is a stock custom-set member (word id 0x42,
 variant -1). A stock game or an older build spawns id 0x42 with the stock
 MapMaker class on the robot model (INFERRED: the human-rig animations, as the
 other real bosses' stage 1).
+
+## Several robots
+
+User request (v0.4.0-mapmaker.25): "Only one giant robot acting under
+appropriate logic when creating multiple." Stock keeps the robot's fight
+state behind globals, so the first port allowed one. Decode (CONFIRMED,
+`test_robot_per_instance_globals`):
+
+| global | users | per robot? |
+|---|---|---|
+| `[0x0078B1DC]` state pointer (0x4C block) | only the robot's functions: `sub_00292550/2630/2650/26B0/2BF0`, `sub_00293100/3660/36C0`, the handler, the message handler | **yes**: one block each, the pointer swapped |
+| `[0x0075F5EC]` shot counter | `sub_00293100` only | **yes**: swapped |
+| `[0x0075F5F0]`, `[0x0075F5F4]` walk / attack timers | the handler only (`sub_002B26F0` reads `[0x0075F5F4 + i*4]` as an unrelated table) | **yes**: swapped |
+| `[0x0078B0D0]` particle block, `[0x0078B0CC..0x0078B188]` its cursor and spawn parameters | the particle module `sub_002A62F0/65A0/7B90/7D60/7F30` (also the realbosses skeleton/walker) | **no**: the same parameters for every robot; one pool. A robot's intro re-arms the pool (`sub_002A65A0`), so a second robot's intro during the first one's death restarts those explosions (cosmetic) |
+| `[0x0078B080..0x0078B098]` effects blocks | `sub_002A8300..` (the split Crowe's effects); no robot code reaches them | untouched |
+| `[0x0075F5E8]` split Crowe block | never read or written by robot code | untouched: the robot's swap is independent of any Crowe swap |
+| story focus `+0xFF4`, level event 2, music | the handler | focus: whichever robot set it last (the bar hook hides the stock bar for any robot); event and music dropped, removal by the running robot |
+
+Every state reader is reached only from four entries (CONFIRMED): the
+handler (dispatcher 0x0027DE18), the message handler (0x0027D447), and the
+two callbacks the handler installs (slot-2 callback `sub_002926B0` at
+0x002938EE, damage `sub_002936C0` at 0x00293923); plus the scene-14 draw and
+the restart reset, which this area replaces in scene 100. Each of the four
+is wrapped: the entity (or the hit record's +0) names the robot (its AI's
+pool entry and spawn record); the wrapper saves the current pointer and
+statics, loads that robot's, runs the original, keeps the robot's statics
+and puts the previous values back. Nested entries (one robot's code reaching
+another's messages) stack. An entity that is not one of this level's robots
+(mission 10, a fifth robot on the bot class, a reused pool entry) runs the
+original untouched. Removal: event 2 removes the robot whose code is running.
+
+Cap: four (four 76-byte blocks per level; the statics live in the area).
+Change `RBT_MAX` to raise it.
 
 ## Risks (INFERRED, need a playtest)
 
@@ -119,6 +157,9 @@ other real bosses' stage 1).
   `[0x0078B0D0]`. With the walker in the same map its beam draw also draws the
   block, so the robot's explosions may be drawn twice (brighter). After the
   robot is removed its leftover particles are not drawn (they would freeze).
+- **Several robots**: each walks to the player's pad, so they bunch up; the
+  door-entry animations all play at the start. The shared particle pool (see
+  above) is the only shared fight state.
 - **Pads**: walking to the player's pad is a simplification of the hangar
   waypoints; the attacks themselves are unchanged.
 - **Split Crowe**: the split Crowe area (separate branch) also needs lv14.pak
@@ -138,6 +179,10 @@ order relative to existing wrappers in parentheses):
 | `sub_001C8540` | `pc_mapmaker_robot_anims` | any order with `pc_mapmaker_realbosses_anims` |
 | `sub_0025F720` | `pc_mapmaker_robot_level` | **outer** of `pc_mapmaker_realbosses_level` (so its clear of `[0x0078B0D0]` runs first and a block the skeleton/walker made is reused; inner works but leaks one 32 KB block) |
 | `sub_0015B830` | `pc_mapmaker_robot_ai_start` | any order with `pc_mapmaker_realbosses_ai_start` (different ids) |
+| `sub_00293730` | `pc_mapmaker_robot_handler` | **new (several robots)**: robot AI handler (cdecl entity) |
+| `sub_00294520` | `pc_mapmaker_robot_message` | **new (several robots)**: robot message handler (cdecl entity, ...) |
+| `sub_002926B0` | `pc_mapmaker_robot_callback` | **new (several robots)**: robot slot-2 callback (cdecl entity); reached through a stored pointer, so the lifted function itself is wrapped |
+| `sub_002936C0` | `pc_mapmaker_robot_damage` | **new (several robots)**: robot damage callback (cdecl hit record); same |
 | `sub_0009CC40` | `pc_mapmaker_robot_nav` | new wrapper |
 | `sub_000462B0` | `pc_mapmaker_robot_music` | new wrapper |
 | `sub_002274C0` | `pc_mapmaker_robot_event` | any order with `pc_mapmaker_realbosses_event` (different return addresses) |
@@ -185,6 +230,8 @@ guide for MapMaker areas) and regenerate the wrapper patch.
 4. Kill it: it plays its death with explosions, then disappears ("defeated:
    removed"); the map's music keeps playing; logic objectives on marker 2 are
    not triggered.
-5. Two robots in one map: the second is a normal bot (logged). Restart the
-   level after its death: the robot fights again.
+5. Two to four robots in one map: each walks in, attacks and dies on its own
+   (log: "gets its story AI (class 0x80000) and state", slot in the high
+   half); killing one removes only that one; a fifth is a normal bot
+   (logged). Restart the level after a death: all fight again.
 6. Story mission 10 still plays stock (all hooks test scene 100).
