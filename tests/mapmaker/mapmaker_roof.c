@@ -308,11 +308,13 @@ static uint32_t caption(uint32_t ret,uint32_t number,uint32_t name)
 #define BUILDS 0x00170000u
 static unsigned build_rooms[8]={1,2,1,3,1,1,1,1},skew_at=99u;
 static void rooms_original(void) { g_esp+=4u; }
+static int count_into(uint32_t r,void *ctx) { (void)r;(*(int *)ctx)++;return 1; }
 static void play_original(void)
 {
     uint32_t save=g_esp,base=0;
-    int n=mapmaker_roof_records(C,count_record,NULL);
+    int n=0;                                      /* the stock builder needs no end chunk */
     unsigned k;
+    (void)mapmaker_roof_records(C,count_into,&n);
     for(k=0;n>0 && k<(unsigned)n && k<8u;k++) {
         uint32_t b=BUILDS+k*0x68u;
         memset((char *)memory+b,0,0x68);
@@ -325,8 +327,11 @@ static void play_original(void)
     g_esp=save;g_esp+=4u;
 }
 static void play(void) { hook(pc_mapmaker_roof_play,play_original,0x00312E50u,0,0); }
-/* Room r (1-based): geometry prop (+4 inst, +0x34 r, +0x94 model 0x907+r),
- * instance [inst] = prop, inst+0x30 = mask. sub_0008F6B0(inst, ...) draws. */
+/* Room r (1-based): geometry prop (+4 inst, +0x34 r, 16-bit model +0x94 =
+ * 0x907+r next to another word +0x96), instance [inst] = prop, inst+0x30 =
+ * mask, inst+4 = node header (count; nodes of 0xC8 bytes before it, mask
+ * +0x5C). sub_0008F6B0(inst, ...) draws. */
+#define NODES 0x001C0000u
 #define PROPS 0x001A0000u
 #define INSTS 0x001B0000u
 static uint32_t inst_of(unsigned room) { return INSTS+room*0x40u; }
@@ -335,7 +340,11 @@ static void make_room(unsigned room,uint32_t mask)
 {
     uint32_t pr=prop_of(room),in=inst_of(room);
     memset((char *)memory+pr,0,0x100);memset((char *)memory+in,0,0x40);
-    WORD_AT(pr+4)=in;WORD_AT(pr+0x34)=room;WORD_AT(pr+0x94)=0x907u+room;WORD_AT(in)=pr;WORD_AT(in+0x30)=mask;
+    uint32_t header=NODES+room*0x1000u;
+    WORD_AT(pr+4)=in;WORD_AT(pr+0x34)=room;WORD_AT(pr+0x94)=0x00050000u|(0x907u+room);WORD_AT(in)=pr;WORD_AT(in+0x30)=mask;
+    /* nodes: the floor (bit 24), one always drawn (0), a wall (bit 0) */
+    WORD_AT(in+4)=header;WORD_AT(header)=3u;
+    WORD_AT(header-3u*0xC8u+0x5Cu)=0x01000000u;WORD_AT(header-2u*0xC8u+0x5Cu)=0;WORD_AT(header-1u*0xC8u+0x5Cu)=0x00000001u;
 }
 static uint32_t drawn_mask;
 static void draw_original(void) { drawn_mask=WORD_AT(WORD_AT(g_esp+4)+0x30);g_esp+=4u; }
@@ -646,11 +655,19 @@ int main(void)
         for(r=1;r<=8u;r++) make_room(r,0x01FFFFFFu);
     }
     CHECK(draw(2)==0x01000000u && WORD_AT(inst_of(2)+0x30)==0x01FFFFFFu);     /* drawn without walls, restored */
+    CHECK(mapmaker_roof_play.shown[1] && !mapmaker_roof_play.shown[0]);
+    {
+        unsigned total=9,hidden=9;
+        mapmaker_roof_count_hidden(inst_of(2),0x01FFFFFFu,0x00FFFFFFu,&total,&hidden);
+        CHECK(total==3u && hidden==1u);
+        mapmaker_roof_count_hidden(inst_of(2),0x01000000u,0x00FFFFFFu,&total,&hidden);
+        CHECK(total==3u && hidden==0u);                     /* the wall was not drawn anyway */
+    }
     CHECK(draw(3)==0x01000000u && draw(5)==0x01000000u && draw(7)==0x01000000u);
     CHECK(draw(1)==0x01FFFFFFu && draw(4)==0x01FFFFFFu && draw(8)==0x01FFFFFFu);
     WORD_AT(prop_of(2)+0x94)=0x123u;                       /* another prop of that room */
     CHECK(draw(2)==0x01FFFFFFu);
-    WORD_AT(prop_of(2)+0x94)=0x909u;WORD_AT(prop_of(2)+4)=0x00123400u;
+    WORD_AT(prop_of(2)+0x94)=0x00050909u;WORD_AT(prop_of(2)+4)=0x00123400u;
     CHECK(draw(2)==0x01FFFFFFu);
     WORD_AT(prop_of(2)+4)=inst_of(2);
     WORD_AT(0x0079094Cu)=102u;                              /* not in play */
@@ -660,9 +677,19 @@ int main(void)
     make_actor(0,-1000.0f,100.0f);WORD_AT(0x0074C37Cu)=1u;
     ticks=0;tick();
     CHECK(ticks==1 && nkilled==0);
-    /* records out of build order: nothing hidden after that piece */
+    /* an entry whose mask differs from its record: logged, still hidden
+     * (the order is fixed by the code) */
     skew_at=1u;play();skew_at=99u;
-    CHECK(mapmaker_roof_play.rooms==0u && mapmaker_roof_play.mismatch==1u && draw(2)==0x01FFFFFFu);
+    CHECK(mapmaker_roof_play.rooms==5u && mapmaker_roof_play.mismatch==1u && draw(2)==0x01000000u);
+    /* a record walk that fails after the records keeps them */
+    {
+        uint32_t end=record(4);
+        CHECK(WORD_AT(end)==0x00C7766Au);
+        WORD_AT(end)=0x00C77670u;WORD_AT(end+4)=0x7FFFFFF0u;     /* no end chunk, a bad size */
+        play();
+        CHECK(mapmaker_roof_play.pieces==4u);CHECK(mapmaker_roof_play.malformed==1u);CHECK(mapmaker_roof_play.rooms==5u);CHECK(draw(2)==0x01000000u);
+        WORD_AT(end)=0x00C7766Au;WORD_AT(end+4)=0;
+    }
     /* limits off: nothing */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);play();set_env("TSFP_MAPMAKER_LIMITS","1");
     CHECK(mapmaker_roof_play.rooms==0u && draw(2)==0x01FFFFFFu);
@@ -671,7 +698,8 @@ int main(void)
     WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
     CHECK((WORD_AT(record(2)+0x24)>>16)==0x5202u && play_mask(2)==0x01000000u);
     play();
-    CHECK(mapmaker_roof_play.kill && mapmaker_roof_play.low==-1 && mapmaker_roof_play.kill_y==-25.0f && mapmaker_roof_play.rooms==5u);
+    CHECK(mapmaker_roof_play.kill && mapmaker_roof_play.low==-1 && mapmaker_roof_play.high==1 && mapmaker_roof_play.kill_y==-25.0f &&
+          mapmaker_roof_play.out_y==-10.0f && mapmaker_roof_play.rooms==5u);
     make_actor(0,-26.0f,100.0f);make_actor(1,-24.0f,100.0f);make_actor(2,-500.0f,0.0f);make_actor(3,-500.0f,50.0f);
     WORD_AT(ent_of(3)+0x7C)=0;                             /* not a live character entry */
     WORD_AT(0x00900100u+4u*4u)=0;WORD_AT(0x0074C37Cu)=5u;
@@ -686,12 +714,51 @@ int main(void)
     WORD_AT(0x0079094Cu)=100u;WORD_AT(0x0074C37Cu)=1000u;tick();
     CHECK(nkilled==3 && killed[1]==ent_of(1) && killed[2]==ent_of(10));   /* count bounded to 64 */
     WORD_AT(0x0074C37Cu)=2u;
+    /* below the floors but above the kill height: dies after 60 ticks there;
+     * standing on the lowest floor (y -5) or one floor down exactly never */
+    {
+        int k;
+        make_actor(0,-12.0f,100.0f);make_actor(1,-9.0f,100.0f);
+        for(k=0;k<59;k++) tick();
+        CHECK(nkilled==3);
+        FLOAT_AT(ent_of(0)+0x68)=-5.0f;tick();               /* back on a floor: the count restarts */
+        FLOAT_AT(ent_of(0)+0x68)=-12.0f;
+        for(k=0;k<59;k++) tick();
+        CHECK(nkilled==3);
+        tick();
+        CHECK(nkilled==4 && killed[3]==ent_of(0));
+        for(k=0;k<100;k++) tick();
+        CHECK(nkilled==4 && FLOAT_AT(ent_of(1)+0x1CC)==100.0f);
+    }
+    /* human players from their player structs ([0x007B0C48] + i*0x1584,
+     * entity +0x14, +4 < 0 empty), counted once when also in the live list */
+    {
+        int k;
+        uint32_t pl=0x001D0000u;
+        WORD_AT(0x007B0C48u)=pl;WORD_AT(0x00790950u)=2u;
+        make_actor(20,-5.0f,100.0f);make_actor(21,-50.0f,100.0f);
+        WORD_AT(pl+4)=0;WORD_AT(pl+0x14)=ent_of(20);                       /* player 0 */
+        WORD_AT(pl+0x1584u+4)=0xFFFFFFFFu;WORD_AT(pl+0x1584u+0x14)=ent_of(21);  /* empty slot */
+        WORD_AT(0x00900100u+0u)=0;WORD_AT(0x00900100u+4u)=0;              /* not in the live list */
+        WORD_AT(0x0074C37Cu)=2u;
+        tick();
+        CHECK(nkilled==4 && FLOAT_AT(ent_of(21)+0x1CC)==100.0f);           /* empty slot ignored */
+        FLOAT_AT(ent_of(20)+0x68)=-30.0f;tick();
+        CHECK(nkilled==5 && killed[4]==ent_of(20));                       /* a human not in the live list */
+        /* a human also in the live list (checked once, as the human) */
+        make_actor(0,-12.0f,100.0f);WORD_AT(pl+0x14)=ent_of(0);
+        for(k=0;k<59;k++) tick();
+        CHECK(nkilled==5);
+        tick();
+        CHECK(nkilled==6 && killed[5]==ent_of(0));
+        WORD_AT(0x00790950u)=0;
+    }
     /* the next map without unbounded tiles has no kill height */
     mapmaker_roof_set(piece(82),0);
     WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
     play();
     FLOAT_AT(ent_of(1)+0x1CC)=100.0f;tick();
-    CHECK(!mapmaker_roof_play.kill && nkilled==3);
+    CHECK(!mapmaker_roof_play.kill && nkilled==6);
     WORD_AT(0x0079094Cu)=102u;
     mapmaker_roof_set(piece(81),0);mapmaker_roof_set(piece(83),0);
 
