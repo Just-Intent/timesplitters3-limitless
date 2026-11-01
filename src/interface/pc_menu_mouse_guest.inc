@@ -803,6 +803,11 @@ void pc_mapmaker_realbosses_tag(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_fx(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_face(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_create(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_skel_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_walk_fight(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_walk_message(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_walk_damage(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_walk_slot(void (*original)(void)) { original(); }
 void pc_mapmaker_robot_anims(void (*original)(void)) { original(); }
 void pc_mapmaker_robot_level(void (*original)(void)) { original(); }
 void pc_mapmaker_robot_ai_start(void (*original)(void)) { original(); }

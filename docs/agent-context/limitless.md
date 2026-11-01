@@ -495,7 +495,7 @@ lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extr
 skies, sandstorm, music; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
 for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll
 list (5 new sets WRAPs; sets_pick outside realbosses_pick; mapmaker-sets.md).
-Multi-boss merge (.26): 22 WRAPs (robot/crowe/tank/mothership/khallos statics
+Multi-boss merge (.26): 28 WRAPs (walker/skeleton/robot/crowe/tank/mothership/khallos statics
 swaps, worm anim register, sky weather); sub_000DAC30 chain: actors, realbosses,
 tank, khallos (log only). See each boss doc.
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
