@@ -185,10 +185,21 @@ MUTATIONS = {
     'walk-focus-kept': ('WORD_AT(player+RBS_FOCUS)==ent) WORD_AT(player+RBS_FOCUS)=0;', 'WORD_AT(player+RBS_FOCUS)==ent) {}'),
     'walk-fx-missing': ('    guest_call(sub_0029CCB0,0);\n', ''),
     'walk-fx-any-caller': ('MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==RBS_RET_FX;', 'MAPMAKER_STACK_OK(4);'),
-    'walk-fx-any-scene': ('rbs_walk.state || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;\n    guest_call', 'rbs_walk.state || !rbs_on()) return;\n    guest_call'),
+    'walk-fx-any-scene': ('rbs_walk.state || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;\n    rbs_walk_wake();', 'rbs_walk.state || !rbs_on()) return;\n    rbs_walk_wake();'),
     'walk-fx-stale': ('    if(!here || !rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state ||', '    if(!here || !rbs_walk.state ||'),
     'walk-meter-shown': (' &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_WALK_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_WALK_MODEL)', ')'),
     'walk-hud-own-bar': (' &&\n        RBS_H(focus+RBS_ENT_MODEL)!=RBS_WALK_MODEL)', ')'),
+    'walk-never-woken': ('    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;\n', ''),
+    'walk-wake-not-called': ('    rbs_walk_wake();\n', ''),
+    'walk-wake-skips-roar': ('#define RBS_WALK_ROAR 2u', '#define RBS_WALK_ROAR 4u'),
+    'walk-wake-any-state': (' || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_WAIT ||', ' ||'),
+    'walk-wake-before-setup': ('    if(RBS_B(st+RBS_WALK_STAGE)!=1u || WORD_AT', '    if(WORD_AT'),
+    'walk-wake-over-request': (' || (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)>=0) return;', ') return;'),
+    'walk-wake-other-record': ('       WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;',
+                               '       !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;'),
+    'walk-wake-other-entity': ('!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;\n    if(RBS_B',
+                               '!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;\n    if(RBS_B'),
+    'walk-wake-sets-state': ('    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;\n', '    WORD_AT(a+RBS_WALK_AI_STATE)=RBS_WALK_ROAR;\n'),
 }
 
 
@@ -693,3 +704,43 @@ def test_skeleton_floor_site():
     assert a[0x0029D070].call and target(a[0x0029D070]) == 0x002895A0 and ends(a, 0x0029D070) == 0x0029D075
     assert {i.address for i in decoded() if i.call and target(i) == 0x002895A0} == {0x0029D070, 0x0029E523}
     assert a[0x0029E523].function == 0x0029E0A0 and ends(a, 0x0029E523) == 0x0029E528
+
+
+def test_walker_intro_waits_for_level_trigger():
+    """State 1 of the walker fight waits for mission 13's level trigger SPC2/SPC1;
+    the fight applies a requested state (AI +0x9D0) first thing each frame."""
+    a = by_address()
+    rd = xbe_reader()
+    # entity -> AI (ebp); a pending request +0x9D0 becomes the state +0x20, then -1
+    assert mem(a[0x002998EF])[0][4] == 0x7C and mem(a[0x002998FA])[0][4] == 0x9D0
+    assert a[0x00299905].mnemonic == 'jl' and mem(a[0x00299907])[0][4] == 0x20
+    assert mem(a[0x0029991F])[0][4] == 0x20 and mem(a[0x00299922])[0][4] == 0x9D0
+    # steering, walking and firing (sub_00298270 ..) only in states above 2
+    assert mem(a[0x0029A9B2])[0][4] == 0x20 and ('imm', 2) in a[0x0029A9B2].ops and a[0x0029A9B6].mnemonic == 'jle'
+    assert target(a[0x0029AA00]) == 0x00298270 and target(a[0x0029AA05]) == 0x00297750
+    # the switch on AI +0x20 (21 states)
+    assert mem(a[0x0029B243])[0][4] == 0x20 and ('imm', 0x14) in a[0x0029B246].ops
+    assert a[0x0029B24F].mnemonic == 'jmp' and '0x29cb90' in a[0x0029B24F].text.lower()
+    jt = [struct.unpack_from('<I', rd(0x0029CB90 + 4 * k, 4))[0] for k in range(21)]
+    assert jt[1] == 0x0029B5A6 and jt[2] == 0x0029B62E and jt[4] == 0x0029B696
+    # first frame (state 0, stage 0): state 1, stage 1
+    assert ('imm', 1) in a[0x0029B4EC].ops and mem(a[0x0029B597])[0][4] == 0x98 and ('imm', 1) in a[0x0029B597].ops
+    # state 1: anim done, then trigger 'SPC2' -> 0x6FB or 'SPC1' -> 0x6FC (both state 2), else return
+    assert target(a[0x0029B5AA]) == 0x00059DD0
+    assert ('imm', 0x53504332) in a[0x0029B5BA].ops and target(a[0x0029B5BF]) == 0x00234190
+    assert ('imm', 0x53504331) in a[0x0029B5C4].ops and target(a[0x0029B5CB]) == 0x00234190
+    assert target(a[0x0029B5D3]) == 0x00234270 and target(a[0x0029B5FF]) == 0x00234270
+    assert ('imm', 0x6FB) in a[0x0029B5E6].ops and ('imm', 0x6FC) in a[0x0029B616].ops
+    assert ('imm', 2) in a[0x0029B5F4].ops and ('imm', 2) in a[0x0029B624].ops
+    assert target(a[0x0029B609]) == 0x0029CB83
+    # the trigger table: level logic items [0x0078CD90] (count [0x0075CCA8]) by tag +0xAC; +0x34 tested
+    assert mem(a[0x00234190])[0][4] == 0x0075CCA8 and mem(a[0x0023419E])[0][4] == 0x0078CD90
+    assert mem(a[0x002341B2])[0][4] == 0xAC and mem(a[0x00234278])[0][4] == 0x34
+    # nothing else uses these tags
+    for tag, site in ((0x53504332, 0x0029B5BA), (0x53504331, 0x0029B5C4)):
+        assert {i.address for i in decoded() if ('imm', tag) in i.ops} == {site}
+    # state 2: anim done, then crowewalkerstunscript 0x6F7, then state 4
+    assert target(a[0x0029B632]) == 0x00059DD0 and ('imm', 0x6F7) in a[0x0029B65E].ops
+    assert target(a[0x0029B664]) == 0x0005F460 and ('imm', 4) in a[0x0029CAF5].ops
+    # stock state changes write the request word as well (0x0029CAFA..)
+    assert mem(a[0x0029CB19])[0][4] == 0x20 and mem(a[0x0029CB1C])[0][4] == 0x9D0
