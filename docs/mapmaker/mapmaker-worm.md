@@ -175,6 +175,9 @@ Logs (stderr, `[mapmaker] worm:`):
 - `mansion worm runs its story update`
 - `mansion worm head bound`
 - `mansion worm drawn`
+- `surfaced, state s, head height h, spawn floor f, worm height w` (each
+  surfacing, up to 8)
+- `lv1_2.pak: only the mansion worm's anims registered`
 - `mansion worm: the mansion script trigger dropped`
 - `mansion worm hit (state before, after)`
 - failures: `no pads near the mansion worm's spawn; bot behaviour`,
@@ -182,10 +185,25 @@ Logs (stderr, `[mapmaker] worm:`):
 
 ## Risks (INFERRED, need a playtest)
 
-- **Ground height**: the area assumes -2.4 (the worms' start height) is the
-  garden floor and puts it at the spawn floor. If the mansion floor differs,
-  the worm surfaces too high or too low by that difference. Look for this
-  first.
+- **Ground height** (CONFIRMED, test `test_heights`):
+  - -2.4 is the mission 5 garden floor: it is by far the most common height
+    of the level geometry (`data/mansion2.raw`'s geometry file in
+    `story/l_1_st.pak`) inside the worms' region.
+  - The worm's height (the burrowing constant and the starts) is that floor,
+    and the surfaced head is placed at it (`sub_001D9B80`); nothing probes
+    collision. The area puts it at the spawn floor (dy = spawn y + 2.4).
+  - The one fixed height: after a state-2 burst (+0x44C 2) stock puts the
+    head at (-62.31, **0**, 16.9) (0x001DA94C..0x001DA969). x and z follow
+    the shifted constants; after each draw the area adds dy to that y 0, so
+    it stays 2.4 above the floor, as in mission 5.
+  - The mapmaker.25 playtest ("floats above the ground, no proper animations
+    or logic") had the trophy monster and the skeleton in the set, so the
+    stopgap skipped lv1_2.pak and the worm ran as a MapMaker bot on its rig.
+    The registration fix gives it the story behaviour in that set too.
+  - Logs: `mansion garden moved by (dx, dz), floor y (mission 5: -2.4, the
+    garden floor)` and, at each surfacing (up to 8), `surfaced, state s,
+    head height h, spawn floor f, worm height w`. h should be about f (or
+    f + 2.4 after a state-2 burst).
 - **Space**: the worm only targets the nearest player clamped to a box of 21.5
   x 45.5 world units centred on the spawn (long axis along z), and wakes when
   a player enters a region of the same size. It burrows through anything; it

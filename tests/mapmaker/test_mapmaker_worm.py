@@ -121,6 +121,10 @@ MUTATIONS = {
     'script-kept': ('    if(wrm_lv.ready && MAPMAKER_STACK_OK(8) && WORD_AT(g_esp)==WRM_RET_SCRIPT && WORD_AT(WRM_SCENE)==100u) {', '    if(0) {'),
     'script-any-site': ('&& WORD_AT(g_esp)==WRM_RET_SCRIPT && WORD_AT(WRM_SCENE)==100u) {', '&& WORD_AT(WRM_SCENE)==100u) {'),
     'script-any-scene': ('WORD_AT(g_esp)==WRM_RET_SCRIPT && WORD_AT(WRM_SCENE)==100u) {', 'WORD_AT(g_esp)==WRM_RET_SCRIPT) {'),
+    'height-burst-unshifted': ('    if(WORD_AT(w+WRM_W_ROUTE_FROM)==2u) wrm_setf(head+WRM_ENT_X+4u,wrm_getf(head+WRM_ENT_X+4u)+wrm_lv.dy);', '    (void)0;'),
+    'height-always-shifted': ('    if(WORD_AT(w+WRM_W_ROUTE_FROM)==2u) wrm_setf(', '    if(1) wrm_setf('),
+    'height-buried-shifted': ('WORD_AT(w+WRM_W_STATE)<WRM_SURFACED) { wrm_lv.surfaced=0;return; }', '0) { wrm_lv.surfaced=0;return; }'),
+    'height-not-called': ('    wrm_shift(0,1);\n    wrm_height();', '    wrm_shift(0,1);'),
     'level-not-forgotten': ('    memset(&wrm_lv,0,sizeof wrm_lv);                  /* a new level', '    (void)0;                  /* a new level'),
 }
 
@@ -433,3 +437,33 @@ def test_registration_sites_and_fixup():
     assert mem(a[0x001DB8A4])[0][4] == 0x44C
     readers = {i.function for i in decoded() if any(k == 'disp' and v == 0x0047D78C for k, v in i.values())}
     assert 0x001DACC5 in readers and len(readers - {0x001DAAB0, 0x001DACC5}) == 5   # five readers outside the worm
+
+
+def test_heights():
+    """The surfaced head: at the worm's height, or after a state-2 burst at the fixed point (x, 0, z);
+    the mission 5 garden floor is the worms' height -2.4 (most common height of the level geometry
+    in the garden region)."""
+    a = by_address()
+    assert mem(a[0x001DA94C])[0][4] == 0x0049DDD8 and mem(a[0x001DA954])[0][4] == 0x0049DDD4
+    assert a[0x001DA961].mnemonic == 'xorps' and mem(a[0x001DA964])[0][4] == 0x68          # y 0
+    assert mem(a[0x001DA8E6])[0][4] == 0x44C and ('imm', 2) in a[0x001DA8EF].ops
+    assert mem(a[0x001DA937])[0][4] == 0x68                                                # else the worm's height
+    import collections
+    import zlib
+    pak = _private() / 'game/pak/story/l_1_st.pak'
+    if not pak.is_file():
+        pytest.skip('needs the mission 5 pak')
+    raw = pak.read_bytes()
+    off, ln = struct.unpack_from('<II', raw, 4)
+    idx = {c: (p, n) for c, p, n, _ in struct.iter_unpack('<4I', raw[off:off + ln])}
+    assert zlib.crc32(b'data/mansion2.raw') & 0xFFFFFFFF in idx
+    best = collections.Counter()
+    for p, n in idx.values():
+        if n < 0x100000:
+            continue
+        d = raw[p:p + n]
+        for i in range(0, len(d) - 12, 4):
+            x, y, z = struct.unpack_from('<3f', d, i)
+            if -80 < x < -54 and -8 < z < 41 and -8 < y < 8 and abs(y) > 1e-6:
+                best[round(y, 1)] += 1
+    assert best.most_common(1)[0][0] == -2.4
