@@ -226,7 +226,7 @@ in `docs/mapmaker/mapmaker-meter-probe.md`.
 User request: a tile that looks like the overlap glitch (floor only, no roof,
 no walls, sky visible), placed from the special/extra tile category of every
 tileset. Files: `src/interface/pc_mapmaker_roof.inc`, `tests/mapmaker/mapmaker_roof.c`,
-`tests/mapmaker/test_mapmaker_roof.py`. Nothing is built or played yet.
+`tests/mapmaker/test_mapmaker_roof.py`. Built and played since v0.4.0-mapmaker.7; the bounded/unbounded split is not built or played yet.
 
 ### Mask bits (CONFIRMED)
 
@@ -248,7 +248,84 @@ points (`cat+0x44` count, 6-byte entries at `+0x48`: byte 0 type, byte 3 bank):
 Open roof clears `0x02000000`; open air clears `0x02FFFFFF` (ceiling and all
 side nodes). Which of the two banks is the wall and which the doorway frame
 is INFERRED (both are cleared); a node with mask 0 is always drawn, so a
-doorframe or pillar modelled that way would stay.
+doorframe or pillar modelled that way would stay. A side bit is
+`1 << (layer*12 + side offset + position along the side)` (the
+`0x00311C67..` cases add the connection point's x or z to the side's base), so
+a set bit is a wall segment where no neighbour connects (INFERRED from stock
+doorways being open where tiles meet).
+
+### Open air (bounded) and (unbounded) (user request 2026-11-01)
+
+"Split the open air tile flag into two separate flags with different
+mechanics: Open air (bounded) [invisible walls keep you from falling off the
+edge] and open air (unbounded) [falling off the edge is possible and kills the
+player.]"
+
+| mode | mark `+0x26` | saved `+8` (draw and collision) | editor 3D view | play draw |
+|---|---|---|---|---|
+| No roof | `0x5201` | without `0x02000000` | as saved | as saved |
+| Open air (unbounded) | `0x5202` | without `0x02FFFFFF` | as saved | as saved; fall kill height |
+| Open air (bounded) | `0x5203` (new) | without `0x02000000` (walls kept) | without `0x02FFFFFF` | side nodes `0x00FFFFFF` left out |
+
+- **Old maps:** `0x5202` keeps its meaning, so every open-air tile saved
+  before the split loads and plays as **Open air (unbounded)** (its old
+  behaviour, now with the fall kill). Palette entry 47 is the same preset,
+  renamed "Small Open (Open Air, Unbounded)". Bounded has no palette entry; it
+  is set from the tile roof menu (any tile, tile 8 included). An older build
+  ignores mark `0x5203` (unknown mode) and a stock game plays the record's
+  `+8`, so a bounded tile shows there as No roof with visible walls.
+- **Bounded, draw only (CONFIRMED statically, not played).** Saving the No
+  roof mask keeps the wall bits in the per-room table and in `inst+0x30`, so
+  the node-mask tests of the geometry queries (`0x00166C77` etc., below) still
+  find the walls. The draw tests the same `inst+0x30` per node in
+  `sub_0008F5E0` (`0x0008F64A`), and every call of `sub_0008F5E0` is in
+  `sub_0008F6B0` itself or in its recursion (`0x0008F853..0x0008F8BC`). The
+  hook on `sub_0008F6B0(inst, pass, layer)` clears `0x00FFFFFF` of a bounded
+  room's geometry instance for that call and restores it after. A room's
+  geometry is the prop `[inst]` with `+0x34` = room (1-based), `+4` = inst and
+  model `+0x94 = 0x907 + room` (`sub_00085CC0` `0x00085D6B..0x00085DD0`);
+  other props of the room are untouched.
+- **Which rooms are bounded (CONFIRMED).** The play build `sub_0008A780`
+  makes one 0x68-byte entry per piece record, in record order
+  (`sub_00083F80`/`sub_00085030` at `0x0008AACE`/`0x0008AAAA`), then calls
+  `sub_00085710(entry)` for each in order (`0x0008AC70..0x0008ACAB`, `edi +=
+  0x68`). The build hook reads the records (marks, `+8`, floor byte `+6`)
+  before the original; the rooms hook takes entry k, checks that its `+0x44`
+  is record k's `+8` (`0x0008A920` copy `+0x14` -> `+0x44` at `0x00084F98` /
+  `0x000856EB`; on a mismatch it stops and logs, so the walls just stay
+  visible) and records rooms `+0x28 .. +0x28 + +0x14 - 1` of a bounded piece.
+- **Unbounded, falling off kills (CONFIRMED that stock has no void death).**
+  The stock kills all need something a void fall lacks: the hazard-floor
+  kills need a ground polygon (`sub_000D5EB0` `0x000D6661..0x000D673E`
+  players, `sub_0015F0D0` `0x0015F161..` AI), fall damage needs a landing
+  (`sub_000D4100` `0x000D44E0..`: drop > 15.0, health -= (drop - 15) * 10),
+  the only height kill (y < -100.0, `0x0015F19B..0x0015F1C2`) runs only in
+  scene 61, and the remaining height kills belong to story level scripts
+  (`sub_001F48A0`, `sub_001E2B80`). That nothing else exists is INFERRED from
+  a search of the kill helpers' callers and the floor fields. So a character
+  that walked off an unbounded tile at the map edge would fall forever.
+  On a map with at least one unbounded tile the tick hook kills every live
+  character whose y (entity `+0x68`, y is up) is below **5 x lowest floor -
+  20** (piece y = record byte `+6` * 5.0 `[0x004760CC]`, `0x0008A87E`,
+  `0x0008A8F0`; editor floors -2..2 give a kill height of -30 at most). It
+  walks the live list (`0x007A3580`, relocated to `0x00900100` by
+  `actors-list.json`, count `[0x0074C37C]`, entity = `[actor]`, entity `+0x7C`
+  = actor) and calls the stock kill-now helper `sub_000BD090(entity)` for a
+  character with health `+0x1CC` > 0, as the stock loop at
+  `0x00067AF1..0x00067B78` does. `sub_000BD090` builds a hit with no attacker
+  and calls the death `sub_000BABA0`: it is scored as a suicide (INFERRED from
+  `0x000BAD24..0x000BB002`), with the normal death and respawn. Humans and
+  bots both die. Maps without an unbounded tile, story levels and the editor
+  are untouched (the flag is reset at every MapMaker play build).
+- Cost: the draw hook runs for every drawn instance; with no bounded room, or
+  outside scene 100, it is one counter test and one scene read; otherwise a
+  few loads and a 256-entry table. The tick hook is one flag test per frame
+  unless the map has an unbounded tile, then a walk of at most 64 characters.
+- Log: `roof: N bounded open-air rooms (walls hidden, collision kept)`,
+  `roof: N unbounded open-air tiles; characters below y Y (lowest floor F)
+  die`, `roof: character I fell off the map (y Y); killed` (first 8), and the
+  warnings `room build does not follow the map records` / `map records
+  unreadable`.
 
 ### Palette entry ("tile category in each set")
 
@@ -393,13 +470,15 @@ INFERRED.
   `0x0016D47A`, `0x0016D7DB`, CONFIRMED; that they are the collision/ray
   tests is INFERRED from node `+0x58` counts and from stock doorways being
   walkable). Expect hidden ceilings and walls to have no collision: rockets
-  and grenades leave through the top, players can walk out of an open-air
-  tile's sides into whatever is next to it. No invisible-wall mode was added
-  (it needs a draw-only hook in `sub_0008F5E0`, per node, every frame).
-- Map edge: no boundary was found that follows the mask; a player walking out
-  of an open-air tile at the edge of the map is INFERRED to fall into the
-  void (fall death). Use Open roof at the map edge, or surround open-air
-  tiles with other tiles.
+  and grenades leave through the top, players can walk out of an unbounded
+  open-air tile's sides into whatever is next to it. Bounded tiles keep the
+  wall bits in the mask, so their walls keep this collision while the draw
+  hook hides them (shots hit the invisible walls too).
+- Map edge: no boundary follows the mask, and the stock game has no death
+  for a fall into the void (see "Open air (bounded) and (unbounded)"). Open
+  air (unbounded) adds a kill height below the lowest floor; Open air
+  (bounded) keeps the walls' collision, so nobody leaves the tile through a
+  side that has no neighbour.
 - Weather: rooms without bit 25 are open for `sub_003381D0` (`0x003381E1`,
   via the getter `sub_00083970`) and the camera (`0x000CAB1C`); with
   `+0x23` = 1 as well, rain/snow is expected inside (desired; pads with pad
@@ -434,6 +513,10 @@ INFERRED.
     WRAP sub_0003D7B0 -> pc_mapmaker_roof_text
     WRAP sub_00151030 -> pc_mapmaker_roof_format
     WRAP sub_0032D9F0 -> pc_mapmaker_roof_caption
+    WRAP sub_0008A780 -> pc_mapmaker_roof_play
+    WRAP sub_00085710 -> pc_mapmaker_roof_rooms
+    WRAP sub_0008F6B0 -> pc_mapmaker_roof_draw
+    WRAP sub_0003C440 -> pc_mapmaker_roof_tick
 
 All but the text hook call their original exactly once (no
 `MAPMAKER_GUEST_RET`); `pc_mapmaker_roof_text` returns its string with
@@ -452,8 +535,24 @@ resolves them to the wrapper). `sub_000792B0` is the generic menu add (every
 menu); its hook only compares a flag set during the tile menu build. Include
 `pc_mapmaker_roof.inc` after `pc_mapmaker_skymask.inc`; it uses
 `mapmaker_limits`, `MAPMAKER_PTR_OK`/`MAPMAKER_STACK_OK`, `WORD_AT`,
-`FLOAT_AT`, `xbox_HeapAlloc`, `g_xbox_mem_offset`. It calls no guest
-function.
+`FLOAT_AT`, `xbox_HeapAlloc`, `g_xbox_mem_offset` and `guest_call`. It calls
+one guest function, `sub_000BD090` (declared `extern void
+sub_000BD090(void);` in the file; link stub in
+`tests/mapmaker/mapmaker_area_stubs.h`).
+
+The four play hooks (bounded/unbounded split) each call their original
+exactly once (no `MAPMAKER_GUEST_RET`) and need prototypes beside the other
+roof hooks in `pc_display_menu.h` and pass-through stubs in the non-display
+branch of `pc_menu_mouse_guest.inc` (not edited here). Chaining:
+`sub_0008A780` is already wrapped by the rooms area
+(`pc_mapmaker_rooms_compile`); the roof hook only reads the container before
+the original and logs after, so any order works (outermost is simplest).
+`sub_00085710` is already wrapped by the sky area
+(`pc_mapmaker_sky_room_mask`, dev switch); the roof hook reads the entry and
+acts after the original, any order works. `sub_0008F6B0` (6 callers:
+`0x0008FA0C`, `0x0008FA2E` in `sub_0008F950`, `0x00185C73`, `0x00185C87`,
+`0x00185D91`, `0x00185DA5`) and `sub_0003C440` (one caller, `0x0003D3CA`)
+are new targets. No guest-code table entry is added.
 
 ### What the user tests
 
@@ -492,12 +591,14 @@ menu to flag the tile either as no roof or open air, probably as options in a
 combobox". Files: `src/interface/pc_mapmaker_tileflags.inc` (area `sky`, included
 after the roof file), the right-click branch in `src/interface/pc_mapmaker_pointer.inc`
 and the hover label in `pc_mapmaker_roof.inc`; tests
-`tests/mapmaker/test_mapmaker_tileflags.py` (fixture `mapmaker_tileflags.c`, 31
-mutations, decode/XBE checks). Not built or played yet.
+`tests/mapmaker/test_mapmaker_tileflags.py` (fixture `mapmaker_tileflags.c`, 35
+mutations, decode/XBE checks). Built and played (v0.4.0-mapmaker.18) before
+the bounded/unbounded split; the split is not built or played yet.
 
 The flags are the roof marks above. Nothing in them is tile-8 specific: the
 mask hook clears the ceiling bit (No roof) or the ceiling and every side node
-bit (Open air) of whatever piece is marked, the rebuild stores word `+0x26`
+bit (Open air (unbounded); Open air (bounded) saves the walls and hides them
+only from the draw) of whatever piece is marked, the rebuild stores word `+0x26`
 for any record, and the load matches tile, position and rotation. A tile
 whose model has no separate ceiling or wall nodes (mask 0) keeps those parts:
 the flag changes only what the catalogue's connection points describe.
@@ -520,9 +621,9 @@ sets `editor+0x25C |= 0x4000000`, pushes `sub_00079860(root, desc, -1)` at
 |---|---|
 | pointer right-click release (no drag, editor screen) | after the empty-cell Y case: `pc_mapmaker_tileflags_click()` takes it in Tiles mode with nothing held, a piece under the pointer and no editor menu open (remembers the piece, sends no Back); otherwise Back as before |
 | `sub_00303E10` -> `pc_mapmaker_tileflags_tiles` | with a remembered piece still under the pointer: allocates once a heap descriptor `{sub_00319300, sub_003192E0, 0, 0}`, a choice word and the texts, sets the word to the tile's current flag, opens the menu with `sub_002FB230`, and skips that frame's tile input (`MAPMAKER_GUEST_RET`) |
-| `sub_00319300` -> `pc_mapmaker_tileflags_build` | for that descriptor only (menu `+4`): the stock frame (`sub_00075B70(0x8400, 0, 50, 0, sub_002FB3C0)`, `+0x218` = 1, `sub_00071B10(1, 0.5, 1, 1)`, `sub_00071C50(0x20000)`), one choice row "Roof" built like the weaponset area's pickup Weapon choice (`sub_00079DE0(text, 1, 0x08000800, 0, 0)`, `sub_0007D4A0`, `sub_00071800` Normal 0 / No roof 1 / Open air 2, `sub_00078590(word)`, `sub_000783D0`), the stock Done row (text 0xB5E, `sub_00079D60` with `sub_002FB3C0`), `sub_00075E70` and the stock position call; the pickup menu itself is the original |
-| `sub_003192E0` -> `pc_mapmaker_tileflags_tick` | for that descriptor: when the word changed to 0..2, the piece (still the same tile id) gets that roof mark; if it was selected when the menu opened, every selected piece in the editor list does too; then the original (Back closes) |
-| `sub_00151030` (roof format hook) | the grid label of any other flagged piece reads "<number>.<name> (No Roof)" / "(Open Air)" (heap copy of the name); tile 8 keeps "46./47." |
+| `sub_00319300` -> `pc_mapmaker_tileflags_build` | for that descriptor only (menu `+4`): the stock frame (`sub_00075B70(0x8400, 0, 50, 0, sub_002FB3C0)`, `+0x218` = 1, `sub_00071B10(1, 0.5, 1, 1)`, `sub_00071C50(0x20000)`), one choice row "Roof" built like the weaponset area's pickup Weapon choice (`sub_00079DE0(text, 1, 0x08000800, 0, 0)`, `sub_0007D4A0`, `sub_00071800` Normal 0 / No roof 1 / Open air (bounded) 2 / Open air (unbounded) 3, `sub_00078590(word)`, `sub_000783D0`), the stock Done row (text 0xB5E, `sub_00079D60` with `sub_002FB3C0`), `sub_00075E70` and the stock position call; the pickup menu itself is the original |
+| `sub_003192E0` -> `pc_mapmaker_tileflags_tick` | for that descriptor: when the word changed to row 0..3, the piece (still the same tile id) gets that row's roof mode (rows 0..3 -> modes 0, 1, 3 bounded, 2 unbounded, `tf_modes`, so saved marks keep their values); if it was selected when the menu opened, every selected piece in the editor list does too; then the original (Back closes). The menu opens on the tile's own row |
+| `sub_00151030` (roof format hook) | the grid label of any other flagged piece, and of a bounded tile 8, reads "<number>.<name> (No Roof)" / "(Open Air, Unbounded)" / "(Open Air, Bounded)" (heap copy of the name); tile 8 No roof / unbounded keep "46./47." |
 
 Selecting tiles: a mouse right click no longer selects a placed tile in
 Tiles mode; Escape (Back in the editor) and the gamepad B button still do. A
@@ -534,15 +635,28 @@ rebuild stores it).
 What the user tests:
 1. Tiles mode, nothing held: right-click a placed tile of any shape (not only
    Small Open). A small menu opens with "Roof: Normal" and Done (log
-   `tileflags: roof menu opened for tile N`). Pick No roof or Open air with
-   left/right or the mouse, then Done: the 3D view shows the change (Open air
-   without walls); the hover label ends with "(No Roof)" / "(Open Air)".
+   `tileflags: roof menu opened for tile N`). Pick No roof, Open air
+   (bounded) or Open air (unbounded) with left/right or the mouse, then
+   Done: the 3D view shows the change (both Open air choices without walls);
+   the hover label ends with "(No Roof)" / "(Open Air, Bounded)" / "(Open
+   Air, Unbounded)".
 2. Select several tiles (Escape or B), right-click one of them: the choice
    applies to all selected tiles (log `N tiles set to ...`).
 3. Save, reload, play: the flagged tiles are open in play; back in the editor
    they keep their flags. Set one back to Normal: closed again.
 4. Right click with a piece held still rotates it; in Objects mode a right
    click still opens a selected object's options; Escape still selects tiles.
+5. Bounded vs unbounded (log `roof: N bounded open-air rooms`, `roof: N
+   unbounded open-air tiles; characters below y Y ... die`): build a row of
+   tiles at the map edge, one bounded, one unbounded. In play the bounded
+   tile shows no walls but you cannot walk (or be pushed by an explosion)
+   off its open edge, and shots stop at the invisible wall; between two
+   bounded or open tiles you walk through freely. Walk off the unbounded
+   tile: you fall and die a moment later (log `character N fell off the
+   map`), scored as a suicide, and respawn. Repeat from an upper floor, with
+   a bot (knock it off), in 2-player split screen, and in a MapMaker Story
+   map. Look for walls that flicker in reflections/shadows on bounded tiles.
+   Load a map saved before this change: its open-air tiles are unbounded.
 
 ## Tests
 
@@ -560,10 +674,14 @@ What the user tests:
   the build and restored, items by pointer, hover/pick preview, masks, record
   mark and mask, load matching, forget on reset/reuse, record walk bounds,
   items after the pads, play -> editor reload -> copy -> play round trip,
-  grid label and numbers 46/47 (55 mutations); plus XBE data (category
-  tables, descriptor, tile 8, tile numbers 1..45, both formats) and decoder
-  checks (record word +0x26 unused, hook and label sites, record sizes,
-  editor start load, node-mask tests).
+  grid label and numbers 46/47, Open air (bounded): saved walls, editor view,
+  mark 0x5203 load, rooms by build order (with the mask cross-check), draw
+  hiding and restore; Open air (unbounded): kill height from the lowest
+  floor, live/dead/entry checks, scene gate, 64-entry bound (80 mutations);
+  plus XBE data (category tables, descriptor, tile 8, tile numbers 1..45,
+  both formats, floor height 5.0) and decoder checks (record word +0x26
+  unused, hook and label sites, record sizes, editor start load, node-mask
+  tests, draw/room/tick/kill sites).
 - `tests/mapmaker/test_mapmaker_skymask.py` (fixture `tests/mapmaker/mapmaker_skymask.c`): the
   room mask switch: off by default, scene 100 only, after the original, the
   relocated table only, build record untouched, 256-entry bound, one summary per

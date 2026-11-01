@@ -4,6 +4,9 @@
  * selecting it. The flags are the roof area's per-piece marks
  * (pc_mapmaker_roof.inc: mask, save word +0x26, load match, copy/move), which
  * already work for every tile id; the 46/47 palette entries stay for old maps.
+ * Second request (2026-11-01): Open air is split into Open air (bounded:
+ * invisible walls keep you from falling off the edge) and Open air
+ * (unbounded: falling off the edge is possible and kills the player).
  *
  * CONFIRMED (decode, tests/mapmaker/test_mapmaker_tileflags.py):
  *  - the editor's per-frame input dispatch sub_003063C0 jumps on toolbar slot
@@ -34,10 +37,12 @@
  *  - tiles (sub_00303E10): with a remembered piece still under the pointer,
  *    opens the menu with sub_002FB230 and skips that frame's tile input.
  *  - build (sub_00319300): for this descriptor, the stock frame and Done row
- *    around one choice row "Roof": Normal / No roof / Open air (built like the
- *    weaponset area's pickup Weapon choice), bound to a heap word.
+ *    around one choice row "Roof": Normal / No roof / Open air (bounded) /
+ *    Open air (unbounded) (built like the weaponset area's pickup Weapon
+ *    choice), bound to a heap word holding the row index.
  *  - tick (sub_003192E0): applies the choice to the piece (and, when that
- *    piece is selected, to every selected piece) with the roof marks.
+ *    piece is selected, to every selected piece) with the roof marks; rows
+ *    map to modes 0 / 1 / 3 / 2 (tf_modes).
  * Gamepad B and Escape (Back) still select tiles. Requires pc_mapmaker_roof.inc
  * (included before), WORD_AT, FLOAT_AT, guest_call, g_esp, xbox_HeapAlloc,
  * MAPMAKER_PTR_OK / MAPMAKER_STACK_OK / MAPMAKER_GUEST_RET. */
@@ -58,7 +63,12 @@
 #define TF_POS_BASE 0x0049F7E8u
 #define TF_POS_LIST 0x007BB1E8u
 #define TF_TEXT_BYTES 24u
-static const char tf_texts[4][TF_TEXT_BYTES]={"Roof","Normal","No roof","Open air"};
+#define TF_CHOICES 4u
+static const char tf_texts[1u+TF_CHOICES][TF_TEXT_BYTES]={"Roof","Normal","No roof","Open air (bounded)","Open air (unbounded)"};
+/* Choice row index <-> roof mode (pc_mapmaker_roof.inc): the rows are in the
+ * order the user asked for, the modes keep their saved values (0x5202 =
+ * unbounded for maps saved before the split). The map is its own inverse. */
+static const uint8_t tf_modes[TF_CHOICES]={0u,MAPMAKER_ROOF_OPEN_ROOF,MAPMAKER_ROOF_OPEN_BOUNDED,MAPMAKER_ROOF_OPEN_AIR};
 
 extern void sub_002FB230(void),sub_00075B70(void),sub_00071B10(void),sub_00071C50(void),sub_00079DE0(void),
     sub_0007D4A0(void),sub_00071800(void),sub_00078590(void),sub_000783D0(void),sub_00079D60(void),
@@ -115,6 +125,7 @@ void pc_mapmaker_tileflags_tiles(void (*original)(void))
     tf.piece=piece;tf.tile=WORD_AT(piece+0x10u);
     tf.group=(WORD_AT(piece+0x14u)&TF_SELECTED)!=0;
     tf.applied=mapmaker_roof_mode(piece);
+    tf.applied=tf.applied<TF_CHOICES?tf_modes[tf.applied]:0u;     /* the row of the tile's mode */
     WORD_AT(tf.value)=tf.applied;
     guest_call(sub_002FB230,1,tf.desc);
     if(tf.opened++<4u) fprintf(stderr,"[mapmaker] tileflags: roof menu opened for tile %u (%s)\n",(unsigned)tf.tile,
@@ -135,7 +146,7 @@ void pc_mapmaker_tileflags_build(void (*original)(void))
     guest_call(sub_00071C50,1,0x20000u);
     guest_call(sub_00079DE0,5,tf_text(0),1u,0x08000800u,0u,0u);
     guest_call(sub_0007D4A0,2,0u,0u);
-    for(k=0;k<3u;k++) guest_call(sub_00071800,2,tf_text(k+1u),(uint32_t)k);
+    for(k=0;k<TF_CHOICES;k++) guest_call(sub_00071800,2,tf_text(k+1u),(uint32_t)k);
     guest_call(sub_00078590,1,tf.value);
     guest_call(sub_000783D0,0);
     guest_call(sub_00079D60,6,guest_call(sub_0003D7B0,1,TF_DONE_TEXT),0xFFFFFFFFu,0u,0x40000000u,TF_CLOSE,0u);
@@ -155,12 +166,12 @@ void pc_mapmaker_tileflags_tick(void (*original)(void))
 {
     uint32_t menu=MAPMAKER_STACK_OK(8u)?WORD_AT(g_esp+4u):0u,v,p;
     unsigned steps,n=0;
-    if(tf.desc && MAPMAKER_PTR_OK(menu,8u) && WORD_AT(menu+4u)==tf.desc && tf.piece && (v=WORD_AT(tf.value))<=2u &&
+    if(tf.desc && MAPMAKER_PTR_OK(menu,8u) && WORD_AT(menu+4u)==tf.desc && tf.piece && (v=WORD_AT(tf.value))<TF_CHOICES &&
        v!=tf.applied && tf_editor() && MAPMAKER_PTR_OK(tf.piece,0x48u) && WORD_AT(tf.piece+0x10u)==tf.tile) {
-        tf_mark(tf.piece,v);n=1;
+        tf_mark(tf.piece,tf_modes[v]);n=1;
         if(tf.group)
             for(steps=0,p=WORD_AT(TF_LIST);p && steps<TF_LIST_STEPS && MAPMAKER_PTR_OK(p,0x48u);steps++,p=WORD_AT(p+0x40u))
-                if(p!=tf.piece && (WORD_AT(p+0x14u)&TF_SELECTED)) { tf_mark(p,v);n++; }
+                if(p!=tf.piece && (WORD_AT(p+0x14u)&TF_SELECTED)) { tf_mark(p,tf_modes[v]);n++; }
         tf.applied=v;
         if(tf.changed++<8u) fprintf(stderr,"[mapmaker] tileflags: %u tile%s set to %s\n",n,n==1u?"":"s",tf_texts[v+1u]);
     }

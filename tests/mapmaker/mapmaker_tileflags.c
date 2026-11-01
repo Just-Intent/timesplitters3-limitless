@@ -4,10 +4,11 @@
  * nothing held is taken (no Back) and opens the menu on the next Tiles input
  * frame through sub_002FB230 with a heap descriptor {sub_00319300,
  * sub_003192E0}; the build lays out one "Roof" choice (Normal / No roof /
- * Open air) bound to a heap word plus the stock Done row; the tick applies the
- * choice as a roof mark to the tile (and to every selected tile when it is
- * selected); other menus, modes and scenes are untouched; every hook pops only
- * its return address. */
+ * Open air (bounded) / Open air (unbounded)) bound to a heap word plus the
+ * stock Done row; the tick applies the choice as a roof mark (rows 0..3 ->
+ * modes 0, 1, 3, 2) to the tile (and to every selected tile when it is
+ * selected), and the menu starts on the tile's own row; other menus, modes
+ * and scenes are untouched; every hook pops only its return address. */
 #define TSFP_MAPMAKER_ROOF_TEST 1
 #define TSFP_MAPMAKER_TILEFLAGS_TEST 1
 #include <stdarg.h>
@@ -40,10 +41,11 @@ void sub_00079D60(void) { g_ecx=11; }
 void sub_00075E70(void) { g_ecx=12; }
 void sub_00077320(void) { g_ecx=13; }
 void sub_0003D7B0(void) { g_ecx=14; }
+void sub_000BD090(void) { g_ecx=15; }
 
 #define DONE_STRING 0x00444000u
 static unsigned nopen, nframe, nrows, nopts, nbind, nend, ndone, nlast, npos;
-static uint32_t open_arg, frame_args[5], row_text, row_args[5], opt_text[4], opt_value[4], bind_arg, done_args[6], pos_args[2];
+static uint32_t open_arg, frame_args[5], row_text, row_args[5], opt_text[5], opt_value[5], bind_arg, done_args[6], pos_args[2];
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -55,7 +57,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     if(f==sub_002FB230) { nopen++;open_arg=x[0];return 0; }
     if(f==sub_00075B70) { nframe++;memcpy(frame_args,x,sizeof frame_args);return 0; }
     if(f==sub_00079DE0) { nrows++;row_text=x[0];memcpy(row_args,x,sizeof row_args);return 0; }
-    if(f==sub_00071800) { if(nopts<4u) { opt_text[nopts]=x[0];opt_value[nopts]=x[1]; } nopts++;return 0; }
+    if(f==sub_00071800) { if(nopts<5u) { opt_text[nopts]=x[0];opt_value[nopts]=x[1]; } nopts++;return 0; }
     if(f==sub_00078590) { nbind++;bind_arg=x[0];return 0; }
     if(f==sub_000783D0) { nend++;return 0; }
     if(f==sub_00079D60) { ndone++;memcpy(done_args,x,sizeof done_args);return 0; }
@@ -170,10 +172,11 @@ int main(void)
     CHECK(WORD_AT(MENU+0x218u)==1u);
     CHECK(nrows==1 && !strcmp((const char *)((uintptr_t)row_text+g_xbox_mem_offset),"Roof"));
     CHECK(row_args[1]==1u && row_args[2]==0x08000800u);
-    CHECK(nopts==3 && opt_value[0]==0 && opt_value[1]==1u && opt_value[2]==2u);
+    CHECK(nopts==4 && opt_value[0]==0 && opt_value[1]==1u && opt_value[2]==2u && opt_value[3]==3u);
     CHECK(!strcmp((const char *)((uintptr_t)opt_text[0]+g_xbox_mem_offset),"Normal"));
     CHECK(!strcmp((const char *)((uintptr_t)opt_text[1]+g_xbox_mem_offset),"No roof"));
-    CHECK(!strcmp((const char *)((uintptr_t)opt_text[2]+g_xbox_mem_offset),"Open air"));
+    CHECK(!strcmp((const char *)((uintptr_t)opt_text[2]+g_xbox_mem_offset),"Open air (bounded)"));
+    CHECK(!strcmp((const char *)((uintptr_t)opt_text[3]+g_xbox_mem_offset),"Open air (unbounded)"));
     CHECK(nbind==1 && bind_arg==tf.value && nend==1);
     CHECK(ndone==1 && done_args[0]==DONE_STRING && done_args[1]==0xFFFFFFFFu && done_args[3]==0x40000000u && done_args[4]==0x002FB3C0u);
     CHECK(nlast==1 && npos==1 && pos_args[0]==0x00555000u && *(float *)&pos_args[1]==260.0f);
@@ -181,13 +184,16 @@ int main(void)
     /* ---- tick: the choice becomes the tile's roof mark ------------------- */
     CALL(pc_mapmaker_tileflags_tick,0x00079920u,MENU,0,0,1);
     CHECK(!mapmaker_roof_mode(P(1)));                                      /* unchanged */
-    WORD_AT(tf.value)=2u;
+    WORD_AT(tf.value)=3u;                                                  /* Open air (unbounded) */
     WORD_AT(MENU+4u)=0x0052DECCu;
     CALL(pc_mapmaker_tileflags_tick,0x00079920u,MENU,0,0,1);               /* another menu */
     CHECK(!mapmaker_roof_mode(P(1)));
     WORD_AT(MENU+4u)=desc;
     CALL(pc_mapmaker_tileflags_tick,0x00079920u,MENU,0,0,1);
-    CHECK(mapmaker_roof_mode(P(1))==MAPMAKER_ROOF_OPEN_AIR && !mapmaker_roof_mode(P(2)) && tf.applied==2u);
+    CHECK(mapmaker_roof_mode(P(1))==MAPMAKER_ROOF_OPEN_AIR && !mapmaker_roof_mode(P(2)) && tf.applied==3u);
+    WORD_AT(tf.value)=2u;                                                  /* Open air (bounded) */
+    CALL(pc_mapmaker_tileflags_tick,0x00079920u,MENU,0,0,1);
+    CHECK(mapmaker_roof_mode(P(1))==MAPMAKER_ROOF_OPEN_BOUNDED && tf.applied==2u);
     WORD_AT(tf.value)=1u;
     CALL(pc_mapmaker_tileflags_tick,0x00079920u,MENU,0,0,1);
     CHECK(mapmaker_roof_mode(P(1))==MAPMAKER_ROOF_OPEN_ROOF);
@@ -206,11 +212,17 @@ int main(void)
     CHECK(pc_mapmaker_tileflags_click());
     CALL(pc_mapmaker_tileflags_tiles,0x003063DEu,0x00700000u,0,0,0);
     CHECK(nopen==2 && open_arg==desc && tf.group);
-    WORD_AT(tf.value)=2u;
+    WORD_AT(tf.value)=3u;
     CALL(pc_mapmaker_tileflags_tick,0x00079920u,MENU,0,0,1);
     CHECK(mapmaker_roof_mode(P(1))==2u && mapmaker_roof_mode(P(3))==2u && !mapmaker_roof_mode(P(2)) && !mapmaker_roof_mode(P(0)));
-    /* the menu starts on the tile's current flag */
+    /* the menu starts on the tile's current flag: unbounded is row 3 */
     CHECK(pc_mapmaker_tileflags_click());
+    CALL(pc_mapmaker_tileflags_tiles,0x003063DEu,0x00700000u,0,0,0);
+    CHECK(WORD_AT(tf.value)==3u && tf.applied==3u);
+    WORD_AT(tf.value)=2u;                                                  /* all bounded */
+    CALL(pc_mapmaker_tileflags_tick,0x00079920u,MENU,0,0,1);
+    CHECK(mapmaker_roof_mode(P(1))==3u && mapmaker_roof_mode(P(3))==3u && !mapmaker_roof_mode(P(2)));
+    CHECK(pc_mapmaker_tileflags_click());                                  /* bounded is row 2 */
     CALL(pc_mapmaker_tileflags_tiles,0x003063DEu,0x00700000u,0,0,0);
     CHECK(WORD_AT(tf.value)==2u && tf.applied==2u);
 
@@ -220,7 +232,15 @@ int main(void)
     g_esp=ESP0;WORD_AT(ESP0)=0x00311729u;WORD_AT(ESP0+4u)=0x0049F7C0u;WORD_AT(ESP0+8u)=12u;WORD_AT(ESP0+12u)=NAME;
     pc_mapmaker_roof_format(fake);
     CHECK(WORD_AT(ESP0+8u)==12u && WORD_AT(ESP0+12u)!=NAME &&
-          !strcmp((const char *)((uintptr_t)WORD_AT(ESP0+12u)+g_xbox_mem_offset),"Big Room (Open Air)"));
+          !strcmp((const char *)((uintptr_t)WORD_AT(ESP0+12u)+g_xbox_mem_offset),"Big Room (Open Air, Bounded)"));
+    mapmaker_roof_set(P(3),MAPMAKER_ROOF_OPEN_AIR);
+    g_esp=ESP0;WORD_AT(ESP0)=0x00311729u;WORD_AT(ESP0+4u)=0x0049F7C0u;WORD_AT(ESP0+8u)=12u;WORD_AT(ESP0+12u)=NAME;
+    pc_mapmaker_roof_format(fake);
+    CHECK(!strcmp((const char *)((uintptr_t)WORD_AT(ESP0+12u)+g_xbox_mem_offset),"Big Room (Open Air, Unbounded)"));
+    mapmaker_roof_set(P(3),MAPMAKER_ROOF_OPEN_ROOF);
+    g_esp=ESP0;WORD_AT(ESP0)=0x00311729u;WORD_AT(ESP0+4u)=0x0049F7C0u;WORD_AT(ESP0+8u)=12u;WORD_AT(ESP0+12u)=NAME;
+    pc_mapmaker_roof_format(fake);
+    CHECK(!strcmp((const char *)((uintptr_t)WORD_AT(ESP0+12u)+g_xbox_mem_offset),"Big Room (No Roof)"));
     WORD_AT(ED+0x2F18u)=P(2);                                              /* not flagged */
     g_esp=ESP0;WORD_AT(ESP0)=0x00311729u;WORD_AT(ESP0+4u)=0x0049F7C0u;WORD_AT(ESP0+8u)=12u;WORD_AT(ESP0+12u)=NAME;
     pc_mapmaker_roof_format(fake);
