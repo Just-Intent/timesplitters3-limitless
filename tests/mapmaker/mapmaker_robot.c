@@ -1,9 +1,12 @@
 /* Asset-free contract for src/interface/pc_mapmaker_robot.inc: the lv14.pak
- * mount, the per-level state, the class 0x80000 override at AI start, the
- * pad fallback, the dropped level event / music change with the removal, the
- * death explosions, the restart reset and the single-bar rule. Fake guest
- * memory; fake originals pop their return address like the lifted callees,
- * and every hook call checks esp. */
+ * mount, one state block per robot (up to four) at level start, the class
+ * 0x80000 override at AI start, the robot's globals (state pointer and three
+ * statics) swapped around each entry into its code (handler, messages, two
+ * callbacks, nesting included), the pad fallback, the dropped level event /
+ * music change with the removal of the robot that died, the death
+ * explosions, the restart reset and the single-bar rule. Fake guest memory;
+ * fake originals pop their return address like the lifted callees, and every
+ * hook call checks esp. */
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -29,9 +32,10 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 #define CAM 0x00510000u
 #define ESP0 0x00600000u
 #define R 10u
-#define ST 0x00700100u                  /* fake robot state (0x4C) */
+#define ST(k) (0x00700100u+(uint32_t)(k)*0x100u)   /* fake robot states (0x4C) */
 #define PT 0x00710000u                  /* fake particle block (0x7D00) */
 #define PT2 0x00720000u                 /* a block someone else made this level */
+#define STAT 0x0075F5ECu                /* the robot's three statics */
 #define A(i) (POOL+(uint32_t)(i)*0xEA0u)
 #define ENT(i) (ENTS+(uint32_t)(i)*0x400u)
 #define REC(i) (RECS+(uint32_t)(i)*0x100u)
@@ -47,9 +51,9 @@ void sub_0015DDA0(void) { g_ecx=6; }
 void sub_00019D70(void) { g_ecx=7; }
 void sub_002A7F30(void) { g_ecx=8; }
 
-static int pak_mounted, mount_ok=1, alloc_ok=1;
-static unsigned nmount, nalloc, nparts, nreset, nremove, nmode, ndraw;
-static uint32_t mount_arg, remove_arg, mode_arg, draw_args[2], draw_scene;
+static int pak_mounted, mount_ok=1, alloc_ok=1, parts_ok=1;
+static unsigned alloc_limit=99, level_allocs, nmount, nalloc, nparts, nreset, nremove, nmode, ndraw;
+static uint32_t mount_arg, remove_arg, mode_arg, draw_args[2], draw_scene, reset_seen[8], alloc_parts;
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -61,14 +65,14 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     va_end(a);
     if(f==sub_00062260) return (x[0]==0x0049DC78u && pak_mounted)?3u:0xFFFFFFFFu;
     if(f==sub_0005A130) { nmount++;mount_arg=x[0];if(mount_ok && x[0]==0x0049DC78u) pak_mounted=1;return mount_ok?1u:0u; }
-    if(f==sub_00292630) {
-        nalloc++;
+    if(f==sub_00292630) {   /* [0x0078B1DC] = a new block, set by sub_00292550 */
+        nalloc++;alloc_parts=WORD_AT(0x0078B0D0u);
         if(alloc_ok==2) WORD_AT(0x0078B1DCu)=0x100u;
-        else if(alloc_ok) { WORD_AT(0x0078B1DCu)=ST;WORD_AT(ST+0x48u)=0; }
+        else if(alloc_ok && level_allocs<alloc_limit) { WORD_AT(0x0078B1DCu)=ST(level_allocs);WORD_AT(ST(level_allocs)+0x48u)=0;level_allocs++; }
         return 0;
     }
-    if(f==sub_002A62C0) { nparts++;if(alloc_ok) WORD_AT(0x0078B0D0u)=PT;return 0; }
-    if(f==sub_00292550) { nreset++;WORD_AT(ST+0x48u)=0;return 0; }
+    if(f==sub_002A62C0) { nparts++;if(parts_ok) WORD_AT(0x0078B0D0u)=PT;return 0; }
+    if(f==sub_00292550) { if(nreset<8u) reset_seen[nreset]=WORD_AT(0x0078B1DCu);nreset++;WORD_AT(WORD_AT(0x0078B1DCu)+0x48u)=0;return 0; }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
     if(f==sub_00019D70) { nmode++;mode_arg=x[0];return 0; }
     if(f==sub_002A7F30) { ndraw++;draw_args[0]=x[0];draw_args[1]=x[1];draw_scene=WORD_AT(0x0079094Cu);return 0; }
@@ -90,6 +94,44 @@ static void fake_ai(void)
 static void fake_hud(void) { originals++;seen_focus=WORD_AT(PLAYER+0xFF4u);g_esp+=4u; }
 /* the level init: sees the particle pointer; an inner area may make the block */
 static void fake_level(void) { originals++;seen_parts=WORD_AT(0x0078B0D0u);if(set_parts) WORD_AT(0x0078B0D0u)=set_parts;g_esp+=4u; }
+
+/* A call from inside a fake original into a hook: ret and args pushed below esp. */
+static void inner(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,int line)
+{
+    uint32_t sp=g_esp;
+    g_esp-=12u;WORD_AT(g_esp)=ret;WORD_AT(g_esp+4u)=a1;WORD_AT(g_esp+8u)=a2;
+    hook(orig);
+    if(g_esp!=sp-8u) { fprintf(stderr,"%s:%d: inner esp %+d\n",__FILE__,line,(int)(g_esp-(sp-8u)));failures++; }
+    g_esp=sp;
+}
+/* The robot's code: records the state pointer and statics it sees, counts its
+ * statics up (1, 2, 3), and may reach another robot's code or fire event 2. */
+static uint32_t seen_state, seen_stat[3], seen_after[4];
+static uint32_t nest_ent, inner_state, inner_stat[3];
+static int dies_now;
+static void fake_inner(void)
+{
+    int i;
+    originals++;inner_state=WORD_AT(0x0078B1DCu);
+    for(i=0;i<3;i++) { inner_stat[i]=WORD_AT(STAT+(uint32_t)i*4u);WORD_AT(STAT+(uint32_t)i*4u)+=100u; }
+    g_esp+=4u;
+}
+static void fake_robot(void)
+{
+    int i;
+    originals++;
+    seen_state=WORD_AT(0x0078B1DCu);
+    for(i=0;i<3;i++) { seen_stat[i]=WORD_AT(STAT+(uint32_t)i*4u);WORD_AT(STAT+(uint32_t)i*4u)+=(uint32_t)i+1u; }
+    if(nest_ent) {
+        inner(pc_mapmaker_robot_message,fake_inner,0x0029400Au,nest_ent,7u,__LINE__);
+        seen_after[0]=WORD_AT(0x0078B1DCu);
+        for(i=0;i<3;i++) seen_after[1+i]=WORD_AT(STAT+(uint32_t)i*4u);
+    }
+    if(dies_now==2) WORD_AT(WORD_AT(WORD_AT(g_esp+4u)+0x7Cu)+0xBF0u)=REC(8);   /* its pool entry reused meanwhile */
+    if(dies_now) inner(pc_mapmaker_robot_event,fake,0x002944E5u,2u,0x3F000000u,__LINE__);
+    g_esp+=4u;
+}
+
 /* Calls hook fn with return address ret and up to three args; checks esp and
  * how often the original ran. */
 static uint32_t call(void (*fn)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,int expect_orig,int line)
@@ -148,24 +190,29 @@ static void play_scene(void) { WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10
 static unsigned level(int line)
 {
     unsigned m=nmount;
-    pak_mounted=0;WORD_AT(0x006D7880u)=10u;
+    pak_mounted=0;WORD_AT(0x006D7880u)=10u;level_allocs=0;
     WORD_AT(0x0078B1DCu)=0x00123450u;WORD_AT(0x0078B0D0u)=0x00123460u;   /* stale pointers */
     call(pc_mapmaker_robot_anims,fake,0x0005C506u,0,0,0,1,line);
     call(pc_mapmaker_robot_level,fake_level,0x0015E81Du,0,0,0,1,line);
     return nmount-m;
 }
-/* level with the robot (actor 3) started */
+/* a level with robots on actors 3.. (n of them) started */
 static const uint16_t robot_set[]={0x0C,0x42,0xA8};
-static void robot_level(int line)
+static void robot_level(unsigned n,int line)
 {
+    unsigned k;
     container(0x11,robot_set,3);
     play_scene();
     set_parts=0;
     level(line);
-    actor(3,0x42,0x5F2,0);
-    call(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1,line);
-    if(seen_class[1]!=0x80000u) { fprintf(stderr,"%s:%d: robot class 0x%X\n",__FILE__,line,(unsigned)seen_class[1]);failures++; }
+    for(k=0;k<n;k++) {
+        actor(3+k,0x42,0x5F2,k);
+        call(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3+k),0,0,1,line);
+        if(k<4u && seen_class[1]!=0x80000u) { fprintf(stderr,"%s:%d: robot %u class 0x%X\n",__FILE__,line,k,(unsigned)seen_class[1]);failures++; }
+    }
 }
+static void statics(uint32_t a,uint32_t b,uint32_t c) { WORD_AT(STAT)=a;WORD_AT(STAT+4u)=b;WORD_AT(STAT+8u)=c; }
+#define STATICS_ARE(a,b,c) (WORD_AT(STAT)==(a) && WORD_AT(STAT+4u)==(b) && WORD_AT(STAT+8u)==(c))
 
 int main(void)
 {
@@ -189,12 +236,14 @@ int main(void)
     CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);
     orig_eax=5;
     CHECK(CALL(pc_mapmaker_robot_nav,fake,0x00293949u,0x46Eu,0,0,1)==5u);
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(0),0,0,1);
+    CHECK(seen_state==0x00123450u);
     set_env("TSFP_MAPMAKER_LIMITS","1");
     set_env("TSFP_MAPMAKER_POOLS","0");                  /* limits need the pools */
     CHECK(level(__LINE__)==0 && nalloc==0);
     set_env("TSFP_MAPMAKER_POOLS",NULL);
 
-    /* ---- level start: the set decides --------------------------------------- */
+    /* ---- level start: the set decides; four state blocks ------------------- */
     container(0x11,without,2);
     CHECK(level(__LINE__)==0 && nalloc==0 && nparts==0);
     CHECK(WORD_AT(0x0078B1DCu)==0x00123450u);                 /* no robot: its pointer untouched */
@@ -209,11 +258,13 @@ int main(void)
     play_scene();
     CHECK(level(__LINE__)==1 && mount_arg==0x0049DC78u && pak_mounted);
     CHECK(seen_parts==0);                                     /* cleared before the stock init */
-    CHECK(nalloc==1 && nparts==1 && rbt_lvl.state==ST && WORD_AT(0x0078B0D0u)==PT);
+    CHECK(nalloc==4 && nparts==1 && WORD_AT(0x0078B0D0u)==PT && alloc_parts==PT);
+    CHECK(rbt_lvl.blocks==4 && rbt_inst[0].state==ST(0) && rbt_inst[1].state==ST(1) && rbt_inst[3].state==ST(3));
+    CHECK(WORD_AT(0x0078B1DCu)==ST(0) && !rbt_lvl.n);           /* outside any robot: the first block */
     container(0x11,without,2);container_extra(with+1,1);      /* slot 11 */
-    CHECK(level(__LINE__)==1 && nalloc==2 && rbt_lvl.state==ST);
+    CHECK(level(__LINE__)==1 && nalloc==8 && rbt_lvl.blocks==4);
     WORD_AT(0x00784014u)=0;                                   /* unreadable container: assumed */
-    CHECK(level(__LINE__)==1 && nalloc==3);
+    CHECK(level(__LINE__)==1 && nalloc==12);
     container(0x11,with,3);
     pak_mounted=1;n=nmount;                                   /* the split Crowe area mounted it */
     WORD_AT(0x006D7880u)=10u;
@@ -225,60 +276,127 @@ int main(void)
     WORD_AT(0x006D7880u)=56u;
     CALL(pc_mapmaker_robot_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==n+1 && pak_mounted);
-    set_parts=PT2;n=nparts;                                   /* the skeleton/walker made the block */
+    set_parts=PT2;n=nparts;level_allocs=0;                    /* the skeleton/walker made the block */
     CALL(pc_mapmaker_robot_level,fake_level,0x0015E81Du,0,0,0,1);
-    CHECK(nparts==n && WORD_AT(0x0078B0D0u)==PT2 && rbt_lvl.state==ST);
+    CHECK(nparts==n && WORD_AT(0x0078B0D0u)==PT2 && rbt_lvl.blocks==4);
     set_parts=0;
-    alloc_ok=0;                                               /* no level memory */
-    WORD_AT(0x0078B1DCu)=0x00123450u;                         /* an earlier level's block */
-    set_parts=PT2;                                            /* the particles exist */
+    alloc_limit=2;level_allocs=0;                             /* memory for two only */
     CALL(pc_mapmaker_robot_level,fake_level,0x0015E81Du,0,0,0,1);
-    CHECK(!rbt_lvl.state);
+    CHECK(rbt_lvl.blocks==2 && rbt_inst[1].state==ST(1) && !rbt_inst[2].state && WORD_AT(0x0078B1DCu)==ST(0));
+    alloc_limit=99;
+    alloc_ok=0;                                               /* no level memory */
+    set_parts=PT2;
+    CALL(pc_mapmaker_robot_level,fake_level,0x0015E81Du,0,0,0,1);
+    CHECK(!rbt_lvl.blocks && !rbt_inst[0].state && !WORD_AT(0x0078B1DCu));
     set_parts=0;
     alloc_ok=2;                                               /* an unusable pointer */
     CALL(pc_mapmaker_robot_level,fake_level,0x0015E81Du,0,0,0,1);
-    CHECK(!rbt_lvl.state);
-    alloc_ok=1;
+    CHECK(!rbt_lvl.blocks);
+    alloc_ok=1;parts_ok=0;                                    /* no particle memory */
+    n=nalloc;
+    CALL(pc_mapmaker_robot_level,fake_level,0x0015E81Du,0,0,0,1);
+    CHECK(!rbt_lvl.blocks && nalloc==n);
+    parts_ok=1;
     container(0x11,with+1,1);                                 /* the robot in slot 1 only */
-    CHECK(level(__LINE__)==1 && rbt_lvl.state==ST);
+    CHECK(level(__LINE__)==1 && rbt_lvl.blocks==4);
     container(0x11,with,3);
     set_env("TSFP_MAPMAKER_REAL_BOSS","0");
     n=nalloc;
     CHECK(level(__LINE__)==0 && nalloc==n);
     set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);
 
-    /* ---- AI start --------------------------------------------------------- */
+    /* ---- AI start: up to four robots, each its own state -------------------- */
     CHECK(level(__LINE__)==1);
     actor(1,0x0C,0x400,0);
     CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(1),0,0,1);
-    CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && !rbt_lvl.record);
+    CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && !rbt_lvl.n);
     actor(2,0x30,0x5F2,1);                                    /* the robot model on another id */
     CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
-    CHECK(seen_class[0]==0 && seen_class[1]==0x80000u && rbt_lvl.record==REC(2) && rbt_lvl.actor==A(2));
-    actor(3,0x42,0x5F2,2);                                    /* a second robot */
-    CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);
-    CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && rbt_lvl.record==REC(2));
+    CHECK(seen_class[0]==0 && seen_class[1]==0x80000u && rbt_lvl.n==1 && rbt_inst[0].record==REC(2) && rbt_inst[0].actor==A(2));
+    rbt_inst[0].statics[1]=77u;
+    for(k=0;k<4u;k++) {                                       /* three more get states; the fifth does not */
+        actor(3+k,0x42,0x5F2,2+k);
+        CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3+k),0,0,1);
+    }
+    CHECK(rbt_lvl.n==4 && rbt_inst[1].record==REC(3) && rbt_inst[3].record==REC(5) && rbt_inst[3].actor==A(5));
+    CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && rbt_lvl.extras==1);   /* robot 5: bot */
     CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);   /* the same one again (restart) */
-    CHECK(seen_class[1]==0x80000u && rbt_lvl.record==REC(2));
-    CHECK(level(__LINE__)==1 && !rbt_lvl.record);              /* a new level forgets it */
+    CHECK(seen_class[1]==0x80000u && rbt_lvl.n==4 && rbt_inst[0].record==REC(2) && !rbt_inst[0].statics[1]);
+    CHECK(level(__LINE__)==1 && !rbt_lvl.n && !rbt_inst[0].record);   /* a new level forgets them */
+    alloc_limit=1;level_allocs=0;                             /* one block: one robot */
+    CALL(pc_mapmaker_robot_level,fake_level,0x0015E81Du,0,0,0,1);
+    alloc_limit=99;
+    actor(3,0x42,0x5F2,0);actor(4,0x42,0x5F2,1);
+    CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);
+    CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(4),0,0,1);
+    CHECK(rbt_lvl.n==1 && seen_class[1]==0);
+    CHECK(level(__LINE__)==1);
+    actor(3,0x42,0x5F2,0);                                    /* its record as spawned again */
     pak_mounted=0;
     CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);
-    CHECK(seen_class[1]==0 && !rbt_lvl.record);
+    CHECK(seen_class[1]==0 && !rbt_lvl.n);
     pak_mounted=1;
-    WORD_AT(0x0078B1DCu)=0x00123450u;                         /* the state is not this level's */
-    CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);
-    CHECK(seen_class[1]==0 && !rbt_lvl.record);
-    WORD_AT(0x0078B1DCu)=ST;
+    alloc_ok=0;level_allocs=0;
+    CALL(pc_mapmaker_robot_level,fake_level,0x0015E81Du,0,0,0,1);
+    alloc_ok=1;
+    CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);   /* no state this level */
+    CHECK(seen_class[1]==0 && !rbt_lvl.n);
+    CHECK(level(__LINE__)==1);
     BYTE_AT(0x007DE455u)=4u;
     CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);
-    CHECK(seen_class[1]==0 && !rbt_lvl.record);
+    CHECK(seen_class[1]==0 && !rbt_lvl.n);
     play_scene();
     set_env("TSFP_MAPMAKER_REAL_BOSS","0");
     CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);
-    CHECK(seen_class[1]==0 && !rbt_lvl.record);
+    CHECK(seen_class[1]==0 && !rbt_lvl.n);
     set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);
     CALL(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);
-    CHECK(seen_class[0]==0 && seen_class[1]==0x80000u && rbt_lvl.record==REC(3));
+    CHECK(seen_class[0]==0 && seen_class[1]==0x80000u && rbt_inst[0].record==REC(3));
+
+    /* ---- the robot's code runs with that robot's globals -------------------- */
+    robot_level(3,__LINE__);                                  /* robots 0..2 on actors 3..5 */
+    statics(0xA0u,0xA1u,0xA2u);                               /* outside values */
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(3),0,0,1);
+    CHECK(seen_state==ST(0) && seen_stat[0]==0 && seen_stat[1]==0 && seen_stat[2]==0);
+    CHECK(WORD_AT(0x0078B1DCu)==ST(0) && STATICS_ARE(0xA0u,0xA1u,0xA2u) && rbt_lvl.cur==-1);
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(4),0,0,1);
+    CHECK(seen_state==ST(1) && seen_stat[0]==0 && seen_stat[2]==0);
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(3),0,0,1);
+    CHECK(seen_state==ST(0) && seen_stat[0]==1u && seen_stat[1]==2u && seen_stat[2]==3u);   /* its own, kept */
+    CALL(pc_mapmaker_robot_message,fake_robot,0x0027D44Cu,ENT(5),2u,0,1);
+    CHECK(seen_state==ST(2) && seen_stat[0]==0);
+    CALL(pc_mapmaker_robot_callback,fake_robot,0x000A5D5Eu,ENT(4),0,0,1);
+    CHECK(seen_state==ST(1) && seen_stat[0]==1u && seen_stat[2]==3u);
+    WORD_AT(0x00575000u)=ENT(5);                              /* hit record: entity at +0 */
+    CALL(pc_mapmaker_robot_damage,fake_robot,0x0009E7A0u,0x00575000u,0,0,1);
+    CHECK(seen_state==ST(2) && seen_stat[0]==1u);
+    CHECK(WORD_AT(0x0078B1DCu)==ST(0) && STATICS_ARE(0xA0u,0xA1u,0xA2u));
+    /* nested: robot 0's code reaches robot 2's messages */
+    nest_ent=ENT(5);
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(3),0,0,2);
+    nest_ent=0;
+    CHECK(seen_state==ST(0) && inner_state==ST(2) && inner_stat[0]==2u && inner_stat[2]==6u);
+    CHECK(seen_after[0]==ST(0) && seen_after[1]==3u && seen_after[2]==6u && seen_after[3]==9u);   /* robot 0's again */
+    CHECK(rbt_inst[2].statics[0]==102u && rbt_inst[0].statics[0]==3u && STATICS_ARE(0xA0u,0xA1u,0xA2u));
+    /* not one of ours: the original as is */
+    actor(9,0x42,0x5F2,9);
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(9),0,0,1);
+    CHECK(seen_state==ST(0) && seen_stat[0]==0xA0u);
+    statics(0xA0u,0xA1u,0xA2u);
+    WORD_AT(A(4)+0xBF0u)=REC(8);                              /* robot 1's pool entry reused */
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(4),0,0,1);
+    CHECK(seen_stat[0]==0xA0u);
+    WORD_AT(A(4)+0xBF0u)=REC(4);
+    statics(0xA0u,0xA1u,0xA2u);
+    actor(8,0x42,0x5F2,8);WORD_AT(A(8)+0xBF0u)=REC(4);        /* another pool entry with robot 1's record */
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(8),0,0,1);
+    CHECK(seen_stat[0]==0xA0u);
+    statics(0xA0u,0xA1u,0xA2u);
+    WORD_AT(0x0079094Cu)=14u;                                 /* mission 10 itself */
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(3),0,0,1);
+    CHECK(seen_stat[0]==0xA0u);
+    play_scene();
+    statics(0xA0u,0xA1u,0xA2u);
 
     /* ---- pads: the seven existence tests get -1 ---------------------------- */
     orig_eax=7;
@@ -291,84 +409,103 @@ int main(void)
     CHECK(CALL(pc_mapmaker_robot_nav,fake,0x00293949u,0x46Eu,0,0,1)==7u);
     play_scene();
 
-    /* ---- death: music, event, removal, explosions --------------------------- */
-    WORD_AT(PLAYER+0xFF4u)=ENT(3);
+    /* ---- death: music, event, removal of the robot that died, explosions ---- */
+    WORD_AT(PLAYER+0xFF4u)=ENT(4);
     CALL(pc_mapmaker_robot_music,fake,0x00255E9Du,0u,0,0,1);                 /* the tank's: stock */
     CALL(pc_mapmaker_robot_music,fake,0x002944D9u,0u,0,0,0);
     WORD_AT(0x0079094Cu)=14u;
     CALL(pc_mapmaker_robot_music,fake,0x002944D9u,0u,0,0,1);
     play_scene();
-    /* explosions only while dying, before the removal */
+    /* explosions only while one is dying, before its removal */
     n=ndraw;
     CALL(pc_mapmaker_robot_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==n);
-    WORD_AT(ST+0x48u)=1u;
+    WORD_AT(ST(1)+0x48u)=1u;                                  /* robot 1 dies */
     CALL(pc_mapmaker_robot_fx,fake,0x001CEE87u,0,0,0,1);                    /* another caller */
     CHECK(ndraw==n);
     CALL(pc_mapmaker_robot_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==n+1 && draw_args[0]==0x00515000u && draw_args[1]==0x40200000u && nmode==1 && mode_arg==1u);
+    WORD_AT(ST(2)+0x48u)=1u;                                  /* robot 2 too: still one draw a frame */
+    CALL(pc_mapmaker_robot_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(ndraw==n+2);
+    WORD_AT(ST(2)+0x48u)=0;
     WORD_AT(0x00790950u)=2u;                                  /* split screen: stock draws none */
     CALL(pc_mapmaker_robot_fx,fake,0x001CEE8Cu,0,0,0,1);
-    CHECK(ndraw==n+1);
+    CHECK(ndraw==n+2);
     WORD_AT(0x00790950u)=1u;
-    WORD_AT(0x0078B1DCu)=0x00123450u;                         /* not this level's state */
-    CALL(pc_mapmaker_robot_fx,fake,0x001CEE8Cu,0,0,0,1);
-    CHECK(ndraw==n+1);
-    WORD_AT(0x0078B1DCu)=ST;
     WORD_AT(0x0079094Cu)=14u;
     CALL(pc_mapmaker_robot_fx,fake,0x001CEE8Cu,0,0,0,1);
-    CHECK(ndraw==n+1);
+    CHECK(ndraw==n+2);
     play_scene();
-    /* the event: another boss's stays, the robot's is dropped and it is removed */
+    /* the event: another boss's stays; a robot's is dropped and that robot removed */
     CALL(pc_mapmaker_robot_event,fake,0x0029E068u,3u,0,0,1);
     CHECK(nremove==0);
     WORD_AT(0x0079094Cu)=14u;
     CALL(pc_mapmaker_robot_event,fake,0x002944E5u,2u,0x3F000000u,0,1);
     CHECK(nremove==0);
     play_scene();
-    CALL(pc_mapmaker_robot_event,fake,0x002944E5u,2u,0x3F000000u,0,0);
-    CHECK(nremove==1 && remove_arg==ENT(3) && WORD_AT(PLAYER+0xFF4u)==0 && rbt_lvl.removed);
-    CALL(pc_mapmaker_robot_event,fake,0x002944E5u,2u,0x3F000000u,0,0);
+    dies_now=1;
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(4),0,0,1);   /* robot 1's own frame */
+    CHECK(nremove==1 && remove_arg==ENT(4) && WORD_AT(PLAYER+0xFF4u)==0 && rbt_inst[1].removed && !rbt_inst[0].removed);
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(4),0,0,1);
     CHECK(nremove==1);                                        /* once */
+    dies_now=0;
+    CALL(pc_mapmaker_robot_event,fake,0x002944E5u,2u,0x3F000000u,0,0);   /* outside any robot: dropped only */
+    CHECK(nremove==1 && !rbt_inst[0].removed && !rbt_inst[2].removed);
     n=ndraw;
     CALL(pc_mapmaker_robot_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==n);                                          /* gone: no frozen particles */
-    /* a soft restart resets the state */
+    WORD_AT(ST(2)+0x48u)=1u;                                  /* but another dying robot draws */
+    CALL(pc_mapmaker_robot_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(ndraw==n+1);
+    WORD_AT(PLAYER+0xFF4u)=ENT(3);dies_now=1;                 /* robot 2 dies, robot 0 has the focus */
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(5),0,0,1);
+    dies_now=0;
+    CHECK(nremove==2 && remove_arg==ENT(5) && WORD_AT(PLAYER+0xFF4u)==ENT(3) && !rbt_inst[0].removed);
+    dies_now=2;                                               /* robot 0 dies, its pool entry reused meanwhile */
+    CALL(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ENT(3),0,0,1);
+    dies_now=0;
+    CHECK(nremove==2 && rbt_inst[0].removed);
+    WORD_AT(A(3)+0xBF0u)=REC(3);
+    /* a soft restart resets every robot's state and statics */
     n=nreset;
     WORD_AT(0x0079094Cu)=14u;
     CALL(pc_mapmaker_robot_reset,fake,0x001CDD79u,0,0,0,1);
     CHECK(nreset==n);
     play_scene();
+    WORD_AT(ST(1)+0x48u)=1u;WORD_AT(ST(3)+0x48u)=1u;
     CALL(pc_mapmaker_robot_reset,fake,0x001CDD79u,0,0,0,1);
-    CHECK(nreset==n+1 && !rbt_lvl.removed && WORD_AT(ST+0x48u)==0);
-    WORD_AT(0x0078B1DCu)=0x00123450u;
-    CALL(pc_mapmaker_robot_reset,fake,0x001CDD79u,0,0,0,1);
-    CHECK(nreset==n+1);
-    WORD_AT(0x0078B1DCu)=ST;
-    /* the focus moved on before the removal: it is not cleared */
-    robot_level(__LINE__);
-    WORD_AT(PLAYER+0xFF4u)=ENT(1);
-    n=nremove;
-    CALL(pc_mapmaker_robot_event,fake,0x002944E5u,2u,0x3F000000u,0,0);
-    CHECK(nremove==n+1 && WORD_AT(PLAYER+0xFF4u)==ENT(1));
+    CHECK(nreset==n+4 && reset_seen[n]==ST(0) && reset_seen[n+1]==ST(1) && reset_seen[n+3]==ST(3));
+    CHECK(!rbt_inst[1].removed && !rbt_inst[2].removed && WORD_AT(ST(1)+0x48u)==0 && WORD_AT(ST(3)+0x48u)==0);
+    CHECK(!rbt_inst[0].statics[0] && !rbt_inst[2].statics[0] && WORD_AT(0x0078B1DCu)==ST(0));
+    robot_level(0,__LINE__);
+    n=nreset;
+    CALL(pc_mapmaker_robot_reset,fake,0x001CDD79u,0,0,0,1);   /* states but no robot yet: reset too */
+    CHECK(nreset==n+4);
+    container(0x11,without,2);level(__LINE__);
+    n=nreset;
+    CALL(pc_mapmaker_robot_reset,fake,0x001CDD79u,0,0,0,1);   /* no robot map */
+    CHECK(nreset==n);
 
-    /* ---- the stock bar is never drawn for the robot ------------------------- */
-    robot_level(__LINE__);
+    /* ---- the stock bar is never drawn for any of the robots ------------------- */
+    robot_level(5,__LINE__);                                  /* robots on 3..6; actor 7 a bot */
     WORD_AT(PLAYER+0xFF4u)=ENT(3);
     CALL(pc_mapmaker_robot_hud,fake_hud,0x0014F25Bu,0,0,0,1);
     CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(3));
-    WORD_AT(ENT(6)+0x7Cu)=A(3);HALF_AT(ENT(6)+0x94u)=0x400u;  /* not the robot's model */
     WORD_AT(PLAYER+0xFF4u)=ENT(6);
     CALL(pc_mapmaker_robot_hud,fake_hud,0x0014F25Bu,0,0,0,1);
-    CHECK(seen_focus==ENT(6));
-    actor(4,0x15,0x5BE,3);                                    /* another boss */
-    WORD_AT(PLAYER+0xFF4u)=ENT(4);
+    CHECK(seen_focus==0 && WORD_AT(PLAYER+0xFF4u)==ENT(6));
+    WORD_AT(ENT(9)+0x7Cu)=A(3);HALF_AT(ENT(9)+0x94u)=0x400u;  /* not the robot's model */
+    WORD_AT(PLAYER+0xFF4u)=ENT(9);
     CALL(pc_mapmaker_robot_hud,fake_hud,0x0014F25Bu,0,0,0,1);
-    CHECK(seen_focus==ENT(4));
-    actor(5,0x42,0x5F2,4);                                    /* a second robot (bot class) */
-    WORD_AT(PLAYER+0xFF4u)=ENT(5);
+    CHECK(seen_focus==ENT(9));
+    actor(1,0x15,0x5BE,3);                                    /* another boss */
+    WORD_AT(PLAYER+0xFF4u)=ENT(1);
     CALL(pc_mapmaker_robot_hud,fake_hud,0x0014F25Bu,0,0,0,1);
-    CHECK(seen_focus==ENT(5));
+    CHECK(seen_focus==ENT(1));
+    WORD_AT(PLAYER+0xFF4u)=ENT(7);                            /* the fifth robot (bot class) */
+    CALL(pc_mapmaker_robot_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+    CHECK(seen_focus==ENT(7));
     WORD_AT(PLAYER+0xFF4u)=ENT(3);
     WORD_AT(0x0079094Cu)=14u;
     CALL(pc_mapmaker_robot_hud,fake_hud,0x0014F25Bu,0,0,0,1);

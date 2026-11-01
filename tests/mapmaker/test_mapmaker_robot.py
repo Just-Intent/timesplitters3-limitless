@@ -27,55 +27,45 @@ MUTATIONS = {
     'any-scene': ('    return rbt_on() && WORD_AT(RBT_SCENE)==100u && RBT_B(RBT_MODE)==10u;', '    return rbt_on() && RBT_B(RBT_MODE)==10u;'),
     'wrong-pak': ('#define RBT_PAK 0x0049DC78u', '#define RBT_PAK 0x0049DB98u'),
     'wrong-id': ('#define RBT_ID 0x42u ', '#define RBT_ID 0xA8u '),
-    'mount-any-map': ('    if(!rbt_play() || rbt.optout || (has=rbt_map_has())==0) return;\n    if(rbt_pak',
-                      '    if(!rbt_play() || rbt.optout || ((has=rbt_map_has()),0)) return;\n    if(rbt_pak'),
-    'mount-ignores-optout': ('    if(!rbt_play() || rbt.optout || (has=rbt_map_has())==0) return;\n    if(rbt_pak',
-                             '    if(!rbt_play() || (has=rbt_map_has())==0) return;\n    if(rbt_pak'),
+    'mount-any-map': ('    if(!rbt_play() || rbt.optout || (has=rbt_map_has())==0) return;\n    if(rbt_pak', '    if(!rbt_play() || rbt.optout || ((has=rbt_map_has()),0)) return;\n    if(rbt_pak'),
+    'mount-ignores-optout': ('    if(!rbt_play() || rbt.optout || (has=rbt_map_has())==0) return;\n    if(rbt_pak', '    if(!rbt_play() || (has=rbt_map_has())==0) return;\n    if(rbt_pak'),
     'mount-twice': ('    if(rbt_pak_mounted()) { rbt_log("lv14.pak already mounted",0,(uint32_t)has);return; }\n', ''),
     'mount-fills-table': ('#define RBT_MOUNT_KEEP 8u', '#define RBT_MOUNT_KEEP 0u'),
-    'mount-before-original': ('    int has;\n    uint32_t mounted;\n    original();\n',
-                              '    int has;\n    uint32_t mounted;\n    guest_call(sub_0005A130,1,RBT_PAK);original();\n'),
+    'mount-before-original': ('    int has;\n    uint32_t mounted;\n    original();\n', '    int has;\n    uint32_t mounted;\n    guest_call(sub_0005A130,1,RBT_PAK);original();\n'),
     'set-preset': ('    if(RBT_H(info+RBT_INFO_SET)!=RBT_SET_MAP) return 0;   /* a preset or profile set */\n', ''),
     'set-skips-slot-1': ('    for(k=0;k<n;k++) if(RBT_H(info', '    for(k=1;k<n;k++) if(RBT_H(info'),
     'set-skips-slots-11-20': ('    for(k=0;extra && k<RBT_B(extra+3u);k++)', '    for(k=0;0 && extra && k<RBT_B(extra+3u);k++)'),
     'set-extra-offset': ('if(RBT_H(extra+4u+k*4u)==RBT_ID) return 1;', 'if(RBT_H(extra+2u+k*4u)==RBT_ID) return 1;'),
-    'set-unreadable-skipped': ('    if(!container || !MAPMAKER_PTR_OK(container,RBT_SCAN) || WORD_AT(container)!=RBT_MAGIC) return -1;',
-                               '    if(!container || !MAPMAKER_PTR_OK(container,RBT_SCAN) || WORD_AT(container)!=RBT_MAGIC) return 0;'),
+    'set-unreadable-skipped': ('    if(!container || !MAPMAKER_PTR_OK(container,RBT_SCAN) || WORD_AT(container)!=RBT_MAGIC) return -1;', '    if(!container || !MAPMAKER_PTR_OK(container,RBT_SCAN) || WORD_AT(container)!=RBT_MAGIC) return 0;'),
     'level-keeps-parts': ('    if(play) WORD_AT(RBT_PARTS)=0;', '    if(0) WORD_AT(RBT_PARTS)=0;'),
     'level-clears-parts-anywhere': ('    if(play) WORD_AT(RBT_PARTS)=0;', '    WORD_AT(RBT_PARTS)=0;'),
-    'level-keeps-robot': ('    memset(&rbt_lvl,0,sizeof rbt_lvl);                /* a new level', '    rbt_lvl.state=0;                /* a new level'),
-    'level-any-map': ('    if(!play || (has=rbt_map_has())==0) return;\n    WORD_AT(RBT_STATE)=0;', '    if(!play || ((has=rbt_map_has()),0)) return;\n    WORD_AT(RBT_STATE)=0;'),
-    'level-stale-state': ('    WORD_AT(RBT_STATE)=0;                              /* stale', '                                  /* stale'),
+    'level-keeps-robot': ('    memset(&rbt_lvl,0,sizeof rbt_lvl);                /* a new level', '    rbt_lvl.cur=0;                /* a new level'),
+    'level-any-map': ('    if(!play || (has=rbt_map_has())==0) return;\n    if(!WORD_AT(RBT_PARTS))', '    if(!play || ((has=rbt_map_has()),0)) return;\n    if(!WORD_AT(RBT_PARTS))'),
+    'level-stale-state': ('        WORD_AT(RBT_STATE)=0;                          /* stale pointer of an earlier level */\n', ''),
     'level-second-parts': ('    if(!WORD_AT(RBT_PARTS)) guest_call(sub_002A62C0,0);', '    guest_call(sub_002A62C0,0);'),
     'level-no-parts': ('    if(!WORD_AT(RBT_PARTS)) guest_call(sub_002A62C0,0);', '    if(0) guest_call(sub_002A62C0,0);'),
-    'level-unchecked': ('    if(!st || !pt || !MAPMAKER_PTR_OK', '    if(0 && !MAPMAKER_PTR_OK'),
+    'level-unchecked': ('        if(!st || !MAPMAKER_PTR_OK(st,RBT_STATE_SIZE)) break;', '        if(!st) break;'),
     'class-value': ('#define RBT_CLASS 0x80000u', '#define RBT_CLASS 0x100000u'),
-    'class-after-original': ('        WORD_AT(rec)=0;WORD_AT(rec+4u)=RBT_CLASS;\n',
-                             '        original();WORD_AT(rec)=0;WORD_AT(rec+4u)=RBT_CLASS;g_esp-=4u;\n'),
+    'class-after-original': ('        WORD_AT(rec)=0;WORD_AT(rec+4u)=RBT_CLASS;\n', '        original();WORD_AT(rec)=0;WORD_AT(rec+4u)=RBT_CLASS;g_esp-=4u;\n'),
     'class-keeps-lo': ('        WORD_AT(rec)=0;WORD_AT(rec+4u)=RBT_CLASS;', '        WORD_AT(rec+4u)=RBT_CLASS;'),
-    'class-any-character': ("    if(RBT_H(a+RBT_ACTOR_CHAR)!=RBT_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && RBT_H(ent+RBT_ENT_MODEL)==RBT_MODEL)) { original();return; }\n", ''),
-    'class-char-only': ('    if(RBT_H(a+RBT_ACTOR_CHAR)!=RBT_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && RBT_H(ent+RBT_ENT_MODEL)==RBT_MODEL))',
-                        '    if(RBT_H(a+RBT_ACTOR_CHAR)!=RBT_ID)'),
+    'class-any-character': ('    if(RBT_H(a+RBT_ACTOR_CHAR)!=RBT_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && RBT_H(ent+RBT_ENT_MODEL)==RBT_MODEL)) { original();return; }\n', ''),
+    'class-char-only': ('    if(RBT_H(a+RBT_ACTOR_CHAR)!=RBT_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && RBT_H(ent+RBT_ENT_MODEL)==RBT_MODEL))', '    if(RBT_H(a+RBT_ACTOR_CHAR)!=RBT_ID)'),
     'class-without-pak': ('    else if(!rbt_pak_mounted()) rbt_log', '    else if(0) rbt_log'),
-    'class-without-state': ('    else if(!rbt_lvl.state || WORD_AT(RBT_STATE)!=rbt_lvl.state) rbt_log', '    else if(0) rbt_log'),
-    'class-stale-state': ('    else if(!rbt_lvl.state || WORD_AT(RBT_STATE)!=rbt_lvl.state) rbt_log', '    else if(!rbt_lvl.state) rbt_log'),
-    'class-two-robots': ('    else if(rbt_lvl.record && rbt_lvl.record!=rec) {', '    else if(0) {'),
     'class-ignores-optout': ('    if(rbt.optout) rbt_log("TSFP_MAPMAKER_REAL_BOSS=0', '    if(0) rbt_log("TSFP_MAPMAKER_REAL_BOSS=0'),
-    'class-no-actor': ('        rbt_lvl.record=rec;rbt_lvl.actor=a;rbt_lvl.removed=0;', '        rbt_lvl.record=rec;rbt_lvl.removed=0;'),
+    'class-no-actor': ('        rbt_inst[k].record=rec;rbt_inst[k].actor=a;rbt_inst[k].removed=0;', '        rbt_inst[k].record=rec;rbt_inst[k].removed=0;'),
     'nav-any-caller': ('    if(k==sizeof rbt_nav_rets/sizeof rbt_nav_rets[0] || WORD_AT', '    if(WORD_AT'),
     'nav-missing-site': ('0x00293C64u,0x00293C9Eu,0x00293CD0u};', '0x00293C64u,0x00293C9Eu,0x00293CE5u};'),
     'nav-any-scene': ('    if(k==sizeof rbt_nav_rets/sizeof rbt_nav_rets[0] || WORD_AT(RBT_SCENE)!=100u || !rbt_on())', '    if(k==sizeof rbt_nav_rets/sizeof rbt_nav_rets[0] || !rbt_on())'),
     'nav-found': ('    g_eax=0xFFFFFFFFu;\n    MAPMAKER_GUEST_RET();\n}', '    g_eax=0u;\n    MAPMAKER_GUEST_RET();\n}'),
     'nav-no-ret': ('    g_eax=0xFFFFFFFFu;\n    MAPMAKER_GUEST_RET();\n}', '    g_eax=0xFFFFFFFFu;\n}'),
-    'music-kept': ('    if(!rbt_lvl.music++) rbt_log("giant robot death: music change dropped (the map keeps its track)",WORD_AT(g_esp+4u),0);\n    MAPMAKER_GUEST_RET();',
-                   '    original();'),
+    'music-kept': ('    if(!rbt_lvl.music++) rbt_log("giant robot death: music change dropped (the map keeps its track)",WORD_AT(g_esp+4u),0);\n    MAPMAKER_GUEST_RET();', '    original();'),
     'music-any-caller': ('|| WORD_AT(g_esp)!=RBT_RET_MUSIC ', ''),
     'music-any-scene': ('WORD_AT(g_esp)!=RBT_RET_MUSIC || WORD_AT(RBT_SCENE)!=100u', 'WORD_AT(g_esp)!=RBT_RET_MUSIC'),
-    'event-kept': ('    rbt_remove();\n    MAPMAKER_GUEST_RET();\n}', '    rbt_remove();\n    original();\n}'),
+    'event-kept': ('    if(rbt_lvl.cur>=0) rbt_remove((unsigned)rbt_lvl.cur);\n    MAPMAKER_GUEST_RET();', '    if(rbt_lvl.cur>=0) rbt_remove((unsigned)rbt_lvl.cur);\n    original();'),
     'event-any-caller': ('|| WORD_AT(g_esp)!=RBT_RET_EVENT ', ''),
     'event-any-scene': ('WORD_AT(g_esp)!=RBT_RET_EVENT || WORD_AT(RBT_SCENE)!=100u', 'WORD_AT(g_esp)!=RBT_RET_EVENT'),
-    'event-not-removed': ('    rbt_remove();\n    MAPMAKER_GUEST_RET();', '    MAPMAKER_GUEST_RET();'),
-    'remove-twice': ('    rbt_lvl.actor=0;rbt_lvl.removed=1;', '    rbt_lvl.removed=1;'),
+    'event-not-removed': ('    if(rbt_lvl.cur>=0) rbt_remove((unsigned)rbt_lvl.cur);\n', ''),
+    'remove-twice': ('    if(rbt_inst[k].removed) return;\n', ''),
     'remove-focus-kept': ('WORD_AT(player+RBT_FOCUS)==ent) WORD_AT(player+RBT_FOCUS)=0;', 'WORD_AT(player+RBT_FOCUS)==ent) {}'),
     'remove-focus-any': ('    if(MAPMAKER_PTR_OK(player,RBT_FOCUS+4u) && WORD_AT(player+RBT_FOCUS)==ent) WORD_AT', '    if(MAPMAKER_PTR_OK(player,RBT_FOCUS+4u)) WORD_AT'),
     'fx-missing': ('    guest_call(sub_002A7F30,2,WORD_AT(cam+RBT_CAMERA_VIEW),RBT_FX_SCALE);\n', ''),
@@ -83,24 +73,54 @@ MUTATIONS = {
     'fx-scale': ('#define RBT_FX_SCALE 0x40200000u', '#define RBT_FX_SCALE 0x3F800000u'),
     'fx-view': ('WORD_AT(cam+RBT_CAMERA_VIEW),RBT_FX_SCALE', 'cam,RBT_FX_SCALE'),
     'fx-any-caller': ('MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==RBT_RET_FX;', 'MAPMAKER_STACK_OK(4);'),
-    'fx-alive': (' || WORD_AT(rbt_lvl.state+RBT_DYING)!=1u) return;', ') return;'),
-    'fx-after-removal': ('    if(!here || rbt_lvl.removed || !rbt_live()', '    if(!here || !rbt_live()'),
+    'fx-alive': (' && WORD_AT(rbt_inst[k].state+RBT_DYING)==1u) return 1;', ') return 1;'),
+    'fx-after-removal': ('        if(!rbt_inst[k].removed && MAPMAKER_PTR_OK(rbt_inst[k].state', '        if(MAPMAKER_PTR_OK(rbt_inst[k].state'),
     'fx-split-screen': ('    if(RBT_B(RBT_MODE)==10u && (int32_t)WORD_AT(RBT_PLAYERS)>1) return;', ''),
-    'live-stale-state': ('    return rbt_lvl.record && rbt_lvl.state && WORD_AT(RBT_STATE)==rbt_lvl.state && WORD_AT',
-                         '    return rbt_lvl.record && rbt_lvl.state && WORD_AT'),
-    'live-any-scene': ('WORD_AT(RBT_STATE)==rbt_lvl.state && WORD_AT(RBT_SCENE)==100u && rbt_on();', 'WORD_AT(RBT_STATE)==rbt_lvl.state && rbt_on();'),
     'reset-missing': ('    guest_call(sub_00292550,0);\n', ''),
-    'reset-any-scene': ('WORD_AT(RBT_STATE)!=rbt_lvl.state || WORD_AT(RBT_SCENE)!=100u || !rbt_on()) return;\n    guest_call(sub_00292550',
-                        'WORD_AT(RBT_STATE)!=rbt_lvl.state || !rbt_on()) return;\n    guest_call(sub_00292550'),
-    'reset-stale': ('    if(!rbt_lvl.state || WORD_AT(RBT_STATE)!=rbt_lvl.state || WORD_AT(RBT_SCENE)!=100u || !rbt_on()) return;\n    guest_call(sub_00292550',
-                    '    if(!rbt_lvl.state || WORD_AT(RBT_SCENE)!=100u || !rbt_on()) return;\n    guest_call(sub_00292550'),
-    'reset-keeps-removed': ('    guest_call(sub_00292550,0);\n    rbt_lvl.removed=0;', '    guest_call(sub_00292550,0);'),
+    'reset-any-scene': ('    if(!rbt_lvl.blocks || WORD_AT(RBT_SCENE)!=100u || !rbt_on()) return;', '    if(!rbt_lvl.blocks || !rbt_on()) return;'),
+    'reset-keeps-removed': ('        rbt_inst[k].removed=0;\n    }', '    }'),
     'hud-own-bar': ('    WORD_AT(player+RBT_FOCUS)=0;                     /* never the stock bar', '    (void)0;                     /* never the stock bar'),
     'hud-keeps-cleared': ('    original();\n    WORD_AT(player+RBT_FOCUS)=focus;\n}', '    original();\n}'),
-    'hud-any-robot': ('       WORD_AT(a+RBT_ACTOR_RECORD)!=rbt_lvl.record || !rbt_play())', '       !rbt_play())'),
+    'hud-any-robot': ('    if(k==rbt_lvl.n) { original();return; }\n    WORD_AT(player+RBT_FOCUS)=0;', '    WORD_AT(player+RBT_FOCUS)=0;'),
     'hud-any-model': ('       RBT_H(focus+RBT_ENT_MODEL)!=RBT_MODEL || !MAPMAKER_PTR_OK', '       !MAPMAKER_PTR_OK'),
-    'hud-any-scene': ('       WORD_AT(a+RBT_ACTOR_RECORD)!=rbt_lvl.record || !rbt_play())', '       WORD_AT(a+RBT_ACTOR_RECORD)!=rbt_lvl.record || !rbt_on())'),
+    'hud-any-scene': ('RBT_ACTOR) || !rbt_play()) { original();return; }', 'RBT_ACTOR) || !rbt_on()) { original();return; }'),
+    'level-one-block': ('    for(k=0;k<RBT_MAX;k++) {\n        WORD_AT(RBT_STATE)=0;', '    for(k=0;k<1u;k++) {\n        WORD_AT(RBT_STATE)=0;'),
+    'level-outside-last': ('    WORD_AT(RBT_STATE)=rbt_inst[0].state;              /* outside any robot', '    (void)0;              /* outside any robot'),
+    'level-parts-unchecked': ('    if(!pt || !MAPMAKER_PTR_OK(pt,RBT_PARTS_SIZE)) { rbt_log', '    if(0) { rbt_log'),
+    'level-keeps-instances': ('    memset(rbt_inst,0,sizeof rbt_inst);\n', ''),
+    'class-beyond-blocks': ('    else if(k==rbt_lvl.n && rbt_lvl.n>=rbt_lvl.blocks) {', '    else if(k==rbt_lvl.n && rbt_lvl.n>=RBT_MAX) {'),
+    'class-one-robot': ('    else if(k==rbt_lvl.n && rbt_lvl.n>=rbt_lvl.blocks) {', '    else if(k==rbt_lvl.n && rbt_lvl.n>=1u) {'),
+    'class-restart-new-slot': ('    for(k=0;k<rbt_lvl.n && rbt_inst[k].record!=rec;k++) {}\n    if(rbt.optout)', '    k=rbt_lvl.n;\n    if(rbt.optout)'),
+    'class-stale-statics': ('        memset(rbt_inst[k].statics,0,sizeof rbt_inst[k].statics);\n        rbt_log("giant robot gets', '        rbt_log("giant robot gets'),
+    'swap-none': ('    rbt_swapped(original,WORD_AT(g_esp+4u));\n}\n/* WRAP sub_00294520', '    original();\n}\n/* WRAP sub_00294520'),
+    'swap-no-message': ('    rbt_swapped(original,WORD_AT(g_esp+4u));\n}\n/* WRAP sub_002926B0', '    original();\n}\n/* WRAP sub_002926B0'),
+    'swap-no-callback': ('    rbt_swapped(original,WORD_AT(g_esp+4u));\n}\n/* WRAP sub_002936C0', '    original();\n}\n/* WRAP sub_002936C0'),
+    'swap-no-damage': ('    rbt_swapped(original,WORD_AT(r));', '    original();'),
+    'swap-damage-record': ('    rbt_swapped(original,WORD_AT(r));', '    rbt_swapped(original,r);'),
+    'swap-no-state': ('    WORD_AT(RBT_STATE)=rbt_inst[k].state;\n    prev=', '    prev='),
+    'swap-state-kept': ('    WORD_AT(RBT_STATE)=keep[0];\n    rbt_lvl.swaps++;', '    rbt_lvl.swaps++;'),
+    'swap-no-statics': ('keep[1u+i]=WORD_AT(RBT_STATICS+i*4u);WORD_AT(RBT_STATICS+i*4u)=rbt_inst[k].statics[i]; }', 'keep[1u+i]=WORD_AT(RBT_STATICS+i*4u); }'),
+    'swap-statics-lost': ('rbt_inst[k].statics[i]=WORD_AT(RBT_STATICS+i*4u);WORD_AT(RBT_STATICS+i*4u)=keep[1u+i]; }', 'WORD_AT(RBT_STATICS+i*4u)=keep[1u+i]; }'),
+    'swap-statics-leak': ('rbt_inst[k].statics[i]=WORD_AT(RBT_STATICS+i*4u);WORD_AT(RBT_STATICS+i*4u)=keep[1u+i]; }', 'rbt_inst[k].statics[i]=WORD_AT(RBT_STATICS+i*4u); }'),
+    'swap-two-statics': ('#define RBT_STATICS_N 3u', '#define RBT_STATICS_N 2u'),
+    'swap-wrong-statics': ('#define RBT_STATICS 0x0075F5ECu', '#define RBT_STATICS 0x0075F5E8u'),
+    'swap-cur-kept': ('    rbt_lvl.cur=prev;\n', ''),
+    'swap-no-cur': ('    prev=rbt_lvl.cur;rbt_lvl.cur=k;', '    prev=rbt_lvl.cur;'),
+    'find-any-actor': ('if(rbt_inst[k].actor==a && rbt_inst[k].record==rec) return (int)k;', 'if(rbt_inst[k].record==rec) return (int)k;'),
+    'find-any-record': ('if(rbt_inst[k].actor==a && rbt_inst[k].record==rec) return (int)k;', 'if(rbt_inst[k].actor==a) return (int)k;'),
+    'find-any-scene': ('       WORD_AT(RBT_SCENE)!=100u || !rbt_on()) return -1;', '       !rbt_on()) return -1;'),
+    'find-first-only': ('    for(k=0;k<rbt_lvl.n;k++) if(rbt_inst[k].actor==a', '    for(k=0;k<1u && k<rbt_lvl.n;k++) if(rbt_inst[k].actor==a'),
+    'event-removes-first': ('    if(rbt_lvl.cur>=0) rbt_remove((unsigned)rbt_lvl.cur);', '    rbt_remove(0u);'),
+    'remove-unchecked': ('    if(!MAPMAKER_PTR_OK(a,RBT_ACTOR) || WORD_AT(a+RBT_ACTOR_RECORD)!=rbt_inst[k].record ||', '    if(!MAPMAKER_PTR_OK(a,RBT_ACTOR) ||'),
+    'fx-first-only': ('    for(k=0;k<rbt_lvl.n;k++)\n        if(!rbt_inst[k].removed', '    for(k=0;k<1u && k<rbt_lvl.n;k++)\n        if(!rbt_inst[k].removed'),
+    'fx-any-scene': ('    if(!here || WORD_AT(RBT_SCENE)!=100u || !rbt_on() || !rbt_any_dying()) return;', '    if(!here || !rbt_on() || !rbt_any_dying()) return;'),
+    'reset-first-only': ('    for(k=0;k<rbt_lvl.blocks;k++) {\n        WORD_AT(RBT_STATE)=rbt_inst[k].state;', '    for(k=0;k<1u;k++) {\n        WORD_AT(RBT_STATE)=rbt_inst[k].state;'),
+    'reset-one-state': ('        WORD_AT(RBT_STATE)=rbt_inst[k].state;\n        guest_call(sub_00292550,0);', '        guest_call(sub_00292550,0);'),
+    'reset-keeps-statics': ('        memset(rbt_inst[k].statics,0,sizeof rbt_inst[k].statics);\n        rbt_inst[k].removed=0;', '        rbt_inst[k].removed=0;'),
+    'reset-pointer-kept': ('    WORD_AT(RBT_STATE)=keep;\n    if(rbt_lvl.resets', '    if(rbt_lvl.resets'),
+    'hud-first-only': ('    for(k=0;k<rbt_lvl.n && rbt_inst[k].record!=rec;k++) {}\n    if(k==rbt_lvl.n) { original();return; }', '    for(k=0;k<1u && k<rbt_lvl.n && rbt_inst[k].record!=rec;k++) {}\n    if(k==rbt_lvl.n || rbt_inst[k].record!=rec) { original();return; }'),
 }
+
 
 
 def build(tmp_path, mutation):
@@ -381,3 +401,45 @@ def test_robot_bar_label_site():
     a = by_address()
     assert ('imm', 0x163D) in a[0x0014D076].ops and target(a[0x0014D07B]) == 0x0003D7B0
     assert mem(a[0x0014D086])[0][4] == 0xFF4 and target(a[0x0014D0B1]) == 0x00139740
+
+
+def test_robot_per_instance_globals():
+    """The facts the multi-robot swap relies on: which globals are the robot's
+    own, every way into the code that reads them, and a fresh block per call."""
+    a = by_address()
+
+    def users(value):
+        return {i.function for i in decoded() if any(v == value for _, v in i.values())}
+    robot = {0x00292550, 0x00292630, 0x00292650, 0x002926B0, 0x00292BF0, 0x00293100, 0x00293660,
+             0x002936C0, HANDLER, MESSAGE}
+    # the state pointer: robot code only
+    assert users(0x0078B1DC) == robot
+    # the three statics: the shot counter in sub_00293100, the two timers in the handler
+    assert users(0x0075F5EC) == {0x00293100}
+    assert users(0x0075F5F0) == {HANDLER}
+    assert users(0x0075F5F4) == {HANDLER, 0x002B26F0}       # also a table base elsewhere (index * 4)
+    assert all('*4' in i.text.replace(' ', '') for i in decoded()
+               if i.function == 0x002B26F0 and any(v == 0x0075F5F4 for _, v in i.values()))
+    # the robot never touches the split Crowe's block pointer next to them
+    assert not users(0x0075F5E8) & robot
+    # every state reader is reached only through the four wrapped entries (or the
+    # scene-14 reset / draw and the allocation)
+    callers = {f: {i.function for i in decoded() if (i.call or i.mnemonic == 'jmp') and target(i) == f}
+               for f in robot}
+    assert callers[HANDLER] == {0x0027D590} and calls(HANDLER) == {0x0027DE18}
+    assert callers[MESSAGE] == {0x0027CEF0} and calls(MESSAGE) == {0x0027D447}
+    assert callers[0x00292BF0] == {HANDLER} and callers[0x00293660] == {HANDLER} and callers[0x00293100] == {0x00293660}
+    assert callers[0x00292550] == {0x0025F6A0, 0x00292630} and callers[0x00292650] == {0x001CEBC0}
+    assert not callers[0x002926B0] and not callers[0x002936C0]               # callbacks: pushed, not called
+    pushed = {f: {i.address for i in decoded() if i.mnemonic == 'push' and ('imm', f) in i.ops} for f in (0x002926B0, 0x002936C0)}
+    assert pushed == {0x002926B0: {0x002938EE}, 0x002936C0: {0x00293923}}
+    assert target(a[0x002938FA]) == 0x000A5CE0 and target(a[0x00293929]) == 0x0009E720
+    # entity arguments: handler, message handler and slot callback take it first; the damage record holds it at +0
+    assert mem(a[0x00294545])[0][4] == 0x40 and ('imm', 0x34) in a[0x00294524].ops       # 0x34 frame + 2 pushes
+    assert mem(a[0x002926BF])[0][4] == 0xE8 and ('imm', 0xE0) in a[0x002926B0].ops       # 0xE0 frame + 1 push
+    assert mem(a[0x002936C0])[0][4] == 4 and mem(a[0x002936C4])[0] [1] == 'eax'
+    # sub_00292630: a fresh 0x4C block from the level heap on every call, then sub_00292550
+    assert ('imm', 0x4C) in a[0x00292632].ops and target(a[0x00292634]) == 0x0003DFA0
+    assert mem(a[0x0029263C])[0][4] == 0x0078B1DC and a[0x00292641].mnemonic == 'jmp' and target(a[0x00292641]) == 0x00292550
+    # the intro re-arms the shared particle pool (sub_002A65A0), one reason it stays shared
+    assert target(a[0x0029387F]) == 0x002A62F0 and target(a[0x00293887]) == 0x002A65A0
