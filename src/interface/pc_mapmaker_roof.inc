@@ -112,7 +112,8 @@
 #define MAPMAKER_ROOF_HOVER_FORMAT 0x0049F7C0u   /* "%d.%s" */
 #define MAPMAKER_ROOF_RET_CAPTION_DRAW 0x0032E5E3u /* sub_0032D9F0 (eax number, ecx name) at 0x0032E5DE */
 #define MAPMAKER_ROOF_NUMBER 46u                /* stock tiles are numbered 1..45 (catalogue +4) */
-#define MAPMAKER_ROOF_ITEM_MIN 0x18u            /* item sub-record: (count byte +0x14 * 4 + 0x1B) & ~3 */
+#define MAPMAKER_ROOF_SUFFIX_BYTES 64u
+#define MAPMAKER_ROOF_ITEM_MIN 0x18u           /* item sub-record: (count byte +0x14 * 4 + 0x1B) & ~3 */
 static const char mapmaker_roof_names[2][MAPMAKER_ROOF_LABEL_BYTES]={"Small Open (No Roof)","Small Open (Open Air)"};
 
 static struct {
@@ -126,6 +127,7 @@ static struct {
     uint32_t preview_inst, preview_saved, preview_applied;
     unsigned preview_mode;         /* open entry highlighted in the palette */
     uint32_t labels;               /* guest strings, 2 x MAPMAKER_ROOF_LABEL_BYTES */
+    uint32_t suffixed;             /* guest string: another tile's name + its flag */
     unsigned long long placed, mismatch, unmatched, restored, full, no_list, carried, freed;
 } mapmaker_roof;
 
@@ -478,6 +480,32 @@ static unsigned mapmaker_roof_label_mode(uint32_t s)
            s==mapmaker_roof.labels+MAPMAKER_ROOF_LABEL_BYTES?MAPMAKER_ROOF_OPEN_AIR:0u;
 }
 
+/* Any other flagged tile (set from the right-click roof menu,
+ * pc_mapmaker_tileflags.inc): the grid label's name gets " (No Roof)" /
+ * " (Open Air)" in a heap copy; the number stays the tile's own. */
+static unsigned mapmaker_roof_hover_mode(void)
+{
+    uint32_t editor=WORD_AT(0x007844A8u),piece;
+    if(!MAPMAKER_PTR_OK(editor,0x2F80u)) return 0;
+    if(!(piece=WORD_AT(editor+0x2F18u))) piece=WORD_AT(editor+0x2F7Cu);
+    return piece && mapmaker_roof_editor()?mapmaker_roof_mode(piece):0u;
+}
+static void mapmaker_roof_suffix(unsigned mode)
+{
+    static const char tail[2][12]={" (No Roof)"," (Open Air)"};
+    uint32_t name=WORD_AT(g_esp+12u);
+    char *out;
+    size_t n=0;
+    if(mode!=MAPMAKER_ROOF_OPEN_ROOF && mode!=MAPMAKER_ROOF_OPEN_AIR) return;
+    if(!mapmaker_roof.suffixed && !(mapmaker_roof.suffixed=xbox_HeapAlloc(MAPMAKER_ROOF_SUFFIX_BYTES,4u))) return;
+    if(!MAPMAKER_PTR_OK(mapmaker_roof.suffixed,MAPMAKER_ROOF_SUFFIX_BYTES) || !MAPMAKER_PTR_OK(name,1u)) return;
+    out=(char *)((uintptr_t)mapmaker_roof.suffixed+g_xbox_mem_offset);
+    while(n<MAPMAKER_ROOF_SUFFIX_BYTES-sizeof tail[0] && MAPMAKER_PTR_OK(name+n,1u) &&
+          (out[n]=*(const char *)((uintptr_t)name+n+g_xbox_mem_offset))!=0) n++;
+    memcpy(out+n,tail[mode-1u],strlen(tail[mode-1u])+1u);
+    WORD_AT(g_esp+12u)=mapmaker_roof.suffixed;
+}
+
 /* WRAP sub_00151030 (sprintf into a static buffer, cdecl). The tile label
  * over the grid (0x0031171D..0x00311724) prints "%d.%s" with the tile's
  * number (catalogue +4, 1..45) and name; for an open piece's label the
@@ -489,6 +517,9 @@ void pc_mapmaker_roof_format(void (*original)(void))
     if(mapmaker_roof.labels && MAPMAKER_STACK_OK(16u) && WORD_AT(g_esp)==MAPMAKER_ROOF_RET_HOVER_FORMAT &&
        WORD_AT(g_esp+4u)==MAPMAKER_ROOF_HOVER_FORMAT && (mode=mapmaker_roof_label_mode(WORD_AT(g_esp+12u)))!=0)
         WORD_AT(g_esp+8u)=MAPMAKER_ROOF_NUMBER+mode-1u;
+    else if(mapmaker_roof.marked && MAPMAKER_STACK_OK(16u) && WORD_AT(g_esp)==MAPMAKER_ROOF_RET_HOVER_FORMAT &&
+            WORD_AT(g_esp+4u)==MAPMAKER_ROOF_HOVER_FORMAT && (mode=mapmaker_roof_hover_mode())!=0)
+        mapmaker_roof_suffix(mode);
     original();
 }
 
