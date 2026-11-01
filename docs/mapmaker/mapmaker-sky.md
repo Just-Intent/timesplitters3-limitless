@@ -326,6 +326,29 @@ player.]"
   character below the lowest floor's height is logged once a second with
   its y, the change over that second and its health, and the health after
   the kill call.
+- **Playtest v0.4.0-mapmaker.26 (2026-11-01): walls fixed, falls still do
+  not kill.** Static re-check (CONFIRMED in code, decoder test): the check
+  reads the right fields: the human's entity is player struct `+0x14` (the
+  stock per-player update reads it the same way at `0x000D5EB5`), y is its
+  live position `+0x68` and y is up (scene-61 kill `-100.0 > y` at
+  `0x0015F1B3..0x0015F1BF`; fall damage = fall start `actor+0xB70` - landing
+  floor `actor+0xBFC`, `0x000D4441..0x000D4449`); and `sub_000BD090` kills a
+  human player in MapMaker play: the stock player hazard kill calls it for
+  the current player in scene 100 (`0x000D672B..0x000D673E`). What a height
+  rule cannot rely on: the character's floor probe `sub_000D9130` asks
+  `sub_000C3B10` for the floor in the character's own room only (`+0x34`,
+  `0x000D9149`; the room's search honours `inst+0x30`, `0x000C3B6C`) and
+  writes `actor+0xBFC` only when it finds one (`0x000D91A2..0x000D91AA`), so
+  outside the map the character keeps its last room and floor height. Whether
+  the controller then stops the fall at that height or lets y drop is not
+  traced (INFERRED either way); a fall that stops never reaches the height
+  rules. So a third rule does not use the height: every 6 ticks the
+  character's body box (x, z +-0.3, y +0.25..+1.5) is passed to the room
+  query `sub_00087310(box, out, 8)` (the camera's room search, tree
+  `0x00702E00`, reimplemented by the rooms area); 8 queries in a row with no
+  room (about 0.8 s) kill. Inside any tile, open air included, the body is
+  inside that tile's room box (INFERRED from the rooms being the tiles'
+  volumes; the log shows the count).
 - **Which rooms are bounded (CONFIRMED).** The play build `sub_0008A780`
   makes one 0x68-byte entry per piece record, in record order
   (`sub_00083F80`/`sub_00085030` at `0x0008AACE`/`0x0008AAAA`), then calls
@@ -352,7 +375,8 @@ player.]"
   20** (piece y = record byte `+6` * 5.0 `[0x004760CC]`, `0x0008A87E`,
   `0x0008A8F0`; editor floors -2..2 give a kill height of -30 at most), or
   stays below **5 x lowest floor - 5** (one floor under the map) for **60
-  ticks** in a row. It
+  ticks** in a row, or overlaps **no room** for 8 room queries in a row
+  (every 6 ticks, above). It
   walks the live list (`0x007A3580`, relocated to `0x00900100` by
   `actors-list.json`, count `[0x0074C37C]`, entity = `[actor]`, entity `+0x7C`
   = actor) and calls the stock kill-now helper `sub_000BD090(entity)` for a
@@ -366,7 +390,10 @@ player.]"
 - Cost: the draw hook runs for every drawn instance; with no bounded room, or
   outside scene 100, it is one counter test and one scene read; otherwise a
   few loads and a 256-entry table. The tick hook is one flag test per frame
-  unless the map has an unbounded tile, then a walk of at most 64 characters.
+  unless the map has an unbounded tile, then a walk of at most 64 characters
+  and, per character every 6 ticks, one room query (a tree walk, as the
+  camera does every frame). The query box and result live in 56 bytes from
+  `xbox_HeapAlloc`, allocated once; without them the room rule is off.
 - Log (stderr, `game.err`), so a playtest shows which step fails:
   - every MapMaker play build: `roof: play build: P pieces (walk W), B
     bounded, U unbounded, floors L..H` (walk -1: the records did not end
@@ -381,14 +408,17 @@ player.]"
   - unbounded: `roof: fall check on: characters die below y K, or below y O
     for 60 ticks (lowest floor F)`; at the first tick `roof: fall check
     running: N live characters, H human players, player 0 at y Y health
-    H`; for the first 10 seconds `roof: player 0 y Y health H` once a second
-    (the standing height); `roof: character S is below the lowest floor (y
-    Y)`; once a second for every living character under the lowest floor's
-    height `roof: character S off the floors: y Y (+D in 1 s) health H, T
-    ticks below y O` (a fall that stops shows D near 0); and `roof:
-    character S fell off the map (y Y); killed, health now H` (H not 0: the
-    kill call did not take). S is the live-list index, or 64 + the human
-    player index.
+    H`; for the first 10 seconds `roof: player 0 at x X y Y z Z health H,
+    rooms R` once a second (the standing height and the room count inside
+    the map; R 0 there would mean the room rule cannot work); `roof:
+    character S is outside every room (x y z)`; `roof: character S is below
+    the lowest floor (y Y)`; once a second for every living character under
+    the lowest floor's height or outside every room `roof: character S off
+    the floors: y Y (+D in 1 s) health H, rooms R, T ticks below y O` (a fall
+    that stops shows D near 0); and `roof: character S fell off the map
+    (outside every room / below the kill height / a floor under the map; x
+    y z); killed, health now H` (H not 0: the kill call did not take). S is
+    the live-list index, or 64 + the human player index.
   No line `play build` at all means the build hook did not run (limits off,
   or the wrapper is missing); no `fall check running` means the tick hook
   did not run in scene 100.
@@ -745,7 +775,8 @@ What the user tests:
   mark 0x5203 load, rooms by build order (with the mask cross-check), draw
   hiding and restore; Open air (unbounded): kill height from the lowest
   floor, live/dead/entry checks, scene gate, 64-entry bound, 16-bit model id, partial record walk, hidden-node count, the
-  60-tick out-of-map rule, human players from their player structs (90
+  60-tick out-of-map rule, human players from their player structs, the
+  no-room rule (8 queries every 6 ticks, body box, reset, no memory) (97
   mutations);
   plus XBE data (category tables, descriptor, tile 8, tile numbers 1..45,
   both formats, floor height 5.0) and decoder checks (record word +0x26
