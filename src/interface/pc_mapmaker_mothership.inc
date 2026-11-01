@@ -14,8 +14,22 @@
  * table, but their model files are only in story/l_2_st.pak, story/l_26_st.pak
  * and challenge/l_64_ch.pak. Every file l_64_ch.pak shares with any other pak
  * is byte-identical (checked against all paks), so mounting it kept open only
- * adds its own models. Its fight state lives on the object and in statics
- * (0x0075C0DC.., 0x0078D500..), so one mothership per map.
+ * adds its own models. Its fight state lives on the object and in statics,
+ * so this area keeps one copy of those statics per ship (up to MSH_MAX per
+ * map) and swaps it in around every entry into the ship's code:
+ *  - the dust height and firing box 0x0049EA84..0x0049EA97 (read only by
+ *    the update; each ship's own values are rebased to its spawn, the stock
+ *    constants are never changed), 0x0075C0DC..0x0075C0E7 (update timer,
+ *    the intro HUD's shake value read by sub_00217020 in scenes 2/0x1A only,
+ *    the engine sound level the init zeroes), the hit ring index 0x0075C0EC
+ *    and its three 0x1C hit records 0x0078D500..0x0078D553 (damage writes,
+ *    the update's sub_002157B0 decays, slot 10 sub_00215B50 draws) and the
+ *    smoke effect handle 0x0078D360 (sub_00111AE0 creates it from the
+ *    template 0x0078D040 when sub_0010E210 says it is gone);
+ *  - entries: the update (slot 3), slot 10 sub_00215B50 (object at [esp+4]),
+ *    the damage sub_002193A0 (shared by several props: record at [esp+4],
+ *    object at +0) and the spawn itself (the init zeroes 0x0075C0E4).
+ * After every entry the statics hold exactly what they held before.
  *
  * The fight (sub_00217050, states +0x1A0, table 0x00218630): 0 flies to the
  * intro's fixed point (-500, 50, -220); 1 hovers; 2 attacks: every frame
@@ -42,19 +56,19 @@
  *
  * Play, per level:
  *  - mount (sub_00062790): after the original, forget the previous level's
- *    ship and put the rebased constants back to their stock values; when the
+ *    ships; when the
  *    map's own custom set holds MSH_ID (or the container cannot be read),
  *    mount pak/challenge/l_64_ch.pak with sub_000622D0(path, 0, 1): kept
  *    open, entries read on demand, as chr.pak.
  *  - request (sub_0015E7C0): request the ship and wreck models
  *    (sub_000A5E40) so the level's load pass reads them.
- *  - ai_start (sub_0015B830): after the original, for the first pool entry
- *    whose character is MSH_ID, when both models are ready: create the ship
+ *  - ai_start (sub_0015B830): after the original, for each pool entry
+ *    whose character is MSH_ID (up to MSH_MAX), when both models are ready: create the ship
  *    MSH_HOVER metres above the placeholder, facing its yaw
  *    (sub_000A6F90(0x539, &pos, &rot, 0, 0); the init runs inside), then
- *    state 2 as sub_00217030 does, and rebase the firing box to MSH_RANGE
- *    metres around the spawn (x/z) and the dust height to the placeholder's
- *    floor. A second placeholder keeps its bot behaviour.
+ *    state 2 as sub_00217030 does, and rebase its firing box to MSH_RANGE
+ *    metres around the spawn (x/z) and its dust height to the placeholder's
+ *    floor, in its own copy. A placeholder past MSH_MAX keeps its bot behaviour.
  *  - update (sub_00217050, the ship's per-frame callback): on its first
  *    frame the placeholder AI is removed (sub_0015DDA0). While falling or
  *    crashing (states 3 and 4 at entry) the ship's height is moved down by
@@ -127,6 +141,8 @@
 #define MSH_RANGE 60.0f                  /* firing box half-width around the spawn (x/z) */
 #define MSH_BOX 0x0049EA88u              /* z low, z high, x low, x high */
 #define MSH_DUST 0x0049EA84u             /* crash dust height */
+#define MSH_MAX 4u                       /* motherships per map */
+#define MSH_WORDS 31u                    /* the statics kept per ship (msh_spans) */
 #define MSH_BAR_TEXT 0x164Bu
 #define MSH_RET_BAR_TEXT 0x0014D09Fu     /* sub_0014CC80: call sub_0003D7B0 at 0x0014D09A */
 #define MSH_LABEL "Timesplitter Mothership"
@@ -134,20 +150,38 @@
 #define MSH_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 static const uint32_t msh_models[2]={MSH_MODEL,MSH_WRECK};
+/* The statics each ship keeps its own copy of: start, words. Dust and box first. */
+static const uint32_t msh_spans[5][2]={
+    {MSH_DUST,5u},                       /* dust height, box z low/high, x low/high */
+    {0x0075C0DCu,3u},                    /* update timer, intro shake, engine sound level */
+    {0x0075C0ECu,1u},                    /* hit ring index */
+    {0x0078D360u,1u},                    /* smoke effect handle */
+    {0x0078D500u,21u},                   /* three hit records of 0x1C */
+};
 
 extern void sub_00062260(void),sub_000622D0(void),sub_000A6F90(void),sub_0015DDA0(void);
 extern void sub_000A5E40(void),sub_000631C0(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
 /* Kept for the session: settings, strings, spawn arguments, stock constants. */
-static struct { int read, optout, saved; uint32_t label, pak, args, stock[5]; unsigned logged; } msh;
-/* This level's ship (cleared by every level's pak mount). */
-static struct {
+static struct { int read, optout; uint32_t label, pak, args; unsigned logged; } msh;
+/* One ship: its object and placeholder, floor, and its copy of the statics. */
+struct msh_one {
     uint32_t obj, place, place_ent, place_rec;
     float floor;
-    int requested, rebased;
-    unsigned extras, shifts;
+    unsigned shifts;
+    uint32_t st[MSH_WORDS];
+};
+/* This level's ships (cleared by every level's pak mount). */
+static struct {
+    struct msh_one s[MSH_MAX];
+    unsigned n;                          /* ships created */
+    unsigned act;                        /* 1 + the ship whose statics are in place; 0: none */
+    uint32_t rest[MSH_WORDS];            /* the statics outside any ship */
+    int requested;
+    unsigned extras;
 } msh_lv;
+#define MS (msh_lv.s[msh_lv.act-1u])     /* the active ship (only with msh_lv.act) */
 
 static void msh_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -167,7 +201,51 @@ static int msh_on(void)
     return mapmaker_limits.limits;
 }
 static int msh_play(void) { return msh_on() && WORD_AT(MSH_SCENE)==100u && MSH_B(MSH_MODE)==10u; }
-static int msh_mine(uint32_t obj) { return msh_lv.obj && obj==msh_lv.obj && WORD_AT(MSH_SCENE)==100u && msh_on(); }
+/* 1 + the index of this level's ship obj, in scene 100; 0 for any other object. */
+static unsigned msh_find(uint32_t obj)
+{
+    unsigned k;
+    if(!obj || WORD_AT(MSH_SCENE)!=100u || !msh_on()) return 0;
+    for(k=0;k<msh_lv.n && k<MSH_MAX;k++) if(msh_lv.s[k].obj==obj) return k+1u;
+    return 0;
+}
+static void msh_save(uint32_t *w)
+{
+    uint32_t k,i,n=0;
+    for(k=0;k<5u;k++) for(i=0;i<msh_spans[k][1];i++) w[n++]=WORD_AT(msh_spans[k][0]+i*4u);
+}
+static void msh_load(const uint32_t *w)
+{
+    uint32_t k,i,n=0;
+    for(k=0;k<5u;k++) for(i=0;i<msh_spans[k][1];i++) WORD_AT(msh_spans[k][0]+i*4u)=w[n++];
+}
+/* Puts ship k (1-based) in the statics; returns what was active before. */
+static unsigned msh_enter(unsigned k)
+{
+    unsigned p=msh_lv.act;
+    if(p==k) return p;
+    msh_save(p?msh_lv.s[p-1u].st:msh_lv.rest);
+    msh_load(msh_lv.s[k-1u].st);
+    msh_lv.act=k;
+    return p;
+}
+/* Takes ship k out of the statics and puts back what msh_enter found. */
+static void msh_leave(unsigned k,unsigned p)
+{
+    if(p==k) return;
+    msh_save(msh_lv.s[k-1u].st);
+    msh_load(p?msh_lv.s[p-1u].st:msh_lv.rest);
+    msh_lv.act=p;
+}
+/* The original with obj's statics in place, when obj is one of ours. */
+static void msh_run(void (*original)(void),uint32_t obj)
+{
+    unsigned k=msh_find(obj),p;
+    if(!k) { original();return; }
+    p=msh_enter(k);
+    original();
+    msh_leave(k,p);
+}
 
 static float msh_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)a+g_xbox_mem_offset),4);return f; }
 static void msh_setf(uint32_t a,float f) { memcpy((void *)((uintptr_t)a+g_xbox_mem_offset),&f,4); }
@@ -245,27 +323,13 @@ static uint32_t msh_models_unready(void)
     return 0;
 }
 
-/* The firing box and the dust height back to stock (another level may be the
- * intro); saved once, before the first rebase. */
-static void msh_restore(void)
+/* A ship's firing box (z low, z high, x low, x high) around its spawn and its
+ * dust height on its floor, in its own copy (st[0..4], as msh_spans). */
+static void msh_rebase(struct msh_one *m,float x,float floor,float z)
 {
-    uint32_t k;
-    if(!msh.saved) return;
-    for(k=0;k<4u;k++) WORD_AT(MSH_BOX+k*4u)=msh.stock[k];
-    WORD_AT(MSH_DUST)=msh.stock[4];
-}
-static void msh_rebase(float x,float floor,float z)
-{
-    uint32_t k;
-    if(!msh.saved) {
-        for(k=0;k<4u;k++) msh.stock[k]=WORD_AT(MSH_BOX+k*4u);
-        msh.stock[4]=WORD_AT(MSH_DUST);
-        msh.saved=1;
-    }
-    msh_setf(MSH_BOX,z-MSH_RANGE);msh_setf(MSH_BOX+4u,z+MSH_RANGE);
-    msh_setf(MSH_BOX+8u,x-MSH_RANGE);msh_setf(MSH_BOX+12u,x+MSH_RANGE);
-    msh_setf(MSH_DUST,floor);
-    msh_lv.rebased=1;
+    float v[5];
+    v[0]=floor;v[1]=z-MSH_RANGE;v[2]=z+MSH_RANGE;v[3]=x-MSH_RANGE;v[4]=x+MSH_RANGE;
+    memcpy(m->st,v,sizeof v);
 }
 
 /* WRAP sub_00062790 (the level's pak mounts, no args). */
@@ -275,8 +339,7 @@ void pc_mapmaker_mothership_mount(void (*original)(void))
     uint32_t mounted;
     if(WORD_AT(MSH_MOUNT_SKIP)) { original();return; }    /* the original does nothing */
     original();
-    memset(&msh_lv,0,sizeof msh_lv);                       /* a new level: forget the last ship */
-    msh_restore();
+    memset(&msh_lv,0,sizeof msh_lv);                       /* a new level: forget the last ships */
     if(!msh_play() || msh.optout || (has=msh_map_has())==0) return;
     if(!msh_string(&msh.pak,MSH_PAK,sizeof MSH_PAK)) return;
     if(msh_pak_mounted()) return;
@@ -304,16 +367,19 @@ void pc_mapmaker_mothership_request(void (*original)(void))
 /* WRAP sub_0015B830 (cdecl AI pool entry): the placeholder becomes the ship. */
 void pc_mapmaker_mothership_ai_start(void (*original)(void))
 {
-    uint32_t a,ent,e,obj,args,i,m;
+    uint32_t a,ent,e,obj,args,i,m,keep[MSH_WORDS];
     float pos[3],yaw;
+    struct msh_one *s;
     if(!MAPMAKER_STACK_OK(8) || !msh_play() || msh.optout) { original();return; }
     a=WORD_AT(g_esp+4u);
     original();
     if(!MAPMAKER_PTR_OK(a,MSH_ACTOR) || MSH_H(a+MSH_ACTOR_CHAR)!=MSH_ID || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;
-    if(msh_lv.obj) {
-        if(msh_lv.extras++<4u) msh_log("only one mothership per map: this placeholder stays a bot",a,msh_lv.obj);
+    for(i=0;i<msh_lv.n;i++) if(msh_lv.s[i].place_ent==ent && msh_lv.s[i].obj) return;   /* started again */
+    if(msh_lv.n>=MSH_MAX) {
+        if(msh_lv.extras++<4u) msh_log("at most 4 motherships per map: this placeholder stays a bot",a,msh_lv.n);
         return;
     }
+    if(msh_lv.act) { msh_log("a mothership is running: this placeholder stays a bot",a,msh_lv.act);return; }
     if(!msh_pak_mounted()) { msh_log("l_64_ch.pak not mounted: the mothership placeholder stays a bot",a,0);return; }
     if(!(e=msh_resource(MSH_MODEL)) || WORD_AT(e+MSH_RES_INIT)!=MSH_INIT || !msh_resource(MSH_WRECK)) {
         msh_log("mothership models missing from the resource table: the placeholder stays a bot",e,e?WORD_AT(e+MSH_RES_INIT):0);
@@ -334,15 +400,20 @@ void pc_mapmaker_mothership_ai_start(void (*original)(void))
     args=msh.args;
     msh_setf(args,pos[0]);msh_setf(args+4u,pos[1]+MSH_HOVER);msh_setf(args+8u,pos[2]);
     msh_setf(args+12u,0.0f);msh_setf(args+16u,yaw);msh_setf(args+20u,0.0f);
+    s=&msh_lv.s[msh_lv.n];
+    msh_save(keep);                                            /* the init writes statics: keep them for after */
     obj=guest_call(sub_000A6F90,5,MSH_MODEL,args,args+12u,0u,0u);
+    if(obj && MAPMAKER_PTR_OK(obj,0x200u)) { memset(s,0,sizeof *s);msh_save(s->st); }
+    msh_load(keep);
     if(!obj || !MAPMAKER_PTR_OK(obj,0x200u)) { msh_log("the mothership was not created: the placeholder stays a bot",a,obj);return; }
     WORD_AT(obj+MSH_STATE)=MSH_ATTACK;                        /* no fly-in: attack where it stands */
-    msh_lv.obj=obj;msh_lv.place=a;msh_lv.place_ent=ent;msh_lv.place_rec=WORD_AT(a+MSH_ACTOR_RECORD);
-    msh_lv.floor=pos[1];
-    msh_rebase(pos[0],pos[1],pos[2]);
+    s->obj=obj;s->place=a;s->place_ent=ent;s->place_rec=WORD_AT(a+MSH_ACTOR_RECORD);
+    s->floor=pos[1];
+    msh_rebase(s,pos[0],pos[1],pos[2]);
+    msh_lv.n++;
     msh_string(&msh.label,MSH_LABEL,sizeof MSH_LABEL);         /* off the text hook's path */
     msh_log("mothership created above the placeholder",a,obj);
-    fprintf(stderr,"[mapmaker] mothership: spawn (%.2f, %.2f, %.2f), floor %.2f, firing box %.0f m around it\n",
+    fprintf(stderr,"[mapmaker] mothership %u: spawn (%.2f, %.2f, %.2f), floor %.2f, firing box %.0f m around it\n",msh_lv.n,
             (double)pos[0],(double)(pos[1]+MSH_HOVER),(double)pos[2],(double)pos[1],(double)MSH_RANGE);
     fflush(stderr);
 }
@@ -351,11 +422,13 @@ void pc_mapmaker_mothership_ai_start(void (*original)(void))
 void pc_mapmaker_mothership_update(void (*original)(void))
 {
     uint32_t obj,a,ent,player,state;
+    unsigned k,p;
     int shift;
-    if(!msh_lv.obj || !MAPMAKER_STACK_OK(8) || !msh_mine(obj=WORD_AT(g_esp+4u))) { original();return; }
-    if(msh_lv.place) {
-        a=msh_lv.place;ent=msh_lv.place_ent;msh_lv.place=0;
-        if(MAPMAKER_PTR_OK(a,MSH_ACTOR) && WORD_AT(a+MSH_ACTOR_RECORD)==msh_lv.place_rec && WORD_AT(a)==ent &&
+    if(!msh_lv.n || !MAPMAKER_STACK_OK(8) || !(k=msh_find(obj=WORD_AT(g_esp+4u)))) { original();return; }
+    p=msh_enter(k);
+    if(MS.place) {
+        a=MS.place;ent=MS.place_ent;MS.place=0;
+        if(MAPMAKER_PTR_OK(a,MSH_ACTOR) && WORD_AT(a+MSH_ACTOR_RECORD)==MS.place_rec && WORD_AT(a)==ent &&
            MAPMAKER_PTR_OK(ent,0x100u) && WORD_AT(ent+MSH_ENT_AI)==a) {
             player=WORD_AT(MSH_PLAYER);
             if(MAPMAKER_PTR_OK(player,MSH_FOCUS+4u) && WORD_AT(player+MSH_FOCUS)==ent) WORD_AT(player+MSH_FOCUS)=0;
@@ -364,19 +437,36 @@ void pc_mapmaker_mothership_update(void (*original)(void))
         } else msh_log("mothership placeholder AI already gone",a,ent);
     }
     state=WORD_AT(obj+MSH_STATE);
-    shift=(state==MSH_FALL || state==MSH_CRASH) && msh_sane(msh_lv.floor);
-    if(!shift) { original();return; }
-    if(!msh_lv.shifts++) msh_log("mothership shot down: falling to the map floor",state,obj);
-    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)-msh_lv.floor);
+    shift=(state==MSH_FALL || state==MSH_CRASH) && msh_sane(MS.floor);
+    if(!shift) { original();msh_leave(k,p);return; }
+    if(!MS.shifts++) msh_log("mothership shot down: falling to the map floor",state,obj);
+    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)-MS.floor);
     original();
-    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+msh_lv.floor);
+    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+MS.floor);
+    msh_leave(k,p);
+}
+
+/* WRAP sub_00215B50 (cdecl ship; slot 10, draws the hit records). */
+void pc_mapmaker_mothership_slot10(void (*original)(void))
+{
+    if(!msh_lv.n || !MAPMAKER_STACK_OK(8)) { original();return; }
+    msh_run(original,WORD_AT(g_esp+4u));
+}
+
+/* WRAP sub_002193A0 (cdecl damage record, the hit object at +0; shared by
+ * several props, so only our ships' records swap). */
+void pc_mapmaker_mothership_damage(void (*original)(void))
+{
+    uint32_t r;
+    if(!msh_lv.n || !MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(r=WORD_AT(g_esp+4u),4u)) { original();return; }
+    msh_run(original,WORD_AT(r));
 }
 
 /* WRAP sub_0003D7B0 (cdecl text id -> string): the bar's label. */
 void pc_mapmaker_mothership_text(void (*original)(void))
 {
     if(!MAPMAKER_STACK_OK(8) || WORD_AT(g_esp+4u)!=MSH_BAR_TEXT || WORD_AT(g_esp)!=MSH_RET_BAR_TEXT || !msh.label ||
-       !msh_lv.obj || !msh_play()) { original();return; }
+       !msh_lv.n || !msh_play()) { original();return; }
     g_eax=msh.label;
     MAPMAKER_GUEST_RET();
 }

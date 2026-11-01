@@ -32,7 +32,7 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 #define PLAYER 0x00500000u
 #define PLAYERS 0x00510000u
 #define RES 0x00520000u
-#define GUNS 0x00540000u
+#define GUNS (WORD_AT(0x0078B560u))   /* the active tank's gun records */
 #define TANK 0x00560000u
 #define ESP0 0x00600000u
 #define A(i) (POOL+(uint32_t)(i)*0xEA0u)
@@ -65,6 +65,7 @@ static unsigned nmount, nspawn, nremove;
 static uint32_t mount_args[3], spawn_args[5], remove_arg;
 static float spawn_pos[3], spawn_rot[3];
 static int spawn_after_original;
+static uint32_t spawn_obj=TANK;
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -85,10 +86,14 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         spawn_after_original=originals;
         for(i=0;i<3;i++) { spawn_pos[i]=FLOAT_AT(x[1]+(uint32_t)i*4u);spawn_rot[i]=FLOAT_AT(x[2]+(uint32_t)i*4u); }
         if(!spawn_ok) return 0;
-        for(i=0;i<3;i++) FLOAT_AT(TANK+0x64u+(uint32_t)i*4u)=spawn_pos[i];
+        for(i=0;i<3;i++) FLOAT_AT(spawn_obj+0x64u+(uint32_t)i*4u)=spawn_pos[i];
+        /* sub_00251AA0: zero the block, point it at the XBE tables, reset sounds and some table words */
+        memset((void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),0,0x64u);
+        WORD_AT(0x0078B560u)=0x0051B9C8u;WORD_AT(0x0078B564u)=0x0051B998u;WORD_AT(0x0078B568u)=0x0051B920u;WORD_AT(0x0078B56Cu)=0x0051BB44u;
         FLOAT_AT(0x0078B580u)=-9.0f;FLOAT_AT(0x0078B584u)=spawn_pos[1];FLOAT_AT(0x0078B588u)=-3.2f;
-        WORD_AT(0x0078B594u)=0;WORD_AT(0x0078B598u)=0;WORD_AT(0x0078B560u)=GUNS;
-        return TANK;
+        for(i=0;i<0x1C;i++) WORD_AT(0x0075F468u+(uint32_t)i*4u)=0x5000u+nspawn;
+        FLOAT_AT(0x0051B9C8u+0x10u)=(float)nspawn;WORD_AT(0x0051B9C0u)=0;WORD_AT(0x0051B920u+0x68u)=0;
+        return spawn_obj;
     }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
     if(f==sub_000A5E40) {   /* queued; the load pass reads it before any AI starts */
@@ -122,7 +127,7 @@ static void fake_target(void)
     int i;
     uint32_t t=WORD_AT(0x0078B5B0u);
     originals++;
-    for(i=0;i<3;i++) { seen_tank[i]=FLOAT_AT(TANK+0x64u+(uint32_t)i*4u);seen_goal[i]=FLOAT_AT(0x0078B580u+(uint32_t)i*4u); }
+    for(i=0;i<3;i++) { seen_tank[i]=FLOAT_AT(g_edi+0x64u+(uint32_t)i*4u);seen_goal[i]=FLOAT_AT(0x0078B580u+(uint32_t)i*4u); }
     if(t) for(i=0;i<3;i++) seen_target[i]=FLOAT_AT(t+0x64u+(uint32_t)i*4u);
     if(target_writes) { FLOAT_AT(0x0078B580u)=10.0f;FLOAT_AT(0x0078B584u)=0.5f;FLOAT_AT(0x0078B588u)=-2.0f; }
     g_esp+=4u;
@@ -146,6 +151,26 @@ static void fake_wreck(void) { originals++;FLOAT_AT(g_esi+0x64u)=0;FLOAT_AT(g_es
 static float gun_seen[3];
 static void fake_gun(void) { int i;originals++;for(i=0;i<3;i++) gun_seen[i]=FLOAT_AT(CANNON+(uint32_t)i*4u);g_esp+=4u; }
 static void cannon(float x,float y,float z) { FLOAT_AT(CANNON)=x;FLOAT_AT(CANNON+4u)=y;FLOAT_AT(CANNON+8u)=z; }
+/* an entry's original: records the state it ran with, changes it, and can
+ * run another tank's damage inside (a shell hitting it) */
+static uint32_t entry_state, entry_guns, entry_set, nest_obj, inner_state;
+static void fake_inner(void) { originals++;inner_state=WORD_AT(0x0078B594u);WORD_AT(0x0078B594u)=99u;g_esp+=4u; }
+void pc_mapmaker_tank_damage(void (*original)(void));
+static void fake_entry(void)
+{
+    originals++;
+    entry_state=WORD_AT(0x0078B594u);entry_guns=WORD_AT(0x0078B560u);
+    if(nest_obj) {
+        WORD_AT(0x0078B598u)=0x77u+entry_set;                         /* changed before the inner call */
+        WORD_AT(0x00570400u)=nest_obj;
+        g_esp-=8u;WORD_AT(g_esp)=0x00256012u;WORD_AT(g_esp+4u)=0x00570400u;
+        pc_mapmaker_tank_damage(fake_inner);
+        g_esp+=4u;
+        if(WORD_AT(0x0078B594u)!=entry_state) entry_state=0xBADu;     /* the outer tank's state is back */
+    }
+    WORD_AT(0x0078B594u)=entry_set;WORD_AT(0x0075F468u)=entry_set;
+    g_esp+=4u;
+}
 static int ai_originals;
 static void fake_ai(void) { originals++;ai_originals++;g_esp+=4u; }
 
@@ -332,7 +357,7 @@ int main(void)
     actor(0,0x12,40.0f,2.0f,30.0f,1.5f);
     READY();
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);   /* pak missing */
-    CHECK(nspawn==0 && !tnk_lv.obj);
+    CHECK(nspawn==0 && !tnk_lv.n);
     pak_mounted=1;
     resources(0,1,1,0x002560C0u);
     READY();
@@ -361,7 +386,7 @@ int main(void)
     CHECK(nspawn==0);
     WORD_AT(RES+3u*0x30u+4u)=0x00539000u;WORD_AT(RES+4u*0x30u+4u)=1u;WORD_AT(RES+5u*0x30u+4u)=1u;   /* loaded before */
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(nspawn==1 && tnk_lv.obj==TANK);
+    CHECK(nspawn==1 && tnk_lv.n==1u && tnk_lv.t[0].obj==TANK);
     resources(1,1,1,0x002560C0u);memset(&tnk_lv,0,sizeof tnk_lv);nspawn=0;
     container(0x11,without,2,NULL,0);
     CALL(pc_mapmaker_tank_request,fake,0x001CDC25u,0,0,0,1);         /* no tank in the set */
@@ -402,20 +427,26 @@ int main(void)
     spawn_ok=0;
     FLOAT_AT(0x0078B580u)=-9.0f;FLOAT_AT(0x0078B588u)=-3.2f;
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(nspawn==1 && !tnk_lv.obj && !tnk_lv.place);
+    CHECK(nspawn==1 && !tnk_lv.n);
     CHECK(FLOAT_AT(0x0078B580u)==-9.0f && FLOAT_AT(0x0078B588u)==-3.2f);   /* nothing rebased */
     spawn_ok=1;
     n=originals;
+    FLOAT_AT(0x0078B580u)=77.0f;WORD_AT(0x0078B594u)=0x55u;WORD_AT(0x0075F468u)=0x66u;   /* the statics before */
+    FLOAT_AT(0x0051B9C8u+0x10u)=88.0f;
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(nspawn==2 && tnk_lv.obj==TANK && spawn_after_original==(int)n+1);   /* after the AI started */
+    CHECK(nspawn==2 && tnk_lv.n==1u && tnk_lv.t[0].obj==TANK && spawn_after_original==(int)n+1);   /* after the AI started */
+    CHECK(FLOAT_AT(0x0078B580u)==77.0f && WORD_AT(0x0078B594u)==0x55u && WORD_AT(0x0075F468u)==0x66u && !tnk_lv.act);   /* restored */
+    CHECK(FLOAT_AT(0x0051B9C8u+0x10u)==88.0f && tnk_lv.t[0].block[0]==tnk.tabs+0xA8u && tnk_lv.t[0].sounds[0]==0x5002u);
+    CHECK(FLOAT_AT(tnk.tabs+0xA8u+0x10u)==2.0f && tnk_lv.t[0].block[3]==0x0051BB44u);   /* its own tables, as the init left them */
+    CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);   /* the same placeholder again */
+    CHECK(nspawn==2 && tnk_lv.n==1u);
+    tnk_enter(1u);                                                    /* tank 1's statics for the hooks below */
     CHECK(spawn_args[0]==0x281u && spawn_args[3]==0 && spawn_args[4]==0);
     CHECK(NEAR(spawn_pos[0],40.0f) && NEAR(spawn_pos[1],2.0f) && NEAR(spawn_pos[2],30.0f));
     CHECK(NEAR(spawn_rot[0],0.0f) && NEAR(spawn_rot[1],1.5f) && NEAR(spawn_rot[2],0.0f));
     dx=40.0f+12.05f;dy=2.0f;dz=30.0f-1.5f;
     CHECK(NEAR(FLOAT_AT(0x0078B580u),-9.0f+dx) && NEAR(FLOAT_AT(0x0078B584u),2.0f) && NEAR(FLOAT_AT(0x0078B588u),-3.2f+dz));
-    actor(2,0x12,0.0f,0.0f,0.0f,0.0f);                                 /* a second placeholder */
-    CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
-    CHECK(nspawn==2 && tnk_lv.obj==TANK);
+    actor(2,0x12,0.0f,0.0f,0.0f,0.0f);
     WORD_AT(0x0079094Cu)=102u;                                        /* not in the editor */
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
     CHECK(nspawn==2);
@@ -476,9 +507,9 @@ int main(void)
     stock_yard();
     tnk_lv.shifted=0;
     /* the drive target search (only its call site): every point counts after 64 outside */
-    tnk_lv.misses=0;
+    TK.misses=0;
     for(k=1;k<64u;k++) CHECK(area_at(-60.0f,0.0f,0x00254848u,__LINE__)==0);
-    CHECK(area_at(-12.0f+dx,0.0f+dz,0x00254848u,__LINE__)==1u && tnk_lv.misses==63u);   /* inside: not a miss */
+    CHECK(area_at(-12.0f+dx,0.0f+dz,0x00254848u,__LINE__)==1u && TK.misses==63u);   /* inside: not a miss */
     n=tnk_lv.logs;
     CHECK(area_at(-60.0f,0.0f,0x00254848u,__LINE__)==1u && tnk_lv.logs==n+1u);         /* the 64th: logged once */
     CHECK(area_at(-60.0f,0.0f,0x00254848u,__LINE__)==1u && tnk_lv.logs==n+1u);
@@ -486,33 +517,33 @@ int main(void)
     g_edi=TANK;target_writes=0;
     CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);    /* a new search */
     target_writes=1;
-    CHECK(tnk_lv.misses==0 && area_at(-60.0f,0.0f,0x00254848u,__LINE__)==0);
-    tnk_lv.misses=70u;
+    CHECK(TK.misses==0 && area_at(-60.0f,0.0f,0x00254848u,__LINE__)==0);
+    TK.misses=70u;
     g_edi=0x00570000u;
     CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);    /* not our tank */
-    CHECK(tnk_lv.misses==70u);
-    tnk_lv.misses=0;
+    CHECK(TK.misses==70u);
+    TK.misses=0;
 
     /* ---- fight-state lines: at frame start, drive target and state entry ------ */
-    tnk_lv.seen_state=0;tnk_lv.logs=0;
+    TK.seen_state=0;tnk_lv.logs=0;
     WORD_AT(0x0078B594u)=1u;
     CALL(pc_mapmaker_tank_update,fake,0x00000100u,0x00570000u,0,0,1);   /* another object */
-    CHECK(tnk_lv.seen_state==0 && tnk_lv.logs==0);
+    CHECK(TK.seen_state==0 && tnk_lv.logs==0);
     CALL(pc_mapmaker_tank_update,fake,0x00000100u,TANK,0,0,1);
-    CHECK(tnk_lv.seen_state==1u && tnk_lv.logs==1u);
+    CHECK(TK.seen_state==1u && tnk_lv.logs==1u);
     CALL(pc_mapmaker_tank_update,fake,0x00000100u,TANK,0,0,1);
     CHECK(tnk_lv.logs==1u);                                            /* unchanged: no line */
     WORD_AT(0x0078B594u)=6u;g_edi=TANK;target_writes=0;
     CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);
-    CHECK(tnk_lv.seen_state==6u && tnk_lv.logs==2u);
+    CHECK(TK.seen_state==6u && tnk_lv.logs==2u);
     WORD_AT(0x0078B594u)=3u;WORD_AT(0x0078B598u)=3u;pre_eax=TANK;
     CALL(pc_mapmaker_tank_state,fake,0x00255BD5u,0,0,0,1);
-    CHECK(tnk_lv.seen_state==3u && tnk_lv.logs==3u);
+    CHECK(TK.seen_state==3u && tnk_lv.logs==3u);
     pre_eax=0x00570000u;WORD_AT(0x0078B594u)=4u;
     CALL(pc_mapmaker_tank_state,fake,0x00255BD5u,0,0,0,1);           /* not our tank */
-    CHECK(tnk_lv.seen_state==3u);
+    CHECK(TK.seen_state==3u);
     for(k=0;k<60u;k++) { WORD_AT(0x0078B594u)=k&1u?3u:4u;CALL(pc_mapmaker_tank_update,fake,0x00000100u,TANK,0,0,1); }
-    CHECK(tnk_lv.logs==49u && tnk_lv.seen_state==3u);                 /* 48 lines, then one "used up" */
+    CHECK(tnk_lv.logs==49u && TK.seen_state==3u);                 /* 48 lines, then one "used up" */
     target_writes=1;tnk_lv.logs=0;
 
     /* ---- target: castle frame ------------------------------------------------- */
@@ -544,7 +575,7 @@ int main(void)
     CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);
     CHECK(NEAR(seen_tank[0],41.0f-dx) && NEAR(FLOAT_AT(0x0078B580u),10.0f+dx));
     WORD_AT(0x0078B5B0u)=ENT(3);
-    g_edi=0x00570000u;                                                 /* not our tank */
+    g_edi=0x00570000u;FLOAT_AT(0x00570000u+0x64u)=41.0f;                                              /* not our tank */
     FLOAT_AT(0x0078B580u)=50.0f;
     CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);
     CHECK(NEAR(seen_tank[0],41.0f) && NEAR(FLOAT_AT(0x0078B580u),10.0f));
@@ -577,25 +608,25 @@ int main(void)
     FLOAT_AT(PLAYERS+0x1584u+0xB4u)=47.5f;FLOAT_AT(PLAYERS+0x1584u+0xB8u)=3.7f;FLOAT_AT(PLAYERS+0x1584u+0xBCu)=36.5f;
     cannon(1.0f,2.0f,3.0f);                                           /* stock: the actor's +0xBB4 */
     WORD_AT(0x0078B594u)=4u;WORD_AT(0x0078B5B0u)=PENT(1);
-    g_edi=TANK;g_ebx=4u;n=tnk_lv.aims;
+    g_edi=TANK;g_ebx=4u;n=TK.aims;
     CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
     CHECK(gun_seen[0]==47.5f && gun_seen[1]==3.7f && gun_seen[2]==36.5f);          /* set before the turn */
-    CHECK(FLOAT_AT(CANNON)==47.5f && FLOAT_AT(CANNON+8u)==36.5f && tnk_lv.aims==n+1u);  /* the new stock aim logged */
+    CHECK(FLOAT_AT(CANNON)==47.5f && FLOAT_AT(CANNON+8u)==36.5f && TK.aims==n+1u);  /* the new stock aim logged */
     CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
-    CHECK(tnk_lv.aims==n+1u);                                          /* our own point: no line */
+    CHECK(TK.aims==n+1u);                                          /* our own point: no line */
     FLOAT_AT(PLAYERS+0x1584u+0xB4u)=48.0f;                             /* the player moves: tracked */
     CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
-    CHECK(gun_seen[0]==48.0f && FLOAT_AT(CANNON)==48.0f && tnk_lv.aims==n+1u);
+    CHECK(gun_seen[0]==48.0f && FLOAT_AT(CANNON)==48.0f && TK.aims==n+1u);
     cannon(9.0f,2.0f,3.0f);                                            /* stock re-aims after a shot */
     CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
-    CHECK(FLOAT_AT(CANNON)==48.0f && tnk_lv.aims==n+2u);
+    CHECK(FLOAT_AT(CANNON)==48.0f && TK.aims==n+2u);
     WORD_AT(0x0078B5B0u)=PENT(0);cannon(9.0f,2.0f,3.0f);              /* the first player */
     CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
     CHECK(gun_seen[0]==44.5f && gun_seen[1]==3.6f && gun_seen[2]==31.5f);
     WORD_AT(0x0078B5B0u)=PENT(1);
-    tnk_lv.aims=TNK_AIM_LOGS;cannon(9.0f,2.0f,3.0f);                  /* budget used: still tracked */
+    TK.aims=TNK_AIM_LOGS;cannon(9.0f,2.0f,3.0f);                  /* budget used: still tracked */
     CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
-    CHECK(FLOAT_AT(CANNON)==48.0f && tnk_lv.aims==TNK_AIM_LOGS);
+    CHECK(FLOAT_AT(CANNON)==48.0f && TK.aims==TNK_AIM_LOGS);
     /* left to stock: other guns, other states, another object, AI targets, no target, the castle */
     cannon(9.0f,2.0f,3.0f);g_ebx=3u;
     CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
@@ -652,11 +683,11 @@ int main(void)
     play_scene();
     WORD_AT(0x006D7C4Cu)=1u;                                           /* the original does nothing */
     CALL(pc_mapmaker_tank_mount,fake,0x001CDB8Au,0,0,0,1);
-    CHECK(tnk_lv.obj==TANK);
+    CHECK(tnk_lv.n==1u && tnk_lv.t[0].obj==TANK);
     WORD_AT(0x006D7C4Cu)=0;
     container(0x11,without,2,NULL,0);
     CALL(pc_mapmaker_tank_mount,fake,0x001CDB8Au,0,0,0,1);           /* next level: no tank */
-    CHECK(!tnk_lv.obj);
+    CHECK(!tnk_lv.n && !tnk_lv.act);
     CALL(pc_mapmaker_tank_wake,fake,0x00255580u,0,0,0,1);
     g_ecx=TANK+0x64u;
     CALL(pc_mapmaker_tank_area,fake,0x00255697u,0,0,0,1);
@@ -665,11 +696,118 @@ int main(void)
 
     /* a full level again: one tank, its placeholder removed once */
     level_with_tank(__LINE__);
-    CHECK(tnk_lv.obj==TANK && nspawn==3);
+    CHECK(tnk_lv.n==1u && tnk_lv.t[0].obj==TANK && nspawn==3);
     WORD_AT(A(0)+0xBF0u)=REC(5);                                      /* the pool entry was reused */
     CALL(pc_mapmaker_tank_update,fake,0x00000100u,TANK,0,0,1);
     CHECK(nremove==1);
     CHECK(ai_originals>0);
+
+    /* ---- several tanks: each runs with its own statics ------------------------------ */
+    if(tnk_lv.act) tnk_leave(tnk_lv.act,0);
+    WORD_AT(0x006D7880u)=10u;pak_mounted=0;
+    CALL(pc_mapmaker_tank_mount,fake,0x001CDB8Au,0,0,0,1);           /* a new level */
+    CHECK(!tnk_lv.n && !tnk_lv.act);
+    resources(1,1,1,0x002560C0u);READY();
+    {
+        static uint32_t b0[0x19],s0[0x1C],t0[0x224/4];
+        unsigned s=nspawn,r=nremove;
+        float sx;
+        for(k=0;k<0x19u;k++) WORD_AT(0x0078B560u+k*4u)=0xA0A0A000u+k;
+        for(k=0;k<0x1Cu;k++) WORD_AT(0x0075F468u+k*4u)=0xB0B0B000u+k;
+        for(k=0;k<0x89u;k++) WORD_AT(0x0051B920u+k*4u)=0xC0C0C000u+k;
+        memcpy(b0,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof b0);
+        memcpy(s0,(void *)((uintptr_t)0x0075F468u+g_xbox_mem_offset),sizeof s0);
+        memcpy(t0,(void *)((uintptr_t)0x0051B920u+g_xbox_mem_offset),sizeof t0);
+        for(k=0;k<5u;k++) {
+            actor(4u+k,0x12,10.0f*(float)k,1.0f,5.0f,0.0f);
+            spawn_obj=0x00440000u+k*0x1000u;
+            CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(4u+k),0,0,1);
+        }
+        spawn_obj=TANK;
+        CHECK(tnk_lv.n==4u && nspawn==s+4u && !tnk_lv.act);          /* the fifth stays a bot */
+        CHECK(!memcmp(b0,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof b0));
+        CHECK(!memcmp(s0,(void *)((uintptr_t)0x0075F468u+g_xbox_mem_offset),sizeof s0));
+        CHECK(!memcmp(t0,(void *)((uintptr_t)0x0051B920u+g_xbox_mem_offset),sizeof t0));
+        for(k=0;k<4u;k++) {
+            struct tnk_one *t=&tnk_lv.t[k];
+            uint32_t tabs=tnk.tabs+k*0x224u;
+            CHECK(t->obj==0x00440000u+k*0x1000u && t->place==A(4u+k) && t->place_ent==ENT(4u+k));
+            CHECK(t->block[0]==tabs+0xA8u && t->block[1]==tabs+0x78u && t->block[2]==tabs && t->block[3]==0x0051BB44u);
+            CHECK(FLOAT_AT(tabs+0xA8u+0x10u)==(float)(s+1u+k) && WORD_AT(tabs+0x68u)==0 && WORD_AT(tabs+4u)==0xC0C0C001u);
+            CHECK(t->sounds[0]==0x5000u+s+1u+k);
+            CHECK(NEAR(t->d[0],10.0f*(float)k+12.05f) && NEAR(t->d[1],1.0f) && NEAR(t->d[2],3.5f) && NEAR(t->spawn[0],10.0f*(float)k));
+            memcpy(&sx,&t->block[8],4);
+            CHECK(NEAR(sx,-9.0f+t->d[0]));                              /* its first drive target */
+            t->block[13]=20u+k;                                         /* [0x0078B594] */
+        }
+        /* the update: tank 3's statics in, its changes kept, the statics put back */
+        entry_set=33u;
+        CALL(pc_mapmaker_tank_update,fake_entry,0x00000100u,0x00442000u,0,0,1);
+        CHECK(entry_state==22u && entry_guns==tnk.tabs+2u*0x224u+0xA8u);
+        CHECK(tnk_lv.t[2].block[13]==33u && tnk_lv.t[2].sounds[0]==33u && !tnk_lv.act);
+        CHECK(!memcmp(b0,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof b0));
+        CHECK(!memcmp(s0,(void *)((uintptr_t)0x0075F468u+g_xbox_mem_offset),sizeof s0));
+        CHECK(nremove==r+1u && remove_arg==ENT(6) && !tnk_lv.t[2].place && tnk_lv.t[1].place);   /* its own placeholder */
+        entry_set=34u;                                                 /* a later frame */
+        CALL(pc_mapmaker_tank_update,fake_entry,0x00000100u,0x00442000u,0,0,1);
+        CHECK(entry_state==33u && tnk_lv.t[2].block[13]==34u && !tnk_lv.act && nremove==r+1u);
+        CHECK(!memcmp(b0,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof b0));
+        /* tank 1 damaged inside tank 2's frame */
+        nest_obj=0x00440000u;entry_set=44u;
+        CALL(pc_mapmaker_tank_update,fake_entry,0x00000100u,0x00441000u,0,0,2);   /* and the inner damage */
+        nest_obj=0;
+        CHECK(inner_state==20u && entry_state==21u && tnk_lv.t[0].block[13]==99u && tnk_lv.t[1].block[13]==44u && tnk_lv.t[1].block[14]==0x77u+44u);
+        CHECK(nremove==r+2u && remove_arg==ENT(5) && !tnk_lv.act);
+        CHECK(!memcmp(b0,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof b0));
+        /* the other entries */
+        entry_set=23u;
+        CALL(pc_mapmaker_tank_slot7,fake_entry,0x00000100u,0x00443000u,0,0,1);
+        CHECK(entry_state==23u && entry_guns==tnk.tabs+3u*0x224u+0xA8u);
+        CALL(pc_mapmaker_tank_slot2,fake_entry,0x00000100u,0x00443000u,0,0,1);
+        CHECK(entry_state==23u);
+        WORD_AT(0x00570400u)=0x00443000u;
+        CALL(pc_mapmaker_tank_damage,fake_entry,0x00000100u,0x00570400u,0,0,1);
+        CHECK(entry_state==23u);
+        WORD_AT(0x007B0C7Cu)=PLAYER;WORD_AT(PLAYER+0xFF4u)=0x00443000u;
+        CALL(pc_mapmaker_tank_bar,fake_entry,0x0014CD2Du,0,0,0,1);
+        CHECK(entry_state==23u && !tnk_lv.act);
+        CHECK(!memcmp(b0,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof b0));
+        /* not ours: the statics as they are */
+        CALL(pc_mapmaker_tank_slot7,fake_entry,0x00000100u,0x00570000u,0,0,1);
+        CHECK(entry_state==0xA0A0A00Du);
+        WORD_AT(0x0078B594u)=0xA0A0A00Du;WORD_AT(0x0075F468u)=0xB0B0B000u;
+        WORD_AT(PLAYER+0xFF4u)=ENT(3);
+        CALL(pc_mapmaker_tank_bar,fake_entry,0x0014CD2Du,0,0,0,1);
+        CHECK(entry_state==0xA0A0A00Du);
+        WORD_AT(0x0078B594u)=0xA0A0A00Du;WORD_AT(0x0075F468u)=0xB0B0B000u;
+        WORD_AT(0x00570400u)=0x00444000u;                            /* the fifth placeholder made no tank */
+        CALL(pc_mapmaker_tank_damage,fake_entry,0x00000100u,0x00570400u,0,0,1);
+        CHECK(entry_state==0xA0A0A00Du);
+        WORD_AT(0x0078B594u)=0xA0A0A00Du;WORD_AT(0x0075F468u)=0xB0B0B000u;
+        /* the inner hooks act on the active tank only */
+        tnk_enter(2u);
+        CHECK(WORD_AT(0x0078B594u)==44u && tnk_lv.act==2u);
+        CHECK(AREA(-12.05f+tnk_lv.t[1].d[0],1.5f+tnk_lv.t[1].d[2])==1u && AREA(-12.05f+tnk_lv.t[0].d[0]-9.0f,1.5f+tnk_lv.t[0].d[2])==0);
+        FLOAT_AT(0x00441000u+0x64u)=10.0f;FLOAT_AT(0x00441000u+0x6Cu)=5.0f;
+        g_edi=0x00440000u;WORD_AT(0x0078B5B0u)=0;FLOAT_AT(0x00440000u+0x64u)=3.0f;
+        CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);    /* tank 1 while tank 2 runs: stock */
+        CHECK(seen_tank[0]==3.0f);
+        g_edi=0x00441000u;
+        CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);
+        CHECK(NEAR(seen_tank[0],10.0f-tnk_lv.t[1].d[0]));
+        g_esi=0x00441000u;
+        CALL(pc_mapmaker_tank_wreck,fake_wreck,0x00255E78u,0,0,0,1);
+        CHECK(NEAR(FLOAT_AT(0x00441000u+0x64u),10.0f) && NEAR(FLOAT_AT(0x00441000u+0x68u),1.0f-50.0f) && NEAR(FLOAT_AT(0x00441000u+0x6Cu),5.0f));
+        g_esi=0x00442000u;FLOAT_AT(0x00442000u+0x68u)=7.0f;
+        CALL(pc_mapmaker_tank_wreck,fake_wreck,0x00255E78u,0,0,0,1);    /* not the active one */
+        CHECK(FLOAT_AT(0x00442000u+0x68u)==20.0f);
+        tnk_leave(2u,0);
+        CHECK(!memcmp(b0,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof b0) && !tnk_lv.act);
+        WORD_AT(0x0079094Cu)=4u;                                       /* the castle: no swaps */
+        CALL(pc_mapmaker_tank_slot7,fake_entry,0x00000100u,0x00443000u,0,0,1);
+        CHECK(entry_state==0xA0A0A00Du);
+        play_scene();
+    }
 
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
     printf("mapmaker tank ok\n");
