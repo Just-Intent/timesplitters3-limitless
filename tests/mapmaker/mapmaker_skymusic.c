@@ -167,6 +167,7 @@ static void weather_list_original(void)         /* sub_00119AB0(count, list): 0 
     originals++;g_esp+=4u;
 }
 static void wx_list(uint32_t count,uint32_t list) { hook(pc_mapmaker_skymusic_weather_list,weather_list_original,0x0006E87Fu,count,list,0); }
+static void wx_frame(void) { hook(pc_mapmaker_skymusic_weather_frame,plain_original,0x001CE564u,0,0,0); }
 static void sky_built(void) { hook(pc_mapmaker_skymusic_sky_built,plain_original,0x000CC966u,0x00500000u,0,0); }
 /* What the cloud setup (pc_mapmaker_sky.inc) sees as the map's sky. */
 static int clouds_sky(void) { return mapmaker_sky_index(INFO(WORD_AT(0x00784014u))); }
@@ -316,6 +317,8 @@ int main(void)
     wx_start();
     CHECK(WORD_AT(0x007AC804u)==0x00507898u && WORD_AT(0x007AC800u)==1u && WORD_AT(0x007AC808u)==0u);
     wx_list(0,0);                                       /* scene 100's empty list after the start */
+    for(i=0;i<700u;i++) wx_frame();
+    CHECK(smx.frames==700u);                            /* probe counts this level's frames */
     CHECK(seen_count==1u && seen_list==0x00507898u && WORD_AT(0x007AC804u)==0x00507898u);
     WORD_AT(0x007AC824u)=0;wx_start();wx_list(0,0);     /* buffers missing: default list kept */
     CHECK(WORD_AT(0x007AC804u)==0x004E63F8u && seen_count==0u);
@@ -327,6 +330,7 @@ int main(void)
     CHECK(WORD_AT(0x0073D9ACu)==0u && call_count==0);
     wx_start();CHECK(WORD_AT(0x007AC804u)==0x004E63F8u);
     wx_list(0,0);CHECK(seen_count==0u);
+    wx_frame();CHECK(smx.frames==0u);                   /* rain map: probe idle */
     make_container(C,F_WX(1),-1,58,0);unmount_all();mount_fails=1;mount();
     wx_load();CHECK(WORD_AT(0x0073D9ACu)==0u && smx.sand_on==0);   /* no pak: no sandstorm */
     mount_fails=0;

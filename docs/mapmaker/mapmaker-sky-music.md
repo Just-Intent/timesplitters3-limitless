@@ -194,6 +194,21 @@ dword). System Link peers without this build see the same fallbacks.
 **Playtest v0.4.0-mapmaker.25 (mapmaker-recon 54129718):** the new music
 played; the extra skies and the sandstorm did not show. Static re-check:
 
+The .25 log (`logs/mapmaker25-bossmap.err`, ignored) has, per level, two
+`mounted an extra sky or weather pak` lines and `sandstorm on (1319, 4)`: in
+that test the paks did mount in the old place and the sandstorm was armed, so
+the mount-timing change below is a hardening, not the cause there. The
+sandstorm was then undone by the level setup's list reset (second item). The
+sky hook logged nothing in .25 (it had no success line), so whether the
+model was requested and read is what the new lines show. A further suspect
+for the sky: story sky models are small (`skycoldnight` 1.8 KB, `skycastle_xbox`
+11.7 KB) and their textures are separate pak entries; if a level's textures
+are loaded from a level-wide list rather than through the model, an extra
+sky would be built but untextured or invisible (INFERRED, not traced). The
+weather per-frame path has no scene gate (`sub_001CE420` -> `sub_0011BBC0`
+every frame; `sub_001CEBC0` -> `sub_0011BC60` draw); the sandstorm runs only
+while the current list entry has type 5.
+
 - **Mounts in the wrong place (sky and sandstorm, the likely cause).** The
   first build mounted both paks in the `sub_00062790` hook, the only hook that
   reads the map before `sub_001CDC50`, and only when `[0x0079094C]` was 100.
@@ -307,6 +322,7 @@ WRAP sub_0011B310 -> pc_mapmaker_skymusic_weather_start  (new in .25; sub_0011B4
 WRAP sub_00045DE0 -> pc_mapmaker_skymusic_music          (new in .25; register argument eax, must see the guest g_eax at entry)
 WRAP sub_00119AB0 -> pc_mapmaker_skymusic_weather_list   (NEW after .25; cdecl count, list; one caller 0x0006E87A; edits its two stack arguments before the original)
 WRAP sub_0011D2C0 -> pc_mapmaker_skymusic_sky_built      (NEW after .25; cdecl view; one caller 0x000CC961; probe after the original)
+WRAP sub_0011BBC0 -> pc_mapmaker_skymusic_weather_frame  (NEW after .25; weather frame update, no args, every frame; callers 0x001CE55F/0x001CE596; probe after the original, one compare when no sandstorm)
 ```
 
 All call their original exactly once (no `MAPMAKER_GUEST_RET`). Guest
@@ -340,6 +356,9 @@ order:
   (one line per view, two at most);
 - `weather start: sandstorm list set ...`, `level setup: sandstorm list kept (count, list) (1, 5273752)`,
   or `sandstorm buffers missing; not drawn (a, b)`.
+- `map start: extra sky row K resolved to record R model 0x.. (resource row N), map's stock sky S, level sky before B`;
+- `weather frame F: list 0x.. index I type T sandstorm 1 buffers ..` on the
+  1st, 60th and 600th frame of a sandstorm level (type 5 draws).
 
 Reading the next log: no `map has extra sky` line = the map's row bits are
 not seen in play; `mounted` but no `map start` line = the map start did not
