@@ -1,10 +1,55 @@
 # MapMaker castle tank (story mission 2 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_tank.inc` (area `tank`),
-fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 90 mutations, plus
+fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 115 mutations, plus
 decode, US XBE data and game-pak checks of every site below). Wired in
 v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
 No guest-code table entry of its own, no new save bytes.
+
+## Fixed after v0.4.0-mapmaker.22: the game froze when the fight started
+
+Playtest log (v0.4.0-mapmaker.22, twice): `castle tank created`, `spawn
+(...)`, `placeholder AI removed`, `fight started: a player came near`, then
+no more guest frames. Cause (CONFIRMED by decode, test
+`test_arena_constants_and_courtyard`): an endless loop in the drive target
+search, caused by this area's own **area** hook.
+
+- `sub_00251CD0` is not a "gate" test: its three rectangles 0x0051BB58..
+  (x -15..-3 / z -10..-6.8, x -17.5..-3 / z -6.8..6.7, x -21.8..-3 /
+  z 6.7..13) together are the castle **courtyard**, where the tank drives.
+  It answers 1 when the point is strictly inside one.
+- `sub_00254690` (default branch, every state but 6/7/8) picks the next
+  drive target: a random point 15 m around the player (clamped to the
+  arena box), counted only when `sub_00251CD0` says inside (`je 0x00254895`
+  skips `inc esi` at 0x00254894), until 10 points are counted (0x002547E0)
+  or the best is 10 m from the tank (0x0025489D, `ja 0x002547E0`). The hook
+  answered "never inside", so nothing was ever counted and the loop never
+  ended. It runs as soon as the fight starts (state 1).
+- Every other loop the tank's frame reaches was checked (backward jumps in
+  all 215 functions reachable from `sub_00255550`): the tank code's loops
+  run over fixed counts (4-5 guns, 3 sounds, 3 rectangles, 10 model parts,
+  the player count, a model's part count); `sub_002548F0`'s backward jump is
+  a shared exit, not a loop; the tagged-object lookup `sub_0023FF20`
+  ('TKDR', state 1) walks a null-terminated sorted list. None depends on
+  castle positions.
+
+Fix: **area** now answers the stock courtyard test with the point moved by
+-d (the courtyard sits around the spawn just as the arena box does); inside
+the castle-frame calls (target, state 7) the point is already moved and is
+tested as is. The same answer drives states 6 (player inside: drive at the
+player) and 8 (tank outside: drive back to the castle point
+(-9.7, -0.17, 4.3) + d) as in the castle. Guard: when one search has met 64
+points outside the courtyard (call site 0x00254848 only), every further
+point counts, which ends the loop within 10 more tries, and the log says
+`drive target search found no courtyard point: taking any (state, misses)`.
+The miss count restarts with every call of `sub_00254690`.
+
+New log lines (their own budget of 48 per level, then `fight log budget used
+up for this level`), each `(new state, previous)` when the fight state
+changed: `fight state at frame start` (start of the tank's frame), `fight
+state at drive target` (entry of `sub_00254690`), `fight state entry`
+(entry of `sub_00255390`, end of the frame). The last line before a hang
+names the state reached.
 
 ## Fixed after v0.4.0-mapmaker.21: the tank model never loaded
 
@@ -91,8 +136,9 @@ game paks and checked by the test; INFERRED = reasoning.
 
 The fight (CONFIRMED from `sub_00255550` and its jump tables 0x00255BDC/
 0x00255BE8/0x00255BF4; meanings INFERRED): 0 wait for the start test, 1
-drive in, 3 chase and fire, 4 gun attack, 5 no target, 6 player in a gate
-area, 7 player below the courtyard, 8 tank in a gate area, 9 stunned by a
+drive in, 3 chase and fire, 4 gun attack, 5 no target, 6 player in the
+courtyard (drive at the player), 7 player below the courtyard, 8 tank out of
+the courtyard (drive back in), 9 stunned by a
 heavy hit (12 s; a second bar shows the time), 10 dead.
 
 ## Castle assumptions and what this area does about them
@@ -100,7 +146,7 @@ heavy hit (12 s; a second bar shows the time), 10 dead.
 | castle assumption (CONFIRMED site) | in a MapMaker map | this area |
 |---|---|---|
 | start test `sub_00253140`: the castle object `'RDPC'` (`sub_000B2350`) must exist and every living player be in state 0x15, then level marker 5 (`sub_00227650(5, 3.0)`) | `'RDPC'` is not found: the fight would never start; marker 5 is the map's own logic marker | **wake**: starts when a living player is within 30 m (x/z) of the tank; no marker |
-| three gate rectangles 0x0051BB58.. (`sub_00251CD0`): player inside -> state 6, tank inside -> state 8 (drive to the castle point (-9.7, -0.17, 4.3)), random targets inside rejected | no castle gate | **area**: never inside |
+| courtyard: three rectangles 0x0051BB58.. (`sub_00251CD0`), x -21.8..-3, z -10..13: player inside -> state 6, tank outside -> state 8 (drive to the castle point (-9.7, -0.17, 4.3)), the drive target search counts only points inside and loops until it has some | the courtyard is elsewhere | **area**: the stock test moved by -d; the search takes any point after 64 outside (v0.4.0-mapmaker.22 answered "never" and froze) |
 | drive target `sub_00254690`: player clamped to the arena x -19.1..-5, z -10..13; state 7 target from gun 4's aim point, y 0.17 | the map is elsewhere | **target**: run in the castle frame (below) |
 | state 7 entry `sub_00255390`: castle aim points (-5.3, -1.4, 19.9) or (-13, -2.2, 25) into all five guns | same | **state**: castle frame, aim points moved by +d after |
 | first drive target (-9, own y, -3.2) set by `sub_00251AA0` | same | moved by +d at spawn |
@@ -117,7 +163,9 @@ and restored exactly afterwards; the drive target goes in and out in castle
 coordinates (left bit for bit when the call picks none). `sub_00254690`
 calls only `sub_00153B40` (random) and `sub_00251CD0` (CONFIRMED), so no
 other code sees the moved positions. The tank therefore roams a 14 x 23 m
-box centred on its spawn point (x +-7.05, z +-11.5).
+box centred on its spawn point (x +-7.05, z +-11.5), inside the courtyard
+moved by d (x -9.75..+9.05, z -11.5..+11.5 from the spawn, narrower at the
+-z end): a MapMaker floor should be open there.
 
 **Not rebased (risk).** The update's height tests use absolute heights:
 player y < -1.0 enters state 7 (0x002556BE), y <= -2.4 keeps it
@@ -192,7 +240,7 @@ unchanged when the switch is off or outside scene 100.
 | `WRAP sub_0015B830 -> pc_mapmaker_tank_ai_start` | AI start (cdecl pool entry) | **shared** with `pc_mapmaker_realbosses_ai_start`; order free (each acts only on its own ids; the tank's runs its work after the original) |
 | `WRAP sub_00255550 -> pc_mapmaker_tank_update` | tank frame (cdecl object) | new |
 | `WRAP sub_00253140 -> pc_mapmaker_tank_wake` | fight start test (no args, eax) | new |
-| `WRAP sub_00251CD0 -> pc_mapmaker_tank_area` | gate test (ecx = point, eax) | new |
+| `WRAP sub_00251CD0 -> pc_mapmaker_tank_area` | courtyard test (ecx = point, eax) | new; behaviour changed after v0.4.0-mapmaker.22 (no wiring change) |
 | `WRAP sub_00254690 -> pc_mapmaker_tank_target` | drive target (edi = tank) | new; must see the guest `g_edi` |
 | `WRAP sub_00255390 -> pc_mapmaker_tank_state` | state entry (eax = tank) | new; must see the guest `g_eax` at entry |
 | `WRAP sub_00255C20 -> pc_mapmaker_tank_wreck` | death (esi = tank) | new |
@@ -213,9 +261,11 @@ Also for the integrator: the editor picker row (above), and the
 
 ## Risks (not verified in game)
 
-- Played twice: v0.4.0-mapmaker.20 failed on the stale map address,
-  .21 on the missing model requests (both fixed above). Nothing after the
-  spawn has run yet.
+- Played three times: v0.4.0-mapmaker.20 failed on the stale map address,
+  .21 on the missing model requests, .22 froze in the drive target search
+  (all fixed above). The fight itself has not run yet.
+- MapMaker walls or pits inside the moved courtyard: the tank's targets
+  ignore them (the castle courtyard was open ground).
 - The models are read during the level load (about 380 KB from prop6.pak,
   research estimate), whether or not the tank's placeholder spawns.
 - Collision and driving of a 0x8000000 prop on MapMaker tile floors
@@ -237,8 +287,9 @@ Also for the integrator: the editor picker row (above), and the
    ground-floor spot: in story play the tank appears there (log: `mounted
    prop6.pak`, `requested the tank, turret and wreck models`, `castle tank created`, `spawn (...)`, `placeholder AI
    removed`).
-2. Walk within 30 m: it starts (log `fight started`), drives and fires;
-   the bottom bar reads "Castle Tank".
+2. Walk within 30 m: it starts (log `fight started`, then `fight state ...
+   (1, 0)`), drives and fires; the bottom bar reads "Castle Tank". The game
+   keeps running; if it stops, the last `fight state` line names the state.
 3. Explosives hurt it; a heavy hit shows "Tank exposed" for 12 s
    (log `level event dropped`); map logic markers are unaffected.
 4. Destroy it: wreck and flying turret appear, the tank vanishes
