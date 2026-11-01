@@ -1,10 +1,11 @@
 /* Asset-free contract for src/interface/pc_mapmaker_mothership.inc: the
  * intro's Timesplitter mothership in MapMaker story play. l_64_ch.pak mount
  * at the level's pak mounts, the model requests, the ship created above a
- * placeholder Story AI (id 0x75) straight in its attack state, the firing box
- * and dust height rebased (and restored on the next level), the placeholder
- * removed on the ship's first frame, the fall shifted to the map floor and the
- * bar label. Fake guest memory; fake originals pop their return address like
+ * placeholder Story AI (id 0x75) straight in its attack state, up to four
+ * ships each running with its own copy of the statics (firing box and dust
+ * height rebased in that copy, the stock constants untouched), the placeholder
+ * removed on each ship's first frame, the fall shifted to the map floor and
+ * the bar label. Fake guest memory; fake originals pop their return address like
  * the lifted callees, and every hook call checks esp. */
 #include <stdarg.h>
 #include <stdint.h>
@@ -46,6 +47,7 @@ void sub_000A6F90(void) { g_ecx=3; }
 void sub_0015DDA0(void) { g_ecx=4; }
 void sub_000A5E40(void) { g_ecx=6; }
 void sub_000631C0(void) { g_ecx=7; }
+void sub_00096330(void) { g_ecx=8; }
 static uint32_t heap_next=HEAP;
 static int heap_fail;
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment) { uint32_t p;(void)alignment;if(heap_fail)return 0;p=heap_next;heap_next+=(bytes+15u)&~15u;return p; }
@@ -54,6 +56,9 @@ static int pak_mounted, mount_ok=1, spawn_ok=1, originals, req_reads=1, req_stat
 static unsigned nmount, nspawn, nremove, nrequest;
 static uint32_t mount_args[3], spawn_args[5], remove_arg, requested[8];
 static float spawn_pos[3], spawn_rot[3];
+static uint32_t spawn_obj=SHIP;
+static unsigned ntex;
+static uint32_t tex_args[4][2];
 static int is_pak(uint32_t p) { return p && !strcmp((const char *)((uintptr_t)p+g_xbox_mem_offset),"pak/challenge/l_64_ch.pak"); }
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
@@ -74,9 +79,10 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         nspawn++;memcpy(spawn_args,x,sizeof spawn_args);
         for(i=0;i<3;i++) { spawn_pos[i]=FLOAT_AT(x[1]+(uint32_t)i*4u);spawn_rot[i]=FLOAT_AT(x[2]+(uint32_t)i*4u); }
         if(!spawn_ok) return 0;
-        for(i=0;i<3;i++) FLOAT_AT(SHIP+0x64u+(uint32_t)i*4u)=spawn_pos[i];
-        WORD_AT(SHIP+0x1A0u)=0;HALF_AT(SHIP+0x94u)=0x539u;
-        return SHIP;
+        for(i=0;i<3;i++) FLOAT_AT(spawn_obj+0x64u+(uint32_t)i*4u)=spawn_pos[i];
+        WORD_AT(spawn_obj+0x1A0u)=0;HALF_AT(spawn_obj+0x94u)=0x539u;
+        WORD_AT(0x0075C0E4u)=0;                                 /* the init's engine sound level */
+        return spawn_obj;
     }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
     if(f==sub_000A5E40) {
@@ -86,6 +92,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         if(r>=0 && r<8) req_state[r]=req_reads?2:1;
         return 0;
     }
+    if(f==sub_00096330) { if(ntex<4u) { tex_args[ntex][0]=x[0];tex_args[ntex][1]=x[1]; } ntex++;return 0; }
     if(f==sub_000631C0) {
         for(i=0;i<8;i++) if(x[0]==PATH(i) && req_state[i]) { WORD_AT(REQ(i)+0x10u)=req_state[i]==2?0x00538000u:0;return REQ(i); }
         return 0;
@@ -103,12 +110,13 @@ static uint32_t orig_eax, pre_eax=0xDDDDu;
 static void fake(void) { originals++;g_eax=orig_eax;g_esp+=4u; }
 static int ai_originals;
 static void fake_ai(void) { originals++;ai_originals++;g_esp+=4u; }
-/* sub_00217050: records the height it saw; state 3 falls 1 m, below 6.6 -> 4 */
-static float seen_y;
+/* sub_00217050: records the height and firing box it saw; state 3 falls 1 m, below 6.6 -> 4 */
+static float seen_y, seen_box[5];
 static void fake_update(void)
 {
     uint32_t s=WORD_AT(g_esp+4u);
     originals++;seen_y=FLOAT_AT(s+0x68u);
+    memcpy(seen_box,(void *)((uintptr_t)0x0049EA84u+g_xbox_mem_offset),sizeof seen_box);
     if(WORD_AT(s+0x1A0u)==3u) {
         FLOAT_AT(s+0x68u)-=1.0f;
         if(FLOAT_AT(s+0x68u)<6.6f) WORD_AT(s+0x1A0u)=4u;
@@ -176,6 +184,29 @@ static const float stock_box[5]={-45.5f,-88.04f,-47.8f,-67.0f,-56.0f};
 static void stock_constants(void) { memcpy((void *)((uintptr_t)0x0049EA84u+g_xbox_mem_offset),stock_box,sizeof stock_box); }
 static int constants_stock(void) { return !memcmp((void *)((uintptr_t)0x0049EA84u+g_xbox_mem_offset),stock_box,sizeof stock_box); }
 static void play_scene(void) { WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10u; }
+/* word i of ship k's copy of the statics, as a float */
+static float stf(unsigned k,unsigned i) { float f;memcpy(&f,&msh_lv.s[k].st[i],4);return f; }
+/* an entry's original: records the statics it ran with, changes them, and can
+ * run another ship's damage inside */
+static uint32_t entry_dc, entry_set, nest_obj, inner_dc;
+static float entry_x;
+static void fake_inner(void) { originals++;inner_dc=WORD_AT(0x0075C0DCu);WORD_AT(0x0075C0DCu)=99u;g_esp+=4u; }
+void pc_mapmaker_mothership_damage(void (*original)(void));
+static void fake_entry(void)
+{
+    originals++;
+    entry_dc=WORD_AT(0x0075C0DCu);entry_x=FLOAT_AT(0x0049EA90u);
+    if(nest_obj) {
+        WORD_AT(0x0078D520u)=0x77u+entry_set;                          /* changed before the inner call */
+        WORD_AT(0x00570400u)=nest_obj;
+        g_esp-=8u;WORD_AT(g_esp)=0x00219460u;WORD_AT(g_esp+4u)=0x00570400u;
+        pc_mapmaker_mothership_damage(fake_inner);
+        g_esp+=4u;
+        if(WORD_AT(0x0075C0DCu)!=entry_dc) entry_dc=0xBADu;          /* the outer ship's statics are back */
+    }
+    WORD_AT(0x0075C0DCu)=entry_set;WORD_AT(0x0078D500u)=entry_set;WORD_AT(0x0078D360u)=entry_set;
+    g_esp+=4u;
+}
 static const uint16_t with[]={0x0C,0x75,0xA8}, without[]={0x0C,0xA8}, extra[]={0x30,0x75};
 /* a new level with the placeholder at (40, 2, 30) facing 1.5 */
 static void level_with_ship(int line)
@@ -282,7 +313,7 @@ int main(void)
     resources(1,1,0x0021A710u);                                       /* nothing requested */
     actor(0,0x75,40.0f,2.0f,30.0f,1.5f);
     CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(nspawn==0 && !msh_lv.obj);
+    CHECK(nspawn==0 && !msh_lv.n);
     req_reads=0;                                                      /* requested, not read */
     CALL(pc_mapmaker_mothership_request,fake,0x001CDC25u,0,0,0,1);
     CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
@@ -308,21 +339,26 @@ int main(void)
     FLOAT_AT(ENT(0)+0x68u)=2.0f;
     spawn_ok=0;
     CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(nspawn==1 && !msh_lv.obj && constants_stock());
+    CHECK(nspawn==1 && !msh_lv.n && constants_stock());
     spawn_ok=1;
     ai_originals=0;
+    BYTE_AT(REQ(3)+2u)=0x10u;BYTE_AT(REQ(4)+2u)=0;msh_lv.textured=0;ntex=0;   /* the ship's textures left to its creation */
+    FLOAT_AT(0x004D2D50u+0x3BCu*0x18u+0x14u)=0;
+    WORD_AT(0x0075C0E4u)=0x66u;WORD_AT(0x0078D500u)=0x67u;           /* the statics before */
     CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(nspawn==2 && msh_lv.obj==SHIP && ai_originals==1);
+    CHECK(nspawn==2 && msh_lv.n==1u && msh_lv.s[0].obj==SHIP && ai_originals==1 && !msh_lv.act);
+    CHECK(ntex==1u && tex_args[0][0]==0x00538000u && tex_args[0][1]==1u && msh_lv.textured);   /* the ship only */
+    CHECK(WORD_AT(0x0075C0E4u)==0x66u && WORD_AT(0x0078D500u)==0x67u && constants_stock());   /* put back */
+    CHECK(msh_lv.s[0].st[7]==0 && msh_lv.s[0].st[10]==0x67u);        /* the init's zero, kept for the ship */
     CHECK(spawn_args[0]==0x539u && spawn_args[3]==0 && spawn_args[4]==0);
     CHECK(NEAR(spawn_pos[0],40.0f) && NEAR(spawn_pos[1],32.0f) && NEAR(spawn_pos[2],30.0f));
     CHECK(NEAR(spawn_rot[0],0.0f) && NEAR(spawn_rot[1],1.5f) && NEAR(spawn_rot[2],0.0f));
     CHECK(WORD_AT(SHIP+0x1A0u)==2u);                                  /* attack: no fly-in */
-    CHECK(NEAR(FLOAT_AT(0x0049EA88u),-30.0f) && NEAR(FLOAT_AT(0x0049EA8Cu),90.0f));   /* z */
-    CHECK(NEAR(FLOAT_AT(0x0049EA90u),-20.0f) && NEAR(FLOAT_AT(0x0049EA94u),100.0f));  /* x */
-    CHECK(NEAR(FLOAT_AT(0x0049EA84u),2.0f));                          /* dust on the floor */
-    actor(1,0x75,0.0f,0.0f,0.0f,0.0f);
-    CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(1),0,0,1);
-    CHECK(nspawn==2 && msh_lv.obj==SHIP);                             /* only one */
+    CHECK(NEAR(stf(0,1),-30.0f) && NEAR(stf(0,2),90.0f));            /* its box: z */
+    CHECK(NEAR(stf(0,3),-20.0f) && NEAR(stf(0,4),100.0f));           /* x */
+    CHECK(NEAR(stf(0,0),2.0f));                                       /* dust on the floor */
+    CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==2 && msh_lv.n==1u && ntex==1u);                     /* the same placeholder again */
 
     /* ---- text ------------------------------------------------------------- */
     orig_eax=0x1234u;
@@ -343,6 +379,7 @@ int main(void)
     FLOAT_AT(SHIP+0x68u)=32.0f;
     CALL(pc_mapmaker_mothership_update,fake_update,0x001234u,SHIP,0,0,1);
     CHECK(nremove==1 && remove_arg==ENT(0) && WORD_AT(PLAYER+0xFF4u)==0 && NEAR(seen_y,32.0f));
+    CHECK(NEAR(seen_box[0],2.0f) && NEAR(seen_box[1],-30.0f) && NEAR(seen_box[4],100.0f) && constants_stock() && !msh_lv.act);
     CALL(pc_mapmaker_mothership_update,fake_update,0x001234u,SHIP,0,0,1);
     CHECK(nremove==1);                                                /* once */
     WORD_AT(SHIP+0x1A0u)=3u;                                          /* shot down */
@@ -362,10 +399,10 @@ int main(void)
     /* ---- the next level restores the constants ------------------------------ */
     container(0x11,without,2,NULL,0);
     CALL(pc_mapmaker_mothership_mount,fake,0x001CDB8Au,0,0,0,1);
-    CHECK(!msh_lv.obj && constants_stock());
+    CHECK(!msh_lv.n && constants_stock());
     CALL(pc_mapmaker_mothership_text,fake,0x0014D09Fu,0x164Bu,0,0,1);   /* no ship this level */
     level_with_ship(__LINE__);
-    CHECK(!constants_stock());
+    CHECK(constants_stock() && msh_lv.n==1u);                        /* the constants are never changed */
     WORD_AT(0x0079094Cu)=2u;                                         /* the intro: stock values */
     CALL(pc_mapmaker_mothership_mount,fake,0x001CDB8Au,0,0,0,1);
     CHECK(constants_stock());
@@ -373,11 +410,90 @@ int main(void)
     memset(&msh_lv,0,sizeof msh_lv);                                  /* a second spawn, no restore between */
     actor(0,0x75,-10.0f,5.0f,-20.0f,0.0f);
     CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(msh_lv.obj==SHIP && NEAR(FLOAT_AT(0x0049EA84u),5.0f));
+    CHECK(msh_lv.s[0].obj==SHIP && NEAR(stf(0,0),5.0f) && NEAR(stf(0,3),-70.0f) && constants_stock());
     WORD_AT(0x0079094Cu)=2u;
     CALL(pc_mapmaker_mothership_mount,fake,0x001CDB8Au,0,0,0,1);
     CHECK(constants_stock());                                         /* still the stock values */
     play_scene();
+
+    /* ---- several ships: each runs with its own statics --------------------------- */
+    container(0x11,with,3,NULL,0);resources(1,1,0x0021A710u);
+    pak_mounted=0;WORD_AT(0x006D7880u)=10u;
+    CALL(pc_mapmaker_mothership_mount,fake,0x001CDB8Au,0,0,0,1);
+    CALL(pc_mapmaker_mothership_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(!msh_lv.n && !msh_lv.act);
+    {
+        static uint32_t r0[31];
+        unsigned s=nspawn,r=nremove,t0=ntex;
+        BYTE_AT(REQ(3)+2u)=0x10u;BYTE_AT(REQ(4)+2u)=0x10u;
+        for(k=0;k<3u;k++) WORD_AT(0x0075C0DCu+k*4u)=0xA0A0A000u+k;
+        WORD_AT(0x0075C0ECu)=0xA0A0A0ECu;WORD_AT(0x0078D360u)=0xA0A0A360u;
+        for(k=0;k<21u;k++) WORD_AT(0x0078D500u+k*4u)=0xB0B0B000u+k;
+        msh_save(r0);
+        for(k=0;k<5u;k++) {
+            actor(2u+k,0x75,100.0f*(float)k,1.0f+(float)k,-50.0f,0.0f);
+            spawn_obj=0x00440000u+k*0x1000u;
+            CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(2u+k),0,0,1);
+        }
+        spawn_obj=SHIP;
+        CHECK(msh_lv.n==4u && nspawn==s+4u && !msh_lv.act);         /* the fifth stays a bot */
+        CHECK(ntex==t0+2u);                                           /* once this level, ship and wreck */
+        {
+            uint32_t now[31];
+            msh_save(now);
+            CHECK(!memcmp(now,r0,sizeof now) && constants_stock());
+        }
+        for(k=0;k<4u;k++) {
+            struct msh_one *m=&msh_lv.s[k];
+            CHECK(m->obj==0x00440000u+k*0x1000u && m->place==A(2u+k) && NEAR(m->floor,1.0f+(float)k));
+            CHECK(NEAR(stf(k,0),1.0f+(float)k) && NEAR(stf(k,1),-110.0f) && NEAR(stf(k,3),100.0f*(float)k-60.0f));
+            CHECK(m->st[5]==0xA0A0A000u && m->st[7]==0 && m->st[8]==0xA0A0A0ECu && m->st[9]==0xA0A0A360u && m->st[10]==0xB0B0B000u);
+            m->st[5]=20u+k;                                            /* [0x0075C0DC] */
+        }
+        /* ship 3's update: its statics in, its changes kept, the statics put back */
+        entry_set=33u;
+        CALL(pc_mapmaker_mothership_update,fake_entry,0x001234u,0x00442000u,0,0,1);
+        CHECK(entry_dc==22u && NEAR(entry_x,140.0f) && msh_lv.s[2].st[5]==33u && msh_lv.s[2].st[9]==33u && msh_lv.s[2].st[10]==33u);
+        CHECK(nremove==r+1u && remove_arg==ENT(4) && !msh_lv.s[2].place && msh_lv.s[1].place && !msh_lv.act);
+        {
+            uint32_t now[31];
+            msh_save(now);
+            CHECK(!memcmp(now,r0,sizeof now) && constants_stock());
+        }
+        entry_set=34u;                                                 /* a later frame */
+        CALL(pc_mapmaker_mothership_update,fake_entry,0x001234u,0x00442000u,0,0,1);
+        CHECK(entry_dc==33u && msh_lv.s[2].st[5]==34u && nremove==r+1u && !msh_lv.act && constants_stock());
+        /* ship 1 damaged inside ship 2's frame */
+        nest_obj=0x00440000u;entry_set=44u;
+        CALL(pc_mapmaker_mothership_update,fake_entry,0x001234u,0x00441000u,0,0,2);
+        nest_obj=0;
+        CHECK(inner_dc==20u && entry_dc==21u && msh_lv.s[0].st[5]==99u && msh_lv.s[1].st[5]==44u && msh_lv.s[1].st[18]==0x77u+44u);
+        CHECK(!msh_lv.act && constants_stock() && WORD_AT(0x0075C0DCu)==0xA0A0A000u);
+        /* slot 10 and the damage of ship 4 */
+        entry_set=23u;
+        CALL(pc_mapmaker_mothership_slot10,fake_entry,0x001234u,0x00443000u,0,0,1);
+        CHECK(entry_dc==23u && NEAR(entry_x,240.0f));
+        WORD_AT(0x00570400u)=0x00443000u;
+        CALL(pc_mapmaker_mothership_damage,fake_entry,0x001234u,0x00570400u,0,0,1);
+        CHECK(entry_dc==23u && NEAR(entry_x,240.0f) && !msh_lv.act && constants_stock());
+        /* not ours (another prop's damage, the fifth placeholder, the intro): as they are */
+        WORD_AT(0x00570400u)=0x00570000u;
+        CALL(pc_mapmaker_mothership_damage,fake_entry,0x001234u,0x00570400u,0,0,1);
+        CHECK(entry_dc==0xA0A0A000u);
+        WORD_AT(0x0075C0DCu)=0xA0A0A000u;
+        CALL(pc_mapmaker_mothership_slot10,fake_entry,0x001234u,0x00444000u,0,0,1);
+        CHECK(entry_dc==0xA0A0A000u);
+        WORD_AT(0x0075C0DCu)=0xA0A0A000u;
+        WORD_AT(0x0079094Cu)=2u;
+        CALL(pc_mapmaker_mothership_slot10,fake_entry,0x001234u,0x00443000u,0,0,1);
+        CHECK(entry_dc==0xA0A0A000u);
+        WORD_AT(0x0075C0DCu)=0xA0A0A000u;
+        play_scene();
+        /* each ship falls to its own floor */
+        WORD_AT(0x00441000u+0x1A0u)=3u;FLOAT_AT(0x00441000u+0x68u)=12.0f;
+        CALL(pc_mapmaker_mothership_update,fake_update,0x001234u,0x00441000u,0,0,1);
+        CHECK(NEAR(seen_y,10.0f) && NEAR(seen_box[0],2.0f) && NEAR(seen_box[3],40.0f) && constants_stock());
+    }
 
     if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }
     puts("mapmaker mothership ok");
