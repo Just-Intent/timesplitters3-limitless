@@ -46,7 +46,7 @@ MUTATIONS = {
     'load-any-scene': ('    if(!smx_on() || smx_scene()!=102u) return;\n    ed=', '    if(!smx_on()) return;\n    ed='),
     'load-unchecked-row': ('    return k<=count?k:0u;', '    return k;'),
     # mounts
-    'mount-no-reset': ('    smx.sky_row=0;smx.sand_ready=0;smx.sand_on=0;smx.level_logs=0;\n', ''),
+    'mount-no-reset': ('    smx.sky_row=0;smx.sand_ready=0;smx.sand_on=0;smx.level_logs=0;smx.frames=0;\n', ''),
     'mount-at-level-start': ('    if(pending==100u && smx_on()) smx_log(', '    if(smx_play_info()) mapmaker_sky.extra_ready=smx_mount(mapmaker_sky_extras[1].pak);\n    if(pending==100u && smx_on()) smx_log('),
     'mount-no-prepare-hook': ('mapmaker_sky.extra_ready=0;mapmaker_sky.extra_prepare=smx_prepare_sky;', 'mapmaker_sky.extra_ready=0;mapmaker_sky.extra_prepare=0;'),
     'mount-skip-ignored': ('    if(WORD_AT(SMX_MOUNT_SKIP)) { original();return; }   /* the original does nothing */\n', ''),
@@ -76,6 +76,8 @@ MUTATIONS = {
     'sand-start-list-kept': ('    WORD_AT(SMX_WX_LIST)=smx_weather[0].list;\n', ''),
     'sand-level-list-reset': ('        WORD_AT(g_esp+8u)=smx_weather[0].list;\n', ''),
     'sand-level-count-zero': ('        WORD_AT(g_esp+4u)=1u;\n', ''),
+    'frame-any-map': ('    if(smx.sand_on!=1 || smx_scene()!=100u) return;\n    smx.frames++;', '    smx.frames++;'),
+    'frame-not-reset': ('smx.level_logs=0;smx.frames=0;', 'smx.level_logs=0;'),
     # music
     'music-any-caller': ('    if(MAPMAKER_PTR_OK(g_esp,4u) && WORD_AT(g_esp)==SMX_RET_MUSIC_PLAY && g_eax==0xFFFFFFFFu &&',
                          '    if(MAPMAKER_PTR_OK(g_esp,4u) && g_eax==0xFFFFFFFFu &&'),
@@ -255,6 +257,7 @@ def test_decoded_sites():
     assert calls(0x001CDE30) == {0x0003D645} and calls(0x0006EC10) == {0x0003D64A}
     assert calls(0x0006D7A0) == {0x0006ED4D, 0x0006EDD2} and calls(0x00119AB0) == {0x0006E87A}
     assert calls(0x0011B430) == {0x001CE046, 0x001CE0BF} and calls(0x0011D2C0) == {0x000CC961}
+    assert calls(0x0011BBC0) == {0x001CE55F, 0x001CE596}
     assert calls(0x000CCA10) >= {0x001CDF9A}
     at0 = {i.address: i for i in insns}
     # sub_00062790 mounts for the pending scene byte while [0x007DE398] has 0x800000.
@@ -349,7 +352,7 @@ def test_wrappers_documented():
     doc = DOC.read_text(encoding='utf-8')
     text = SMX.read_text(encoding='utf-8')
     for target, name in (('00078590', 'rows'), ('003006C0', 'compile'), ('00301A90', 'load'), ('00062790', 'mount'),
-                         ('0023F390', 'level'), ('00119960', 'weather_load'), ('0011B310', 'weather_start'), ('00119AB0', 'weather_list'), ('0011D2C0', 'sky_built'),
+                         ('0023F390', 'level'), ('00119960', 'weather_load'), ('0011B310', 'weather_start'), ('00119AB0', 'weather_list'), ('0011D2C0', 'sky_built'), ('0011BBC0', 'weather_frame'),
                          ('00045DE0', 'music')):
         assert f'WRAP sub_{target} -> pc_mapmaker_skymusic_{name}' in doc, name
         assert f'void pc_mapmaker_skymusic_{name}(void (*original)(void))' in text, name

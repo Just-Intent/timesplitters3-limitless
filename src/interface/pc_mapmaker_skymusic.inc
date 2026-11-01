@@ -134,6 +134,7 @@ static struct {
     const char *path_of[MAPMAKER_SKY_EXTRA_COUNT+SMX_WEATHER_COUNT];
     uint32_t sky_row;                        /* this level: extra sky row whose pak was tried */
     uint32_t level_logs;                     /* this level: sky probe lines */
+    uint32_t frames;                         /* this level: weather frames seen (probe) */
     int sand_ready;                          /* this level: the sandstorm pak is mounted */
     int sand_on;                             /* this level: sandstorm flag set by us */
     unsigned long long rows, logged;
@@ -326,7 +327,7 @@ void pc_mapmaker_skymusic_mount(void (*original)(void))
     if(WORD_AT(SMX_MOUNT_SKIP)) { original();return; }   /* the original does nothing */
     original();
     mapmaker_sky.extra_ready=0;mapmaker_sky.extra_prepare=smx_prepare_sky;
-    smx.sky_row=0;smx.sand_ready=0;smx.sand_on=0;smx.level_logs=0;
+    smx.sky_row=0;smx.sand_ready=0;smx.sand_on=0;smx.level_logs=0;smx.frames=0;
     if(pending==100u && smx_on()) smx_log("new MapMaker level (scene now, mounted paks)",smx_scene(),WORD_AT(SMX_MOUNTS));
 }
 
@@ -350,10 +351,12 @@ void pc_mapmaker_skymusic_level(void (*original)(void))
         return;
     }
     old=smx_get16(info+SMX_INFO_SKY);
+    fprintf(stderr,"[mapmaker] skymusic: map start: extra sky row %u resolved to record %d model 0x%X (resource row %d), map's stock sky %d, level sky before %u\n",
+            k,mapmaker_sky_extras[k-1u].sky,model,smx_get16(SMX_RESMAP+model*2u),old,WORD_AT(SMX_LEVEL100+0x10u));
     smx_set16(info+SMX_INFO_SKY,(uint32_t)mapmaker_sky_extras[k-1u].sky);
     original();
     smx_set16(info+SMX_INFO_SKY,(uint32_t)old);
-    smx_log("map start: level sky record, model requested",WORD_AT(SMX_LEVEL100+0x10u),model);
+    smx_log("map start: level sky record after, model requested",WORD_AT(SMX_LEVEL100+0x10u),model);
 }
 
 /* WRAP sub_0011D2C0 (a view's sky prop; cdecl view): probe only. Logs the
@@ -437,6 +440,26 @@ void pc_mapmaker_skymusic_weather_list(void (*original)(void))
         smx_log("level setup: sandstorm list kept (count, list)",1u,smx_weather[0].list);
     }
     original();
+}
+
+/* WRAP sub_0011BBC0 (weather frame update, no args; called every frame from
+ * sub_001CE420 at 0x001CE55F/0x001CE596 with no scene test; it runs the
+ * sandstorm (sub_0011ACF0) only while [0x0073D9AC] and the current list
+ * entry has type 5, 0x0011BC4F): probe only. On a sandstorm map it logs, on
+ * the 1st, 60th and 600th frame of the level, the list, the entry's type,
+ * the flag and the buffers. */
+void pc_mapmaker_skymusic_weather_frame(void (*original)(void))
+{
+    uint32_t list,index,type;
+    original();
+    if(smx.sand_on!=1 || smx_scene()!=100u) return;
+    smx.frames++;
+    if(smx.frames!=1u && smx.frames!=60u && smx.frames!=600u) return;
+    list=WORD_AT(SMX_WX_LIST);index=WORD_AT(SMX_WX_INDEX);
+    type=MAPMAKER_PTR_OK(list+index*0x28u,4u)?WORD_AT(list+index*0x28u):0xFFFFFFFFu;
+    fprintf(stderr,"[mapmaker] skymusic: weather frame %u: list 0x%08X index %u type %d sandstorm %u buffers 0x%08X 0x%08X (type 5 draws)\n",
+            smx.frames,list,index,(int)type,WORD_AT(SMX_SANDSTORM),WORD_AT(SMX_WX_BUF1),WORD_AT(SMX_WX_BUF2));
+    fflush(stderr);
 }
 
 /* WRAP sub_00045DE0 (start the level music: eax = music id, -1 = the
