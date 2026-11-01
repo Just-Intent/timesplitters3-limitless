@@ -46,6 +46,7 @@ static int near_eq(float a,float b) { return fabsf(a-b)<0.01f; }
 
 /* distinct bodies: identical ones may be folded */
 void sub_0003DFA0(void) { g_ecx=1; }
+void sub_0005B980(void) { g_ecx=11; }
 void sub_0005A130(void) { g_ecx=2; }
 void sub_00062260(void) { g_ecx=3; }
 void sub_001D1E80(void) { g_ecx=4; }
@@ -55,7 +56,8 @@ void sub_001DA990(void) { g_ecx=7; }
 void sub_00378400(void) { g_ecx=8; }
 void sub_0010E2A0(void) { g_ecx=9; }
 void sub_0009A420(void) { g_ecx=10; }
-int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)area;(void)hook;return 1; }
+static int register_on=1;
+int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)area;return strcmp(hook,"pc_mapmaker_worm_register") || register_on; }
 
 static int failures, originals;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
@@ -63,16 +65,16 @@ static int pak_mounted, trophy_mounted, skeleton_mounted, mount_ok=1, alloc_ok=1
 static unsigned nmount, nalloc, ninit, nupdate, ndraw, nrelease, neffect, npadcalls;
 static uint32_t mount_arg, scratch_size, effect_args[2], init_objects, init_route_done, refuse=0xFFFFFFFFu;
 static uint32_t seen_route[6], seen_enable, seen_wall, tag_ret[2], seen_props, seen_extra, seen_script;
-static float seen_const[10], seen_draw[2];
-static const uint32_t cad[10]={0x0049DF08u,0x0049DF10u,0x0049DE40u,0x0049DF0Cu,0x0047D69Cu,
+static float seen_const[11], seen_draw[2];
+static const uint32_t cad[11]={0x0047D78Cu,0x0049DF08u,0x0049DF10u,0x0049DE40u,0x0049DF0Cu,0x0047D69Cu,
                                0x0049DE3Cu,0x0049DE34u,0x0049DE38u,0x0049DDD8u,0x0049DDD4u};
-static const uint32_t cbits[10]={0xC0198937u,0xC29A6666u,0xC25ECCCDu,0x421E0000u,0xC0C00000u,
+static const uint32_t cbits[11]={0x41D80000u,0xC0198937u,0xC29A6666u,0xC25ECCCDu,0x421E0000u,0xC0C00000u,
                                  0xC29E0000u,0xC0FCCCCDu,0x42213333u,0xC2794189u,0x41873333u};
-static void stock_consts(void) { unsigned k;for(k=0;k<10u;k++) WORD_AT(cad[k])=cbits[k];WORD_AT(0x0049DE08u)=0xC257999Au; }
+static void stock_consts(void) { unsigned k;for(k=0;k<11u;k++) WORD_AT(cad[k])=cbits[k];WORD_AT(0x0049DE08u)=0xC257999Au; }
 static int consts_stock(void)
 {
     unsigned k;
-    for(k=0;k<10u;k++) if(WORD_AT(cad[k])!=cbits[k]) return 0;
+    for(k=0;k<11u;k++) if(WORD_AT(cad[k])!=cbits[k]) return 0;
     return WORD_AT(0x0049DE08u)==0xC257999Au;
 }
 static const uint32_t route_ids[6]={0x4FF,0x514,0x515,0x51D,0x516,0x500};
@@ -126,7 +128,7 @@ static void fake_update(void)
     unsigned k;
     uint32_t ent;
     nupdate++;
-    for(k=0;k<10u;k++) seen_const[k]=F(cad[k]);
+    for(k=0;k<11u;k++) seen_const[k]=F(cad[k]);
     for(k=0;k<6u;k++) seen_route[k]=WORD_AT(0x004FDC24u+k*4u);
     seen_enable=WORD_AT(0x0075B4BCu);
     if(!seen_enable) return;
@@ -146,6 +148,10 @@ static void fake_update(void)
     }
     if(die && WORD_AT(0x0078FAE0u)) { WORD_AT(W(0)+0x24u)=4u;WORD_AT(0x0078FAE0u)=0; }   /* state 4: head removed */
 }
+/* the stock registration sub_0005B980: the table and count it is given */
+static uint32_t reg_seen[2], reg_nested[3];
+static unsigned nregister;
+static void fake_reg(void) { originals++;reg_seen[0]=WORD_AT(g_esp+8u);reg_seen[1]=WORD_AT(g_esp+12u);g_esp+=4u; }
 /* the stock hit callback sub_001D1F30: what it sees; a hit while surfaced */
 static uint32_t hit_seen[5];
 static void fake_hit(void)
@@ -174,6 +180,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     va_start(a,n);
     for(i=0;i<n && i<12;i++) x[i]=va_arg(a,uint32_t);
     va_end(a);
+    if(f==sub_0005B980) { nregister++;reg_nested[0]=x[0];reg_nested[1]=x[1];reg_nested[2]=x[2];return 0; }
     if(f==sub_00062260) return ((x[0]==0x0049D7BCu && pak_mounted) || (x[0]==0x0049D77Cu && trophy_mounted) ||
                                 (x[0]==0x0049D6FCu && skeleton_mounted))?4u:0xFFFFFFFFu;
     if(f==sub_0005A130) { nmount++;mount_arg=x[0];if(mount_ok) pak_mounted=1;return mount_ok?1u:0u; }
@@ -321,14 +328,42 @@ int main(void)
     CALL(pc_mapmaker_worm_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==1 && !pak_mounted);
     WORD_AT(0x006D7880u)=10u;
-    /* lv1_2 shares anim ids with lv1_3 and lv1_6: never mounted with either */
-    pak_mounted=0;trophy_mounted=1;
+    /* with lv1_3 or lv1_6: mounted (register keeps lv1_2 to the worm's names) */
+    pak_mounted=0;trophy_mounted=1;skeleton_mounted=1;
     CALL(pc_mapmaker_worm_anims,fake,0x0005C506u,0,0,0,1);
-    CHECK(nmount==1 && !pak_mounted);
+    CHECK(nmount==2 && pak_mounted);
+    /* without register: never mounted with either (they share two Jo-Beth names) */
+    register_on=0;
+    pak_mounted=0;skeleton_mounted=0;
+    CALL(pc_mapmaker_worm_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nmount==2 && !pak_mounted);
     trophy_mounted=0;skeleton_mounted=1;
     CALL(pc_mapmaker_worm_anims,fake,0x0005C506u,0,0,0,1);
-    CHECK(nmount==1 && !pak_mounted);
-    skeleton_mounted=0;pak_mounted=1;
+    CHECK(nmount==2 && !pak_mounted);
+    skeleton_mounted=0;
+    CALL(pc_mapmaker_worm_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nmount==3 && pak_mounted);
+    register_on=1;
+
+    /* ---- register: lv1_2's table gives only the worm's names ------------- */
+    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048BEC8u,0x1Eu,1);
+    CHECK(reg_seen[0]==0x0048BEC8u+21u*0x18u && reg_seen[1]==8u);                  /* wrmburst..wrmdeath */
+    CHECK(nregister==1 && reg_nested[0]==0x0049C690u && reg_nested[1]==0x0048BEC8u+5u*0x18u && reg_nested[2]==1u);  /* barney_worm */
+    CHECK(WORD_AT(ESP0+8u)==0x0048BEC8u && WORD_AT(ESP0+12u)==0x1Eu && WORD_AT(ESP0+4u)==0x0049C690u);
+    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048C1B0u,0x10u,1);   /* lv1_3: stock */
+    CHECK(reg_seen[0]==0x0048C1B0u && reg_seen[1]==0x10u && nregister==1);
+    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048C738u,0x1Eu,1);   /* another table, same count: stock */
+    CHECK(reg_seen[0]==0x0048C738u && reg_seen[1]==0x1Eu && nregister==1);
+    CALL(pc_mapmaker_worm_register,fake_reg,0x001C9601u,0x0049C690u,0x0048BEC8u,0x1Du,1);   /* another count: stock */
+    CHECK(reg_seen[1]==0x1Du && nregister==1);
+    WORD_AT(0x0079094Cu)=1u;                                  /* mission 5: the whole table */
+    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048BEC8u,0x1Eu,1);
+    CHECK(reg_seen[0]==0x0048BEC8u && reg_seen[1]==0x1Eu && nregister==1);
+    WORD_AT(0x0079094Cu)=100u;
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);                     /* off: stock */
+    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048BEC8u,0x1Eu,1);
+    CHECK(reg_seen[1]==0x1Eu && nregister==1);
+    set_env("TSFP_MAPMAKER_LIMITS","1");
 
     /* ---- AI start: one worm per map ------------------------------------- */
     level();
@@ -362,10 +397,11 @@ int main(void)
     CHECK(!near_eq(F(W(0)+0x3Cu+64u*12u),10.0f));            /* the trail ends at 64 */
     CHECK(near_eq(wrm_lv.dx,76.45f) && near_eq(wrm_lv.dz,-36.75f) && near_eq(wrm_lv.dy,6.4f));
     /* during the update: the constants follow the spawn, the route is this map's */
-    CHECK(near_eq(seen_const[0],4.001f) && near_eq(seen_const[1],-0.75f) && near_eq(seen_const[2],20.75f));
-    CHECK(near_eq(seen_const[3],2.75f) && near_eq(seen_const[4],-42.75f) && near_eq(seen_const[5],-2.55f));
-    CHECK(near_eq(seen_const[6],-44.65f) && near_eq(seen_const[7],3.55f));
-    CHECK(near_eq(seen_const[8],14.136f) && near_eq(seen_const[9],-19.85f));
+    CHECK(near_eq(seen_const[1],4.001f) && near_eq(seen_const[2],-0.75f) && near_eq(seen_const[3],20.75f));
+    CHECK(near_eq(seen_const[4],2.75f) && near_eq(seen_const[5],-42.75f) && near_eq(seen_const[6],-2.55f));
+    CHECK(near_eq(seen_const[7],-44.65f) && near_eq(seen_const[8],3.55f));
+    CHECK(near_eq(seen_const[9],14.136f) && near_eq(seen_const[10],-19.85f));
+    CHECK(near_eq(seen_const[0],27.0f-36.75f));                 /* the state-2 burst line follows z */
     for(k=0;k<6u;k++) CHECK(seen_route[k]==ring[k]);
     CHECK(consts_stock() && route_stock());                  /* restored after the call */
     CHECK(seen_script==0);                                   /* the mansion script trigger dropped */
@@ -382,11 +418,11 @@ int main(void)
     CHECK(WORD_AT(ENT(0)+0x160u)==0x000D8E30u && WORD_AT(ENT(0)+0x164u)==0);
     /* every later tick: the update again, no think, nothing moves */
     CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
-    CHECK(nupdate==2 && near_eq(F(W(0)),10.0f) && near_eq(seen_const[0],4.001f) && consts_stock());
+    CHECK(nupdate==2 && near_eq(F(W(0)),10.0f) && near_eq(seen_const[1],4.001f) && consts_stock());
     /* a constant that is not stock is left alone */
     SETF(0x0049DF0Cu,1.5f);
     CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
-    CHECK(near_eq(seen_const[3],1.5f) && near_eq(F(0x0049DF0Cu),1.5f) && near_eq(seen_const[1],-0.75f));
+    CHECK(near_eq(seen_const[4],1.5f) && near_eq(F(0x0049DF0Cu),1.5f) && near_eq(seen_const[2],-0.75f));
     stock_consts();
     /* a stale worm block (another level's): stock */
     WORD_AT(0x0075B4B4u)=0x00740000u;
