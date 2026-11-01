@@ -140,13 +140,24 @@
  * is local to a bone. So it emerges (princess_start) wherever its Story AI
  * spawns.
  *  - level (sub_0025F720): after the original, in a MapMaker story map whose
- *    custom set has id 0x28 (or an unreadable container), allocate the state
- *    with the stock sub_00287E00 (52.6 KB of the level heap, freed with the
- *    level like the stock blocks; the pointers are cleared first so a failed
- *    allocation is seen). Every level start forgets the previous level's.
- *  - ai_start: one giant skeleton per map gets record +0/+4 = 0/0x20000 when
- *    lv1_6.pak is mounted and this level's state exists; a second one (other
- *    spawn record) keeps the MapMaker class (logged, counted).
+ *    custom set has id 0x28 (or an unreadable container), one state per
+ *    Story AI placed with it (chunk +0x28 slot holding 0x28; at least 1, at
+ *    most RBS_INST_MAX 4), each made with the stock sub_00287E00 (52.6 KB of
+ *    the level heap, freed with the level like the stock blocks; the
+ *    pointers are cleared first so a failed allocation is seen). Every level
+ *    start forgets the previous level's.
+ *  - Several per map (user, 2026-11-01): each instance keeps its own state
+ *    and its own copy of the particle/effect statics RBS_FX
+ *    (0x0078B080..0x0078B1DB: the particle block pointer [0x0078B0D0], emitter
+ *    shape and counts). Around every entry into its code (the fight, its
+ *    slot-2 callback sub_00286430, the fire draw) the instance is swapped in
+ *    ([0x0078B1EC] and RBS_FX) and everything is put back after, so another
+ *    instance or another area's boss keeps its blocks. Outside, [0x0078B1EC]
+ *    is the first one: its particle-type callback sub_00288BD0 (one shared
+ *    entry, sub_00378400) is called with no entity and uses it.
+ *  - ai_start: each giant skeleton gets a free instance and record +0/+4 =
+ *    0/0x20000 when lv1_6.pak is mounted; one more than the map prepared
+ *    keeps the MapMaker class (logged, counted).
  *  - princess (sub_0029FE00(entity)): for that boss in scene 100, the mansion
  *    variant (a direct call: the callee pops the caller's return address,
  *    exactly the lifted tail jump).
@@ -195,8 +206,12 @@
  * [0x0078B0D0] the skeleton also uses), [0x0078B1E8] = sub_0003DFA0(0x64DC, 1),
  * then sub_00297690 sets every field. The fight works from the entity's own
  * position and the players ([0x007B0C48]); it reads no arena coordinate.
- *  - level: as the skeleton's, with sub_002976F0; ai_start gives one
- *    spawn record per level class 0/0x100000.
+ *  - level: as the skeleton's (several per map, each with its own state, its
+ *    own copy of RBS_FX including the effect blocks [0x0078B090]/[0x0078B098],
+ *    and its own WELL stand-in), with sub_002976F0; ai_start gives each a
+ *    free instance and class 0/0x100000. Swapped in around its fight
+ *    sub_002998E0, message handler sub_0029CBF0, damage callback sub_00298BA0,
+ *    slots 2/3 sub_00299140/sub_00298F60 and the beam draw sub_0029CCB0.
  *  - tag (sub_0023FF20(tag) -> object or 0): its first frame looks up the
  *    level object tagged 'WELL' (0x57454C4C, call 0x0029B32C, return
  *    0x0029B331) and writes its +0x28 without a null test (0x0029B343), as does
@@ -361,6 +376,11 @@
 #define RBS_WALK_TURN 0x590u            /* state: turn to apply, -1/1 x 59.5 degrees (0x0029CA42) */
 #define RBS_WALK_STUN_AT 0x584u         /* state: stage-1 health that triggers the stun (0x00298AB5) */
 #define RBS_WALK_MOVES 40u              /* fight-state changes logged per level */
+/* several giant skeletons / Crow walkers per map (user, 2026-11-01) */
+#define RBS_INST_MAX 4u                 /* per boss and map */
+#define RBS_FX 0x0078B080u              /* particle/effect statics both fights use: 0x0078B080..0x0078B1DB */
+#define RBS_FX_SIZE 0x15Cu              /* (sub_002A62C0..sub_002A8760; the boss pointers follow at 0x0078B1DC) */
+#define RBS_SAI_SLOT 0x28u              /* Story AI chunk data byte: character slot 0..19 (pc_mapmaker_sets.inc) */
 #define RBS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBS_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -372,15 +392,36 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
     int read, optout;
-    uint32_t label, skel_label, walk_label, well, extra_label[6];
+    uint32_t label, skel_label, walk_label, well[RBS_INST_MAX], extra_label[6];
     unsigned logged, meters;
     struct { uint32_t record; uint8_t boss; } real[RBS_REAL_MAX];
 } rbs;
-/* The giant skeleton of this level: its state blocks (0 = none this level)
- * and the one spawn record that holds the boss class. */
-static struct { uint32_t state, parts, record; unsigned extras, events, throws, deaths, skipped, fire; float floor; int floor_set; } rbs_skel;
-/* The Crow walker of this level: its state block, spawn record and pool entry. */
-static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx, seen, ticks, beats, woken, roars, armed, moves; uint32_t last; } rbs_walk;
+/* The giant skeletons and Crow walkers of this level, one per placed Story AI
+ * (at most RBS_INST_MAX each). Each has its own stock state block, its own
+ * copy of the particle/effect statics RBS_FX (its particle block pointer
+ * [0x0078B0D0], emitter shape and counts, the walker's effect blocks
+ * [0x0078B090]/[0x0078B098]) and the spawn record that holds its class. */
+typedef struct {
+    uint32_t state, parts, record;
+    unsigned throws, skipped, fire;
+    float floor;
+    int floor_set;
+    uint8_t fx[RBS_FX_SIZE];
+} RbsSkel;
+typedef struct {
+    uint32_t state, record, actor;
+    unsigned wells, drawn, ticks, beats, woken, roars, armed, moves;
+    uint32_t last;
+    uint8_t fx[RBS_FX_SIZE];
+} RbsWalk;
+static RbsSkel rbs_skels[RBS_INST_MAX];
+static RbsWalk rbs_walks[RBS_INST_MAX];
+/* n: instances with a state this level; cur: the one swapped in (0 = none). */
+static struct { unsigned n, extras, events, deaths; RbsSkel *cur; } rbs_skelf;
+static struct { unsigned n, extras, events, seen; RbsWalk *cur; } rbs_walkf;
+/* What a swap replaced: the boss pointer, the statics and the instance that
+ * was current (an inner entry of the same instance swaps nothing). */
+typedef struct { uint32_t ptr; void *prev; int swapped; uint8_t fx[RBS_FX_SIZE]; } RbsSave;
 
 static void rbs_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -636,10 +677,11 @@ void pc_mapmaker_realbosses_model_request(void (*original)(void))
  * 0x0023F462..0x0023F46D); any other index plays a preset/profile set.
  * 1: custom set read, *t / *s = first slot (1-based) of the trophy monster /
  * the skeleton or 0; 0: not the map's set; -1: unreadable. */
-static int rbs_set_scan(uint32_t *t,uint32_t *s,uint32_t *w)
+static int rbs_set_scan(uint32_t *t,uint32_t *s,uint32_t *w,uint16_t *ids)
 {
     uint32_t container=WORD_AT(RBS_CONTAINER),c,end,steps,info=0,isz=0,extra=0,n,k,id;
     *t=*s=*w=0;
+    if(ids) for(k=0;k<RBS_SET_MAX;k++) ids[k]=0xFFFFu;
     if(!container || !MAPMAKER_PTR_OK(container,RBS_SCAN) || WORD_AT(container)!=RBS_MAGIC) return -1;
     c=container+8u;end=container+RBS_SCAN;
     for(steps=0;steps<0x40000u && end-c>=8u;steps++) {
@@ -657,12 +699,14 @@ static int rbs_set_scan(uint32_t *t,uint32_t *s,uint32_t *w)
     if(RBS_INFO_MEMBERS+n*4u>isz) n=(isz-RBS_INFO_MEMBERS)/4u;
     for(k=0;k<n;k++) {
         id=RBS_H(info+RBS_INFO_MEMBERS+k*4u);
+        if(ids) ids[k]=(uint16_t)id;
         if(id==RBS_WALK_ID && !*w) *w=k+1u;
         if(id==RBS_ID && !*t) *t=k+1u;
         if(id==RBS_SKEL_ID && !*s) *s=k+1u;
     }
     for(k=0;extra && k<RBS_B(extra+3u);k++) {          /* slots 11-20 */
         id=RBS_H(extra+4u+k*4u);
+        if(ids && RBS_INFO_SLOTS+k<RBS_SET_MAX) ids[RBS_INFO_SLOTS+k]=(uint16_t)id;
         if(id==RBS_WALK_ID && !*w) *w=RBS_INFO_SLOTS+k+1u;
         if(id==RBS_ID && !*t) *t=RBS_INFO_SLOTS+k+1u;
         if(id==RBS_SKEL_ID && !*s) *s=RBS_INFO_SLOTS+k+1u;
@@ -673,16 +717,35 @@ static int rbs_set_scan(uint32_t *t,uint32_t *s,uint32_t *w)
 static int rbs_map_has(uint32_t id)
 {
     uint32_t t,s,w;
-    int r=rbs_set_scan(&t,&s,&w);
+    int r=rbs_set_scan(&t,&s,&w,0);
     if(r<=0) return r;
     return (id==RBS_ID?t:id==RBS_SKEL_ID?s:w)!=0;
+}
+/* How many of this boss to prepare: the map's Story AIs whose character slot
+ * (Story AI chunk +0x28; 0..9 the map-info members, 10..19 the sets chunk)
+ * holds the id, at least 1 (as before: a set member with no Story AI, or an
+ * unreadable container) and at most RBS_INST_MAX. */
+static unsigned rbs_count(uint32_t id)
+{
+    uint16_t ids[RBS_SET_MAX];
+    uint32_t t,s,w,container=WORD_AT(RBS_CONTAINER),c,end,steps,slot;
+    unsigned n=0;
+    if(rbs_set_scan(&t,&s,&w,ids)<=0) return 1u;
+    c=container+8u;end=container+RBS_SCAN;
+    for(steps=0;steps<0x40000u && end-c>=8u;steps++) {
+        uint32_t tag=WORD_AT(c),sz=WORD_AT(c+4u);
+        if(tag==RBS_TAG_END || sz>end-c-8u) break;
+        if(tag==RBS_TAG_SAI && sz>RBS_SAI_SLOT && (slot=RBS_B(c+8u+RBS_SAI_SLOT))<RBS_SET_MAX && ids[slot]==id) n++;
+        c+=8u+sz;
+    }
+    return n<1u?1u:n>RBS_INST_MAX?RBS_INST_MAX:n;
 }
 /* What the set check found, for the log (own small budget, once per level hook). */
 static void rbs_set_report(const char *where)
 {
     static unsigned n;
     uint32_t t,s,w;
-    int r=rbs_set_scan(&t,&s,&w);
+    int r=rbs_set_scan(&t,&s,&w,0);
     if(n>=12u) return;
     n++;
     if(r<0) fprintf(stderr,"[mapmaker] realbosses: %s set check: map container unreadable; every real boss assumed\n",where);
@@ -730,71 +793,179 @@ void pc_mapmaker_realbosses_anims(void (*original)(void))
     else rbs_log(has<0?"mounted lv1_3.pak (map container unreadable)":"mounted lv1_3.pak for the giant trophy monster",mounted+1u,0);
 }
 
-/* WRAP sub_0025F720 (story level init, no args): after the original, the
- * giant skeleton's per-level state, allocated and initialised by the stock
- * sub_00287E00 as for scenes 1 and 17. */
-void pc_mapmaker_realbosses_level(void (*original)(void))
-{
-    int has;
-    uint32_t st,pt;
-    original();
-    memset(&rbs_skel,0,sizeof rbs_skel);              /* a new level: nothing of the last one */
-    memset(&rbs_walk,0,sizeof rbs_walk);
-    rbs.logged=0;                                      /* a log budget per level */
-    if(!rbs_play() || rbs.optout) return;
-    rbs_set_report("level init");
-    if((has=rbs_map_has(RBS_WALK_ID))!=0) {           /* before the skeleton: both share [0x0078B0D0] */
-        WORD_AT(RBS_WALK_STATE)=0;
-        guest_call(sub_002976F0,0);
-        st=WORD_AT(RBS_WALK_STATE);
-        if(!st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) rbs_log("no level memory for the Crow walker; bot behaviour",st,0);
-        else {
-            rbs_walk.state=st;
-            rbs_log(has<0?"Crow walker state allocated (map container unreadable)":"Crow walker state allocated",st,0);
-        }
-    }
-    if((has=rbs_map_has(RBS_SKEL_ID))==0) return;
-    WORD_AT(RBS_SKEL_STATE)=0;WORD_AT(RBS_SKEL_PARTS)=0;   /* stale pointers of an earlier level */
-    guest_call(sub_00287E00,0);
-    st=WORD_AT(RBS_SKEL_STATE);pt=WORD_AT(RBS_SKEL_PARTS);
-    if(!st || !pt || !MAPMAKER_PTR_OK(st,RBS_SKEL_STATE_SIZE) || !MAPMAKER_PTR_OK(pt,RBS_SKEL_PARTS_SIZE)) {
-        rbs_log("no level memory for the giant skeleton; bot behaviour",st,pt);
-        return;
-    }
-    rbs_skel.state=st;rbs_skel.parts=pt;
-    rbs_log(has<0?"giant skeleton state allocated (map container unreadable)":"giant skeleton state allocated",st,pt);
-}
-/* This level's skeleton state is in place and this entity is the boss. */
-static int rbs_skel_boss(uint32_t ent)
-{
-    uint32_t a;
-    if(!rbs_skel.record || !rbs_skel.state || WORD_AT(RBS_SKEL_STATE)!=rbs_skel.state) return 0;
-    if(!MAPMAKER_PTR_OK(ent,0x100u) || !MAPMAKER_PTR_OK(a=WORD_AT(ent+RBS_ENT_AI),RBS_ACTOR)) return 0;
-    return WORD_AT(a+RBS_ACTOR_RECORD)==rbs_skel.record && WORD_AT(RBS_SCENE)==100u && rbs_on();
-}
-
+static void *rbs_g(uint32_t a) { return (void *)((uintptr_t)a+g_xbox_mem_offset); }
 static float rbs_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)a+g_xbox_mem_offset),4);return f; }
 static void rbs_setf(uint32_t a,float f) { memcpy((void *)((uintptr_t)a+g_xbox_mem_offset),&f,4); }
 static int rbs_sane(float f) { return f==f && f>-100000.0f && f<100000.0f; }
+
+/* Swap an instance in around a call into its stock code: the boss pointer
+ * (global) and the statics RBS_FX get the instance's, and after the call the
+ * statics are kept in the instance and both are put back exactly as they
+ * were, so no other boss (a robot or split Crowe area, another instance) is
+ * left looking at this one's blocks. An inner entry of the instance that is
+ * already in (a callback during its own fight) swaps nothing. */
+static void rbs_in(uint32_t global,uint32_t state,const uint8_t *fx,RbsSave *s)
+{
+    s->ptr=WORD_AT(global);
+    memcpy(s->fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+    WORD_AT(global)=state;
+    memcpy(rbs_g(RBS_FX),fx,RBS_FX_SIZE);
+    s->swapped=1;
+}
+static void rbs_out(uint32_t global,uint8_t *fx,const RbsSave *s)
+{
+    if(!s->swapped) return;
+    memcpy(fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+    WORD_AT(global)=s->ptr;
+    memcpy(rbs_g(RBS_FX),s->fx,RBS_FX_SIZE);
+}
+static void rbs_skel_in(RbsSkel *k,RbsSave *s)
+{
+    s->swapped=0;s->prev=rbs_skelf.cur;
+    if(rbs_skelf.cur==k) return;
+    rbs_in(RBS_SKEL_STATE,k->state,k->fx,s);
+    rbs_skelf.cur=k;
+}
+static void rbs_skel_out(RbsSkel *k,const RbsSave *s)
+{
+    rbs_out(RBS_SKEL_STATE,k->fx,s);
+    rbs_skelf.cur=(RbsSkel *)s->prev;
+}
+static void rbs_walk_in(RbsWalk *w,RbsSave *s)
+{
+    s->swapped=0;s->prev=rbs_walkf.cur;
+    if(rbs_walkf.cur==w) return;
+    rbs_in(RBS_WALK_STATE,w->state,w->fx,s);
+    rbs_walkf.cur=w;
+}
+static void rbs_walk_out(RbsWalk *w,const RbsSave *s)
+{
+    rbs_out(RBS_WALK_STATE,w->fx,s);
+    rbs_walkf.cur=(RbsWalk *)s->prev;
+}
+
+/* WRAP sub_0025F720 (story level init, no args): after the original, the
+ * per-level state of every giant skeleton and Crow walker the map places,
+ * each made by the stock sub_00287E00 / sub_002976F0 as for scenes 1, 17 and
+ * 81 (one call per instance; each call allocates a new state block, particle
+ * block and, for the walker, effect blocks). Every instance starts from the
+ * statics RBS_FX as they were, keeps its own copy, and the statics are put
+ * back after, so a robot or split Crowe area keeps its own particle block.
+ * The boss pointers are left on the first instance ("home"): code that no
+ * entity routes (the skeleton's particle callback sub_00288BD0) uses it. */
+void pc_mapmaker_realbosses_level(void (*original)(void))
+{
+    int has;
+    unsigned n,k;
+    uint32_t st,pt;
+    uint8_t base[RBS_FX_SIZE];
+    original();
+    memset(rbs_skels,0,sizeof rbs_skels);memset(&rbs_skelf,0,sizeof rbs_skelf);   /* a new level: nothing of the last one */
+    memset(rbs_walks,0,sizeof rbs_walks);memset(&rbs_walkf,0,sizeof rbs_walkf);
+    rbs.logged=0;                                      /* a log budget per level */
+    if(!rbs_play() || rbs.optout) return;
+    rbs_set_report("level init");
+    memcpy(base,rbs_g(RBS_FX),RBS_FX_SIZE);
+    if((has=rbs_map_has(RBS_WALK_ID))!=0) {
+        n=rbs_count(RBS_WALK_ID);
+        for(k=0;k<n;k++) {
+            memcpy(rbs_g(RBS_FX),base,RBS_FX_SIZE);
+            WORD_AT(RBS_WALK_STATE)=0;                 /* a stale pointer of an earlier level is not taken */
+            guest_call(sub_002976F0,0);
+            st=WORD_AT(RBS_WALK_STATE);
+            if(!st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) { rbs_log("no level memory for a Crow walker; bot behaviour",st,k);break; }
+            rbs_walks[k].state=st;
+            memcpy(rbs_walks[k].fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+            rbs_walkf.n=k+1u;
+        }
+        WORD_AT(RBS_WALK_STATE)=rbs_walkf.n?rbs_walks[0].state:0u;
+        if(rbs_walkf.n) rbs_log(has<0?"Crow walker states allocated (map container unreadable)":"Crow walker states allocated",
+                                rbs_walks[0].state,rbs_walkf.n);
+    }
+    if((has=rbs_map_has(RBS_SKEL_ID))!=0) {
+        n=rbs_count(RBS_SKEL_ID);
+        for(k=0;k<n;k++) {
+            memcpy(rbs_g(RBS_FX),base,RBS_FX_SIZE);
+            WORD_AT(RBS_SKEL_STATE)=0;WORD_AT(RBS_SKEL_PARTS)=0;   /* stale pointers of an earlier level */
+            guest_call(sub_00287E00,0);
+            st=WORD_AT(RBS_SKEL_STATE);pt=WORD_AT(RBS_SKEL_PARTS);
+            if(!st || !pt || !MAPMAKER_PTR_OK(st,RBS_SKEL_STATE_SIZE) || !MAPMAKER_PTR_OK(pt,RBS_SKEL_PARTS_SIZE)) {
+                rbs_log("no level memory for a giant skeleton; bot behaviour",st,pt);
+                break;
+            }
+            rbs_skels[k].state=st;rbs_skels[k].parts=pt;
+            memcpy(rbs_skels[k].fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+            rbs_skelf.n=k+1u;
+        }
+        WORD_AT(RBS_SKEL_STATE)=rbs_skelf.n?rbs_skels[0].state:0u;
+        if(rbs_skelf.n) rbs_log(has<0?"giant skeleton states allocated (map container unreadable)":"giant skeleton states allocated",
+                                rbs_skels[0].state,rbs_skelf.n);
+    }
+    memcpy(rbs_g(RBS_FX),base,RBS_FX_SIZE);            /* the statics as they were */
+}
+/* The boss pointer still holds one of this level's instances (home or a
+ * swapped one): nothing else has replaced it. */
+static int rbs_skel_ours(void)
+{
+    unsigned k;
+    uint32_t p=WORD_AT(RBS_SKEL_STATE);
+    for(k=0;k<rbs_skelf.n && rbs_skels[k].state!=p;k++) {}
+    return p && k<rbs_skelf.n;
+}
+static int rbs_walk_ours(void)
+{
+    unsigned k;
+    uint32_t p=WORD_AT(RBS_WALK_STATE);
+    for(k=0;k<rbs_walkf.n && rbs_walks[k].state!=p;k++) {}
+    return p && k<rbs_walkf.n;
+}
+/* The giant skeleton this entity is (its AI's spawn record), in scene 100. */
+static RbsSkel *rbs_skel_of(uint32_t ent)
+{
+    uint32_t a,rec;
+    unsigned k;
+    if(!rbs_skelf.n || !rbs_skel_ours()) return 0;
+    if(!MAPMAKER_PTR_OK(ent,0x100u) || !MAPMAKER_PTR_OK(a=WORD_AT(ent+RBS_ENT_AI),RBS_ACTOR)) return 0;
+    rec=WORD_AT(a+RBS_ACTOR_RECORD);
+    for(k=0;k<rbs_skelf.n && (!rbs_skels[k].record || rbs_skels[k].record!=rec);k++) {}
+    if(k==rbs_skelf.n || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return 0;
+    return &rbs_skels[k];
+}
+static RbsWalk *rbs_walk_of(uint32_t ent)
+{
+    uint32_t a,rec;
+    unsigned k;
+    if(!rbs_walkf.n || !rbs_walk_ours()) return 0;
+    if(!MAPMAKER_PTR_OK(ent,0x100u) || !MAPMAKER_PTR_OK(a=WORD_AT(ent+RBS_ENT_AI),RBS_ACTOR)) return 0;
+    rec=WORD_AT(a+RBS_ACTOR_RECORD);
+    for(k=0;k<rbs_walkf.n && (!rbs_walks[k].record || rbs_walks[k].record!=rec);k++) {}
+    if(k==rbs_walkf.n || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return 0;
+    return &rbs_walks[k];
+}
+
 /* The skeleton's floor: its spawn height, read on the fight's first frame
  * (user report, v0.4.0-mapmaker.16: it hovered one floor up). */
-static void rbs_skel_floor(uint32_t ent)
+static void rbs_skel_floor(RbsSkel *k,uint32_t ent)
 {
     float y;
-    if(rbs_skel.floor_set || !rbs_sane(y=rbs_getf(ent+RBS_ENT_Y))) return;
-    rbs_skel.floor=y;rbs_skel.floor_set=1;
-    fprintf(stderr,"[mapmaker] realbosses: giant skeleton floor height %.2f (mission 5 forces 0)\n",(double)y);
+    if(k->floor_set || !rbs_sane(y=rbs_getf(ent+RBS_ENT_Y))) return;
+    k->floor=y;k->floor_set=1;
+    fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u floor height %.2f (mission 5 forces 0)\n",(unsigned)(k-rbs_skels)+1u,(double)y);
     fflush(stderr);
 }
 
 /* WRAP sub_0029FE00 (cdecl entity; class 0x20000): the mansion variant for
- * the boss in scene 100. sub_0029CEF0 pops the return address at [g_esp]
- * (the lifted tail jump does the same call). */
+ * the boss in scene 100, with its own state swapped in. sub_0029CEF0 pops
+ * the return address at [g_esp] (the lifted tail jump does the same call). */
 void pc_mapmaker_realbosses_princess(void (*original)(void))
 {
-    if(!rbs_skel.record || !MAPMAKER_STACK_OK(8) || !rbs_skel_boss(WORD_AT(g_esp+4u))) { original();return; }
-    rbs_skel_floor(WORD_AT(g_esp+4u));
+    RbsSkel *k;
+    RbsSave s;
+    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(8) || !(k=rbs_skel_of(WORD_AT(g_esp+4u)))) { original();return; }
+    rbs_skel_floor(k,WORD_AT(g_esp+4u));
+    rbs_skel_in(k,&s);
     sub_0029CEF0();
+    rbs_skel_out(k,&s);
 }
 
 /* WRAP sub_002895A0 (cdecl entity; the fight's facing step). Every frame the
@@ -803,9 +974,10 @@ void pc_mapmaker_realbosses_princess(void (*original)(void))
  * MapMaker floor is elsewhere. For the boss in scene 100: its spawn height. */
 void pc_mapmaker_realbosses_face(void (*original)(void))
 {
+    RbsSkel *k;
     uint32_t ent;
-    if(!rbs_skel.floor_set || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=RBS_RET_FACE || !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
-    rbs_setf(ent+RBS_ENT_Y,rbs_skel.floor);
+    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=RBS_RET_FACE || !(k=rbs_skel_of(ent=WORD_AT(g_esp+4u))) || !k->floor_set) { original();return; }
+    rbs_setf(ent+RBS_ENT_Y,k->floor);
     original();
 }
 
@@ -820,12 +992,12 @@ void pc_mapmaker_realbosses_face(void (*original)(void))
  * the focus, fires level event 3 (dropped by _event) and removes the AI with
  * sub_0015DDA0 (0x0029E069), as in mission 5. For the boss in scene 100: the
  * mansion handler (a direct call: the callee pops the caller's return
- * address, exactly the lifted tail jump). */
+ * address, exactly the lifted tail jump). It reads no boss state (test). */
 void pc_mapmaker_realbosses_message(void (*original)(void))
 {
     uint32_t ent;
-    if(!rbs_skel.record || !MAPMAKER_STACK_OK(20) || !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
-    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH && rbs_skel.deaths++<2u)
+    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(20) || !rbs_skel_of(ent=WORD_AT(g_esp+4u))) { original();return; }
+    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH && rbs_skelf.deaths++<4u)
         rbs_log("giant skeleton killed: the mansion death (state 6, animation 0x1A6)",ent,RBS_MSG_DEATH);
     sub_00286D30();
 }
@@ -834,7 +1006,7 @@ void pc_mapmaker_realbosses_message(void (*original)(void))
 void pc_mapmaker_realbosses_risen(void (*original)(void))
 {
     uint32_t ent;
-    if(!rbs_skel.record || !MAPMAKER_STACK_OK(8) || !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
+    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(8) || !rbs_skel_of(ent=WORD_AT(g_esp+4u))) { original();return; }
     g_eax=guest_call(sub_00059DB0,2,ent,RBS_SKEL_START);
     MAPMAKER_GUEST_RET();
 }
@@ -842,15 +1014,19 @@ void pc_mapmaker_realbosses_risen(void (*original)(void))
 /* WRAP sub_00287E20 (cdecl entity, out): the feeble throw as in scene 1. */
 void pc_mapmaker_realbosses_throw(void (*original)(void))
 {
+    RbsSkel *k;
+    RbsSave s;
     uint32_t ent,a,act,st,phase,shot,proj;
-    if(!rbs_skel.record || !MAPMAKER_STACK_OK(12) || !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
+    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(12) || !(k=rbs_skel_of(ent=WORD_AT(g_esp+4u)))) { original();return; }
     a=WORD_AT(ent+RBS_ENT_AI);act=WORD_AT(a+RBS_SKEL_ACTION);
     if(act>=8u || WORD_AT(RBS_SKEL_ACTIONS+act*4u)!=RBS_SKEL_THROW) { original();return; }   /* same in both scenes */
-    st=rbs_skel.state;phase=WORD_AT(st+RBS_SKEL_PHASE);
+    st=k->state;phase=WORD_AT(st+RBS_SKEL_PHASE);
     if(phase==0) {                                     /* aim: the original reads the scene once, first */
+        rbs_skel_in(k,&s);
         WORD_AT(RBS_SCENE)=1u;
         original();
         WORD_AT(RBS_SCENE)=100u;
+        rbs_skel_out(k,&s);
         return;
     }
     if(phase==1) {                                     /* fire, in the real scene */
@@ -858,16 +1034,16 @@ void pc_mapmaker_realbosses_throw(void (*original)(void))
         if(!rbs_sane(rbs_getf(shot)) || !rbs_sane(rbs_getf(shot+4u)) || !rbs_sane(rbs_getf(shot+8u)) ||
            !rbs_sane(rbs_getf(shot+0xCu)) || !rbs_sane(rbs_getf(shot+0x10u)) || !rbs_sane(rbs_getf(shot+0x14u))) {
             WORD_AT(st+RBS_SKEL_PHASE)=2u;                 /* no throw from a broken aim */
-            if(rbs_skel.skipped++<4u) rbs_log("giant skeleton throw skipped: aim not a usable point",WORD_AT(shot),WORD_AT(shot+0xCu));
+            if(k->skipped++<4u) rbs_log("giant skeleton throw skipped: aim not a usable point",WORD_AT(shot),WORD_AT(shot+0xCu));
             MAPMAKER_GUEST_RET();
             return;
         }
         proj=guest_call(sub_000EA9C0,12,0x34u,shot,shot+0xCu,0x3E99999Au,ent,a,2u,1u,WORD_AT(ent+0x34u),0xEu,0xCu,0x3DCCCCCDu);
         guest_call(sub_0010EB90,2,WORD_AT(shot+0x18u),0u);
         WORD_AT(st+RBS_SKEL_PHASE)=2u;
-        if(rbs_skel.throws++<8u) {
-            fprintf(stderr,"[mapmaker] realbosses: giant skeleton feeble throw fired from (%.1f, %.1f, %.1f) dir (%.2f, %.2f, %.2f), boss at height %.1f, projectile 0x%X\n",
-                    (double)rbs_getf(shot),(double)rbs_getf(shot+4u),(double)rbs_getf(shot+8u),(double)rbs_getf(shot+0xCu),
+        if(k->throws++<8u) {
+            fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u feeble throw fired from (%.1f, %.1f, %.1f) dir (%.2f, %.2f, %.2f), boss at height %.1f, projectile 0x%X\n",
+                    (unsigned)(k-rbs_skels)+1u,(double)rbs_getf(shot),(double)rbs_getf(shot+4u),(double)rbs_getf(shot+8u),(double)rbs_getf(shot+0xCu),
                     (double)rbs_getf(shot+0x10u),(double)rbs_getf(shot+0x14u),(double)rbs_getf(ent+RBS_ENT_Y),(unsigned)proj);
             fflush(stderr);
         }
@@ -875,34 +1051,59 @@ void pc_mapmaker_realbosses_throw(void (*original)(void))
     MAPMAKER_GUEST_RET();                              /* done: scene 1 returns (0x00287FD7) */
 }
 
+/* WRAP sub_00286430 (cdecl entity; the slot-2 callback the mansion fight
+ * installs with sub_000A5CE0 at 0x0029D443): reads the skeleton's state, so
+ * this skeleton's is swapped in. */
+void pc_mapmaker_realbosses_skel_slot(void (*original)(void))
+{
+    RbsSkel *k;
+    RbsSave s;
+    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(8) || !(k=rbs_skel_of(WORD_AT(g_esp+4u)))) { original();return; }
+    rbs_skel_in(k,&s);
+    original();
+    rbs_skel_out(k,&s);
+}
+
 /* The Crow walker's death animation has ended: remove it (sub_0015DDA0, the
  * skeleton's stock death call) and drop a story focus that is still on it. */
-static void rbs_walk_remove(void)
+static void rbs_walk_remove(RbsWalk *w)
 {
-    uint32_t a=rbs_walk.actor,ent,player=WORD_AT(RBS_PLAYER);
-    rbs_walk.actor=0;
-    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record ||
+    uint32_t a=w->actor,ent,player=WORD_AT(RBS_PLAYER);
+    w->actor=0;
+    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || WORD_AT(a+RBS_ACTOR_RECORD)!=w->record ||
        !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;
     if(MAPMAKER_PTR_OK(player,RBS_FOCUS+4u) && WORD_AT(player+RBS_FOCUS)==ent) WORD_AT(player+RBS_FOCUS)=0;
     guest_call(sub_0015DDA0,1,ent);
     rbs_log("Crow walker defeated: removed",a,ent);
 }
 
-/* WRAP sub_0023FF20 (cdecl tag -> level object or 0): the walker's 'WELL'. */
+/* The walker whose code is running (swapped in), else the first started one. */
+static RbsWalk *rbs_walk_now(void)
+{
+    unsigned k;
+    if(rbs_walkf.cur) return rbs_walkf.cur;
+    for(k=0;k<rbs_walkf.n && !rbs_walks[k].record;k++) {}
+    return k<rbs_walkf.n?&rbs_walks[k]:0;
+}
+
+/* WRAP sub_0023FF20 (cdecl tag -> level object or 0): the walker's 'WELL',
+ * one stand-in per walker (each moves its +0x68 and flag 0x40). */
 void pc_mapmaker_realbosses_tag(void (*original)(void))
 {
-    uint32_t p;
-    if(!rbs_walk.record || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=RBS_RET_WELL || WORD_AT(g_esp+4u)!=RBS_WALK_TAG) { original();return; }
+    uint32_t p,*slot;
+    RbsWalk *w;
+    if(!rbs_walkf.n || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=RBS_RET_WELL || WORD_AT(g_esp+4u)!=RBS_WALK_TAG) { original();return; }
     original();
-    if(g_eax || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;
-    if(!rbs.well) {
+    if(g_eax || !(w=rbs_walk_now()) || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;
+    slot=&rbs.well[w-rbs_walks];
+    if(!*slot) {
         p=xbox_HeapAlloc(RBS_OBJ_SIZE,16u);
-        if(p && MAPMAKER_PTR_OK(p,RBS_OBJ_SIZE)) rbs.well=p;
+        if(p && MAPMAKER_PTR_OK(p,RBS_OBJ_SIZE)) *slot=p;
         else { rbs_log("no memory for the Crow walker's WELL stand-in",RBS_OBJ_SIZE,0);return; }
     }
-    memset((void *)((uintptr_t)rbs.well+g_xbox_mem_offset),0,RBS_OBJ_SIZE);
-    g_eax=rbs.well;
-    if(!rbs_walk.wells++) rbs_log("Crow walker: no WELL object in a MapMaker map; stand-in used",rbs.well,0);
+    memset((void *)((uintptr_t)*slot+g_xbox_mem_offset),0,RBS_OBJ_SIZE);
+    g_eax=*slot;
+    if(!w->wells++) rbs_log("Crow walker: no WELL object in a MapMaker map; stand-in used",*slot,(uint32_t)(w-rbs_walks)+1u);
 }
 
 /* The giant skeleton's fire (user report, v0.4.0-mapmaker.17: the breath
@@ -911,14 +1112,17 @@ void pc_mapmaker_realbosses_tag(void (*original)(void))
  * 0x001CEE31/0x001CEE42); scene 1's branch: when state +0x3E88 == 1,
  * sub_00019D70(1) then sub_002A7F30([[0x007B0CC0]+0x208], 2.5). Done here
  * for this level's skeleton in scene 100, from the same frame. */
-static void rbs_skel_fire(void)
+static void rbs_skel_fire(RbsSkel *k)
 {
-    uint32_t st=rbs_skel.state,view=WORD_AT(RBS_VIEW);
-    if(!rbs_skel.record || !st || WORD_AT(RBS_SKEL_STATE)!=st || WORD_AT(st+RBS_SKEL_FIRE)!=1u ||
+    uint32_t st=k->state,view=WORD_AT(RBS_VIEW);
+    RbsSave s;
+    if(!k->record || !st || !rbs_skel_ours() || WORD_AT(st+RBS_SKEL_FIRE)!=1u ||
        WORD_AT(RBS_SCENE)!=100u || !rbs_on() || !MAPMAKER_PTR_OK(view,0x20Cu)) return;
+    rbs_skel_in(k,&s);                                 /* its own particle block and counts */
     guest_call(sub_00019D70,1,1u);
     guest_call(sub_002A7F30,2,WORD_AT(view+0x208u),0x40200000u);
-    if(!rbs_skel.fire++) rbs_log("giant skeleton fire particles drawn",st,WORD_AT(RBS_SKEL_PARTS));
+    rbs_skel_out(k,&s);
+    if(!k->fire++) rbs_log("giant skeleton fire particles drawn",st,k->parts);
 }
 
 /* Crow walker heartbeat (user report, v0.4.0-mapmaker.21: "looks right but
@@ -929,21 +1133,22 @@ static void rbs_skel_fire(void)
  * AI class words (+0x10/+0x14); after mapmaker.23 also the animation
  * controller (entity +4): current animation +0xD4, blend target +0x12C and
  * the finished flag sub_00059DD0 reads (+0x17C or +0x124). Log only. */
-static void rbs_walk_heartbeat(void)
+static void rbs_walk_heartbeat(RbsWalk *w)
 {
-    uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state,ctl,cur=0,alt=0,done=0;
-    if(!a || !st || WORD_AT(RBS_WALK_STATE)!=st || rbs_walk.beats>=15u || (rbs_walk.ticks++%120u)) return;
+    uint32_t a=w->actor,ent,st=w->state,ctl,cur=0,alt=0,done=0;
+    unsigned n=(unsigned)(w-rbs_walks)+1u;
+    if(!a || !st || !rbs_walk_ours() || w->beats>=15u || (w->ticks++%120u)) return;
     if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) return;
-    rbs_walk.beats++;
+    w->beats++;
     if(MAPMAKER_PTR_OK(ctl=WORD_AT(ent+4u),RBS_ANIM_SIZE)) {
         cur=WORD_AT(ctl+RBS_ANIM_CUR);alt=WORD_AT(ctl+RBS_ANIM_ALT);
         done=WORD_AT(ctl+(alt?RBS_ANIM_ALT_DONE:RBS_ANIM_DONE));
     }
-    fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: animation 0x%X (blend 0x%X, finished %u), state request %d, yaw %.0f, turn %d, guns %u/%u, stun at %.1f\n",
-            rbs_walk.beats,(unsigned)cur,(unsigned)alt,(unsigned)done,(int)WORD_AT(a+RBS_WALK_AI_NEXT),(double)rbs_getf(ent+0x70u),
+    fprintf(stderr,"[mapmaker] realbosses: Crow walker %u beat %u: animation 0x%X (blend 0x%X, finished %u), state request %d, yaw %.0f, turn %d, guns %u/%u, stun at %.1f\n",
+            n,w->beats,(unsigned)cur,(unsigned)alt,(unsigned)done,(int)WORD_AT(a+RBS_WALK_AI_NEXT),(double)rbs_getf(ent+0x70u),
             (int)WORD_AT(st+RBS_WALK_TURN),(unsigned)WORD_AT(st+RBS_WALK_GUN1),(unsigned)WORD_AT(st+RBS_WALK_GUN2),(double)rbs_getf(st+RBS_WALK_STUN_AT));
-    fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: stage %u, fight state %u, target 0x%X, aim %.0f, entity +0x20 %u, at (%.1f, %.1f, %.1f), health %.1f, class 0x%X/0x%X\n",
-            rbs_walk.beats,(unsigned)RBS_B(st+RBS_WALK_STAGE),(unsigned)WORD_AT(a+RBS_WALK_AI_STATE),(unsigned)WORD_AT(a+4u),
+    fprintf(stderr,"[mapmaker] realbosses: Crow walker %u beat %u: stage %u, fight state %u, target 0x%X, aim %.0f, entity +0x20 %u, at (%.1f, %.1f, %.1f), health %.1f, class 0x%X/0x%X\n",
+            n,w->beats,(unsigned)RBS_B(st+RBS_WALK_STAGE),(unsigned)WORD_AT(a+RBS_WALK_AI_STATE),(unsigned)WORD_AT(a+4u),
             (double)rbs_getf(st+0xE4u),(unsigned)WORD_AT(ent+0x20u),(double)rbs_getf(ent+0x64u),(double)rbs_getf(ent+0x68u),
             (double)rbs_getf(ent+0x6Cu),(double)rbs_getf(st+0x580u),(unsigned)WORD_AT(a+0x10u),(unsigned)WORD_AT(a+0x14u));
     fflush(stderr);
@@ -981,19 +1186,19 @@ static void rbs_walk_heartbeat(void)
 /* Every change of the walker's fight state (AI +0x20), 40 per level: where
  * it goes and what it sees (user request after v0.4.0-mapmaker.25: show
  * exactly where the fight stops). Log only. */
-static void rbs_walk_track(uint32_t a,uint32_t ent,uint32_t st)
+static void rbs_walk_track(RbsWalk *w,uint32_t a,uint32_t ent,uint32_t st)
 {
     uint32_t s=WORD_AT(a+RBS_WALK_AI_STATE),ctl=WORD_AT(ent+4u);
-    if(s==rbs_walk.last || rbs_walk.moves>=RBS_WALK_MOVES) return;
-    rbs_walk.moves++;
-    fprintf(stderr,"[mapmaker] realbosses: Crow walker fight state %u -> %u: stage %u, animation 0x%X, yaw %.0f, aim %.0f, turn %d, guns %u/%u, health %.1f (stun at %.1f), request %d\n",
-            (unsigned)rbs_walk.last,(unsigned)s,(unsigned)RBS_B(st+RBS_WALK_STAGE),
+    if(s==w->last || w->moves>=RBS_WALK_MOVES) return;
+    w->moves++;
+    fprintf(stderr,"[mapmaker] realbosses: Crow walker %u fight state %u -> %u: stage %u, animation 0x%X, yaw %.0f, aim %.0f, turn %d, guns %u/%u, health %.1f (stun at %.1f), request %d\n",
+            (unsigned)(w-rbs_walks)+1u,(unsigned)w->last,(unsigned)s,(unsigned)RBS_B(st+RBS_WALK_STAGE),
             MAPMAKER_PTR_OK(ctl,RBS_ANIM_SIZE)?(unsigned)WORD_AT(ctl+RBS_ANIM_CUR):0u,(double)rbs_getf(ent+0x70u),
             (double)rbs_getf(st+0xE4u),(int)WORD_AT(st+RBS_WALK_TURN),(unsigned)WORD_AT(st+RBS_WALK_GUN1),
             (unsigned)WORD_AT(st+RBS_WALK_GUN2),(double)rbs_getf(st+0x580u),(double)rbs_getf(st+RBS_WALK_STUN_AT),
             (int)WORD_AT(a+RBS_WALK_AI_NEXT));
     fflush(stderr);
-    rbs_walk.last=s;
+    w->last=s;
 }
 
 /* The walker's guns (user report, v0.4.0-mapmaker.25: "still won't turn to
@@ -1014,11 +1219,11 @@ static void rbs_walk_track(uint32_t a,uint32_t ent,uint32_t st)
  * pending, request state 0x12 (AI +0x9D0): when the current animation ends
  * the guns are deployed by the stock sub_00294B90 and state 4 runs the fight
  * (turns 8/9, walking, firing). Back hits and the stun keep working. */
-static void rbs_walk_arm(uint32_t a,uint32_t ent,uint32_t st)
+static void rbs_walk_arm(RbsWalk *w,uint32_t a,uint32_t ent,uint32_t st)
 {
-    if(rbs_walk.armed || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_STANDOFF || (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)>=0 ||
+    if(w->armed || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_STANDOFF || (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)>=0 ||
        WORD_AT(st+RBS_WALK_GUN1) || WORD_AT(st+RBS_WALK_GUN2)) return;
-    rbs_walk.armed++;
+    w->armed++;
     WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ARM;
     rbs_log("Crow walker guns deployed: the stage-1 standoff (hits in its back only) skipped; turn, walk and fire",a,ent);
 }
@@ -1027,18 +1232,18 @@ static void rbs_walk_arm(uint32_t a,uint32_t ent,uint32_t st)
  * crowewalker180turnleft 0x6FC). */
 static int rbs_walk_own(uint32_t anim) { return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }
 
-static void rbs_walk_wake(void)
+static void rbs_walk_wake(RbsWalk *w)
 {
-    uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state,s,ctl,r;
-    if(!a || !st || WORD_AT(RBS_WALK_STATE)!=st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE) || !MAPMAKER_PTR_OK(a,RBS_ACTOR) ||
-       WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;
-    rbs_walk_track(a,ent,st);
+    uint32_t a=w->actor,ent,st=w->state,s,ctl,r;
+    if(!a || !st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE) || !MAPMAKER_PTR_OK(a,RBS_ACTOR) ||
+       WORD_AT(a+RBS_ACTOR_RECORD)!=w->record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;
+    rbs_walk_track(w,a,ent,st);
     if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;
-    rbs_walk_arm(a,ent,st);
+    rbs_walk_arm(w,a,ent,st);
     s=WORD_AT(a+RBS_WALK_AI_STATE);
     if(s==RBS_WALK_WAIT && (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {
         WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;
-        if(!rbs_walk.woken++) rbs_log("Crow walker woken: no SPC1/SPC2 trigger in a MapMaker map; roar, then fight",a,ent);
+        if(!w->woken++) rbs_log("Crow walker woken: no SPC1/SPC2 trigger in a MapMaker map; roar, then fight",a,ent);
     } else if(s!=RBS_WALK_ROAR) return;
     /* v0.4.0-mapmaker.25 log: the controller held 0xFE, not 0. Character
      * creation gives a creature its skeleton's bind pose as its first
@@ -1047,26 +1252,77 @@ static void rbs_walk_wake(void)
      * Crowe), which never finishes. Only the walker's own animations (lv81
      * 0x6EE..0x6FC) are left to the stock path; the skeleton and the split
      * Crowe play their first animation over their poses the same way. */
-    if(rbs_walk.roars || !MAPMAKER_PTR_OK(ctl=WORD_AT(ent+4u),RBS_ANIM_SIZE) || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR)) ||
+    if(w->roars || !MAPMAKER_PTR_OK(ctl=WORD_AT(ent+4u),RBS_ANIM_SIZE) || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR)) ||
        rbs_walk_own(WORD_AT(ctl+RBS_ANIM_ALT))) return;
-    rbs_walk.roars++;
+    w->roars++;
     r=guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u);
     rbs_log(r?"Crow walker had none of its own animations (bind pose): roar started (state 2 waits for an animation to finish)":
               "Crow walker roar refused by sub_0005F460 (animation not loaded or not allowed)",WORD_AT(ctl+RBS_ANIM_CUR),r);
 }
 
+/* One walker's frame step: heartbeat, wake-up and its beams (sub_0029CCB0
+ * reads [0x0078B1E8] and the effect blocks, so its own are swapped in). */
+static void rbs_walk_frame(RbsWalk *w)
+{
+    RbsSave s;
+    if(!w->record) return;
+    rbs_walk_heartbeat(w);
+    if(!w->state || !rbs_walk_ours() || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;
+    rbs_walk_wake(w);
+    rbs_walk_in(w,&s);
+    guest_call(sub_0029CCB0,0);
+    rbs_walk_out(w,&s);
+    if(!w->drawn++) rbs_log("Crow walker effects drawn",w->state,(uint32_t)(w-rbs_walks)+1u);
+}
+
 /* WRAP sub_00126560 (frame step before the scene-81 beam draw at 0x001CEE8C). */
 void pc_mapmaker_realbosses_fx(void (*original)(void))
 {
-    int here=(rbs_walk.record || rbs_skel.record) && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==RBS_RET_FX;
+    unsigned k;
+    int here=(rbs_walkf.n || rbs_skelf.n) && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==RBS_RET_FX;
     original();
-    if(here) rbs_skel_fire();
-    if(!rbs_walk.record) return;
-    if(here) rbs_walk_heartbeat();
-    if(!here || !rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;
-    rbs_walk_wake();
-    guest_call(sub_0029CCB0,0);
-    if(!rbs_walk.fx++) rbs_log("Crow walker effects drawn",rbs_walk.state,0);
+    if(!here) return;
+    for(k=0;k<rbs_skelf.n;k++) rbs_skel_fire(&rbs_skels[k]);
+    for(k=0;k<rbs_walkf.n;k++) rbs_walk_frame(&rbs_walks[k]);
+}
+
+/* The walker's other ways in (decode test: each reads [0x0078B1E8]), with
+ * the entity at [esp+off] (off 0: a damage record whose +0 is the entity):
+ * its fight sub_002998E0, message handler sub_0029CBF0, damage callback
+ * sub_00298BA0 and object slots 2/3 sub_00299140/sub_00298F60. */
+static void rbs_walk_call(void (*original)(void),uint32_t ent)
+{
+    RbsWalk *w;
+    RbsSave s;
+    if(!(w=rbs_walk_of(ent))) { original();return; }
+    rbs_walk_in(w,&s);
+    original();
+    rbs_walk_out(w,&s);
+}
+/* WRAP sub_002998E0 (cdecl entity; class 0x100000: the walker's fight). */
+void pc_mapmaker_realbosses_walk_fight(void (*original)(void))
+{
+    if(!rbs_walkf.n || !MAPMAKER_STACK_OK(8)) { original();return; }
+    rbs_walk_call(original,WORD_AT(g_esp+4u));
+}
+/* WRAP sub_0029CBF0 (cdecl entity, message, ...; its message handler). */
+void pc_mapmaker_realbosses_walk_message(void (*original)(void))
+{
+    if(!rbs_walkf.n || !MAPMAKER_STACK_OK(12)) { original();return; }
+    rbs_walk_call(original,WORD_AT(g_esp+4u));
+}
+/* WRAP sub_00298BA0 (cdecl damage record; +0 the hit entity). */
+void pc_mapmaker_realbosses_walk_damage(void (*original)(void))
+{
+    uint32_t r;
+    if(!rbs_walkf.n || !MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(r=WORD_AT(g_esp+4u),4u)) { original();return; }
+    rbs_walk_call(original,WORD_AT(r));
+}
+/* WRAP sub_00299140 and sub_00298F60 (cdecl entity, ...; object slots 2/3). */
+void pc_mapmaker_realbosses_walk_slot(void (*original)(void))
+{
+    if(!rbs_walkf.n || !MAPMAKER_STACK_OK(8)) { original();return; }
+    rbs_walk_call(original,WORD_AT(g_esp+4u));
 }
 
 /* WRAP sub_002274C0 (cdecl event, arg): the boss's death fires level event 3
@@ -1074,15 +1330,16 @@ void pc_mapmaker_realbosses_fx(void (*original)(void))
 void pc_mapmaker_realbosses_event(void (*original)(void))
 {
     uint32_t ret;
-    if(rbs_walk.record && MAPMAKER_STACK_OK(12) && ((ret=WORD_AT(g_esp))==RBS_RET_WALK_INTRO || ret==RBS_RET_WALK_INTRO2 ||
+    RbsWalk *w;
+    if(rbs_walkf.n && MAPMAKER_STACK_OK(12) && ((ret=WORD_AT(g_esp))==RBS_RET_WALK_INTRO || ret==RBS_RET_WALK_INTRO2 ||
        ret==RBS_RET_WALK_DONE) && WORD_AT(RBS_SCENE)==100u && rbs_on()) {
-        if(rbs_walk.events++<4u) rbs_log("Crow walker level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),ret);
-        if(ret==RBS_RET_WALK_DONE) rbs_walk_remove();
+        if(rbs_walkf.events++<4u) rbs_log("Crow walker level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),ret);
+        if(ret==RBS_RET_WALK_DONE && (w=rbs_walk_now())) rbs_walk_remove(w);
         MAPMAKER_GUEST_RET();
         return;
     }
     if(!MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=RBS_RET_EVENT || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) { original();return; }
-    if(rbs_skel.events++<4u) rbs_log("giant skeleton level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),WORD_AT(g_esp+8u));
+    if(rbs_skelf.events++<4u) rbs_log("giant skeleton level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),WORD_AT(g_esp+8u));
     MAPMAKER_GUEST_RET();
 }
 
@@ -1135,14 +1392,33 @@ void pc_mapmaker_realbosses_create(void (*original)(void))
     fflush(stderr);
 }
 
+/* The instance for this spawn record: the one it already has (a restart of
+ * the same AI), else the first free one with a state. */
+static RbsSkel *rbs_skel_free(uint32_t rec)
+{
+    unsigned k;
+    for(k=0;k<rbs_skelf.n;k++) if(rbs_skels[k].record==rec) return &rbs_skels[k];
+    for(k=0;k<rbs_skelf.n;k++) if(!rbs_skels[k].record && rbs_skels[k].state) return &rbs_skels[k];
+    return 0;
+}
+static RbsWalk *rbs_walk_free(uint32_t rec)
+{
+    unsigned k;
+    for(k=0;k<rbs_walkf.n;k++) if(rbs_walks[k].record==rec) { rbs_walks[k].actor=0;return &rbs_walks[k]; }
+    for(k=0;k<rbs_walkf.n;k++) if(!rbs_walks[k].record && rbs_walks[k].state) return &rbs_walks[k];
+    return 0;
+}
+
 void pc_mapmaker_realbosses_ai_start(void (*original)(void))
 {
     uint32_t a,ent,rec,id;
+    RbsSkel *k;
+    RbsWalk *w;
     if(!MAPMAKER_STACK_OK(8) || !rbs_play()) { original();return; }
     a=WORD_AT(g_esp+4u);
     if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || !MAPMAKER_PTR_OK(rec=WORD_AT(a+RBS_ACTOR_RECORD),12u)) { original();return; }
     ent=WORD_AT(a);
-    if(rbs_walk.state && rbs_walk.seen++<12u) {          /* which characters start, while the walker is missing */
+    if(rbs_walkf.n && rbs_walkf.seen++<12u) {          /* which characters start, while the walker is missing */
         fprintf(stderr,"[mapmaker] realbosses: AI start: character 0x%X, model 0x%X, record id 0x%X\n",(unsigned)RBS_H(a+RBS_ACTOR_CHAR),
                 MAPMAKER_PTR_OK(ent,0x100u)?(unsigned)RBS_H(ent+RBS_ENT_MODEL):0u,(unsigned)WORD_AT(rec+8u));
         fflush(stderr);
@@ -1150,14 +1426,14 @@ void pc_mapmaker_realbosses_ai_start(void (*original)(void))
     if(RBS_H(a+RBS_ACTOR_CHAR)==RBS_WALK_ID || (MAPMAKER_PTR_OK(ent,0x100u) && RBS_H(ent+RBS_ENT_MODEL)==RBS_WALK_MODEL)) {
         if(rbs.optout) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: Crow walker with bot behaviour",a,0);
         else if(!rbs_walk_pak_mounted()) rbs_log("lv81.pak not mounted: Crow walker with bot behaviour",a,0);
-        else if(!rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state)
+        else if(!rbs_walkf.n || !rbs_walk_ours())
             rbs_log("no Crow walker state this level: bot behaviour",a,WORD_AT(RBS_WALK_STATE));
-        else if(rbs_walk.record && rbs_walk.record!=rec) {
-            if(rbs_walk.extras++<4u) rbs_log("only one Crow walker per map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
+        else if(!(w=rbs_walk_free(rec))) {
+            if(rbs_walkf.extras++<4u) rbs_log("no Crow walker left this level (one per placed walker, at most 4): bot behaviour",a,WORD_AT(rec+8u));
         } else {
             id=WORD_AT(rec+8u);
             WORD_AT(rec)=RBS_CLASS_LO;WORD_AT(rec+4u)=RBS_WALK_CLASS;
-            rbs_walk.record=rec;rbs_walk.actor=a;
+            w->record=rec;w->actor=a;
             rbs_note(rec,pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")?rbs_boss_flag(id-WORD_AT(RBS_SAI_BASE)-1u):0u);
             rbs_log("Crow walker gets its story AI (class 0x100000)",a,id);
         }
@@ -1167,14 +1443,14 @@ void pc_mapmaker_realbosses_ai_start(void (*original)(void))
     if(RBS_H(a+RBS_ACTOR_CHAR)==RBS_SKEL_ID || (MAPMAKER_PTR_OK(ent,0x100u) && RBS_H(ent+RBS_ENT_MODEL)==RBS_SKEL_MODEL)) {
         if(rbs.optout) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: giant skeleton with bot behaviour",a,0);
         else if(!rbs_skel_pak_mounted()) rbs_log("lv1_6.pak not mounted: giant skeleton with bot behaviour",a,0);
-        else if(!rbs_skel.state || WORD_AT(RBS_SKEL_STATE)!=rbs_skel.state)
+        else if(!rbs_skelf.n || !rbs_skel_ours())
             rbs_log("no giant skeleton state this level: bot behaviour",a,WORD_AT(RBS_SKEL_STATE));
-        else if(rbs_skel.record && rbs_skel.record!=rec) {
-            if(rbs_skel.extras++<4u) rbs_log("only one giant skeleton per map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
+        else if(!(k=rbs_skel_free(rec))) {
+            if(rbs_skelf.extras++<4u) rbs_log("no giant skeleton left this level (one per placed skeleton, at most 4): bot behaviour",a,WORD_AT(rec+8u));
         } else {
             id=WORD_AT(rec+8u);
             WORD_AT(rec)=RBS_CLASS_LO;WORD_AT(rec+4u)=RBS_SKEL_CLASS;
-            rbs_skel.record=rec;
+            k->record=rec;
             rbs_note(rec,pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")?rbs_boss_flag(id-WORD_AT(RBS_SAI_BASE)-1u):0u);
             rbs_log("giant skeleton gets the mansion boss AI (class 0x20000)",a,id);
         }
