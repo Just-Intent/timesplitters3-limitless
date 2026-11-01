@@ -29,7 +29,9 @@ STUB(sub_00079DE0,11) STUB(sub_0007D4A0,12) STUB(sub_000716D0,13) STUB(sub_00078
 STUB(sub_00303350,16) STUB(sub_00071940,17)
 STUB(sub_00075B70,18) STUB(sub_00079D60,19) STUB(sub_002BF830,20) STUB(sub_00079710,21) STUB(sub_000780E0,22)
 STUB(sub_000781A0,23) STUB(sub_000772E0,24) STUB(sub_00077320,25) STUB(sub_00074A00,26) STUB(sub_00077110,27)
-STUB(sub_00075E70,28)
+STUB(sub_00075E70,28) STUB(sub_0003FCF0,29)
+static float glyph_w=7.f;                /* sub_0003FCF0: width per character (0: the measure fails) */
+static unsigned measures;
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -76,6 +78,12 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         snprintf((char *)((uintptr_t)r+g_xbox_mem_offset),16,"T%X",(unsigned)x[0]);
     }
     else if(f==sub_00303350) r=0x00710000u+x[0];
+    else if(f==sub_0003FCF0) {                   /* (float *w, float *h, text, 0) */
+        measures++;
+        FLOAT_AT(x[0])=glyph_w*(float)strlen((const char *)((uintptr_t)x[2]+g_xbox_mem_offset));
+        FLOAT_AT(x[1])=12.f;
+        CHECK(x[3]==0u);
+    }
     else if(f==sub_00071940) r=x[0]==PANE && x[1]==0xFFFFFFFBu?SETITEM:0u;
     else if(f==sub_00071800) { if(noptions<32u) { options[noptions][0]=x[0];options[noptions][1]=x[1]; } noptions++; }
     if(f==sub_00079DE0 || f==sub_0007D4A0 || f==sub_000716D0 || f==sub_00078590 || f==sub_000783D0 || f==sub_00071800) {
@@ -394,6 +402,45 @@ static void label_test(void)
     label_at(0x002D3DF6u,4u,l,&c);CHECK(l[0]==0x35 && c==0xDEADu);       /* stock rows untouched */
     label_at(0x002D3DF7u,12u,l,&c);CHECK(l[0]==0x3D && c==0xDEADu);      /* other caller */
 }
+/* The row draw frame at the name lookup sub_0003D7B0 (call 0x002D3F90): +4
+ * text id, +8 the fit width of sub_00040A40, +0x2C the name x (frame +0x18),
+ * +0x50 the row item (argument 2), +0x54 the label (frame +0x40). */
+static void fake_text(void) { originals++;g_eax=0x00715000u+WORD_AT(g_esp+4u);g_esp+=4u; }
+static void name_at(uint32_t ret,uint32_t value,const char *label,float *x,float *width)
+{
+    uint32_t sp=g_esp,f=sp-0x200u;
+    memset((void *)((uintptr_t)f+g_xbox_mem_offset),0,0x80u);
+    WORD_AT(f)=ret;WORD_AT(f+4u)=0x4321u;FLOAT_AT(f+8u)=200.f;FLOAT_AT(f+0x2Cu)=120.f;
+    WORD_AT(f+0x50u)=ROWITEM;WORD_AT(ROWITEM+0x14u)=value;
+    strcpy((char *)((uintptr_t)(f+0x54u)+g_xbox_mem_offset),label);
+    g_esp=f;originals=0;
+    pc_mapmaker_weaponset_title(fake_text);
+    if(g_esp!=f+4u || originals!=1u || g_eax!=0x00715000u+0x4321u) { fprintf(stderr,"name esp/original\n");failures++; }
+    *x=FLOAT_AT(f+0x2Cu);*width=FLOAT_AT(f+8u);
+    g_esp=sp;
+}
+static void name_test(void)
+{
+    float x,w;
+    /* two-digit labels: the name moves right by the first digit's width */
+    measures=0;name_at(0x002D3F95u,10u,"11",&x,&w);CHECK(x==127.f && w==193.f && measures==1u);
+    name_at(0x002D3F95u,19u,"20",&x,&w);CHECK(x==127.f && w==193.f);
+    name_at(0x002D3F95u,9u,"10",&x,&w);CHECK(x==127.f && w==193.f);
+    /* one-digit labels, other callers and the stock six rows: unchanged */
+    measures=0;
+    name_at(0x002D3F95u,8u,"9",&x,&w);CHECK(x==120.f && w==200.f);
+    name_at(0x002D3F95u,2u,"3",&x,&w);CHECK(x==120.f && w==200.f);
+    name_at(0x002D3F95u,12u,"3",&x,&w);CHECK(x==120.f && w==200.f);         /* a one-character label */
+    name_at(0x002D3F95u,20u,"21",&x,&w);CHECK(x==120.f && w==200.f);
+    name_at(0x002D3FC2u,12u,"13",&x,&w);CHECK(x==120.f && w==200.f);
+    name_at(0x002D3F96u,12u,"13",&x,&w);CHECK(x==120.f && w==200.f);
+    CHECK(measures==0u);
+    ws.rows=6u;name_at(0x002D3F95u,12u,"13",&x,&w);CHECK(x==120.f && w==200.f);ws.rows=20u;
+    /* the measure fails or is implausible: a fixed digit width */
+    glyph_w=0.f;name_at(0x002D3F95u,12u,"13",&x,&w);CHECK(x==126.f && w==194.f);
+    glyph_w=40.f;name_at(0x002D3F95u,12u,"13",&x,&w);CHECK(x==126.f && w==194.f);
+    glyph_w=7.f;
+}
 static void row_action(uint32_t value)
 {
     uint32_t sp=g_esp;
@@ -461,6 +508,8 @@ static void screen_tests(void)
     build_pane();frame(0,0,2u);CHECK(ws_diag_n==before+2u && ws.rows==20u);
     /* the row label and colour: "7".."20", colours repeat by 6 */
     label_test();
+    /* the weapon name after a two-digit label */
+    name_test();
     /* the row action: the editor's stays stock */
     originals=0;row_action(9u);CHECK(originals==1u);
 }

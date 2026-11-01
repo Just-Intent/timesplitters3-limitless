@@ -81,6 +81,10 @@ void sub_002BE300(void) {}  /* sets: slot label, row -> text id */
 void sub_002BFFD0(void) {}
 void sub_000D7780(void) {}
 void sub_002C0310(void) {}
+/* sets: the 20-row slot pane builder replays the stock builder's calls */
+void sub_00071BE0(void) {} void sub_002C1830(void) {} void sub_00078320(void) {}
+void sub_000792B0(void) {} void sub_00078380(void) {} void sub_00077140(void) {}
+void sub_00077360(void) {}
 /* matchbots (pc_mapmaker_matchbots.inc: profile, slot portrait, availability) */
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it */
 void sub_00069640(void) {}

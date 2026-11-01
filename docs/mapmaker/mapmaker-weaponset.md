@@ -3,7 +3,9 @@
 Status 2026-10-31: implemented in `src/interface/pc_mapmaker_weaponset.inc`
 (area `weaponset`), fixture-tested (`tests/mapmaker/test_mapmaker_weaponset.py`:
 mutations plus decode and XBE facts; `..._weaponset_classified.py`: every
-slot constant around the weapon set classified). Not built or played. No
+slot constant around the weapon set classified). 2026-11-01: weapon names
+on rows 10-20 move right past the two-digit number ("Row name" below). Not
+built or played. No
 guest-code table (`config/guest-code-patches/weaponset.json` does not exist;
 wrappers only).
 
@@ -124,6 +126,23 @@ table and every id-indexed table and jump table; rejected. Instead:
     hook on `sub_00064E70` (only its call at return 0x002D3DF6, after both)
     rewrites the label to "7".."20" and the stored colour (entry - 0x24) to
     entry `value % 6`; the read past the table took the return address.
+  - Row name (2026-11-01; user request: "Offset weapon slot weapon name text
+    slightly for slots 11-20, as the name is currently overlapping the number
+    on each slot"). CONFIRMED (decode test `test_row_name_follows_label`): the
+    draw computes x = (int)(rect.x + 5.0f) (0x002D3D45), draws the label at x
+    + 5 (0x002D3F40) and the weapon name at x + 20: it stores x + 0x14 as a
+    float at frame +0x18 (0x002D3F6A / 0x002D3F8A), asks `sub_0003D7B0(name
+    id)` (call 0x002D3F90, return 0x002D3F95), shrinks the font to fit the
+    width rect +8 - name x (`sub_00040A40(text, width, 0, 1)`, which measures
+    with `sub_0003FCF0(&w, &h, text, 0)`) and draws the name from frame +0x18
+    (0x002D3FD1). A one-digit label fits the 15 units; "10".."20" ran into the
+    name. `pc_mapmaker_weaponset_title` (the existing `sub_0003D7B0` WRAP,
+    return 0x002D3F95 only, 20-row pane only) measures the label's first digit
+    with `sub_0003FCF0` and moves the name right by that width, narrowing the
+    fit width by the same amount, for values 9..19 (slots 10-20: "10" has two
+    digits as well). A failed or implausible measure (<= 0 or > 20) uses 6.0
+    (INFERRED digit width). Not seen in game; the gap after the second digit
+    is then the stock one-digit gap only if both digits are equally wide.
   - Outside the editor, rows 7-20 are read-only: the row action
     `sub_002D4040` (opens the weapon list; the front end's pick writes the
     profile set at row index - 2, 0x002BF982, six slots) does nothing there,
@@ -223,7 +242,8 @@ pane 0x005236EC exists only inside screen 0x0052371C = {`sub_002D44D0`,
 ## Extension memory
 
 0x00906000..0x0090607F play set, 0x00906080..0x009060FF AI pick set,
-0x00906100..0x0090613F unused (the retired paged title), 0x00906140..0x0090640F choice texts
+0x00906100..0x0090610F the row label measure (w, h, one-character text),
+0x00906110..0x0090613F unused (the retired paged title), 0x00906140..0x0090640F choice texts
 (15 x 0x30); 0x00906000..0x009064FF reserved for this area.
 
 ## Hooks (WRAP lines for the integrator, area `weaponset`)
@@ -240,7 +260,7 @@ WRAP sub_002D3B00 -> pc_mapmaker_weaponset_get          (new; return-address tes
 WRAP sub_00312AE0 -> pc_mapmaker_weaponset_set          (new; return-address test; reads ebx)
 WRAP sub_002D4040 -> pc_mapmaker_weaponset_row          (new; slot row action)
 WRAP sub_00064E70 -> pc_mapmaker_weaponset_label        (new; return-address test 0x002D3DF6, per drawn row)
-WRAP sub_0003D7B0 -> pc_mapmaker_weaponset_title        (retired pass-through; may be dropped from the chain)
+WRAP sub_0003D7B0 -> pc_mapmaker_weaponset_title        (chained, outermost as now; return-address test 0x002D3F95: weapon name after a two-digit label; keep it)
 WRAP sub_00078590 -> pc_mapmaker_weaponset_sai_choice   (chained: bosses, sets; order free; return-address test)
 WRAP sub_000783D0 -> pc_mapmaker_weaponset_options      (new; return-address test)
 WRAP sub_0006BD30 -> pc_mapmaker_weaponset_play_set     (new; hot, per call)
@@ -269,7 +289,9 @@ already stubbed).
    and `slot pane open: ... items=22`. Scroll with the wheel, the scrollbar
    or by moving the pointer/Down past row 6: rows 7-20 (labels 7..20,
    empty). Pick weapons into a few of them (A, choose; X clears). Slots 1-6
-   are unchanged. Save the map. If no `slot pane build` line appears, send
+   are unchanged. On rows 10-20 the weapon name starts a little further
+   right than on rows 1-9 and no longer covers the two-digit number; long
+   names still end inside the row. Save the map. If no `slot pane build` line appears, send
    the log: the hooks did not run.
 1b. Front end -> MapMaker -> load the map -> Arcade -> setup -> Weapons ->
    choose the MapMaker set: 20 rows, 7-20 show the saved slots (read-only,

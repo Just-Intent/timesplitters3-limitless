@@ -26,6 +26,13 @@ static volatile uint32_t stub_ran;
 STUB(sub_0003DFA0,1) STUB(sub_00074670,2) STUB(sub_00071970,3) STUB(sub_00076EF0,4) STUB(sub_002BFFD0,5)
 STUB(sub_0003D7B0,6) STUB(sub_00303350,7) STUB(sub_00071800,8) STUB(sub_000D7780,9)
 STUB(sub_002C0310,10)
+STUB(sub_00075B70,11) STUB(sub_00071BE0,12) STUB(sub_00079D60,13) STUB(sub_002C1830,14) STUB(sub_00079710,15)
+STUB(sub_000780E0,16) STUB(sub_00078320,17) STUB(sub_000792B0,18) STUB(sub_00078380,19) STUB(sub_000781A0,20)
+STUB(sub_00077140,21) STUB(sub_00077360,22) STUB(sub_00074A00,23) STUB(sub_00074460,24)
+static struct { void (*f)(void); uint32_t a[7]; } build[96];   /* the pane builder's calls */
+static unsigned nbuild;
+static uint32_t advanced[8][2];                                /* sub_00074460(pane, value, 0) */
+static unsigned nadvanced;
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -55,6 +62,13 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     va_start(a,n);
     for(i=0;i<n && i<8;i++) x[i]=va_arg(a,uint32_t);
     va_end(a);
+    if(f==sub_00075B70 || f==sub_00071BE0 || f==sub_00079D60 || f==sub_002C1830 || f==sub_00079710 ||
+       f==sub_000780E0 || f==sub_00078320 || f==sub_000792B0 || f==sub_00078380 || f==sub_000781A0 ||
+       f==sub_00077140 || f==sub_00077360 || f==sub_00074A00) {
+        if(nbuild<96u) { build[nbuild].f=f;memcpy(build[nbuild].a,x,sizeof build[nbuild].a); }
+        nbuild++;
+    }
+    if(f==sub_00074460) { if(nadvanced<8u) { advanced[nadvanced][0]=x[0];advanced[nadvanced][1]=x[1]; } nadvanced++;CHECK(x[2]==0u); }
     if(f==sub_00074670) r=(x[0]==PARENT && x[1]==0x0052372Cu)?PANE:0u;
     else if(f==sub_00071970) r=(x[0]==PANE && x[1]<10u && x[2]==0u)?ITEMS+x[1]*0x10u:0u;
     else if(f==sub_00076EF0) { if(x[0]==PANE) selected=x[1]; }
@@ -273,74 +287,215 @@ static void fake_screen(void)
         }
         b=inner_call(pc_mapmaker_sets_editor_set,fake_editor_set,0x003141B5u);
         for(k=0;k<10u;k++) WORD_AT(WORK+k*0x1Cu+8u)=BYTE_AT(b+7u+8u*k);
+        /* portraits: sub_002BE600(id, variant) returning to 0x002C054C */
+        for(k=0;k<10u;k++) {
+            int32_t id=(int32_t)WORD_AT(WORK+k*0x1Cu);
+            WORD_AT(WORK+k*0x1Cu+0x14u)=id<0?0xFFFFFFFFu:(uint32_t)id+0x1000u;
+        }
         WORD_AT(0x0078AEACu)=idx;
     }
     hook_store_entry();
     g_esp+=4u;
 }
-static void frame(int32_t row,uint32_t input)
-{
-    WORD_AT(PANE+0x18Cu)=(uint32_t)row;WORD_AT(PANE+0xC4u)=input;WORD_AT(PANE+0xC8u)=input&0xFu;
-    CALL(pc_mapmaker_sets_screen,fake_screen,0x0007AD7Bu,PARENT,0u);
-}
+static void frame(void) { CALL(pc_mapmaker_sets_screen,fake_screen,0x0007AD7Bu,PARENT,0u); }
 static int work_id(unsigned k) { return (int)(int32_t)WORD_AT(WORK+k*0x1Cu); }
+static int shadow_id(unsigned k) { int32_t id;memcpy(&id,sl.rows+k*0x1Cu,4);return id; }
 static int member(unsigned k) { return HALF_AT(ESET+4u+8u*k); }
-static const char *title(void) { return (const char *)((uintptr_t)WORD_AT(PARENT+0x204u)+g_xbox_mem_offset); }
+static uint32_t work_sum(void)
+{
+    uint32_t s=0,k;
+    for(k=0;k<10u*0x1Cu;k+=4u) s=s*31u+WORD_AT(WORK+k);
+    return s;
+}
+
+/* the pane builder as the pane system calls it (sub_00078E50 0x00078F72) */
+static void build_pane(void)
+{
+    originals=0;nbuild=0;
+    WORD_AT(0x007BB1E8u)=PANE;
+    CALL(pc_mapmaker_sets_build,fake_plain,0x00078F74u,PANE,0u);
+}
+#define B(i) build[i].f
+#define A(i,k) build[i].a[k]
+static void check_build(void)
+{
+    unsigned i,v;
+    CHECK(nbuild==73u);
+    if(nbuild!=73u) return;
+    CHECK(B(0)==sub_00075B70 && A(0,0)==0x10u && A(0,1)==0u && A(0,2)==0x42340000u && A(0,3)==0u && A(0,4)==0x002C1450u);
+    CHECK(B(1)==sub_00071BE0 && A(1,0)==1u && A(1,1)==0x40A00000u && A(1,2)==0x40A00000u);
+    CHECK(B(2)==sub_00079D60 && A(2,0)==0x00700000u+0xE8Bu && A(2,1)==0xFFFFFFFFu && A(2,2)==0x04032404u && !A(2,3) && !A(2,4) && !A(2,5));
+    CHECK(B(3)==sub_00079D60 && A(3,0)==0x004766D8u && A(3,1)==0xFFFFFFFEu && A(3,2)==0x08030C00u && !A(3,3));
+    CHECK(B(4)==sub_002C1830 && A(4,0)==PANE);
+    CHECK(B(5)==sub_00079710 && A(5,0)==0u);
+    CHECK(B(6)==sub_000780E0 && A(6,0)==0x42200000u && A(6,1)==0u);       /* ten rows of 4.0 */
+    for(v=0;v<20u;v++) {
+        i=7u+3u*v;
+        CHECK(B(i)==sub_00078320 && A(i,0)==0u && A(i,1)==1u && A(i,2)==4u);
+        CHECK(B(i+1)==sub_000792B0 && A(i+1,0)==0u && A(i+1,1)==v && A(i+1,2)==0u && A(i+1,3)==0x42200000u &&
+              A(i+1,4)==0x40800000u && A(i+1,5)==0x002C1490u && A(i+1,6)==0x002C0660u);
+        CHECK(B(i+2)==sub_00078380);
+    }
+    i=67u;
+    CHECK(B(i)==sub_000781A0);
+    CHECK(B(i+1)==sub_00077140 && A(i+1,0)==PANE);
+    CHECK(B(i+2)==sub_00077360 && A(i+2,0)==PANE && A(i+2,1)==0x40A00000u && A(i+2,2)==0x41133333u);
+    CHECK(B(i+3)==sub_00074A00 && A(i+3,0)==0u && A(i+3,1)==0x00700000u+0xE88u && A(i+3,2)==1u && A(i+3,3)==0u);
+    CHECK(B(i+4)==sub_00074A00 && A(i+4,0)==3u && A(i+4,1)==0x00700000u+0x3B2u && A(i+4,2)==1u && A(i+4,3)==0u);
+    CHECK(B(i+5)==sub_00074A00 && A(i+5,0)==1u && A(i+5,1)==0x00700000u+0x1A27u && A(i+5,2)==0u && A(i+5,3)==0u);
+}
+
+/* Row callbacks as the stock code reads them: the draw (pane, item, rect)
+ * reads item +0x14 and that work row; the action and the pane update read
+ * pane +0x184 - 2 (and +0x18C); the update clears the row on X. */
+static uint32_t seen_value,seen_index,seen_hl,seen_id,seen_portrait;
+static void fake_draw(void)
+{
+    uint32_t item=WORD_AT(g_esp+8u);
+    originals++;seen_value=WORD_AT(item+0x14u);
+    seen_id=seen_value<10u?WORD_AT(WORK+seen_value*0x1Cu):0xDEADu;
+    seen_portrait=seen_value<10u?WORD_AT(WORK+seen_value*0x1Cu+0x14u):0xDEADu;
+    g_esp+=4u;
+}
+static void fake_row_cb(void)
+{
+    uint32_t pane=WORD_AT(g_esp+4u),row;
+    originals++;seen_index=WORD_AT(pane+0x184u);seen_hl=WORD_AT(pane+0x18Cu);row=seen_index-2u;
+    seen_id=row<10u?WORD_AT(WORK+row*0x1Cu):0xDEADu;
+    if(row<10u && (WORD_AT(pane+0xC4u)&0x00800000u) && (int32_t)WORD_AT(WORK+row*0x1Cu)>=0) {    /* X, 0x002C1718 */
+        WORD_AT(WORK+row*0x1Cu)=0xFFFFFFFFu;WORD_AT(WORK+row*0x1Cu+0x14u)=0xFFFFFFFFu;
+    }
+    g_esp+=4u;
+}
+/* sub_002C1C90: row = slot pane +0x184 - 2 gets the picked character, then
+ * the highlight moves on while its value is below 9. */
+#define PICKER 0x00306000u
+#define PITEM 0x00307000u
+static void fake_pick(void)
+{
+    uint32_t row=WORD_AT(PANE+0x184u)-2u,v;
+    originals++;seen_index=WORD_AT(PANE+0x184u);
+    if(!(BYTE_AT(PITEM+0x28u)&1u)) {
+        if(row<10u) { WORD_AT(WORK+row*0x1Cu)=77u;WORD_AT(WORK+row*0x1Cu+0x14u)=0x99u;WORD_AT(WORK+row*0x1Cu+0x18u)=1u;WORD_AT(WORK+row*0x1Cu+8u)=2u; }
+        else seen_index=0xBADu;                  /* past the work copy */
+        if((v=WORD_AT(PANE+0x18Cu))<9u) { WORD_AT(PANE+0x18Cu)=v+1u;guest_call(sub_00074460,3,PANE,v+1u,0u); }
+    }
+    g_esp+=4u;
+}
+static void row_draw(uint32_t value)
+{
+    WORD_AT(ITEMS+0x14u)=value;
+    CALL(pc_mapmaker_sets_row_draw,fake_draw,0x00073E00u,PANE,ITEMS);
+}
+static void pane_at(void (*hook)(void (*)(void)),uint32_t value,uint32_t input)
+{
+    WORD_AT(PANE+0x184u)=value+2u;WORD_AT(PANE+0x18Cu)=value;WORD_AT(PANE+0xC4u)=input;
+    CALL(hook,fake_row_cb,0x0007AD7Bu,PANE,0u);
+}
+static void pick_at(uint32_t value,int disabled)
+{
+    WORD_AT(PICKER+0x2Cu)=PARENT;WORD_AT(PICKER+0x198u)=PITEM;BYTE_AT(PITEM+0x28u)=(uint8_t)(disabled?1u:0u);
+    WORD_AT(PANE+0x184u)=value+2u;WORD_AT(PANE+0x18Cu)=value;nadvanced=0;
+    CALL(pc_mapmaker_sets_pick,fake_pick,0x00073E00u,PICKER,0u);
+}
 static void screen_tests(void)
 {
-    unsigned k;
+    unsigned k,before;
+    uint32_t sum;
     editor_set(some_extras);
-    strcpy((char *)((uintptr_t)TITLE_TEXT+g_xbox_mem_offset),"Characters");
-    WORD_AT(PARENT+0x204u)=TITLE_TEXT;
     WORD_AT(0x0079094Cu)=102u;WORD_AT(0x00784024u)=0x11u;WORD_AT(0x0078AEACu)=0;
-    /* opened: page 1-10 */
-    frame(0,0);
-    for(k=0;k<10u;k++) CHECK(work_id(k)==100+(int)k);
-    CHECK(!strcmp(title(),"Characters  (1-10)"));
-    WORD_AT(WORK+3u*0x1Cu)=150u;frame(3,0);
-    CHECK(member(3)==150 && WORD_AT(ESET)==10u);
-    /* Down on row 10 -> slots 11-20; a pick made this frame is kept */
-    WORD_AT(WORK+5u*0x1Cu)=155u;
-    frame(9,0x00020002u);
-    CHECK(member(5)==155);
-    CHECK(work_id(0)==200 && work_id(1)==-1 && work_id(2)==202 && work_id(9)==0xA8);
-    CHECK(WORD_AT(WORK+2u*0x1Cu+8u)==0x1Cu && (int32_t)WORD_AT(WORK+2u*0x1Cu+0x18u)==-1);    /* slot 13 */
-    CHECK(selected==ITEMS && (WORD_AT(PANE+0xC4u)&0x000F000Fu)==0u);
-    CHECK(!strcmp(title(),"Characters  (11-20)"));
-    for(k=0;k<10u;k++) CHECK(member(k)==(k==3?150:k==5?155:100+(int)k));
-    CHECK(WORD_AT(ESET)==10u);
-    /* a pick on page 2 lands in slot 13; slots 1-10 and the count stay */
-    WORD_AT(WORK+2u*0x1Cu)=77u;WORD_AT(WORK+2u*0x1Cu+0x18u)=1u;
-    frame(2,0);
-    CHECK(member(12)==77 && HALF_AT(ESET+4u+8u*12u+6u)==1 && member(2)==102 && WORD_AT(ESET)==10u);
-    WORD_AT(WORK+1u*0x1Cu)=33u;frame(1,0);
-    CHECK(member(11)==33 && member(1)==101);
-    /* Down on the last row of page 2: stock (no wrap to page 1) */
-    frame(9,0x00020002u);
-    CHECK(work_id(0)==200 && !strcmp(title(),"Characters  (11-20)"));
-    /* Up on row 11 -> back to slots 1-10, cursor on row 10 */
-    selected=0;
-    frame(0,0x00010001u);
-    CHECK(work_id(3)==150 && work_id(5)==155 && work_id(0)==100 && selected==ITEMS+9u*0x10u);
-    CHECK(member(12)==77 && member(11)==33);
-    CHECK(!strcmp(title(),"Characters  (1-10)"));
-    /* Up on row 1 of page 1: stock */
-    frame(0,0x00010001u);
-    CHECK(work_id(0)==100);
-    /* reopening resets to page 1 */
-    frame(9,0x00020002u);CHECK(work_id(0)==200);
-    WORD_AT(0x0078AEACu)=0;frame(0,0);
-    CHECK(work_id(0)==100 && !strcmp(title(),"Characters  (1-10)"));
-    /* preset set: no paging */
-    WORD_AT(0x00784024u)=3u;frame(9,0x00020002u);
-    CHECK(WORD_AT(PANE+0xC4u)==0x00020002u);
-    WORD_AT(0x00784024u)=0x11u;WORD_AT(0x0078AEACu)=0x11u;
-    /* switch off: no paging, title stays */
+    memset((void *)((uintptr_t)WORK+g_xbox_mem_offset),0x5A,10u*0x1Cu);      /* stale */
+    /* switch off: the stock builder, the screen and the rows stock */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
-    WORD_AT(PARENT+0x204u)=TITLE_TEXT;
-    frame(9,0x00020002u);
-    CHECK(work_id(0)==100 && WORD_AT(PANE+0xC4u)==0x00020002u && WORD_AT(PARENT+0x204u)==TITLE_TEXT);
+    build_pane();CHECK(originals==1u && nbuild==0u && !sl.on);
+    originals=0;frame();CHECK(originals==1u && work_id(0)==100);
+    row_draw(12u);CHECK(seen_value==12u);
     set_env("TSFP_MAPMAKER_LIMITS","1");
+    /* outside the editor: stock */
+    WORD_AT(0x0079094Cu)=101u;build_pane();CHECK(originals==1u && nbuild==0u && !sl.on);
+    WORD_AT(0x0079094Cu)=102u;
+    /* the editor: the stock calls with 20 row groups in a scrolling region ten rows tall */
+    WORD_AT(0x0078AEACu)=0;
+    memset((void *)((uintptr_t)WORK+g_xbox_mem_offset),0x5A,10u*0x1Cu);
+    build_pane();
+    CHECK(originals==0u && sl.on && !sl.valid);
+    check_build();
+    /* the first update: the shadow load (members 10..19), then the stock run (1-10) */
+    originals=0;stores=0;frame();
+    CHECK(originals==2u && stores==2u && sl.valid && sl.index==0x11u && WORD_AT(0x0078AEACu)==0x11u);
+    for(k=0;k<10u;k++) CHECK(work_id(k)==100+(int)k && member(k)==100+(int)k && member(10u+k)==some_extras[10u+k]);
+    for(k=0;k<10u;k++) CHECK(shadow_id(k)==some_extras[10u+k]);
+    { int32_t d,p,var;memcpy(&d,sl.rows+2u*0x1Cu+8u,4);memcpy(&p,sl.rows+2u*0x1Cu+0x14u,4);memcpy(&var,sl.rows+2u*0x1Cu+0x18u,4);
+      CHECK(d==0x1C && p==202+0x1000 && var==-1); }                          /* slot 13 */
+    CHECK(WORD_AT(ESET)==10u && !sets.page && !sets.in_update);
+    /* later frames: stock only */
+    originals=0;frame();CHECK(originals==1u && work_id(0)==100);
+    /* the row draw: rows 11-20 show their shadow row in work row k, then put it back */
+    sum=work_sum();
+    row_draw(12u);CHECK(seen_value==2u && seen_id==202u && seen_portrait==202u+0x1000u && WORD_AT(ITEMS+0x14u)==12u);
+    CHECK(work_sum()==sum && shadow_id(2)==202);
+    row_draw(19u);CHECK(seen_value==9u && seen_id==0xA8u);
+    row_draw(11u);CHECK(seen_value==1u && seen_id==0xFFFFFFFFu);
+    row_draw(3u);CHECK(seen_value==3u && seen_id==103u);
+    row_draw(20u);CHECK(seen_value==20u);                                    /* not a slot row: stock */
+    CHECK(work_sum()==sum);
+    /* the row action: row index k + 2 while it runs */
+    pane_at(pc_mapmaker_sets_row_action,15u,0u);
+    CHECK(seen_index==7u && seen_id==0xFFFFFFFFu && WORD_AT(PANE+0x184u)==17u && WORD_AT(PANE+0x18Cu)==15u && work_sum()==sum);
+    pane_at(pc_mapmaker_sets_row_action,4u,0u);CHECK(seen_index==6u && seen_id==104u);
+    /* the pane update: hints/preview for the shadow row; X clears slot 13 */
+    pane_at(pc_mapmaker_sets_pane,12u,0u);
+    CHECK(seen_index==4u && seen_hl==2u && seen_id==202u && WORD_AT(PANE+0x184u)==14u && WORD_AT(PANE+0x18Cu)==12u);
+    pane_at(pc_mapmaker_sets_pane,12u,0x00800000u);
+    CHECK(shadow_id(2)==-1 && member(12)==-1 && work_id(2)==102 && member(2)==102 && work_sum()==sum);
+    pane_at(pc_mapmaker_sets_pane,2u,0u);CHECK(seen_index==4u && seen_hl==2u && seen_id==102u);
+    /* nothing highlighted (-2): +0x18C left alone */
+    WORD_AT(PANE+0x184u)=14u;WORD_AT(PANE+0x18Cu)=0xFFFFFFFEu;WORD_AT(PANE+0xC4u)=0;
+    CALL(pc_mapmaker_sets_pane,fake_row_cb,0x0007AD7Bu,PANE,0u);
+    CHECK(seen_hl==0xFFFFFFFEu && WORD_AT(PANE+0x18Cu)==0xFFFFFFFEu && WORD_AT(PANE+0x184u)==14u);
+    /* the pick: slot 16 gets it, the highlight moves to 17 (stock's own move stays off) */
+    pick_at(15u,0);
+    CHECK(seen_index==7u && member(15)==77 && HALF_AT(ESET+4u+8u*15u+6u)==1 && BYTE_AT(ESET+4u+8u*15u+3u)==2u);
+    CHECK(shadow_id(5)==77 && work_id(5)==105 && member(5)==105 && work_sum()==sum);
+    CHECK(nadvanced==1u && advanced[0][0]==PANE && advanced[0][1]==16u && WORD_AT(PANE+0x18Cu)==16u && WORD_AT(PANE+0x184u)==17u);
+    row_draw(15u);CHECK(seen_id==77u && seen_portrait==0x99u);
+    /* slot 20: nowhere to go; slot 10 moves on to 11; slots 1-9: stock moves on */
+    pick_at(19u,0);CHECK(member(19)==77 && nadvanced==0u);
+    pick_at(9u,0);CHECK(work_id(9)==77 && nadvanced==1u && advanced[0][1]==10u && WORD_AT(PANE+0x18Cu)==10u);
+    pick_at(3u,0);CHECK(work_id(3)==77 && nadvanced==1u && advanced[0][1]==4u);
+    /* a disabled row picks nothing and does not move */
+    pick_at(17u,1);CHECK(member(17)==-1 && nadvanced==0u && WORD_AT(PANE+0x18Cu)==17u);
+    pick_at(9u,1);CHECK(nadvanced==0u);
+    /* sub-mode 0x13 limits the rows: no extra move */
+    BYTE_AT(0x0078ADAEu)=0x13u;pick_at(13u,0);CHECK(member(13)==77 && nadvanced==0u);BYTE_AT(0x0078ADAEu)=0;
+    /* a preset: empty rows 11-20, no shadow load; slots 11-20 are not written */
+    WORD_AT(0x00784024u)=3u;originals=0;frame();
+    CHECK(originals==1u && sl.index==3u);
+    for(k=0;k<10u;k++) CHECK(shadow_id(k)==-1);
+    pane_at(pc_mapmaker_sets_pane,15u,0u);CHECK(seen_id==0xFFFFFFFFu && member(15)==77);
+    row_draw(15u);CHECK(seen_id==0xFFFFFFFFu && member(15)==77);
+    /* back to the custom set: loaded again from members 10..19 */
+    WORD_AT(0x00784024u)=0x11u;originals=0;frame();
+    CHECK(originals==2u && shadow_id(5)==77 && shadow_id(0)==200 && work_id(0)==100);
+    /* a new build (the screen reopened) loads again */
+    build_pane();CHECK(sl.on && !sl.valid);originals=0;frame();
+    CHECK(originals==2u && sl.valid && shadow_id(0)==200 && shadow_id(5)==77 && work_id(0)==100);
+    /* outside the editor the list is off */
+    WORD_AT(0x0079094Cu)=101u;row_draw(12u);CHECK(seen_value==12u);
+    pane_at(pc_mapmaker_sets_pane,12u,0u);CHECK(seen_index==14u);
+    originals=0;frame();CHECK(originals==1u);
+    WORD_AT(0x0079094Cu)=102u;
+    /* diagnostics: the first pane update, moves past row 10, scroll changes */
+    sl.opened=0;before=sets_diag_opens;
+    pane_at(pc_mapmaker_sets_pane,0u,0u);CHECK(sl.opened && sets_diag_opens==before+1u);
+    before=sets_diag_moves;
+    pane_at(pc_mapmaker_sets_pane,3u,0u);CHECK(sets_diag_moves==before);       /* rows 1-10 */
+    pane_at(pc_mapmaker_sets_pane,12u,0u);CHECK(sets_diag_moves==before+1u);   /* slot 13 */
+    pane_at(pc_mapmaker_sets_pane,12u,0u);CHECK(sets_diag_moves==before+1u);   /* unchanged */
+    FLOAT_AT(PANE+0x88u)=4.f;pane_at(pc_mapmaker_sets_pane,12u,0u);CHECK(sets_diag_moves==before+2u);
+    FLOAT_AT(PANE+0x88u)=0.f;
+    /* every build logs */
+    before=sets_diag_opens;build_pane();CHECK(sets_diag_opens==before+1u);
     /* outside the screen update the getters are stock */
     sets.page=1;
     CHECK(inner_call(pc_mapmaker_sets_set_ptr,fake_set_ptr,0x002C0319u)==ESET);
@@ -371,13 +526,18 @@ static void fake_match_start(void)
 }
 static void match_tests(void)
 {
+    unsigned k;
     editor_set(some_extras);
-    strcpy((char *)((uintptr_t)TITLE_TEXT+g_xbox_mem_offset),"Characters");
-    WORD_AT(PARENT+0x204u)=TITLE_TEXT;
     WORD_AT(0x0079094Cu)=102u;WORD_AT(0x00784024u)=0x11u;WORD_AT(0x0078AEACu)=0;
-    frame(0,0);frame(9,0x00020002u);
-    CHECK(work_id(0)==200 && sets.page==1);
-    /* the screen closed on slots 11-20; the Test map start sees rows 1-10 */
+    /* the 20-row list leaves rows 1-10 in the work copy and the getters stock */
+    build_pane();frame();
+    CHECK(work_id(0)==100 && sets.page==0);
+    refills=0;originals=0;
+    CALL(pc_mapmaker_sets_match_start,fake_match_start,0x002D3933u,0u,0u);
+    CHECK(refills==0u && originals==1u && roster[0]==100u && roster[9]==109u);
+    /* the getters still shifted: the Test map start refills rows 1-10 */
+    for(k=0;k<10u;k++) WORD_AT(WORK+k*0x1Cu)=(uint32_t)(int32_t)some_extras[10u+k];
+    sets.page=1;
     refills=0;originals=0;g_eax=0x77u;
     CALL(pc_mapmaker_sets_match_start,fake_match_start,0x002D3933u,0u,0u);
     CHECK(refills==1u && refill_index==0x11u && originals==1u && g_eax==0x77u);
@@ -387,7 +547,8 @@ static void match_tests(void)
     refills=0;CALL(pc_mapmaker_sets_match_start,fake_match_start,0x002D3933u,0u,0u);
     CHECK(refills==0u && originals==2u);
     /* outside the editor: stock, the flag is dropped */
-    frame(9,0x00020002u);CHECK(sets.page==1);
+    for(k=0;k<10u;k++) WORD_AT(WORK+k*0x1Cu)=(uint32_t)(int32_t)some_extras[10u+k];
+    sets.page=1;
     WORD_AT(0x0079094Cu)=100u;originals=0;
     CALL(pc_mapmaker_sets_match_start,fake_match_start,0x002D5E52u,0u,0u);
     CHECK(refills==0u && sets.page==0 && originals==1u && work_id(0)==200);
