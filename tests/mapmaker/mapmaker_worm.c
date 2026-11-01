@@ -59,7 +59,7 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)area;(vo
 
 static int failures, originals;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
-static int pak_mounted, mount_ok=1, alloc_ok=1, scratch_ok=1, bind=1, die;
+static int pak_mounted, trophy_mounted, skeleton_mounted, mount_ok=1, alloc_ok=1, scratch_ok=1, bind=1, die;
 static unsigned nmount, nalloc, ninit, nupdate, ndraw, nrelease, neffect, npadcalls;
 static uint32_t mount_arg, scratch_size, effect_args[2], init_objects, init_route_done, refuse=0xFFFFFFFFu;
 static uint32_t seen_route[6], seen_enable, seen_wall, tag_ret[2], seen_props, seen_extra, seen_script;
@@ -174,7 +174,8 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     va_start(a,n);
     for(i=0;i<n && i<12;i++) x[i]=va_arg(a,uint32_t);
     va_end(a);
-    if(f==sub_00062260) return (x[0]==0x0049D7BCu && pak_mounted)?4u:0xFFFFFFFFu;
+    if(f==sub_00062260) return ((x[0]==0x0049D7BCu && pak_mounted) || (x[0]==0x0049D77Cu && trophy_mounted) ||
+                                (x[0]==0x0049D6FCu && skeleton_mounted))?4u:0xFFFFFFFFu;
     if(f==sub_0005A130) { nmount++;mount_arg=x[0];if(mount_ok) pak_mounted=1;return mount_ok?1u:0u; }
     if(f==sub_001D1E80) { nalloc++;WORD_AT(0x0075B4B4u)=alloc_ok?WST:0u;return 0; }
     if(f==sub_0003DFA0) { scratch_size=x[0];if(scratch_ok) memset((void *)((uintptr_t)SCR+g_xbox_mem_offset),0xEE,x[0]);return scratch_ok?SCR:0u; }
@@ -319,7 +320,15 @@ int main(void)
     pak_mounted=0;WORD_AT(0x006D7880u)=60u;
     CALL(pc_mapmaker_worm_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==1 && !pak_mounted);
-    WORD_AT(0x006D7880u)=10u;pak_mounted=1;
+    WORD_AT(0x006D7880u)=10u;
+    /* lv1_2 shares anim ids with lv1_3 and lv1_6: never mounted with either */
+    pak_mounted=0;trophy_mounted=1;
+    CALL(pc_mapmaker_worm_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nmount==1 && !pak_mounted);
+    trophy_mounted=0;skeleton_mounted=1;
+    CALL(pc_mapmaker_worm_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nmount==1 && !pak_mounted);
+    skeleton_mounted=0;pak_mounted=1;
 
     /* ---- AI start: one worm per map ------------------------------------- */
     level();

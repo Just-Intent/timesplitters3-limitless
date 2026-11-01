@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,2946 @@
+@@ -1037,6 +1037,3000 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1773,13 +1773,23 @@
 +}
 +
 +extern void sub_002C1C90_gen(void);
-+void sub_002C1C90(void)
++static void sub_002C1C90_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_pick")) pc_mapmaker_realbosses_pick(sub_002C1C90_gen);
 +    else sub_002C1C90_gen();
 +#else
 +    sub_002C1C90_gen();
++#endif
++}
++
++void sub_002C1C90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_pick")) pc_mapmaker_sets_pick(sub_002C1C90_layer0);
++    else sub_002C1C90_layer0();
++#else
++    sub_002C1C90_layer0();
 +#endif
 +}
 +
@@ -2678,6 +2688,50 @@
 +    else sub_00315D20_gen();
 +#else
 +    sub_00315D20_gen();
++#endif
++}
++
++extern void sub_002C19F0_gen(void);
++void sub_002C19F0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_build")) pc_mapmaker_sets_build(sub_002C19F0_gen);
++    else sub_002C19F0_gen();
++#else
++    sub_002C19F0_gen();
++#endif
++}
++
++extern void sub_002C0660_gen(void);
++void sub_002C0660(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_row_draw")) pc_mapmaker_sets_row_draw(sub_002C0660_gen);
++    else sub_002C0660_gen();
++#else
++    sub_002C0660_gen();
++#endif
++}
++
++extern void sub_002C1490_gen(void);
++void sub_002C1490(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_row_action")) pc_mapmaker_sets_row_action(sub_002C1490_gen);
++    else sub_002C1490_gen();
++#else
++    sub_002C1490_gen();
++#endif
++}
++
++extern void sub_002C1570_gen(void);
++void sub_002C1570(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_pane")) pc_mapmaker_sets_pane(sub_002C1570_gen);
++    else sub_002C1570_gen();
++#else
++    sub_002C1570_gen();
 +#endif
 +}
 +

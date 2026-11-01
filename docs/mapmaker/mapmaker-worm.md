@@ -218,6 +218,18 @@ Story AI chunk byte of its own (+0x29 is the bosses area's Boss flag). A stock
 game or an older fork build plays id 0x2C with the MapMaker bot class on the
 worm rig (no anims). Mission 5 holds the same id.
 
+## Shared anim ids (crash fixed after v0.4.0-mapmaker.24)
+
+User report: mapmaker.24 crashed at every level load with a set holding the giant trophy monster,
+the giant skeleton and the worm. CONFIRMED (crash dump: guest return 0x0005C562 = `sub_00350EC0`,
+called right after the anim name registration `sub_001CA2F0` at 0x0005C558; registration tables):
+lv1_2.pak's anim ids 0x13E..0x1AE (table 0x0048BEC8, 0x1E entries) overlap lv1_3.pak
+(0x0048C1B0, the trophy monster) and lv1_6.pak (0x0048C738, the skeleton); `sub_0005B980` stores
+each id's data by id (`0x007E03C0` map), so mounting them together overwrites one boss's anims
+with another's. Mission 5 never mounts them at the same time. Fix: the worm's mount hook skips
+lv1_2.pak when lv1_3.pak or lv1_6.pak is mounted (they mount first, inside the same chain); the
+worm then keeps the bot behaviour (logged). Remapping the ids so all three can coexist: not done.
+
 ## Wrappers for the integrator
 
 New area `worm` (add it where the areas are listed, e.g. the

@@ -82,6 +82,8 @@
 #define WRM_ID 0x2Cu                    /* character id */
 #define WRM_MODEL 0x5EAu                /* CHR_MANSION_MANSIONWORM */
 #define WRM_PAK 0x0049D7BCu             /* "pak/stream/lv1/anim/lv1_2.pak" */
+#define WRM_PAK_TROPHY 0x0049D77Cu      /* "pak/stream/lv1/anim/lv1_3.pak": anim ids overlap lv1_2's */
+#define WRM_PAK_SKELETON 0x0049D6FCu    /* "pak/stream/lv1/anim/lv1_6.pak": anim ids overlap lv1_2's */
 #define WRM_MOUNTS 0x006D7880u          /* mounted paks */
 #define WRM_MOUNT_MAX 64u               /* paktable.json: 64 slots at 0x00907000 */
 #define WRM_MOUNT_KEEP 8u
@@ -242,6 +244,16 @@ void pc_mapmaker_worm_anims(void (*original)(void))
     uint32_t mounted;
     original();
     if(!wrm_play() || wrm.optout || (has=wrm_set_has())==0 || wrm_pak_mounted()) return;
+    /* lv1_2's anim ids 0x13E..0x1AE overlap lv1_3 (giant trophy monster,
+     * 0x127..0x193) and lv1_6 (giant skeleton, 0x19C..0x1A9); mission 5 never
+     * mounts them together. Registered together, one overwrites the other's
+     * slots and the level load crashed (v0.4.0-mapmaker.24 user report,
+     * sub_00350EC0 from 0x0005C55D). The bosses mounted first keep theirs. */
+    if((int32_t)guest_call(sub_00062260,1,WRM_PAK_TROPHY)!=-1 || (int32_t)guest_call(sub_00062260,1,WRM_PAK_SKELETON)!=-1) {
+        wrm_log("lv1_2.pak shares anim ids with the trophy monster's or skeleton's pak: the mansion worm keeps the bot behaviour",
+                WORD_AT(WRM_MOUNTS),0);
+        return;
+    }
     if((mounted=WORD_AT(WRM_MOUNTS))+WRM_MOUNT_KEEP>WRM_MOUNT_MAX)
         wrm_log("pak mount table full; the mansion worm keeps the bot behaviour",mounted,WRM_MOUNT_MAX);
     else if(!guest_call(sub_0005A130,1,WRM_PAK)) wrm_log("lv1_2.pak did not mount; bot behaviour",mounted,(uint32_t)has);

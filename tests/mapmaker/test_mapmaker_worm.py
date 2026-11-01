@@ -23,6 +23,9 @@ ROOT = Path(__file__).resolve().parents[2]
 INC = ROOT / 'src/interface/pc_mapmaker_worm.inc'
 
 MUTATIONS = {
+    'shared-ids-trophy': ('(int32_t)guest_call(sub_00062260,1,WRM_PAK_TROPHY)!=-1 || ', ''),
+    'shared-ids-skeleton': (' || (int32_t)guest_call(sub_00062260,1,WRM_PAK_SKELETON)!=-1) {', ') {'),
+    'shared-ids-wrong-pak': ('#define WRM_PAK_SKELETON 0x0049D6FCu', '#define WRM_PAK_SKELETON 0x0049D77Cu'),
     'always-on': ('    return mapmaker_limits.limits;\n}', '    return 1;\n}'),
     'any-mode': ('WORD_AT(WRM_SCENE)==100u && WRM_B(WRM_MODE)==10u; }', 'WORD_AT(WRM_SCENE)==100u; }'),
     'any-scene': ('wrm_on() && WORD_AT(WRM_SCENE)==100u && WRM_B(WRM_MODE)==10u; }', 'wrm_on() && WRM_B(WRM_MODE)==10u; }'),
@@ -373,3 +376,17 @@ def test_draw():
     assert mem(a[0x001DA917])[0][4] == 0x64 and mem(a[0x001DA928])[0][4] == 0x6C
     # the mansion wall clip: camera x against -53.9
     assert mem(a[0x001D294A])[0][4] == 0x0049DE08 and mem(a[0x001D2942])[0][4] == 0x27C
+
+
+
+def test_lv1_paks_share_anim_ids():
+    """lv1_2 (worm) anim ids overlap lv1_3 (trophy monster) and lv1_6 (skeleton):
+    the registration tables (0x0048BEC8 x 0x1E, 0x0048C1B0 x 0x10, 0x0048C738 x 0x12)."""
+    from test_mapmaker_realbosses import xbe_reader
+    import struct as st
+    rd = xbe_reader()
+
+    def ids(va, n):
+        return {st.unpack_from('<H', rd(va + k * 0x18, 0x18), 0x10)[0] for k in range(n)}
+    worm, trophy, skel = ids(0x0048BEC8, 0x1E), ids(0x0048C1B0, 0x10), ids(0x0048C738, 0x12)
+    assert worm & trophy and worm & skel and not trophy & skel
