@@ -1,7 +1,7 @@
 # MapMaker Khallos in the flying chair (story mission 4 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_khallos.inc` (area
-`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 178
+`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 188
 mutations, plus decode, US XBE data and game-pak checks of every site below).
 Wired in v0.4.0-mapmaker.25 (picker row 156); **up to four chairs per map**
 since then ([Several chairs](#several-chairs)), with three new wrappers and
@@ -72,6 +72,37 @@ character made by `sub_000DAC30` (with its pool slot and object, or `NOT
 made`), every AI start of id 0x33, and each step of the chair (created, anchor
 rebased, rider, fight, shot down, removed).
 
+## Crash in v0.4.0-mapmaker.26: emitter owner slots
+
+Playtest (.26, the first build with several chairs): loading a map with a
+single Khallos crashed (crash dump pending). A use-after-free in the
+per-chair copies, confirmed in the decode (`test_emitter_owner_slots`):
+
+- `sub_00111AE0` (the emitter maker, through `sub_00378530`) stores the
+  address of its owner slot in the new emitter (+0) and the emitter in the
+  slot. The chair's jet (`[0x0078F054]`) and first death emitter
+  (`[0x0078DF50]`) are such owner slots (init `sub_001EEA30`, 0x001EEB26 /
+  0x001EEB7A).
+- When an emitter is freed or recycled, at any time and from the particle
+  system (`sub_0010E070`, from `sub_0010E110`, `sub_0010E510`, `sub_00111E40`,
+  and `sub_0010E2A0`), the engine writes 0 through that address.
+- With the chair statics swapped in and out, the stock slot holds the outside
+  value (or another chair's) most of the time: the engine clears the wrong
+  slot and the chair's own copy keeps a dangling emitter pointer that its next
+  update hands to `sub_0010E730`.
+
+Fix: each chair owns two guest slots (one 32-byte allocation per session,
+cleared at every level's pak mount). After the chair is made its emitters'
+owner fields point at its slots; while the chair's code runs (each swap in)
+the value and the owner move to the stock slot and back after. A failed
+creation (no object, or the rising variant) detaches the emitters it made.
+An emitter the engine frees at any time now clears its own chair's slot.
+
+Not from this pattern: the robot swaps no emitter slots, and the realbosses
+skeleton/walker and split Crowe pass emitter owners inside their own heap
+state blocks (the blocks are per instance; only their pointers are swapped),
+so their .26 crashes need their own look.
+
 ## Several chairs
 
 User (2026-11-01): "All of these one-per-map limits need fixed." The chair's
@@ -81,6 +112,7 @@ code keeps its state in globals (CONFIRMED, `test_multi_chair_globals`):
 |---|---|---|
 | `0x0078F000..0x0078F06F` (object, live position, velocity, thrust, active flag, jet emitter, gun toggle, fire timer, the rider's sway +0x60..+0x6C) | the init `sub_001EEA30`, the update, the damage callback, the rising variant, the init switch `sub_001F4E00`, the seated Khallos' handler `sub_00263260` and his pose callback `sub_00263150` | **per chair** |
 | `[0x0078DF50..58]` the death's emitters (made by the init through `sub_00378530`) | the init, the damage callback | **per chair** |
+| owner slots `[0x0078F054]`, `[0x0078DF50]` (emitter +0 points at them) | the particle system clears them on free | **per chair guest slots**, the emitters re-pointed (see the .26 crash) |
 | `[0x00500088]`, `[0x00500094]` | the update only (set and restored around each call already) | per call |
 
 The globals of chair k are loaded around every entry into that code and
