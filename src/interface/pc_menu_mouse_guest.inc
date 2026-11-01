@@ -62,12 +62,16 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_skymask.inc"
 #include "pc_mapmaker_roof.inc"
 #include "pc_mapmaker_tileflags.inc"
+#include "pc_mapmaker_skymusic.inc"
 #include "pc_mapmaker_bosses.inc"
 #include "pc_mapmaker_characters.inc"
 #include "pc_mapmaker_realbosses.inc"
 #include "pc_mapmaker_robot.inc"
 #include "pc_mapmaker_crowe.inc"
 #include "pc_mapmaker_tank.inc"
+#include "pc_mapmaker_khallos.inc"
+#include "pc_mapmaker_worm.inc"
+#include "pc_mapmaker_mothership.inc"
 #include "pc_mapmaker_bigdraw.inc"
 #include "pc_mapmaker_sets.inc"
 #include "pc_mapmaker_matchbots.inc"
@@ -762,6 +766,18 @@ void pc_mapmaker_roof_format(void (*original)(void)) { original(); }
 void pc_mapmaker_tileflags_tiles(void (*original)(void)) { original(); }
 void pc_mapmaker_tileflags_build(void (*original)(void)) { original(); }
 void pc_mapmaker_tileflags_tick(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_play(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_rooms(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_tick(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_rows(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_load(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_level(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_weather_load(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_weather_start(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_music(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_caption(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_picker_end(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_pick(void (*original)(void)) { original(); }
@@ -815,6 +831,35 @@ void pc_mapmaker_tank_wreck(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_event(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_text(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_request(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_gun(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_request(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_update(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_damage(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_event(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_text(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_flame(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_flash(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_shot(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_sound(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_engine(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_level(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_tick(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_tag(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_hit(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_fx(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_props(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_extra(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_script(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_request(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_update(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_text(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_rows(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_close(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_delete(void (*original)(void)) { original(); }

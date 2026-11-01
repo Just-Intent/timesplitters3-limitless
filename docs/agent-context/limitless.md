@@ -489,6 +489,11 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 `sub_0015E7C0` -> `pc_mapmaker_tank_request` (models requested at level init).
 After mapmaker.22: tank courtyard test/target search bounded (freeze); walker
 intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
+More boss areas (merged 2026-11-01, not played): `khallos` (id 0x33 chair prop 0x376),
+`worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`; wrapper
+lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
+skies, sandstorm, music; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
+for bounded vs unbounded open air (mapmaker-sky.md).
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
 anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 (30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear

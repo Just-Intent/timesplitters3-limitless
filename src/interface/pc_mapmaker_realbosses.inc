@@ -357,7 +357,7 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
     int read, optout;
-    uint32_t label, skel_label, walk_label, well, extra_label[3];
+    uint32_t label, skel_label, walk_label, well, extra_label[6];
     unsigned logged, meters;
     struct { uint32_t record; uint8_t boss; } real[RBS_REAL_MAX];
 } rbs;
@@ -428,11 +428,14 @@ static uint32_t rbs_walk_label(void)
  * (model 0x5F2), 0x46 split Crowe (0x5E8), 0x12 the guard robot that stands in
  * for the castle tank prop (pc_mapmaker_tank.inc). sub_002BE270 is 0 for all
  * three (byte table 0x002BE29C entry 1), so the variant is -1 as for 0x15. */
-#define RBS_EXTRA_N 3u
+#define RBS_EXTRA_N 6u
 static const struct { uint32_t row, id, text, standin; char label[16]; } rbs_extra[RBS_EXTRA_N]={
     {153u,0x42u,0x52420042u,0xA8u,"Giant Robot"},  /* preview: the Arcade giant robot */
     {154u,0x46u,0x52420046u,0x1Eu,"Split Crowe"},  /* preview: Arcade Old Crow */
     {155u,0x12u,0x52420012u,0xA8u,"Castle Tank"},  /* preview: the Arcade giant robot */
+    {156u,0x33u,0x52420033u,0x02u,"Khallos (Chair)"},  /* pc_mapmaker_khallos.inc; preview: Arcade Khallos */
+    {157u,0x2Cu,0x5242002Cu,0x6Bu,"Mansion Worm"}, /* pc_mapmaker_worm.inc; preview: Arcade mansion zombie nurse */
+    {158u,0x75u,0x52420075u,0x4Eu,"Mothership"},   /* pc_mapmaker_mothership.inc; preview: Arcade Timesplitter */
 };
 static unsigned rbs_extra_by_row(uint32_t row)
 {
