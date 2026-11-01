@@ -197,16 +197,28 @@ MUTATIONS = {
     'walk-wake-over-request': ('    if(s==RBS_WALK_WAIT && (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {', '    if(s==RBS_WALK_WAIT) {'),
     'walk-wake-other-record': ('       WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;',
                                '       !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;'),
-    'walk-wake-other-entity': ('!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;\n    if(RBS_B',
-                               '!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;\n    if(RBS_B'),
+    'walk-wake-other-entity': ('!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;\n    rbs_walk_track',
+                               '!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;\n    rbs_walk_track'),
     'walk-roar-never': ('    r=guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u);', '    r=0;'),
     'walk-roar-wrong-anim': ('#define RBS_WALK_STUN 0x6F7u', '#define RBS_WALK_STUN 0x6F6u'),
     'walk-roar-slow': ('guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u)', 'guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F000000u)'),
-    'walk-roar-over-anim': (' || WORD_AT(ctl+RBS_ANIM_CUR) || WORD_AT(ctl+RBS_ANIM_ALT)) return;', ' || WORD_AT(ctl+RBS_ANIM_ALT)) return;'),
-    'walk-roar-over-blend': (' || WORD_AT(ctl+RBS_ANIM_CUR) || WORD_AT(ctl+RBS_ANIM_ALT)) return;', ' || WORD_AT(ctl+RBS_ANIM_CUR)) return;'),
+    'walk-roar-over-anim': (' || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR)) ||\n       rbs_walk_own(WORD_AT(ctl+RBS_ANIM_ALT))) return;', ' ||\n       rbs_walk_own(WORD_AT(ctl+RBS_ANIM_ALT))) return;'),
+    'walk-roar-over-blend': (' || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR)) ||\n       rbs_walk_own(WORD_AT(ctl+RBS_ANIM_ALT))) return;', ' || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR))) return;'),
+    'walk-roar-empty-only': (' || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR)) ||', ' || WORD_AT(ctl+RBS_ANIM_CUR) ||'),
+    'walk-own-range-low': ('return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }', 'return anim>RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }'),
+    'walk-own-range-high': ('return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }', 'return anim>=RBS_WALK_ANIM_FIRST && anim<RBS_WALK_ANIM_LAST; }'),
+    'walk-own-any': ('return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }', 'return anim!=0; }'),
     'walk-roar-repeats': ('    rbs_walk.roars++;\n    r=guest_call', '    r=guest_call'),
     'walk-roar-any-state': ('    } else if(s!=RBS_WALK_ROAR) return;\n', '    }\n'),
     'walk-roar-only-state1': ('    } else if(s!=RBS_WALK_ROAR) return;\n', '    } else return;\n'),
+    'walk-arm-never': ('    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ARM;\n', ''),
+    'walk-arm-wrong-state': ('#define RBS_WALK_ARM 0x12u', '#define RBS_WALK_ARM 0x4u'),
+    'walk-arm-any-state': ('    if(rbs_walk.armed || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_STANDOFF || ', '    if(rbs_walk.armed || '),
+    'walk-arm-over-request': (' || (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)>=0 ||\n', ' ||\n'),
+    'walk-arm-one-gun': ('       WORD_AT(st+RBS_WALK_GUN1) || WORD_AT(st+RBS_WALK_GUN2)) return;', '       (WORD_AT(st+RBS_WALK_GUN1) && WORD_AT(st+RBS_WALK_GUN2))) return;'),
+    'walk-arm-stage2': ('    if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;\n    rbs_walk_arm(a,ent,st);\n', '    rbs_walk_arm(a,ent,st);\n    if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;\n'),
+    'walk-arm-repeats': ('    rbs_walk.armed++;\n', ''),
+    'walk-track-stuck': ('    rbs_walk.last=s;\n', ''),
     'walk-wake-sets-state': ('    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;\n', '    WORD_AT(a+RBS_WALK_AI_STATE)=RBS_WALK_ROAR;\n'),
 }
 
@@ -781,3 +793,47 @@ def test_walker_roar_needs_an_animation():
     e = rd(0x00484F68 + 14 * 0x18, 0x18)
     assert struct.unpack_from('<H', e, 0x10)[0] == 0x6F7 and rd(struct.unpack_from('<I', e, 0)[0], 22) == b'crowewalkerstunscript\0'
     assert struct.unpack_from('<I', e, 8)[0] & 1 == 0
+    # creation (sub_000DAC30) sets the skeleton's bind pose as the first "animation" with
+    # sub_000966E0 (+0xD4 = id, finished +0x124 = 0): 0xFE for the walker skeleton
+    assert a[0x000DB1C9].mnemonic == 'push' and ('imm', 0xFE) in a[0x000DB1C9].ops
+    assert target(a[0x000DB1CF]) == 0x000966E0 and a[0x000DB1CF].function == 0x000DAC30
+    assert mem(a[0x000966F1])[0][4] == 0xD4 and mem(a[0x00096770])[0][4] == 0x124
+    # the walker's own animations are lv81's 0x6EE..0x6FC (20 names from 0x6B9)
+    ids = [struct.unpack_from('<H', rd(0x00484F68 + k * 0x18 + 0x10, 2))[0] for k in range(0x14)]
+    assert min(i for i in ids if i >= 0x6EE) == 0x6EE and max(ids) == 0x6FC and 0xFE not in ids
+
+
+def test_walker_guns_gate_the_fight():
+    """State 4 fights only with both guns active; they start off and only state 0x12
+    (after a stun at the stage-1 threshold, back hits only) turns them on."""
+    a = by_address()
+    rd = xbe_reader()
+    jt = [struct.unpack('<I', rd(0x0029CB90 + 4 * k, 4))[0] for k in range(21)]
+    # state 4: either gun off -> 0x0029BC6F -> 0x0029BE76: state = edi = 0x13
+    assert mem(a[0x0029B696])[0][4] == 0x4CC and target(a[0x0029B69E]) == 0x0029BC6F
+    assert mem(a[0x0029B6A4])[0][4] == 0x52C and target(a[0x0029B6AC]) == 0x0029BC6F
+    assert target(a[0x0029BC79]) == 0x0029BE76 and mem(a[0x0029BE76])[0][4] == 0x20
+    assert a[0x0029B1EC].text == 'edi, 0x13'
+    # state 0x13 only waits for both guns == 1, then state 4
+    assert jt[0x13] == 0x0029C933 and mem(a[0x0029C940])[0][4] == 0x4CC and mem(a[0x0029C953])[0][4] == 0x52C
+    # state 0x12: after the animation ends, sub_00294B90, then state 4
+    assert jt[0x12] == 0x0029CA34 and target(a[0x0029CACD]) == 0x00059DD0 and target(a[0x0029CAF0]) == 0x00294B90
+    assert ('imm', 4) in a[0x0029CAF5].ops
+    assert {i.address for i in decoded() if i.call and target(i) == 0x00294B90} == {0x0029CAF0}
+    # sub_00294B90: both guns = 1 (ecx)
+    assert a[0x00294C1C].text == 'ecx, 1'
+    assert mem(a[0x00294C9D])[0][4] == 0x4CC and mem(a[0x00294CC3])[0][4] == 0x52C
+    assert a[0x00294C9D].text.endswith('ecx') and a[0x00294CC3].text.endswith('ecx')
+    assert not [i for i in decoded() if 0x00294C1C < i.address < 0x00294CC3 and i.text.startswith('ecx')]
+    # the level init never sets them
+    for f in (0x002976F0, 0x00297690, 0x002971D0, 0x00296000, 0x00296BD0):
+        assert not [i for i in decoded() if i.function == f and any(op[0] == 'mem' and op[4] in (0x4CC, 0x52C) for op in i.ops)]
+    # the damage code: stage-1 health at +0x584 -> request 0x12, stun 0x6F6, stage 2
+    assert mem(a[0x00298AB5])[0][4] == 0x584 and a[0x00298ACD].text == 'eax, 0x12' and mem(a[0x00298AD6])[0][4] == 0x9D0
+    assert ('imm', 0x6F6) in a[0x00298AE8].ops and mem(a[0x00298B01])[0][4] == 0x98 and ('imm', 2) in a[0x00298B01].ops
+    # stage-1 damage needs sub_00295150: the hit against the facing (+0xA8) below -0.75 = in the back
+    assert target(a[0x00298A48]) == 0x00295150 and mem(a[0x002951FD])[0][4] == 0x0047DE84
+    assert struct.unpack('<f', rd(0x0047DE84, 4))[0] == -0.75
+    # turning: state 9/0x12 apply +0x590 as 59.5 degrees to the yaw (ebx = entity +0x70) and +0xC4
+    assert struct.unpack('<f', rd(0x0049F440, 4))[0] == 59.5 and mem(a[0x0029CA51])[0][4] == 0x0049F440
+    assert mem(a[0x0029A992])[0][4] == 0x70 and mem(a[0x0029CA70])[0][4] == 0xC4
