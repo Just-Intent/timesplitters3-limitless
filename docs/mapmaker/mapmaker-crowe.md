@@ -57,6 +57,16 @@ Checked as the brief asked (CONFIRMED unless marked):
   boss's (+0x1198) cell; state 0 puts the boss on its cell's centre
   (0x00290E81/0x00290EAF) and every move walks to a cell centre
   (`sub_0005BA40` with the x/z distance, 0x00291B78).
+- **Start cell** (CONFIRMED, decode; test `test_start_cell`): state 0 first
+  writes 310.0 (`[0x0049F3D8]`, 0x00290DC2) to the boss's x (`ebp` =
+  entity+0x64, 0x00290022), then `sub_002A9D00(state+4, player x/z, 310.0,
+  own z)` (0x00290E62) looks up the cell of (310.0, own z) into
+  +0x1198/+0x119C, and the boss goes to that cell's centre. So the stock
+  start is always in the 310.0 column, in the row of the boss's own z.
+  `sub_002A9330` picks the row by z (each row's first cell, +4 < z < +0xC)
+  and then the column by x (+0 < x < +8), writing nothing when either is
+  missing; the build `sub_002A93D0` leaves -1 there (0x002A9400), so a miss
+  reads cell -8 (state+0x830) as the position.
 - **Floor height**: mission 10's floor is y = 86. Hard-coded: the death
   point (310.49, 86, 80.95) written to +0x64/+0x68/+0x6C (0x002922FB..
   0x0029231D); the eight falling hazards at state +0x11A0 (0x168 each,
@@ -103,7 +113,7 @@ image constants that only it reads, so it can be moved.
 | `sub_001C8540` -> `pc_mapmaker_crowe_anims` | after the original: when the map's custom set (index 0x11, slots 1-20, as realbosses reads it) holds 0x46 (or the container is unreadable) and lv14.pak is not mounted, mount it with `sub_0005A130` when >= 2 of the 30 mount slots are free |
 | `sub_0025F720` -> `pc_mapmaker_crowe_level` | after the original: forget the last level; when the set holds 0x46, clear `[0x0075F5E8]`, call the stock `sub_0028D6D0` (0x2E04 bytes of level heap plus the effect blocks), then `sub_002A62C0` for the particle block (a block another boss allocated this level stays if this one fails; otherwise the new one replaces it, which leaks 32 KB of level heap and keeps every boss working: they read the global). A failed allocation logs and keeps the bot AI |
 | `sub_0015B830` -> `pc_mapmaker_crowe_ai_start` | character 0x46 or model 0x5E8: class 0/0x40000 when lv14.pak is mounted and this level's state exists; one per map (extras keep the bot AI); notes the Story AI's Boss flag (chunk +0x29) for the HUD |
-| `sub_0028FE30` -> `pc_mapmaker_crowe_fight` | for this boss in scene 100: **relocate** on its first frame (state 0): the grid's type-0 cell nearest the outer centre is put under the spawn x/z, every cell, the outer and the used edge rectangles (+0/+4/+8/+0xC/+0x10/+0x14) move by the same (dx, dz), sizes and types unchanged; dy = spawn height - 86. **Intro**: state 1 becomes 2 (+0x9D4 1, +0x20 2, +0x9D0 2, +0x9D8 0). **Floor**: during the original only, the image constants 86.0 (0x0049F3C4), 86.205, 88.25, 88.4 get + dy, 310.49 and 310.0 + dx, 80.95 + dz, and the stock bits are written back after (a constant that is not stock is left alone). **End**: in state 0x12 it is removed with `sub_0015DDA0` (focus cleared) instead of the original, once |
+| `sub_0028FE30` -> `pc_mapmaker_crowe_fight` | for this boss in scene 100: **relocate** on its first frame (state 0): the start cell (the 310.0 column's cell, a type-0 platform first, nearest the outer centre in z, whose centre the stock lookup maps back to it; with no such cell, the type-0 cell nearest the outer centre) is centred on the spawn x/z, every cell, the outer and the used edge rectangles (+0/+4/+8/+0xC/+0x10/+0x14) move by the same (dx, dz), sizes and types unchanged; dy = spawn height - 86. **Intro**: state 1 becomes 2 (+0x9D4 1, +0x20 2, +0x9D0 2, +0x9D8 0). **Floor**: during the original only, the image constants 86.0 (0x0049F3C4), 86.205, 88.25, 88.4 get + dy, 310.49 and 310.0 + dx, 80.95 + dz, and the stock bits are written back after (a constant that is not stock is left alone). **Start**: after that first state-0 frame, if the boss is not on the spawn x/z or +0x1198/+0x119C are not the start cell (only possible when no cell holds 310.0), both are set; the boss starts exactly at its Story AI spawn point. **End**: in state 0x12 it is removed with `sub_0015DDA0` (focus cleared) instead of the original, once |
 | `sub_0028DD50` -> `pc_mapmaker_crowe_near` | return 0x00290BE7 while shifted: 86.0 restored inside (a distance there), shifted again after |
 | `sub_002A85C0` -> `pc_mapmaker_crowe_sparks` | return 0x00290C02 while shifted: the pushed floor 86.4 + dy, the caller's slot restored |
 | `sub_0028E770` -> `pc_mapmaker_crowe_part` | return 0x0028ECF1, scene 100: only the stock explosion `sub_000EFBD0(0x20, 0x17, state+0x2BFC+part*0x5C, 0, 0, 0, 0, 1)` for parts 0..2, no prop; the original is not run |
@@ -114,15 +124,20 @@ image constants that only it reads, so it can be moved.
 
 Logs (stderr, `[mapmaker] crowe:`): `mounted lv14.pak for the split
 Crowe`, `split Crowe state allocated`, `split Crowe gets its story AI (class
-0x40000)`, `arena moved by (dx, dz), floor y (mission 10: 86)`, `no intro
+0x40000)`, `arena moved by (dx, dz), floor y (mission 10: 86), start cell row,col at
+the spawn (x, z)`, `split Crowe start put back on the spawn point` (should
+not appear), `no intro
 cutscene; the fight starts`, `split Crowe effects drawn`, `part destroyed:
 explosion only`, `level marker dropped`, `split Crowe defeated: removed`,
 `overhead health meter hidden`.
 
 ## Risks (INFERRED, need a playtest)
 
-- **Space**: the arena is about 43 x 40 world units around the spawn point
-  (the spawn is the platform near its centre). The boss walks its lattice of
+- **Space**: the arena is about 43 x 40 world units around the spawn point.
+  The boss starts on its spawn point, but the start platform is in column 4
+  of 7, as in mission 10: the lattice reaches about 27 units towards -x and
+  17 towards +x of the spawn, and about 20 each way in z (INFERRED from the
+  grid constants). The boss walks its lattice of
   platforms and bridges straight through whatever the map has there; it has
   no wall test of its own. Build an open floor (e.g. Open air tiles) around
   it. MapMaker's world units per tile were not measured.
@@ -146,7 +161,13 @@ explosion only`, `level marker dropped`, `split Crowe defeated: removed`,
   `_simd_b_address = 0x49F3C4` in the generated C). Nothing else runs inside
   that call that reads them except `sub_0028DD50`, handled.
 - **Respawn**: a second spawn of the same Story AI in one level keeps the
-  first relocation.
+  first relocation (and stock state 0 then snaps it to that grid).
+- **Fixed after the v0.4.0-mapmaker.21 playtest**: the boss started about
+  one platform (about 6 units in x) away from its spawn point, sometimes
+  behind a wall. The relocation centred the platform nearest the arena's
+  centre (column 3) on the spawn point, but stock state 0 always moves the
+  boss to the 310.0 column (column 4). The relocation now centres that start
+  cell on the spawn point.
 - Untested: collision size on tiles, the walk animation's root motion on a
   flat MapMaker floor, the giant robot and the Crowe together (both use
   lv14.pak; the robot's state is separate).
@@ -220,8 +241,9 @@ needs none of it):
    tiles of open floor or more). Save, reload: kept.
 2. Play in Story. stderr: `mounted lv14.pak for the split Crowe`, `split
    Crowe state allocated`, `gets its story AI (class 0x40000)`, `arena moved
-   by (...)`, `no intro cutscene; the fight starts`, `effects drawn`.
-3. Watch: it walks between platforms around its spawn, turns 90 degrees,
+   by (...) ... start cell 2,4 at the spawn (x, z)` (row/column may differ), `no intro cutscene; the fight starts`, `effects drawn`.
+3. Watch: it appears exactly where its Story AI was placed (not a few
+   tiles off), then walks between platforms around its spawn, turns 90 degrees,
    fires; falling hazards drop near you and explode on the floor (not in
    the air). Shoot its turrets: each explodes (`part destroyed`), no debris.
 4. Kill it: death animation, then after about 3 s it disappears (`level

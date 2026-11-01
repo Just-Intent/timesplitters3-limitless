@@ -1,10 +1,51 @@
 # MapMaker castle tank (story mission 2 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_tank.inc` (area `tank`),
-fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 79 mutations, plus
+fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 90 mutations, plus
 decode, US XBE data and game-pak checks of every site below). Wired in
 v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
 No guest-code table entry of its own, no new save bytes.
+
+## Fixed after v0.4.0-mapmaker.21: the tank model never loaded
+
+Playtest log (v0.4.0-mapmaker.21): `mounted prop6.pak`, then `the tank was
+not created (model not loaded?) (0x81B7DDE0, 0x0)`: the resource rows were
+found, but `sub_000A6F90` returned 0. Cause (CONFIRMED, test
+`test_model_load_path`): nothing had **requested** the models.
+
+- `sub_000A6880` loads a row's model with `sub_00096410(row +0x10 path,
+  model)` (0x000A6927). That function finds the file only through the
+  level's load request for that path (`sub_000631C0`, 0x00096422). Without a
+  request it falls back to looking up the bare row path
+  `castle/props/tankboss` in the mounted paks (`sub_00062C30`,
+  `sub_00062F00`), which never matches a pak entry (those are the CRC32 of
+  `assets/ts/models/<path>/xbox/output/<name>.xbr`). So it returns no model,
+  and `sub_000A6880` returns 0 (0x000A695C).
+- Requests are made by `sub_000A5E40(model)` -> `sub_00063A40` (builds the
+  `.xbr` path from format 0x00478354, queues it sorted by file offset at
+  `[0x006D7C84]`). The scene loop `sub_0003D440` reads every queued request
+  right after the level setup (`sub_001CDB80` at 0x0003D590, then
+  `sub_00063390` at 0x0003D5AD). The castle level requests its tank; a
+  MapMaker map requests only the models of its own objects and set.
+- In scene 100 the story-only flag and the streaming branch are skipped
+  (`sub_00096410` 0x00096451, `sub_000A5E40` 0x000A5E83), so the models
+  come from whichever mounted pak holds them: prop6.pak, mounted with
+  load=0 (file kept open, so the load pass can read from it).
+
+Fix: **request** (`sub_0015E7C0`, story level init, called once by the level
+setup at 0x001CDC20, after `sub_000A5C00` at 0x001CDBF3 has built the
+resource table through the callback `sub_00242BA0` -> `sub_00242780`, and
+before the load pass): when the map's set holds 0x12, prop6.pak is mounted
+and the three rows exist, `sub_000A5E40(0x281)`, `(0x297)`, `(0x298)`.
+
+Guard: `sub_00096410` takes a request's data (+0x10) without a null test
+(0x00096437 -> 0x0009651F). So before creating the tank, ai_start checks
+that each of the three models is already loaded (row +4) or that its
+request (row path +0x10, and second path +0x14 when set) holds the read
+file. Otherwise the placeholder stays a bot and the log names the model,
+its row and the request data (`tank models not requested this level` /
+`a tank model was requested but not read`). The turret and wreck are
+checked too because the death creates them through the same path.
 
 ## Fixed after v0.4.0-mapmaker.20: the tank never appeared
 
@@ -120,9 +161,12 @@ do; 0x12 has no Arcade row).
    `sub_000622D0(0x0049DF7C, 0, 1)`: kept open, entries read on demand, like
    `chr.pak` (0x0006298E). A missing file answers -1 (`sub_000389B0` is a
    plain ret). The stock bulk unmount removes it with the level.
+1b. **request** (`sub_0015E7C0`): the three models are requested for the
+   load pass (see the v0.4.0-mapmaker.21 fix above).
 2. **ai_start** (`sub_0015B830`): after the original, the first pool entry
    with character (a+0x48) 0x12, when the pak is mounted and the resource map
-   (`0x008CA000`, moved there by the rooms area) has 0x281 (row +0x2C == `sub_002560C0`), 0x297 and 0x298:
+   (`0x008CA000`, moved there by the rooms area) has 0x281 (row +0x2C == `sub_002560C0`), 0x297 and 0x298,
+   and all three are loaded or their requests hold the read file:
    `sub_000A6F90(0x281, &pos, &rot, 0, 0)` with pos = the placeholder's
    +0x64..+0x6C and rot = (0, its +0x70, 0). Layout (CONFIRMED):
    `sub_000A6F90` -> `sub_000A6EC0(type, model, pos, rot, a, b)` ->
@@ -144,6 +188,7 @@ unchanged when the switch is off or outside scene 100.
 | wrapper | function | chaining |
 |---|---|---|
 | `WRAP sub_00062790 -> pc_mapmaker_tank_mount` | level pak mounts | new |
+| `WRAP sub_0015E7C0 -> pc_mapmaker_tank_request` | story level init (no args) | **new after v0.4.0-mapmaker.21**; works after the original, so any order with other wrappers |
 | `WRAP sub_0015B830 -> pc_mapmaker_tank_ai_start` | AI start (cdecl pool entry) | **shared** with `pc_mapmaker_realbosses_ai_start`; order free (each acts only on its own ids; the tank's runs its work after the original) |
 | `WRAP sub_00255550 -> pc_mapmaker_tank_update` | tank frame (cdecl object) | new |
 | `WRAP sub_00253140 -> pc_mapmaker_tank_wake` | fight start test (no args, eax) | new |
@@ -155,18 +200,24 @@ unchanged when the switch is off or outside scene 100.
 | `WRAP sub_0003D7B0 -> pc_mapmaker_tank_text` | text lookup (cdecl), hot | **shared** with `pc_mapmaker_realbosses_text` (and others); order free: ids 0x165B/0x1635 at their return addresses only |
 
 Guest functions called: `sub_00062260` (is a pak mounted), `sub_000622D0`
-(mount), `sub_000A6F90` (create the tank), `sub_0015DDA0` (remove the
+(mount), `sub_000A5E40` (request a model), `sub_000631C0` (find a model's
+request), `sub_000A6F90` (create the tank), `sub_0015DDA0` (remove the
 placeholder AI). Host: `xbox_HeapAlloc` (labels, 32-byte argument buffer,
 once per session). The area stubs (`tests/mapmaker/mapmaker_area_stubs.h`)
-need `sub_000622D0` and `sub_000A6F90` when the include chain links this
-area (`sub_00062260` and `sub_0015DDA0` are already there).
+need `sub_000622D0`, `sub_000A6F90`, `sub_000A5E40` and `sub_000631C0` when
+the include chain links this area (`sub_00062260` and `sub_0015DDA0` are
+already there).
 
 Also for the integrator: the editor picker row (above), and the
 `docs/agent-context` guide entry for this area.
 
 ## Risks (not verified in game)
 
-- Played once (v0.4.0-mapmaker.20): only the pak mount ran; the spawn failed on the stale map address (fixed above). Everything after the spawn is still unplayed.
+- Played twice: v0.4.0-mapmaker.20 failed on the stale map address,
+  .21 on the missing model requests (both fixed above). Nothing after the
+  spawn has run yet.
+- The models are read during the level load (about 380 KB from prop6.pak,
+  research estimate), whether or not the tank's placeholder spawns.
 - Collision and driving of a 0x8000000 prop on MapMaker tile floors
   (`sub_002548F0` drives by its own position; INFERRED it follows the floor
   through stock object physics).
@@ -184,7 +235,7 @@ Also for the integrator: the editor picker row (above), and the
 
 1. A map whose custom set holds id 0x12 with one Story AI of it on a
    ground-floor spot: in story play the tank appears there (log: `mounted
-   prop6.pak`, `castle tank created`, `spawn (...)`, `placeholder AI
+   prop6.pak`, `requested the tank, turret and wreck models`, `castle tank created`, `spawn (...)`, `placeholder AI
    removed`).
 2. Walk within 30 m: it starts (log `fight started`), drives and fires;
    the bottom bar reads "Castle Tank".
