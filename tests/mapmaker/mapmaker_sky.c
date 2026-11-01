@@ -260,6 +260,28 @@ int main(void)
     CHECK(seen_level_sky==7u && pristine_sum()==h0);
     WORD_AT(0x00784014u)=C;
 
+    /* Extra sky (row 6 = record 43, pc_mapmaker_skymusic.inc): its own cloud
+     * fields while its pak is mounted, never patched; else the fallback. */
+    make_container(C,0x00010000u|(6u<<19),61,0);
+    mapmaker_sky.extra_ready=1;
+    originals=0;play();
+    CHECK(originals==1 && seen_level_sky==43u && WORD_AT(MAPMAKER_SKY_LEVEL+0x10u)==7u && pristine_sum()==h0);
+    make_container(C,0x00050000u|(6u<<19),61,0);
+    play();
+    CHECK(seen_level_sky==43u && pristine_sum()==h0);
+    make_container(C,0x00050000u|(31u<<19),61,0);   /* unknown row: the stock field */
+    play();
+    CHECK(seen_level_sky==61u && rec(61,0)==tmpl[0]);
+    make_container(C,0x00050000u|(6u<<19),61,0);
+    mapmaker_sky.extra_ready=0;                      /* pak not mounted: the fallback */
+    play();
+    CHECK(seen_level_sky==61u && rec(61,0)==tmpl[0]);
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);mapmaker_sky.extra_ready=1;
+    make_container(C,0x00010000u|(6u<<19),61,0);
+    play();
+    CHECK(seen_level_sky==7u);
+    set_env("TSFP_MAPMAKER_LIMITS","1");mapmaker_sky.extra_ready=0;
+
     /* Allocation failure: no checkbox, counted. */
     mapmaker_sky.storage=0;heap_result=0;
     WORD_AT(0x0079094Cu)=102u;
