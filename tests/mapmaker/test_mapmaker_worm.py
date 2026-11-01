@@ -24,7 +24,19 @@ INC = ROOT / 'src/interface/pc_mapmaker_worm.inc'
 
 MUTATIONS = {
     'shared-ids-trophy': ('(int32_t)guest_call(sub_00062260,1,WRM_PAK_TROPHY)!=-1 || ', ''),
-    'shared-ids-skeleton': (' || (int32_t)guest_call(sub_00062260,1,WRM_PAK_SKELETON)!=-1) {', ') {'),
+    'shared-ids-skeleton': (' || (int32_t)guest_call(sub_00062260,1,WRM_PAK_SKELETON)!=-1)) {', ')) {'),
+    'shared-ids-always': ('    if(!pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_register") &&\n', '    if(1 &&\n'),
+    'shared-ids-never': ('    if(!pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_register") &&\n', '    if(0 &&\n'),
+    'register-off': ('WORD_AT(g_esp+12u)!=WRM_ANIMS_N || !wrm_play()) { original();return; }', 'WORD_AT(g_esp+12u)!=WRM_ANIMS_N || 1) { original();return; }'),
+    'register-any-table': ('WORD_AT(g_esp+8u)!=WRM_ANIMS || WORD_AT(g_esp+12u)!=WRM_ANIMS_N', 'WORD_AT(g_esp+12u)!=WRM_ANIMS_N'),
+    'register-any-count': (' || WORD_AT(g_esp+12u)!=WRM_ANIMS_N || !wrm_play())', ' || !wrm_play())'),
+    'register-any-scene': ('WORD_AT(g_esp+12u)!=WRM_ANIMS_N || !wrm_play()) {', 'WORD_AT(g_esp+12u)!=WRM_ANIMS_N || !wrm_on()) {'),
+    'register-no-barney': ('    guest_call(sub_0005B980,3,prefix,WRM_ANIMS+WRM_ANIM_BARNEY*WRM_ANIM,1u);\n', ''),
+    'register-wrong-first': ('#define WRM_ANIM_FIRST 21u', '#define WRM_ANIM_FIRST 20u'),
+    'register-wrong-count': ('#define WRM_ANIM_COUNT 8u', '#define WRM_ANIM_COUNT 9u'),
+    'register-whole-table': ('    WORD_AT(sp+8u)=WRM_ANIMS+WRM_ANIM_FIRST*WRM_ANIM;WORD_AT(sp+12u)=WRM_ANIM_COUNT;\n', ''),
+    'register-not-restored': ('    WORD_AT(sp+8u)=WRM_ANIMS;WORD_AT(sp+12u)=WRM_ANIMS_N;', '    (void)0;'),
+    'shift-burst-line-missing': ('    {0x0047D78Cu,0x41D80000u,2},', ''),
     'shared-ids-wrong-pak': ('#define WRM_PAK_SKELETON 0x0049D6FCu', '#define WRM_PAK_SKELETON 0x0049D77Cu'),
     'always-on': ('    return mapmaker_limits.limits;\n}', '    return 1;\n}'),
     'any-mode': ('WORD_AT(WRM_SCENE)==100u && WRM_B(WRM_MODE)==10u; }', 'WORD_AT(WRM_SCENE)==100u; }'),
@@ -35,30 +47,27 @@ MUTATIONS = {
     'mount-wrong-pak': ('#define WRM_PAK 0x0049D7BCu', '#define WRM_PAK 0x0049DC78u'),
     'mount-full-ignored': ('    if((mounted=WORD_AT(WRM_MOUNTS))+WRM_MOUNT_KEEP>WRM_MOUNT_MAX)', '    if(0)'),
     'mount-when-mounted': ('(has=wrm_set_has())==0 || wrm_pak_mounted()) return;', '(has=wrm_set_has())==0) return;'),
-    'level-no-alloc-check': ('    if(!st || !MAPMAKER_PTR_OK(st,WRM_STATE_SIZE) || !scratch', '    if(!scratch'),
-    'level-no-scratch-check': ('|| !scratch || !MAPMAKER_PTR_OK(scratch,WRM_SCRATCH)) {', ') {'),
+    'level-no-alloc-check': ('    if(!st || !MAPMAKER_PTR_OK(st,WRM_STATE_SIZE)) {\n        wrm_log("no level memory for a mansion worm', '    if(0) {\n        wrm_log("no level memory for a mansion worm'),
+    'level-no-scratch-check': ('    if(!scratch || !MAPMAKER_PTR_OK(scratch,WRM_SCRATCH)) {', '    if(0) {'),
     'scratch-not-zeroed': ('    wrm_zero(scratch,WRM_SCRATCH);\n', ''),
     'scratch-no-object': ('    WORD_AT(scratch+WRM_FAKE_TABLE+WRM_OBJECT*4u)=scratch+WRM_FAKE_OBJECT;\n', ''),
-    'init-real-objects': ('    WORD_AT(WRM_OBJECTS)=scratch+WRM_FAKE_TABLE;      /* object', '    (void)0;      /* object'),
+    'init-real-objects': ('    WORD_AT(WRM_OBJECTS)=wrm_scratch+WRM_FAKE_TABLE;  /* object', '    (void)0;  /* object'),
     'init-converts-pads': ('    WORD_AT(WRM_ROUTE_DONE)=0;                         /* the mansion', '    (void)0;                         /* the mansion'),
     'init-objects-kept': ('    WORD_AT(WRM_OBJECTS)=objects;WORD_AT(WRM_ROUTE_DONE)=route_done;', '    WORD_AT(WRM_ROUTE_DONE)=route_done;'),
     'init-flag-kept': ('    WORD_AT(WRM_OBJECTS)=objects;WORD_AT(WRM_ROUTE_DONE)=route_done;', '    WORD_AT(WRM_OBJECTS)=objects;'),
-    'no-effect': ('    wrm_lv.effect=guest_call(sub_00378400,2,WRM_EFFECT_FN,5u);', '    wrm_lv.effect=0;'),
+    'no-effect': ('    wrm_effect=guest_call(sub_00378400,2,WRM_EFFECT_FN,5u);', '    wrm_effect=0;'),
     'park-none': ('        WORD_AT(w+WRM_W_STATE)=WRM_GONE;\n', ''),
-    'park-from-0': ('    for(k=1;k<WRM_WORMS;k++) {                         /* one worm', '    for(k=0;k<WRM_WORMS;k++) {                         /* one worm'),
+    'park-from-0': ('    for(i=1;i<WRM_WORMS;i++) {                         /* one map worm', '    for(i=0;i<WRM_WORMS;i++) {                         /* one map worm'),
     'park-emitters-kept': ('        if(WORD_AT(w+WRM_W_EMITTER)) guest_call(sub_0010E2A0,1,WORD_AT(w+WRM_W_EMITTER));\n', ''),
-    'enable-at-level': ('    WORD_AT(WRM_ENABLE)=0;                             /* until', '    WORD_AT(WRM_ENABLE)=1;                             /* until'),
-    'ai-extra-wins': ('    else if(wrm_lv.record && wrm_lv.record!=rec) {', '    else if(0) {'),
+    'ai-extra-wins': ('    else if(k==wrm_n && wrm_n>=WRM_MAX) {', '    else if(0) {'),
     'ai-any-character': ("    if(WRM_H(a+WRM_ACTOR_CHAR)!=WRM_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && WRM_H(ent+WRM_ENT_MODEL)==WRM_MODEL)) { original();return; }\n", ''),
-    'ai-class-changed': ('        wrm_lv.record=rec;wrm_lv.actor=a;', '        wrm_lv.record=rec;wrm_lv.actor=a;WORD_AT(rec)=0;'),
-    'head-any-entity': ('    return WORD_AT(a+WRM_ACTOR_RECORD)==wrm_lv.record && WORD_AT(WRM_SCENE)', '    return 1 && WORD_AT(WRM_SCENE)'),
-    'head-any-scene': ('wrm_lv.record && WORD_AT(WRM_SCENE)==100u && wrm_on();', 'wrm_lv.record && wrm_on();'),
-    'head-stale-state': ('    if(!wrm_lv.record || !wrm_state_ok()) return 0;', '    if(!wrm_lv.record) return 0;'),
-    'tick-thinks': ('    if(!wrm.ticks++) wrm_log("mansion worm runs its story update",ent,WORD_AT(wrm_lv.state+WRM_W_STATE));\n    MAPMAKER_GUEST_RET();',
-                    '    if(!wrm.ticks++) wrm_log("mansion worm runs its story update",ent,WORD_AT(wrm_lv.state+WRM_W_STATE));\n    original();'),
+    'ai-class-changed': ('        wrm_inst[k].record=rec;wrm_inst[k].actor=a;', '        wrm_inst[k].record=rec;wrm_inst[k].actor=a;WORD_AT(rec)=0;'),
+    'head-any-entity': ('    for(k=0;k<wrm_n;k++) if(wrm_inst[k].record && wrm_inst[k].record==rec && wrm_inst[k].state) return (int)k;', '    for(k=0;k<wrm_n;k++) if(wrm_inst[k].state) return (int)k;'),
+    'head-any-scene': ('    return k>=0 && WORD_AT(WRM_SCENE)==100u && wrm_on()?k:-1;', '    return k>=0 && wrm_on()?k:-1;'),
+    'tick-thinks': ('    wrm_leave(prev);\n    MAPMAKER_GUEST_RET();', '    wrm_leave(prev);\n    original();'),
     'tick-no-update': ('    guest_call(sub_001DAAB0,0);\n', ''),
     'tick-setup-every-time': ('    if(!wrm_lv.ready && !wrm_lv.failed) wrm_setup(ent);', '    if(!wrm_lv.failed) wrm_setup(ent);'),
-    'tick-failed-runs': ('    if(wrm_lv.failed) { original();return; }\n    wrm_shift(1,0);', '    wrm_shift(1,0);'),
+    'tick-failed-runs': ('    if(wrm_lv.failed) { wrm_leave(prev);original();return; }\n', ''),
     'tick-slot-lost': ('!WORD_AT(ent+WRM_SLOT3)) WORD_AT(ent+WRM_SLOT3)=WRM_CHAR_UPDATE;', '!WORD_AT(ent+WRM_SLOT3)) {}'),
     'tick-slot-after-death': ('    if(WORD_AT(WRM_HEADS)==ent && !WORD_AT(ent+WRM_SLOT3))', '    if(!WORD_AT(ent+WRM_SLOT3))'),
     'shift-none': ('    wrm_shift(1,0);\n    guest_call(sub_001DAAB0,0);', '    guest_call(sub_001DAAB0,0);'),
@@ -87,7 +96,6 @@ MUTATIONS = {
     'route-no-repeat': ('    for(k=found;k<WRM_ROUTE_N;k++) wrm_lv.pad[k]=wrm_lv.pad[k%found];\n', ''),
     'tag-any-site': ('|| WORD_AT(g_esp)!=WRM_RET_TAG ||', '||'),
     'tag-any-worm': ('    g_eax=tag==WRM_TAG && wrm_head(ent)?ent:0u;', '    g_eax=wrm_head(ent)?ent:0u;'),
-    'tag-before-ready': ('    if(!wrm_lv.ready || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=WRM_RET_TAG', '    if(!MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=WRM_RET_TAG'),
     'hit-no-script': ('    WORD_AT(WRM_SCRIPT)=wrm_lv.scratch;WORD_AT(WRM_OBJECTS)', '    WORD_AT(WRM_OBJECTS)'),
     'hit-no-objects': ('WORD_AT(WRM_SCRIPT)=wrm_lv.scratch;WORD_AT(WRM_OBJECTS)=wrm_lv.scratch+WRM_FAKE_TABLE;', 'WORD_AT(WRM_SCRIPT)=wrm_lv.scratch;'),
     'hit-no-effect': ('    WORD_AT(WRM_EFFECT)=wrm_lv.effect;WORD_AT(ent+WRM_ENT_TAG)=WRM_TAG;', '    WORD_AT(ent+WRM_ENT_TAG)=WRM_TAG;'),
@@ -96,9 +104,9 @@ MUTATIONS = {
     'hit-tag-kept': ('WORD_AT(WRM_EFFECT)=effect;WORD_AT(ent+WRM_ENT_TAG)=tag;', 'WORD_AT(WRM_EFFECT)=effect;'),
     'hit-counter-kept': ('    WORD_AT(wrm_lv.scratch+WRM_KILLS)=0;\n    WORD_AT(WRM_SCRIPT)=wrm_lv.scratch;', '    WORD_AT(WRM_SCRIPT)=wrm_lv.scratch;'),
     'hit-counter-after': ('    WORD_AT(wrm_lv.scratch+WRM_KILLS)=0;\n    if(WORD_AT(wrm_lv.state+WRM_W_STATE)!=st', '    if(WORD_AT(wrm_lv.state+WRM_W_STATE)!=st'),
-    'hit-any-entity': ('       !wrm_head(ent=WORD_AT(info))) { original();return; }', '       !(ent=WORD_AT(info))) { original();return; }'),
-    'fx-any-call': ('    int here=wrm_lv.ready && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==WRM_RET_FX;', '    int here=wrm_lv.ready && MAPMAKER_STACK_OK(4);'),
-    'fx-not-ready': ('    int here=wrm_lv.ready && MAPMAKER_STACK_OK(4)', '    int here=wrm_lv.state && MAPMAKER_STACK_OK(4)'),
+    'hit-any-entity': ('       (k=wrm_worm(ent=WORD_AT(info)))<0 || !wrm_inst[k].ready) { original();return; }', '       (k=0,ent=WORD_AT(info),!wrm_inst[k].ready)) { original();return; }'),
+    'fx-any-call': ('    int here=wrm_n && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==WRM_RET_FX,prev;', '    int here=wrm_n && MAPMAKER_STACK_OK(4),prev;'),
+    'fx-not-ready': ('        if(!wrm_inst[k].ready) continue;\n', ''),
     'fx-no-draw': ('    guest_call(sub_001DA990,0);\n', ''),
     'fx-no-shift': ('    wrm_shift(1,1);\n', ''),
     'fx-wall-kept': ('            if(wrm_lv.wall==WRM_WALL_BITS) WORD_AT(WRM_WALL)=WRM_FLT_MAX;', '            (void)0;'),
@@ -109,7 +117,26 @@ MUTATIONS = {
     'script-kept': ('    if(wrm_lv.ready && MAPMAKER_STACK_OK(8) && WORD_AT(g_esp)==WRM_RET_SCRIPT && WORD_AT(WRM_SCENE)==100u) {', '    if(0) {'),
     'script-any-site': ('&& WORD_AT(g_esp)==WRM_RET_SCRIPT && WORD_AT(WRM_SCENE)==100u) {', '&& WORD_AT(WRM_SCENE)==100u) {'),
     'script-any-scene': ('WORD_AT(g_esp)==WRM_RET_SCRIPT && WORD_AT(WRM_SCENE)==100u) {', 'WORD_AT(g_esp)==WRM_RET_SCRIPT) {'),
-    'level-not-forgotten': ('    memset(&wrm_lv,0,sizeof wrm_lv);                  /* a new level', '    (void)0;                  /* a new level'),
+    'height-burst-unshifted': ('    if(WORD_AT(w+WRM_W_ROUTE_FROM)==2u) wrm_setf(head+WRM_ENT_X+4u,wrm_getf(head+WRM_ENT_X+4u)+wrm_lv.dy);', '    (void)0;'),
+    'height-always-shifted': ('    if(WORD_AT(w+WRM_W_ROUTE_FROM)==2u) wrm_setf(', '    if(1) wrm_setf('),
+    'height-buried-shifted': ('WORD_AT(w+WRM_W_STATE)<WRM_SURFACED) { wrm_lv.surfaced=0;return; }', '0) { wrm_lv.surfaced=0;return; }'),
+    'height-not-called': ('            wrm_shift(0,1);\n            wrm_height();', '            wrm_shift(0,1);'),
+    'multi-no-swap': ('    prev=wrm_enter(k);                                 /* this worm', '    prev=wrm_cur;wrm_i=&wrm_inst[k];                                 /* this worm'),
+    'multi-tick-not-left': ('    if(!wrm.ticks++) wrm_log("mansion worm runs its story update (worm, state)",(uint32_t)k,WORD_AT(wrm_lv.state+WRM_W_STATE));\n    wrm_leave(prev);', '    if(!wrm.ticks++) wrm_log("mansion worm runs its story update (worm, state)",(uint32_t)k,WORD_AT(wrm_lv.state+WRM_W_STATE));'),
+    'multi-failed-not-left': ('    if(wrm_lv.failed) { wrm_leave(prev);original();return; }', '    if(wrm_lv.failed) { original();return; }'),
+    'multi-leave-no-store': ('    if(wrm_cur==prev) return;\n    wrm_store(wrm_cur);', '    if(wrm_cur==prev) return;'),
+    'multi-enter-no-store': ('    if(prev==k) return prev;\n    wrm_store(prev);', '    if(prev==k) return prev;'),
+    'multi-window-no-heads': ('    0x0078FAE0u,0x0078FAE4u,0x0078FAE8u,0x0078FAECu,0x0078FAF0u,\n', ''),
+    'multi-window-no-block': ('    WRM_STATE,0x0075B4B8u,WRM_ENABLE,0x004FDC20u,', '    0x0075B4B8u,WRM_ENABLE,0x004FDC20u,'),
+    'multi-alloc-keeps-globals': ('    for(j=0;j<WRM_NWIN;j++) WORD_AT(wrm_win[j])=live[j];\n    wrm_inst[k].state=st;', '    wrm_inst[k].state=st;'),
+    'multi-alloc-not-captured': ('    for(j=0;j<WRM_NWIN;j++) wrm_inst[k].win[j]=WORD_AT(wrm_win[j]);\n', ''),
+    'multi-no-extra-alloc': ('    } else if(k==wrm_n && !wrm_alloc(k)) {', '    } else if(k==wrm_n) {'),
+    'multi-count-kept': ('        if(k==wrm_n) wrm_n++;\n', ''),
+    'multi-cap-high': ('#define WRM_MAX 4u', '#define WRM_MAX 5u'),
+    'multi-draw-unswapped': ('        prev=wrm_enter((int)k);\n        if(wrm_state_ok()) {', '        prev=wrm_cur;wrm_i=&wrm_inst[k];\n        if(wrm_state_ok()) {'),
+    'multi-hit-unswapped': ('    prev=wrm_enter(k);\n    wrm_hit(ent,original);', '    prev=wrm_cur;\n    wrm_hit(ent,original);'),
+    'multi-reuse-slot-lost': ('    if(k==wrm_n) for(k=0;k<wrm_n && wrm_inst[k].record;k++) {}   /* a block allocated but unused */\n', ''),
+    'level-not-forgotten': ('    memset(wrm_inst,0,sizeof wrm_inst);               /* a new level', '    (void)0;               /* a new level'),
 }
 
 
@@ -343,6 +370,8 @@ def test_update_constants_route_and_reachability():
     seen = reach(set())
     others = readers[0x0047D69C] - worm
     assert others and not others & seen
+    others = readers[0x0047D78C] - worm
+    assert others and not others & seen
     assert 0x0015BA10 in seen and 0x000877B0 not in seen
     # the two ways to markers and tag lookups: the dropped 'SFCC' trigger and the generic explosion (a read)
     assert ('imm', 0x53464343) in a[0x001DC455].ops and target(a[0x001DC45A]) == 0x00234CD0
@@ -380,13 +409,104 @@ def test_draw():
 
 
 def test_lv1_paks_share_anim_ids():
-    """lv1_2 (worm) anim ids overlap lv1_3 (trophy monster) and lv1_6 (skeleton):
-    the registration tables (0x0048BEC8 x 0x1E, 0x0048C1B0 x 0x10, 0x0048C738 x 0x12)."""
-    from test_mapmaker_realbosses import xbe_reader
-    import struct as st
+    """lv1_2 shares two Jo-Beth names (and ids) with lv1_3 (trophy monster) and lv1_6 (skeleton);
+    the worm's own entries (21..28 and 5) are unique among every boss pak's registration table."""
     rd = xbe_reader()
 
-    def ids(va, n):
-        return {st.unpack_from('<H', rd(va + k * 0x18, 0x18), 0x10)[0] for k in range(n)}
-    worm, trophy, skel = ids(0x0048BEC8, 0x1E), ids(0x0048C1B0, 0x10), ids(0x0048C738, 0x12)
-    assert worm & trophy and worm & skel and not trophy & skel
+    def names(va, n):
+        return {anim_table_entry(rd, va, k) for k in range(n)}
+    lv1_2 = [anim_table_entry(rd, 0x0048BEC8, k) for k in range(0x1E)]
+    trophy, skel = names(0x0048C1B0, 0x10), names(0x0048C738, 0x12)
+    assert {n for n in lv1_2 if n in trophy} == {('jblookout', 0x193)}
+    assert {n for n in lv1_2 if n in skel} == {('jbgrossend', 0x1AE)} and not trophy & skel
+    kept = lv1_2[21:29] + [lv1_2[5]]
+    assert [n for n, _ in kept] == ['wrmburst', 'wrmidle', 'wrmflaming', 'wrmattack', 'wrmburrow', 'wrmhitreact',
+                                    'wrmtantrum', 'wrmdeath', 'barney_worm']
+    others = set()
+    for va, n in ((0x00484F68, 0x14), (0x0048C738, 0x12), (0x0048C1B0, 0x10), (0x0047E938, 0x29)):  # lv81, lv1_6, lv1_3, lv14
+        others |= names(va, n)
+    assert not {i for _, i in kept} & {i for _, i in others} and not {n for n, _ in kept} & {n for n, _ in others}
+
+
+def anim_table_entry(rd, va, k):
+    e = rd(va + k * 0x18, 0x18)
+    return rd(struct.unpack_from('<I', e, 0)[0], 40).split(b'\0')[0].decode(), struct.unpack_from('<H', e, 0x10)[0]
+
+
+def test_registration_sites_and_fixup():
+    """sub_0005B980(prefix, table, count) registers entry by entry; sub_00057F30 fixes the anim data up in place;
+    the worm's state 2 burst (+0x44C 2, barney_worm 0x149) is behind the z line 27.0 (0x0047D78C)."""
+    a = by_address()
+    assert ('imm', 0x1E) in a[0x001CAD69].ops and target(a[0x001CAD75]) == 0x0005B980 and ends(a, 0x001CAD75) == 0x001CAD7A
+    assert ('imm', 0x0048BEC8) in a[0x001C95F2].ops and target(a[0x001C95FC]) == 0x0005B980
+    assert mem(a[0x0005B993])[0][4] == 0x8C and mem(a[0x0005B99B])[0][4] == 0x94 and mem(a[0x0005B987])[0][4] == 0x90
+    assert ('imm', 0x18) in a[0x0005B9E9].ops and target(a[0x0005B9C9]) == 0x00057F30
+    assert mem(a[0x0005805F])[0][4] == 0x1C and mem(a[0x00058070])[0][4] == 0x28          # offsets become pointers
+    # barney_worm on the head in state 9 when +0x44C == 2; +0x44C = the state (2) south of z 27.0
+    assert ('imm', 0x149) in a[0x001DBF46].ops and target(a[0x001DBF64]) == 0x0005F460
+    assert mem(a[0x001DB887])[0][4] == 0x0047D78C and mem(a[0x001DB88F])[0][4] == 8
+    assert mem(a[0x001DB8A4])[0][4] == 0x44C
+    readers = {i.function for i in decoded() if any(k == 'disp' and v == 0x0047D78C for k, v in i.values())}
+    assert 0x001DACC5 in readers and len(readers - {0x001DAAB0, 0x001DACC5}) == 5   # five readers outside the worm
+
+
+def test_heights():
+    """The surfaced head: at the worm's height, or after a state-2 burst at the fixed point (x, 0, z);
+    the mission 5 garden floor is the worms' height -2.4 (most common height of the level geometry
+    in the garden region)."""
+    a = by_address()
+    assert mem(a[0x001DA94C])[0][4] == 0x0049DDD8 and mem(a[0x001DA954])[0][4] == 0x0049DDD4
+    assert a[0x001DA961].mnemonic == 'xorps' and mem(a[0x001DA964])[0][4] == 0x68          # y 0
+    assert mem(a[0x001DA8E6])[0][4] == 0x44C and ('imm', 2) in a[0x001DA8EF].ops
+    assert mem(a[0x001DA937])[0][4] == 0x68                                                # else the worm's height
+    import collections
+    import zlib
+    pak = _private() / 'game/pak/story/l_1_st.pak'
+    if not pak.is_file():
+        pytest.skip('needs the mission 5 pak')
+    raw = pak.read_bytes()
+    off, ln = struct.unpack_from('<II', raw, 4)
+    idx = {c: (p, n) for c, p, n, _ in struct.iter_unpack('<4I', raw[off:off + ln])}
+    assert zlib.crc32(b'data/mansion2.raw') & 0xFFFFFFFF in idx
+    best = collections.Counter()
+    for p, n in idx.values():
+        if n < 0x100000:
+            continue
+        d = raw[p:p + n]
+        for i in range(0, len(d) - 12, 4):
+            x, y, z = struct.unpack_from('<3f', d, i)
+            if -80 < x < -54 and -8 < z < 41 and -8 < y < 8 and abs(y) > 1e-6:
+                best[round(y, 1)] += 1
+    assert best.most_common(1)[0][0] == -2.4
+
+
+def test_multi_instance_globals():
+    """The globals the worm code writes outside the geometry tables and the draw scratch are the swapped
+    window: the block, its init flag, the enable flag, the active flag and the five heads."""
+    a = by_address()
+    graph, writes = {}, {}
+    for i in decoded():
+        if i.call or (i.branch and i.mnemonic == 'jmp'):
+            t = target(i)
+            if t is not None:
+                graph.setdefault(i.function, set()).add(t)
+        if i.mnemonic in ('mov', 'movss', 'inc', 'dec', 'add', 'or', 'and', 'fstp') and i.ops and i.ops[0][0] == 'mem':
+            disp = i.ops[0][4]
+            if 0x004FD000 <= disp < 0x00547000 or 0x00700000 <= disp < 0x00800000:
+                writes.setdefault(i.function, set()).add(disp)
+    seen, todo = set(), [0x001DAAB0, 0x001DA990, 0x001D1F30, 0x001D2350, 0x001D1E80]
+    while todo:
+        f = todo.pop()
+        if f not in seen:
+            seen.add(f)
+            todo.extend(graph.get(f, ()))
+    worm = {f for f in seen if 0x001D1000 <= f < 0x001DE000}
+    written = set().union(*(writes.get(f, set()) for f in worm))
+    tables = {v for v in written if 0x0078F300 <= v < 0x00790800 and not 0x0078FAE0 <= v <= 0x0078FAF0}   # geometry, scratch
+    assert {v for f in worm - {0x001D1BD0, 0x001D2800} for v in writes.get(f, set())} & tables <= set()
+    kept = written - tables
+    assert kept == {0x0075B4B4, 0x0075B4B8, 0x0075B4BC, 0x004FDC20, 0x004FDC58,
+                    0x0078FAE0, 0x0078FAE4, 0x0078FAE8, 0x0078FAEC, 0x0078FAF0}, sorted(hex(v) for v in kept)
+    text = INC.read_text(encoding='utf-8')
+    assert 'WRM_STATE,0x0075B4B8u,WRM_ENABLE,0x004FDC20u,' in text          # 0x004FDC58: kept 0 during each init
+    assert '0x0078FAE0u,0x0078FAE4u,0x0078FAE8u,0x0078FAECu,0x0078FAF0u,' in text
