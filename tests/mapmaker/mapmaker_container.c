@@ -124,6 +124,7 @@ static void make_map(uint32_t c,uint32_t used,uint32_t seed)
     memset(host(c),0,MAPMAKER_CONTAINER_N);
     WORD_AT(c)=0x00C77667u;WORD_AT(c+4)=0x12Du;
     WORD_AT(c+8)=0x00C77668u;WORD_AT(c+12)=0x3DCu;
+    WORD_AT(c+16+8)=3u<<16;                                   /* tileset word +0xA: Military */
     WORD_AT(c+16+0x248)=used;
     WORD_AT(c+16+0x3DC)=0x00C77669u;WORD_AT(c+16+0x3DC+4)=fill;
     for(i=0;i<fill;i++) host(c+16+0x3DC+8)[i]=(uint8_t)(i*31u+seed);
@@ -304,6 +305,8 @@ int main(void)
         make_map(c,0x1000u,5);WORD_AT(c+16+4)=200u;CHECK(save_tier(c)==MAPMAKER_CONTAINER_STOCK);
         WORD_AT(c+16+4)=201u;CHECK(save_tier(c)==0xFFE0u);          /* header piece count */
         make_map(c,0x10000u,5);WORD_AT(c+16+4)=201u;CHECK(save_tier(c)==0x1FFE0u); /* larger anyway */
+        make_map(c,0x1000u,5);WORD_AT(c+16+8)=1u<<16;CHECK(save_tier(c)==MAPMAKER_CONTAINER_STOCK); /* Lab */
+        WORD_AT(c+16+8)=0u|0x1234u;CHECK(save_tier(c)==0xFFE0u);     /* tileset 0, Abstract: fork tier */
         /* The editor's own counts (scene 102): story AI, logic, free objects,
          * attached items in all and per category, tiles and their pad costs. */
         make_map(c,0x1000u,5);

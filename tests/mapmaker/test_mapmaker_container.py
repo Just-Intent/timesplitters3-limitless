@@ -28,6 +28,8 @@ MUTATIONS = {
     'over-stock-always': ('        over=mapmaker_container_over_stock(c);', '        over=1;'),
     'over-chunks-off-by-one': ('++counts[i]>mapmaker_container_stock_chunks[i].stock) return 1;',
                                '++counts[i]>mapmaker_container_stock_chunks[i].stock+1u) return 1;'),
+    'over-abstract-ignored': (' && (WORD_AT(p+8u+8u)>>16)==0u) return 1;', ' && 0) return 1;'),
+    'over-abstract-any-tileset': ('(WORD_AT(p+8u+8u)>>16)==0u) return 1;', '(WORD_AT(p+8u+8u)>>16)<=1u) return 1;'),
     'over-no-header': ('WORD_AT(p+8u+4u)>MAPMAKER_CONTAINER_STOCK_PIECES &&', '0 &&'),
     'over-no-editor': ('    return mapmaker_container_over_chunks(c) || mapmaker_container_over_editor();',
                        '    return mapmaker_container_over_chunks(c);'),
