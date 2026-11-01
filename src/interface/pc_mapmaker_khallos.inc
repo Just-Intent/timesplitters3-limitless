@@ -46,6 +46,11 @@
  * and the seated Khallos' handler sub_00263260; the previous values are put
  * back after (nests). Each chair has its own placeholder, rider, frame and
  * removal.
+ * The jet [0x0078F054] and the first death emitter [0x0078DF50] are owner
+ * slots: the emitter keeps the slot address (+0) and the particle system
+ * writes 0 there when it frees it, at any time. Each chair owns two guest
+ * slots its emitters point at; only while its code runs do they point at the
+ * stock slots (v0.4.0-mapmaker.26 crashed with a single chair).
  *
  * Placement (no new save bytes): a Story AI whose character is the
  * placeholder id KHL_ID 0x33 (the fifth copy of the story-only cutscene
@@ -198,6 +203,8 @@
 #define KHL_MAX 4u                       /* chairs per map */
 #define KHL_BLOCK_N 0x1Cu                /* words of chair statics from 0x0078F000 (sub_001EEA30 zeroes these) */
 #define KHL_SMOKE_N 3u                   /* the death's emitters [0x0078DF50..58] */
+#define KHL_OWNERS 2u                    /* slots the engine knows as emitter owners: the jet, the death's first */
+#define KHL_EMIT_OWNER 0x0u              /* emitter +0: its owner slot, cleared by the engine on free (sub_0010E070) */
 #define KHL_LOGS 48u                     /* log lines per level */
 #define KHL_CREATES 8u                   /* placeholder/Khallos creation and AI start lines per level */
 #define KHL_RET_START 0x001EEC72u        /* event 0x29 (call 0x001EEC6D) */
@@ -222,7 +229,13 @@ extern void sub_000A6F90(void),sub_0015DDA0(void),sub_000A9070(void),sub_0010E2A
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
 /* Kept for the session: settings, label and the spawn argument buffer. */
-static struct { int read, optout; uint32_t label, args; unsigned logged; } khl;
+static struct { int read, optout; uint32_t label, args, slots; unsigned logged; } khl;
+/* sub_00111AE0 keeps the owner slot's address in a new emitter (+0) and the
+ * emitter in the slot; sub_0010E070 (an emitter freed or recycled, at any
+ * time) writes 0 through that address. Each chair therefore owns guest slots
+ * (khl.slots) for its jet and death emitters: its emitters point there, and
+ * only while its code runs do they point at the stock slots. */
+static const uint32_t khl_owners[KHL_OWNERS]={0x0078F054u,0x0078DF50u};
 /* This level's chairs: each its own copy of the chair statics and emitters,
  * its placeholder, rider and spawn (cleared by every level's pak mount). */
 static struct {
@@ -286,19 +299,45 @@ static float khl_clamp(float v,float lo,float hi) { return v<lo?lo:v>hi?hi:v; }
 
 /* The chair globals (statics block and the death's emitters) of chair k in,
  * the previous ones kept; khl_out stores chair k's and puts them back. */
+static uint32_t khl_gslot(unsigned k,unsigned i) { return khl.slots?khl.slots+(k*KHL_OWNERS+i)*4u:0u; }
+/* Moves an emitter's owner from slot `from` to slot `to` when it is still `from`. */
+static void khl_reown(uint32_t e,uint32_t from,uint32_t to)
+{
+    if(e && MAPMAKER_PTR_OK(e,4u) && WORD_AT(e+KHL_EMIT_OWNER)==from) WORD_AT(e+KHL_EMIT_OWNER)=to;
+}
 static void khl_in(unsigned k,uint32_t *keep)
 {
-    uint32_t i;
+    uint32_t i,g,e;
     for(i=0;i<KHL_BLOCK_N;i++) { keep[i]=WORD_AT(KHL_OBJ+i*4u);WORD_AT(KHL_OBJ+i*4u)=khl_ch[k].block[i]; }
     for(i=0;i<KHL_SMOKE_N;i++) { keep[KHL_BLOCK_N+i]=WORD_AT(KHL_SMOKE+i*4u);WORD_AT(KHL_SMOKE+i*4u)=khl_ch[k].smoke[i]; }
+    for(i=0;i<KHL_OWNERS;i++) {                           /* the chair's own slots are authoritative */
+        if(!(g=khl_gslot(k,i))) continue;
+        WORD_AT(khl_owners[i])=e=WORD_AT(g);
+        khl_reown(e,g,khl_owners[i]);
+    }
 }
 static void khl_out(unsigned k,const uint32_t *keep)
 {
-    uint32_t i;
+    uint32_t i,g,e;
+    for(i=0;i<KHL_OWNERS;i++) {
+        if(!(g=khl_gslot(k,i))) continue;
+        WORD_AT(g)=e=WORD_AT(khl_owners[i]);
+        khl_reown(e,khl_owners[i],g);
+    }
     for(i=0;i<KHL_BLOCK_N;i++) { khl_ch[k].block[i]=WORD_AT(KHL_OBJ+i*4u);WORD_AT(KHL_OBJ+i*4u)=keep[i]; }
     for(i=0;i<KHL_SMOKE_N;i++) { khl_ch[k].smoke[i]=WORD_AT(KHL_SMOKE+i*4u);WORD_AT(KHL_SMOKE+i*4u)=keep[KHL_BLOCK_N+i]; }
 }
 /* The original with chair k's globals (nests). */
+/* Chair slot k will not be used (a failed creation): its emitters lose their owner. */
+static void khl_detach(unsigned k)
+{
+    uint32_t i,g,e;
+    for(i=0;i<KHL_OWNERS;i++) {
+        if(!(g=khl_gslot(k,i))) continue;
+        e=WORD_AT(g);WORD_AT(g)=0;
+        khl_reown(e,g,0u);
+    }
+}
 static void khl_swapped(void (*original)(void),unsigned k)
 {
     uint32_t keep[KHL_BLOCK_N+KHL_SMOKE_N];
@@ -430,6 +469,11 @@ void pc_mapmaker_khallos_mount(void (*original)(void))
     memset(khl_ch,0,sizeof khl_ch);
     khl_lv.cur=-1;
     khl.logged=0;                                          /* and log it afresh */
+    if(!khl.slots) {                                       /* the chairs' emitter owner slots, once */
+        uint32_t s=xbox_HeapAlloc(KHL_MAX*KHL_OWNERS*4u,4u);
+        if(s && MAPMAKER_PTR_OK(s,KHL_MAX*KHL_OWNERS*4u)) khl.slots=s;
+    }
+    if(khl.slots) memset((void *)((uintptr_t)khl.slots+g_xbox_mem_offset),0,KHL_MAX*KHL_OWNERS*4u);
     if(!khl_play() || khl.optout || (has=khl_map_has(KHL_ID))==0) return;
     if(khl_mounted(KHL_PAK)) return;
     if((mounted=WORD_AT(KHL_MOUNTS))+KHL_MOUNT_KEEP>KHL_MOUNT_MAX) {
@@ -537,13 +581,13 @@ void pc_mapmaker_khallos_ai_start(void (*original)(void))
     khl_in(k,keep);                                       /* the init writes the new chair's globals */
     obj=guest_call(sub_000A6F90,5,KHL_MODEL,args,args+12u,0u,0u);
     if(!obj || !MAPMAKER_PTR_OK(obj,0x100u)) {
-        khl_out(k,keep);
+        khl_out(k,keep);khl_detach(k);
         khl_log("the chair was not created (model not loaded?): placeholder stays a bot",a,obj);
         return;
     }
     if(WORD_AT(KHL_OBJ)!=obj) {                            /* the train's rising variant */
         guest_call(sub_000A9070,1,obj);
-        khl_out(k,keep);
+        khl_out(k,keep);khl_detach(k);
         khl_log("the chair took the train's other variant (player +0x1568): removed, placeholder stays a bot",obj,khl_ch[k].block[0]);
         return;
     }

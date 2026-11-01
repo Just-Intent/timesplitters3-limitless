@@ -65,7 +65,7 @@ MUTATIONS = {
     'spawn-no-yaw': ('khl_setf(args+16u,yaw);', 'khl_setf(args+16u,0.0f);'),
     'spawn-failed-kept': ('    if(!obj || !MAPMAKER_PTR_OK(obj,0x100u)) {', '    if(!MAPMAKER_PTR_OK(obj,0x100u) && 0) {'),
     'variant-kept': ("    if(WORD_AT(KHL_OBJ)!=obj) {                            /* the train's rising variant */", '    if(0) {'),
-    'variant-not-removed': ('        guest_call(sub_000A9070,1,obj);\n        khl_out(k,keep);\n        khl_log("the chair took', '        khl_out(k,keep);\n        khl_log("the chair took'),
+    'variant-not-removed': ('        guest_call(sub_000A9070,1,obj);\n        khl_out(k,keep);khl_detach(k);\n        khl_log("the chair took', '        khl_out(k,keep);khl_detach(k);\n        khl_log("the chair took'),
     'anchor-not-rebased': ('    khl_setf(KHL_POS,pos[0]);khl_setf(KHL_POS+4u,pos[1]+KHL_LIFT);khl_setf(KHL_POS+8u,pos[2]);\n', ''),
     'anchor-no-lift': ('khl_setf(KHL_POS+4u,pos[1]+KHL_LIFT);', 'khl_setf(KHL_POS+4u,pos[1]);'),
     'object-not-placed': ('    for(i=0;i<3u;i++) khl_setf(obj+KHL_ENT_POS+i*4u,khl_getf(KHL_POS+i*4u));\n', ''),
@@ -174,7 +174,7 @@ MUTATIONS = {
     'spawn-same-placeholder-twice': ('    if(k<khl_lv.n) { khl_log("this chair placeholder already has its chair",a,k);return; }\n', ''),
     'spawn-globals-not-scratch': ("    khl_in(k,keep);                                       /* the init writes the new chair's globals */\n", '    memcpy(keep,(void *)((uintptr_t)KHL_OBJ+g_xbox_mem_offset),4u*KHL_BLOCK_N);memcpy(keep+KHL_BLOCK_N,(void *)((uintptr_t)KHL_SMOKE+g_xbox_mem_offset),4u*KHL_SMOKE_N);\n'),
     'spawn-chair-not-kept': ('    khl_out(k,keep);\n    khl_ch[k].obj=obj;', '    memcpy((void *)((uintptr_t)KHL_OBJ+g_xbox_mem_offset),keep,4u*KHL_BLOCK_N);\n    khl_ch[k].obj=obj;'),
-    'spawn-failed-not-back': ('        khl_out(k,keep);\n        khl_log("the chair was not created', '        khl_log("the chair was not created'),
+    'spawn-failed-not-back': ('        khl_out(k,keep);khl_detach(k);\n        khl_log("the chair was not created', '        khl_detach(k);\n        khl_log("the chair was not created'),
     'variant-not-back': ('        guest_call(sub_000A9070,1,obj);\n        khl_out(k,keep);', '        guest_call(sub_000A9070,1,obj);'),
     'rider-two-chairs': ('        if(khl_lv.cand_bound[c] || !khl_same_ai(khl_lv.cand[c],khl_lv.cand_ent[c],khl_lv.cand_rec[c])) continue;', '        if(!khl_same_ai(khl_lv.cand[c],khl_lv.cand_ent[c],khl_lv.cand_rec[c])) continue;'),
     'rider-not-swapped': ('    khl_swapped(original,(unsigned)k);\n}\n/* WRAP sub_00263150', '    original();\n}\n/* WRAP sub_00263150'),
@@ -197,7 +197,18 @@ MUTATIONS = {
     'create-any-scene': ('khl_lv.creates>=KHL_CREATES || !khl_play()) return;', 'khl_lv.creates>=KHL_CREATES || !khl_on()) return;'),
     'seen-not-logged': ('    if(id==KHL_ID && khl_lv.seen++<KHL_CREATES) khl_log', '    if(0 && id==KHL_ID && khl_lv.seen++<KHL_CREATES) khl_log'),
     'pose-not-swapped': ('    khl_swapped(original,(unsigned)k);\n}\n\n/* WRAP sub_002274C0', '    original();\n}\n\n/* WRAP sub_002274C0'),
+    'owner-not-loaded': ('        WORD_AT(khl_owners[i])=e=WORD_AT(g);\n        khl_reown(e,g,khl_owners[i]);', '        e=WORD_AT(g);(void)e;'),
+    'owner-not-moved-in': ('        WORD_AT(khl_owners[i])=e=WORD_AT(g);\n        khl_reown(e,g,khl_owners[i]);', '        WORD_AT(khl_owners[i])=e=WORD_AT(g);'),
+    'owner-not-saved': ('        WORD_AT(g)=e=WORD_AT(khl_owners[i]);\n        khl_reown(e,khl_owners[i],g);', '        e=WORD_AT(khl_owners[i]);\n        khl_reown(e,khl_owners[i],g);'),
+    'owner-not-moved-out': ('        WORD_AT(g)=e=WORD_AT(khl_owners[i]);\n        khl_reown(e,khl_owners[i],g);', '        WORD_AT(g)=e=WORD_AT(khl_owners[i]);'),
+    'owner-any': ('    if(e && MAPMAKER_PTR_OK(e,4u) && WORD_AT(e+KHL_EMIT_OWNER)==from) WORD_AT(e+KHL_EMIT_OWNER)=to;', '    if(e && MAPMAKER_PTR_OK(e,4u)) WORD_AT(e+KHL_EMIT_OWNER)=to;'),
+    'owner-jet-only': ('={0x0078F054u,0x0078DF50u};', '={0x0078F054u,0x0078F054u};'),
+    'owner-slots-shared': ('static uint32_t khl_gslot(unsigned k,unsigned i) { return khl.slots?khl.slots+(k*KHL_OWNERS+i)*4u:0u; }', 'static uint32_t khl_gslot(unsigned k,unsigned i) { (void)k;return khl.slots?khl.slots+i*4u:0u; }'),
+    'owner-slots-none': ('        if(s && MAPMAKER_PTR_OK(s,KHL_MAX*KHL_OWNERS*4u)) khl.slots=s;', '        (void)s;'),
+    'owner-slots-stale': ('    if(khl.slots) memset((void *)((uintptr_t)khl.slots+g_xbox_mem_offset),0,KHL_MAX*KHL_OWNERS*4u);\n', ''),
+    'detach-missing': ('        khl_out(k,keep);khl_detach(k);\n        khl_log("the chair took', '        khl_out(k,keep);\n        khl_log("the chair took'),
 }
+
 
 
 
@@ -570,3 +581,22 @@ def test_multi_chair_globals():
     assert ('imm', 0x0078DF50) in a[0x001EEB7A].ops and target(a[0x001EEB7F]) == 0x00378530
     # the character maker a placeholder goes through (logged): sub_000DAC30(id, .., pool slot)
     assert calls_to(0x000DAC30) >= {0x0015DFD5}
+
+
+def test_emitter_owner_slots():
+    """The chair's jet and death emitters remember the address of their owner
+    slot, and the particle system clears that slot when it frees them."""
+    a = by_address()
+    # sub_00111AE0: new emitter (esi) +0 = owner slot (arg 1), *slot = emitter
+    assert mem(a[0x00111DC4])[0][4] == 0x28 and a[0x00111DC8].mnemonic == 'test'
+    assert a[0x00111DCC].mnemonic == 'mov' and mem(a[0x00111DCC])[0][1] == 'esi' and mem(a[0x00111DCC])[0][4] == 0
+    assert mem(a[0x00111DD4])[0][1] == 'eax' and mem(a[0x00111DD4])[0][4] == 0
+    # sub_0010E070 (free): if emitter +0 then *(+0) = 0; reached from the particle system and sub_0010E2A0
+    assert mem(a[0x0010E076])[0][1] == 'esi' and mem(a[0x0010E076])[0][4] == 0
+    assert a[0x0010E07F].mnemonic == 'je' and mem(a[0x0010E081])[0][1] == 'eax' and 'ecx' in a[0x0010E081].text
+    assert a[0x0010E078].mnemonic == 'xor' and 'ecx, ecx' in a[0x0010E078].text
+    assert calls_to(0x0010E070) == {0x0010E14A, 0x0010E1A8, 0x0010E2A9, 0x0010E52C, 0x00111FA4}
+    # the chair's init passes its jet slot and its first death emitter slot as owners
+    assert ('imm', 0x0078F054) in a[0x001EEB26].ops and target(a[0x001EEB33]) == 0x00378530
+    assert ('imm', 0x0078DF50) in a[0x001EEB7A].ops and target(a[0x001EEB7F]) == 0x00378530
+    assert target(a[0x00378591]) == 0x00111AE0

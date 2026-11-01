@@ -105,15 +105,20 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         obj=CHAIR+cn*0x1000u;                       /* a new object per chair of the level */
         for(i=0;i<3;i++) FLOAT_AT(obj+0x64u+(uint32_t)i*4u)=spawn_pos[i];
         memset((void *)((uintptr_t)0x0078F000u+g_xbox_mem_offset),0,0x70);
-        if(rise_variant) { FLOAT_AT(LIVE)=-600.0f;return obj; }   /* never sets [0x0078F000] */
+        if(rise_variant) { FLOAT_AT(LIVE)=-600.0f;WORD_AT(0x0078F054u)=JETE+0x80u;WORD_AT(JETE+0x80u)=0x0078F054u;return obj; }   /* never sets [0x0078F000]; its jet (sub_0010E1C0) */
         WORD_AT(0x0078F000u)=obj;FLOAT_AT(LIVE)=-576.2f;FLOAT_AT(LIVE+4u)=7.5f;FLOAT_AT(LIVE+8u)=0.0f;
         FLOAT_AT(obj+0x1CCu)=60.0f;WORD_AT(0x0078F054u)=JETE+cn*0x100u;
         WORD_AT(0x0078DF50u)=0x00576000u+cn*0x100u;           /* the death's emitters */
+        WORD_AT(JETE+cn*0x100u)=0x0078F054u;WORD_AT(0x00576000u+cn*0x100u)=0x0078DF50u;   /* +0: owner slot (sub_00111AE0) */
         return obj;
     }
     if(f==sub_0015DDA0) { if(nremove<4u) remove_arg[nremove]=x[0];nremove++;return 0; }
     if(f==sub_000A9070) { ndestroy++;destroy_arg=x[0];return 0; }
-    if(f==sub_0010E2A0) { nfree++;free_arg=x[0];return 0; }
+    if(f==sub_0010E2A0) {   /* sub_0010E070: the owner slot is cleared */
+        nfree++;free_arg=x[0];
+        if(x[0] && WORD_AT(x[0])) { WORD_AT(WORD_AT(x[0]))=0;WORD_AT(x[0])=0; }
+        return 0;
+    }
     if(f==sub_0010EB90) { if(nstop<8u) stop_args[nstop]=x[0];nstop++;CHECK(x[1]==0);return 0; }
     if(f==sub_000A5E40) {
         int16_t r=(int16_t)HALF_AT(0x008CA000u+x[0]*2u);
@@ -179,6 +184,7 @@ static void call_world(void (*hook)(void (*)(void)),uint32_t ret,uint32_t a1,uin
  * climbing 5 m a frame when dead), and the calls out of it. */
 static float seen_line, seen_gap, seen_live[3], seen_obj[3], seen_p[3], after_p[2], after_live[2], after_obj[2];
 static int seen_inside, fire=1;
+static uint32_t seen_jet, seen_owner, foreign_jet;
 static unsigned nupdate;
 static struct seen s_flame, s_flash, s_flash2, s_shot, s_sound, s_engine;
 static void fake_update(void)
@@ -195,6 +201,8 @@ static void fake_update(void)
     }
     for(i=0;i<3u;i++) { seen_live[i]=FLOAT_AT(LIVE+i*4u);seen_obj[i]=FLOAT_AT(obj+0x64u+i*4u);seen_p[i]=FLOAT_AT(p+0xB4u+i*4u); }
     seen_inside=khl_lv.inside;
+    seen_jet=WORD_AT(0x0078F054u);seen_owner=seen_jet?WORD_AT(seen_jet):0xFFFFFFFFu;
+    if(foreign_jet) WORD_AT(0x0078F054u)=foreign_jet;                /* an emitter someone else owns lands in the slot */
     FLOAT_AT(VEC)=seen_live[0];FLOAT_AT(VEC+4u)=seen_live[1]-0.3f;FLOAT_AT(VEC+8u)=seen_live[2];
     call_world(pc_mapmaker_khallos_flame,0x001EED7Au,JETE,VEC,0,VEC,&s_flame,__LINE__);
     for(i=0;i<2u;i++) { after_p[i]=FLOAT_AT(p+0xB8u+i*4u);after_live[i]=FLOAT_AT(LIVE+4u+i*4u);after_obj[i]=FLOAT_AT(obj+0x68u+i*4u); }
@@ -508,6 +516,7 @@ int main(void)
     spawn_ok=1;rise_variant=1;FLOAT_AT(LIVE)=-1.0f;
     CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(nspawn==2 && !khl_lv.n && ndestroy==1 && destroy_arg==CHAIR && FLOAT_AT(LIVE)==-1.0f);   /* outside values back */
+    CHECK(khl.slots && !WORD_AT(khl.slots) && !WORD_AT(JETE+0x80u));    /* its emitter lost its owner, no slot holds it */
     rise_variant=0;
     n=originals;
     CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
@@ -812,10 +821,27 @@ int main(void)
     CHECK(rider_saw==CHAIR && rider_live==40.0f && WORD_AT(0x0078F060u)==0 && WORD_AT(0x0078F000u)==0x00123450u);
     CALL(pc_mapmaker_khallos_rider_pose,fake_rider,0x000A5D5Eu,ENT(10),0,0,1);
     CHECK(rider_saw==0x00123450u && khl_lv.cur==-1);
+    /* emitter owners: each chair's emitters point at its own guest slot, the stock slot only inside its code */
+    CHECK(khl.slots && WORD_AT(JETE)==khl.slots && WORD_AT(khl.slots)==JETE);
+    CHECK(WORD_AT(JETE+0x100u)==khl.slots+8u && WORD_AT(khl.slots+8u)==JETE+0x100u && WORD_AT(0x00576100u)==khl.slots+12u);
+    CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR+0x1000u,0,0,1);
+    CHECK(seen_jet==JETE+0x100u && seen_owner==0x0078F054u && WORD_AT(JETE+0x100u)==khl.slots+8u);
+    WORD_AT(0x0078F054u)=0x0BADu;                                        /* someone else's outside value */
+    WORD_AT(WORD_AT(JETE+0x100u))=0;WORD_AT(JETE+0x100u)=0;              /* the engine frees chair 1's jet meanwhile */
+    CHECK(WORD_AT(0x0078F054u)==0x0BADu && WORD_AT(khl.slots)==JETE);    /* nothing else touched */
+    CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR+0x1000u,0,0,1);
+    CHECK(seen_jet==0 && WORD_AT(0x0078F054u)==0x0BADu);                 /* chair 1 sees it gone, not a dangling pointer */
+    CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR,0,0,1);
+    WORD_AT(0x0078F054u)=0;
+    WORD_AT(0x00577800u)=0x00123000u;foreign_jet=0x00577800u;           /* owned by 0x00123000 */
+    CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR+0x1000u,0,0,1);
+    foreign_jet=0;
+    CHECK(WORD_AT(0x00577800u)==0x00123000u && WORD_AT(khl.slots+8u)==0x00577800u);   /* kept, its owner untouched */
+    WORD_AT(khl.slots+8u)=0;
     /* chair 1 dies and flies off: only chair 1 is removed */
     n=ndestroy;
     for(k=0;k<6u && !khl_ch[1].removed;k++) CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR+0x1000u,0,0,1);
-    CHECK(khl_ch[1].removed && !khl_ch[0].removed && ndestroy==n+1u && destroy_arg==CHAIR+0x1000u && free_arg==JETE+0x100u);
+    CHECK(khl_ch[1].removed && !khl_ch[0].removed && ndestroy==n+1u && destroy_arg==CHAIR+0x1000u && !WORD_AT(khl.slots+8u));   /* its jet was freed before */
     CHECK(!CW(1,0x0078F000u) && CW(0,0x0078F000u)==CHAIR && khl_ch[0].rider==A(1));
     CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR+0x1000u,0,0,0);   /* removed: skipped */
     CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR,0,0,1);        /* chair 0 runs on */
@@ -856,7 +882,7 @@ int main(void)
     play_scene();
     container(0x11,neither,2,NULL,0);
     CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);           /* next level: no chair */
-    CHECK(!khl_lv.n);
+    CHECK(!khl_lv.n && khl.slots && !WORD_AT(khl.slots) && !WORD_AT(khl.slots+8u) && !WORD_AT(khl.slots+12u));
     UPDATE(1);
     CHECK(nremove==n && seen_line==-535.0f);
 
