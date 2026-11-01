@@ -84,6 +84,12 @@
  *    the overhead meter unless the Story AI chose the Sub-boss bar, as the
  *    realbosses area does for the others.
  *
+ * Several bosses: up to CRW_MAX split Crowes per map each have their own copy
+ * of the 29 globals their code uses (crw_win: the state pointer, the effect
+ * and particle systems), swapped in around every entry into their code
+ * (fight, message handler, think and hit callbacks, draw) and put back after;
+ * the boss whose copy is live is crw_lv. Docs: "Several split Crowes".
+ *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax, g_xbox_mem_offset,
  * pc_mapmaker_area_enabled and pc_mapmaker_limits.inc. Hot hooks (hud, meter,
  * fx: every frame) test a fixed value first. */
@@ -183,8 +189,22 @@ static struct {
     int read, optout;
     unsigned logged, meters, extras, events, parts, fx;
 } crw;
-/* This level's boss: state block, spawn record, pool entry, relocation. */
-static struct {
+/* The globals one split Crowe's code uses (CONFIRMED, every [abs] operand of
+ * the functions reachable from its entry points, test): the state pointer,
+ * the effect blocks (sub_002A8300/8380/85C0/8FC0) and the particle block with
+ * its count and emitter templates (sub_002A62C0/62F0/7D60/7F30). Each boss
+ * has its own copy; it is swapped in around every entry into Crowe code. */
+static const uint32_t crw_win[]={
+    CRW_STATE,
+    0x0078B080u,0x0078B084u,0x0078B088u,0x0078B08Cu,0x0078B090u,0x0078B094u,0x0078B098u,
+    0x0078B0CCu,0x0078B0D0u,0x0078B0ECu,
+    0x0078B100u,0x0078B104u,0x0078B108u,0x0078B10Cu,0x0078B110u,0x0078B114u,0x0078B118u,0x0078B11Cu,0x0078B120u,
+    0x0078B130u,0x0078B134u,0x0078B138u,0x0078B140u,0x0078B144u,0x0078B148u,0x0078B180u,0x0078B184u,0x0078B188u,
+};
+#define CRW_NWIN (sizeof crw_win/sizeof crw_win[0])
+#define CRW_MAX 4u                      /* split Crowes with the story behaviour per map */
+/* One boss of this level: its blocks, spawn record, pool entry, relocation. */
+struct crw_boss_s {
     uint32_t state, record, actor;
     uint8_t boss;
     int relocated, removed, shifted, place;
@@ -192,7 +212,47 @@ static struct {
     uint32_t row, col;                  /* the start cell */
     float dx, dy, dz, sx, sz;           /* grid offset, spawn point */
     uint32_t saved[CRW_NCONST];
-} crw_lv;
+    uint32_t win[CRW_NWIN];             /* its globals while another's (or nobody's) are live */
+};
+static struct crw_boss_s crw_inst[CRW_MAX], crw_none;
+static unsigned crw_n;                  /* bosses with their own blocks this level */
+static int crw_cur=-1;                  /* whose globals are live; -1: the outside values */
+static uint32_t crw_out[CRW_NWIN];      /* the outside values (stock, other bosses) while a Crowe's are live */
+static struct crw_boss_s *crw_i=&crw_none;
+#define crw_lv (*crw_i)                 /* the boss whose code runs now (crw_none outside) */
+
+static void crw_store(int k)
+{
+    uint32_t *to=k<0?crw_out:crw_inst[k].win;
+    unsigned j;
+    for(j=0;j<CRW_NWIN;j++) to[j]=WORD_AT(crw_win[j]);
+}
+static void crw_load(int k)
+{
+    const uint32_t *from=k<0?crw_out:crw_inst[k].win;
+    unsigned j;
+    for(j=0;j<CRW_NWIN;j++) WORD_AT(crw_win[j])=from[j];
+    crw_i=k<0?&crw_none:&crw_inst[k];
+}
+/* Make boss k's globals live; returns whose were live, for crw_leave. The same
+ * boss again (a nested call) changes nothing; another boss inside (one
+ * Crowe's hazard hits another) keeps the first one's current values. */
+static int crw_enter(int k)
+{
+    int prev=crw_cur;
+    if(prev==k) return prev;
+    crw_store(prev);
+    crw_load(k);
+    crw_cur=k;
+    return prev;
+}
+static void crw_leave(int prev)
+{
+    if(crw_cur==prev) return;
+    crw_store(crw_cur);
+    crw_load(prev);
+    crw_cur=prev;
+}
 
 static void crw_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -242,7 +302,58 @@ static int crw_set_has(void)
     return 0;
 }
 static int crw_pak_mounted(void) { return (int32_t)guest_call(sub_00062260,1,CRW_PAK)!=-1; }
-static int crw_state_ok(void) { return crw_lv.state && WORD_AT(CRW_STATE)==crw_lv.state; }
+static int crw_state_ok(void) { return crw_lv.state!=0; }
+/* A new level: no boss, the live globals are the outside values. */
+static void crw_reset(void)
+{
+    if(crw_cur>=0) crw_leave(-1);
+    memset(crw_inst,0,sizeof crw_inst);
+    memset(&crw_none,0,sizeof crw_none);
+    crw_n=0;crw_cur=-1;crw_i=&crw_none;
+}
+/* Boss k's blocks: the stock scene 14 allocation (sub_0028D6D0: effect
+ * blocks, state, its init; sub_002A62C0: particles), captured into its copy;
+ * the globals as they were (another boss's blocks, the stock values) are put
+ * back. 1: allocated. */
+static int crw_alloc(unsigned k)
+{
+    uint32_t live[CRW_NWIN],st,parts=0;
+    unsigned j;
+    int ok=1;
+    for(j=0;j<CRW_NWIN;j++) live[j]=WORD_AT(crw_win[j]);
+    WORD_AT(CRW_STATE)=0;
+    guest_call(sub_0028D6D0,0);
+    st=WORD_AT(CRW_STATE);
+    if(!st || !MAPMAKER_PTR_OK(st,CRW_STATE_SIZE) || !WORD_AT(CRW_FX0) || !WORD_AT(CRW_FX1)) {
+        crw_log("no level memory for a split Crowe; bot behaviour",st,WORD_AT(CRW_FX0));
+        ok=0;
+    } else {
+        WORD_AT(CRW_PARTS)=0;
+        guest_call(sub_002A62C0,0);
+        parts=WORD_AT(CRW_PARTS);
+        if(!parts || !MAPMAKER_PTR_OK(parts,CRW_PARTS_SIZE)) {
+            crw_log("no level memory for a split Crowe's particles; bot behaviour",parts,st);
+            ok=0;
+        }
+    }
+    if(ok) {
+        for(j=0;j<CRW_NWIN;j++) crw_inst[k].win[j]=WORD_AT(crw_win[j]);
+        crw_inst[k].state=st;
+    }
+    for(j=0;j<CRW_NWIN;j++) WORD_AT(crw_win[j])=live[j];
+    if(ok) crw_log("split Crowe state allocated (boss, particles)",k,parts);
+    return ok;
+}
+/* The boss whose spawn record ent's AI has, or -1. */
+static int crw_find(uint32_t ent)
+{
+    uint32_t a,rec;
+    unsigned k;
+    if(!crw_n || !MAPMAKER_PTR_OK(ent,0x100u) || !MAPMAKER_PTR_OK(a=WORD_AT(ent+CRW_ENT_AI),CRW_ACTOR)) return -1;
+    rec=WORD_AT(a+CRW_ACTOR_RECORD);
+    for(k=0;k<crw_n;k++) if(crw_inst[k].record && crw_inst[k].record==rec && crw_inst[k].state) return (int)k;
+    return -1;
+}
 
 /* WRAP sub_001C8540 (the level's anim paks; sub_001CA2F0 registers names next). */
 void pc_mapmaker_crowe_anims(void (*original)(void))
@@ -262,29 +373,14 @@ void pc_mapmaker_crowe_anims(void (*original)(void))
 void pc_mapmaker_crowe_level(void (*original)(void))
 {
     int has;
-    uint32_t st,parts,old;
     original();
-    memset(&crw_lv,0,sizeof crw_lv);                  /* a new level: nothing of the last one */
+    crw_reset();                                       /* a new level: nothing of the last one */
     if(!crw_play() || crw.optout || (has=crw_set_has())==0) return;
     WORD_AT(CRW_STATE)=0;                              /* a stale pointer of an earlier level */
-    guest_call(sub_0028D6D0,0);
-    st=WORD_AT(CRW_STATE);
-    if(!st || !MAPMAKER_PTR_OK(st,CRW_STATE_SIZE) || !WORD_AT(CRW_FX0) || !WORD_AT(CRW_FX1)) {
-        crw_log("no level memory for the split Crowe; bot behaviour",st,WORD_AT(CRW_FX0));
-        WORD_AT(CRW_STATE)=0;
-        return;
+    if(crw_alloc(0)) {
+        crw_n=1;
+        if(has<0) crw_log("split Crowe state allocated with the map container unreadable",crw_inst[0].state,0);
     }
-    old=WORD_AT(CRW_PARTS);                            /* another boss's block of this level stays usable */
-    WORD_AT(CRW_PARTS)=0;
-    guest_call(sub_002A62C0,0);
-    parts=WORD_AT(CRW_PARTS);
-    if(!parts || !MAPMAKER_PTR_OK(parts,CRW_PARTS_SIZE)) {
-        WORD_AT(CRW_PARTS)=old;WORD_AT(CRW_STATE)=0;
-        crw_log("no level memory for the split Crowe's particles; bot behaviour",parts,old);
-        return;
-    }
-    crw_lv.state=st;
-    crw_log(has<0?"split Crowe state allocated (map container unreadable)":"split Crowe state allocated",st,parts);
 }
 
 static uint8_t crw_boss_flag(uint32_t index)
@@ -306,37 +402,43 @@ static uint8_t crw_boss_flag(uint32_t index)
 }
 
 /* WRAP sub_0015B830 (cdecl AI pool entry; story mode copies record +0/+4 to
- * AI +0x10/+0x14 at 0x0015B9A3): one split Crowe per map gets class 0/0x40000. */
+ * AI +0x10/+0x14 at 0x0015B9A3): up to CRW_MAX split Crowes per map get class
+ * 0/0x40000, each with its own blocks (the first allocated at level init, the
+ * others here). */
 void pc_mapmaker_crowe_ai_start(void (*original)(void))
 {
     uint32_t a,ent,rec,id;
+    unsigned k;
     if(!MAPMAKER_STACK_OK(8) || !crw_play()) { original();return; }
     a=WORD_AT(g_esp+4u);
     if(!MAPMAKER_PTR_OK(a,CRW_ACTOR) || !MAPMAKER_PTR_OK(rec=WORD_AT(a+CRW_ACTOR_RECORD),12u)) { original();return; }
     ent=WORD_AT(a);
     if(CRW_H(a+CRW_ACTOR_CHAR)!=CRW_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && CRW_H(ent+CRW_ENT_MODEL)==CRW_MODEL)) { original();return; }
+    for(k=0;k<crw_n && crw_inst[k].record!=rec;k++) {}  /* the same record again */
+    if(k==crw_n) for(k=0;k<crw_n && crw_inst[k].record;k++) {}   /* a slot allocated but unused */
     if(crw.optout) crw_log("TSFP_MAPMAKER_REAL_BOSS=0: split Crowe with bot behaviour",a,0);
     else if(!crw_pak_mounted()) crw_log("lv14.pak not mounted: split Crowe with bot behaviour",a,0);
-    else if(!crw_state_ok()) crw_log("no split Crowe state this level: bot behaviour",a,WORD_AT(CRW_STATE));
-    else if(crw_lv.record && crw_lv.record!=rec) {
-        if(crw.extras++<4u) crw_log("only one split Crowe per map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
+    else if(!crw_n) crw_log("no split Crowe state this level: bot behaviour",a,WORD_AT(CRW_STATE));
+    else if(k==crw_n && crw_n>=CRW_MAX) {
+        if(crw.extras++<4u) crw_log("more than 4 split Crowes in the map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
+    } else if(k==crw_n && !crw_alloc(k)) {
+        if(crw.extras++<4u) crw_log("no memory for another split Crowe: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
     } else {
+        if(k==crw_n) crw_n++;
         id=WORD_AT(rec+8u);
         WORD_AT(rec)=0;WORD_AT(rec+4u)=CRW_CLASS;
-        crw_lv.record=rec;crw_lv.actor=a;
-        crw_lv.boss=pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")?crw_boss_flag(id-WORD_AT(CRW_SAI_BASE)-1u):0u;
-        crw_log("split Crowe gets its story AI (class 0x40000)",a,id);
+        crw_inst[k].record=rec;crw_inst[k].actor=a;
+        crw_inst[k].boss=pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")?crw_boss_flag(id-WORD_AT(CRW_SAI_BASE)-1u):0u;
+        crw_log("split Crowe gets its story AI (class 0x40000; actor, boss)",a,k);
     }
     original();
 }
 
-/* This level's state is in place and ent is the boss. */
+/* ent is one of this level's bosses (in scene 100): its index, or -1. */
 static int crw_boss(uint32_t ent)
 {
-    uint32_t a;
-    if(!crw_lv.record || !crw_state_ok()) return 0;
-    if(!MAPMAKER_PTR_OK(ent,0x100u) || !MAPMAKER_PTR_OK(a=WORD_AT(ent+CRW_ENT_AI),CRW_ACTOR)) return 0;
-    return WORD_AT(a+CRW_ACTOR_RECORD)==crw_lv.record && WORD_AT(CRW_SCENE)==100u && crw_on();
+    int k=crw_find(ent);
+    return k>=0 && WORD_AT(CRW_SCENE)==100u && crw_on()?k:-1;
 }
 
 /* sub_002A9330 (grid, x, z, out): the row whose first cell holds z strictly
@@ -450,12 +552,11 @@ static void crw_shift(int on)
     }
 }
 
-/* WRAP sub_0028FE30 (cdecl entity; class 0x40000, per AI frame). */
-void pc_mapmaker_crowe_fight(void (*original)(void))
+/* The fight call for the boss whose globals are live. */
+static void crw_fight(uint32_t ent,void (*original)(void))
 {
-    uint32_t ent,a,player;
+    uint32_t a,player;
     int placing;
-    if(!crw_lv.record || !MAPMAKER_STACK_OK(8) || !crw_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
     a=WORD_AT(ent+CRW_ENT_AI);
     if(WORD_AT(a+CRW_AI_STATE)==0x12u) {                  /* defeated: stock waits for the level script */
         uint32_t parts;
@@ -488,6 +589,49 @@ void pc_mapmaker_crowe_fight(void (*original)(void))
     original();
     crw_shift(0);
     if(placing) crw_place(ent);
+}
+/* WRAP sub_0028FE30 (cdecl entity; class 0x40000, per AI frame): with this
+ * boss's globals live. */
+void pc_mapmaker_crowe_fight(void (*original)(void))
+{
+    uint32_t ent;
+    int k,prev;
+    if(!crw_n || !MAPMAKER_STACK_OK(8) || (k=crw_boss(ent=WORD_AT(g_esp+4u)))<0) { original();return; }
+    prev=crw_enter(k);
+    crw_fight(ent,original);
+    crw_leave(prev);
+}
+/* An entry into a boss's code with entity ent: its globals live during the
+ * original. */
+static void crw_entry(uint32_t ent,void (*original)(void))
+{
+    int k,prev;
+    if((k=crw_boss(ent))<0) { original();return; }
+    prev=crw_enter(k);
+    original();
+    crw_leave(prev);
+}
+/* WRAP sub_00292430 (cdecl entity, message, a, b; the boss's message handler,
+ * from sub_0027CEF0 at 0x0027D3E9). */
+void pc_mapmaker_crowe_message(void (*original)(void))
+{
+    if(!crw_n || !MAPMAKER_STACK_OK(8)) { original();return; }
+    crw_entry(WORD_AT(g_esp+4u),original);
+}
+/* WRAP sub_0028DA10 (cdecl entity; slot 2, set by the fight's state 0 at
+ * 0x00290EF7). */
+void pc_mapmaker_crowe_think(void (*original)(void))
+{
+    if(!crw_n || !MAPMAKER_STACK_OK(8)) { original();return; }
+    crw_entry(WORD_AT(g_esp+4u),original);
+}
+/* WRAP sub_0028F730 (cdecl hit record; +0 the entity hit, +4 the attacker;
+ * the boss's hit callback, set at 0x00290EEC). */
+void pc_mapmaker_crowe_hit(void (*original)(void))
+{
+    uint32_t info;
+    if(!crw_n || !MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(info=WORD_AT(g_esp+4u),0x30u)) { original();return; }
+    crw_entry(WORD_AT(info),original);
 }
 
 /* WRAP sub_0028DD50 (cdecl entity): 86.0 is a distance threshold here. */
@@ -537,23 +681,28 @@ void pc_mapmaker_crowe_event(void (*original)(void))
  * draw sub_0028D710 runs only in scene 14). */
 void pc_mapmaker_crowe_fx(void (*original)(void))
 {
-    int here=crw_lv.state && !crw_lv.removed && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX;
+    int here=crw_n && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX,prev;
+    unsigned k;
     original();
-    if(!here || !crw_state_ok() || WORD_AT(CRW_SCENE)!=100u || !crw_on()) return;
-    guest_call(sub_0028D710,0);
-    if(!crw.fx++) crw_log("split Crowe effects drawn",crw_lv.state,0);
+    if(!here || WORD_AT(CRW_SCENE)!=100u || !crw_on()) return;
+    for(k=0;k<crw_n;k++) {                             /* each boss with its own blocks, until it is removed */
+        if(!crw_inst[k].state || !crw_inst[k].record || crw_inst[k].removed) continue;
+        prev=crw_enter((int)k);
+        guest_call(sub_0028D710,0);
+        crw_leave(prev);
+        if(!crw.fx++) crw_log("split Crowe effects drawn (boss)",k,0);
+    }
 }
 
 /* WRAP sub_0014CC80 (story boss bar; chain inside pc_mapmaker_bosses_hud):
  * never the stock bar (Boss Off = none, Boss bar = the bosses area's). */
 void pc_mapmaker_crowe_hud(void (*original)(void))
 {
-    uint32_t player,focus,a;
-    if(!crw_lv.record) { original();return; }
+    uint32_t player,focus;
+    if(!crw_n) { original();return; }
     player=WORD_AT(CRW_PLAYER);
     if(!MAPMAKER_PTR_OK(player,CRW_FOCUS+4u) || !MAPMAKER_PTR_OK(focus=WORD_AT(player+CRW_FOCUS),0x100u) ||
-       CRW_H(focus+CRW_ENT_MODEL)!=CRW_MODEL || !MAPMAKER_PTR_OK(a=WORD_AT(focus+CRW_ENT_AI),CRW_ACTOR) ||
-       WORD_AT(a+CRW_ACTOR_RECORD)!=crw_lv.record || !crw_play()) { original();return; }
+       CRW_H(focus+CRW_ENT_MODEL)!=CRW_MODEL || crw_find(focus)<0 || !crw_play()) { original();return; }
     WORD_AT(player+CRW_FOCUS)=0;
     original();
     WORD_AT(player+CRW_FOCUS)=focus;
@@ -563,10 +712,12 @@ void pc_mapmaker_crowe_hud(void (*original)(void))
 void pc_mapmaker_crowe_meter(void (*original)(void))
 {
     uint32_t a;
-    if(!crw_lv.record || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=CRW_RET_METER) { original();return; }
+    int k;
+    if(!crw_n || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=CRW_RET_METER) { original();return; }
     a=WORD_AT(g_esp+4u);
-    if(!MAPMAKER_PTR_OK(a,CRW_ACTOR) || WORD_AT(a+CRW_ACTOR_RECORD)!=crw_lv.record ||
-       crw_lv.boss==CRW_BOSS_SUB || !crw_play()) { original();return; }
+    if(!MAPMAKER_PTR_OK(a,CRW_ACTOR)) { original();return; }
+    for(k=0;k<(int)crw_n && (!crw_inst[k].record || crw_inst[k].record!=WORD_AT(a+CRW_ACTOR_RECORD));k++) {}
+    if(k==(int)crw_n || crw_inst[k].boss==CRW_BOSS_SUB || !crw_play()) { original();return; }
     if(!crw.meters++) crw_log("overhead health meter hidden on the split Crowe",a,0);
     MAPMAKER_GUEST_RET();
 }
