@@ -97,8 +97,8 @@
 #define TNK_RES_INIT 0x2Cu
 #define TNK_PAK 0x0049DF7Cu              /* "pak/stream/lv4/prop6.pak" */
 #define TNK_MOUNTS 0x006D7880u           /* mounted paks, table of 30 (0x000620F9) */
-#define TNK_MOUNT_MAX 30u
-#define TNK_MOUNT_KEEP 2u
+#define TNK_MOUNT_MAX 64u               /* paktable.json: 64 slots at 0x00907000 */
+#define TNK_MOUNT_KEEP 8u
 #define TNK_MOUNT_SKIP 0x006D7C4Cu       /* sub_00062790 does nothing when set */
 #define TNK_CONTAINER 0x00784014u
 #define TNK_MAGIC 0x00C77667u

@@ -486,6 +486,11 @@ played): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot
 after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 `rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8.
+Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
+anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
+(30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear
+0x0006275B -> 0x1C0 dwords; areas use MOUNT_MAX 64 / KEEP 8.
+`tests/mapmaker/test_mapmaker_paktable.py`.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
 of `sub_0029CE00` (+0x3E88 == 1, `sub_002A7F30`). Walker missing: log-only
 WRAP `sub_000DAC30` -> `pc_mapmaker_realbosses_create`, AI-start log.

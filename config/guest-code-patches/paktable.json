@@ -1,0 +1,261 @@
+{
+  "patches": [
+    {
+      "id": "paktable-00061FDD",
+      "kind": "operand",
+      "function": "0x00061FD0",
+      "address": "0x00061FDD",
+      "original_hex": "b818796d00",
+      "operand": 1,
+      "value": "0x00907018",
+      "reason": "mov eax, 0x6d7918: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062005",
+      "kind": "operand",
+      "function": "0x00061FD0",
+      "address": "0x00062005",
+      "original_hex": "81c600796d00",
+      "operand": 1,
+      "value": "0x00907000",
+      "reason": "add esi, 0x6d7900: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062074",
+      "kind": "operand",
+      "function": "0x00062040",
+      "address": "0x00062074",
+      "original_hex": "be18796d00",
+      "operand": 1,
+      "value": "0x00907018",
+      "reason": "mov esi, 0x6d7918: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-000620A3",
+      "kind": "operand",
+      "function": "0x00062040",
+      "address": "0x000620A3",
+      "original_hex": "81c100796d00",
+      "operand": 1,
+      "value": "0x00907000",
+      "reason": "add ecx, 0x6d7900: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-000620F3",
+      "kind": "operand",
+      "function": "0x000620E0",
+      "address": "0x000620F3",
+      "original_hex": "81c600796d00",
+      "operand": 1,
+      "value": "0x00907000",
+      "reason": "add esi, 0x6d7900: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062272",
+      "kind": "operand",
+      "function": "0x00062260",
+      "address": "0x00062272",
+      "original_hex": "bd14796d00",
+      "operand": 1,
+      "value": "0x00907014",
+      "reason": "mov ebp, 0x6d7914: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-0006238D",
+      "kind": "operand",
+      "function": "0x00062380",
+      "address": "0x0006238D",
+      "original_hex": "8b8210796d00",
+      "operand": 1,
+      "value": "0x00907010",
+      "reason": "mov eax, dword ptr [edx + 0x6d7910]: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062399",
+      "kind": "operand",
+      "function": "0x00062380",
+      "address": "0x00062399",
+      "original_hex": "8bb208796d00",
+      "operand": 1,
+      "value": "0x00907008",
+      "reason": "mov esi, dword ptr [edx + 0x6d7908]: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-000623BB",
+      "kind": "operand",
+      "function": "0x00062380",
+      "address": "0x000623BB",
+      "original_hex": "8d9200796d00",
+      "operand": 1,
+      "value": "0x00907000",
+      "reason": "lea edx, [edx + 0x6d7900]: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-000623E8",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x000623E8",
+      "original_hex": "8b8600796d00",
+      "operand": 1,
+      "value": "0x00907000",
+      "reason": "mov eax, dword ptr [esi + 0x6d7900]: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-000623FD",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x000623FD",
+      "original_hex": "8b8618796d00",
+      "operand": 1,
+      "value": "0x00907018",
+      "reason": "mov eax, dword ptr [esi + 0x6d7918]: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062409",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x00062409",
+      "original_hex": "39be0c796d00",
+      "operand": 0,
+      "value": "0x0090700C",
+      "reason": "cmp dword ptr [esi + 0x6d790c], edi: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062411",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x00062411",
+      "original_hex": "8b8610796d00",
+      "operand": 1,
+      "value": "0x00907010",
+      "reason": "mov eax, dword ptr [esi + 0x6d7910]: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062424",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x00062424",
+      "original_hex": "8b8614796d00",
+      "operand": 1,
+      "value": "0x00907014",
+      "reason": "mov eax, dword ptr [esi + 0x6d7914]: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062437",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x00062437",
+      "original_hex": "8b860c796d00",
+      "operand": 1,
+      "value": "0x0090700C",
+      "reason": "mov eax, dword ptr [esi + 0x6d790c]: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-0006244A",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x0006244A",
+      "original_hex": "89be14796d00",
+      "operand": 0,
+      "value": "0x00907014",
+      "reason": "mov dword ptr [esi + 0x6d7914], edi: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062450",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x00062450",
+      "original_hex": "89be0c796d00",
+      "operand": 0,
+      "value": "0x0090700C",
+      "reason": "mov dword ptr [esi + 0x6d790c], edi: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062456",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x00062456",
+      "original_hex": "89be08796d00",
+      "operand": 0,
+      "value": "0x00907008",
+      "reason": "mov dword ptr [esi + 0x6d7908], edi: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-0006245C",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x0006245C",
+      "original_hex": "89be10796d00",
+      "operand": 0,
+      "value": "0x00907010",
+      "reason": "mov dword ptr [esi + 0x6d7910], edi: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062469",
+      "kind": "operand",
+      "function": "0x000623E0",
+      "address": "0x00062469",
+      "original_hex": "c78618796d00ffffffff",
+      "operand": 0,
+      "value": "0x00907018",
+      "reason": "mov dword ptr [esi + 0x6d7918], 0xffffffff: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-0006272D",
+      "kind": "operand",
+      "function": "0x00062720",
+      "address": "0x0006272D",
+      "original_hex": "bf00796d00",
+      "operand": 1,
+      "value": "0x00907000",
+      "reason": "mov edi, 0x6d7900: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062762",
+      "kind": "operand",
+      "function": "0x00062720",
+      "address": "0x00062762",
+      "original_hex": "bf00796d00",
+      "operand": 1,
+      "value": "0x00907000",
+      "reason": "mov edi, 0x6d7900: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062ABF",
+      "kind": "operand",
+      "function": "0x00062A90",
+      "address": "0x00062ABF",
+      "original_hex": "be00796d00",
+      "operand": 1,
+      "value": "0x00907000",
+      "reason": "mov esi, 0x6d7900: pak mount table 0x006D7900 (30 x 0x1C) -> 0x00907000 (64 slots)"
+    },
+    {
+      "id": "paktable-00062049-cap",
+      "kind": "code",
+      "function": "0x00062040",
+      "address": "0x00062049",
+      "original_hex": "83f91e",
+      "new_hex": "83f940",
+      "reason": "sub_00062040 cmp ecx,0x1E: mount-table cap 30 -> 64 (table relocated to 0x00907000)"
+    },
+    {
+      "id": "paktable-000620F9-cap",
+      "kind": "code",
+      "function": "0x000620E0",
+      "address": "0x000620F9",
+      "original_hex": "83f81e",
+      "new_hex": "83f840",
+      "reason": "sub_000620E0 cmp eax,0x1E: mount-table cap 30 -> 64 (table relocated to 0x00907000)"
+    },
+    {
+      "id": "paktable-0006275B-cap",
+      "kind": "code",
+      "function": "0x00062720",
+      "address": "0x0006275B",
+      "original_hex": "b9d2000000",
+      "new_hex": "b9c0010000",
+      "reason": "sub_00062720 rep stosd count 0xD2 (30 x 0x1C / 4) -> 0x1C0 (64 x 0x1C / 4): clear the relocated table"
+    }
+  ]
+}

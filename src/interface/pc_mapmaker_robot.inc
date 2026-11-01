@@ -97,8 +97,8 @@
 #define RBT_MODEL 0x5F2u                /* chrs/FF2GiantRobot, no LOD */
 #define RBT_PAK 0x0049DC78u             /* "pak/stream/lv14/anim/lv14.pak" */
 #define RBT_MOUNTS 0x006D7880u          /* mounted paks, table of 30 (0x000620F9) */
-#define RBT_MOUNT_MAX 30u
-#define RBT_MOUNT_KEEP 2u               /* leave this many slots for stock streaming */
+#define RBT_MOUNT_MAX 64u               /* paktable.json: 64 slots at 0x00907000 */
+#define RBT_MOUNT_KEEP 8u               /* leave this many slots for stock streaming */
 #define RBT_CLASS 0x80000u              /* record +4 -> AI +0x14: sub_00293730 */
 #define RBT_STATE 0x0078B1DCu           /* 0x4C bytes, sub_00292630 */
 #define RBT_STATE_SIZE 0x4Cu

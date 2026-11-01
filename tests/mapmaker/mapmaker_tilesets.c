@@ -188,10 +188,10 @@ int main(void)
     CHECK(originals==1 && mounts==1 && seen_arg==1u);
     CHECK((WORD_AT(INFO+0x08)>>16)==1u && (WORD_AT(INFO+0x08)&0xFFFFu)==0x5A5Au);
     CHECK(WORD_AT(0x00784020u)==1u);
-    mount_fails=0;WORD_AT(0x006D7880u)=23u;make_container(0);
+    mount_fails=0;WORD_AT(0x006D7880u)=57u;make_container(0);
     path(TS_RET_PAK_PATH,0);                          /* the mount table is too full */
     CHECK(originals==1 && mounts==0 && seen_arg==1u && (WORD_AT(INFO+0x08)>>16)==1u && WORD_AT(0x00784020u)==1u);
-    WORD_AT(0x006D7880u)=22u;make_container(0);
+    WORD_AT(0x006D7880u)=56u;make_container(0);
     path(TS_RET_PAK_PATH,0);                          /* 22 + 8 still fits */
     CHECK(originals==1 && mounts==1 && seen_arg==0u && (WORD_AT(INFO+0x08)>>16)==0u);
     already=0;WORD_AT(0x006D7880u)=7u;mount_fails=1;

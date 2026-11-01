@@ -219,10 +219,10 @@ int main(void)
     WORD_AT(0x006D7880u)=10u;
     CALL(pc_mapmaker_robot_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==n);
-    pak_mounted=0;WORD_AT(0x006D7880u)=29u;                   /* table nearly full */
+    pak_mounted=0;WORD_AT(0x006D7880u)=57u;                   /* table nearly full */
     CALL(pc_mapmaker_robot_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==n && !pak_mounted);
-    WORD_AT(0x006D7880u)=28u;
+    WORD_AT(0x006D7880u)=56u;
     CALL(pc_mapmaker_robot_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==n+1 && pak_mounted);
     set_parts=PT2;n=nparts;                                   /* the skeleton/walker made the block */

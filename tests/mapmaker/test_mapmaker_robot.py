@@ -32,7 +32,7 @@ MUTATIONS = {
     'mount-ignores-optout': ('    if(!rbt_play() || rbt.optout || (has=rbt_map_has())==0) return;\n    if(rbt_pak',
                              '    if(!rbt_play() || (has=rbt_map_has())==0) return;\n    if(rbt_pak'),
     'mount-twice': ('    if(rbt_pak_mounted()) { rbt_log("lv14.pak already mounted",0,(uint32_t)has);return; }\n', ''),
-    'mount-fills-table': ('#define RBT_MOUNT_KEEP 2u', '#define RBT_MOUNT_KEEP 0u'),
+    'mount-fills-table': ('#define RBT_MOUNT_KEEP 8u', '#define RBT_MOUNT_KEEP 0u'),
     'mount-before-original': ('    int has;\n    uint32_t mounted;\n    original();\n',
                               '    int has;\n    uint32_t mounted;\n    guest_call(sub_0005A130,1,RBT_PAK);original();\n'),
     'set-preset': ('    if(RBT_H(info+RBT_INFO_SET)!=RBT_SET_MAP) return 0;   /* a preset or profile set */\n', ''),

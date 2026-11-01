@@ -239,10 +239,10 @@ int main(void)
     CHECK(nmount==1 && mount_args[0]==0x0049DF7Cu && mount_args[1]==0 && mount_args[2]==1u && pak_mounted);
     CALL(pc_mapmaker_tank_mount,fake,0x001CDB8Au,0,0,0,1);    /* already mounted */
     CHECK(nmount==1);
-    pak_mounted=0;WORD_AT(0x006D7880u)=29u;                   /* one slot left: kept for stock */
+    pak_mounted=0;WORD_AT(0x006D7880u)=57u;                   /* one slot left: kept for stock */
     CALL(pc_mapmaker_tank_mount,fake,0x001CDB8Au,0,0,0,1);
     CHECK(nmount==1);
-    WORD_AT(0x006D7880u)=28u;
+    WORD_AT(0x006D7880u)=56u;
     CALL(pc_mapmaker_tank_mount,fake,0x001CDB8Au,0,0,0,1);
     CHECK(nmount==2 && pak_mounted);
     pak_mounted=0;WORD_AT(0x006D7880u)=10u;
