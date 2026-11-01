@@ -117,7 +117,8 @@ not an AI class at all; the mansion level runs it.
 
 ## What the area does (scene 100 story, `TSFP_MAPMAKER_LIMITS=1`)
 
-One worm per map: worm 0 is this map's, worms 1-4 are parked.
+Up to 4 map worms, each with its own worm block: in each block worm 0 is
+that map worm, worms 1-4 are parked ([Several mansion worms](#several-mansion-worms)).
 
 | hook | what |
 |---|---|
@@ -181,7 +182,7 @@ Logs (stderr, `[mapmaker] worm:`):
 - `mansion worm: the mansion script trigger dropped`
 - `mansion worm hit (state before, after)`
 - failures: `no pads near the mansion worm's spawn; bot behaviour`,
-  `only one mansion worm per map`, and so on
+  `more than 4 mansion worms in the map`, and so on
 
 ## Risks (INFERRED, need a playtest)
 
@@ -231,7 +232,44 @@ Logs (stderr, `[mapmaker] worm:`):
 - Untested: worm 2's scripted state 8 path (parked); the `0x2349` object
   (state 7, parked worms only).
 
-## Save format and stock games
+## Several mansion worms
+
+User request: every placed mansion worm should have its story behaviour.
+
+**Why not use the stock worms 1-4 of one block**: the stock update runs
+all five worms in one call, with one set of mission 5 coordinates. Map
+worms at different spawn points need their own offsets, so each map worm
+gets its own block.
+
+**What one block's code keeps globally** (CONFIRMED, test
+`test_multi_instance_globals`; written operands of the code reachable from
+the update, draw, hit callback, init and allocation):
+- the block `[0x0075B4B4]`, its init flag `[0x0075B4B8]`, the enable flag
+  `[0x0075B4BC]`, the "worms active" flag `[0x004FDC20]` and the five bound
+  heads `[0x0078FAE0..0x0078FAF0]`: 9 words, swapped per worm;
+- `[0x004FDC58]` (the pad conversion flag): kept 0 by the area during each
+  init and restored, as before;
+- the rest it writes is the body-geometry tables of `sub_001D1BD0` (the same
+  values every init) and the draw's scratch (`sub_001D2800`, rewritten every
+  draw): shared, not swapped.
+
+**What the area does**:
+- Up to 4 map worms (`WRM_MAX`), each with its own block (`wrm_alloc`: the
+  stock allocation and init with the stand-ins, worms 1-4 parked) and its own
+  copy of the 9 words.
+- Allocation: the first block at level init, each further one at that worm's
+  AI start. The globals as they were are put back after each allocation.
+- `wrm_enter(k)` / `wrm_leave(prev)` swap the copies around every entry into
+  that worm's code: its tick (the stock update, with its own constants
+  offsets and route pads), its hit callback, and its draw (the fx hook draws
+  each worm in turn).
+- The head lookup inside an update finds that worm's own head.
+- The scratch block (script block and object stand-ins) and the effect type
+  are shared by every worm. The kill counter is reset around every hit, so
+  it never reaches 5.
+- The fifth and later mansion worms keep the bot AI (logged).
+
+
 
 Unchanged: a stock custom-set member (word id 0x2C, sbyte variant -1). No
 Story AI chunk byte of its own (+0x29 is the bosses area's Boss flag). A stock
@@ -303,6 +341,7 @@ WRAP sub_001D9370 -> pc_mapmaker_worm_props      (new; return-address test)
 WRAP sub_001D7200 -> pc_mapmaker_worm_extra      (new; return-address test)
 WRAP sub_00234CD0 -> pc_mapmaker_worm_script     (new; return-address test; 5 callers)
 WRAP sub_0005B980 -> pc_mapmaker_worm_register   (new; level load only; table 0x0048BEC8 count 0x1E test first)
+(several worms: no new wrapper; the same hooks swap each worm's globals)
 ```
 
 Each layer: `if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_<x>"))
@@ -365,8 +404,9 @@ entries.
 4. Shoot it while it is out (`hit` lines with states 9-11 -> 0xD), or use an
    explosive (-> 0xC). When it dies (`wrmdeath`) it sinks and the Story AI is
    removed. No map logic marker changes.
-5. Boss flag Boss bar: a bar while it is alive. A second Mansion Worm AI
-   fights as a bot (`only one mansion worm per map`). Mission 5 still plays
+5. Boss flag Boss bar: a bar while it is alive. Up to four Mansion Worm AIs
+   each burrow and attack around their own spawn; a fifth fights as a bot
+   (`more than 4 mansion worms in the map`). Mission 5 still plays
    stock.
 6. Report:
    - where it surfaces relative to the floor and the spawn;
