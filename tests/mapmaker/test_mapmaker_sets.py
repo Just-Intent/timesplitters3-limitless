@@ -31,20 +31,75 @@ MUTATIONS = {
     'changed-ignores-extras': ('    if(g_eax || !(e=sets_editor())) return;\n', '    return;\n'),
     'changed-ignores-variant': ('(id!=-1 && SETS_H(m+6u)!=variant)', '(0 && variant)'),
     'reset-skips': ('    if((e=sets_editor())) sets_clear_extras(e);\n', '    (void)e;\n'),
-    'flip-loses-pick': ('            guest_call(sub_002BFFD0,0);           /* keep this page\'s last change */\n', ''),
     'fill-wrong-page': ('    if(ret==SETS_FILL_RET && sets.in_update && sets.page && g_eax) g_eax+=8u*SETS_STOCK;',
                         '    if(ret==SETS_FILL_RET && sets.in_update && sets.page && g_eax) g_eax+=8u*(SETS_STOCK-1u);'),
     'fill-any-time': ('    if(ret==SETS_FILL_RET && sets.in_update && sets.page && g_eax)', '    if(ret==SETS_FILL_RET && sets.page && g_eax)'),
     'store-no-scratch': ('    else if(ret==SETS_STORE_RET && sets.in_store) g_eax=SETS_SCRATCH;\n', ''),
-    'no-reload': ('            WORD_AT(SETS_LOADED)=0xFFFFFFFFu;     /* the original reloads the work copy */\n', ''),
-    'no-cursor': ('            sets_select(pane,sets.page?0u:SETS_STOCK-1u);\n', ''),
-    'keeps-direction': ('            WORD_AT(pane+0xC4u)&=~0x000F000Fu;WORD_AT(pane+0xC8u)&=~0xFu;\n', ''),
-    'page-sticks': ('    if(!sets.forced && WORD_AT(SETS_LOADED)!=WORD_AT(SETS_INDEX)) sets.page=0;   /* opened or index changed */\n', ''),
-    'screen-always-on': ('    if(!sets_custom() || !MAPMAKER_STACK_OK(8) || !sets_on()) { sets.page=0;original();return; }',
-                         '    if(!sets_custom() || !MAPMAKER_STACK_OK(8)) { sets.page=0;original();return; }'),
-    'screen-skips-original': ('    original();                                   /* pops the return address */\n    sets.in_update=0;',
-                              '    g_esp+=4u;\n    sets.in_update=0;'),
-    'no-title': ('    if(MAPMAKER_PTR_OK(menu,0x208u)) sets_title(menu);\n', ''),
+    # the editor's 20-row slot list
+    'rows-10': ('    for(v=0;v<SETS_SLOTS;v++) {\n        guest_call(sub_00078320', '    for(v=0;v<SETS_STOCK;v++) {\n        guest_call(sub_00078320'),
+    'no-scroll-region': ('    guest_call(sub_000780E0,2,SETS_VIEW,0u);\n', ''),
+    'no-region-end': ('    guest_call(sub_000781A0,0);\n    built=', '    built='),
+    'region-height': ('#define SETS_VIEW 0x42200000u', '#define SETS_VIEW 0x42A00000u'),
+    'no-row-group': ('        guest_call(sub_00078320,3,0u,1u,4u);\n', ''),
+    'row-group-open': ('        guest_call(sub_00078380,0);\n', ''),
+    'row-callbacks-swapped': ('SETS_ROW_HEIGHT,SETS_ROW_ACTION,SETS_ROW_DRAW);', 'SETS_ROW_HEIGHT,SETS_ROW_DRAW,SETS_ROW_ACTION);'),
+    'set-list-value': ('0x004766D8u,0xFFFFFFFEu,0x08030C00u', '0x004766D8u,0xFFFFFFFBu,0x08030C00u'),
+    'build-no-choices': ('    guest_call(sub_002C1830,1,menu);\n', ''),
+    'build-no-frame': ('    guest_call(sub_00071BE0,3,1u,SETS_F5,SETS_F5);\n', ''),
+    'build-size': ('SETS_F5,SETS_F9_2);', 'SETS_F5,SETS_F5);'),
+    'build-footer-text': ('guest_call(sub_0003D7B0,1,0x3B2u),1u,0u);', 'guest_call(sub_0003D7B0,1,0xE89u),1u,0u);'),
+    'build-ignores-switch': ("    if(scene!=102 || !sets_on() || !MAPMAKER_PTR_OK(menu,0x200u)) {", "    if(scene!=102 || !MAPMAKER_PTR_OK(menu,0x200u)) {"),
+    'build-any-scene': ("    if(scene!=102 || !sets_on() || !MAPMAKER_PTR_OK(menu,0x200u)) {", "    if(!sets_on() || !MAPMAKER_PTR_OK(menu,0x200u)) {"),
+    'build-no-ret': ('(int)WORD_AT(SETS_INDEX));\n    MAPMAKER_GUEST_RET();', '(int)WORD_AT(SETS_INDEX));'),
+    'build-list-off': ('    sl.on=1;\n', ''),
+    'build-keeps-shadow': ('    sl.on=0;sl.valid=0;sl.opened=0;', '    sl.on=0;sl.opened=0;'),
+    'list-any-scene': ('static int sets_list(void) { return sl.on && WORD_AT(SETS_SCENE)==102u; }', 'static int sets_list(void) { return sl.on; }'),
+    'list-row-from-1': ('v>=SETS_STOCK && v<SETS_SLOTS ? (int)(v-SETS_STOCK)', 'v>=1u && v<SETS_SLOTS ? (int)(v%SETS_STOCK)'),
+    'list-row-past-end': ('v>=SETS_STOCK && v<SETS_SLOTS ? (int)(v-SETS_STOCK)', 'v>=SETS_STOCK && v<=SETS_SLOTS ? (int)(v-SETS_STOCK)'),
+    'borrow-keeps': ('    memcpy(t,w,SETS_ROW);memcpy(w,s,SETS_ROW);memcpy(s,t,SETS_ROW);', '    memcpy(t,w,SETS_ROW);memcpy(w,s,SETS_ROW);(void)t;'),
+    'draw-value-kept': ('    WORD_AT(item+0x14u)=(uint32_t)k;sets_borrow((unsigned)k);', '    sets_borrow((unsigned)k);'),
+    'draw-value-stale': ('    sets_borrow((unsigned)k);WORD_AT(item+0x14u)=v;', '    sets_borrow((unsigned)k);'),
+    'draw-no-return': ('    original();\n    sets_borrow((unsigned)k);WORD_AT(item+0x14u)=v;', '    original();\n    WORD_AT(item+0x14u)=v;'),
+    'call-index-kept': ('    WORD_AT(pane+0x184u)=k+2u;\n    if(val==idx-2u)', '    if(val==idx-2u)'),
+    'call-index-stale': ('    if(WORD_AT(pane+0x184u)==k+2u) WORD_AT(pane+0x184u)=idx;\n', ''),
+    'call-value-kept': ('    if(val==idx-2u) WORD_AT(pane+0x18Cu)=k;\n', ''),
+    'call-value-any': ('    if(val==idx-2u) WORD_AT(pane+0x18Cu)=k;\n', '    WORD_AT(pane+0x18Cu)=k;\n'),
+    'call-value-stale': ('    if(val==idx-2u && WORD_AT(pane+0x18Cu)==k) WORD_AT(pane+0x18Cu)=val;\n', ''),
+    'call-not-kept': ('    sets_borrow(k);\n    if(WORD_AT(pane+0x184u)==k+2u)', '    if(WORD_AT(pane+0x184u)==k+2u)'),
+    'clear-not-stored': ('    if(val==idx-2u && WORD_AT(pane+0x18Cu)==k) WORD_AT(pane+0x18Cu)=val;\n    sets_list_keep(k);', '    if(val==idx-2u && WORD_AT(pane+0x18Cu)==k) WORD_AT(pane+0x18Cu)=val;'),
+    'keep-preset': ('    if(!sets_custom() || !(e=sets_editor())) return;\n    memcpy(&id,r,4);', '    if(!(e=sets_editor())) return;\n    memcpy(&id,r,4);'),
+    'keep-difficulty': ('SETS_B(m+3u)=(uint8_t)diff;', '(void)diff;'),
+    'keep-variant': ('SETS_H(m+6u)=(int16_t)variant;\n}', '(void)variant;\n}'),
+    'keep-wrong-member': ('    m=SETS_MEMBER(e+SETS_EDITOR_SET,SETS_STOCK+k);\n    SETS_H(m)=(int16_t)id;', '    m=SETS_MEMBER(e+SETS_EDITOR_SET,k);\n    SETS_H(m)=(int16_t)id;'),
+    'action-stock': ('    if(!MAPMAKER_PTR_OK(pane,0x200u) || (k=sets_list_row(WORD_AT(pane+0x184u)-2u))<0) { original();return; }\n    sets_list_call(original,pane,(unsigned)k);\n}\n/* WRAP sub_002C1570',
+                     '    (void)k;original();\n}\n/* WRAP sub_002C1570'),
+    'pane-stock': ('    if((k=sets_list_row((uint32_t)row))<0) { original();return; }\n    sets_list_call(original,pane,(unsigned)k);',
+                   '    (void)k;original();'),
+    'pick-stock': ('    WORD_AT(slot+0x184u)=(uint32_t)k+2u;WORD_AT(slot+0x18Cu)=SETS_STOCK-1u;', '    original();return;'),
+    'pick-stock-advance': ('WORD_AT(slot+0x184u)=(uint32_t)k+2u;WORD_AT(slot+0x18Cu)=SETS_STOCK-1u;', 'WORD_AT(slot+0x184u)=(uint32_t)k+2u;WORD_AT(slot+0x18Cu)=(uint32_t)k;'),
+    'pick-not-kept': ('    sets_list_keep((unsigned)k);\n    if(advance', '    if(advance'),
+    'pick-index-stale': ('    WORD_AT(slot+0x184u)=idx;WORD_AT(slot+0x18Cu)=val;\n', '    WORD_AT(slot+0x18Cu)=val;\n'),
+    'pick-no-advance': ('    if(advance && val+1u<SETS_SLOTS) sets_advance(slot,val+1u);\n}', '}'),
+    'pick-advance-past-end': ('    if(advance && val+1u<SETS_SLOTS) sets_advance', '    if(advance && val<SETS_SLOTS) sets_advance'),
+    'pick-advance-disabled': ("    advance=MAPMAKER_PTR_OK(item,0x2Cu) && !(SETS_B(item+0x28u)&1u) &&", "    advance=MAPMAKER_PTR_OK(item,0x2Cu) &&"),
+    'pick-advance-submode': ("            SETS_B(SETS_SUBMODE)!=0x13u && val==idx-2u;", "            val==idx-2u;"),
+    'pick-slot-10-stops': ('        if(advance && val==SETS_STOCK-1u && WORD_AT(slot+0x184u)==idx && WORD_AT(slot+0x18Cu)==val) sets_advance(slot,val+1u);\n', ''),
+    'pick-slot-10-twice': ('val==SETS_STOCK-1u && WORD_AT(slot+0x184u)==idx && WORD_AT(slot+0x18Cu)==val)', 'val<SETS_STOCK && WORD_AT(slot+0x184u)==idx)'),
+    'screen-no-shadow': ('        if((int32_t)index>=0xC && sets_editor()) {', '        if(0) {'),
+    'screen-preset-shadow': ('        if((int32_t)index>=0xC && sets_editor()) {', '        if(sets_editor()) {'),
+    'screen-shadow-every-frame': ('    if(!sl.valid || sl.index!=index) {', '    if(1) {'),
+    'screen-shadow-sticks': ('    if(!sl.valid || sl.index!=index) {', '    if(!sl.valid) {'),
+    'screen-no-force': ('            sets.page=1;sets.in_update=1;WORD_AT(SETS_LOADED)=0xFFFFFFFFu;', '            sets.page=1;sets.in_update=1;'),
+    'screen-unshifted': ('            sets.page=1;sets.in_update=1;WORD_AT(SETS_LOADED)=0xFFFFFFFFu;', '            sets.in_update=1;WORD_AT(SETS_LOADED)=0xFFFFFFFFu;'),
+    'screen-no-repush': ('            g_esp-=4u;WORD_AT(g_esp)=ret;         /* for the stock run below */\n', ''),
+    'screen-work-lost': ('            memcpy(sets_work(0),save,sizeof save);WORD_AT(SETS_LOADED)=loaded;', '            WORD_AT(SETS_LOADED)=loaded;'),
+    'screen-loaded-lost': ('            memcpy(sets_work(0),save,sizeof save);WORD_AT(SETS_LOADED)=loaded;', '            memcpy(sets_work(0),save,sizeof save);'),
+    'screen-page-sticks': ('            sets.page=0;sets.in_update=0;\n            memcpy(sl.rows', '            sets.in_update=0;\n            memcpy(sl.rows'),
+    'screen-skips-original': ('    sets.in_update=1;\n    original();                                   /* pops the return address */\n    sets.in_update=0;\n}',
+                              '    sets.in_update=1;\n    g_esp+=4u;\n    sets.in_update=0;\n}'),
+    'empty-keeps-ids': ('        memcpy(r,&none,4);memcpy(r+0x10,&none,4);', '        memcpy(r+0x10,&none,4);'),
+    'diag-no-open': ('        sets_diag(0,"slot pane open:', '        if(0) sets_diag(0,"slot pane open:'),
+    'diag-no-moves': ('    sl.last_row=row;sl.last_scroll=scroll;\n', ''),
     'choice-any-caller': ('WORD_AT(g_esp)!=SETS_CHOICE_RET || !sets_custom()', '0 || !sets_custom()'),
     'choice-ignores-switch': ('    if(!sets_on() && !(MAPMAKER_PTR_OK(value,4)', '    if(0 && !(MAPMAKER_PTR_OK(value,4)'),
     'choice-empty-name': ('    if(SETS_H(m)==-1) return guest_call(sub_0003D7B0,1,0xD7Cu);', '    if(0) return 0;'),
@@ -86,7 +141,8 @@ NAME_MUTATIONS = {
     'wrong-item': (INC, 'SETS_SLOT_ITEM+k-SETS_STOCK);', 'SETS_SLOT_ITEM+k);'),
     'shift-any-time': (INC, 'else if(ret==SETS_NAME_SET_RET && sets.name_shift && g_eax)',
                        'else if(ret==SETS_NAME_SET_RET && g_eax)'),
-    'rbs-skeleton-unnamed': (RBS, '    row=id==RBS_ID?RBS_ROW:RBS_SKEL_ROW;', '    row=RBS_ROW;'),
+    'rbs-skeleton-unnamed': (RBS, 'row=id==RBS_ID?RBS_ROW:id==RBS_SKEL_ID?RBS_SKEL_ROW:id==RBS_WALK_ID',
+                             'row=id==RBS_ID?RBS_ROW:id==RBS_SKEL_ID?RBS_ROW:id==RBS_WALK_ID'),
     'rbs-name-caller-only': (RBS, '(ret==RBS_RET_NAME && WORD_AT(g_esp+12u)==RBS_RET_NAME_OUTER)', '0'),
 }
 
@@ -123,6 +179,11 @@ def test_mapmaker_sets(tmp_path, mutation):
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'mapmaker sets ok' in result.stdout
+        # the diagnostics a user run shows (stderr)
+        assert '[mapmaker] sets: slot pane build (stock 10 rows: TSFP_MAPMAKER_LIMITS is not 1) ret=0x00078F74 menu=0x00301000' in result.stderr
+        assert '[mapmaker] sets: slot pane build (20 rows, scrolling) ret=0x00078F74 menu=0x00301000 set=17' in result.stderr
+        assert '[mapmaker] sets: slot pane open: pane=0x00301000 items=' in result.stderr
+        assert '[mapmaker] sets: list: slot 13 highlighted, scroll 0.0' in result.stderr
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 
@@ -158,6 +219,10 @@ def mem(i):
     return [op for op in i.ops if op[0] == 'mem']
 
 
+def disp(i):
+    return [op[4] for op in mem(i)]
+
+
 def ret_of(a, site, target):
     call = a[site]
     assert call.call and f'0x{target:x}' in call.text, (hex(site), call.text)
@@ -186,6 +251,66 @@ def test_hook_return_addresses():
     assert mem(a[0x003365F0])[0][4] == 0x00765E38
     callers = {i.function for i in decoded() if (i.call or i.branch) and '0x314210' in i.text}
     assert callers == {0x002BFFD0}
+
+
+def test_slot_list_facts():
+    """The editor's 20-row list replays the stock builder; rows 11-20 borrow a work-copy row."""
+    a = by_address()
+    pushed = lambda x: [op[1] for op in a[x].ops if op[0] == 'imm']
+    # stock builder sub_002C19F0: frame (0x10, 0, 45.0f, 0, 0x002C1450), sub_00071BE0(1, 5.0f, 5.0f)
+    assert [pushed(x) for x in (0x002C19F3, 0x002C19F8, 0x002C19FA, 0x002C19FF, 0x002C1A01)] == \
+        [[0x002C1450], [0], [0x42340000], [0], [0x10]] and '0x75b70' in a[0x002C1A03].text
+    assert [pushed(x) for x in (0x002C1A08, 0x002C1A0D, 0x002C1A12)] == [[0x40A00000], [0x40A00000], [1]]
+    assert '0x71be0' in a[0x002C1A14].text
+    # title 0xE8B (-1, 0x04032404), set list 0x004766D8 (-2, 0x08030C00), sub_002C1830(menu), sub_00079710(0)
+    assert pushed(0x002C1A22) == [0x04032404] and pushed(0x002C1A27) == [-1 & 0xFFFFFFFF] and pushed(0x002C1A29) == [0xE8B]
+    assert pushed(0x002C1A42) == [0x08030C00] and pushed(0x002C1A47) == [-2 & 0xFFFFFFFF] and pushed(0x002C1A49) == [0x004766D8]
+    assert '0x2c1830' in a[0x002C1A58].text and 0x40 in disp(a[0x002C1A53]) and '0x79710' in a[0x002C1A5F].text
+    # ten row groups: sub_00078320(0, 1, 4); editor: sub_000792B0(0, row, 0, 40.0f, 4.0f, sub_002C1490, sub_002C0660)
+    assert [pushed(x) for x in (0x002C1A70, 0x002C1A72, 0x002C1A74)] == [[4], [1], [0]] and '0x78320' in a[0x002C1A76].text
+    assert ('imm', 0x66) in a[0x002C1A83].ops and a[0x002C1A86].mnemonic == 'jne'
+    assert [pushed(x) for x in (0x002C1A88, 0x002C1A8D, 0x002C1A92, 0x002C1A97, 0x002C1A9C, 0x002C1A9F)] == \
+        [[0x002C0660], [0x002C1490], [0x40800000], [0x42200000], [0], [0]]
+    assert a[0x002C1A9E].mnemonic == 'push' and a[0x002C1A9E].ops == (('reg', 'esi'),)       # the row value
+    assert a[0x002C1A67].mnemonic == 'xor' and 'esi' in a[0x002C1A67].text                    # from 0
+    assert '0x792b0' in a[0x002C1AA1].text and a[0x002C1AA9].mnemonic == 'jmp' and '0x2c1c04' in a[0x002C1AA9].text
+    assert '0x78380' in a[0x002C1C04].text and ('imm', 0xA) in a[0x002C1C0A].ops
+    # sizes and footer: sub_00077140(menu), sub_00077360(menu, 5.0f, 9.2f), 0xE88 / 0x3B2 / 0x1A27
+    assert '0x77140' in a[0x002C1C1A].text and pushed(0x002C1C24) == [0x41133333] and pushed(0x002C1C29) == [0x40A00000]
+    assert '0x77360' in a[0x002C1C2F].text
+    assert [pushed(x) for x in (0x002C1C3B, 0x002C1C57, 0x002C1C73)] == [[0xE88], [0x3B2], [0x1A27]]
+    assert [pushed(x) for x in (0x002C1C49, 0x002C1C65, 0x002C1C81)] == [[0], [3], [1]]
+    assert a[0x002C1C8E].mnemonic == 'ret'
+    # a group end counts one row (+0x180); group items made in a region get flag 0x40 too
+    assert 0x180 in disp(a[0x000783C8]) and a[0x000783C8].mnemonic == 'inc'
+    assert 0x14 in disp(a[0x000791A3]) and ('imm', 0x40) in a[0x0007914A].ops
+    # a laid-out row with +0xB0 set and flag 0x40 adds its height to the content +0x5C
+    assert 0xB0 in disp(a[0x000753A7]) and 0x5C in disp(a[0x000753CD]) and 0x5C in disp(a[0x000753D2])
+    assert ('imm', 1) in a[0x00078392].ops and 0xB0 in disp(a[0x00078392])     # sub_00078380 marks the row's last item
+    # the draw reads the row value at item +0x14; the editor names rows below 10 only; highlight = item pointer
+    assert 0x34 in disp(a[0x002C0663]) and 0x14 in disp(a[0x002C0667])
+    assert ('imm', 0xA) in a[0x002C08AF].ops and '0x71a60' in a[0x002C0A2B].text and 0x48 in disp(a[0x002C0A30])
+    # the row action and the pane update: row = +0x184 - 2, the editor stops at 10 rows
+    assert 0x184 in disp(a[0x002C1499]) and ('imm', 2) in a[0x002C149F].ops and ('imm', 0xA) in a[0x002C14B3].ops
+    assert 0x184 in disp(a[0x002C157E]) and ('imm', 2) in a[0x002C1584].ops and ('imm', 0xA) in a[0x002C16D8].ops
+    assert ('imm', 0x800000) in a[0x002C16FD].ops and 0x0075FD90 in disp(a[0x002C1718])
+    assert 0x0075FDA8 in disp(a[0x002C17F2]) and 0x0075FD90 in disp(a[0x002C17F8]) and '0x2be600' in a[0x002C1800].text
+    # the pick: slot pane (sub_00074670(parent, 0x0052372C)) +0x184 - 2, moves on while +0x18C < 9
+    assert pushed(0x002C1CB4) == [0x0052372C] and 0x184 in disp(a[0x002C1CC7]) and ('imm', 2) in a[0x002C1CD9].ops
+    assert 0x0075FD90 in disp(a[0x002C1D2B]) and 0x0075FDA4 in disp(a[0x002C1D37]) and 0x0075FDA8 in disp(a[0x002C1D50])
+    assert 0x18C in disp(a[0x002C1D88]) and ('imm', 9) in a[0x002C1D8E].ops and '0x74460' in a[0x002C1DC5].text
+    assert 0x28 in disp(a[0x002C1C9F]) and a[0x002C1CA9].mnemonic == 'jne'
+    # the picker list scrolls in a region; its descriptor's update is the highlight
+    assert '0x780e0' in a[0x002C1F15].text and '0x781a0' in a[0x002C1FA0].text
+    # the update's reload portraits return to 0x002C054C (realbosses names its rows there)
+    assert ret_of(a, 0x002C0547, 0x2be600) == 0x002C054C
+
+
+def test_slot_list_descriptors():
+    rd = xbe_reader()
+    # slot pane {builder, update}, picker {builder, update = highlight}
+    assert struct.unpack('<2I', rd(0x0052372C, 8)) == (0x002C19F0, 0x002C1570)
+    assert struct.unpack('<2I', rd(0x0052374C, 8)) == (0x002C1EA0, 0x002C1E10)
 
 
 def test_set_structs_hold_twenty():

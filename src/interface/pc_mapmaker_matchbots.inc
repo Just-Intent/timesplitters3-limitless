@@ -23,7 +23,7 @@
  *    or a Test map pause, no System Link, TSFP_MAPMAKER_LIMITS=1). While page
  *    2 is shown the per-frame store sub_002BFFD0 keeps the rows here instead
  *    of writing the profile's rows 1-10. The editor's own screen (scene 102)
- *    is paged by pc_mapmaker_sets.inc (custom set members 11-20);
+ *    is a 20-row list in pc_mapmaker_sets.inc (custom set members 11-20);
  *  - match start: after the stock roster, rows 11-20 (scene 102: custom set
  *    members 11-20 with rows 1-10's team and difficulty) become more bots with
  *    the stock rules, until 24 characters or 20 bots. Index < 16 goes into the

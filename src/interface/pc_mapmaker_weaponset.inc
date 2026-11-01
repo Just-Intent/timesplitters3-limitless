@@ -36,8 +36,8 @@
  * without it. Empty extra slots are id 0, as stock "None".
  *
  * Extension memory: 0x00906000..0x009064FF (sets 0x00906000, choice texts
- * 0x00906140..0x00906410; 0x00906100..0x0090613F, the retired paged title,
- * is unused).
+ * 0x00906140..0x00906410; 0x00906100..0x0090610F, in the retired paged
+ * title block, holds the row label measure; 0x00906110..0x0090613F unused).
  * Requires the includer's WORD_AT, FLOAT_AT, guest_call, g_eax, g_ebx, g_esp,
  * g_xbox_mem_offset and pc_mapmaker_limits.inc. */
 #include <stdarg.h>
@@ -98,6 +98,11 @@
 #define WS_PICK_RET 0x002BF95Au         /* sub_002BF910: weapon picked for row */
 #define WS_CLEAR_RET 0x002D41C7u        /* sub_002D40A0: X clears the row */
 #define WS_LABEL_RET 0x002D3DF6u        /* sub_002D3D30: sub_00064E70(filter, weapon) after the row label */
+#define WS_NAME_RET 0x002D3F95u         /* sub_002D3D30: sub_0003D7B0(weapon name id) before the name fit */
+#define WS_TWO_DIGITS 9u                /* row value 9 = slot 10, the first two-digit label */
+#define WS_NAME_SHIFT 6.0f              /* fallback: the measure failed (INFERRED digit width) */
+#define WS_NAME_SHIFT_MAX 20.0f         /* the stock label-to-name distance is 15 */
+#define WS_MEASURE 0x00906100u          /* w, h, 2-byte text (in the retired title block) */
 #define WS_BUILDING 0x007BB1E8u         /* the menu being built */
 #define WS_ROW_ACTION 0x002D4040u       /* slot row callbacks (0x002D4295 / 0x002D4290) */
 #define WS_ROW_DRAW 0x002D3D30u
@@ -118,7 +123,7 @@ extern void sub_00064E70(void),sub_00069640(void),sub_000BE860(void),sub_0006B2D
     sub_00079DE0(void),sub_0007D4A0(void),sub_000716D0(void),sub_00078590(void),sub_000783D0(void),
     sub_00303350(void),sub_00075B70(void),sub_00079D60(void),sub_002BF830(void),
     sub_00079710(void),sub_000780E0(void),sub_000781A0(void),sub_000772E0(void),sub_00077320(void),
-    sub_00074A00(void),sub_00077110(void),sub_00075E70(void);
+    sub_00074A00(void),sub_00077110(void),sub_00075E70(void),sub_0003FCF0(void);
 
 static struct {
     unsigned rows;                   /* slot rows of the last pane built (6 stock, 20) */
@@ -488,10 +493,38 @@ void pc_mapmaker_weaponset_build(void (*original)(void))
         ret,menu,WORD_AT(menu+4u),scene,set,ws_pointer_mode());
     MAPMAKER_GUEST_RET();
 }
-/* WRAP sub_0003D7B0: retired (the paged title). Kept as a pass-through so the
- * existing wrapper chain links; the integrator may drop its WRAP line. */
+/* Width of the label's first character in the row font (sub_0003FCF0(&w, &h,
+ * text, 0), as sub_00040A40 measures), or WS_NAME_SHIFT when that fails. */
+static float ws_digit_width(uint32_t label)
+{
+    float w;
+    if(!MAPMAKER_PTR_OK(label,4u) || !WS_B(label) || !WS_B(label+1u)) return 0.f;
+    WS_B(WS_MEASURE+8u)=WS_B(label);WS_B(WS_MEASURE+9u)=0;
+    WS_F(WS_MEASURE)=0.f;WS_F(WS_MEASURE+4u)=0.f;
+    guest_call(sub_0003FCF0,4,WS_MEASURE,WS_MEASURE+4u,WS_MEASURE+8u,0u);
+    w=WS_F(WS_MEASURE);
+    return w>0.f && w<=WS_NAME_SHIFT_MAX?w:WS_NAME_SHIFT;
+}
+/* WRAP sub_0003D7B0 (cdecl text id -> string): only its call in the weapon
+ * slot row draw at 0x002D3F90 (return 0x002D3F95) matters. sub_002D3D30 draws
+ * the label at x + 5 and the weapon name at x + 20 (frame +0x18, stored at
+ * 0x002D3F8A, read at 0x002D3FD1), fitted into the width argument of
+ * sub_00040A40 (this call's +8 slot, rect +8 - name x). Two-digit labels
+ * ("10".."20", values 9..19) ran into the name: move the name right by the
+ * width of the label's first digit and narrow the fit by the same amount.
+ * Every other caller runs the original first thing. */
 void pc_mapmaker_weaponset_title(void (*original)(void))
 {
+    uint32_t item,v;
+    float shift;
+    if(MAPMAKER_STACK_OK(0x60) && WORD_AT(g_esp)==WS_NAME_RET && ws.rows==WS_SLOTS) {
+        item=WORD_AT(g_esp+0x50u);                              /* the row item (argument 2) */
+        if(MAPMAKER_PTR_OK(item,0x18u) && (v=WORD_AT(item+0x14u))>=WS_TWO_DIGITS && v<WS_SLOTS &&
+           (shift=ws_digit_width(g_esp+0x54u))>0.f) {           /* the label (frame +0x40) */
+            WS_F(g_esp+0x2Cu)+=shift;
+            WS_F(g_esp+8u)-=shift;
+        }
+    }
     original();
 }
 /* WRAP sub_002D40A0 (cdecl pane): update of the weapon slot pane, called by
