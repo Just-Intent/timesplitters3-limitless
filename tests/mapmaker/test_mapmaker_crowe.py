@@ -64,10 +64,19 @@ MUTATIONS = {
     'boss-any-entity': ('    return WORD_AT(a+CRW_ACTOR_RECORD)==crw_lv.record && WORD_AT(CRW_SCENE)', '    return 1 && WORD_AT(CRW_SCENE)'),
     'relocate-none': ('&& !crw_lv.relocated) crw_relocate(ent);', '&& !crw_lv.relocated) {}'),
     'relocate-twice': ('    if(WORD_AT(a+CRW_AI_STATE)==0u && !crw_lv.relocated) crw_relocate(ent);', '    if(WORD_AT(a+CRW_AI_STATE)==0u) crw_relocate(ent);'),
-    'relocate-any-cell': ('        if(WORD_AT(c+0x20u)!=0) continue;                  /* type 0', '        /* type 0'),
-    'relocate-farthest': ('if(bd<0.0f || d<bd) { bd=d;best=c; }', 'if(bd<0.0f || d>bd) { bd=d;best=c; }'),
+    'relocate-any-cell': ('            if(WORD_AT(c+0x20u)!=0) continue;              /* type 0', '            /* type 0'),
+    'relocate-farthest': ('if(bd<0.0f || d<bd) { bd=d;best=c;row=', 'if(bd<0.0f || d>bd) { bd=d;best=c;row='),
     'relocate-size-moved': ('fx[3]={0u,8u,0x10u}', 'fx[3]={0u,8u,0x18u}'),
     'relocate-z-as-x': ('fz[3]={4u,0xCu,0x14u}', 'fz[3]={4u,0xCu,0x10u}'),
+    'start-nearest-centre': ('    if(!(best=crw_start_cell(g,oz,&row,&col))) {', '    if(1) {'),
+    'start-any-type': ('            t=WORD_AT(cell+0x20u)==0;d=', '            t=1;d='),
+    'start-farthest': ('(t==bt && d<bd)) { best=cell;', '(t==bt && d>bd)) { best=cell;'),
+    'start-x-wrong': ('#define CRW_START_X 310.0f', '#define CRW_START_X 300.0f'),
+    'place-none': ('    if(placing) crw_place(ent);\n', ''),
+    'place-only-x': ('crw_setf(ent+CRW_ENT_X,crw_lv.sx);crw_setf(ent+CRW_ENT_X+8u,crw_lv.sz);', 'crw_setf(ent+CRW_ENT_X,crw_lv.sx);'),
+    'place-keeps-index': ('    WORD_AT(st+CRW_START_ROW)=crw_lv.row;WORD_AT(st+CRW_START_COL)=crw_lv.col;\n', ''),
+    'place-flag-kept': ('    crw_lv.place=0;\n    if(WORD_AT(st+CRW_START_ROW)', '    if(WORD_AT(st+CRW_START_ROW)'),
+    'cell-row-by-x': ('        if(!(z>crw_getf(cell+4u) && crw_getf(cell+0xCu)>z)) continue;', '        if(!(x>crw_getf(cell) && crw_getf(cell+8u)>x)) continue;'),
     'relocate-skips-edges': ('    for(k=0;k<CRW_CELLS+1u+CRW_EDGES;k++) {', '    for(k=0;k<CRW_CELLS+1u;k++) {'),
     'relocate-skips-outer': ('k==CRW_CELLS?o:st+CRW_EDGE', 'k==CRW_CELLS?st+CRW_EDGE+0x400u:st+CRW_EDGE'),
     'relocate-unused-edges': ('        if(!WORD_AT(c) && !WORD_AT(c+8u)) continue;        /* an unused edge entry */\n', ''),
@@ -327,6 +336,35 @@ def test_arena_grid_and_floor():
     for va in (0x0049F3CC, 0x0049F3C8, 0x0049F3D8):
         assert readers[va] == {0x0028FE30}
 
+
+
+def test_start_cell():
+    """Stock state 0 puts the boss in the 310.0 column (the hook's start cell)."""
+    a = by_address()
+    rd = xbe_reader()
+    assert struct.unpack('<f', rd(0x0049F3D8, 4))[0] == 310.0
+    # ebp = entity +0x64 (x); state 0 writes 310.0 there before the lookup
+    m = mem(a[0x00290022])[0]
+    assert a[0x00290022].mnemonic == 'lea' and m[1] == 'esi' and m[4] == 0x64
+    assert mem(a[0x00290DC2])[0][4] == 0x0049F3D8
+    m = mem(a[0x00290DD3])[0]
+    assert m[1] == 'ebp' and not m[4]
+    # sub_002A9D00(state+4, ..., x, own z): the second point's cell to +4+0x1194 = +0x1198
+    assert ('imm', 4) in a[0x00290E5E].ops and target(a[0x00290E62]) == 0x002A9D00
+    assert mem(a[0x00290E4C])[0][1] == 'ebp' and mem(a[0x00290E49])[0][4] == 0x6C
+    assert mem(a[0x002A9D19])[0][4] == 0x96C and mem(a[0x002A9D2D])[0][4] == 0x1194
+    assert target(a[0x002A9D37]) == 0x002A9330
+    # the boss's cell index: +0x1198 * 7 + +0x119C
+    assert mem(a[0x00290E6D])[0][4] == 0x1198 and mem(a[0x00290E73])[0][4] == 0x119C
+    assert ('imm', 7) in a[0x00290E79].ops
+    # sub_002A9330: rows by z of each row's first cell (+4, +0xC; 7 cells a row), then x (+0, +8)
+    assert mem(a[0x002A934F])[0][4] == 0xC and ('imm', 0x118) in a[0x002A93A0].ops
+    assert mem(a[0x002A9356])[0][4] == 0xFFFFFFF8 and mem(a[0x002A935C])[0][4] in (0, None)
+    assert mem(a[0x002A9383])[0][4] == 8 and ('imm', 7) in a[0x002A9393].ops
+    assert a[0x002A93AB].mnemonic == 'cmp' and ('imm', 1) in a[0x002A93AB].ops   # written only when found
+    # sub_002A93D0 (the build) starts both cell indices at -1
+    assert ('imm', 0xFFFFFFFF) in a[0x002A93FD].ops
+    assert mem(a[0x002A9400])[0][4] in (0, None) and mem(a[0x002A9409])[0][4] in (0, None)
 
 def test_intro_wait():
     a = by_address()

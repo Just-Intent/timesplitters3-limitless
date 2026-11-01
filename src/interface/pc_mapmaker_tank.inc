@@ -26,9 +26,16 @@
  *    free, mount it with sub_000622D0(path, 0, 1): kept open, entries read on
  *    demand, as chr.pak (0x0006298A). The stock bulk unmount (sub_00062720)
  *    removes it with the rest.
+ *  - request (sub_0015E7C0, story level init, inside the level setup after
+ *    the resource table is built): request the tank, turret and wreck models
+ *    (sub_000A5E40) so the scene loop's load pass (sub_00063390) reads them
+ *    from prop6.pak; a MapMaker map requests only its own objects' models and
+ *    sub_00096410 finds a model only through its request.
  *  - ai_start (sub_0015B830): after the original, for the first pool entry
  *    whose character (a+0x48) is TNK_ID: when the pak is mounted and the
  *    resource map (0x008CA000, moved by the rooms area) has 0x281 (init 0x002560C0), 0x297 and 0x298,
+ *    and each of the three is loaded or its request holds the read file
+ *    (sub_000631C0 -> +0x10; sub_00096410 takes it without a null test),
  *    create the tank at the placeholder's position, facing its yaw:
  *    sub_000A6F90(0x281, &pos, &rot, 0, 0) (pos -> +0x64, rot -> +0xC0/+0x70/
  *    +0xC8, sub_000A6880; the init runs inside, sub_000A6EC0 0x000A6F3A).
@@ -156,7 +163,14 @@
 #define TNK_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define TNK_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
+#define TNK_RES_LOADED 0x4u              /* row: model already loaded */
+#define TNK_RES_PATH 0x10u               /* row: model path ("castle/props/tankboss") */
+#define TNK_RES_LOD 0x14u                /* row: second model path or 0 */
+#define TNK_REQ_DATA 0x10u               /* request (sub_000631C0): loaded file or 0 */
+static const uint32_t tnk_models[3]={TNK_MODEL,TNK_TURRET,TNK_WRECK};
+
 extern void sub_00062260(void),sub_000622D0(void),sub_000A6F90(void),sub_0015DDA0(void);
+extern void sub_000A5E40(void),sub_000631C0(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
 /* Kept for the session: settings, labels and the spawn argument buffer. */
@@ -165,7 +179,7 @@ static struct { int read, optout; uint32_t label, timer, args; unsigned logged; 
 static struct {
     uint32_t obj, place, place_ent, place_rec;
     float d[3], spawn[3];
-    int shifted;
+    int shifted, requested;
     unsigned extras, events, wakes;
 } tnk_lv;
 
@@ -243,6 +257,56 @@ static uint32_t tnk_resource(uint32_t model)
     e=t+(uint32_t)i*0x30u;
     return MAPMAKER_PTR_OK(e,0x30u)?e:0;
 }
+/* A model path the level's load pass has read: its request (sub_000631C0,
+ * keyed by the row's path) holds the file. sub_00096410 takes the request's
+ * data without a null test (0x00096437 -> 0x0009651F), so a model whose
+ * request is missing or empty must not be created. 1: ready. */
+static int tnk_path_ready(uint32_t path,uint32_t *req)
+{
+    uint32_t r;
+    *req=0;
+    if(!path || !MAPMAKER_PTR_OK(path,4u)) return 0;
+    r=guest_call(sub_000631C0,1,path);
+    *req=r;
+    return r && MAPMAKER_PTR_OK(r,0x14u) && WORD_AT(r+TNK_REQ_DATA)!=0;
+}
+/* 0 when the tank, turret and wreck can all be created, else the model that cannot. */
+static uint32_t tnk_models_unready(uint32_t *row,uint32_t *req)
+{
+    uint32_t k,e,path;
+    for(k=0;k<3u;k++) {
+        *row=e=tnk_resource(tnk_models[k]);
+        *req=0;
+        if(!e) return tnk_models[k];
+        if(WORD_AT(e+TNK_RES_LOADED)) continue;            /* loaded before: no file read */
+        if(!tnk_path_ready(WORD_AT(e+TNK_RES_PATH),req)) return tnk_models[k];
+        if((path=WORD_AT(e+TNK_RES_LOD))!=0 && !tnk_path_ready(path,req)) return tnk_models[k];
+    }
+    return 0;
+}
+
+/* WRAP sub_0015E7C0 (story level init, no args; called once by the level
+ * setup sub_001CDB80 at 0x001CDC20). The level's resource rows exist by then
+ * (sub_000A5C00 at 0x001CDBF3 runs the table builder sub_00242BA0 ->
+ * sub_00242780), and the scene loop sub_0003D440 reads every requested file
+ * right after the setup (sub_00063390 at 0x0003D5AD). Models are found only
+ * through those requests (sub_00096410: sub_000631C0, else a lookup by the
+ * bare row path that never matches), and a MapMaker map requests only its
+ * own objects' models: request the tank, turret and wreck here
+ * (sub_000A5E40(model): sub_00063A40 queues the .xbr of the row's path). */
+void pc_mapmaker_tank_request(void (*original)(void))
+{
+    uint32_t k;
+    original();
+    if(!tnk_play() || tnk.optout || tnk_map_has()==0) return;
+    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted at level init: tank models not requested",0,0);return; }
+    for(k=0;k<3u;k++) {
+        if(!tnk_resource(tnk_models[k])) { tnk_log("no resource row: tank models not requested",tnk_models[k],0);return; }
+    }
+    for(k=0;k<3u;k++) guest_call(sub_000A5E40,1,tnk_models[k]);
+    tnk_lv.requested=1;
+    tnk_log("requested the tank, turret and wreck models",TNK_MODEL,TNK_WRECK);
+}
 
 /* WRAP sub_00062790 (the level's pak mounts, no args). */
 void pc_mapmaker_tank_mount(void (*original)(void))
@@ -282,6 +346,15 @@ void pc_mapmaker_tank_ai_start(void (*original)(void))
                 (uint32_t)(int16_t)TNK_H(TNK_RESMAP+TNK_MODEL*2u)+1u,
                 ((uint32_t)(int16_t)TNK_H(TNK_RESMAP+TNK_TURRET*2u)+1u)<<16 | (((uint32_t)(int16_t)TNK_H(TNK_RESMAP+TNK_WRECK*2u)+1u)&0xFFFFu));
         return;
+    }
+    {
+        uint32_t row,req,m=tnk_models_unready(&row,&req);
+        if(m) {
+            tnk_log(tnk_lv.requested?"a tank model was requested but not read: the placeholder stays a bot":
+                                     "tank models not requested this level: the placeholder stays a bot",m,req);
+            tnk_log("its resource row and request data (0 = none)",row,req && MAPMAKER_PTR_OK(req,0x14u)?WORD_AT(req+TNK_REQ_DATA):0);
+            return;
+        }
     }
     for(i=0;i<3u;i++) if(!tnk_sane(pos[i]=tnk_getf(ent+TNK_ENT_POS+i*4u))) { tnk_log("placeholder position unusable",a,i);return; }
     if(!tnk_sane(yaw=tnk_getf(ent+TNK_ENT_YAW))) yaw=0.0f;

@@ -30,9 +30,13 @@
  *    +0x18/+0x1C half size, +0x20 type), the outer rectangle at +0xEE8 and
  *    14 edge rectangles at +0xF60, in world x 283.45..326.71, z 61.2..100.7.
  *    State 0 puts the boss on the centre of its cell (0x00290E81/0x00290EAF);
- *    every move is to a cell centre. relocate: on its first frame the whole
- *    grid is moved in x/z so the type-0 cell nearest the arena's centre is
- *    under the Story AI's spawn point.
+ *    every move is to a cell centre. The start cell is the one holding
+ *    (310.0, the boss's z) (0x00290DC2: x = [0x0049F3D8] = 310.0; lookup
+ *    sub_002A9D00 -> sub_002A9330 into +0x1198/+0x119C, -1 from the build
+ *    when no cell holds it). relocate: on its first frame the whole grid is
+ *    moved in x/z so the start cell (the 310.0 column's platform nearest the
+ *    arena's centre) is centred on the Story AI's spawn point, and the
+ *    first frame ends with the boss on the spawn point and that cell.
  *  - Floor height 86 (mission 10): the death puts the boss at (310.49, 86,
  *    80.95) (0x002922FB..0x0029231D); the falling hazards (+0x11A0, eight
  *    0x168 objects: spawned at y 86 by sub_002AB1B0 from 0x00291E7F, moved by
@@ -76,6 +80,7 @@
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax, g_xbox_mem_offset,
  * pc_mapmaker_area_enabled and pc_mapmaker_limits.inc. Hot hooks (hud, meter,
  * fx: every frame) test a fixed value first. */
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -102,6 +107,11 @@
 #define CRW_GRID 0x970u                 /* 35 cells of 0x28 */
 #define CRW_CELLS 35u
 #define CRW_CELL 0x28u
+#define CRW_ROWS 5u                     /* rows by z, 7 columns by x */
+#define CRW_COLS 7u
+#define CRW_START_ROW 0x1198u           /* the boss's cell (state 0 start, moves) */
+#define CRW_START_COL 0x119Cu
+#define CRW_START_X 310.0f              /* 0x0049F3D8: stock state 0 x */
 #define CRW_OUTER 0xEE8u
 #define CRW_EDGE 0xF60u                 /* 14 rectangles, to +0x1190 */
 #define CRW_EDGES 14u
@@ -167,8 +177,9 @@ static struct {
 static struct {
     uint32_t state, record, actor;
     uint8_t boss;
-    int relocated, removed, shifted;
-    float dx, dy, dz;
+    int relocated, removed, shifted, place;
+    uint32_t row, col;                  /* the start cell */
+    float dx, dy, dz, sx, sz;           /* grid offset, spawn point */
     uint32_t saved[CRW_NCONST];
 } crw_lv;
 
@@ -317,10 +328,50 @@ static int crw_boss(uint32_t ent)
     return WORD_AT(a+CRW_ACTOR_RECORD)==crw_lv.record && WORD_AT(CRW_SCENE)==100u && crw_on();
 }
 
-/* Move the arena grid under the spawn point (x/z), note the floor offset. */
+/* sub_002A9330 (grid, x, z, out): the row whose first cell holds z strictly
+ * in (+4, +0xC), then that row's cell holding x strictly in (+0, +8); no
+ * write when either is missing (sub_002A93D0 leaves the -1 of the build). */
+static int crw_cell_at(uint32_t g,float x,float z,uint32_t *row,uint32_t *col)
+{
+    uint32_t r,c,cell;
+    for(r=0;r<CRW_ROWS;r++) {
+        cell=g+r*CRW_COLS*CRW_CELL;
+        if(!(z>crw_getf(cell+4u) && crw_getf(cell+0xCu)>z)) continue;
+        for(c=0;c<CRW_COLS;c++) {
+            cell=g+(r*CRW_COLS+c)*CRW_CELL;
+            if(x>crw_getf(cell) && crw_getf(cell+8u)>x) { *row=r;*col=c;return 1; }
+        }
+        return 0;
+    }
+    return 0;
+}
+/* The start cell: stock state 0 (0x00290DC2..0x00290EAF) sets the boss's x
+ * to 310.0 (0x0049F3D8, ebp = entity+0x64 at 0x00290022), looks up the cell of
+ * (that x, its own z) into state+0x1198/+0x119C (sub_002A9D00 -> sub_002A9330)
+ * and puts the boss on that cell's centre. So the start is in the 310.0
+ * column: take that column's cell (a type-0 platform first) nearest the
+ * arena's centre in z whose centre the lookup maps back to it. */
+static uint32_t crw_start_cell(uint32_t g,float oz,uint32_t *row,uint32_t *col)
+{
+    uint32_t r,c,best=0,br=0,bc=0,cell,rr,cc;
+    float bd=-1.0f,d;
+    int bt=0,t;
+    for(r=0;r<CRW_ROWS;r++)
+        for(c=0;c<CRW_COLS;c++) {
+            cell=g+(r*CRW_COLS+c)*CRW_CELL;
+            if(!(CRW_START_X>crw_getf(cell) && crw_getf(cell+8u)>CRW_START_X)) continue;
+            if(!crw_cell_at(g,CRW_START_X,crw_getf(cell+0x14u),&rr,&cc) || rr!=r || cc!=c) continue;
+            t=WORD_AT(cell+0x20u)==0;d=crw_getf(cell+0x14u)-oz;d*=d;
+            if(!best || t>bt || (t==bt && d<bd)) { best=cell;br=r;bc=c;bt=t;bd=d; }
+        }
+    *row=br;*col=bc;
+    return best;
+}
+/* Move the arena grid so the boss's start cell is centred on the spawn point
+ * (x/z), note the floor offset. */
 static void crw_relocate(uint32_t ent)
 {
-    uint32_t st=crw_lv.state,g=st+CRW_GRID,o=st+CRW_OUTER,c,best=0,k;
+    uint32_t st=crw_lv.state,g=st+CRW_GRID,o=st+CRW_OUTER,c,best=0,k,row=0,col=0;
     float sx=crw_getf(ent+CRW_ENT_X),sy=crw_getf(ent+CRW_ENT_X+4u),sz=crw_getf(ent+CRW_ENT_X+8u);
     float ox=crw_getf(o+0x10u),oz=crw_getf(o+0x14u),bd=-1.0f,d,dx,dz;
     static const uint32_t fx[3]={0u,8u,0x10u},fz[3]={4u,0xCu,0x14u};
@@ -329,13 +380,17 @@ static void crw_relocate(uint32_t ent)
         crw_log("split Crowe spawn or arena not a usable point; mission 10 coordinates kept",WORD_AT(ent+CRW_ENT_X),WORD_AT(o+0x10u));
         return;
     }
-    for(k=0;k<CRW_CELLS;k++) {
-        c=g+k*CRW_CELL;
-        if(WORD_AT(c+0x20u)!=0) continue;                  /* type 0: a full platform */
-        dx=crw_getf(c+0x10u)-ox;dz=crw_getf(c+0x14u)-oz;d=dx*dx+dz*dz;
-        if(bd<0.0f || d<bd) { bd=d;best=c; }
+    if(!(best=crw_start_cell(g,oz,&row,&col))) {
+        for(k=0;k<CRW_CELLS;k++) {                     /* no cell holds 310.0: the start is set after the call */
+            c=g+k*CRW_CELL;
+            if(WORD_AT(c+0x20u)!=0) continue;              /* type 0: a full platform */
+            dx=crw_getf(c+0x10u)-ox;dz=crw_getf(c+0x14u)-oz;d=dx*dx+dz*dz;
+            if(bd<0.0f || d<bd) { bd=d;best=c;row=k/CRW_COLS;col=k%CRW_COLS; }
+        }
+        crw_log("split Crowe: no arena cell holds the stock start x; start cell set after the first frame",st,row*CRW_COLS+col);
     }
     if(!best) { crw_log("split Crowe arena has no platform cell; mission 10 coordinates kept",st,0);return; }
+    crw_lv.row=row;crw_lv.col=col;crw_lv.sx=sx;crw_lv.sz=sz;crw_lv.place=1;
     crw_lv.dx=sx-crw_getf(best+0x10u);crw_lv.dz=sz-crw_getf(best+0x14u);crw_lv.dy=sy-CRW_FLOOR;
     for(k=0;k<CRW_CELLS+1u+CRW_EDGES;k++) {
         unsigned j;
@@ -346,9 +401,23 @@ static void crw_relocate(uint32_t ent)
             crw_setf(c+fz[j],crw_getf(c+fz[j])+crw_lv.dz);
         }
     }
-    fprintf(stderr,"[mapmaker] crowe: arena moved by (%.2f, %.2f), floor %.2f (mission 10: 86)\n",
-            (double)crw_lv.dx,(double)crw_lv.dz,(double)sy);
+    fprintf(stderr,"[mapmaker] crowe: arena moved by (%.2f, %.2f), floor %.2f (mission 10: 86), start cell %u,%u at the spawn (%.2f, %.2f)\n",
+            (double)crw_lv.dx,(double)crw_lv.dz,(double)sy,(unsigned)row,(unsigned)col,(double)sx,(double)sz);
     fflush(stderr);
+}
+/* After the first state-0 frame: the boss stands at the spawn point on its
+ * start cell. Stock already does so when the start cell holds 310.0; anything
+ * else (no such cell: index -1 reads cell -8) is put right here. */
+static void crw_place(uint32_t ent)
+{
+    uint32_t st=crw_lv.state,xb=WORD_AT(ent+CRW_ENT_X);
+    float x=crw_getf(ent+CRW_ENT_X),z=crw_getf(ent+CRW_ENT_X+8u);
+    crw_lv.place=0;
+    if(WORD_AT(st+CRW_START_ROW)==crw_lv.row && WORD_AT(st+CRW_START_COL)==crw_lv.col &&
+       fabsf(x-crw_lv.sx)<0.05f && fabsf(z-crw_lv.sz)<0.05f) return;
+    WORD_AT(st+CRW_START_ROW)=crw_lv.row;WORD_AT(st+CRW_START_COL)=crw_lv.col;
+    crw_setf(ent+CRW_ENT_X,crw_lv.sx);crw_setf(ent+CRW_ENT_X+8u,crw_lv.sz);
+    crw_log("split Crowe start put back on the spawn point (start cell, stock x bits)",crw_lv.row*CRW_COLS+crw_lv.col,xb);
 }
 /* Shift (on) or restore (off) the arena constants. A constant that does not
  * hold its stock bits is left alone. */
@@ -374,6 +443,7 @@ static void crw_shift(int on)
 void pc_mapmaker_crowe_fight(void (*original)(void))
 {
     uint32_t ent,a,player;
+    int placing;
     if(!crw_lv.record || !MAPMAKER_STACK_OK(8) || !crw_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
     a=WORD_AT(ent+CRW_ENT_AI);
     if(WORD_AT(a+CRW_AI_STATE)==0x12u) {                  /* defeated: stock waits for the level script */
@@ -387,6 +457,7 @@ void pc_mapmaker_crowe_fight(void (*original)(void))
         return;
     }
     if(WORD_AT(a+CRW_AI_STATE)==0u && !crw_lv.relocated) crw_relocate(ent);
+    placing=crw_lv.place && WORD_AT(a+CRW_AI_STATE)==0u;
     if(WORD_AT(a+CRW_AI_STATE)==1u) {                     /* no intro cutscene in MapMaker */
         WORD_AT(a+0x9D4u)=1u;WORD_AT(a+CRW_AI_STATE)=2u;WORD_AT(a+0x9D0u)=2u;crw_setf(a+0x9D8u,0.0f);
         crw_log("split Crowe: no intro cutscene; the fight starts",a,0);
@@ -394,6 +465,7 @@ void pc_mapmaker_crowe_fight(void (*original)(void))
     crw_shift(1);
     original();
     crw_shift(0);
+    if(placing) crw_place(ent);
 }
 
 /* WRAP sub_0028DD50 (cdecl entity): 86.0 is a distance threshold here. */
