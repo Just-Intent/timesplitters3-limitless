@@ -222,6 +222,12 @@
  *    (sub_00059DD0), and a walker that was never animated never finishes,
  *    so while its controller has no animation the wake-up starts the roar
  *    with state 2's own call sub_0005F460(entity, 0x6F7, 0, 1.0), once.
+ *    After the roar, state 4 fights only with both guns active (state
+ *    +0x4CC/+0x52C), which only state 0x12 sets (after a stun at the
+ *    stage-1 threshold, reached by hits in the walker's back). Stage 1 is a
+ *    standoff in state 0x13, so once per level, standing there in stage 1
+ *    with both guns off, the walker gets the request AI +0x9D0 = 0x12: the
+ *    stock gun deployment, then the walking, turning and firing fight.
  *  - hud, meter and the bigdraw area treat model 0x637 like the others. */
 #include <stdio.h>
 #include <stdlib.h>
@@ -346,6 +352,13 @@
 #define RBS_ANIM_ALT 0x12Cu             /* blend target animation, 0 = none */
 #define RBS_ANIM_ALT_DONE 0x17Cu        /* its finished flag (sub_00059DD0 when +0x12C is set) */
 #define RBS_ANIM_SIZE 0x184u
+#define RBS_WALK_ARM 0x12u              /* after a stun: guns deployed (sub_00294B90 at 0x0029CAF0), then state 4 */
+#define RBS_WALK_STANDOFF 0x13u         /* waits until both guns are active (0x0029C933) */
+#define RBS_WALK_GUN1 0x4CCu            /* state: gun 1 active (1) or not (0) */
+#define RBS_WALK_GUN2 0x52Cu            /* state: gun 2 active */
+#define RBS_WALK_TURN 0x590u            /* state: turn to apply, -1/1 x 59.5 degrees (0x0029CA42) */
+#define RBS_WALK_STUN_AT 0x584u         /* state: stage-1 health that triggers the stun (0x00298AB5) */
+#define RBS_WALK_MOVES 40u              /* fight-state changes logged per level */
 #define RBS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBS_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -365,7 +378,7 @@ static struct {
  * and the one spawn record that holds the boss class. */
 static struct { uint32_t state, parts, record; unsigned extras, events, throws, deaths, skipped, fire; float floor; int floor_set; } rbs_skel;
 /* The Crow walker of this level: its state block, spawn record and pool entry. */
-static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx, seen, ticks, beats, woken, roars; } rbs_walk;
+static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx, seen, ticks, beats, woken, roars, armed, moves; uint32_t last; } rbs_walk;
 
 static void rbs_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -924,8 +937,9 @@ static void rbs_walk_heartbeat(void)
         cur=WORD_AT(ctl+RBS_ANIM_CUR);alt=WORD_AT(ctl+RBS_ANIM_ALT);
         done=WORD_AT(ctl+(alt?RBS_ANIM_ALT_DONE:RBS_ANIM_DONE));
     }
-    fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: animation 0x%X (blend 0x%X, finished %u), state request %d\n",
-            rbs_walk.beats,(unsigned)cur,(unsigned)alt,(unsigned)done,(int)WORD_AT(a+RBS_WALK_AI_NEXT));
+    fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: animation 0x%X (blend 0x%X, finished %u), state request %d, yaw %.0f, turn %d, guns %u/%u, stun at %.1f\n",
+            rbs_walk.beats,(unsigned)cur,(unsigned)alt,(unsigned)done,(int)WORD_AT(a+RBS_WALK_AI_NEXT),(double)rbs_getf(ent+0x70u),
+            (int)WORD_AT(st+RBS_WALK_TURN),(unsigned)WORD_AT(st+RBS_WALK_GUN1),(unsigned)WORD_AT(st+RBS_WALK_GUN2),(double)rbs_getf(st+RBS_WALK_STUN_AT));
     fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: stage %u, fight state %u, target 0x%X, aim %.0f, entity +0x20 %u, at (%.1f, %.1f, %.1f), health %.1f, class 0x%X/0x%X\n",
             rbs_walk.beats,(unsigned)RBS_B(st+RBS_WALK_STAGE),(unsigned)WORD_AT(a+RBS_WALK_AI_STATE),(unsigned)WORD_AT(a+4u),
             (double)rbs_getf(st+0xE4u),(unsigned)WORD_AT(ent+0x20u),(double)rbs_getf(ent+0x64u),(double)rbs_getf(ent+0x68u),
@@ -962,12 +976,59 @@ static void rbs_walk_heartbeat(void)
  * never had an animation (+0xD4 and +0x12C both 0), the roar is started with
  * the stock call state 2 itself makes: sub_0005F460(entity, 0x6F7, 0, 1.0).
  * When it ends, state 2 sees it finished and current, and enters the fight. */
+/* Every change of the walker's fight state (AI +0x20), 40 per level: where
+ * it goes and what it sees (user request after v0.4.0-mapmaker.25: show
+ * exactly where the fight stops). Log only. */
+static void rbs_walk_track(uint32_t a,uint32_t ent,uint32_t st)
+{
+    uint32_t s=WORD_AT(a+RBS_WALK_AI_STATE),ctl=WORD_AT(ent+4u);
+    if(s==rbs_walk.last || rbs_walk.moves>=RBS_WALK_MOVES) return;
+    rbs_walk.moves++;
+    fprintf(stderr,"[mapmaker] realbosses: Crow walker fight state %u -> %u: stage %u, animation 0x%X, yaw %.0f, aim %.0f, turn %d, guns %u/%u, health %.1f (stun at %.1f), request %d\n",
+            (unsigned)rbs_walk.last,(unsigned)s,(unsigned)RBS_B(st+RBS_WALK_STAGE),
+            MAPMAKER_PTR_OK(ctl,RBS_ANIM_SIZE)?(unsigned)WORD_AT(ctl+RBS_ANIM_CUR):0u,(double)rbs_getf(ent+0x70u),
+            (double)rbs_getf(st+0xE4u),(int)WORD_AT(st+RBS_WALK_TURN),(unsigned)WORD_AT(st+RBS_WALK_GUN1),
+            (unsigned)WORD_AT(st+RBS_WALK_GUN2),(double)rbs_getf(st+0x580u),(double)rbs_getf(st+RBS_WALK_STUN_AT),
+            (int)WORD_AT(a+RBS_WALK_AI_NEXT));
+    fflush(stderr);
+    rbs_walk.last=s;
+}
+
+/* The walker's guns (user report, v0.4.0-mapmaker.25: "still won't turn to
+ * face me"). After the roar, state 4 (0x0029B696) runs the walking and
+ * turning fight only while both guns are active (state +0x4CC and +0x52C ==
+ * 1); otherwise it goes to state 0x13 (0x0029BC6F/0x0029BE76), which only
+ * waits for both to be 1 (0x0029C933). The level init never sets them: only
+ * sub_00294B90 does (0x00294C1C..0x00294CC3), called once by state 0x12 when
+ * an animation ends (0x0029CAF0), and the damage code clears a destroyed gun
+ * (sub_00298570). State 0x12 is requested by the damage code when stage-1
+ * health (+0x580) drops to +0x584, with the stun 0x6F6 and stage 2
+ * (0x00298ACA..0x00298B01); stage-1 damage counts only for hits on the
+ * walker's back (sub_00295150: the hit direction against its facing). So
+ * stage 1 is a standoff: the walker stands without turning until shot in
+ * the back, which mission 13 arranges with its arena and 180 turns. In a
+ * MapMaker map it faced the player and never left it. Once per level, when
+ * it first stands in state 0x13 in stage 1 with both guns off and no request
+ * pending, request state 0x12 (AI +0x9D0): when the current animation ends
+ * the guns are deployed by the stock sub_00294B90 and state 4 runs the fight
+ * (turns 8/9, walking, firing). Back hits and the stun keep working. */
+static void rbs_walk_arm(uint32_t a,uint32_t ent,uint32_t st)
+{
+    if(rbs_walk.armed || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_STANDOFF || (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)>=0 ||
+       WORD_AT(st+RBS_WALK_GUN1) || WORD_AT(st+RBS_WALK_GUN2)) return;
+    rbs_walk.armed++;
+    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ARM;
+    rbs_log("Crow walker guns deployed: the stage-1 standoff (hits in its back only) skipped; turn, walk and fire",a,ent);
+}
+
 static void rbs_walk_wake(void)
 {
     uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state,s,ctl,r;
     if(!a || !st || WORD_AT(RBS_WALK_STATE)!=st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE) || !MAPMAKER_PTR_OK(a,RBS_ACTOR) ||
        WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;
+    rbs_walk_track(a,ent,st);
     if(RBS_B(st+RBS_WALK_STAGE)!=1u) return;
+    rbs_walk_arm(a,ent,st);
     s=WORD_AT(a+RBS_WALK_AI_STATE);
     if(s==RBS_WALK_WAIT && (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)<0) {
         WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;

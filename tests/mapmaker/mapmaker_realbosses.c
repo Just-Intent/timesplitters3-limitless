@@ -927,7 +927,41 @@ int main(void)
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);                /* refused: logged, not retried */
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
         CHECK(nanim==3 && rbs_walk.roars==1u);
-        anim_ok=1;WORD_AT(ENT(8)+4u)=0;nfx=f0;
+        anim_ok=1;WORD_AT(ENT(8)+4u)=0;
+        /* the guns: standing in state 0x13 in stage 1 with both guns off -> state 0x12 once */
+        WORD_AT(A(8)+0x20u)=0x13u;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;BYTE_AT(WKST+0x98u)=1u;
+        WORD_AT(WKST+0x4CCu)=1u;WORD_AT(WKST+0x52Cu)=0;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu && rbs_walk.last==0x13u);        /* gun 1 active */
+        WORD_AT(WKST+0x4CCu)=0;WORD_AT(WKST+0x52Cu)=1u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* gun 2 active */
+        WORD_AT(WKST+0x52Cu)=0;BYTE_AT(WKST+0x98u)=2u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* stage 2: stock */
+        BYTE_AT(WKST+0x98u)=1u;WORD_AT(A(8)+0x9D0u)=5u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==5u);                                          /* a request pending */
+        WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;WORD_AT(A(8)+0x20u)=4u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu && rbs_walk.last==4u);           /* not standing */
+        WORD_AT(A(8)+0x20u)=0x13u;WORD_AT(0x0079094Cu)=81u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* mission 13 */
+        WORD_AT(0x0079094Cu)=100u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE90u,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* other caller */
+        WORD_AT(A(8)+0xBF0u)=REC(9);
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* slot reused */
+        WORD_AT(A(8)+0xBF0u)=REC(8);
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0x12u && rbs_walk.armed==1u && rbs_walk.last==0x13u);
+        WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu && nanim==3u);                    /* once a level, no roar */
+        CHECK(rbs_walk.moves>=3u);
+        WORD_AT(WKST+0x4CCu)=0;WORD_AT(WKST+0x52Cu)=0;nfx=f0;
         WORD_AT(A(8)+0x20u)=0;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;
         /* HUD and meter as the other real bosses */
         WORD_AT(PLAYER+0xFF4u)=ENT(8);

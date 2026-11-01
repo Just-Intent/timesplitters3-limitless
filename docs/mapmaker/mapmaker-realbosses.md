@@ -372,6 +372,46 @@ No new wrapper. The area now calls `sub_0005F460`; its link stub is added to
 animation 0x6F7, then the fight state reaching 4 and beyond (turns 8/9, walking, firing). If
 the roar is refused, the log names it.
 
+### Stage 1 is a standoff (fixed after v0.4.0-mapmaker.25)
+
+User report (mapmaker.25): "Crow walker still won't turn to face me." Static analysis
+(CONFIRMED by decode, `test_walker_guns_gate_the_fight`; the log for this build was not
+available yet):
+
+- **How it turns:** state 4 (0x0029B696) sends it to state 8 when the aim error |+0xE4|
+  exceeds 60. State 8 plays `crowewalkerturnleft`/`right` 0x6F4/0x6F5 while it is still above 40 and
+  enters state 9 (else back to state 4). When that animation ends, state 9 sets +0x590 to ±1. That turns the yaw
+  (entity +0x70, copied to +0xC4) by 59.5 degrees (0x0029CA42..0x0029CABF). The yaw changes
+  only through these finished turn animations.
+- **Why it never turned:** state 4 runs its walking and turning code only while both guns are
+  active (state +0x4CC and +0x52C == 1). Otherwise it goes to state 0x13
+  (0x0029BC6F -> 0x0029BE76, edi = 0x13 from 0x0029B1EC). State 0x13 (0x0029C933) only waits
+  for both guns.
+  - The level init never sets the guns (`sub_002976F0`, `sub_00297690`, `sub_002971D0`,
+    `sub_00296000`, `sub_00296BD0`).
+  - Only `sub_00294B90` does (ecx = 1 at 0x00294C1C), called once, by state 0x12 when an
+    animation ends (0x0029CAF0). The damage code clears a destroyed gun.
+  - State 0x12 is requested by the damage code (`sub_00298570`, from the damage callback
+    `sub_00298BA0`): when stage-1 health +0x580 falls to +0x584 (60 -> 40, or 50 -> 35 at the
+    easiest setting), with the stun `crowewalkerstun` 0x6F6 and stage 2 (0x00298AB5..0x00298B01).
+  - Stage-1 hits count only in the walker's back: `sub_00295150` needs the hit direction
+    against its facing below -0.75 (0x0047DE84).
+- So stage 1 is a standoff in state 0x13: the walker stands without turning until shot in the
+  back to the stun. Mission 13 arranges this with its arena and the 180 turns (INFERRED). In a
+  MapMaker map the walker faces the player and never leaves stage 1.
+- The animations are not the problem: lv81's ids 0x6B9..0x6FC collide with none of lv1_2,
+  lv1_3, lv1_6, lv14 or the 44 global `pak/anim` tables (checked against every registration
+  table). They are registered whenever lv81.pak is mounted (0x001CA92C).
+
+| change | what it does |
+|---|---|
+| `_fx` wake-up, guns | once per level: when the walker stands in state 0x13 in stage 1 with both guns off and no request pending, request state 0x12 (AI +0x9D0). When the current animation ends, the stock `sub_00294B90` deploys the guns and state 4 runs the fight (turns 8/9, walking, firing). Back hits and the stun keep working. Logged once: `Crow walker guns deployed: the stage-1 standoff ... skipped` |
+| fight-state log | every change of the fight state, 40 per level: `Crow walker fight state A -> B: stage, animation, yaw, aim, turn, guns, health (stun at), request` |
+| heartbeat | the animation line also shows the yaw (+0x70), turn (+0x590), guns and stun threshold |
+
+INFERRED, needs a playtest: walking and gun fire on MapMaker tiles; destroyed guns send it back
+to state 0x13 until the next stun, as in stock.
+
 ## The Crow walker (story mission 13)
 
 User request (2026-11-01): the Crow walker and tank bosses next. The walker
