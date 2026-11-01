@@ -98,7 +98,14 @@ MUTATIONS = {
     'intro-next-stale': ('WORD_AT(a+CRW_AI_STATE)=2u;WORD_AT(a+0x9D0u)=2u;', 'WORD_AT(a+CRW_AI_STATE)=2u;'),
     'remove-missing': ('        guest_call(sub_0015DDA0,1,ent);\n', ''),
     'remove-twice': ('        crw_lv.removed=1;\n', ''),
-    'remove-runs-original': ('        crw_log("split Crowe defeated: removed",a,ent);\n        MAPMAKER_GUEST_RET();', '        crw_log("split Crowe defeated: removed",a,ent);\n        original();'),
+    'remove-at-once': ('        if(WORD_AT(CRW_LIVE) && crw_lv.fading<CRW_FADE_MAX) return;\n', ''),
+    'remove-never': ('        if(WORD_AT(CRW_LIVE) && crw_lv.fading<CRW_FADE_MAX) return;', '        if(1) return;'),
+    'remove-no-cap': ('        if(WORD_AT(CRW_LIVE) && crw_lv.fading<CRW_FADE_MAX) return;', '        if(WORD_AT(CRW_LIVE)) return;'),
+    'death-smokes-on': ('        WORD_AT(crw_lv.state+CRW_PARTS_ON)=0;\n', ''),
+    'death-parts-lost': ('        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;\n', ''),
+    'death-no-original': ('        crw_shift(1);\n        original();\n        crw_shift(0);\n        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;', '        MAPMAKER_GUEST_RET();\n        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;'),
+    'death-unshifted': ('        crw_shift(1);\n        original();\n        crw_shift(0);\n        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;', '        original();\n        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;'),
+    'fx-after-removal': ('    int here=crw_lv.state && !crw_lv.removed && MAPMAKER_STACK_OK(4)', '    int here=crw_lv.state && MAPMAKER_STACK_OK(4)'),
     'remove-focus-kept': ('WORD_AT(player+CRW_FOCUS)==ent) WORD_AT(player+CRW_FOCUS)=0;', 'WORD_AT(player+CRW_FOCUS)==ent) {}'),
     'part-original': ('        guest_call(sub_000EFBD0,8,', '        original();g_esp-=4u;guest_call(sub_000EFBD0,8,'),
     'part-position': ('crw_lv.state+CRW_SHOT+part*CRW_PART_STRIDE', 'crw_lv.state+CRW_SHOT'),
@@ -477,3 +484,22 @@ def test_draw_hud_and_meter_sites():
     assert mem(a[0x00290F6E])[0][4] == 0x268
     # the meter's only caller
     assert calls_to(0x0013A400) == {0x0014D25F} and ends(a, 0x0014D25F) == 0x0014D264
+
+
+def test_death_effects():
+    """After the death the fight call still updates the particles; smoke follows the parts mask."""
+    a = by_address()
+    # every fight call, before the state switch (0x00290D98): the particle update with the emit mask
+    assert target(a[0x00290D3E]) == 0x002A7D60 and a[0x00290D3E].address < 0x00290D98
+    assert mem(a[0x00290C0F])[0][4] == 0x2E00 and a[0x00290C17].mnemonic == 'je'   # mask built only while +0x2E00
+    assert ('imm', 0x42C80000) in a[0x00290D17].ops
+    # sub_002A7D60 recounts the live particles in [0x0078B0CC] and ages them (+0x18)
+    assert mem(a[0x002A7D8A])[0][4] == 0x0078B0CC and mem(a[0x002A7E95])[0][4] == 0x0078B0CC
+    assert mem(a[0x002A7DA6])[0][4] == 0x18
+    # +0x2E00: 0x2F at the fight start, 0 only in state 0 (0x00290E43) and the init; the death leaves it
+    writes = {i.address for i in decoded() if i.mnemonic == 'mov' and mem(i) and mem(i)[0][4] == 0x2E00
+              and i.ops[0][0] == 'mem' and 0x0028D0C0 <= i.address < 0x00292430}
+    assert writes == {0x0028D2AA, 0x00290E43, 0x002911D0, 0x002913EB}
+    assert ('imm', 0x2F) in a[0x002911D0].ops and ('imm', 0x2F) in a[0x002913EB].ops
+    # the draw: hazards, parts, sparks and the shared particles, all from sub_0028D710
+    assert target(a[0x0028D9D0]) == 0x002A8FC0 and target(a[0x0028DA03]) == 0x002A7F30
