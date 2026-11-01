@@ -25,6 +25,10 @@
  *   original runs. Records 58..67 are used by no level table entry (87 entries
  *   at 0x00515FF8 checked), so story levels never read the copy; it is undone
  *   at the next scene-100 setup.
+ * Extra skies (table mapmaker_sky_extras, pc_mapmaker_skymusic.inc): a map
+ * with an extra sky row whose pak is mounted this level uses that story
+ * record; the cloud hook then sets the level's sky to it while the original
+ * runs and patches nothing (the record keeps its own cloud fields).
  * The stock game ignores the flag: such a map loads there with its sky and no
  * clouds. Requires the includer's WORD_AT, guest_call, g_esp,
  * mapmaker_limits/mapmaker_limits_read and MAPMAKER_PTR_OK
@@ -46,6 +50,37 @@
 #define MAPMAKER_SKY_RET_LOADER_RESET 0x00301B4Fu /* sub_00301A90 -> sub_002FEBF0 */
 #define MAPMAKER_SKY_RET_SETTINGS_BIND 0x00313888u /* sub_003133E0 -> sub_00078560(&editor+0x21C) */
 
+/* Extra skies (docs/mapmaker/mapmaker-sky-music.md): story and arcade sky
+ * records whose model is in a level pak MapMaker play does not mount. The
+ * map keeps a MapMaker sky (fallback) in info +0x10 for stock builds and the
+ * row number 1..17 in info flag bits 19..23; pc_mapmaker_skymusic.inc mounts
+ * the pak and makes the map start use the record. */
+#define MAPMAKER_SKY_EXTRA_SHIFT 19u
+#define MAPMAKER_SKY_EXTRA_MASK 0x00F80000u
+static const struct mapmaker_sky_extra {
+    int sky, fallback;        /* sky table record; MapMaker sky stock builds get */
+    const char *pak, *label;
+} mapmaker_sky_extras[]={
+    { 5,64,"pak/arcade/l_20_ar.pak","Story: Cold Night"},
+    {35,58,"pak/arcade/l_59_ar.pak","Story: Castle"},
+    {39,63,"pak/cutscene/l_33_cs.pak","Story: Train"},
+    {41,60,"pak/arcade/l_38_ar.pak","Arcade: Virtua"},
+    {42,67,"pak/arcade/l_29_ar.pak","Arcade: Prison"},
+    {43,61,"pak/challenge/l_64_ch.pak","Story: Time to Split"},
+    {44,61,"pak/story/l_81_st.pak","Story: Nemo"},
+    {45,59,"pak/arcade/l_46_ar.pak","Arcade: Venice"},
+    {46,61,"pak/cutscene/l_40_cs.pak","Story: Street War"},
+    {47,62,"pak/arcade/l_48_ar.pak","Arcade: Vietnam"},
+    {48,62,"pak/arcade/l_49_ar.pak","Arcade: Temple"},
+    {49,60,"pak/arcade/l_15_ar.pak","Arcade: Spaceport"},
+    {50,63,"pak/challenge/l_76_ch.pak","Story: Depot"},
+    {51,64,"pak/arcade/l_53_ar.pak","Arcade: Sniper"},
+    {52,61,"pak/challenge/l_66_ch.pak","Story: NF1"},
+    {56,66,"pak/arcade/l_25_ar.pak","Arcade: Chinese"},
+    {57,59,"pak/arcade/l_39_ar.pak","Arcade: Horror"},
+};
+#define MAPMAKER_SKY_EXTRA_COUNT ((uint32_t)(sizeof mapmaker_sky_extras/sizeof mapmaker_sky_extras[0]))
+
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 extern void sub_00079D60(void),sub_0007D4F0(void),sub_00078560(void);
 
@@ -53,6 +88,7 @@ static struct {
     uint32_t storage;   /* guest: +0 checkbox value, +4 "Clouds" */
     uint32_t editor;    /* editor object the state below belongs to */
     int live, bound, value;
+    int extra_ready;    /* this level's extra-sky pak is mounted (pc_mapmaker_skymusic.inc) */
     int have_pristine, patched;
     uint32_t pristine[MAPMAKER_SKY_LAST-MAPMAKER_SKY_FIRST+1][MAPMAKER_SKY_CLOUD_WORDS];
     unsigned long long no_storage, no_info, applied;
@@ -160,11 +196,22 @@ void pc_mapmaker_sky_compile(void (*original)(void))
     else WORD_AT(info+0x244u)&=~MAPMAKER_SKY_FLAG_CLOUDS;
 }
 
-/* The map's effective sky: info +0x10 if not negative, else the tileset's. */
+/* The map's extra sky row (1..MAPMAKER_SKY_EXTRA_COUNT), or 0: none, an
+ * unknown row, or this level's pak is not mounted. */
+static uint32_t mapmaker_sky_extra_of(uint32_t info)
+{
+    uint32_t k=(WORD_AT(info+0x244u)&MAPMAKER_SKY_EXTRA_MASK)>>MAPMAKER_SKY_EXTRA_SHIFT;
+    return k<=MAPMAKER_SKY_EXTRA_COUNT && mapmaker_sky.extra_ready?k:0u;
+}
+
+/* The map's effective sky: an extra sky, else info +0x10 if not negative,
+ * else the tileset's. */
 static int mapmaker_sky_index(uint32_t info)
 {
     int sky=(int16_t)(WORD_AT(info+0x10u)&0xFFFFu);
     uint32_t tileset=WORD_AT(info+0x08u)>>16;      /* word +0x0A */
+    uint32_t extra=mapmaker_sky_extra_of(info);
+    if(extra) return mapmaker_sky_extras[extra-1u].sky;
     if(sky>=0) return sky;
     if(tileset>=6u) return -1;
     return (int)(WORD_AT(MAPMAKER_SKY_TILESETS+tileset*0x58u)>>16&0xFFu);
@@ -188,6 +235,16 @@ void pc_mapmaker_sky_clouds(void (*original)(void))
     if(mapmaker_sky_scene()!=100u) { original();return; }
     mapmaker_sky_restore();
     info=mapmaker_sky_on()?mapmaker_sky_info(WORD_AT(0x00784014u)):0u;
+    if(info && mapmaker_sky_extra_of(info)) {
+        /* An extra (story) sky keeps its own cloud fields: never patched,
+         * the level's sky is that record while the original reads it. */
+        sky=mapmaker_sky_index(info);
+        old=WORD_AT(MAPMAKER_SKY_LEVEL+0x10u);
+        WORD_AT(MAPMAKER_SKY_LEVEL+0x10u)=(uint32_t)sky;
+        original();
+        WORD_AT(MAPMAKER_SKY_LEVEL+0x10u)=old;
+        return;
+    }
     if(!info || !(WORD_AT(info+0x244u)&MAPMAKER_SKY_FLAG_CLOUDS)) { original();return; }
     sky=mapmaker_sky_index(info);
     if(sky<MAPMAKER_SKY_FIRST || sky>MAPMAKER_SKY_LAST) {
