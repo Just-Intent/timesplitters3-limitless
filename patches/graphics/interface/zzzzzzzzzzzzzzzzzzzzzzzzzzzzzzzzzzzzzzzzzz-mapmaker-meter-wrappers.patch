@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,2114 @@
+@@ -1037,6 +1037,2147 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1673,6 +1673,39 @@
 +    else sub_0028D0A0_gen();
 +#else
 +    sub_0028D0A0_gen();
++#endif
++}
++
++extern void sub_0023FF20_gen(void);
++void sub_0023FF20(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_tag")) pc_mapmaker_realbosses_tag(sub_0023FF20_gen);
++    else sub_0023FF20_gen();
++#else
++    sub_0023FF20_gen();
++#endif
++}
++
++extern void sub_00126560_gen(void);
++void sub_00126560(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_fx")) pc_mapmaker_realbosses_fx(sub_00126560_gen);
++    else sub_00126560_gen();
++#else
++    sub_00126560_gen();
++#endif
++}
++
++extern void sub_002895A0_gen(void);
++void sub_002895A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_face")) pc_mapmaker_realbosses_face(sub_002895A0_gen);
++    else sub_002895A0_gen();
++#else
++    sub_002895A0_gen();
 +#endif
 +}
 +

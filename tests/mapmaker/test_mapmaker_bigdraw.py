@@ -28,7 +28,8 @@ EXPECTED = '\n'.join([
 
 # Each mutation breaks one contract the fixture must detect.
 MUTATIONS = {
-    'any-model': ('if((model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY) || ', 'if('),
+    'any-model': ('if((model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY && model!=BIGDRAW_WALKER) || ', 'if('),
+    'walker-left-out': (' && model!=BIGDRAW_WALKER) || ', ') || '),
     'skeleton-only': ('model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY', 'model!=BIGDRAW_SKELETON'),
     'trophy-only': ('model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY', 'model!=BIGDRAW_TROPHY'),
     'any-type': (' || WORD_AT(prop+BIGDRAW_TYPE)!=BIGDRAW_CHARACTER) return;', ') return;'),

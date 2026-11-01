@@ -1,11 +1,11 @@
-# MapMaker real story bosses: the giant trophy monster and the giant skeleton
+# MapMaker real story bosses: the giant trophy monster, the giant skeleton and the Crow walker
 
 Status: implemented in `src/interface/pc_mapmaker_realbosses.inc` (area
 `realbosses`), fixture-tested (`tests/mapmaker/test_mapmaker_realbosses.py`:
-95 mutations, plus decode and US XBE data checks of every site below). The
-creature was played in v0.4.0-mapmaker.5 (user: working); the floating-meter
-fix, the health display choice, "Boss Off = no health" and the giant
-skeleton ([below](#the-giant-skeleton-mansion-boss)) are not built or played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
+130 mutations, plus decode and US XBE data checks of every site below). The
+creature was played in v0.4.0-mapmaker.5 (user: working), the giant skeleton
+in v0.4.0-mapmaker.13 (user: working; its death fix is in .15); the Crow
+walker ([below](#the-crow-walker-story-mission-13)) is not played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
 `TSFP_MAPMAKER_REAL_BOSS=0` keeps the creature on the normal bot AI (stage 1).
 
 User report (2026-10-31): the trophy monster from story mission 5 is much
@@ -243,6 +243,68 @@ spoofed scene during aiming, the fight's untraced reliance on mansion script
 state, the throw target point (state +0x4164, filled by `sub_00159150`),
 collision on tiles.
 
+### Height and the throw (fixed after v0.4.0-mapmaker.16)
+
+User report (mapmaker.16): the skeleton hovered one floor above its spawn,
+part of its body stretched across the map, and the game froze right after its
+feeble throw fired (log: last line `giant skeleton feeble throw fired`, then
+no guest frame; both real bosses in slots 11 and 12). CONFIRMED (decode,
+`test_skeleton_floor_site`): every frame `sub_0029CEF0` sets the entity's
+height +0x68 to 0, the mission 5 courtyard floor (`xorps xmm6` 0x0029D067,
+store 0x0029D06B), right before its facing step `sub_002895A0` (call
+0x0029D070, return 0x0029D075; the catacombs fight calls it at 0x0029E523).
+A MapMaker floor is at another height, so the boss stood at height 0.
+
+| WRAP | what it does |
+|---|---|
+| `sub_0029FE00` princess | on the boss's first fight frame, notes its spawn height (+0x68), logged once per level (`giant skeleton floor height`) |
+| `sub_002895A0` -> `pc_mapmaker_realbosses_face` | return 0x0029D075 only, the boss in scene 100: height = the noted spawn height before the original |
+| `sub_00287E20` throw (fire) | a throw whose origin or direction (state +0x413C, six floats) is not finite or lies beyond +-100000 is skipped (phase 2, logged); every throw (first 8 per level) logs its origin, direction and the boss height |
+
+INFERRED: the stretching came from the same mismatch (the body drawn at height
+0 while parts follow the spawn floor). The freeze is not explained yet: if it
+recurs, wait more than 60 s before closing the game so the hang watchdog
+writes a report, and send the throw lines.
+
+## The Crow walker (story mission 13)
+
+User request (2026-11-01): the Crow walker and tank bosses next. The walker
+is a character, so it follows the giant skeleton's recipe; the tank is a
+level prop (research `logs/limits/features/real-bosses.md` section 4) and is
+not done yet. CONFIRMED (decode and US XBE data, `test_walker_*`):
+
+| | value |
+|---|---|
+| character id | 0x64 (character table: voice set 0x00539948, model 0x637 `chrs/walkercrow`, no LOD; not story-only flagged); no Arcade row |
+| picker | synthetic row 152 "Crow Walker", text 0x52420064; preview stand-in the Arcade giant robot (id 0xA8, row 90) |
+| behaviour | class 0x100000: `sub_0027D590` 0x0027DD2A -> `sub_002998E0(entity)` (call 0x0027DE5A, its only caller); no scene test in the fight, its only direct callee that reads the scene is the level event `sub_002274C0` |
+| death | message handler `sub_0029CBF0` (0x0027D426): message 2 plays `crowewalkerdeath` 0x6F9 and sets anim state 0x14 in every scene; no message hook needed |
+| animations | `pak/stream/lv81/anim/lv81.pak` (string 0x0049D9A8, 94 KB, registered at 0x001CA92C from table 0x00484F68: `crowewalker*` 0x6EE..0x6FC plus five scene props); no id shared with lv1_3 or lv1_6 |
+| per-level state | `sub_002976F0` (stock from `sub_0025F720` only in scene 81): `sub_002A8300` (effect blocks `[0x0078B090]`/`[0x0078B098]`), `sub_002A62C0` (the particle block `[0x0078B0D0]` the skeleton also uses), `[0x0078B1E8]` = `sub_0003DFA0(0x64DC, 1)`, then `sub_00297690` sets every field |
+
+The fight steers from the entity's own position and the players
+(`[0x007B0C48]`); no arena coordinate was found in its state or code.
+
+| WRAP | what it does (scene 100 story, `TSFP_MAPMAKER_LIMITS=1`) |
+|---|---|
+| picker_end, pick, highlight, row_of, row_text, text | row 152 / id 0x64 as rows 150/151 |
+| `sub_001C8540` anims | also mounts lv81.pak when the map's set (slots 1-20) holds 0x64 |
+| `sub_0025F720` level | before the skeleton's: clears `[0x0078B1E8]` and calls the stock `sub_002976F0` (about 59 KB of level heap with its effect blocks) |
+| `sub_0015B830` ai_start | one walker per map gets record class 0/0x100000 when lv81.pak is mounted and this level's state exists; notes it for the Boss bar, meter and HUD as the others |
+| `sub_0023FF20` -> `pc_mapmaker_realbosses_tag` | the fight's first frame looks up the level object tagged `WELL` (0x57454C4C, call 0x0029B32C, ret 0x0029B331) and writes its +0x28 without a null test (0x0029B349; again at the end of its death, 0x0029CB3A). A MapMaker map has none: that call gets a zeroed 0x2E8-byte stand-in object (heap, reused, zeroed per lookup). A real object is returned unchanged |
+| `sub_002274C0` event | level event 1 after its intro (ret 0x0029AEBE, 0x0029B120) and event 2 when the death animation ends (ret 0x0029CB80) are the map's own logic markers: dropped. At event 2 the walker is removed with `sub_0015DDA0` (the skeleton's stock death call) and a story focus on it is cleared; mission 13 runs its ending instead |
+| `sub_00126560` -> `pc_mapmaker_realbosses_fx` | the frame `sub_001CEBC0` draws the walker's beams (`sub_0029CCB0`) only in scene 81 (0x001CEE8C), right after `sub_00126560` (call 0x001CEE87, its only caller): after the original, with this level's walker state, called in scene 100 too |
+| hud, meter, bigdraw | model 0x637 like 0x5E9/0x5BE: Boss Off = no health, Boss bar = the bosses bar, Sub-boss = the meter; drawn over the whole view |
+
+Risks (INFERRED, need a playtest): movement on MapMaker tiles and pads
+(the walker is large and may not fit through tile doorways), the jumps
+(`crowewalkerjumpleft/right`) against tile walls, collision radius, what the
+stand-in `WELL` would have shown (the fight only toggles its flag 0x40 and
+moves its +0x68), beam visuals in scene 100, a walker and a skeleton in the
+same map sharing the particle block `[0x0078B0D0]` (both valid; the walker's
+emitter shape `sub_002A62F0` is set first, the skeleton's after). Not built
+or played.
+
 ## Whole height on screen
 
 User report (v0.4.0-mapmaker.11): the giant skeleton is visible only up to
@@ -387,3 +449,14 @@ stubs). No extension memory.
    view`, once). From inside a closed tile it shows only through doorways,
    not through walls or the ceiling. Same for the Giant Trophy Monster.
    Without `TSFP_MAPMAKER_LIMITS=1` it is clipped as before.
+9. Crow walker: in a custom set slot pick "Crow Walker" (after Giant
+   Skeleton; preview shows the giant robot), give one Story AI that slot and
+   play in Story. stderr: `set check found: ... Crow walker slot N`,
+   `mounted lv81.pak for the Crow walker`, `Crow walker state allocated`,
+   `Crow walker gets its story AI (class 0x100000)`, then `no WELL object in
+   a MapMaker map; stand-in used` and `Crow walker effects drawn`. Check it
+   walks, turns, jumps and fires its beams at you; with the Boss bar, empty
+   it: death animation, then it disappears (`Crow walker defeated:
+   removed`, `Crow walker level event dropped`), logic markers unchanged.
+   A second Crow walker AI fights as a bot (`only one Crow walker per map`).
+   Mission 13 still plays stock.

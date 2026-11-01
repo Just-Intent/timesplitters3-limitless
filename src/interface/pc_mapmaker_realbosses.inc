@@ -179,7 +179,41 @@
  *    boss = the meter (record made at 0x0029D101). meter treats it like the
  *    deerbeast.
  *  - Not drawn in scene 100: the boss's dust particles (sub_0029CE00, called
- *    by the frame sub_001CEBC0 only in scenes 1 and 17, 0x001CEE31/42). */
+ *    by the frame sub_001CEBC0 only in scenes 1 and 17, 0x001CEE31/42).
+ *
+ * The Crow walker of story mission 13 (scene 81, nemoend; CONFIRMED, US XBE
+ * data and tests): character id 0x64 (character table: voice set 0x00539948,
+ * model 0x637 chrs/walkercrow, no LOD; not story-only flagged), no Arcade row;
+ * picker row RBS_WALK_ROW (152) "Crow Walker", preview stand-in the Arcade
+ * giant robot (id 0xA8). Behaviour: class 0x100000 (sub_0027D590 0x0027DD2A ->
+ * call sub_002998E0(entity) at 0x0027DE5A, no scene test); its message handler
+ * sub_0029CBF0 (0x0027D426) plays the death animation 0x6F9 in every scene, so
+ * no message hook is needed. Anims: pak/stream/lv81/anim/lv81.pak (string
+ * 0x0049D9A8, 94 KB, registered at 0x001CA92C). Per-level state: sub_002976F0
+ * (stock from sub_0025F720 only in scene 81, 0x0025F79A): sub_002A8300 (an
+ * effect block, [0x0078B090]/[0x0078B098]), sub_002A62C0 (the particle block
+ * [0x0078B0D0] the skeleton also uses), [0x0078B1E8] = sub_0003DFA0(0x64DC, 1),
+ * then sub_00297690 sets every field. The fight works from the entity's own
+ * position and the players ([0x007B0C48]); it reads no arena coordinate.
+ *  - level: as the skeleton's, with sub_002976F0; ai_start gives one
+ *    spawn record per level class 0/0x100000.
+ *  - tag (sub_0023FF20(tag) -> object or 0): its first frame looks up the
+ *    level object tagged 'WELL' (0x57454C4C, call 0x0029B32C, return
+ *    0x0029B331) and writes its +0x28 without a null test (0x0029B343), as does
+ *    the end of its death (0x0029CB34); a MapMaker map has no such object. For
+ *    that call in scene 100, a zeroed stand-in object (0x2E8 bytes, heap) is
+ *    returned instead of 0; only the walker reads it (+0x28 flag 0x40, +0x68).
+ *  - event: level event 1 at the end of its intro (returns 0x0029AEBE and
+ *    0x0029B120) and event 2 when its death animation has ended (0x0029CB80)
+ *    are the map's own logic markers in MapMaker: dropped. At the second, the
+ *    walker is removed with sub_0015DDA0 (as the skeleton's stock death does,
+ *    0x0029E069; mission 13 plays its ending instead) and the story focus is
+ *    cleared if it is the walker.
+ *  - fx (sub_00126560, called by the frame sub_001CEBC0 at 0x001CEE87, its
+ *    only caller): the frame draws the walker's beams (sub_0029CCB0) only in
+ *    scene 81 (0x001CEE8C); after the original, in scene 100 with this
+ *    level's walker state, it is called too.
+ *  - hud, meter and the bigdraw area treat model 0x637 like the others. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -268,25 +302,48 @@
 #define RBS_SKEL_THROW 6u               /* action type: feeble throw */
 #define RBS_SKEL_PHASE 0x4160u          /* state: 0 aim, 1 fire, 2 done */
 #define RBS_SKEL_SHOT 0x413Cu           /* state: origin (+0), direction (+0xC), effect (+0x18) */
+#define RBS_ENT_Y 0x68u                /* entity position +0x64 x, +0x68 y (up), +0x6C z */
+#define RBS_RET_FACE 0x0029D075u        /* sub_0029CEF0: height = 0 at 0x0029D06B, call sub_002895A0 at 0x0029D070 */
 #define RBS_MSG_DEATH 2u                /* sub_0015DB20: message 2 = killed */
 #define RBS_RET_EVENT 0x0029E068u      /* sub_0029CEF0: call sub_002274C0(3, 0) at 0x0029E063 */
+/* the Crow walker */
+#define RBS_WALK_ID 0x64u
+#define RBS_WALK_MODEL 0x637u           /* chrs/walkercrow, no LOD */
+#define RBS_WALK_ROW 152u
+#define RBS_WALK_TEXT 0x52420064u
+#define RBS_WALK_LABEL "Crow Walker"
+#define RBS_WALK_STANDIN 0xA8u          /* Arcade giant robot: preview stand-in */
+#define RBS_WALK_PAK 0x0049D9A8u        /* "pak/stream/lv81/anim/lv81.pak" */
+#define RBS_WALK_CLASS 0x100000u        /* record +4 -> AI +0x14: sub_002998E0 */
+#define RBS_WALK_STATE 0x0078B1E8u      /* 0x64DC bytes, sub_002976F0 */
+#define RBS_WALK_STATE_SIZE 0x64DCu
+#define RBS_WALK_TAG 0x57454C4Cu        /* 'WELL' */
+#define RBS_RET_WELL 0x0029B331u        /* sub_002998E0: call sub_0023FF20 at 0x0029B32C */
+#define RBS_OBJ_SIZE 0x2E8u             /* level object (table [0x0072F5E8], stride 0x2E8) */
+#define RBS_RET_WALK_INTRO 0x0029AEBEu  /* event 1 (call 0x0029AEB9) */
+#define RBS_RET_WALK_INTRO2 0x0029B120u /* event 1 (call 0x0029B11B) */
+#define RBS_RET_WALK_DONE 0x0029CB80u   /* event 2 (call 0x0029CB7B): death animation ended */
+#define RBS_RET_FX 0x001CEE8Cu          /* sub_001CEBC0: call sub_00126560 at 0x001CEE87 */
 #define RBS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBS_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 extern void sub_00079D60(void),sub_00071630(void),sub_00071C70(void),sub_0005A130(void),sub_00062260(void);
 extern void sub_00287E00(void),sub_0029CEF0(void),sub_00286D30(void),sub_00059DB0(void),sub_000EA9C0(void),sub_0010EB90(void);
+extern void sub_002976F0(void),sub_0015DDA0(void),sub_0029CCB0(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
     int read, optout;
-    uint32_t label, skel_label;
+    uint32_t label, skel_label, walk_label, well;
     unsigned logged, meters;
     struct { uint32_t record; uint8_t boss; } real[RBS_REAL_MAX];
 } rbs;
 /* The giant skeleton of this level: its state blocks (0 = none this level)
  * and the one spawn record that holds the boss class. */
-static struct { uint32_t state, parts, record; unsigned extras, events, throws, deaths; } rbs_skel;
+static struct { uint32_t state, parts, record; unsigned extras, events, throws, deaths, skipped; float floor; int floor_set; } rbs_skel;
+/* The Crow walker of this level: its state block, spawn record and pool entry. */
+static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx; } rbs_walk;
 
 static void rbs_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -332,6 +389,17 @@ static uint32_t rbs_skel_label(void)
     }
     return rbs.skel_label;
 }
+static uint32_t rbs_walk_label(void)
+{
+    if(!rbs.walk_label) {
+        uint32_t p=xbox_HeapAlloc(sizeof RBS_WALK_LABEL,4u);
+        if(p && MAPMAKER_PTR_OK(p,sizeof RBS_WALK_LABEL)) {
+            memcpy((void *)((uintptr_t)p+g_xbox_mem_offset),RBS_WALK_LABEL,sizeof RBS_WALK_LABEL);
+            rbs.walk_label=p;
+        } else rbs_log("no memory for the Crow walker label",(uint32_t)sizeof RBS_WALK_LABEL,0);
+    }
+    return rbs.walk_label;
+}
 static uint32_t rbs_arcade_row(uint32_t id)
 {
     uint32_t i;
@@ -344,6 +412,7 @@ static uint32_t rbs_preview_row(uint32_t row)
 {
     if(row==RBS_ROW) return rbs_trophy_row();
     if(row==RBS_SKEL_ROW) return rbs_arcade_row(RBS_SKEL_STANDIN);
+    if(row==RBS_WALK_ROW) return rbs_arcade_row(RBS_WALK_STANDIN);
     return row;
 }
 
@@ -361,6 +430,10 @@ void pc_mapmaker_realbosses_picker_end(void (*original)(void))
             guest_call(sub_00079D60,6,text,RBS_SKEL_ROW,RBS_PICK_FLAGS,0u,RBS_PICK_CB,0u);
             guest_call(sub_00071C70,2,guest_call(sub_00071630,0),0u);
         }
+        if((text=rbs_walk_label())!=0) {
+            guest_call(sub_00079D60,6,text,RBS_WALK_ROW,RBS_PICK_FLAGS,0u,RBS_PICK_CB,0u);
+            guest_call(sub_00071C70,2,guest_call(sub_00071630,0),0u);
+        }
     }
     original();
 }
@@ -376,8 +449,10 @@ void pc_mapmaker_realbosses_pick(void (*original)(void))
         s=RBS_SLOTS+k*RBS_SLOT_STRIDE;
         if(WORD_AT(s+0x14u)==RBS_ROW) id=RBS_ID;
         else if(WORD_AT(s+0x14u)==RBS_SKEL_ROW) id=RBS_SKEL_ID;
+        else if(WORD_AT(s+0x14u)==RBS_WALK_ROW) id=RBS_WALK_ID;
         else continue;
-        if(WORD_AT(s)!=id) rbs_log(id==RBS_ID?"slot set to the giant trophy monster":"slot set to the giant skeleton",k,id);
+        if(WORD_AT(s)!=id) rbs_log(id==RBS_ID?"slot set to the giant trophy monster":
+                                   id==RBS_SKEL_ID?"slot set to the giant skeleton":"slot set to the Crow walker",k,id);
         WORD_AT(s)=id;
         WORD_AT(s+0x18u)=0xFFFFFFFFu;
     }
@@ -394,9 +469,9 @@ void pc_mapmaker_realbosses_highlight(void (*original)(void))
 void pc_mapmaker_realbosses_row_of(void (*original)(void))
 {
     uint32_t ret,row,id;
-    if(!MAPMAKER_STACK_OK(16) || ((id=WORD_AT(g_esp+4u))!=RBS_ID && id!=RBS_SKEL_ID) || !rbs_editor()) { original();return; }
+    if(!MAPMAKER_STACK_OK(16) || ((id=WORD_AT(g_esp+4u))!=RBS_ID && id!=RBS_SKEL_ID && id!=RBS_WALK_ID) || !rbs_editor()) { original();return; }
     ret=WORD_AT(g_esp);
-    row=id==RBS_ID?RBS_ROW:RBS_SKEL_ROW;
+    row=id==RBS_ID?RBS_ROW:id==RBS_SKEL_ID?RBS_SKEL_ROW:RBS_WALK_ROW;
     if(ret==RBS_RET_RELOAD || (ret==RBS_RET_NAME && WORD_AT(g_esp+12u)==RBS_RET_NAME_OUTER)) {}
     else if(ret==RBS_RET_PREVIEW1 || ret==RBS_RET_PREVIEW2) row=rbs_preview_row(row);
     else { original();return; }
@@ -408,9 +483,9 @@ void pc_mapmaker_realbosses_row_of(void (*original)(void))
 void pc_mapmaker_realbosses_row_text(void (*original)(void))
 {
     uint32_t row;
-    if(!MAPMAKER_STACK_OK(8) || ((row=WORD_AT(g_esp+4u))!=RBS_ROW && row!=RBS_SKEL_ROW) || !rbs_editor() ||
-       !(row==RBS_ROW?rbs_label():rbs_skel_label())) { original();return; }
-    g_eax=row==RBS_ROW?RBS_TEXT:RBS_SKEL_TEXT;
+    if(!MAPMAKER_STACK_OK(8) || ((row=WORD_AT(g_esp+4u))!=RBS_ROW && row!=RBS_SKEL_ROW && row!=RBS_WALK_ROW) || !rbs_editor() ||
+       !(row==RBS_ROW?rbs_label():row==RBS_SKEL_ROW?rbs_skel_label():rbs_walk_label())) { original();return; }
+    g_eax=row==RBS_ROW?RBS_TEXT:row==RBS_SKEL_ROW?RBS_SKEL_TEXT:RBS_WALK_TEXT;
     MAPMAKER_GUEST_RET();
 }
 
@@ -428,6 +503,11 @@ void pc_mapmaker_realbosses_text(void (*original)(void))
     }
     if(id==RBS_SKEL_TEXT) {
         g_eax=rbs.skel_label?rbs.skel_label:RBS_EMPTY_TEXT;
+        MAPMAKER_GUEST_RET();
+        return;
+    }
+    if(id==RBS_WALK_TEXT) {
+        g_eax=rbs.walk_label?rbs.walk_label:RBS_EMPTY_TEXT;
         MAPMAKER_GUEST_RET();
         return;
     }
@@ -456,10 +536,10 @@ void pc_mapmaker_realbosses_model_request(void (*original)(void))
  * 0x0023F462..0x0023F46D); any other index plays a preset/profile set.
  * 1: custom set read, *t / *s = first slot (1-based) of the trophy monster /
  * the skeleton or 0; 0: not the map's set; -1: unreadable. */
-static int rbs_set_scan(uint32_t *t,uint32_t *s)
+static int rbs_set_scan(uint32_t *t,uint32_t *s,uint32_t *w)
 {
     uint32_t container=WORD_AT(RBS_CONTAINER),c,end,steps,info=0,isz=0,extra=0,n,k,id;
-    *t=*s=0;
+    *t=*s=*w=0;
     if(!container || !MAPMAKER_PTR_OK(container,RBS_SCAN) || WORD_AT(container)!=RBS_MAGIC) return -1;
     c=container+8u;end=container+RBS_SCAN;
     for(steps=0;steps<0x40000u && end-c>=8u;steps++) {
@@ -477,11 +557,13 @@ static int rbs_set_scan(uint32_t *t,uint32_t *s)
     if(RBS_INFO_MEMBERS+n*4u>isz) n=(isz-RBS_INFO_MEMBERS)/4u;
     for(k=0;k<n;k++) {
         id=RBS_H(info+RBS_INFO_MEMBERS+k*4u);
+        if(id==RBS_WALK_ID && !*w) *w=k+1u;
         if(id==RBS_ID && !*t) *t=k+1u;
         if(id==RBS_SKEL_ID && !*s) *s=k+1u;
     }
     for(k=0;extra && k<RBS_B(extra+3u);k++) {          /* slots 11-20 */
         id=RBS_H(extra+4u+k*4u);
+        if(id==RBS_WALK_ID && !*w) *w=RBS_INFO_SLOTS+k+1u;
         if(id==RBS_ID && !*t) *t=RBS_INFO_SLOTS+k+1u;
         if(id==RBS_SKEL_ID && !*s) *s=RBS_INFO_SLOTS+k+1u;
     }
@@ -490,27 +572,28 @@ static int rbs_set_scan(uint32_t *t,uint32_t *s)
 /* 1: the map's custom set has the id; 0: it has not; -1: unreadable. */
 static int rbs_map_has(uint32_t id)
 {
-    uint32_t t,s;
-    int r=rbs_set_scan(&t,&s);
+    uint32_t t,s,w;
+    int r=rbs_set_scan(&t,&s,&w);
     if(r<=0) return r;
-    return (id==RBS_ID?t:s)!=0;
+    return (id==RBS_ID?t:id==RBS_SKEL_ID?s:w)!=0;
 }
 /* What the set check found, for the log (own small budget, once per level hook). */
 static void rbs_set_report(const char *where)
 {
     static unsigned n;
-    uint32_t t,s;
-    int r=rbs_set_scan(&t,&s);
+    uint32_t t,s,w;
+    int r=rbs_set_scan(&t,&s,&w);
     if(n>=12u) return;
     n++;
-    if(r<0) fprintf(stderr,"[mapmaker] realbosses: %s set check: map container unreadable; both real bosses assumed\n",where);
+    if(r<0) fprintf(stderr,"[mapmaker] realbosses: %s set check: map container unreadable; every real boss assumed\n",where);
     else if(!r) fprintf(stderr,"[mapmaker] realbosses: %s set check: not the map's own set; no real boss\n",where);
-    else fprintf(stderr,"[mapmaker] realbosses: %s set check found: giant trophy monster %s%u, giant skeleton %s%u\n",where,
-                 t?"slot ":"none ",(unsigned)t,s?"slot ":"none ",(unsigned)s);
+    else fprintf(stderr,"[mapmaker] realbosses: %s set check found: giant trophy monster %s%u, giant skeleton %s%u, Crow walker %s%u\n",where,
+                 t?"slot ":"none ",(unsigned)t,s?"slot ":"none ",(unsigned)s,w?"slot ":"none ",(unsigned)w);
     fflush(stderr);
 }
 static int rbs_pak_mounted(void) { return (int32_t)guest_call(sub_00062260,1,RBS_PAK)!=-1; }
 static int rbs_skel_pak_mounted(void) { return (int32_t)guest_call(sub_00062260,1,RBS_SKEL_PAK)!=-1; }
+static int rbs_walk_pak_mounted(void) { return (int32_t)guest_call(sub_00062260,1,RBS_WALK_PAK)!=-1; }
 
 /* WRAP sub_001C8540 (mount the level's anim paks; names registered next). */
 void pc_mapmaker_realbosses_anims(void (*original)(void))
@@ -527,6 +610,14 @@ void pc_mapmaker_realbosses_anims(void (*original)(void))
             rbs_log("pak mount table full; the giant skeleton keeps the bot behaviour",mounted,RBS_MOUNT_MAX);
         else if(!guest_call(sub_0005A130,1,RBS_SKEL_PAK)) rbs_log("lv1_6.pak did not mount; bot behaviour",mounted,(uint32_t)has);
         else rbs_log(has<0?"mounted lv1_6.pak (map container unreadable)":"mounted lv1_6.pak for the giant skeleton",mounted+1u,0);
+    }
+    if((has=rbs_map_has(RBS_WALK_ID))!=0) {
+        rbs_walk_label();
+        if(rbs_walk_pak_mounted()) {}
+        else if((mounted=WORD_AT(RBS_MOUNTS))+RBS_MOUNT_KEEP>RBS_MOUNT_MAX)
+            rbs_log("pak mount table full; the Crow walker keeps the bot behaviour",mounted,RBS_MOUNT_MAX);
+        else if(!guest_call(sub_0005A130,1,RBS_WALK_PAK)) rbs_log("lv81.pak did not mount; bot behaviour",mounted,(uint32_t)has);
+        else rbs_log(has<0?"mounted lv81.pak (map container unreadable)":"mounted lv81.pak for the Crow walker",mounted+1u,0);
     }
     if((has=rbs_map_has(RBS_ID))==0) return;
     rbs_label();                                       /* the bar label, off the HUD path */
@@ -548,8 +639,19 @@ void pc_mapmaker_realbosses_level(void (*original)(void))
     uint32_t st,pt;
     original();
     memset(&rbs_skel,0,sizeof rbs_skel);              /* a new level: nothing of the last one */
+    memset(&rbs_walk,0,sizeof rbs_walk);
     if(!rbs_play() || rbs.optout) return;
     rbs_set_report("level init");
+    if((has=rbs_map_has(RBS_WALK_ID))!=0) {           /* before the skeleton: both share [0x0078B0D0] */
+        WORD_AT(RBS_WALK_STATE)=0;
+        guest_call(sub_002976F0,0);
+        st=WORD_AT(RBS_WALK_STATE);
+        if(!st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) rbs_log("no level memory for the Crow walker; bot behaviour",st,0);
+        else {
+            rbs_walk.state=st;
+            rbs_log(has<0?"Crow walker state allocated (map container unreadable)":"Crow walker state allocated",st,0);
+        }
+    }
     if((has=rbs_map_has(RBS_SKEL_ID))==0) return;
     WORD_AT(RBS_SKEL_STATE)=0;WORD_AT(RBS_SKEL_PARTS)=0;   /* stale pointers of an earlier level */
     guest_call(sub_00287E00,0);
@@ -570,13 +672,40 @@ static int rbs_skel_boss(uint32_t ent)
     return WORD_AT(a+RBS_ACTOR_RECORD)==rbs_skel.record && WORD_AT(RBS_SCENE)==100u && rbs_on();
 }
 
+static float rbs_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)a+g_xbox_mem_offset),4);return f; }
+static void rbs_setf(uint32_t a,float f) { memcpy((void *)((uintptr_t)a+g_xbox_mem_offset),&f,4); }
+static int rbs_sane(float f) { return f==f && f>-100000.0f && f<100000.0f; }
+/* The skeleton's floor: its spawn height, read on the fight's first frame
+ * (user report, v0.4.0-mapmaker.16: it hovered one floor up). */
+static void rbs_skel_floor(uint32_t ent)
+{
+    float y;
+    if(rbs_skel.floor_set || !rbs_sane(y=rbs_getf(ent+RBS_ENT_Y))) return;
+    rbs_skel.floor=y;rbs_skel.floor_set=1;
+    fprintf(stderr,"[mapmaker] realbosses: giant skeleton floor height %.2f (mission 5 forces 0)\n",(double)y);
+    fflush(stderr);
+}
+
 /* WRAP sub_0029FE00 (cdecl entity; class 0x20000): the mansion variant for
  * the boss in scene 100. sub_0029CEF0 pops the return address at [g_esp]
  * (the lifted tail jump does the same call). */
 void pc_mapmaker_realbosses_princess(void (*original)(void))
 {
     if(!rbs_skel.record || !MAPMAKER_STACK_OK(8) || !rbs_skel_boss(WORD_AT(g_esp+4u))) { original();return; }
+    rbs_skel_floor(WORD_AT(g_esp+4u));
     sub_0029CEF0();
+}
+
+/* WRAP sub_002895A0 (cdecl entity; the fight's facing step). Every frame the
+ * mansion fight sets the entity's height to 0, the courtyard floor
+ * (0x0029D06B), right before this call (0x0029D070, return 0x0029D075); a
+ * MapMaker floor is elsewhere. For the boss in scene 100: its spawn height. */
+void pc_mapmaker_realbosses_face(void (*original)(void))
+{
+    uint32_t ent;
+    if(!rbs_skel.floor_set || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=RBS_RET_FACE || !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
+    rbs_setf(ent+RBS_ENT_Y,rbs_skel.floor);
+    original();
 }
 
 /* WRAP sub_0028D0A0 (cdecl entity, message, a, b; the class 0x20000 message
@@ -625,18 +754,78 @@ void pc_mapmaker_realbosses_throw(void (*original)(void))
     }
     if(phase==1) {                                     /* fire, in the real scene */
         shot=st+RBS_SKEL_SHOT;
+        if(!rbs_sane(rbs_getf(shot)) || !rbs_sane(rbs_getf(shot+4u)) || !rbs_sane(rbs_getf(shot+8u)) ||
+           !rbs_sane(rbs_getf(shot+0xCu)) || !rbs_sane(rbs_getf(shot+0x10u)) || !rbs_sane(rbs_getf(shot+0x14u))) {
+            WORD_AT(st+RBS_SKEL_PHASE)=2u;                 /* no throw from a broken aim */
+            if(rbs_skel.skipped++<4u) rbs_log("giant skeleton throw skipped: aim not a usable point",WORD_AT(shot),WORD_AT(shot+0xCu));
+            MAPMAKER_GUEST_RET();
+            return;
+        }
         guest_call(sub_000EA9C0,12,0x34u,shot,shot+0xCu,0x3E99999Au,ent,a,2u,1u,WORD_AT(ent+0x34u),0xEu,0xCu,0x3DCCCCCDu);
         guest_call(sub_0010EB90,2,WORD_AT(shot+0x18u),0u);
         WORD_AT(st+RBS_SKEL_PHASE)=2u;
-        if(!rbs_skel.throws++) rbs_log("giant skeleton feeble throw fired",ent,a);
+        if(rbs_skel.throws++<8u) {
+            fprintf(stderr,"[mapmaker] realbosses: giant skeleton feeble throw fired from (%.1f, %.1f, %.1f) dir (%.2f, %.2f, %.2f), boss at height %.1f\n",
+                    (double)rbs_getf(shot),(double)rbs_getf(shot+4u),(double)rbs_getf(shot+8u),(double)rbs_getf(shot+0xCu),
+                    (double)rbs_getf(shot+0x10u),(double)rbs_getf(shot+0x14u),(double)rbs_getf(ent+RBS_ENT_Y));
+            fflush(stderr);
+        }
     }
     MAPMAKER_GUEST_RET();                              /* done: scene 1 returns (0x00287FD7) */
+}
+
+/* The Crow walker's death animation has ended: remove it (sub_0015DDA0, the
+ * skeleton's stock death call) and drop a story focus that is still on it. */
+static void rbs_walk_remove(void)
+{
+    uint32_t a=rbs_walk.actor,ent,player=WORD_AT(RBS_PLAYER);
+    rbs_walk.actor=0;
+    if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record ||
+       !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;
+    if(MAPMAKER_PTR_OK(player,RBS_FOCUS+4u) && WORD_AT(player+RBS_FOCUS)==ent) WORD_AT(player+RBS_FOCUS)=0;
+    guest_call(sub_0015DDA0,1,ent);
+    rbs_log("Crow walker defeated: removed",a,ent);
+}
+
+/* WRAP sub_0023FF20 (cdecl tag -> level object or 0): the walker's 'WELL'. */
+void pc_mapmaker_realbosses_tag(void (*original)(void))
+{
+    uint32_t p;
+    if(!rbs_walk.record || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=RBS_RET_WELL || WORD_AT(g_esp+4u)!=RBS_WALK_TAG) { original();return; }
+    original();
+    if(g_eax || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;
+    if(!rbs.well) {
+        p=xbox_HeapAlloc(RBS_OBJ_SIZE,16u);
+        if(p && MAPMAKER_PTR_OK(p,RBS_OBJ_SIZE)) rbs.well=p;
+        else { rbs_log("no memory for the Crow walker's WELL stand-in",RBS_OBJ_SIZE,0);return; }
+    }
+    memset((void *)((uintptr_t)rbs.well+g_xbox_mem_offset),0,RBS_OBJ_SIZE);
+    g_eax=rbs.well;
+    if(!rbs_walk.wells++) rbs_log("Crow walker: no WELL object in a MapMaker map; stand-in used",rbs.well,0);
+}
+
+/* WRAP sub_00126560 (frame step before the scene-81 beam draw at 0x001CEE8C). */
+void pc_mapmaker_realbosses_fx(void (*original)(void))
+{
+    int here=rbs_walk.record && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==RBS_RET_FX;
+    original();
+    if(!here || !rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;
+    guest_call(sub_0029CCB0,0);
+    if(!rbs_walk.fx++) rbs_log("Crow walker effects drawn",rbs_walk.state,0);
 }
 
 /* WRAP sub_002274C0 (cdecl event, arg): the boss's death fires level event 3
  * (0x0029E063); in MapMaker that is the map's own logic marker. Dropped. */
 void pc_mapmaker_realbosses_event(void (*original)(void))
 {
+    uint32_t ret;
+    if(rbs_walk.record && MAPMAKER_STACK_OK(12) && ((ret=WORD_AT(g_esp))==RBS_RET_WALK_INTRO || ret==RBS_RET_WALK_INTRO2 ||
+       ret==RBS_RET_WALK_DONE) && WORD_AT(RBS_SCENE)==100u && rbs_on()) {
+        if(rbs_walk.events++<4u) rbs_log("Crow walker level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),ret);
+        if(ret==RBS_RET_WALK_DONE) rbs_walk_remove();
+        MAPMAKER_GUEST_RET();
+        return;
+    }
     if(!MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=RBS_RET_EVENT || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) { original();return; }
     if(rbs_skel.events++<4u) rbs_log("giant skeleton level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),WORD_AT(g_esp+8u));
     MAPMAKER_GUEST_RET();
@@ -681,6 +870,23 @@ void pc_mapmaker_realbosses_ai_start(void (*original)(void))
     a=WORD_AT(g_esp+4u);
     if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || !MAPMAKER_PTR_OK(rec=WORD_AT(a+RBS_ACTOR_RECORD),12u)) { original();return; }
     ent=WORD_AT(a);
+    if(RBS_H(a+RBS_ACTOR_CHAR)==RBS_WALK_ID || (MAPMAKER_PTR_OK(ent,0x100u) && RBS_H(ent+RBS_ENT_MODEL)==RBS_WALK_MODEL)) {
+        if(rbs.optout) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: Crow walker with bot behaviour",a,0);
+        else if(!rbs_walk_pak_mounted()) rbs_log("lv81.pak not mounted: Crow walker with bot behaviour",a,0);
+        else if(!rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state)
+            rbs_log("no Crow walker state this level: bot behaviour",a,WORD_AT(RBS_WALK_STATE));
+        else if(rbs_walk.record && rbs_walk.record!=rec) {
+            if(rbs_walk.extras++<4u) rbs_log("only one Crow walker per map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
+        } else {
+            id=WORD_AT(rec+8u);
+            WORD_AT(rec)=RBS_CLASS_LO;WORD_AT(rec+4u)=RBS_WALK_CLASS;
+            rbs_walk.record=rec;rbs_walk.actor=a;
+            rbs_note(rec,pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")?rbs_boss_flag(id-WORD_AT(RBS_SAI_BASE)-1u):0u);
+            rbs_log("Crow walker gets its story AI (class 0x100000)",a,id);
+        }
+        original();
+        return;
+    }
     if(RBS_H(a+RBS_ACTOR_CHAR)==RBS_SKEL_ID || (MAPMAKER_PTR_OK(ent,0x100u) && RBS_H(ent+RBS_ENT_MODEL)==RBS_SKEL_MODEL)) {
         if(rbs.optout) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: giant skeleton with bot behaviour",a,0);
         else if(!rbs_skel_pak_mounted()) rbs_log("lv1_6.pak not mounted: giant skeleton with bot behaviour",a,0);
@@ -721,7 +927,8 @@ void pc_mapmaker_realbosses_hud(void (*original)(void))
     if(!rbs.real[0].record) { original();return; }   /* cheap: no real boss started yet (filled from 0) */
     player=WORD_AT(RBS_PLAYER);
     if(!MAPMAKER_PTR_OK(player,RBS_FOCUS+4u) || !MAPMAKER_PTR_OK(focus=WORD_AT(player+RBS_FOCUS),0x100u) ||
-       (RBS_H(focus+RBS_ENT_MODEL)!=RBS_MODEL && RBS_H(focus+RBS_ENT_MODEL)!=RBS_SKEL_MODEL) || !rbs_play()) { original();return; }
+       (RBS_H(focus+RBS_ENT_MODEL)!=RBS_MODEL && RBS_H(focus+RBS_ENT_MODEL)!=RBS_SKEL_MODEL &&
+        RBS_H(focus+RBS_ENT_MODEL)!=RBS_WALK_MODEL) || !rbs_play()) { original();return; }
     a=WORD_AT(focus+RBS_ENT_AI);
     if(!MAPMAKER_PTR_OK(a,RBS_ACTOR)) { original();return; }
     rec=WORD_AT(a+RBS_ACTOR_RECORD);
@@ -744,7 +951,8 @@ void pc_mapmaker_realbosses_meter(void (*original)(void))
     a=WORD_AT(g_esp+4u);
     if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) { original();return; }
     if(RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_MODEL &&
-       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL) { original();return; }
+       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL &&
+       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_WALK_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_WALK_MODEL) { original();return; }
     rec=WORD_AT(a+RBS_ACTOR_RECORD);
     for(k=0;k<RBS_REAL_MAX && rbs.real[k].record!=rec;k++) {}
     if(k==RBS_REAL_MAX || rbs.real[k].boss==RBS_BOSS_SUB || !rbs_play()) { original();return; }   /* Sub-boss: keep it */
