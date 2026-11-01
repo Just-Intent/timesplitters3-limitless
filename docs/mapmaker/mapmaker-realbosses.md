@@ -292,6 +292,14 @@ table `prop/table/prop_all_xbas.raw` and its model file is in `pak/chr.pak`;
 its character table row equals the skeleton's except name text 0. Not
 explained yet; the logs above should show whether it is created.
 
+### Walker heartbeat and log budget (after v0.4.0-mapmaker.21)
+
+User report (mapmaker.21): the Crow walker "looks right but isn't responding at all". The log
+showed its AI start but nothing after: `rbs_log` had a 24-line budget for the whole session.
+The budget is now per level (reset in `_level`), and `_fx` logs a heartbeat every 120 frame
+steps, 15 times per level: stage (state +0x98), animation state (entity +0x20), position,
+health (state +0x580) and the AI class words (+0x10/+0x14). Log only.
+
 ## The Crow walker (story mission 13)
 
 User request (2026-11-01): the Crow walker and tank bosses next. The walker
