@@ -24,7 +24,19 @@ INC = ROOT / 'src/interface/pc_mapmaker_worm.inc'
 
 MUTATIONS = {
     'shared-ids-trophy': ('(int32_t)guest_call(sub_00062260,1,WRM_PAK_TROPHY)!=-1 || ', ''),
-    'shared-ids-skeleton': (' || (int32_t)guest_call(sub_00062260,1,WRM_PAK_SKELETON)!=-1) {', ') {'),
+    'shared-ids-skeleton': (' || (int32_t)guest_call(sub_00062260,1,WRM_PAK_SKELETON)!=-1)) {', ')) {'),
+    'shared-ids-always': ('    if(!pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_register") &&\n', '    if(1 &&\n'),
+    'shared-ids-never': ('    if(!pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_register") &&\n', '    if(0 &&\n'),
+    'register-off': ('WORD_AT(g_esp+12u)!=WRM_ANIMS_N || !wrm_play()) { original();return; }', 'WORD_AT(g_esp+12u)!=WRM_ANIMS_N || 1) { original();return; }'),
+    'register-any-table': ('WORD_AT(g_esp+8u)!=WRM_ANIMS || WORD_AT(g_esp+12u)!=WRM_ANIMS_N', 'WORD_AT(g_esp+12u)!=WRM_ANIMS_N'),
+    'register-any-count': (' || WORD_AT(g_esp+12u)!=WRM_ANIMS_N || !wrm_play())', ' || !wrm_play())'),
+    'register-any-scene': ('WORD_AT(g_esp+12u)!=WRM_ANIMS_N || !wrm_play()) {', 'WORD_AT(g_esp+12u)!=WRM_ANIMS_N || !wrm_on()) {'),
+    'register-no-barney': ('    guest_call(sub_0005B980,3,prefix,WRM_ANIMS+WRM_ANIM_BARNEY*WRM_ANIM,1u);\n', ''),
+    'register-wrong-first': ('#define WRM_ANIM_FIRST 21u', '#define WRM_ANIM_FIRST 20u'),
+    'register-wrong-count': ('#define WRM_ANIM_COUNT 8u', '#define WRM_ANIM_COUNT 9u'),
+    'register-whole-table': ('    WORD_AT(sp+8u)=WRM_ANIMS+WRM_ANIM_FIRST*WRM_ANIM;WORD_AT(sp+12u)=WRM_ANIM_COUNT;\n', ''),
+    'register-not-restored': ('    WORD_AT(sp+8u)=WRM_ANIMS;WORD_AT(sp+12u)=WRM_ANIMS_N;', '    (void)0;'),
+    'shift-burst-line-missing': ('    {0x0047D78Cu,0x41D80000u,2},', ''),
     'shared-ids-wrong-pak': ('#define WRM_PAK_SKELETON 0x0049D6FCu', '#define WRM_PAK_SKELETON 0x0049D77Cu'),
     'always-on': ('    return mapmaker_limits.limits;\n}', '    return 1;\n}'),
     'any-mode': ('WORD_AT(WRM_SCENE)==100u && WRM_B(WRM_MODE)==10u; }', 'WORD_AT(WRM_SCENE)==100u; }'),
@@ -343,6 +355,8 @@ def test_update_constants_route_and_reachability():
     seen = reach(set())
     others = readers[0x0047D69C] - worm
     assert others and not others & seen
+    others = readers[0x0047D78C] - worm
+    assert others and not others & seen
     assert 0x0015BA10 in seen and 0x000877B0 not in seen
     # the two ways to markers and tag lookups: the dropped 'SFCC' trigger and the generic explosion (a read)
     assert ('imm', 0x53464343) in a[0x001DC455].ops and target(a[0x001DC45A]) == 0x00234CD0
@@ -380,13 +394,42 @@ def test_draw():
 
 
 def test_lv1_paks_share_anim_ids():
-    """lv1_2 (worm) anim ids overlap lv1_3 (trophy monster) and lv1_6 (skeleton):
-    the registration tables (0x0048BEC8 x 0x1E, 0x0048C1B0 x 0x10, 0x0048C738 x 0x12)."""
-    from test_mapmaker_realbosses import xbe_reader
-    import struct as st
+    """lv1_2 shares two Jo-Beth names (and ids) with lv1_3 (trophy monster) and lv1_6 (skeleton);
+    the worm's own entries (21..28 and 5) are unique among every boss pak's registration table."""
     rd = xbe_reader()
 
-    def ids(va, n):
-        return {st.unpack_from('<H', rd(va + k * 0x18, 0x18), 0x10)[0] for k in range(n)}
-    worm, trophy, skel = ids(0x0048BEC8, 0x1E), ids(0x0048C1B0, 0x10), ids(0x0048C738, 0x12)
-    assert worm & trophy and worm & skel and not trophy & skel
+    def names(va, n):
+        return {anim_table_entry(rd, va, k) for k in range(n)}
+    lv1_2 = [anim_table_entry(rd, 0x0048BEC8, k) for k in range(0x1E)]
+    trophy, skel = names(0x0048C1B0, 0x10), names(0x0048C738, 0x12)
+    assert {n for n in lv1_2 if n in trophy} == {('jblookout', 0x193)}
+    assert {n for n in lv1_2 if n in skel} == {('jbgrossend', 0x1AE)} and not trophy & skel
+    kept = lv1_2[21:29] + [lv1_2[5]]
+    assert [n for n, _ in kept] == ['wrmburst', 'wrmidle', 'wrmflaming', 'wrmattack', 'wrmburrow', 'wrmhitreact',
+                                    'wrmtantrum', 'wrmdeath', 'barney_worm']
+    others = set()
+    for va, n in ((0x00484F68, 0x14), (0x0048C738, 0x12), (0x0048C1B0, 0x10), (0x0047E938, 0x29)):  # lv81, lv1_6, lv1_3, lv14
+        others |= names(va, n)
+    assert not {i for _, i in kept} & {i for _, i in others} and not {n for n, _ in kept} & {n for n, _ in others}
+
+
+def anim_table_entry(rd, va, k):
+    e = rd(va + k * 0x18, 0x18)
+    return rd(struct.unpack_from('<I', e, 0)[0], 40).split(b'\0')[0].decode(), struct.unpack_from('<H', e, 0x10)[0]
+
+
+def test_registration_sites_and_fixup():
+    """sub_0005B980(prefix, table, count) registers entry by entry; sub_00057F30 fixes the anim data up in place;
+    the worm's state 2 burst (+0x44C 2, barney_worm 0x149) is behind the z line 27.0 (0x0047D78C)."""
+    a = by_address()
+    assert ('imm', 0x1E) in a[0x001CAD69].ops and target(a[0x001CAD75]) == 0x0005B980 and ends(a, 0x001CAD75) == 0x001CAD7A
+    assert ('imm', 0x0048BEC8) in a[0x001C95F2].ops and target(a[0x001C95FC]) == 0x0005B980
+    assert mem(a[0x0005B993])[0][4] == 0x8C and mem(a[0x0005B99B])[0][4] == 0x94 and mem(a[0x0005B987])[0][4] == 0x90
+    assert ('imm', 0x18) in a[0x0005B9E9].ops and target(a[0x0005B9C9]) == 0x00057F30
+    assert mem(a[0x0005805F])[0][4] == 0x1C and mem(a[0x00058070])[0][4] == 0x28          # offsets become pointers
+    # barney_worm on the head in state 9 when +0x44C == 2; +0x44C = the state (2) south of z 27.0
+    assert ('imm', 0x149) in a[0x001DBF46].ops and target(a[0x001DBF64]) == 0x0005F460
+    assert mem(a[0x001DB887])[0][4] == 0x0047D78C and mem(a[0x001DB88F])[0][4] == 8
+    assert mem(a[0x001DB8A4])[0][4] == 0x44C
+    readers = {i.function for i in decoded() if any(k == 'disp' and v == 0x0047D78C for k, v in i.values())}
+    assert 0x001DACC5 in readers and len(readers - {0x001DAAB0, 0x001DACC5}) == 5   # five readers outside the worm
