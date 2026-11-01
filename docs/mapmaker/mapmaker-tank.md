@@ -6,6 +6,41 @@ decode, US XBE data and game-pak checks of every site below). Wired in
 v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
 No guest-code table entry of its own, no new save bytes.
 
+## v0.4.0-mapmaker.25: no tank at all (diagnostics)
+
+Report: the tank no longer appears, also alone. The .25 log
+(`logs/mapmaker25-bossmap.err`, one set with nine bosses, a level per test)
+shows, every level, `mounted prop6.pak` and `requested the tank, turret and
+wreck models`, then nothing from the tank: its AI start hook never saw a
+Story AI with character 0x12 (any 0x12 actor there logs, created or not; the
+session log budget was not used up, 18 of 24 lines). Each level started
+exactly one Story AI (walker, Crowe, robot, skeleton, worm, mothership); the
+tank's level and two others started none. The tank's own hooks are those
+of v0.4.0-mapmaker.23 (plus the cannon's gun hook, which runs only inside a
+tank), and no other area claims id 0x12 or rewrites an actor's character
+(checked: robot 0x42, Crowe 0x46, realbosses 0x15/0x28/0x64, Khallos 0x33
+and its rider 2, worm 0x2C, mothership 0x75; the bosses area only reads
+0x12 in its probe). Stock (CONFIRMED, test `test_story_ai_spawn_gate`): a
+Story AI's spawn `sub_0015F8C0` runs its AI start `sub_0015B830` only when
+`sub_0006C890(record +0xC, record +0x2C)` is true, in scene 100 the map's
+logic `sub_0006B100` - a placeholder whose spawn logic is false waits
+without a line. Not settled from this log, so the tank now says where its
+placeholder stops (per level, its own budget):
+
+- `castle tank placeholder character created (pool slot, object)` or
+  `... NOT created (pool slot, 0)`: from `sub_000DAC30` (the character create
+  realbosses already logs for its ids; id at `[esp+4]`, pool slot at
+  `[esp+12]`).
+- `castle tank placeholder waiting to spawn: its spawn logic is not true yet
+  (actor, logic)`: once per placeholder, from `sub_0015F8C0`, with record
+  +0xC; then `castle tank placeholder spawn reached its AI start (actor,
+  spawn tries)` when it does.
+- `castle tank placeholder AI started without an entity: stays a bot` (that
+  case was silent before).
+
+Next playtest: one tank placeholder, nothing else in the set, and the same
+with the nine-boss set; send the `tank:` lines.
+
 ## Several tanks per map (after v0.4.0-mapmaker.23)
 
 Up to **4** castle tanks per map (`TNK_MAX`); a fifth placeholder stays a
@@ -322,6 +357,8 @@ unchanged when the switch is off or outside scene 100.
 | `WRAP sub_00251CD0 -> pc_mapmaker_tank_area` | courtyard test (ecx = point, eax) | new; behaviour changed after v0.4.0-mapmaker.22 (no wiring change) |
 | `WRAP sub_00254690 -> pc_mapmaker_tank_target` | drive target (edi = tank) | new; must see the guest `g_edi` |
 | `WRAP sub_002522B0 -> pc_mapmaker_tank_gun` | gun turn (no args; ebx = gun, edi = tank) | **new after v0.4.0-mapmaker.23**; must see the guest `g_ebx` and `g_edi` at entry; works before the original |
+| `WRAP sub_000DAC30 -> pc_mapmaker_tank_create` | character create (cdecl id, ..., pool slot) | **new (.25 diagnostics)**; **shared** with `pc_mapmaker_realbosses_create`; order free (log only, after the original) |
+| `WRAP sub_0015F8C0 -> pc_mapmaker_tank_spawn` | Story AI spawn (cdecl entity) | **new (.25 diagnostics)**; log only, around the original |
 | `WRAP sub_00253840 -> pc_mapmaker_tank_slot7` | tank callback slot 7 (cdecl object, arg) | **new for several tanks** |
 | `WRAP sub_00253D60 -> pc_mapmaker_tank_slot2` | tank callback slot 2 (cdecl object) | **new for several tanks** |
 | `WRAP sub_00255FD0 -> pc_mapmaker_tank_damage` | tank damage callback (cdecl damage record) | **new for several tanks** |

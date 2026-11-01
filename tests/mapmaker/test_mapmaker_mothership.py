@@ -107,6 +107,13 @@ MUTATIONS = {
     'damage-unswapped': ('    msh_run(original,WORD_AT(r));', '    original();'),
     'damage-record-as-ship': ('    msh_run(original,WORD_AT(r));', '    msh_run(original,r);'),
     'run-not-left': ('    original();\n    msh_leave(k,p);\n}\n\nstatic float msh_getf', '    original();\n}\n\nstatic float msh_getf'),
+    # textures the load pass left to the model creation
+    'tex-never': ('        guest_call(sub_00096330,2,file,1u);\n', ''),
+    'tex-every-spawn': ('    if(msh_lv.textured) return;\n', ''),
+    'tex-ignores-mark': ('        if(!(MSH_B(req+MSH_REQ_FLAGS)&MSH_REQ_DEFERRED)) {', '        if(0) {'),
+    'tex-creation-flag': ('guest_call(sub_00096330,2,file,1u);', 'guest_call(sub_00096330,2,file,0u);'),
+    'tex-request-not-file': ('guest_call(sub_00096330,2,file,1u);', 'guest_call(sub_00096330,2,req,1u);'),
+    'tex-not-called': ('    msh_textures();\n', ''),
 }
 
 
@@ -304,6 +311,24 @@ def test_per_ship_statics_and_entries():
     assert calls_to(0x002157B0) == {0x002170CA}
     assert calls_to(0x00217020) == {0x00118BDB, 0x00118BEE}
     assert ('imm', 2) in a[0x00118BCD].ops and ('imm', 0x1A) in a[0x00118BD2].ops
+
+
+def test_model_texture_registration():
+    """The load pass registers a read model's textures only when its texture
+    block's +0x48 is 0x10, else marks the request (+2 |= 0x10) and leaves them
+    to the model's creation, which skips them in scene 100."""
+    a = by_address()
+    assert a[0x00063543].mnemonic == 'cmp' and ('imm', 0x10) in a[0x00063543].ops and target(a[0x00063546]) == 0x00063559
+    assert a[0x00063548].mnemonic == 'or' and mem(a[0x00063548])[0][4] == 2 and ('imm', 0x10) in a[0x00063548].ops
+    assert target(a[0x0006355D]) == 0x00096220
+    # sub_00096410: not in scene 100 (0x64), only rows with flag 0x2000000, then sub_00096330(file, 1)
+    assert mem(a[0x00096551])[0][4] == 0x0079094C and ('imm', 0x64) in a[0x00096556].ops and target(a[0x00096559]) == 0x00096597
+    assert ('imm', 0x2000000) in a[0x00096585].ops
+    assert a[0x0009658C].ops[0][1] == 1 and target(a[0x0009658F]) == 0x00096330
+    assert calls_to(0x00096330) == {0x00096407, 0x0009658F}
+    # the hit glow: effect texture 0x3BC through sub_00080F20 (table 0x004D2D50, 0x18 each, +0x14)
+    assert a[0x00215B5F].ops[0][1] == 0x3BC and target(a[0x00215B64]) == 0x00080F20
+    assert mem(a[0x00080F27])[0][4] == 0x004D2D64
 
 
 def test_no_level_event():

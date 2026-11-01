@@ -47,6 +47,7 @@ void sub_000A6F90(void) { g_ecx=3; }
 void sub_0015DDA0(void) { g_ecx=4; }
 void sub_000A5E40(void) { g_ecx=6; }
 void sub_000631C0(void) { g_ecx=7; }
+void sub_00096330(void) { g_ecx=8; }
 static uint32_t heap_next=HEAP;
 static int heap_fail;
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment) { uint32_t p;(void)alignment;if(heap_fail)return 0;p=heap_next;heap_next+=(bytes+15u)&~15u;return p; }
@@ -56,6 +57,8 @@ static unsigned nmount, nspawn, nremove, nrequest;
 static uint32_t mount_args[3], spawn_args[5], remove_arg, requested[8];
 static float spawn_pos[3], spawn_rot[3];
 static uint32_t spawn_obj=SHIP;
+static unsigned ntex;
+static uint32_t tex_args[4][2];
 static int is_pak(uint32_t p) { return p && !strcmp((const char *)((uintptr_t)p+g_xbox_mem_offset),"pak/challenge/l_64_ch.pak"); }
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
@@ -89,6 +92,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         if(r>=0 && r<8) req_state[r]=req_reads?2:1;
         return 0;
     }
+    if(f==sub_00096330) { if(ntex<4u) { tex_args[ntex][0]=x[0];tex_args[ntex][1]=x[1]; } ntex++;return 0; }
     if(f==sub_000631C0) {
         for(i=0;i<8;i++) if(x[0]==PATH(i) && req_state[i]) { WORD_AT(REQ(i)+0x10u)=req_state[i]==2?0x00538000u:0;return REQ(i); }
         return 0;
@@ -338,9 +342,12 @@ int main(void)
     CHECK(nspawn==1 && !msh_lv.n && constants_stock());
     spawn_ok=1;
     ai_originals=0;
+    BYTE_AT(REQ(3)+2u)=0x10u;BYTE_AT(REQ(4)+2u)=0;msh_lv.textured=0;ntex=0;   /* the ship's textures left to its creation */
+    FLOAT_AT(0x004D2D50u+0x3BCu*0x18u+0x14u)=0;
     WORD_AT(0x0075C0E4u)=0x66u;WORD_AT(0x0078D500u)=0x67u;           /* the statics before */
     CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(nspawn==2 && msh_lv.n==1u && msh_lv.s[0].obj==SHIP && ai_originals==1 && !msh_lv.act);
+    CHECK(ntex==1u && tex_args[0][0]==0x00538000u && tex_args[0][1]==1u && msh_lv.textured);   /* the ship only */
     CHECK(WORD_AT(0x0075C0E4u)==0x66u && WORD_AT(0x0078D500u)==0x67u && constants_stock());   /* put back */
     CHECK(msh_lv.s[0].st[7]==0 && msh_lv.s[0].st[10]==0x67u);        /* the init's zero, kept for the ship */
     CHECK(spawn_args[0]==0x539u && spawn_args[3]==0 && spawn_args[4]==0);
@@ -351,7 +358,7 @@ int main(void)
     CHECK(NEAR(stf(0,3),-20.0f) && NEAR(stf(0,4),100.0f));           /* x */
     CHECK(NEAR(stf(0,0),2.0f));                                       /* dust on the floor */
     CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
-    CHECK(nspawn==2 && msh_lv.n==1u);                                 /* the same placeholder again */
+    CHECK(nspawn==2 && msh_lv.n==1u && ntex==1u);                     /* the same placeholder again */
 
     /* ---- text ------------------------------------------------------------- */
     orig_eax=0x1234u;
@@ -417,7 +424,8 @@ int main(void)
     CHECK(!msh_lv.n && !msh_lv.act);
     {
         static uint32_t r0[31];
-        unsigned s=nspawn,r=nremove;
+        unsigned s=nspawn,r=nremove,t0=ntex;
+        BYTE_AT(REQ(3)+2u)=0x10u;BYTE_AT(REQ(4)+2u)=0x10u;
         for(k=0;k<3u;k++) WORD_AT(0x0075C0DCu+k*4u)=0xA0A0A000u+k;
         WORD_AT(0x0075C0ECu)=0xA0A0A0ECu;WORD_AT(0x0078D360u)=0xA0A0A360u;
         for(k=0;k<21u;k++) WORD_AT(0x0078D500u+k*4u)=0xB0B0B000u+k;
@@ -429,6 +437,7 @@ int main(void)
         }
         spawn_obj=SHIP;
         CHECK(msh_lv.n==4u && nspawn==s+4u && !msh_lv.act);         /* the fifth stays a bot */
+        CHECK(ntex==t0+2u);                                           /* once this level, ship and wreck */
         {
             uint32_t now[31];
             msh_save(now);

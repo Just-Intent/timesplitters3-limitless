@@ -9,6 +9,34 @@ played**: the wrappers, the picker row and the stubs are the integrator's
 `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_MOTHERSHIP=0` keeps the placeholder
 a normal bot. No guest-code table, no new save bytes.
 
+## Fixed after v0.4.0-mapmaker.25: a grey, untextured ship
+
+Report: the ship appears as a giant grey object and seems to shoot, but its
+shots can't be seen. Cause (CONFIRMED, test `test_model_texture_registration`):
+
+- The level's load pass `sub_00063390` registers a read model's textures
+  (`sub_00096220`, 0x0006355D) only when its texture block's +0x48 is 0x10
+  (prop stream models such as the castle tank's). Otherwise it marks the
+  request (+2 |= 0x10, 0x00063548) and leaves the textures to the model's
+  creation: `sub_00096410` calls `sub_00096330(file, 1)` at 0x0009658F, but
+  not in scene 100 (0x00096556) - so a level-pak model like the intro ship
+  is created without textures in MapMaker.
+- Fix: before the first ship is created in a level, the ship and wreck
+  models whose request carries that mark get the same `sub_00096330(file,
+  1)` call (once per level). Log: `registered the model's textures (story
+  levels do it at creation; scene 100 skips it)` per model, or `model
+  textures registered by the level's load pass`.
+- Effects (not fixed, INFERRED): its hit glow is effect texture 0x3BC
+  (`sub_00080F20`, table 0x004D2D50); the log now says whether it is loaded
+  this level (`hit glow effect texture 0x3BC this level (0 = not loaded)`).
+  Effect textures are loaded per level by `sub_00081220` (level setup
+  0x001CDC55/0x001CDCC3) or on demand by `sub_000810C0(id)`; the homing
+  shot (`sub_000EA9C0(0x32, ...)`) and its textures were not traced yet.
+
+The same texture gap may hit other ports that load a model from a level
+pak in scene 100 (the Khallos chair's prop3.pak model, for one); their
+requests can be checked the same way.
+
 ## Several motherships per map
 
 Up to **4** motherships per map (`MSH_MAX`); a fifth placeholder stays a bot
@@ -133,7 +161,9 @@ map floor`.
 
 Guest functions called: `sub_00062260`, `sub_000622D0`, `sub_000A5E40`,
 `sub_000631C0`, `sub_000A6F90`, `sub_0015DDA0` (all already used by the tank
-area, so the area stubs exist). Host: `xbox_HeapAlloc` (pak path, label,
+area, so the area stubs exist) and, after v0.4.0-mapmaker.25,
+`sub_00096330` (register a model file's textures: **add it to the area
+stubs**). Host: `xbox_HeapAlloc` (pak path, label,
 32-byte argument buffer; once per session).
 
 **Picker row** (in `pc_mapmaker_realbosses.inc`, `rbs_extra`):

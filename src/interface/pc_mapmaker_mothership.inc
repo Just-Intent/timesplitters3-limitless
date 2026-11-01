@@ -69,6 +69,16 @@
  *    state 2 as sub_00217030 does, and rebase its firing box to MSH_RANGE
  *    metres around the spawn (x/z) and its dust height to the placeholder's
  *    floor, in its own copy. A placeholder past MSH_MAX keeps its bot behaviour.
+ *  - textures (v0.4.0-mapmaker.25: a grey, untextured ship): the level's
+ *    load pass (sub_00063390) registers a read model's textures
+ *    (sub_00096220 at 0x0006355D) only when its texture block's +0x48 is
+ *    0x10; otherwise it marks the request (+2 |= 0x10, 0x00063548) and the
+ *    model's creation registers them, sub_00096330(file, 1) at 0x0009658F,
+ *    but never in scene 100 (0x00096556). The intro ship comes from a
+ *    level pak and is such a model. Before the first ship is created, each
+ *    of the ship and wreck models whose request carries that mark gets the
+ *    same call (once per level, logged), and whether the hit glow effect
+ *    texture 0x3BC (slot 10, sub_00080F20) is loaded is logged.
  *  - update (sub_00217050, the ship's per-frame callback): on its first
  *    frame the placeholder AI is removed (sub_0015DDA0). While falling or
  *    crashing (states 3 and 4 at entry) the ship's height is moved down by
@@ -106,6 +116,10 @@
 #define MSH_RES_LOD 0x14u
 #define MSH_RES_INIT 0x2Cu
 #define MSH_REQ_DATA 0x10u               /* request (sub_000631C0): loaded file or 0 */
+#define MSH_REQ_FLAGS 2u                 /* request byte: 0x10 = textures left to the model's creation */
+#define MSH_REQ_DEFERRED 0x10u
+#define MSH_FX 0x004D2D50u               /* effect textures by id, 0x18 each, the loaded one at +0x14 */
+#define MSH_FX_HIT 0x3BCu                /* slot 10's hit glow (0x00215B5F) */
 #define MSH_PAK "pak/challenge/l_64_ch.pak"
 #define MSH_MOUNTS 0x006D7880u           /* mounted paks */
 #define MSH_MOUNT_MAX 64u               /* paktable.json: 64 slots */
@@ -160,7 +174,7 @@ static const uint32_t msh_spans[5][2]={
 };
 
 extern void sub_00062260(void),sub_000622D0(void),sub_000A6F90(void),sub_0015DDA0(void);
-extern void sub_000A5E40(void),sub_000631C0(void);
+extern void sub_000A5E40(void),sub_000631C0(void),sub_00096330(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
 /* Kept for the session: settings, strings, spawn arguments, stock constants. */
@@ -178,7 +192,7 @@ static struct {
     unsigned n;                          /* ships created */
     unsigned act;                        /* 1 + the ship whose statics are in place; 0: none */
     uint32_t rest[MSH_WORDS];            /* the statics outside any ship */
-    int requested;
+    int requested, textured;
     unsigned extras;
 } msh_lv;
 #define MS (msh_lv.s[msh_lv.act-1u])     /* the active ship (only with msh_lv.act) */
@@ -323,6 +337,30 @@ static uint32_t msh_models_unready(void)
     return 0;
 }
 
+/* The ship and wreck models' textures, which scene 100 never registers when
+ * the load pass left them to the model's creation (once per level). */
+static void msh_textures(void)
+{
+    uint32_t k,e,path,req,file;
+    if(msh_lv.textured) return;
+    msh_lv.textured=1;
+    for(k=0;k<2u;k++) {
+        if(!(e=msh_resource(msh_models[k])) || !(path=WORD_AT(e+MSH_RES_PATH)) || !MAPMAKER_PTR_OK(path,4u)) continue;
+        req=guest_call(sub_000631C0,1,path);
+        if(!req || !MAPMAKER_PTR_OK(req,0x14u) || !(file=WORD_AT(req+MSH_REQ_DATA)) || !MAPMAKER_PTR_OK(file,0x10u)) {
+            msh_log("model file not read: its textures not registered",msh_models[k],req);
+            continue;
+        }
+        if(!(MSH_B(req+MSH_REQ_FLAGS)&MSH_REQ_DEFERRED)) {
+            msh_log("model textures registered by the level's load pass",msh_models[k],MSH_B(req+MSH_REQ_FLAGS));
+            continue;
+        }
+        guest_call(sub_00096330,2,file,1u);
+        msh_log("registered the model's textures (story levels do it at creation; scene 100 skips it)",msh_models[k],file);
+    }
+    msh_log("hit glow effect texture 0x3BC this level (0 = not loaded)",MSH_FX_HIT,WORD_AT(MSH_FX+MSH_FX_HIT*0x18u+0x14u));
+}
+
 /* A ship's firing box (z low, z high, x low, x high) around its spawn and its
  * dust height on its floor, in its own copy (st[0..4], as msh_spans). */
 static void msh_rebase(struct msh_one *m,float x,float floor,float z)
@@ -392,6 +430,7 @@ void pc_mapmaker_mothership_ai_start(void (*original)(void))
     }
     for(i=0;i<3u;i++) if(!msh_sane(pos[i]=msh_getf(ent+MSH_ENT_POS+i*4u))) { msh_log("placeholder position unusable",a,i);return; }
     if(!msh_sane(yaw=msh_getf(ent+MSH_ENT_YAW))) yaw=0.0f;
+    msh_textures();
     if(!msh.args) {
         uint32_t p=xbox_HeapAlloc(32u,16u);
         if(!p || !MAPMAKER_PTR_OK(p,32u)) { msh_log("no memory for the spawn arguments",32u,0);return; }
