@@ -1,3 +1,13 @@
+## MapMaker v0.4.0-mapmaker.17 and .18: in-game checks (2026-11-01)
+
+Local previews on the second Windows 11 PC. v0.4.0-mapmaker.18 (exe SHA-256 prefix 31911b8b, source 0325b04f):
+the right-click tile roof menu works (user-confirmed: "The tiles flags are working great!").
+v0.4.0-mapmaker.17 (exe prefix 63c55caf, source cdfa1ef8): the giant skeleton now stands at its spawn
+floor (log: floor height -9.49); its fire breath plays the animation but shows no fire and does not hurt
+(cause found for the missing fire: the mission 5 particle draw runs only in scenes 1/17; fixed after .18);
+the Crow walker does not appear: its pak and level state load, but no AI start was logged for it (cause
+not found yet; the next build logs real-boss character creation and AI starts).
+
 ## MapMaker v0.4.0-mapmaker.16: in-game checks (2026-11-01)
 
 Local preview v0.4.0-mapmaker.16 (exe SHA-256 prefix b95069b4, source cc7ee51b) on the second Windows 11 PC.
