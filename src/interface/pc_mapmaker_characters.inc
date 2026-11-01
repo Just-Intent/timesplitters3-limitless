@@ -58,7 +58,7 @@
 #define CHR_CHARS 0x0053A3CCu           /* character table, 0x30 per id, +4 model */
 #define CHR_IDS 0xB0u                   /* ids in the Arcade table are 0x00..0xAF */
 #define CHR_MODEL_MAX 0x9D0u            /* sub_000A5E40 ignores ids >= 0x9D0 */
-#define CHR_SLOTS 0x0078B860u           /* int16 resource slot per id */
+#define CHR_SLOTS 0x008CA000u           /* int16 resource slot per id; stock 0x0078B860, moved by the rooms area */
 #define CHR_RESOURCES 0x00791D4Cu       /* resource entries, 0x30 each */
 #define CHR_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define CHR_H(a) (*(int16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
