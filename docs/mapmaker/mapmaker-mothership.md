@@ -9,6 +9,64 @@ played**: the wrappers, the picker row and the stubs are the integrator's
 `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_MOTHERSHIP=0` keeps the placeholder
 a normal bot. No guest-code table, no new save bytes.
 
+## Fixed after v0.4.0-mapmaker.25: a grey, untextured ship
+
+Report: the ship appears as a giant grey object and seems to shoot, but its
+shots can't be seen. Cause (CONFIRMED, test `test_model_texture_registration`):
+
+- The level's load pass `sub_00063390` registers a read model's textures
+  (`sub_00096220`, 0x0006355D) only when its texture block's +0x48 is 0x10
+  (prop stream models such as the castle tank's). Otherwise it marks the
+  request (+2 |= 0x10, 0x00063548) and leaves the textures to the model's
+  creation: `sub_00096410` calls `sub_00096330(file, 1)` at 0x0009658F, but
+  not in scene 100 (0x00096556) - so a level-pak model like the intro ship
+  is created without textures in MapMaker.
+- Fix: before the first ship is created in a level, the ship and wreck
+  models whose request carries that mark get the same `sub_00096330(file,
+  1)` call (once per level). Log: `registered the model's textures (story
+  levels do it at creation; scene 100 skips it)` per model, or `model
+  textures registered by the level's load pass`.
+- Effects (not fixed, INFERRED): its hit glow is effect texture 0x3BC
+  (`sub_00080F20`, table 0x004D2D50); the log now says whether it is loaded
+  this level (`hit glow effect texture 0x3BC this level (0 = not loaded)`).
+  Effect textures are loaded per level by `sub_00081220` (level setup
+  0x001CDC55/0x001CDCC3) or on demand by `sub_000810C0(id)`; the homing
+  shot (`sub_000EA9C0(0x32, ...)`) and its textures were not traced yet.
+
+The same texture gap may hit other ports that load a model from a level
+pak in scene 100 (the Khallos chair's prop3.pak model, for one); their
+requests can be checked the same way.
+
+## Several motherships per map
+
+Up to **4** motherships per map (`MSH_MAX`); a fifth placeholder stays a bot
+(logged `at most 4 motherships per map`). The ship's fight state is on its
+object (+0x1A0 and up), but its code also keeps some in statics (CONFIRMED,
+test `test_per_ship_statics_and_entries`). Each ship gets its own copy of
+those 31 words, swapped in around every way into its code and saved back on
+return, so the statics always hold what they held before:
+
+| statics | what (CONFIRMED site) |
+|---|---|
+| `0x0049EA84..0x0049EA97` | dust height and firing box, read only by the update; each ship's copy holds its own rebased values (spawn ± 60 m, its floor). The stock constants are **no longer written at all** (the old global rebase and the restore at mount are gone) |
+| `0x0075C0DC..0x0075C0E7` | update timer; the intro HUD's shake value (`sub_00217020`, read only in scenes 2 and 0x1A); the engine sound level (`sub_001515E0` at 0x002185F1; the init zeroes it at 0x0021ABB8) |
+| `0x0075C0EC`, `0x0078D500..0x0078D553` | the hit ring: index and three 0x1C hit records (damage writes them, the update's `sub_002157B0` decays them, slot 10 `sub_00215B50` draws them) |
+| `0x0078D360` | the smoke effect handle (`sub_00111AE0` creates it from the template 0x0078D040 when `sub_0010E210` says it is gone) |
+
+Not copied: the smoke template 0x0078D040 (its field 0x0078D0A0 is written
+right before each use) and the other effect templates (built the same way by
+every init).
+
+Ways in, each run with that ship's statics: the update `sub_00217050` (object
+at `[esp+4]`), slot 10 `sub_00215B50` (its first argument), the damage
+`sub_002193A0` (shared by several props: damage record at `[esp+4]`, the hit
+object at +0; only our ships' records swap) and the spawn (the init writes
+0x0075C0E4: the result goes to the new ship and the statics are put back).
+One ship's damage inside another's frame nests correctly. Each ship removes
+its own placeholder and falls to its own floor. Every ship sets the players'
+focus while it attacks (stock), so the boss bar follows whichever updated
+last.
+
 Why this boss: the survey ([mapmaker-boss-survey.md](mapmaker-boss-survey.md))
 found it and the catacombs pit-fight skeleton as the only story bosses not yet
 ported or in progress. The mothership has no animations, no per-level state
@@ -46,7 +104,7 @@ sets +0x1A0 = 2 on the object tagged 'MTHS'. Death calls
 callbacks (static call graph, test).
 
 Each rebased constant (0x0049EA84..0x0049EA94) is read by exactly one ship
-instruction. The crash floor 0x0049E324 (6.6) is also read by other code, so
+instruction; each ship has its own values (above). The crash floor 0x0049E324 (6.6) is also read by other code, so
 it is left alone.
 
 ## The pak
@@ -76,13 +134,14 @@ y 50), facing its yaw, already attacking.
 
 | hook | behaviour |
 |---|---|
-| mount (`sub_00062790`) | after the original: forget the last level's ship and put the rebased constants back to stock (saved once); when the map's own custom set (slots 1-20) holds 0x75, or the container can't be read: mount l_64_ch.pak, keeping 8 table slots free |
+| mount (`sub_00062790`) | after the original: forget the last level's ships; when the map's own custom set (slots 1-20) holds 0x75, or the container can't be read: mount l_64_ch.pak, keeping 8 table slots free |
 | request (`sub_0015E7C0`) | after the original: request 0x539 and 0x53A (`sub_000A5E40`) so the load pass reads them |
-| ai_start (`sub_0015B830`) | after the original, first placeholder only, when both models are ready (resource rows with init 0x0021A710, read requests): create the ship (`sub_000A6F90(0x539, &pos, &rot, 0, 0)`), set state 2 (as `sub_00217030`), firing box = spawn ± 60 m (x/z), dust height = the placeholder's floor. A second placeholder stays a bot (logged) |
-| update (`sub_00217050`) | our ship only: first frame removes the placeholder AI (`sub_0015DDA0`, focus cleared if it was on it); in states 3 and 4 the ship's height is moved down by the floor for the call and back, so the fall ends 6.6 m above the map floor |
+| ai_start (`sub_0015B830`) | after the original, each placeholder up to 4 ships, when both models are ready (resource rows with init 0x0021A710, read requests): create the ship (`sub_000A6F90(0x539, &pos, &rot, 0, 0)`), set state 2 (as `sub_00217030`), firing box = spawn ± 60 m (x/z), dust height = the placeholder's floor, in the ship's own copy of the statics. A fifth placeholder stays a bot (logged) |
+| update (`sub_00217050`) | our ships only, with that ship's statics: first frame removes the placeholder AI (`sub_0015DDA0`, focus cleared if it was on it); in states 3 and 4 the ship's height is moved down by the floor for the call and back, so the fall ends 6.6 m above the map floor |
+| slot 10 (`sub_00215B50`), damage (`sub_002193A0`) | our ships' objects: the original with that ship's statics |
 | text (`sub_0003D7B0`) | id 0x164B at return 0x0014D09F, with a ship this level: "Timesplitter Mothership" |
 
-Log lines (`[mapmaker] mothership: ...`): `mounted l_64_ch.pak for the
+Log lines (`[mapmaker] mothership: ...`; the spawn line names the ship, `mothership N: spawn ...`): `mounted l_64_ch.pak for the
 mothership`, `requested the mothership and wreck models`, `mothership created
 above the placeholder`, `spawn (x, y, z), floor f, firing box 60 m around it`,
 `mothership placeholder AI removed`, `mothership shot down: falling to the
@@ -96,11 +155,15 @@ map floor`.
 | `WRAP sub_0015E7C0 -> pc_mapmaker_mothership_request` | story level init (no args) | **shared** with `pc_mapmaker_tank_request`; order free (both work after the original) |
 | `WRAP sub_0015B830 -> pc_mapmaker_mothership_ai_start` | AI start (cdecl pool entry) | **shared** with realbosses, robot, crowe, tank; order free (acts only on id 0x75, after the original) |
 | `WRAP sub_00217050 -> pc_mapmaker_mothership_update` | ship frame (cdecl object; called through the slot-3 pointer) | new. The native-high-refresh numeric policy (`src/gameplay/pc_native_numeric.h`) patches instructions inside this function, not its entry, so the two don't conflict |
+| `WRAP sub_00215B50 -> pc_mapmaker_mothership_slot10` | ship callback slot 10 (cdecl object) | **new for several ships** |
+| `WRAP sub_002193A0 -> pc_mapmaker_mothership_damage` | damage callback shared by several props (cdecl damage record) | **new for several ships**; other props' records run the original untouched |
 | `WRAP sub_0003D7B0 -> pc_mapmaker_mothership_text` | text lookup (cdecl), hot | **shared** with realbosses and tank text hooks; order free (id 0x164B at return 0x0014D09F only) |
 
 Guest functions called: `sub_00062260`, `sub_000622D0`, `sub_000A5E40`,
 `sub_000631C0`, `sub_000A6F90`, `sub_0015DDA0` (all already used by the tank
-area, so the area stubs exist). Host: `xbox_HeapAlloc` (pak path, label,
+area, so the area stubs exist) and, after v0.4.0-mapmaker.25,
+`sub_00096330` (register a model file's textures: **add it to the area
+stubs**). Host: `xbox_HeapAlloc` (pak path, label,
 32-byte argument buffer; once per session).
 
 **Picker row** (in `pc_mapmaker_realbosses.inc`, `rbs_extra`):
@@ -127,4 +190,9 @@ Also for the integrator: the `docs/agent-context` guide entry for this area.
 - Health 250 with no boss-row scaling (the ship isn't a Story AI, so the
   bosses area's multipliers don't apply).
 - Story restart (`sub_0025F6A0`) was not examined for the ship.
+- Several ships: the smoke effect system might keep the handle slot's
+  address (0x0078D360) and clear it when an effect ends; with the swap that
+  would clear whatever is in the slot at that moment, and a ship would just
+  recreate its smoke (INFERRED harmless). Shots from several ships at once
+  are the intro's own homing shots.
 - Textures: assumed embedded in the .xbr (not checked).
