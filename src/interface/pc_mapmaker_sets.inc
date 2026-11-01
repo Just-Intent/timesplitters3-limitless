@@ -18,15 +18,18 @@
  *    -1), a new map clears them (the reset copies a preset whose members
  *    10..19 are zero = character 0), and Map Settings' "set changed" test
  *    (undo step) compares them too;
- *  - the slot screen pages: Down on row 10 shows slots 11-20, Up on row 11
- *    returns; the fill/store of the shared work copy are pointed at members
- *    10..19 while page 2 is shown; the title gets "(1-10)" / "(11-20)"; a
- *    match start (editor Test map) after the screen closed on slots 11-20
- *    refills rows 1-10 first, since the work copy rows are its bots;
+ *  - the editor's slot screen is a 20-row scrolling list, built like the
+ *    weapon set's (the engine's scrolling region, ten rows tall, so the
+ *    cursor, pointer, scrollbar and wheel reach slots 11-20). The 10-row
+ *    work copy stays slots 1-10; rows 11-20 are ten shadow rows, loaded by
+ *    the stock reload with the fill getters pointed at members 10..19, and
+ *    lent to work-copy row k while each stock row callback runs (draw, row
+ *    action, pane update, picker pick), then stored to members 10..19;
  *  - the in-game pause and Arcade setup Bots screen is the same screen, but
  *    there (scenes 100/101, MapMaker Arcade mode 9, index 0x11) its rows are
  *    the match's bot roster (at most 10 rows, 16 actors per match); its page
- *    2 (more bots) is pc_mapmaker_matchbots.inc;
+ *    2 (more bots) is pc_mapmaker_matchbots.inc, which uses sets_title and
+ *    sets_select below;
  *  - the Story AI character choice lists slots 11-20 after the stock ten,
  *    each named by the stock slot-name path (sub_00303350 case 3 for slot
  *    k - 10 with the set read shifted 10 members, so realbosses' names of
@@ -39,16 +42,21 @@
  *    empty slot gets the first used slot instead of id -1 (logged).
  * Weapon sets are not raised: weapon slots are bound to the six weapon and
  * six ammo item types (catalogue +8 slot index); see the doc.
- * Editing (paging, extra choices) needs TSFP_MAPMAKER_LIMITS=1; loading and
- * playing a map that has the chunk works without it.
+ * Editing (the 20-row list, extra choices) needs TSFP_MAPMAKER_LIMITS=1;
+ * loading and playing a map that has the chunk works without it.
  *
- * Extension memory: 0x00903700..0x0090373F title text, 0x00903740..0x009037E3
- * page-2 store scratch (0x009037E4..0x009037FF reserved for this area).
- * Requires the includer's WORD_AT, guest_call, g_eax, g_esp,
+ * Extension memory: 0x00903700..0x0090373F title text (matchbots' pages),
+ * 0x00903740..0x009037E3 store scratch for members 10..19
+ * (0x009037E4..0x009037FF reserved for this area). The shadow rows are host
+ * memory. Requires the includer's WORD_AT, guest_call, g_eax, g_esp,
  * g_xbox_mem_offset and pc_mapmaker_limits.inc. */
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
+#ifndef MAPMAKER_GUEST_RET
+#define MAPMAKER_GUEST_RET() (g_esp+=4u)
+#endif
 #ifndef MAPMAKER_STACK_OK
 #define MAPMAKER_STACK_OK(n) (g_esp>=0x00010000u && g_esp<0x04000000u-(uint32_t)(n))
 #endif
@@ -93,15 +101,38 @@
 #define SETS_NAME_SET_RET 0x003033A9u  /* sub_00303350 case 3: call sub_002C0290 */
 #define SETS_H(a) (*(int16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define SETS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+/* the 20-row slot list (editor) */
+#define SETS_WORK 0x0075FD90u           /* 10 x 0x1C: +0 id, +8 difficulty, +0x10 override, +0x14 portrait, +0x18 variant */
+#define SETS_ROW 0x1Cu
+#define SETS_SUBMODE 0x0078ADAEu        /* byte: setup sub-mode (0x13 limits the rows) */
+#define SETS_BUILDING 0x007BB1E8u       /* the menu being built */
+#define SETS_ROW_ACTION 0x002C1490u     /* slot row callbacks (pushed at 0x002C1A8D / 0x002C1A88) */
+#define SETS_ROW_DRAW 0x002C0660u
+#define SETS_ROW_HEIGHT 0x40800000u     /* 4.0f, the rows' height argument (0x002C1A92) */
+#define SETS_VIEW 0x42200000u           /* 40.0f = ten rows of 4.0: the pane keeps its stock size */
+#define SETS_F5 0x40A00000u             /* 5.0f */
+#define SETS_F9_2 0x41133333u           /* 9.2f (0x002C1C24) */
+#define SETS_F40 0x42200000u            /* 40.0f, the rows' width argument (0x002C1A97) */
+#define SETS_F45 0x42340000u            /* 45.0f (0x002C19FA) */
 
 extern void sub_00074670(void),sub_00071970(void),sub_00076EF0(void),sub_002BFFD0(void),
-    sub_0003D7B0(void),sub_00303350(void),sub_00071800(void),sub_000D7780(void),sub_002C0310(void);
+    sub_0003D7B0(void),sub_00303350(void),sub_00071800(void),sub_000D7780(void),sub_002C0310(void),
+    sub_00075B70(void),sub_00071BE0(void),sub_00079D60(void),sub_002C1830(void),sub_00079710(void),
+    sub_000780E0(void),sub_00078320(void),sub_000792B0(void),sub_00078380(void),sub_000781A0(void),
+    sub_00077140(void),sub_00077360(void),sub_00074A00(void),sub_00074460(void);
 
 static struct {
-    int page,forced,in_update,in_store,name_shift;
+    int page,in_update,in_store,name_shift;
     uint32_t title_menu,title_original;
     unsigned logged;
 } sets;
+/* The editor's 20-row slot list: rows 11-20 are ten shadow work-copy rows. */
+static struct {
+    int on,valid,opened,last_row;      /* on: the pane was built with 20 rows */
+    uint32_t index;                     /* set index the shadow rows were loaded for */
+    float last_scroll;
+    uint8_t rows[SETS_STOCK*SETS_ROW];
+} sl;
 
 static void sets_log(const char *what,int a,int b)
 {
@@ -256,10 +287,199 @@ void pc_mapmaker_sets_reset(void (*original)(void))
     if((e=sets_editor())) sets_clear_extras(e);
 }
 
-/* ---- slot screen paging ------------------------------------------------ */
+/* ---- slot screen: a 20-row scrolling list ------------------------------ */
 static int sets_custom(void)
 {
     return WORD_AT(SETS_SCENE)==102u && (int32_t)WORD_AT(SETS_INDEX)>=0xC;
+}
+/* Screen diagnostics (own budget, as the weapon set's): the pane build, its
+ * first update and moves past row 10 or of the scroll. */
+static unsigned sets_diag_opens,sets_diag_moves;
+static void sets_diag(int moves,const char *format,...)
+{
+    va_list ap;
+    if(moves ? sets_diag_moves>=48u : sets_diag_opens>=256u) return;
+    if(moves) sets_diag_moves++; else sets_diag_opens++;
+    fputs("[mapmaker] sets: ",stderr);
+    va_start(ap,format);vfprintf(stderr,format,ap);va_end(ap);
+    fputc('\n',stderr);
+    fflush(stderr);
+}
+static float sets_f(uint32_t a) { uint32_t u=WORD_AT(a);float f;memcpy(&f,&u,4);return f; }
+static uint8_t *sets_work(unsigned k) { return (uint8_t *)((uintptr_t)(SETS_WORK+k*SETS_ROW)+g_xbox_mem_offset); }
+static int sets_list(void) { return sl.on && WORD_AT(SETS_SCENE)==102u; }
+/* Row value v (pane +0x184 - 2, item +0x14) of slots 11-20 -> shadow row. */
+static int sets_list_row(uint32_t v) { return sets_list() && v>=SETS_STOCK && v<SETS_SLOTS ? (int)(v-SETS_STOCK) : -1; }
+/* Lend shadow row k (slot 11 + k) to work-copy row k, or take it back. */
+static void sets_borrow(unsigned k)
+{
+    uint8_t t[SETS_ROW],*w=sets_work(k),*s=sl.rows+k*SETS_ROW;
+    memcpy(t,w,SETS_ROW);memcpy(w,s,SETS_ROW);memcpy(s,t,SETS_ROW);
+}
+/* Rows with no character (a preset: its members 10..19 are id 0, a real
+ * character), team and difficulty as row k of the work copy. */
+static void sets_list_empty(void)
+{
+    unsigned k;
+    int32_t none=-1;
+    memcpy(sl.rows,sets_work(0),sizeof sl.rows);
+    for(k=0;k<SETS_STOCK;k++) {
+        uint8_t *r=sl.rows+k*SETS_ROW;
+        memcpy(r,&none,4);memcpy(r+0x10,&none,4);memcpy(r+0x14,&none,4);memcpy(r+0x18,&none,4);
+    }
+}
+/* Shadow row k into editor member 10 + k, as sub_00314210 stores a row:
+ * word id (+0), byte difficulty (+8 -> +3), word variant (+0x18 -> +6). */
+static void sets_list_keep(unsigned k)
+{
+    uint32_t e,m;
+    const uint8_t *r=sl.rows+k*SETS_ROW;
+    int32_t id,diff,variant;
+    if(!sets_custom() || !(e=sets_editor())) return;
+    memcpy(&id,r,4);memcpy(&diff,r+8,4);memcpy(&variant,r+0x18,4);
+    m=SETS_MEMBER(e+SETS_EDITOR_SET,SETS_STOCK+k);
+    SETS_H(m)=(int16_t)id;SETS_B(m+3u)=(uint8_t)diff;SETS_H(m+6u)=(int16_t)variant;
+}
+/* Move the highlight to row value v (the pick's own advance, 0x002C1DB2). */
+static void sets_advance(uint32_t pane,uint32_t v)
+{
+    WORD_AT(pane+0x18Cu)=v;
+    guest_call(sub_00074460,3,pane,v,0u);
+}
+
+/* WRAP sub_002C19F0 (cdecl menu): builder of the character slot pane
+ * 0x0052372C. In the editor (scene 102) stock adds the title 0xE8B, the set
+ * list (value -2), ten row groups (sub_00078320(0, 1, 4), one item
+ * sub_000792B0(0, row, 0, 40.0f, 4.0f, sub_002C1490, sub_002C0660),
+ * sub_00078380()) and the footer. With the switch this replays the same
+ * calls with twenty row groups inside the scrolling region the picker list
+ * sub_002C1EA0 and the weapon slot pane use (sub_000780E0(height, 0) ..
+ * sub_000781A0()), ten rows tall: every item made in it gets flag 0x40
+ * (0x0007914A) and its group adds the row height to the content +0x5C
+ * (0x000753CD), so the stock cursor, the pointer, the scrollbar and the wheel
+ * reach slots 11-20. The row index stays value + 2. Rows 11-20 borrow a
+ * work-copy row while their callbacks run (sets_borrow). */
+void pc_mapmaker_sets_build(void (*original)(void))
+{
+    uint32_t ret=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp):0u,menu=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,built,v;
+    int scene=(int)WORD_AT(SETS_SCENE);
+    sl.on=0;sl.valid=0;sl.opened=0;sl.last_row=-1;sl.last_scroll=-1.f;
+    if(scene!=102 || !sets_on() || !MAPMAKER_PTR_OK(menu,0x200u)) {
+        if(scene==102) sets_diag(0,"slot pane build (stock 10 rows: %s) ret=0x%08X menu=0x%08X",
+            !sets_on()?"TSFP_MAPMAKER_LIMITS is not 1":"no menu",ret,menu);
+        original();return;
+    }
+    guest_call(sub_00075B70,5,0x10u,0u,SETS_F45,0u,0x002C1450u);
+    guest_call(sub_00071BE0,3,1u,SETS_F5,SETS_F5);
+    guest_call(sub_00079D60,6,guest_call(sub_0003D7B0,1,0xE8Bu),0xFFFFFFFFu,0x04032404u,0u,0u,0u);
+    guest_call(sub_00079D60,6,0x004766D8u,0xFFFFFFFEu,0x08030C00u,0u,0u,0u);
+    guest_call(sub_002C1830,1,menu);
+    guest_call(sub_00079710,1,0u);
+    guest_call(sub_000780E0,2,SETS_VIEW,0u);
+    for(v=0;v<SETS_SLOTS;v++) {
+        guest_call(sub_00078320,3,0u,1u,4u);
+        guest_call(sub_000792B0,7,0u,v,0u,SETS_F40,SETS_ROW_HEIGHT,SETS_ROW_ACTION,SETS_ROW_DRAW);
+        guest_call(sub_00078380,0);
+    }
+    guest_call(sub_000781A0,0);
+    built=WORD_AT(SETS_BUILDING);
+    guest_call(sub_00077140,1,built);
+    guest_call(sub_00077360,3,WORD_AT(SETS_BUILDING),SETS_F5,SETS_F9_2);
+    guest_call(sub_00074A00,4,0u,guest_call(sub_0003D7B0,1,0xE88u),1u,0u);
+    guest_call(sub_00074A00,4,3u,guest_call(sub_0003D7B0,1,0x3B2u),1u,0u);
+    guest_call(sub_00074A00,4,1u,guest_call(sub_0003D7B0,1,0x1A27u),0u,0u);
+    sl.on=1;
+    sets_diag(0,"slot pane build (20 rows, scrolling) ret=0x%08X menu=0x%08X set=%d",ret,menu,(int)WORD_AT(SETS_INDEX));
+    MAPMAKER_GUEST_RET();
+}
+/* WRAP sub_002C0660 (cdecl pane, item, rect): a slot row's draw. It reads
+ * the row value at item +0x14 (0x002C0667) and the work-copy row of it (in
+ * the editor only rows below 10 get a name, 0x002C08A6); the highlight is
+ * the item pointer (sub_00071A60, 0x002C0A2B). */
+void pc_mapmaker_sets_row_draw(void (*original)(void))
+{
+    uint32_t item=MAPMAKER_STACK_OK(0x10)?WORD_AT(g_esp+8u):0u,v;
+    int k;
+    if(!MAPMAKER_PTR_OK(item,0x18u) || (k=sets_list_row(v=WORD_AT(item+0x14u)))<0) { original();return; }
+    WORD_AT(item+0x14u)=(uint32_t)k;sets_borrow((unsigned)k);
+    original();
+    sets_borrow((unsigned)k);WORD_AT(item+0x14u)=v;
+}
+/* Run a slot pane callback (row = pane +0x184 - 2, 0x002C1499 / 0x002C157E)
+ * for slot 11 + k as for slot 1 + k; the editor stops at row 10
+ * (0x002C14B3, 0x002C16D8). +0x18C (the highlighted value) follows. */
+static void sets_list_call(void (*original)(void),uint32_t pane,unsigned k)
+{
+    uint32_t idx=WORD_AT(pane+0x184u),val=WORD_AT(pane+0x18Cu);
+    WORD_AT(pane+0x184u)=k+2u;
+    if(val==idx-2u) WORD_AT(pane+0x18Cu)=k;
+    sets_borrow(k);
+    original();
+    sets_borrow(k);
+    if(WORD_AT(pane+0x184u)==k+2u) WORD_AT(pane+0x184u)=idx;
+    if(val==idx-2u && WORD_AT(pane+0x18Cu)==k) WORD_AT(pane+0x18Cu)=val;
+    sets_list_keep(k);
+}
+/* WRAP sub_002C1490 (cdecl pane): a slot row's action (opens the picker
+ * 0x0052374C when the set is custom). */
+void pc_mapmaker_sets_row_action(void (*original)(void))
+{
+    uint32_t pane=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u;
+    int k;
+    if(!MAPMAKER_PTR_OK(pane,0x200u) || (k=sets_list_row(WORD_AT(pane+0x184u)-2u))<0) { original();return; }
+    sets_list_call(original,pane,(unsigned)k);
+}
+/* WRAP sub_002C1570 (cdecl pane): the slot pane's update. For the
+ * highlighted row it shows the button hints, clears the row on X (+0x800000:
+ * id and portrait -1, 0x002C1718) and picks the preview ([0x0078AEA8], from
+ * the row's id and variant, 0x002C17F2). Logs the first update and moves of
+ * the highlight past row 10 or of the scroll. */
+void pc_mapmaker_sets_pane(void (*original)(void))
+{
+    uint32_t pane=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u;
+    int k,row;
+    float scroll;
+    if(!sets_list() || !MAPMAKER_PTR_OK(pane,0x200u)) { original();return; }
+    row=(int)WORD_AT(pane+0x184u)-2;scroll=sets_f(pane+0x88u);
+    if(!sl.opened) {
+        sl.opened=1;
+        sets_diag(0,"slot pane open: pane=0x%08X items=%u content=%.1f view=%.1f..%.1f scroll=%.1f slot=%d",
+            pane,WORD_AT(pane+0x180u),(double)sets_f(pane+0x5Cu),(double)sets_f(pane+0x6Cu),(double)sets_f(pane+0x70u),
+            (double)scroll,row+1);
+    } else if((row!=sl.last_row && row>=(int)SETS_STOCK) || scroll!=sl.last_scroll)
+        sets_diag(1,"list: slot %d highlighted, scroll %.1f of %.1f",row+1,(double)scroll,
+            (double)(sets_f(pane+0x5Cu)-(sets_f(pane+0x70u)-sets_f(pane+0x6Cu))));
+    sl.last_row=row;sl.last_scroll=scroll;
+    if((k=sets_list_row((uint32_t)row))<0) { original();return; }
+    sets_list_call(original,pane,(unsigned)k);
+}
+/* WRAP sub_002C1C90 (cdecl picker pane): the character picker's row
+ * callback; stores the pick into work-copy row (slot pane +0x184 - 2),
+ * 0x002C1CC7..0x002C1D56, then moves the slot highlight on while its value
+ * is below 9 (0x002C1D8E). Chained OUTSIDE pc_mapmaker_realbosses_pick so its
+ * fix-up of the work copy sees the borrowed row. Slots 11-20 store into
+ * their shadow row and move on to the next slot; slot 10 moves on to 11. */
+void pc_mapmaker_sets_pick(void (*original)(void))
+{
+    uint32_t picker=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,slot,idx,val,item;
+    int k,advance;
+    if(!sets_list() || !MAPMAKER_PTR_OK(picker,0x200u) ||
+       !MAPMAKER_PTR_OK(slot=guest_call(sub_00074670,2,WORD_AT(picker+0x2Cu),SETS_PANE),0x200u)) { original();return; }
+    idx=WORD_AT(slot+0x184u);val=WORD_AT(slot+0x18Cu);item=WORD_AT(picker+0x198u);
+    advance=MAPMAKER_PTR_OK(item,0x2Cu) && !(SETS_B(item+0x28u)&1u) &&    /* a disabled row picks nothing (0x002C1CA9) */
+            SETS_B(SETS_SUBMODE)!=0x13u && val==idx-2u;                   /* sub-mode 0x13 limits the rows (0x002C1D96) */
+    if((k=sets_list_row(idx-2u))<0) {
+        original();
+        if(advance && val==SETS_STOCK-1u && WORD_AT(slot+0x184u)==idx && WORD_AT(slot+0x18Cu)==val) sets_advance(slot,val+1u);
+        return;
+    }
+    WORD_AT(slot+0x184u)=(uint32_t)k+2u;WORD_AT(slot+0x18Cu)=SETS_STOCK-1u;   /* the stock advance stays off */
+    sets_borrow((unsigned)k);
+    original();
+    sets_borrow((unsigned)k);
+    WORD_AT(slot+0x184u)=idx;WORD_AT(slot+0x18Cu)=val;
+    sets_list_keep((unsigned)k);
+    if(advance && val+1u<SETS_SLOTS) sets_advance(slot,val+1u);
 }
 static void sets_title(uint32_t menu)
 {
@@ -285,37 +505,40 @@ static void sets_select(uint32_t pane,uint32_t row)
 }
 /* WRAP sub_002C0490 (cdecl menu): update of the character set screen
  * 0x0052375C; it reloads the 10-row work copy when the set index differs
- * from [0x0078AEAC] and stores it back (sub_002BFFD0) every frame. */
+ * from [0x0078AEAC] (sub_002C0310, then the portraits sub_002BE600 returning
+ * to 0x002C054C) and stores it back (sub_002BFFD0) every frame. With the
+ * 20-row list, when the screen opens or the index changes, it first runs once
+ * with the fill getters on members 10..19 (sets.page) and the reload forced:
+ * the stock code, every hook on it included (realbosses names its rows for
+ * that return address), fills the work copy with slots 11-20, which become
+ * the shadow rows; the work copy and [0x0078AEAC] are then put back and the
+ * original runs as stock for slots 1-10. Presets get empty rows 11-20. */
 void pc_mapmaker_sets_screen(void (*original)(void))
 {
-    uint32_t menu,pane,in;
-    int32_t row;
-    if(!sets_custom() || !MAPMAKER_STACK_OK(8) || !sets_on()) { sets.page=0;original();return; }
-    menu=WORD_AT(g_esp+4u);
-    if(!sets.forced && WORD_AT(SETS_LOADED)!=WORD_AT(SETS_INDEX)) sets.page=0;   /* opened or index changed */
-    sets.forced=0;
-    pane=MAPMAKER_PTR_OK(menu,0x208u)?guest_call(sub_00074670,2,menu,SETS_PANE):0u;
-    if(pane && MAPMAKER_PTR_OK(pane,0x200u)) {
-        row=(int32_t)WORD_AT(pane+0x18Cu);in=WORD_AT(pane+0xC4u);
-        if((!sets.page && row==(int32_t)SETS_STOCK-1 && (in&0x00020002u)) ||
-           (sets.page && row==0 && (in&0x00010001u))) {
-            sets.in_update=1;
-            guest_call(sub_002BFFD0,0);           /* keep this page's last change */
-            sets.page^=1;
-            WORD_AT(pane+0xC4u)&=~0x000F000Fu;WORD_AT(pane+0xC8u)&=~0xFu;
-            sets_select(pane,sets.page?0u:SETS_STOCK-1u);
-            WORD_AT(SETS_LOADED)=0xFFFFFFFFu;     /* the original reloads the work copy */
-            sets.forced=1;
-        }
+    uint32_t ret,index,loaded;
+    uint8_t save[sizeof sl.rows];
+    sets.page=0;
+    if(!sets_list() || !MAPMAKER_STACK_OK(8) || !sets_on()) { original();return; }
+    ret=WORD_AT(g_esp);index=WORD_AT(SETS_INDEX);
+    if(!sl.valid || sl.index!=index) {
+        if((int32_t)index>=0xC && sets_editor()) {
+            memcpy(save,sets_work(0),sizeof save);loaded=WORD_AT(SETS_LOADED);
+            sets.page=1;sets.in_update=1;WORD_AT(SETS_LOADED)=0xFFFFFFFFu;
+            original();                           /* pops the return address */
+            g_esp-=4u;WORD_AT(g_esp)=ret;         /* for the stock run below */
+            sets.page=0;sets.in_update=0;
+            memcpy(sl.rows,sets_work(0),sizeof sl.rows);
+            memcpy(sets_work(0),save,sizeof save);WORD_AT(SETS_LOADED)=loaded;
+        } else sets_list_empty();
+        sl.index=index;sl.valid=1;
     }
-    if(MAPMAKER_PTR_OK(menu,0x208u)) sets_title(menu);
     sets.in_update=1;
     original();                                   /* pops the return address */
     sets.in_update=0;
-    if(sets.forced && WORD_AT(SETS_LOADED)!=0xFFFFFFFFu) sets.forced=0;
 }
 /* WRAP sub_002C0290 (cdecl index; returns a set): the fill sub_002C0310
- * reads members +4.. of it; page 2 reads members 10..19. The slot name of
+ * reads members +4.. of it; the slot list's shadow load (sets.page inside
+ * the screen update) reads members 10..19. The slot name of
  * sub_00303350 case 3 (0x003033A4) reads member item - 0x38; while
  * sets_label asks for slot k (11-20) as item 0x38 + k - 10, member k. */
 void pc_mapmaker_sets_set_ptr(void (*original)(void))
@@ -325,8 +548,9 @@ void pc_mapmaker_sets_set_ptr(void (*original)(void))
     if(ret==SETS_FILL_RET && sets.in_update && sets.page && g_eax) g_eax+=8u*SETS_STOCK;
     else if(ret==SETS_NAME_SET_RET && sets.name_shift && g_eax) g_eax+=8u*SETS_STOCK;
 }
-/* WRAP sub_00312950 (returns the editor set in scene 102): page 2 for the
- * byte fill sub_003141B0, and the store's scratch. */
+/* WRAP sub_00312950 (returns the editor set in scene 102): members 10..19
+ * for the byte fill sub_003141B0 during the shadow load, and the store's
+ * scratch. */
 void pc_mapmaker_sets_editor_set(void (*original)(void))
 {
     uint32_t ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;
@@ -336,8 +560,9 @@ void pc_mapmaker_sets_editor_set(void (*original)(void))
     else if(ret==SETS_STORE_RET && sets.in_store) g_eax=SETS_SCRATCH;
 }
 /* WRAP sub_00314210 (cdecl work copy): stores 10 rows into members 0..9 and
- * the count of used rows into +0. Page 2 stores into a scratch set and
- * copies the rows to members 10..19; the count (rows 1-10, stock) stays. */
+ * the count of used rows into +0. During the shadow load (the update's tail
+ * store) it stores into a scratch set and copies the rows to members
+ * 10..19; the count (rows 1-10, stock) stays. */
 void pc_mapmaker_sets_store(void (*original)(void))
 {
     uint32_t e;
@@ -356,9 +581,10 @@ void pc_mapmaker_sets_store(void (*original)(void))
  * (0x002D36EA..0x002D3822) turns the 10 work-copy rows 0x0075FD90 into the
  * match's bots (0x0078AD6C.. per-actor bytes, 16 actors). The editor's Test
  * map setup (sub_002EFBF0 -> sub_002D38C0) reaches it in scene 102 with the
- * work copy the slot screen left behind: closed on slots 11-20, the test's
- * bots would be those. Refill rows 1-10 (sub_002C0310, index in eax) first;
- * stock fills them the same way when the screen opens. */
+ * work copy the slot screen left behind. The 20-row list always leaves rows
+ * 1-10 there (sets.page is set only inside its shadow load); should the
+ * getters still be shifted, refill rows 1-10 (sub_002C0310, index in eax)
+ * first, as stock fills them when the screen opens. */
 void pc_mapmaker_sets_match_start(void (*original)(void))
 {
     if(sets.page && WORD_AT(SETS_SCENE)==102u && (int32_t)WORD_AT(SETS_INDEX)>=0xC) {
