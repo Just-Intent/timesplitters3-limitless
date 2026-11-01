@@ -27,8 +27,9 @@ not an AI class at all; the mansion level runs it.
   `wrmdeath` 0x19B, named only by `pak/stream/lv1/anim/lv1_2.pak` (string
   0x0049D7BC, registered by `sub_001CA2F0` at 0x001CAD57 from table
   0x0048BEC8, 30 names; mounted before registration: `sub_0005C420` calls
-  `sub_001C8540` at 0x0005C501, `sub_001CA2F0` at 0x0005C558). Its two ids
-  shared with lv1_3/lv1_6 (0x193, 0x1AE) are the same Jo-Beth anims.
+  `sub_001C8540` at 0x0005C501, `sub_001CA2F0` at 0x0005C558; also
+  `sub_001C95F0`). Two of its names are also in lv1_3/lv1_6 (`jblookout`
+  0x193, `jbgrossend` 0x1AE): see [Shared anim names](#shared-anim-names-crash-after-v040-mapmaker24).
 - Health 12.1 (`+0x1CC`/`+0x1D8`, written at binding, 0x001D9B6E).
 
 ## How mission 5 runs it (CONFIRMED)
@@ -79,6 +80,7 @@ not an AI class at all; the mansion level runs it.
   | `0x0049DF10`, `0x0049DE40` | target box x -77.2..-55.7 (the target is the nearest player, clamped) | the update; `0x0049DE40` also `sub_001D5D70` |
   | `0x0049DF0C`, `0x0047D69C` | target box z -6.0..39.5 | `0x0047D69C` is shared with 7 other functions, none reachable from the update |
   | `0x0049DE3C`/`0x0049DE40`, `0x0049DE34`/`0x0049DE38` | wake region x -79..-55.7, z -7.9..40.3 | `sub_001D5D70` only |
+  | `0x0047D78C` | 27.0: a worm in state 2 south of it bursts out with `barney_worm` (+0x44C 2) | shared with 5 other functions, none reachable from the update |
   | `0x0049DDD8`/`0x0049DDD4` | worm 2's point (-62.31, 16.9) | init, update, draw `sub_001D9B80` |
   | `0x0049DE08` | -53.9, the mansion wall | draw: bodies are clipped at a screen line (`sub_001D2690`, fixed points `0x0049DE0C..0x0049DE18`) when the camera x is past it |
 
@@ -115,7 +117,8 @@ not an AI class at all; the mansion level runs it.
 
 ## What the area does (scene 100 story, `TSFP_MAPMAKER_LIMITS=1`)
 
-One worm per map: worm 0 is this map's, worms 1-4 are parked.
+Up to 4 map worms, each with its own worm block: in each block worm 0 is
+that map worm, worms 1-4 are parked ([Several mansion worms](#several-mansion-worms)).
 
 | hook | what |
 |---|---|
@@ -173,17 +176,35 @@ Logs (stderr, `[mapmaker] worm:`):
 - `mansion worm runs its story update`
 - `mansion worm head bound`
 - `mansion worm drawn`
+- `surfaced, state s, head height h, spawn floor f, worm height w` (each
+  surfacing, up to 8)
+- `lv1_2.pak: only the mansion worm's anims registered`
 - `mansion worm: the mansion script trigger dropped`
 - `mansion worm hit (state before, after)`
 - failures: `no pads near the mansion worm's spawn; bot behaviour`,
-  `only one mansion worm per map`, and so on
+  `more than 4 mansion worms in the map`, and so on
 
 ## Risks (INFERRED, need a playtest)
 
-- **Ground height**: the area assumes -2.4 (the worms' start height) is the
-  garden floor and puts it at the spawn floor. If the mansion floor differs,
-  the worm surfaces too high or too low by that difference. Look for this
-  first.
+- **Ground height** (CONFIRMED, test `test_heights`):
+  - -2.4 is the mission 5 garden floor: it is by far the most common height
+    of the level geometry (`data/mansion2.raw`'s geometry file in
+    `story/l_1_st.pak`) inside the worms' region.
+  - The worm's height (the burrowing constant and the starts) is that floor,
+    and the surfaced head is placed at it (`sub_001D9B80`); nothing probes
+    collision. The area puts it at the spawn floor (dy = spawn y + 2.4).
+  - The one fixed height: after a state-2 burst (+0x44C 2) stock puts the
+    head at (-62.31, **0**, 16.9) (0x001DA94C..0x001DA969). x and z follow
+    the shifted constants; after each draw the area adds dy to that y 0, so
+    it stays 2.4 above the floor, as in mission 5.
+  - The mapmaker.25 playtest ("floats above the ground, no proper animations
+    or logic") had the trophy monster and the skeleton in the set, so the
+    stopgap skipped lv1_2.pak and the worm ran as a MapMaker bot on its rig.
+    The registration fix gives it the story behaviour in that set too.
+  - Logs: `mansion garden moved by (dx, dz), floor y (mission 5: -2.4, the
+    garden floor)` and, at each surfacing (up to 8), `surfaced, state s,
+    head height h, spawn floor f, worm height w`. h should be about f (or
+    f + 2.4 after a state-2 burst).
 - **Space**: the worm only targets the nearest player clamped to a box of 21.5
   x 45.5 world units centred on the spawn (long axis along z), and wakes when
   a player enters a region of the same size. It burrows through anything; it
@@ -211,24 +232,95 @@ Logs (stderr, `[mapmaker] worm:`):
 - Untested: worm 2's scripted state 8 path (parked); the `0x2349` object
   (state 7, parked worms only).
 
-## Save format and stock games
+## Several mansion worms
+
+User request: every placed mansion worm should have its story behaviour.
+
+**Why not use the stock worms 1-4 of one block**: the stock update runs
+all five worms in one call, with one set of mission 5 coordinates. Map
+worms at different spawn points need their own offsets, so each map worm
+gets its own block.
+
+**What one block's code keeps globally** (CONFIRMED, test
+`test_multi_instance_globals`; written operands of the code reachable from
+the update, draw, hit callback, init and allocation):
+- the block `[0x0075B4B4]`, its init flag `[0x0075B4B8]`, the enable flag
+  `[0x0075B4BC]`, the "worms active" flag `[0x004FDC20]` and the five bound
+  heads `[0x0078FAE0..0x0078FAF0]`: 9 words, swapped per worm;
+- `[0x004FDC58]` (the pad conversion flag): kept 0 by the area during each
+  init and restored, as before;
+- the rest it writes is the body-geometry tables of `sub_001D1BD0` (the same
+  values every init) and the draw's scratch (`sub_001D2800`, rewritten every
+  draw): shared, not swapped.
+
+**What the area does**:
+- Up to 4 map worms (`WRM_MAX`), each with its own block (`wrm_alloc`: the
+  stock allocation and init with the stand-ins, worms 1-4 parked) and its own
+  copy of the 9 words.
+- Allocation: the first block at level init, each further one at that worm's
+  AI start. The globals as they were are put back after each allocation.
+- `wrm_enter(k)` / `wrm_leave(prev)` swap the copies around every entry into
+  that worm's code: its tick (the stock update, with its own constants
+  offsets and route pads), its hit callback, and its draw (the fx hook draws
+  each worm in turn).
+- The head lookup inside an update finds that worm's own head.
+- The scratch block (script block and object stand-ins) and the effect type
+  are shared by every worm. The kill counter is reset around every hit, so
+  it never reaches 5.
+- The fifth and later mansion worms keep the bot AI (logged).
+
+
 
 Unchanged: a stock custom-set member (word id 0x2C, sbyte variant -1). No
 Story AI chunk byte of its own (+0x29 is the bosses area's Boss flag). A stock
 game or an older fork build plays id 0x2C with the MapMaker bot class on the
 worm rig (no anims). Mission 5 holds the same id.
 
-## Shared anim ids (crash fixed after v0.4.0-mapmaker.24)
+## Shared anim names (crash after v0.4.0-mapmaker.24)
 
-User report: mapmaker.24 crashed at every level load with a set holding the giant trophy monster,
-the giant skeleton and the worm. CONFIRMED (crash dump: guest return 0x0005C562 = `sub_00350EC0`,
-called right after the anim name registration `sub_001CA2F0` at 0x0005C558; registration tables):
-lv1_2.pak's anim ids 0x13E..0x1AE (table 0x0048BEC8, 0x1E entries) overlap lv1_3.pak
-(0x0048C1B0, the trophy monster) and lv1_6.pak (0x0048C738, the skeleton); `sub_0005B980` stores
-each id's data by id (`0x007E03C0` map), so mounting them together overwrites one boss's anims
-with another's. Mission 5 never mounts them at the same time. Fix: the worm's mount hook skips
-lv1_2.pak when lv1_3.pak or lv1_6.pak is mounted (they mount first, inside the same chain); the
-worm then keeps the bot behaviour (logged). Remapping the ids so all three can coexist: not done.
+**User report**: mapmaker.24 crashed at every level load when a set held the
+giant trophy monster, the giant skeleton and the worm.
+
+**Crash site** (crash dump; CONFIRMED): guest return 0x0005C562 is
+`sub_00350EC0`, called right after the anim name registration `sub_001CA2F0`
+at 0x0005C558.
+
+**Cause** (CONFIRMED, decode and registration tables; test
+`test_lv1_paks_share_anim_ids`, `test_registration_sites_and_fixup`):
+- `sub_0005B980(prefix, table, count)` registers a mounted pak's names one by
+  one through `sub_00057F30(path, id, 0)`. That finds the anim file in the
+  mounted paks, maps the id (`0x007E03C0`) and **fixes the file up in place**:
+  its offsets become pointers (+0x1C, +0x28, +0x2C at 0x0005805F..).
+- lv1_2.pak's table (0x0048BEC8, 30 entries) names two Jo-Beth anims that
+  other boss paks also name: `jblookout` 0x193 (lv1_3.pak, 0x0048C1B0, the
+  trophy monster) and `jbgrossend` 0x1AE (lv1_6.pak, 0x0048C738, the
+  skeleton). With both paks mounted, the same anim is fixed up twice and its
+  pointers become junk (eax 0xFFC00000 in the dump).
+- No other id or name is shared. lv1_3 and lv1_6 share nothing, and the
+  worm's names are unique among lv1_2, lv1_3, lv1_6, lv81 and lv14 (test).
+- Mission 5 never mounts these paks together.
+
+**Fix**: in scene 100, `pc_mapmaker_worm_register` (on `sub_0005B980`)
+replaces lv1_2's whole table with the worm's own entries:
+- `barney_worm` 0x149 (entry 5), registered by a nested call;
+- `wrmburst` 0x194 .. `wrmdeath` 0x19B (entries 21..28), registered by the
+  original with the table and count arguments changed for the call and then
+  restored.
+
+The rest of the mansion cast (and the two shared Jo-Beth names) is not
+registered; MapMaker never uses them. The other bosses' paks keep their stock
+tables and ids. No anim id is remapped: the worm code requests 0x149 and
+0x194..0x19B, and none of these is registered by any other pak.
+
+`barney_worm` is needed: the update plays it on the head in state 9 when
++0x44C == 2 (0x001DBF46). +0x44C becomes 2 when a worm in state 2 is south
+of z 27.0 (0x001DB887..0x001DB8A4; `0x0047D78C`, shifted by dz with the
+other constants).
+
+**Fallback**: the stopgap of mapmaker.25 is kept for when
+`pc_mapmaker_worm_register` is off (`pc_mapmaker_area_enabled`). In that
+case the mount hook skips lv1_2.pak if lv1_3.pak or lv1_6.pak is mounted,
+and the worm keeps the bot behaviour (logged).
 
 ## Wrappers for the integrator
 
@@ -248,6 +340,8 @@ WRAP sub_00126560 -> pc_mapmaker_worm_fx         (layer with realbosses_fx/crowe
 WRAP sub_001D9370 -> pc_mapmaker_worm_props      (new; return-address test)
 WRAP sub_001D7200 -> pc_mapmaker_worm_extra      (new; return-address test)
 WRAP sub_00234CD0 -> pc_mapmaker_worm_script     (new; return-address test; 5 callers)
+WRAP sub_0005B980 -> pc_mapmaker_worm_register   (new; level load only; table 0x0048BEC8 count 0x1E test first)
+(several worms: no new wrapper; the same hooks swap each worm's globals)
 ```
 
 Each layer: `if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_<x>"))
@@ -261,7 +355,8 @@ Guest calls (`extern void ...(void)`, called with `guest_call`):
 `sub_0005A130(path)`, `sub_00062260(path)`, `sub_001D1E80()`,
 `sub_0003DFA0(size, 1)`, `sub_00378400(fn, n)`, `sub_001D2350()`,
 `sub_0010E2A0(emitter)`, `sub_001DAAB0()`, `sub_001DA990()`,
-`sub_0009A420(pad)`.
+`sub_0009A420(pad)`, `sub_0005B980(prefix, table, count)` (new, by
+`pc_mapmaker_worm_register`; a guest function the build already has).
 
 Link stubs to add in `tests/mapmaker/mapmaker_area_stubs.h` (new):
 `sub_001D1E80`, `sub_001D2350`, `sub_001DAAB0`, `sub_001DA990`,
@@ -309,8 +404,9 @@ entries.
 4. Shoot it while it is out (`hit` lines with states 9-11 -> 0xD), or use an
    explosive (-> 0xC). When it dies (`wrmdeath`) it sinks and the Story AI is
    removed. No map logic marker changes.
-5. Boss flag Boss bar: a bar while it is alive. A second Mansion Worm AI
-   fights as a bot (`only one mansion worm per map`). Mission 5 still plays
+5. Boss flag Boss bar: a bar while it is alive. Up to four Mansion Worm AIs
+   each burrow and attack around their own spawn; a fifth fights as a bot
+   (`more than 4 mansion worms in the map`). Mission 5 still plays
    stock.
 6. Report:
    - where it surfaces relative to the floor and the spawn;
