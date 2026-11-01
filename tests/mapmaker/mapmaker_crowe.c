@@ -57,16 +57,21 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)hook;ret
 static int pak_mounted, mount_ok=1, alloc_ok=1, parts_ok=1;
 static unsigned nmount, nalloc, nparts, ndraw, nexplode, nremove;
 static uint32_t mount_arg, draw_scene, explode_args[8], remove_arg;
-/* the stock grid: 5 x 7 cells (type 0 on even row and column), outer, 14 edges (10 used) */
+/* the stock grid: 5 x 7 cells (type 0 on even rows), outer, 14 edges (10 used).
+ * The type-0 cell nearest the outer centre is column 3; 310.0 is in column 4
+ * (grid_gap 1: in no cell, and cell 17 not a platform; 2: cell 18 not a
+ * platform). The build leaves -1 in the cell indices. */
+static int grid_gap;
 static void build_grid(uint32_t st)
 {
     unsigned k;
+    for(k=0;k<4u;k++) WORD_AT(st+0x1190u+k*4u)=0xFFFFFFFFu;
     for(k=0;k<35u;k++) {
         uint32_t c=st+0x970u+k*0x28u;
-        float x0=283.45f+(float)(k%7u)*6.0f,z0=61.2f+(float)(k/7u)*8.0f;
+        float x0=283.45f+(float)(k%7u)*6.0f+(grid_gap==1 && k%7u==4u?3.4f:0.0f),z0=61.2f+(float)(k/7u)*8.0f;
         SETF(c,x0);SETF(c+4u,z0);SETF(c+8u,x0+3.22f);SETF(c+0xCu,z0+3.2f);
         SETF(c+0x10u,x0+1.61f);SETF(c+0x14u,z0+1.6f);SETF(c+0x18u,1.61f);SETF(c+0x1Cu,1.6f);
-        WORD_AT(c+0x20u)=((k%7u)%2u || (k/7u)%2u)?1u:0u;WORD_AT(c+0x24u)=0;
+        WORD_AT(c+0x20u)=((k/7u)%2u || (grid_gap==1 && k==17u) || (grid_gap==2 && k==18u))?1u:0u;WORD_AT(c+0x24u)=0;
     }
     SETF(st+0xEE8u,283.45f);SETF(st+0xEECu,61.2f);SETF(st+0xEF0u,326.71f);SETF(st+0xEF4u,100.7f);
     SETF(st+0xEF8u,305.08f);SETF(st+0xEFCu,80.95f);SETF(st+0xF00u,21.63f);SETF(st+0xF04u,19.75f);
@@ -128,6 +133,23 @@ static void inner(void (*fn)(void (*)(void)),void (*orig)(void),uint32_t ret,uin
 static void fake_near(void) { seen_near=F(0x0049F3C4u);g_esp+=4u; }
 static void fake_spark(void) { seen_spark=F(g_esp+4u);g_esp+=4u; }
 static const uint32_t cad[7]={0x0049F3C4u,0x0049F4CCu,0x0049F4D0u,0x0049F4D4u,0x0049F3CCu,0x0049F3C8u,0x0049F3D8u};
+/* stock state 0: x = [0x0049F3D8], the cell of (x, own z) by sub_002A9330 into
+ * +0x1198/+0x119C, the boss on that cell's centre (index -1: cell -8) */
+static void fake_start(uint32_t ent)
+{
+    uint32_t st=WORD_AT(0x0075F5E8u),r,c,cell;
+    int32_t i;
+    float x=F(0x0049F3D8u),z=F(ent+0x6Cu);
+    for(r=0;r<5u;r++) {
+        cell=st+0x970u+r*7u*0x28u;
+        if(!(z>F(cell+4u) && F(cell+0xCu)>z)) continue;
+        for(c=0;c<7u;c++) { cell=st+0x970u+(r*7u+c)*0x28u;if(x>F(cell) && F(cell+8u)>x) { WORD_AT(st+0x1198u)=r;WORD_AT(st+0x119Cu)=c;break; } }
+        break;
+    }
+    i=(int32_t)WORD_AT(st+0x1198u)*7+(int32_t)WORD_AT(st+0x119Cu);
+    cell=st+0x970u+(uint32_t)(i*0x28);
+    SETF(ent+0x64u,F(cell+0x10u));SETF(ent+0x6Cu,F(cell+0x14u));
+}
 static void fake_fight(void)
 {
     unsigned k;
@@ -135,6 +157,7 @@ static void fake_fight(void)
     originals++;
     for(k=0;k<7u;k++) seen_const[k]=F(cad[k]);
     seen_state=WORD_AT(a+0x20u);seen_next=WORD_AT(a+0x9D0u);
+    if(seen_state==0u && WORD_AT(0x0075F5E8u)==CST) fake_start(WORD_AT(g_esp+4u));
     inner(pc_mapmaker_crowe_near,fake_near,0x00290BE7u,ENT(0));
     seen_after_near=F(0x0049F3C4u);
     inner(pc_mapmaker_crowe_sparks,fake_spark,0x00290C02u,0x42ACCCCDu);   /* 86.4 */
@@ -319,7 +342,8 @@ int main(void)
     WORD_AT(A(0)+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     CHECK(seen_state==0);
-    /* the type-0 cell nearest the outer centre (305.08, 80.95): row 2, col 4 = cell 18, centre (309.06, 78.8) */
+    /* the start cell: column 4 (holds 310.0), its platform nearest the outer centre z 80.95:
+     * row 2 = cell 18, centre (309.06, 78.8); not cell 17, the platform nearest the centre */
     gx=F(CST+0x970u+18u*0x28u+0x10u);gz=F(CST+0x970u+18u*0x28u+0x14u);
     CHECK(near_eq(gx,10.0f) && near_eq(gz,-20.0f));
     CHECK(near_eq(F(CST+0x970u+18u*0x28u),10.0f-1.61f) && near_eq(F(CST+0x970u+18u*0x28u+8u),10.0f+1.61f));
@@ -331,6 +355,9 @@ int main(void)
     CHECK(near_eq(F(CST+0xF60u),290.0f-299.06f) && near_eq(F(CST+0xF60u+9u*0x28u+0x14u),62.5f-98.8f));
     CHECK(WORD_AT(CST+0xF60u+10u*0x28u)==0 && WORD_AT(CST+0xF60u+13u*0x28u+0x14u)==0);   /* unused edges */
     CHECK(near_eq(crw_lv.dy,4.0f-86.0f));
+    /* stock state 0 left the boss on the spawn point and the start cell */
+    CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f) && near_eq(F(ENT(0)+0x68u),4.0f));
+    CHECK(WORD_AT(CST+0x1198u)==2u && WORD_AT(CST+0x119Cu)==4u && crw_lv.row==2u && crw_lv.col==4u && !crw_lv.place);
     /* during the call: the arena constants follow the floor and the grid */
     CHECK(near_eq(seen_const[0],4.0f) && near_eq(seen_const[1],86.205f-82.0f) && near_eq(seen_const[2],88.25f-82.0f));
     CHECK(near_eq(seen_const[3],88.4f-82.0f) && near_eq(seen_const[4],310.49f-299.06f) && near_eq(seen_const[5],80.95f-98.8f));
@@ -437,6 +464,28 @@ int main(void)
     WORD_AT(A(0)+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     CHECK(near_eq(F(CST+0x970u+18u*0x28u+0x10u),309.06f) && near_eq(seen_const[0],86.0f) && consts_stock());
+
+    /* ---- no cell holds 310.0: stock reads cell -8, the boss is put back ---- */
+    grid_gap=1;
+    CHECK(level_gives_class());
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
+    WORD_AT(A(0)+0x20u)=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    /* the platform nearest the centre (cell 18, centre 312.46; cell 17 is not one) is centred on the spawn */
+    CHECK(near_eq(F(CST+0x970u+18u*0x28u+0x10u),10.0f) && near_eq(F(CST+0x970u+18u*0x28u+0x14u),-20.0f));
+    CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f));
+    CHECK(WORD_AT(CST+0x1198u)==2u && WORD_AT(CST+0x119Cu)==4u && !crw_lv.place && consts_stock());
+    /* ---- the start column's nearest cell is not a platform: the nearest platform in it ---- */
+    grid_gap=2;
+    CHECK(level_gives_class());
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
+    WORD_AT(A(0)+0x20u)=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    /* column 4: rows 0 (62.8) and 4 (94.8) are platforms; row 4 is nearer 80.95 = cell 32 */
+    CHECK(near_eq(F(CST+0x970u+32u*0x28u+0x10u),10.0f) && near_eq(F(CST+0x970u+32u*0x28u+0x14u),-20.0f));
+    CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f));
+    CHECK(WORD_AT(CST+0x1198u)==4u && WORD_AT(CST+0x119Cu)==4u && crw_lv.row==4u && consts_stock());
+    grid_gap=0;
 
     /* ---- allocation failures --------------------------------------------- */
     alloc_ok=0;
