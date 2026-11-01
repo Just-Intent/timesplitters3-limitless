@@ -113,6 +113,13 @@
  *    (return 0x0014CD42) and 0x1635 (0x0014CD83, the state-9 timer from
  *    sub_00251800); in scene 100 those ids are the MapMaker level's own text,
  *    so our labels are returned there.
+ * Diagnostics (v0.4.0-mapmaker.25: no tank and no line after the model
+ * request): the character create sub_000DAC30 (id at [esp+4], pool slot at
+ * [esp+12]) logs each castle tank placeholder character and what came back;
+ * the Story AI spawn sub_0015F8C0 (entity at [esp+4]; it runs the AI start
+ * sub_0015B830 only when the placeholder's spawn logic, record +0xC, is true:
+ * sub_0006C890 -> sub_0006B100 in scene 100) logs once per placeholder that
+ * it is waiting, and when its AI start was reached.
  * The wake, area, target, state, gun and wreck hooks run inside a tank's
  * entry and act on the tank whose state is in the statics.
  * Not rebased (documented): the update's height tests (player y < -1.0 enters
@@ -198,6 +205,8 @@
 #define TNK_RET_SEARCH 0x00254848u       /* sub_00254690: the search's call to sub_00251CD0 */
 #define TNK_SEARCH_MAX 64u               /* points outside before every point counts */
 #define TNK_LV_LOGS 48u                  /* fight-state and search lines per level */
+#define TNK_SEEN 8u                      /* placeholders followed per level (diagnostics) */
+#define TNK_REC_LOGIC 0xCu               /* spawn record: its spawn logic (sub_0006C890) */
 #define TNK_MAX 4u                       /* castle tanks per map */
 #define TNK_BLOCK 0x0078B560u            /* the fight statics sub_00251AA0 zeroes */
 #define TNK_BLOCK_WORDS 0x19u
@@ -249,6 +258,8 @@ static struct {
     uint32_t rest[TNK_BLOCK_WORDS], rest_sounds[TNK_SOUNDS_WORDS];   /* the statics outside any tank */
     int shifted, requested;
     unsigned extras, events, logs;
+    struct { uint32_t actor; unsigned tries; int started, told; } seen[TNK_SEEN];   /* placeholders' spawns */
+    unsigned nseen, created;
 } tnk_lv;
 #define TK (tnk_lv.t[tnk_lv.act-1u])     /* the active tank (only with tnk_lv.act) */
 #define TNK_P(a) ((void *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -265,7 +276,8 @@ static void tnk_lvlog(const char *what,uint32_t a,uint32_t b)
 {
     if(tnk_lv.logs>TNK_LV_LOGS) return;
     if(tnk_lv.logs++==TNK_LV_LOGS) what="fight log budget used up for this level";
-    fprintf(stderr,"[mapmaker] tank %u: %s (%u, %u)\n",tnk_lv.act,what,(unsigned)a,(unsigned)b);
+    if(tnk_lv.act) fprintf(stderr,"[mapmaker] tank %u: %s (%u, %u)\n",tnk_lv.act,what,(unsigned)a,(unsigned)b);
+    else fprintf(stderr,"[mapmaker] tank: %s (0x%X, 0x%X)\n",what,(unsigned)a,(unsigned)b);
     fflush(stderr);
 }
 /* Logs the fight state when it changed: (new state, previous). */
@@ -460,6 +472,47 @@ void pc_mapmaker_tank_mount(void (*original)(void))
     else tnk_log(has<0?"mounted prop6.pak (map container unreadable)":"mounted prop6.pak for the castle tank",mounted+1u,0);
 }
 
+/* The diagnostics' record of placeholder actor a, or -1 when the table is full. */
+static int tnk_seen_slot(uint32_t a)
+{
+    unsigned k;
+    for(k=0;k<tnk_lv.nseen;k++) if(tnk_lv.seen[k].actor==a) return (int)k;
+    if(tnk_lv.nseen>=TNK_SEEN) return -1;
+    memset(&tnk_lv.seen[tnk_lv.nseen],0,sizeof tnk_lv.seen[0]);
+    tnk_lv.seen[tnk_lv.nseen].actor=a;
+    return (int)tnk_lv.nseen++;
+}
+
+/* WRAP sub_000DAC30 (cdecl character id, ..., pool slot -> object or 0): log only. */
+void pc_mapmaker_tank_create(void (*original)(void))
+{
+    uint32_t id=MAPMAKER_STACK_OK(16)?WORD_AT(g_esp+4u):0u,slot=id==TNK_ID?WORD_AT(g_esp+12u):0u;
+    original();
+    if(id!=TNK_ID || !tnk_play() || tnk.optout || tnk_lv.created>=TNK_SEEN) return;
+    tnk_lv.created++;
+    tnk_lvlog(g_eax?"castle tank placeholder character created (pool slot, object)":
+                    "castle tank placeholder character NOT created (pool slot, 0)",slot,g_eax);
+}
+
+/* WRAP sub_0015F8C0 (cdecl entity: a Story AI's spawn; its AI start runs only
+ * when the spawn logic is true): log only, once per placeholder and again
+ * when its AI start was reached. */
+void pc_mapmaker_tank_spawn(void (*original)(void))
+{
+    uint32_t ent,a,rec;
+    int k;
+    if(!MAPMAKER_STACK_OK(8) || !tnk_play() || tnk.optout || !MAPMAKER_PTR_OK(ent=WORD_AT(g_esp+4u),0x100u) ||
+       !MAPMAKER_PTR_OK(a=WORD_AT(ent+TNK_ENT_AI),TNK_ACTOR) || TNK_H(a+TNK_ACTOR_CHAR)!=TNK_ID || (k=tnk_seen_slot(a))<0) { original();return; }
+    rec=WORD_AT(a+TNK_ACTOR_RECORD);
+    original();
+    if(tnk_lv.seen[k].started) {
+        if(!tnk_lv.seen[k].told++) tnk_lvlog("castle tank placeholder spawn reached its AI start (actor, spawn tries)",a,tnk_lv.seen[k].tries+1u);
+    } else if(!tnk_lv.seen[k].tries)
+        tnk_lvlog("castle tank placeholder waiting to spawn: its spawn logic is not true yet (actor, logic)",a,
+                  MAPMAKER_PTR_OK(rec,0x30u)?WORD_AT(rec+TNK_REC_LOGIC):0xFFFFFFFFu);
+    tnk_lv.seen[k].tries++;
+}
+
 /* WRAP sub_0015B830 (cdecl AI pool entry): the placeholder becomes the tank. */
 void pc_mapmaker_tank_ai_start(void (*original)(void))
 {
@@ -469,7 +522,10 @@ void pc_mapmaker_tank_ai_start(void (*original)(void))
     if(!MAPMAKER_STACK_OK(8) || !tnk_play() || tnk.optout) { original();return; }
     a=WORD_AT(g_esp+4u);
     original();
-    if(!MAPMAKER_PTR_OK(a,TNK_ACTOR) || TNK_H(a+TNK_ACTOR_CHAR)!=TNK_ID || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;
+    if(!MAPMAKER_PTR_OK(a,TNK_ACTOR) || TNK_H(a+TNK_ACTOR_CHAR)!=TNK_ID) return;
+    {   int k=tnk_seen_slot(a);
+        if(k>=0) tnk_lv.seen[k].started=1; }
+    if(!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) { tnk_lvlog("castle tank placeholder AI started without an entity: stays a bot",a,0);return; }
     for(i=0;i<tnk_lv.n;i++) if(tnk_lv.t[i].place_ent==ent && tnk_lv.t[i].obj) return;   /* started again */
     if(tnk_lv.n>=TNK_MAX) {
         if(tnk_lv.extras++<4u) tnk_log("at most 4 castle tanks per map: this placeholder stays a bot",a,tnk_lv.n);

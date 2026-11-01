@@ -702,7 +702,46 @@ int main(void)
     CHECK(nremove==1);
     CHECK(ai_originals>0);
 
-    /* ---- several tanks: each runs with its own statics ------------------------------ */
+    /* ---- diagnostics: the placeholder's character and its spawn --------------------- */
+    if(tnk_lv.act) tnk_leave(tnk_lv.act,0);
+    play_scene();memset(&tnk_lv,0,sizeof tnk_lv);
+    orig_eax=0x00450000u;
+    CALL(pc_mapmaker_tank_create,fake,0x000DAD80u,0x12u,0,3u,1);
+    CHECK(tnk_lv.created==1u && tnk_lv.logs==1u);
+    CALL(pc_mapmaker_tank_create,fake,0x000DAD80u,0x13u,0,3u,1);     /* another character */
+    orig_eax=0;
+    CALL(pc_mapmaker_tank_create,fake,0x000DAD80u,0x12u,0,4u,1);     /* failed: logged too */
+    CHECK(tnk_lv.created==2u && tnk_lv.logs==2u);
+    WORD_AT(0x0079094Cu)=4u;
+    CALL(pc_mapmaker_tank_create,fake,0x000DAD80u,0x12u,0,3u,1);
+    CHECK(tnk_lv.created==2u);
+    play_scene();
+    actor(6,0x12,1.0f,2.0f,3.0f,0.0f);WORD_AT(REC(6)+0xCu)=0x77u;
+    actor(7,0x13,1.0f,2.0f,3.0f,0.0f);
+    n=tnk_lv.logs;
+    CALL(pc_mapmaker_tank_spawn,fake,0x0027F982u,ENT(7),0,0,1);      /* not a tank placeholder */
+    CHECK(!tnk_lv.nseen);
+    CALL(pc_mapmaker_tank_spawn,fake,0x0027F982u,ENT(6),0,0,1);      /* waiting: logged once */
+    CALL(pc_mapmaker_tank_spawn,fake,0x0027F982u,ENT(6),0,0,1);
+    CHECK(tnk_lv.nseen==1u && tnk_lv.seen[0].actor==A(6) && tnk_lv.seen[0].tries==2u && !tnk_lv.seen[0].started && tnk_lv.logs==n+1u);
+    pak_mounted=0;
+    CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(6),0,0,1);   /* its AI start (no tank: pak missing) */
+    CHECK(tnk_lv.seen[0].started);
+    n=tnk_lv.logs;
+    CALL(pc_mapmaker_tank_spawn,fake,0x0027F982u,ENT(6),0,0,1);
+    CALL(pc_mapmaker_tank_spawn,fake,0x0027F982u,ENT(6),0,0,1);
+    CHECK(tnk_lv.seen[0].told==2u && tnk_lv.logs==n+1u);              /* "reached" once */
+    WORD_AT(A(6))=0;                                                  /* no entity: said so */
+    n=tnk_lv.logs;
+    CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(6),0,0,1);
+    CHECK(tnk_lv.logs==n+1u);
+    WORD_AT(A(6))=ENT(6);
+    for(k=0;k<9u;k++) { actor(8u+(k&1u),0x12,0,0,0,0);WORD_AT(ENT(8u+(k&1u))+0x7Cu)=A(10u+k);
+                        WORD_AT(A(10u+k))=ENT(8u+(k&1u));HALF_AT(A(10u+k)+0x48u)=0x12u;
+                        CALL(pc_mapmaker_tank_spawn,fake,0x0027F982u,ENT(8u+(k&1u)),0,0,1); }
+    CHECK(tnk_lv.nseen==8u);                                          /* bounded */
+    pak_mounted=1;orig_eax=0;
+
     if(tnk_lv.act) tnk_leave(tnk_lv.act,0);
     WORD_AT(0x006D7880u)=10u;pak_mounted=0;
     CALL(pc_mapmaker_tank_mount,fake,0x001CDB8Au,0,0,0,1);           /* a new level */

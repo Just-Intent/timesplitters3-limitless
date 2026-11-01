@@ -131,6 +131,15 @@ MUTATIONS = {
     'gun-log-every-frame': ('WORD_AT(aim)!=TK.cannon[0] || WORD_AT(aim+4u)!=TK.cannon[1] || WORD_AT(aim+8u)!=TK.cannon[2]', '1'),
     'gun-not-remembered': ('WORD_AT(aim+i*4u)=TK.cannon[i]=WORD_AT(', 'WORD_AT(aim+i*4u)=WORD_AT('),
     'gun-log-unbudgeted': ('        if(TK.aims<TNK_AIM_LOGS) {', '        {'),
+    # diagnostics: the placeholder's character and spawn
+    'create-any-id': ('    if(id!=TNK_ID || !tnk_play() || tnk.optout || tnk_lv.created>=TNK_SEEN) return;', '    if(!tnk_play() || tnk.optout || tnk_lv.created>=TNK_SEEN) return;'),
+    'create-any-scene': ('    if(id!=TNK_ID || !tnk_play() || tnk.optout || tnk_lv.created>=TNK_SEEN) return;', '    if(id!=TNK_ID || tnk.optout || tnk_lv.created>=TNK_SEEN) return;'),
+    'spawn-log-every-try': ('    } else if(!tnk_lv.seen[k].tries)\n', '    } else\n'),
+    'spawn-reached-every-time': ('        if(!tnk_lv.seen[k].told++) tnk_lvlog', '        if(++tnk_lv.seen[k].told) tnk_lvlog'),
+    'spawn-any-character': ('TNK_H(a+TNK_ACTOR_CHAR)!=TNK_ID || (k=tnk_seen_slot(a))<0', '(k=tnk_seen_slot(a))<0'),
+    'start-not-noted': ('        if(k>=0) tnk_lv.seen[k].started=1; }', '        (void)k; }'),
+    'seen-unbounded': ('    if(tnk_lv.nseen>=TNK_SEEN) return -1;\n', ''),
+    'start-no-entity-silent': ('    if(!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) { tnk_lvlog("castle tank placeholder AI started without an entity: stays a bot",a,0);return; }', '    if(!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;'),
     # several tanks: each with its own statics
     'max-three': ('#define TNK_MAX 4u', '#define TNK_MAX 3u'),
     'restart-makes-another': ('    for(i=0;i<tnk_lv.n;i++) if(tnk_lv.t[i].place_ent==ent && tnk_lv.t[i].obj) return;   /* started again */\n', ''),
@@ -477,6 +486,19 @@ def test_per_tank_statics_and_entries():
     # the castle's own ways in: its 'KNAT' object, its level scripts
     assert calls_to(0x00256040) == {0x001E4059} and ('imm', 0x54414E4B) in a[0x001E4044].ops
     assert calls_to(0x002533E0) == {0x001E782A}
+
+
+def test_story_ai_spawn_gate():
+    """sub_0015F8C0 (a Story AI's spawn) runs the AI start sub_0015B830 only
+    when sub_0006C890(record +0xC, record +0x2C) is true; in scene 100 that is
+    the map logic sub_0006B100. sub_000DAC30 takes the character id at
+    [esp+4] and the pool slot at [esp+12]."""
+    a = by_address()
+    assert calls_to(0x0015F8C0) == {0x0027F97D, 0x0035810B}
+    assert mem(a[0x0015F8C9])[0][4] == 0x7C and mem(a[0x0015F901])[0][4] == 0xBF0
+    assert mem(a[0x0015F963])[0][4] == 0x2C and mem(a[0x0015F966])[0][4] == 0xC
+    assert target(a[0x0015F96B]) == 0x0006C890 and a[0x0015F975].mnemonic == 'je' and target(a[0x0015F97C]) == 0x0015B830
+    assert mem(a[0x0006C890])[0][4] == 0x0079094C and ('imm', 0x64) in a[0x0006C890].ops and target(a[0x0006C8AA]) == 0x0006B100
 
 
 def test_death_park_point():
