@@ -42,6 +42,7 @@ void sub_00075E70(void) { g_ecx=12; }
 void sub_00077320(void) { g_ecx=13; }
 void sub_0003D7B0(void) { g_ecx=14; }
 void sub_000BD090(void) { g_ecx=15; }
+void sub_00087310(void) { g_ecx=16; }
 
 #define DONE_STRING 0x00444000u
 static unsigned nopen, nframe, nrows, nopts, nbind, nend, ndone, nlast, npos;

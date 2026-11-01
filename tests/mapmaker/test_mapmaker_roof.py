@@ -98,13 +98,20 @@ MUTATIONS = {
     'draw-model-dword': ('(WORD_AT(prop+0x94u)&0xFFFFu)!=MAPMAKER_ROOF_ROOM_MODEL+room', 'WORD_AT(prop+0x94u)!=MAPMAKER_ROOF_ROOM_MODEL+room'),
     'count-wrong-stride': ('m=WORD_AT(first+i*MAPMAKER_ROOF_NODE+0x5Cu);', 'm=WORD_AT(first+i*0xC0u+0x5Cu);'),
     'count-hidden-anyway': ('if(m && (m&mask) && !(m&mask&~hide)) (*hidden)++;', 'if(m && !(m&mask&~hide)) (*hidden)++;'),
-    'out-rule-off': ('    if(!(y<mapmaker_roof_play.kill_y) && mapmaker_roof_play.out[slot]<MAPMAKER_ROOF_OUT_FRAMES) return;',
-                     '    if(!(y<mapmaker_roof_play.kill_y)) return;'),
+    'out-rule-off': ('    else if(mapmaker_roof_play.out[slot]>=MAPMAKER_ROOF_OUT_FRAMES) mapmaker_roof_kill(', '    else if(0) mapmaker_roof_kill('),
+    'room-rule-off': ('            if(++mapmaker_roof_play.noroom[slot]>=MAPMAKER_ROOF_NOROOM_QUERIES) {', '            if(0) {'),
+    'room-rule-no-reset': ('        } else if(rooms>0) mapmaker_roof_play.noroom[slot]=0;', '        }'),
+    'room-rule-fast': ('#define MAPMAKER_ROOF_NOROOM_QUERIES 8u', '#define MAPMAKER_ROOF_NOROOM_QUERIES 4u'),
+    'room-query-every-tick': ('    if((mapmaker_roof_play.ticks+slot)%MAPMAKER_ROOF_QUERY_EVERY==0u) {', '    if(1) {'),
+    'room-no-memory-kills': ('    if(!q) return -1;', '    if(!q) return 0;'),
+    'room-box-at-feet': ('FLOAT_AT(q+4u)=y+MAPMAKER_ROOF_BODY_LOW;', 'FLOAT_AT(q+4u)=y;'),
+    'room-box-flat': ('FLOAT_AT(q+0x10u)=y+MAPMAKER_ROOF_BODY_HIGH;', 'FLOAT_AT(q+0x10u)=y+MAPMAKER_ROOF_BODY_LOW;'),
     'humans-skipped': ('    for(i=0;i<h;i++) if(human[i]) mapmaker_roof_fall_check(', '    for(i=0;i<0u;i++) if(human[i]) mapmaker_roof_fall_check('),
     'inactive-player': ('        if((int32_t)WORD_AT(pl+4u)<0 || !MAPMAKER_PTR_OK(', '        if(!MAPMAKER_PTR_OK('),
     'player-entity-offset': ('ent=WORD_AT(pl+0x14u),0x1D0u)', 'ent=WORD_AT(pl+0x10u),0x1D0u)'),
     'out-rule-at-floor': ('#define MAPMAKER_ROOF_OUT_DEPTH 5.0f', '#define MAPMAKER_ROOF_OUT_DEPTH 0.0f'),
-    'out-not-reset': ('{ mapmaker_roof_play.out[slot]=0;mapmaker_roof_play.below[slot]=0;return; }', '{ mapmaker_roof_play.below[slot]=0;return; }'),
+    'out-not-reset': ('    if(!(y<mapmaker_roof_play.out_y)) { mapmaker_roof_play.out[slot]=0;mapmaker_roof_play.below[slot]=0;return; }',
+                      '    if(!(y<mapmaker_roof_play.out_y)) { mapmaker_roof_play.below[slot]=0;return; }'),
     'rooms-wrong-base': ('mapmaker_roof_play.hide[base+j]=MAPMAKER_ROOF_SIDES;', 'mapmaker_roof_play.hide[j]=MAPMAKER_ROOF_SIDES;'),
     'rooms-one-room': ('    for(j=0;(int32_t)count>0 && j<count;j++) {', '    for(j=0;(int32_t)count>0 && j<1u;j++) {'),
     'rooms-not-reset': ('    memset(mapmaker_roof_play.hide,0,sizeof mapmaker_roof_play.hide);\n', ''),
@@ -119,7 +126,7 @@ MUTATIONS = {
     'kill-bounded-too': ('    if(mode==MAPMAKER_ROOF_OPEN_AIR) mapmaker_roof_play.unbounded++;', '    if(mode) mapmaker_roof_play.unbounded++;'),
     'kill-any-scene': ('    if(!mapmaker_roof_play.kill || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY) return;',
                        '    if(!mapmaker_roof_play.kill) return;'),
-    'kill-the-dead': ('    if(!(health>0.0f) || !(y<mapmaker_roof_play.out_y))', '    if(!(y<mapmaker_roof_play.out_y))'),
+    'kill-the-dead': ('    if(!(health>0.0f)) { mapmaker_roof_play.out[slot]=', '    if(0) { mapmaker_roof_play.out[slot]='),
     'kill-no-entry-check': (' || WORD_AT(ent+0x7Cu)!=actor) continue;', ') continue;'),
     'kill-floor-ignored': ('mapmaker_roof_play.kill_y=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-MAPMAKER_ROOF_KILL_DEPTH;',
                            'mapmaker_roof_play.kill_y=-MAPMAKER_ROOF_KILL_DEPTH;'),
@@ -369,8 +376,22 @@ def test_bounded_and_fall_sites():
     assert at[0x000BD0D2].text == 'dword ptr [esp + 0xc], 0'           # no attacker
     assert at[0x00067AF1].ops[1][4] == 0x007A3580 and at[0x00067B58].ops[0][1] == 0x000BD090
     assert at[0x00067AFE].text == 'xmm0, dword ptr [eax + 0x1cc]'
+    # The player hazard kill uses the same helper in MapMaker play (scene 100
+    # hook first), on the entity of the current player struct (+0x14).
+    assert at[0x000D672B].text == 'dword ptr [0x79094c], 0x64'
+    assert at[0x000D673E].ops[0][1] == 0x000BD090 and at[0x000D673D].text == 'ebp'
+    assert at[0x000D5EB5].text == 'ecx, dword ptr [eax + 0x14]' and at[0x000D5EBC].text == 'esi, dword ptr [ecx + 0x7c]'
+    # y is up: the scene-61 kill is -100.0 > y, fall damage is start - landing height.
+    assert at[0x0015F1B3].ops[1][4] == 0x0047D6D8 and at[0x0015F1BB].text == 'xmm0, dword ptr [esi + 0x68]'
+    assert at[0x000D4449].text == 'xmm0, dword ptr [edi + 0xbfc]' and at[0x000D4441].text == 'xmm0, dword ptr [edi + 0xb70]'
+    # The floor probe searches only the character's room (+0x34) and keeps
+    # the last floor when it finds none; the room's search honours inst+0x30.
+    assert at[0x000D9149].text == 'ecx, dword ptr [esi + 0x34]' and at[0x000D9184].ops[0][1] == 0x000C3B10
+    assert at[0x000D91AA].text == 'dword ptr [edi + 0xbfc], xmm0' and 'jnp' in at[0x000D91A2].mnemonic
+    assert at[0x000C3B46].text == 'esi, dword ptr [0x7b975c]' and at[0x000C3B6C].text == 'edx, dword ptr [ecx + 0x30]'
     read = _xbe()
     assert struct.unpack('<f', read(0x004760CC, 4))[0] == 5.0
+    assert struct.unpack('<f', read(0x0047D6D8, 4))[0] == -100.0
 
 
 def test_wrappers_documented():
