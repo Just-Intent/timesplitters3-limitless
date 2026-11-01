@@ -337,7 +337,7 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
     int read, optout;
-    uint32_t label, skel_label, walk_label, well;
+    uint32_t label, skel_label, walk_label, well, extra_label[3];
     unsigned logged, meters;
     struct { uint32_t record; uint8_t boss; } real[RBS_REAL_MAX];
 } rbs;
@@ -402,6 +402,42 @@ static uint32_t rbs_walk_label(void)
     }
     return rbs.walk_label;
 }
+/* Picker rows of the bosses ported in their own areas (pc_mapmaker_robot.inc,
+ * pc_mapmaker_crowe.inc, pc_mapmaker_tank.inc), which own the play side; only
+ * the editor rows live here, built like the rows above. Ids: 0x42 giant robot
+ * (model 0x5F2), 0x46 split Crowe (0x5E8), 0x12 the guard robot that stands in
+ * for the castle tank prop (pc_mapmaker_tank.inc). sub_002BE270 is 0 for all
+ * three (byte table 0x002BE29C entry 1), so the variant is -1 as for 0x15. */
+#define RBS_EXTRA_N 3u
+static const struct { uint32_t row, id, text, standin; char label[16]; } rbs_extra[RBS_EXTRA_N]={
+    {153u,0x42u,0x52420042u,0xA8u,"Giant Robot"},  /* preview: the Arcade giant robot */
+    {154u,0x46u,0x52420046u,0x1Eu,"Split Crowe"},  /* preview: Arcade Old Crow */
+    {155u,0x12u,0x52420012u,0xA8u,"Castle Tank"},  /* preview: the Arcade giant robot */
+};
+static unsigned rbs_extra_by_row(uint32_t row)
+{
+    unsigned k;
+    for(k=0;k<RBS_EXTRA_N && rbs_extra[k].row!=row;k++) {}
+    return k;
+}
+static unsigned rbs_extra_by_id(uint32_t id)
+{
+    unsigned k;
+    for(k=0;k<RBS_EXTRA_N && rbs_extra[k].id!=id;k++) {}
+    return k;
+}
+static uint32_t rbs_extra_label(unsigned k)
+{
+    if(k>=RBS_EXTRA_N) return 0;
+    if(!rbs.extra_label[k]) {
+        uint32_t p=xbox_HeapAlloc(sizeof rbs_extra[k].label,4u);
+        if(p && MAPMAKER_PTR_OK(p,sizeof rbs_extra[k].label)) {
+            memcpy((void *)((uintptr_t)p+g_xbox_mem_offset),rbs_extra[k].label,sizeof rbs_extra[k].label);
+            rbs.extra_label[k]=p;
+        } else rbs_log("no memory for a boss label",rbs_extra[k].row,0);
+    }
+    return rbs.extra_label[k];
+}
 static uint32_t rbs_arcade_row(uint32_t id)
 {
     uint32_t i;
@@ -415,6 +451,7 @@ static uint32_t rbs_preview_row(uint32_t row)
     if(row==RBS_ROW) return rbs_trophy_row();
     if(row==RBS_SKEL_ROW) return rbs_arcade_row(RBS_SKEL_STANDIN);
     if(row==RBS_WALK_ROW) return rbs_arcade_row(RBS_WALK_STANDIN);
+    if(rbs_extra_by_row(row)<RBS_EXTRA_N) return rbs_arcade_row(rbs_extra[rbs_extra_by_row(row)].standin);
     return row;
 }
 
@@ -425,6 +462,7 @@ static int rbs_editor(void) { return rbs_on() && WORD_AT(RBS_SCENE)==102u; }
 void pc_mapmaker_realbosses_picker_end(void (*original)(void))
 {
     uint32_t text;
+    unsigned k;
     if(MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==RBS_PICKER_END && rbs_editor() && (text=rbs_label())!=0) {
         guest_call(sub_00079D60,6,text,RBS_ROW,RBS_PICK_FLAGS,0u,RBS_PICK_CB,0u);
         guest_call(sub_00071C70,2,guest_call(sub_00071630,0),0u);   /* enabled, as the stock rows */
@@ -436,6 +474,10 @@ void pc_mapmaker_realbosses_picker_end(void (*original)(void))
             guest_call(sub_00079D60,6,text,RBS_WALK_ROW,RBS_PICK_FLAGS,0u,RBS_PICK_CB,0u);
             guest_call(sub_00071C70,2,guest_call(sub_00071630,0),0u);
         }
+        for(k=0;k<RBS_EXTRA_N;k++) if((text=rbs_extra_label(k))!=0) {
+            guest_call(sub_00079D60,6,text,rbs_extra[k].row,RBS_PICK_FLAGS,0u,RBS_PICK_CB,0u);
+            guest_call(sub_00071C70,2,guest_call(sub_00071630,0),0u);
+        }
     }
     original();
 }
@@ -445,6 +487,7 @@ void pc_mapmaker_realbosses_picker_end(void (*original)(void))
 void pc_mapmaker_realbosses_pick(void (*original)(void))
 {
     uint32_t k,s,id;
+    unsigned e;
     original();
     if(!rbs_editor()) return;
     for(k=0;k<RBS_SLOT_COUNT;k++) {
@@ -452,9 +495,11 @@ void pc_mapmaker_realbosses_pick(void (*original)(void))
         if(WORD_AT(s+0x14u)==RBS_ROW) id=RBS_ID;
         else if(WORD_AT(s+0x14u)==RBS_SKEL_ROW) id=RBS_SKEL_ID;
         else if(WORD_AT(s+0x14u)==RBS_WALK_ROW) id=RBS_WALK_ID;
+        else if((e=rbs_extra_by_row(WORD_AT(s+0x14u)))<RBS_EXTRA_N) id=rbs_extra[e].id;
         else continue;
         if(WORD_AT(s)!=id) rbs_log(id==RBS_ID?"slot set to the giant trophy monster":
-                                   id==RBS_SKEL_ID?"slot set to the giant skeleton":"slot set to the Crow walker",k,id);
+                                   id==RBS_SKEL_ID?"slot set to the giant skeleton":
+                                   id==RBS_WALK_ID?"slot set to the Crow walker":"slot set to a ported story boss",k,id);
         WORD_AT(s)=id;
         WORD_AT(s+0x18u)=0xFFFFFFFFu;
     }
@@ -471,9 +516,10 @@ void pc_mapmaker_realbosses_highlight(void (*original)(void))
 void pc_mapmaker_realbosses_row_of(void (*original)(void))
 {
     uint32_t ret,row,id;
-    if(!MAPMAKER_STACK_OK(16) || ((id=WORD_AT(g_esp+4u))!=RBS_ID && id!=RBS_SKEL_ID && id!=RBS_WALK_ID) || !rbs_editor()) { original();return; }
+    if(!MAPMAKER_STACK_OK(16) || ((id=WORD_AT(g_esp+4u))!=RBS_ID && id!=RBS_SKEL_ID && id!=RBS_WALK_ID &&
+       rbs_extra_by_id(id)>=RBS_EXTRA_N) || !rbs_editor()) { original();return; }
     ret=WORD_AT(g_esp);
-    row=id==RBS_ID?RBS_ROW:id==RBS_SKEL_ID?RBS_SKEL_ROW:RBS_WALK_ROW;
+    row=id==RBS_ID?RBS_ROW:id==RBS_SKEL_ID?RBS_SKEL_ROW:id==RBS_WALK_ID?RBS_WALK_ROW:rbs_extra[rbs_extra_by_id(id)].row;
     if(ret==RBS_RET_RELOAD || (ret==RBS_RET_NAME && WORD_AT(g_esp+12u)==RBS_RET_NAME_OUTER)) {}
     else if(ret==RBS_RET_PREVIEW1 || ret==RBS_RET_PREVIEW2) row=rbs_preview_row(row);
     else { original();return; }
@@ -485,6 +531,12 @@ void pc_mapmaker_realbosses_row_of(void (*original)(void))
 void pc_mapmaker_realbosses_row_text(void (*original)(void))
 {
     uint32_t row;
+    unsigned e;
+    if(MAPMAKER_STACK_OK(8) && (e=rbs_extra_by_row(WORD_AT(g_esp+4u)))<RBS_EXTRA_N && rbs_editor() && rbs_extra_label(e)) {
+        g_eax=rbs_extra[e].text;
+        MAPMAKER_GUEST_RET();
+        return;
+    }
     if(!MAPMAKER_STACK_OK(8) || ((row=WORD_AT(g_esp+4u))!=RBS_ROW && row!=RBS_SKEL_ROW && row!=RBS_WALK_ROW) || !rbs_editor() ||
        !(row==RBS_ROW?rbs_label():row==RBS_SKEL_ROW?rbs_skel_label():rbs_walk_label())) { original();return; }
     g_eax=row==RBS_ROW?RBS_TEXT:row==RBS_SKEL_ROW?RBS_SKEL_TEXT:RBS_WALK_TEXT;
@@ -512,6 +564,14 @@ void pc_mapmaker_realbosses_text(void (*original)(void))
         g_eax=rbs.walk_label?rbs.walk_label:RBS_EMPTY_TEXT;
         MAPMAKER_GUEST_RET();
         return;
+    }
+    if((id&0xFFFFFF00u)==0x52420000u) {               /* the ported bosses' rows */
+        unsigned k;
+        for(k=0;k<RBS_EXTRA_N;k++) if(rbs_extra[k].text==id) {
+            g_eax=rbs.extra_label[k]?rbs.extra_label[k]:RBS_EMPTY_TEXT;
+            MAPMAKER_GUEST_RET();
+            return;
+        }
     }
     if(id==RBS_BAR_TEXT && WORD_AT(g_esp)==RBS_RET_BAR_TEXT && rbs.label && rbs_play()) {
         g_eax=rbs.label;

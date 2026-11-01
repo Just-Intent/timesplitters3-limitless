@@ -478,6 +478,14 @@ Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained (no hang report).
+Ported bosses in their own areas (parallel sessions, merged 2026-11-01; not
+played): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
+`crowe` (`pc_mapmaker_crowe.inc`, id 0x46, mapmaker-crowe.md), `tank`
+(`pc_mapmaker_tank.inc`: guard robot id 0x12 placeholder -> castle tank prop
+0x281 from prop6.pak, mapmaker-tank.md). Wrapper lists: each doc. ORDER puts them
+after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
+realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
+`rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
 of `sub_0029CE00` (+0x3E88 == 1, `sub_002A7F30`). Walker missing: log-only
 WRAP `sub_000DAC30` -> `pc_mapmaker_realbosses_create`, AI-start log.

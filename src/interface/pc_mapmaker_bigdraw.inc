@@ -60,6 +60,8 @@
 #define BIGDRAW_SKELETON 0x5E9u          /* CHR_MANSION_MANSIONBOSS */
 #define BIGDRAW_TROPHY 0x5BEu            /* CHR_MANSION_DEERBEAST */
 #define BIGDRAW_WALKER 0x637u            /* chrs/walkercrow */
+#define BIGDRAW_ROBOT 0x5F2u             /* chrs/FF2GiantRobot */
+#define BIGDRAW_CROWE 0x5E8u             /* chrs/splittercrow */
 #define BIGDRAW_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 static struct { unsigned long long widened, unseen; unsigned logged; } mapmaker_bigdraw;
@@ -80,7 +82,8 @@ void pc_mapmaker_bigdraw_rect(void (*original)(void))
     original();
     if(!prop || !MAPMAKER_PTR_OK(prop,BIGDRAW_PROP_SIZE)) return;
     model=BIGDRAW_H(prop+BIGDRAW_MODEL);
-    if((model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY && model!=BIGDRAW_WALKER) || WORD_AT(prop+BIGDRAW_TYPE)!=BIGDRAW_CHARACTER) return;
+    if((model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY && model!=BIGDRAW_WALKER &&
+        model!=BIGDRAW_ROBOT && model!=BIGDRAW_CROWE) || WORD_AT(prop+BIGDRAW_TYPE)!=BIGDRAW_CHARACTER) return;
     mapmaker_limits_read();
     if(!mapmaker_limits.limits || WORD_AT(BIGDRAW_SCENE)!=BIGDRAW_PLAY) return;
     vp=WORD_AT(BIGDRAW_VIEWPORT);
