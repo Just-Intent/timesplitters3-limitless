@@ -101,6 +101,14 @@ container (info `+0x10`, else the tileset table `0x0052CF40` byte `+2`), and:
    while the original runs (the stale value of the previous map is put back;
    `sub_0023F390` writes the same sky later).
 
+Extra skies (`docs/mapmaker/mapmaker-sky-music.md`): when the map has an
+extra sky row (info flag bits 19..23) and `pc_mapmaker_skymusic_mount`
+mounted its pak this level, `mapmaker_sky_index` returns that story record
+and the hook sets the level's sky to it while the original runs, without
+patching anything, so the record's own cloud fields apply (record 5 has
+clouds). With the pak missing the map's MapMaker fallback sky is used as
+above.
+
 Story safety: no entry of the 87-entry level table `0x00515FF8` uses skies
 58..67 (checked by `tests/mapmaker/test_mapmaker_sky.py` when the XBE is present), the
 hook acts only in scene 100, and nothing is written in other scenes. INFERRED:
@@ -546,7 +554,8 @@ What the user tests:
 
 ## Tests
 
-- `tests/mapmaker/test_mapmaker_sky.py`: fixture (20 mutations: scene gates, limits
+- `tests/mapmaker/test_mapmaker_sky.py`: fixture (24 mutations: extra sky without its pak,
+  extra row bounds, extra sky kept and level sky restored; scene gates, limits
   gate, restore, level sky set/restored, template, sky range, tileset default,
   stock-bit collision, read before rebuild, load/new-map/editor-change state,
   checkbox caller/binding/refresh, rebuild container, chunk walk) and the stock
