@@ -50,9 +50,16 @@
  *    fight never starts) and then fires level marker 5 (sub_00227650(5, 3.0)).
  *    For our tank: 1 when a living player stands within TNK_WAKE metres
  *    (x/z) of it, else 0; no marker.
- *  - area (sub_00251CD0, ecx = point: inside one of three castle gate
- *    rectangles 0x0051BB58.. -> states 6/8 and the random-target rejection):
- *    0 for our tank; a MapMaker map has no castle gate.
+ *  - area (sub_00251CD0, ecx = point -> inside the courtyard: the union of
+ *    three castle rectangles 0x0051BB58.., x -21.8..-3, z -10..13): the
+ *    stock test with the point moved by -d, so the courtyard sits around the
+ *    spawn (inside the castle-frame calls below the point is already moved).
+ *    Player inside -> state 6, tank outside -> state 8; the drive target
+ *    search in sub_00254690 (0x002547E0..0x002548A2) only counts points
+ *    inside and loops until it has 10 of them or one 10 m from the tank:
+ *    v0.4.0-mapmaker.22 answered 0 here and that loop never ended (freeze
+ *    right after the fight started). As a guard, after TNK_SEARCH_MAX
+ *    points outside in one search every point counts (logged).
  *  - target (sub_00254690, edi = tank: picks the drive target [0x0078B580..88]
  *    from castle constants: arena box x -19.1..-5, z -10..13 and fixed points)
  *    and state (sub_00255390, eax = tank, on entering state 7 "player below
@@ -149,6 +156,11 @@
 #define TNK_GUN_AIM 0x10u
 #define TNK_GUN_COUNT 5u
 #define TNK_STATE_LOW 7u                 /* "player below the courtyard" */
+#define TNK_YARD 0x0051BB58u             /* courtyard rectangles x1, z1, x2, z2 (castle frame) */
+#define TNK_YARD_COUNT 3u
+#define TNK_RET_SEARCH 0x00254848u       /* sub_00254690: the search's call to sub_00251CD0 */
+#define TNK_SEARCH_MAX 64u               /* points outside before every point counts */
+#define TNK_LV_LOGS 48u                  /* fight-state and search lines per level */
 #define TNK_CX (-12.05f)                 /* castle arena centre: x -19.1..-5 */
 #define TNK_CY 0.0f                      /* courtyard floor (INFERRED) */
 #define TNK_CZ 1.5f                      /* z -10..13 */
@@ -181,6 +193,8 @@ static struct {
     float d[3], spawn[3];
     int shifted, requested;
     unsigned extras, events, wakes;
+    uint32_t seen_state;                 /* last fight state logged */
+    unsigned misses, logs;               /* points outside in this search; lines this level */
 } tnk_lv;
 
 static void tnk_log(const char *what,uint32_t a,uint32_t b)
@@ -189,6 +203,22 @@ static void tnk_log(const char *what,uint32_t a,uint32_t b)
     tnk.logged++;
     fprintf(stderr,"[mapmaker] tank: %s (0x%X, 0x%X)\n",what,(unsigned)a,(unsigned)b);
     fflush(stderr);
+}
+/* Fight lines: their own budget per level, so the last state reached shows. */
+static void tnk_lvlog(const char *what,uint32_t a,uint32_t b)
+{
+    if(tnk_lv.logs>TNK_LV_LOGS) return;
+    if(tnk_lv.logs++==TNK_LV_LOGS) what="fight log budget used up for this level";
+    fprintf(stderr,"[mapmaker] tank: %s (%u, %u)\n",what,(unsigned)a,(unsigned)b);
+    fflush(stderr);
+}
+/* Logs the fight state when it changed: (new state, previous). */
+static void tnk_note_state(const char *where)
+{
+    uint32_t s=WORD_AT(TNK_STATE),was=tnk_lv.seen_state;
+    if(s==was) return;
+    tnk_lv.seen_state=s;
+    tnk_lvlog(where,s,was);
 }
 static int tnk_on(void)
 {
@@ -385,7 +415,9 @@ void pc_mapmaker_tank_ai_start(void (*original)(void))
 void pc_mapmaker_tank_update(void (*original)(void))
 {
     uint32_t a,ent,player;
-    if(!tnk_lv.place || !MAPMAKER_STACK_OK(8) || !tnk_mine(WORD_AT(g_esp+4u))) { original();return; }
+    if(!MAPMAKER_STACK_OK(8) || !tnk_mine(WORD_AT(g_esp+4u))) { original();return; }
+    tnk_note_state("fight state at frame start (state, previous)");
+    if(!tnk_lv.place) { original();return; }
     a=tnk_lv.place;ent=tnk_lv.place_ent;tnk_lv.place=0;
     if(MAPMAKER_PTR_OK(a,TNK_ACTOR) && WORD_AT(a+TNK_ACTOR_RECORD)==tnk_lv.place_rec && WORD_AT(a)==ent &&
        MAPMAKER_PTR_OK(ent,0x100u) && WORD_AT(ent+TNK_ENT_AI)==a) {
@@ -417,11 +449,33 @@ void pc_mapmaker_tank_wake(void (*original)(void))
     MAPMAKER_GUEST_RET();
 }
 
-/* WRAP sub_00251CD0 (ecx = point -> inside a castle gate rectangle): never. */
+/* sub_00251CD0's test in the castle frame: strictly inside a rectangle. */
+static int tnk_yard(float x,float z)
+{
+    uint32_t k,r;
+    float x1,z1,x2,z2,t;
+    for(k=0;k<TNK_YARD_COUNT;k++) {
+        r=TNK_YARD+k*16u;
+        x1=tnk_getf(r);z1=tnk_getf(r+4u);x2=tnk_getf(r+8u);z2=tnk_getf(r+12u);
+        if(x1>x2) { t=x1;x1=x2;x2=t; }
+        if(z1>z2) { t=z1;z1=z2;z2=t; }
+        if(x2>x && x>x1 && z2>z && z>z1) return 1;
+    }
+    return 0;
+}
+
+/* WRAP sub_00251CD0 (ecx = point x, y, z -> inside the courtyard). */
 void pc_mapmaker_tank_area(void (*original)(void))
 {
-    if(!tnk_lv.obj || !MAPMAKER_STACK_OK(4) || WORD_AT(TNK_SCENE)!=100u || !tnk_on()) { original();return; }
-    g_eax=0;
+    float x,z;
+    if(!tnk_lv.obj || !MAPMAKER_STACK_OK(4) || WORD_AT(TNK_SCENE)!=100u || !tnk_on() || !MAPMAKER_PTR_OK(g_ecx,12u)) { original();return; }
+    x=tnk_getf(g_ecx);z=tnk_getf(g_ecx+8u);
+    if(!tnk_lv.shifted) { x-=tnk_lv.d[0];z-=tnk_lv.d[2]; }
+    g_eax=(uint32_t)tnk_yard(x,z);
+    if(!g_eax && WORD_AT(g_esp)==TNK_RET_SEARCH && ++tnk_lv.misses>=TNK_SEARCH_MAX) {
+        if(tnk_lv.misses==TNK_SEARCH_MAX) tnk_lvlog("drive target search found no courtyard point: taking any (state, misses)",WORD_AT(TNK_STATE),tnk_lv.misses);
+        g_eax=1;
+    }
     MAPMAKER_GUEST_RET();
 }
 
@@ -460,13 +514,17 @@ static void tnk_shifted(void (*original)(void),int guns)
 /* WRAP sub_00254690 (edi = tank; picks the drive target). */
 void pc_mapmaker_tank_target(void (*original)(void))
 {
-    if(tnk_lv.shifted || !tnk_mine(g_edi)) { original();return; }
+    if(!tnk_mine(g_edi)) { original();return; }
+    tnk_note_state("fight state at drive target (state, previous)");
+    tnk_lv.misses=0;
+    if(tnk_lv.shifted) { original();return; }
     tnk_shifted(original,0);
 }
 
 /* WRAP sub_00255390 (eax = tank; runs a state's entry once per change). */
 void pc_mapmaker_tank_state(void (*original)(void))
 {
+    if(tnk_mine(g_eax)) tnk_note_state("fight state entry (state, previous)");
     if(!tnk_mine(g_eax) || WORD_AT(TNK_STATE)!=TNK_STATE_LOW || WORD_AT(TNK_PREV)==TNK_STATE_LOW) { original();return; }
     tnk_shifted(original,1);
 }

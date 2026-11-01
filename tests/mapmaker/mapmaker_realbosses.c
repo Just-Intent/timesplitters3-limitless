@@ -763,6 +763,7 @@ int main(void)
         static const uint16_t walk_set[]={0x0C,0x64}, no_walk[]={0x0C,0xA8};
         static const uint8_t walk_bar[]={0,0xB1,0}, walk_none[]={0,0,0};
         uint32_t m,well,w2;
+        unsigned f0;
         /* editor: pick, preview, row lookups, names */
         WORD_AT(0x0079094Cu)=102u;
         WORD_AT(0x0075FD90u+6u*0x1Cu)=0x99u;WORD_AT(0x0075FD90u+6u*0x1Cu+0x14u)=152u;WORD_AT(0x0075FD90u+6u*0x1Cu+0x18u)=3u;
@@ -846,6 +847,37 @@ int main(void)
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
         CHECK(nfx==1);                                                            /* stock draws it there */
         WORD_AT(0x0079094Cu)=100u;
+        /* wake-up: the intro state 1 waits for a level trigger no MapMaker map has */
+        f0=nfx;
+        WORD_AT(A(8)+0x20u)=1u;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;BYTE_AT(WKST+0x98u)=0;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* first frame not done */
+        BYTE_AT(WKST+0x98u)=1u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE90u,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* other caller */
+        WORD_AT(0x0079094Cu)=81u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* mission 13 has SPC1/2 */
+        WORD_AT(0x0079094Cu)=100u;
+        WORD_AT(A(8)+0x9D0u)=3u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==3u);                                          /* a request pending */
+        WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;WORD_AT(A(8)+0xBF0u)=REC(9);
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* slot reused */
+        WORD_AT(A(8)+0xBF0u)=REC(8);WORD_AT(ENT(8)+0x7Cu)=A(9);
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* entity moved on */
+        WORD_AT(ENT(8)+0x7Cu)=A(8);
+        WORD_AT(A(8)+0x20u)=4u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu);                                 /* already fighting */
+        WORD_AT(A(8)+0x20u)=1u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(WORD_AT(A(8)+0x9D0u)==2u && WORD_AT(A(8)+0x20u)==1u && rbs_walk.woken==1u);   /* roar, then fight */
+        CHECK(nfx==f0+6u);                                                        /* beams still drawn */
+        nfx=f0;
+        WORD_AT(A(8)+0x20u)=0;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;
         /* HUD and meter as the other real bosses */
         WORD_AT(PLAYER+0xFF4u)=ENT(8);
         CALL(pc_mapmaker_realbosses_hud,fake_hud,0x0014F25Bu,0,0,0,1);

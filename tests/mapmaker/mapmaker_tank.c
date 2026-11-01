@@ -1,7 +1,8 @@
 /* Asset-free contract for src/interface/pc_mapmaker_tank.inc: the castle tank
  * in MapMaker story play. prop6.pak mount at the level's pak mounts, the tank
  * created at a placeholder Story AI (id 0x12), the placeholder removed on the
- * tank's first frame, the proximity wake, no castle gate areas, the castle
+ * tank's first frame, the proximity wake, the courtyard test moved to the
+ * spawn with its bounded drive-target search, fight-state logs, the castle
  * frame shift around the target and state-7 code, the parked wreck, the
  * dropped level event and the bar labels. Fake guest memory; fake originals
  * pop their return address like the lifted callees, and every hook call
@@ -211,6 +212,17 @@ static void players(float x0,float z0,float h0,float x1,float z1,float h1)
     FLOAT_AT(PENT(1)+0x64u)=x1;FLOAT_AT(PENT(1)+0x6Cu)=z1;FLOAT_AT(PENT(1)+0x1CCu)=h1;
 }
 static void play_scene(void) { WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10u; }
+/* the stock courtyard rectangles 0x0051BB58 (x1, z1, x2, z2; x reversed) */
+static const float yard[12]={-3.0f,-10.0f,-15.0f,-6.8f, -3.0f,-6.8f,-17.5f,6.7f, -3.0f,6.7f,-21.8f,13.0f};
+static void stock_yard(void) { memcpy((void *)((uintptr_t)0x0051BB58u+g_xbox_mem_offset),yard,sizeof yard); }
+#define PT 0x00570800u
+/* sub_00251CD0 on (x, z), called from ret */
+static uint32_t area_at(float x,float z,uint32_t ret,int line)
+{
+    FLOAT_AT(PT)=x;FLOAT_AT(PT+4u)=99.0f;FLOAT_AT(PT+8u)=z;g_ecx=PT;pre_eax=0xEEEEu;
+    return call(pc_mapmaker_tank_area,fake,ret,0,0,0,0,line);
+}
+#define AREA(x,z) area_at(x,z,0x00255697u,__LINE__)
 /* a new level with the tank placeholder at (40, 2, 30) facing 1.5 */
 static uint32_t level_with_tank(int line)
 {
@@ -234,6 +246,7 @@ int main(void)
     unsigned n,k;
     float dx,dy,dz;
     g_xbox_mem_offset=(uintptr_t)memory;
+    stock_yard();
     set_env("TSFP_MAPMAKER_POOLS",NULL);
     set_env("TSFP_MAPMAKER_TANK",NULL);
 
@@ -440,10 +453,62 @@ int main(void)
     players(40.0f,30.0f-29.0f,1.0f,100.0f,100.0f,1.0f);                 /* z only */
     CHECK(CALL(pc_mapmaker_tank_wake,fake,0x00255580u,0,0,0,0)==1u);
 
-    /* ---- area: no castle gate --------------------------------------------- */
+    /* ---- area: the castle courtyard around the spawn ------------------------ */
     g_ecx=TANK+0x64u;
-    pre_eax=1u;
-    CHECK(CALL(pc_mapmaker_tank_area,fake,0x00255697u,0,0,0,0)==0);
+    CHECK(CALL(pc_mapmaker_tank_area,fake,0x00255697u,0,0,0,0)==1u);   /* the spawn: castle centre */
+    CHECK(AREA(-12.05f+dx,1.5f+dz)==1u && AREA(-12.05f,1.5f)==0);       /* world frame: moved by -d */
+    CHECK(AREA(-14.0f+dx,-8.0f+dz)==1u && AREA(-16.0f+dx,-8.0f+dz)==0); /* first rectangle: x -15..-3 */
+    CHECK(AREA(-20.0f+dx,10.0f+dz)==1u && AREA(-20.0f+dx,5.0f+dz)==0);  /* the third reaches x -21.8 */
+    CHECK(AREA(-2.0f+dx,0.0f+dz)==0 && AREA(-12.0f+dx,14.0f+dz)==0 && AREA(-12.0f+dx,-11.0f+dz)==0);
+    tnk_lv.shifted=1;                                                  /* inside a castle-frame call */
+    CHECK(AREA(-12.05f,1.5f)==1u && AREA(-12.05f+dx,1.5f+dz)==0);
+    CHECK(AREA(-3.0f,0.0f)==0 && AREA(-3.01f,0.0f)==1u && AREA(-17.5f,0.0f)==0 && AREA(-17.49f,0.0f)==1u);   /* strictly inside */
+    CHECK(AREA(-10.0f,13.0f)==0 && AREA(-10.0f,12.99f)==1u && AREA(-10.0f,-10.0f)==0 && AREA(-10.0f,-9.99f)==1u);
+    FLOAT_AT(0x0051BB58u+4u)=-6.8f;FLOAT_AT(0x0051BB58u+12u)=-10.0f;  /* z given high to low */
+    CHECK(AREA(-14.0f,-8.0f)==1u);
+    FLOAT_AT(0x0051BB58u+20u)=50.0f;                                   /* the table is read, not copied */
+    CHECK(AREA(-10.0f,40.0f)==1u);
+    stock_yard();
+    tnk_lv.shifted=0;
+    /* the drive target search (only its call site): every point counts after 64 outside */
+    tnk_lv.misses=0;
+    for(k=1;k<64u;k++) CHECK(area_at(-60.0f,0.0f,0x00254848u,__LINE__)==0);
+    CHECK(area_at(-12.0f+dx,0.0f+dz,0x00254848u,__LINE__)==1u && tnk_lv.misses==63u);   /* inside: not a miss */
+    n=tnk_lv.logs;
+    CHECK(area_at(-60.0f,0.0f,0x00254848u,__LINE__)==1u && tnk_lv.logs==n+1u);         /* the 64th: logged once */
+    CHECK(area_at(-60.0f,0.0f,0x00254848u,__LINE__)==1u && tnk_lv.logs==n+1u);
+    for(k=0;k<100u;k++) CHECK(AREA(-60.0f,0.0f)==0);                    /* other callers: never forced */
+    g_edi=TANK;target_writes=0;
+    CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);    /* a new search */
+    target_writes=1;
+    CHECK(tnk_lv.misses==0 && area_at(-60.0f,0.0f,0x00254848u,__LINE__)==0);
+    tnk_lv.misses=70u;
+    g_edi=0x00570000u;
+    CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);    /* not our tank */
+    CHECK(tnk_lv.misses==70u);
+    tnk_lv.misses=0;
+
+    /* ---- fight-state lines: at frame start, drive target and state entry ------ */
+    tnk_lv.seen_state=0;tnk_lv.logs=0;
+    WORD_AT(0x0078B594u)=1u;
+    CALL(pc_mapmaker_tank_update,fake,0x00000100u,0x00570000u,0,0,1);   /* another object */
+    CHECK(tnk_lv.seen_state==0 && tnk_lv.logs==0);
+    CALL(pc_mapmaker_tank_update,fake,0x00000100u,TANK,0,0,1);
+    CHECK(tnk_lv.seen_state==1u && tnk_lv.logs==1u);
+    CALL(pc_mapmaker_tank_update,fake,0x00000100u,TANK,0,0,1);
+    CHECK(tnk_lv.logs==1u);                                            /* unchanged: no line */
+    WORD_AT(0x0078B594u)=6u;g_edi=TANK;target_writes=0;
+    CALL(pc_mapmaker_tank_target,fake_target,0x002559CBu,0,0,0,1);
+    CHECK(tnk_lv.seen_state==6u && tnk_lv.logs==2u);
+    WORD_AT(0x0078B594u)=3u;WORD_AT(0x0078B598u)=3u;pre_eax=TANK;
+    CALL(pc_mapmaker_tank_state,fake,0x00255BD5u,0,0,0,1);
+    CHECK(tnk_lv.seen_state==3u && tnk_lv.logs==3u);
+    pre_eax=0x00570000u;WORD_AT(0x0078B594u)=4u;
+    CALL(pc_mapmaker_tank_state,fake,0x00255BD5u,0,0,0,1);           /* not our tank */
+    CHECK(tnk_lv.seen_state==3u);
+    for(k=0;k<60u;k++) { WORD_AT(0x0078B594u)=k&1u?3u:4u;CALL(pc_mapmaker_tank_update,fake,0x00000100u,TANK,0,0,1); }
+    CHECK(tnk_lv.logs==49u && tnk_lv.seen_state==3u);                 /* 48 lines, then one "used up" */
+    target_writes=1;tnk_lv.logs=0;
 
     /* ---- target: castle frame ------------------------------------------------- */
     actor(3,0x0C,45.0f,2.5f,33.0f,0.0f);

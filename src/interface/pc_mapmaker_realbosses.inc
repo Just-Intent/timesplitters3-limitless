@@ -212,7 +212,12 @@
  *  - fx (sub_00126560, called by the frame sub_001CEBC0 at 0x001CEE87, its
  *    only caller): the frame draws the walker's beams (sub_0029CCB0) only in
  *    scene 81 (0x001CEE8C); after the original, in scene 100 with this
- *    level's walker state, it is called too.
+ *    level's walker state, it is called too. Before that call, the wake-up:
+ *    the fight's intro state 1 (AI +0x20) waits for the mission's level
+ *    trigger 'SPC2'/'SPC1' (sub_00234190/sub_00234270, 0x0029B5BA..0x0029B609)
+ *    and a MapMaker map has none, so once its first frame is done (state
+ *    +0x98 == 1) the walker's AI gets the request AI +0x9D0 = 2 (applied by
+ *    the fight at 0x002998FA): its roar 0x6F7, then the fight (state 4).
  *  - hud, meter and the bigdraw area treat model 0x637 like the others. */
 #include <stdio.h>
 #include <stdlib.h>
@@ -326,6 +331,11 @@
 #define RBS_RET_WALK_INTRO2 0x0029B120u /* event 1 (call 0x0029B11B) */
 #define RBS_RET_WALK_DONE 0x0029CB80u   /* event 2 (call 0x0029CB7B): death animation ended */
 #define RBS_RET_FX 0x001CEE8Cu          /* sub_001CEBC0: call sub_00126560 at 0x001CEE87 */
+#define RBS_WALK_STAGE 0x98u            /* state byte: 0 before its first frame, 1 after (0x0029B597) */
+#define RBS_WALK_AI_STATE 0x20u         /* AI: the fight's state (switch 0x0029B24F, table 0x0029CB90) */
+#define RBS_WALK_AI_NEXT 0x9D0u         /* AI: requested state, applied first thing by the fight (0x002998FA) */
+#define RBS_WALK_WAIT 1u                /* intro: waits for level trigger 'SPC2'/'SPC1' (0x0029B5A6) */
+#define RBS_WALK_ROAR 2u                /* stunscript 0x6F7, then the fight, state 4 (0x0029B62E) */
 #define RBS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBS_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -345,7 +355,7 @@ static struct {
  * and the one spawn record that holds the boss class. */
 static struct { uint32_t state, parts, record; unsigned extras, events, throws, deaths, skipped, fire; float floor; int floor_set; } rbs_skel;
 /* The Crow walker of this level: its state block, spawn record and pool entry. */
-static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx, seen, ticks, beats; } rbs_walk;
+static struct { uint32_t state, record, actor; unsigned extras, events, wells, fx, seen, ticks, beats, woken; } rbs_walk;
 
 static void rbs_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -885,18 +895,45 @@ static void rbs_skel_fire(void)
 
 /* Crow walker heartbeat (user report, v0.4.0-mapmaker.21: "looks right but
  * isn't responding at all"): every 120 frame steps, 15 times per level, its
- * fight stage (state +0x98), animation state (entity +0x20), position, the
- * state's health (+0x580) and the AI class words (+0x10/+0x14). Log only. */
+ * fight stage (state +0x98), the fight's state (AI +0x20; the entity's +0x20,
+ * logged as "anim state" before mapmaker.23, is not it), its target (AI +4),
+ * the aim error (state +0xE4), position, the state's health (+0x580) and the
+ * AI class words (+0x10/+0x14). Log only. */
 static void rbs_walk_heartbeat(void)
 {
     uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state;
     if(!a || !st || WORD_AT(RBS_WALK_STATE)!=st || rbs_walk.beats>=15u || (rbs_walk.ticks++%120u)) return;
     if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) return;
     rbs_walk.beats++;
-    fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: stage %u, anim state %u, at (%.1f, %.1f, %.1f), health %.1f, class 0x%X/0x%X\n",
-            rbs_walk.beats,(unsigned)RBS_B(st+0x98u),(unsigned)WORD_AT(ent+0x20u),(double)rbs_getf(ent+0x64u),(double)rbs_getf(ent+0x68u),
+    fprintf(stderr,"[mapmaker] realbosses: Crow walker beat %u: stage %u, fight state %u, target 0x%X, aim %.0f, entity +0x20 %u, at (%.1f, %.1f, %.1f), health %.1f, class 0x%X/0x%X\n",
+            rbs_walk.beats,(unsigned)RBS_B(st+RBS_WALK_STAGE),(unsigned)WORD_AT(a+RBS_WALK_AI_STATE),(unsigned)WORD_AT(a+4u),
+            (double)rbs_getf(st+0xE4u),(unsigned)WORD_AT(ent+0x20u),(double)rbs_getf(ent+0x64u),(double)rbs_getf(ent+0x68u),
             (double)rbs_getf(ent+0x6Cu),(double)rbs_getf(st+0x580u),(unsigned)WORD_AT(a+0x10u),(unsigned)WORD_AT(a+0x14u));
     fflush(stderr);
+}
+
+/* The Crow walker's wake-up (user report, v0.4.0-mapmaker.22: it never moves
+ * or attacks). The fight's intro state 1 (0x0029B5A6) waits for its animation
+ * to end, then for the mission 13 level trigger 'SPC2' (-> 180 turn right
+ * 0x6FB) or 'SPC1' (-> 180 turn left 0x6FC), looked up with sub_00234190 in
+ * the level's logic table [0x0078CD90] and tested with sub_00234270; with
+ * neither it returns, and the steering, walking and firing above the switch
+ * run only in states above 2 (0x0029A9B2). A MapMaker map has no such
+ * trigger, so the walker idled in state 1 forever. Once its first frame is
+ * done (stage 1) and it waits in state 1 with no request pending, request
+ * state 2 through the fight's own request word AI +0x9D0, which the fight
+ * applies first thing next frame (0x002998FA..0x00299922, as the stock state
+ * changes do): state 2 waits for the animation, plays crowewalkerstunscript
+ * 0x6F7 and enters the fight (state 4), whose steering turns it toward the
+ * player. The 180 turns are skipped: they assume the mission's arena. */
+static void rbs_walk_wake(void)
+{
+    uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state;
+    if(!a || !st || WORD_AT(RBS_WALK_STATE)!=st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE) || !MAPMAKER_PTR_OK(a,RBS_ACTOR) ||
+       WORD_AT(a+RBS_ACTOR_RECORD)!=rbs_walk.record || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u) || WORD_AT(ent+RBS_ENT_AI)!=a) return;
+    if(RBS_B(st+RBS_WALK_STAGE)!=1u || WORD_AT(a+RBS_WALK_AI_STATE)!=RBS_WALK_WAIT || (int32_t)WORD_AT(a+RBS_WALK_AI_NEXT)>=0) return;
+    WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;
+    if(!rbs_walk.woken++) rbs_log("Crow walker woken: no SPC1/SPC2 trigger in a MapMaker map; roar, then fight",a,ent);
 }
 
 /* WRAP sub_00126560 (frame step before the scene-81 beam draw at 0x001CEE8C). */
@@ -908,6 +945,7 @@ void pc_mapmaker_realbosses_fx(void (*original)(void))
     if(!rbs_walk.record) return;
     if(here) rbs_walk_heartbeat();
     if(!here || !rbs_walk.state || WORD_AT(RBS_WALK_STATE)!=rbs_walk.state || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return;
+    rbs_walk_wake();
     guest_call(sub_0029CCB0,0);
     if(!rbs_walk.fx++) rbs_log("Crow walker effects drawn",rbs_walk.state,0);
 }
