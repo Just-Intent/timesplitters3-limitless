@@ -279,6 +279,18 @@ re-saving it there turns them back into Small Open. *Automated tests only.*
 `TSFP_MAPMAKER_ROOM_MASK_CLEAR` stays a developer test switch. Details:
 [open sky](mapmaker-sky.md).
 
+### Sixth tileset: Abstract (`LIMITS`)
+
+**Map Settings → Tileset** gains a sixth choice, **Abstract**, after Virtual.
+It is the plain look the original editor uses for its piece previews; the
+developers never offered it, but every tile, pad and item model for it is in
+the game files. It shares Lab's music and most of Lab's props (with its own
+keycards). Playing an Abstract map loads the editor's game file as well,
+which needs no switch; if that is not possible the map plays as Lab and the
+log says so. Abstract maps save in the fork's format, so the original game
+and System Link refuse them. *Automated tests only.* Details:
+[tilesets](mapmaker-tilesets.md).
+
 ## Mouse controls
 
 These are on without any switch:
@@ -316,7 +328,8 @@ Details: [mapmaker-bugfix.md](mapmaker-bugfix.md).
 
 - Maps within the original limits are saved in the original format and work in
   other builds. Larger maps need this fork and are refused for System Link,
-  which can only send original-size maps.
+  which can only send original-size maps. Maps using the Abstract tileset
+  always need this fork.
 - More than 32 characters and more than 30 AI only happen in a MapMaker map
   played locally in Story. Arcade, System Link and campaign levels keep the
   original numbers.

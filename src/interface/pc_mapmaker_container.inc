@@ -136,6 +136,7 @@ static int mapmaker_container_over_chunks(uint32_t c)
         if(tag==0x00C776F5u || tag==0x00C776F6u) return 1;   /* character slots 11-20 (pc_mapmaker_sets.inc), weapon slots 7-20 (pc_mapmaker_weaponset.inc) */
         if(tag==0x00C77668u && size>=8u && WORD_AT(p+8u+4u)>MAPMAKER_CONTAINER_STOCK_PIECES &&
            (int32_t)WORD_AT(p+8u+4u)>0) return 1;          /* header piece count */
+        if(tag==0x00C77668u && size>=0x0Cu && (WORD_AT(p+8u+8u)>>16)==0u) return 1; /* tileset 0, Abstract (pc_mapmaker_tilesets.inc) */
         for(i=0;i<MAPMAKER_CONTAINER_STOCK_CHUNKS;i++)
             if(tag==mapmaker_container_stock_chunks[i].tag && ++counts[i]>mapmaker_container_stock_chunks[i].stock) return 1;
         p=next;
