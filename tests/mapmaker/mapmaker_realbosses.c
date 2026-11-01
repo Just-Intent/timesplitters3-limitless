@@ -185,6 +185,7 @@ static void arcade_table(void)
     WORD_AT(0x00521A18u+43u*0x30u+4u)=0xA7u;                 /* trophy monster row */
     WORD_AT(0x00521A18u+144u*0x30u+4u)=0xA6u;                /* skeleton cowboy row */
     WORD_AT(0x00521A18u+90u*0x30u+4u)=0xA8u;                 /* giant robot row */
+    WORD_AT(0x00521A18u+14u*0x30u+4u)=0x1Eu;                 /* Old Crow row */
     for(i=0;i<43u;i++) if(WORD_AT(0x00521A18u+i*0x30u+4u)==0xA7u) WORD_AT(0x00521A18u+i*0x30u+4u)=0x20u;
 }
 /* map container: map-info chunk (custom set), then Story AI chunks */
@@ -298,11 +299,13 @@ int main(void)
     CHECK(nrows==0);
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_picker_end,fake,0x002C1FA5u,0,0,0,1);
-    CHECK(nrows==3 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
+    CHECK(nrows==6 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
     CHECK(!strcmp(rows[0].label,"Giant Trophy Monster"));
     CHECK(rows[1].id==151u && rows[1].flags==0x20900u && rows[1].cb==0x002C1C90u && !strcmp(rows[1].label,"Giant Skeleton"));
     CHECK(rows[2].id==152u && rows[2].flags==0x20900u && rows[2].cb==0x002C1C90u && !strcmp(rows[2].label,"Crow Walker"));
-    CHECK(nenable==3 && enable_item==ITEM && enable_flag==0);
+    CHECK(rows[3].id==153u && !strcmp(rows[3].label,"Giant Robot") && rows[4].id==154u && !strcmp(rows[4].label,"Split Crowe"));
+    CHECK(rows[5].id==155u && !strcmp(rows[5].label,"Castle Tank") && rows[5].flags==0x20900u && rows[5].cb==0x002C1C90u);
+    CHECK(nenable==6 && enable_item==ITEM && enable_flag==0);
     /* pick: row 150 -> id 0x15, variant -1; other slots untouched */
     for(k=0;k<10u;k++) { WORD_AT(0x0075FD90u+k*0x1Cu)=0x40u+k;WORD_AT(0x0075FD90u+k*0x1Cu+0x14u)=k;WORD_AT(0x0075FD90u+k*0x1Cu+0x18u)=0; }
     CALL(pc_mapmaker_realbosses_pick,fake_pick,0x00077000u,0x00330000u,0,0,1);
@@ -344,7 +347,29 @@ int main(void)
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,150u,0,0,0)==0x52420015u);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,151u,0,0,0)==0x52420028u);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,152u,0,0,0)==0x52420064u);
-    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,153u,0,0,1)==0);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,153u,0,0,0)==0x52420042u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,154u,0,0,0)==0x52420046u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,155u,0,0,0)==0x52420012u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,156u,0,0,1)==0);
+    {   /* the ported bosses' rows: names, pick, row lookups and previews */
+        uint32_t s=CALL(pc_mapmaker_realbosses_text,fake,0x00077000u,0x52420012u,0,0,0);
+        CHECK(s && !strcmp((const char *)((uintptr_t)s+g_xbox_mem_offset),"Castle Tank"));
+        orig_eax=0x1234u;
+        CHECK(CALL(pc_mapmaker_realbosses_text,fake,0x00077000u,0x52420043u,0,0,1)==0x1234u);   /* not a row */
+        WORD_AT(0x0075FD90u+7u*0x1Cu+0x14u)=153u;WORD_AT(0x0075FD90u+8u*0x1Cu+0x14u)=155u;
+        CALL(pc_mapmaker_realbosses_pick,fake,0x00077000u,0x00330000u,0,0,1);
+        CHECK(WORD_AT(0x0075FD90u+7u*0x1Cu)==0x42u && WORD_AT(0x0075FD90u+8u*0x1Cu)==0x12u && WORD_AT(0x0075FD90u+8u*0x1Cu+0x18u)==0xFFFFFFFFu);
+        WORD_AT(0x0075FD90u+7u*0x1Cu+0x14u)=7u;WORD_AT(0x0075FD90u+8u*0x1Cu+0x14u)=8u;
+        orig_eax=0xFFFFFFFFu;
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C054Cu,0x46u,0xFFFFFFFFu,0,0)==154u);
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C1805u,0x46u,0xFFFFFFFFu,0,0)==14u);   /* Old Crow */
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C1805u,0x12u,0xFFFFFFFFu,0,0)==90u);   /* giant robot */
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x000668F5u,0x42u,0xFFFFFFFFu,0,1)==0xFFFFFFFFu);
+        WORD_AT(0x00700000u)=153u;
+        CALL(pc_mapmaker_realbosses_highlight,fake_highlight,0x00077000u,0x00330000u,0,0,1);
+        CHECK(WORD_AT(0x0078AEA8u)==90u);
+        orig_eax=0;
+    }
     orig_eax=0xE20u;
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,149u,0,0,1)==0xE20u);
     orig_eax=0;

@@ -108,6 +108,9 @@ void sub_002FB230(void) {}
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines these */
 void sub_00071B10(void) {} void sub_00071C50(void) {}
 #endif
+/* robot, crowe, tank (pc_mapmaker_robot.inc, pc_mapmaker_crowe.inc, pc_mapmaker_tank.inc) */
+void sub_000A6F90(void) {} void sub_000EFBD0(void) {} void sub_0028D6D0(void) {} void sub_0028D710(void) {}
+void sub_00292550(void) {} void sub_00292630(void) {} void sub_002A62C0(void) {}
 /* tilesets (pc_mapmaker_tilesets.inc: pak mount) */
 void sub_000622D0(void) {}
 #endif

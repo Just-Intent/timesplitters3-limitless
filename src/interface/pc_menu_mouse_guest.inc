@@ -65,6 +65,9 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_bosses.inc"
 #include "pc_mapmaker_characters.inc"
 #include "pc_mapmaker_realbosses.inc"
+#include "pc_mapmaker_robot.inc"
+#include "pc_mapmaker_crowe.inc"
+#include "pc_mapmaker_tank.inc"
 #include "pc_mapmaker_bigdraw.inc"
 #include "pc_mapmaker_sets.inc"
 #include "pc_mapmaker_matchbots.inc"
@@ -781,6 +784,36 @@ void pc_mapmaker_realbosses_tag(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_fx(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_face(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_create(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_level(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_nav(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_music(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_event(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_fx(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_level(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_fight(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_near(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_sparks(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_part(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_event(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_fx(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_meter(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_update(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_wake(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_area(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_target(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_state(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_wreck(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_event(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_text(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_rows(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_close(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_delete(void (*original)(void)) { original(); }
