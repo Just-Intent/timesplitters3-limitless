@@ -202,8 +202,12 @@ MUTATIONS = {
     'walk-roar-never': ('    r=guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u);', '    r=0;'),
     'walk-roar-wrong-anim': ('#define RBS_WALK_STUN 0x6F7u', '#define RBS_WALK_STUN 0x6F6u'),
     'walk-roar-slow': ('guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u)', 'guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F000000u)'),
-    'walk-roar-over-anim': (' || WORD_AT(ctl+RBS_ANIM_CUR) || WORD_AT(ctl+RBS_ANIM_ALT)) return;', ' || WORD_AT(ctl+RBS_ANIM_ALT)) return;'),
-    'walk-roar-over-blend': (' || WORD_AT(ctl+RBS_ANIM_CUR) || WORD_AT(ctl+RBS_ANIM_ALT)) return;', ' || WORD_AT(ctl+RBS_ANIM_CUR)) return;'),
+    'walk-roar-over-anim': (' || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR)) ||\n       rbs_walk_own(WORD_AT(ctl+RBS_ANIM_ALT))) return;', ' ||\n       rbs_walk_own(WORD_AT(ctl+RBS_ANIM_ALT))) return;'),
+    'walk-roar-over-blend': (' || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR)) ||\n       rbs_walk_own(WORD_AT(ctl+RBS_ANIM_ALT))) return;', ' || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR))) return;'),
+    'walk-roar-empty-only': (' || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR)) ||', ' || WORD_AT(ctl+RBS_ANIM_CUR) ||'),
+    'walk-own-range-low': ('return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }', 'return anim>RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }'),
+    'walk-own-range-high': ('return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }', 'return anim>=RBS_WALK_ANIM_FIRST && anim<RBS_WALK_ANIM_LAST; }'),
+    'walk-own-any': ('return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }', 'return anim!=0; }'),
     'walk-roar-repeats': ('    rbs_walk.roars++;\n    r=guest_call', '    r=guest_call'),
     'walk-roar-any-state': ('    } else if(s!=RBS_WALK_ROAR) return;\n', '    }\n'),
     'walk-roar-only-state1': ('    } else if(s!=RBS_WALK_ROAR) return;\n', '    } else return;\n'),
@@ -789,6 +793,14 @@ def test_walker_roar_needs_an_animation():
     e = rd(0x00484F68 + 14 * 0x18, 0x18)
     assert struct.unpack_from('<H', e, 0x10)[0] == 0x6F7 and rd(struct.unpack_from('<I', e, 0)[0], 22) == b'crowewalkerstunscript\0'
     assert struct.unpack_from('<I', e, 8)[0] & 1 == 0
+    # creation (sub_000DAC30) sets the skeleton's bind pose as the first "animation" with
+    # sub_000966E0 (+0xD4 = id, finished +0x124 = 0): 0xFE for the walker skeleton
+    assert a[0x000DB1C9].mnemonic == 'push' and ('imm', 0xFE) in a[0x000DB1C9].ops
+    assert target(a[0x000DB1CF]) == 0x000966E0 and a[0x000DB1CF].function == 0x000DAC30
+    assert mem(a[0x000966F1])[0][4] == 0xD4 and mem(a[0x00096770])[0][4] == 0x124
+    # the walker's own animations are lv81's 0x6EE..0x6FC (20 names from 0x6B9)
+    ids = [struct.unpack_from('<H', rd(0x00484F68 + k * 0x18 + 0x10, 2))[0] for k in range(0x14)]
+    assert min(i for i in ids if i >= 0x6EE) == 0x6EE and max(ids) == 0x6FC and 0xFE not in ids
 
 
 def test_walker_guns_gate_the_fight():

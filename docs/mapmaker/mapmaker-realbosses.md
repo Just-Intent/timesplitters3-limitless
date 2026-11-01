@@ -412,6 +412,27 @@ available yet):
 INFERRED, needs a playtest: walking and gun fire on MapMaker tiles; destroyed guns send it back
 to state 0x13 until the next stun, as in stock.
 
+### The roar never started either: the bind pose (fixed after v0.4.0-mapmaker.25)
+
+The mapmaker.25 log (built before the guns change) showed the wake-up, then
+`animation 0xFE (blend 0x0, finished 0)` and fight state 2 in every beat. The mapmaker.23 roar
+start ran only for an empty controller. CONFIRMED (decode, `test_walker_roar_needs_an_animation`):
+
+- Character creation `sub_000DAC30` gives a creature its skeleton's bind pose as its first
+  "animation", with `sub_000966E0` (0x000DB0BB..0x000DB1CF): 0xFE for the walker skeleton
+  (0x000DB1C9), 0xA3 for the mansion boss, 0xA8 for the split Crowe, 0xF0 for the worm.
+- `sub_000966E0` sets +0xD4 = id and clears "finished" (+0x124). A pose never finishes, so state
+  2 still waited.
+- The skeleton and the split Crowe fights play their first animation over their poses, and they
+  work in game.
+
+| change | what it does |
+|---|---|
+| `_fx` wake-up, roar | the roar now starts (once per level) whenever neither the current animation nor the blend target is one of the walker's own (lv81 0x6EE..0x6FC), so over the bind pose too. Logged once: `Crow walker had none of its own animations (bind pose): roar started ...` with the animation it replaced |
+
+The next log should show animation 0x6F7, then the fight state passing 4 -> 0x13 -> 0x12 -> 4
+and then 8/9 turns (the fight-state lines from the guns change).
+
 ## The Crow walker (story mission 13)
 
 User request (2026-11-01): the Crow walker and tank bosses next. The walker

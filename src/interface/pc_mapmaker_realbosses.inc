@@ -352,6 +352,8 @@
 #define RBS_ANIM_ALT 0x12Cu             /* blend target animation, 0 = none */
 #define RBS_ANIM_ALT_DONE 0x17Cu        /* its finished flag (sub_00059DD0 when +0x12C is set) */
 #define RBS_ANIM_SIZE 0x184u
+#define RBS_WALK_ANIM_FIRST 0x6EEu      /* crowewalkertostill */
+#define RBS_WALK_ANIM_LAST 0x6FCu       /* crowewalker180turnleft */
 #define RBS_WALK_ARM 0x12u              /* after a stun: guns deployed (sub_00294B90 at 0x0029CAF0), then state 4 */
 #define RBS_WALK_STANDOFF 0x13u         /* waits until both guns are active (0x0029C933) */
 #define RBS_WALK_GUN1 0x4CCu            /* state: gun 1 active (1) or not (0) */
@@ -1021,6 +1023,10 @@ static void rbs_walk_arm(uint32_t a,uint32_t ent,uint32_t st)
     rbs_log("Crow walker guns deployed: the stage-1 standoff (hits in its back only) skipped; turn, walk and fire",a,ent);
 }
 
+/* One of the walker's own animations (lv81.pak: crowewalkertostill 0x6EE ..
+ * crowewalker180turnleft 0x6FC). */
+static int rbs_walk_own(uint32_t anim) { return anim>=RBS_WALK_ANIM_FIRST && anim<=RBS_WALK_ANIM_LAST; }
+
 static void rbs_walk_wake(void)
 {
     uint32_t a=rbs_walk.actor,ent,st=rbs_walk.state,s,ctl,r;
@@ -1034,11 +1040,19 @@ static void rbs_walk_wake(void)
         WORD_AT(a+RBS_WALK_AI_NEXT)=RBS_WALK_ROAR;
         if(!rbs_walk.woken++) rbs_log("Crow walker woken: no SPC1/SPC2 trigger in a MapMaker map; roar, then fight",a,ent);
     } else if(s!=RBS_WALK_ROAR) return;
-    if(rbs_walk.roars || !MAPMAKER_PTR_OK(ctl=WORD_AT(ent+4u),RBS_ANIM_SIZE) || WORD_AT(ctl+RBS_ANIM_CUR) || WORD_AT(ctl+RBS_ANIM_ALT)) return;
+    /* v0.4.0-mapmaker.25 log: the controller held 0xFE, not 0. Character
+     * creation gives a creature its skeleton's bind pose as its first
+     * "animation" (sub_000DAC30 0x000DB0BB..0x000DB1CF -> sub_000966E0: 0xFE
+     * for the walker skeleton, 0xA3 for the mansion boss, 0xA8 the split
+     * Crowe), which never finishes. Only the walker's own animations (lv81
+     * 0x6EE..0x6FC) are left to the stock path; the skeleton and the split
+     * Crowe play their first animation over their poses the same way. */
+    if(rbs_walk.roars || !MAPMAKER_PTR_OK(ctl=WORD_AT(ent+4u),RBS_ANIM_SIZE) || rbs_walk_own(WORD_AT(ctl+RBS_ANIM_CUR)) ||
+       rbs_walk_own(WORD_AT(ctl+RBS_ANIM_ALT))) return;
     rbs_walk.roars++;
     r=guest_call(sub_0005F460,4,ent,RBS_WALK_STUN,0u,0x3F800000u);
-    rbs_log(r?"Crow walker had never been animated: roar started (state 2 waits for an animation to finish)":
-              "Crow walker roar refused by sub_0005F460 (animation not loaded or not allowed)",ent,r);
+    rbs_log(r?"Crow walker had none of its own animations (bind pose): roar started (state 2 waits for an animation to finish)":
+              "Crow walker roar refused by sub_0005F460 (animation not loaded or not allowed)",WORD_AT(ctl+RBS_ANIM_CUR),r);
 }
 
 /* WRAP sub_00126560 (frame step before the scene-81 beam draw at 0x001CEE8C). */
