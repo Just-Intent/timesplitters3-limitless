@@ -1,0 +1,524 @@
+/* US 45410066 MapMaker real story boss: the mansion worm of story mission 5
+ * (scene 1, "data/mansion2.raw") as a MapMaker Story AI. Area `worm`; every
+ * hook is inert unless TSFP_MAPMAKER_LIMITS=1 (TSFP_MAPMAKER_REAL_BOSS=0
+ * keeps the bot AI). Docs: docs/mapmaker/mapmaker-worm.md (CONFIRMED/INFERRED
+ * labels, the wrapper list for the integrator). Tests:
+ * tests/mapmaker/test_mapmaker_worm.py.
+ *
+ * The worm (CONFIRMED, US XBE data and decode): character id 0x2C (character
+ * table: voice set 0x005397C8, model 0x5EA CHR_MANSION_MANSIONWORM
+ * chrs/mansionworm in pak/chr.pak, no LOD; no Arcade row), skeleton group
+ * 0x47. Its eight anims wrm* 0x194..0x19B are named only by
+ * pak/stream/lv1/anim/lv1_2.pak (string 0x0049D7BC, registered by
+ * sub_001CA2F0 at 0x001CAD57, table 0x0048BEC8, 30 names).
+ *
+ * The worm is not an AI class. The mansion level runs it:
+ *  - Blocks: [0x0075B4B4] = 5 worms of 0x450 bytes (sub_001D1E80, from
+ *    sub_0036C740 in scene 1 only), set up by sub_001D2350 (from the level
+ *    init sub_001DDB50 of the scene descriptor at 0x004FDF80): fixed starts
+ *    in the mansion garden (y -2.4), worm 2 in its own state 8, a dirt
+ *    emitter each (+0x43C), the enable flag [0x0075B4BC] = 0 (the level
+ *    script's sub_001D5E10 sets it), and two mansion-only steps: the six
+ *    route pad ids at 0x004FDC24 (0x4FF, 0x514, 0x515, 0x51D, 0x516, 0x500)
+ *    converted to pad indices once ([0x004FDC58]), and level object 0x18
+ *    ([[0x007B9784]+0x60], no null check) given flag 0x10 and a hit callback.
+ *  - Update: the descriptor's level update sub_001DDC90 calls sub_001DAAB0
+ *    (17 states at worm +0x24) every frame. A worm runs only once its head is
+ *    bound: sub_001D9AF0 looks up the AI whose spawn record is tagged
+ *    'WRM1'+i (sub_0015BA10, the AI pool), clears its slots 3 (the character
+ *    update sub_000D8E30) and 4, sets its hit callback sub_001D1F30, lowers
+ *    it by 5 and gives it 12.1 health (+0x1CC/+0x1D8).
+ *  - Mansion coordinates read from image constants: the burrowing height
+ *    -2.399, the target box (x -77.2..-55.7, z -6.0..39.5; -6.0 is the shared
+ *    constant 0x0047D69C, whose other readers are not reachable from the
+ *    update), the wake region (sub_001D5D70: a player in x -79..-55.7, z
+ *    -7.9..40.3) and worm 2's point (-62.31, 16.9).
+ *  - Route: the worm patrols the six pads (next = (i + 1) mod 6) and walks
+ *    the pad graph (sub_001596F0); a missing pad (-1) reads position 0.
+ *  - Draw: the frame sub_001CEBC0 calls sub_001DA990 only in scene 1
+ *    (0x001CEE2C). It draws the bodies and positions the surfaced heads
+ *    (sub_001D9B80), but also runs sub_001D9370 (mansion props, tag
+ *    lookups) and sub_001D7200, and clips the bodies at a mansion wall
+ *    (camera x > -53.9, 0x0049DE08).
+ *  - Hit: sub_001D1F30 needs the head's +0x60 == 'WRM1'+i, counts kills in
+ *    the mansion script block [[0x0075B0C4]+0x3C] (no null check) and at 5
+ *    kills fires level marker 1 and event 4; its effect uses the mansion's
+ *    effect type [0x0078F590] (sub_00378400(sub_001D6290, 5)).
+ * This area runs the stock code with one worm in scene 100:
+ *  - level: allocates the worm block, a scratch block (stand-ins for the
+ *    script block and object 0x18) and the effect type, runs the stock init
+ *    with a fake object table and the pad conversion off, parks worms 1-4
+ *    (state 4: no head, never updated or drawn, emitters released).
+ *  - tick: on the head's character update, the first time: worm 0 at the
+ *    spawn point, the mansion box centred on it (dx, dz), the burrowing
+ *    height at the spawn floor (dy), six pads around the spawn, enable. Every
+ *    tick: the constants shifted and the pad table swapped in for the stock
+ *    update only, slot 3 kept, no character think (as stock).
+ *  - tag: 'WRM1' finds this map's head, 'WRM2'..'WRM5' nothing.
+ *  - hit: the stand-ins swapped in for the stock callback; the kill counter
+ *    reset, so the 5-kill marker never fires.
+ *  - fx: the stock draw in scene 100, with its two mansion callees skipped
+ *    and the wall clip off.
+ *  - script: the update's trigger of the mansion script object 'SFCC'
+ *    (sub_00234CD0 at 0x001DC45A, which reaches level markers and tag
+ *    lookups through sub_0025F0C0) dropped. The only other way from the
+ *    update to a marker is the generic explosion sub_000BB6C0 (68 callers),
+ *    which only reads one.
+ *
+ * Requires the includer's WORD_AT, guest_call, g_esp/g_eax, g_xbox_mem_offset,
+ * pc_mapmaker_area_enabled and pc_mapmaker_limits.inc. Hot hooks (tick: every
+ * character every frame; fx: every frame) test a fixed value first. */
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#ifndef MAPMAKER_STACK_OK
+#define MAPMAKER_STACK_OK(n) (g_esp>=0x00010000u && g_esp<0x04000000u-(uint32_t)(n))
+#endif
+
+#define WRM_SCENE 0x0079094Cu
+#define WRM_MODE 0x007DE455u            /* byte: 10 = story */
+#define WRM_ID 0x2Cu                    /* character id */
+#define WRM_MODEL 0x5EAu                /* CHR_MANSION_MANSIONWORM */
+#define WRM_PAK 0x0049D7BCu             /* "pak/stream/lv1/anim/lv1_2.pak" */
+#define WRM_MOUNTS 0x006D7880u          /* mounted paks */
+#define WRM_MOUNT_MAX 64u               /* paktable.json: 64 slots at 0x00907000 */
+#define WRM_MOUNT_KEEP 8u
+#define WRM_STATE 0x0075B4B4u           /* 5 worms, sub_001D1E80 */
+#define WRM_WORM 0x450u
+#define WRM_WORMS 5u
+#define WRM_STATE_SIZE 0x1590u
+#define WRM_ENABLE 0x0075B4BCu          /* sub_001D5E10 (the level script) */
+#define WRM_HEADS 0x0078FAE0u           /* bound head entity per worm */
+#define WRM_SCRIPT 0x0075B0C4u          /* mansion script block, 0x50 (sub_001D7830) */
+#define WRM_SCRIPT_SIZE 0x50u
+#define WRM_KILLS 0x3Cu                 /* script block: worms killed */
+#define WRM_OBJECTS 0x007B9784u         /* level object table (sub_000877B0) */
+#define WRM_OBJECT 0x18u                /* the mansion object the init touches */
+#define WRM_EFFECT 0x0078F590u          /* the mansion effect type (sub_001D6420) */
+#define WRM_EFFECT_FN 0x001D6290u       /* its behaviour; 5 variants */
+#define WRM_ROUTE 0x004FDC24u           /* six route pads (ids, indices after the init) */
+#define WRM_ROUTE_N 6u
+#define WRM_ROUTE_DONE 0x004FDC58u      /* 1: ids not converted yet */
+#define WRM_PADS 0x00715F2Cu            /* regular pads, 0x20 each, position +0xC */
+#define WRM_PAD_COUNT 0x007B6664u
+#define WRM_PAD 0x20u
+#define WRM_PAD_SCAN 0x2000u
+#define WRM_TAG 0x57524D31u             /* 'WRM1' + worm */
+#define WRM_CHAR_UPDATE 0x000D8E30u     /* slot 3 of every character (sub_0009E2D0(8, 3, ..) at 0x000D9210) */
+#define WRM_SLOT3 0x160u                /* entity +0x154 + 3*4 */
+#define WRM_ENT_TAG 0x60u               /* head: 'WRM1' + worm for the hit callback */
+#define WRM_W_STATE 0x24u               /* worm +0x24 state, 4 = gone */
+#define WRM_W_TRAIL 0x3Cu               /* 64 trail positions of 12 bytes */
+#define WRM_W_TRAILS 64u
+#define WRM_W_EMITTER 0x43Cu
+#define WRM_W_PAD 0x440u                /* current pad, +0x444 previous */
+#define WRM_GONE 4u
+#define WRM_GROUND (-2.4f)              /* mission 5: the worms' start height */
+#define WRM_BOX_X (-66.45f)             /* centre of the target box (x -77.2..-55.7, z -6..39.5) */
+#define WRM_BOX_Z 16.75f
+#define WRM_BOX_HX 10.75f
+#define WRM_BOX_HZ 22.75f
+#define WRM_PAD_DY 4.0f                 /* a route pad is on the spawn's floor */
+#define WRM_PAD_GAP 3.0f
+#define WRM_FLT_MAX 0x7F7FFFFFu
+#define WRM_WALL 0x0049DE08u            /* -53.9: the mansion wall clip (camera x) */
+#define WRM_WALL_BITS 0xC257999Au
+#define WRM_CONTAINER 0x00784014u
+#define WRM_MAGIC 0x00C77667u
+#define WRM_TAG_INFO 0x00C77668u
+#define WRM_TAG_END 0x00C7766Au
+#define WRM_TAG_SETS 0x00C776F5u
+#define WRM_SCAN 0x00080000u
+#define WRM_SET_MAP 0x11u
+#define WRM_INFO_SLOTS 10u
+#define WRM_ACTOR 0xEA0u
+#define WRM_ACTOR_CHAR 0x48u
+#define WRM_ACTOR_RECORD 0xBF0u
+#define WRM_ACTOR_PAD 0x678u            /* the AI's current pad */
+#define WRM_ENT_AI 0x7Cu
+#define WRM_ENT_MODEL 0x94u
+#define WRM_ENT_X 0x64u                 /* +0x64 x, +0x68 y (up), +0x6C z */
+#define WRM_RET_TAG 0x001D9AFDu         /* sub_001D9AF0: call sub_0015BA10 at 0x001D9AF8 */
+#define WRM_RET_PROPS 0x001DA998u       /* sub_001DA990: call sub_001D9370 at 0x001DA993 */
+#define WRM_RET_EXTRA 0x001DA9A9u       /* sub_001DA990: call sub_001D7200 at 0x001DA9A4 */
+#define WRM_RET_FX 0x001CEE8Cu          /* sub_001CEBC0: call sub_00126560 at 0x001CEE87 */
+#define WRM_RET_SCRIPT 0x001DC45Fu      /* sub_001DAAB0: push 'SFCC'; call sub_00234CD0 at 0x001DC45A */
+#define WRM_SCRATCH 0x300u              /* +0 script block, +0x50 object table, +0x100 object */
+#define WRM_FAKE_TABLE 0x50u
+#define WRM_FAKE_OBJECT 0x100u
+#define WRM_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+#define WRM_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+
+/* Image constants shifted during the stock update: address, stock bits, axis
+ * (0 x, 1 y, 2 z). */
+static const struct { uint32_t addr, bits; int axis; } wrm_consts[]={
+    {0x0049DF08u,0xC0198937u,1},   /* -2.399: the burrowing height */
+    {0x0049DF10u,0xC29A6666u,0},   /* -77.2: target box x */
+    {0x0049DE40u,0xC25ECCCDu,0},   /* -55.7: target box and wake region x */
+    {0x0049DF0Cu,0x421E0000u,2},   /* 39.5: target box z */
+    {0x0047D69Cu,0xC0C00000u,2},   /* -6.0: target box z (shared; no other reader in the update) */
+    {0x0049DE3Cu,0xC29E0000u,0},   /* -79.0: wake region x */
+    {0x0049DE34u,0xC0FCCCCDu,2},   /* -7.9: wake region z */
+    {0x0049DE38u,0x42213333u,2},   /* 40.3: wake region z */
+    {0x0049DDD8u,0xC2794189u,0},   /* -62.31: worm 2's point x */
+    {0x0049DDD4u,0x41873333u,2},   /* 16.9: worm 2's point z */
+};
+#define WRM_NCONST (sizeof wrm_consts/sizeof wrm_consts[0])
+#define WRM_NDRAW 2u                    /* the last two are also read by the draw */
+
+extern void sub_0005A130(void),sub_00062260(void),sub_001D1E80(void),sub_001D2350(void),sub_001DAAB0(void);
+extern void sub_001DA990(void),sub_00378400(void),sub_0010E2A0(void),sub_0003DFA0(void),sub_0009A420(void);
+int pc_mapmaker_area_enabled(const char *area,const char *hook);
+
+static struct {
+    int read, optout;
+    unsigned logged, extras, ticks, hits, draws, scripts;
+} wrm;
+/* This level's worm: blocks, spawn record, pool entry, placement. */
+static struct {
+    uint32_t state, scratch, effect, record, actor;
+    int ready, failed, shifted, drawing, swapped;
+    float dx, dy, dz;
+    uint32_t pad[WRM_ROUTE_N], saved[WRM_NCONST], route[WRM_ROUTE_N], wall;
+} wrm_lv;
+
+static void wrm_log(const char *what,uint32_t a,uint32_t b)
+{
+    if(wrm.logged>=24u) return;
+    wrm.logged++;
+    fprintf(stderr,"[mapmaker] worm: %s (0x%X, 0x%X)\n",what,(unsigned)a,(unsigned)b);
+    fflush(stderr);
+}
+static int wrm_on(void)
+{
+    mapmaker_limits_read();
+    if(!wrm.read) {
+        const char *v=getenv("TSFP_MAPMAKER_REAL_BOSS");
+        wrm.read=1;
+        wrm.optout=v && v[0]=='0' && !v[1];
+    }
+    return mapmaker_limits.limits;
+}
+static int wrm_play(void) { return wrm_on() && WORD_AT(WRM_SCENE)==100u && WRM_B(WRM_MODE)==10u; }
+static float wrm_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)a+g_xbox_mem_offset),4);return f; }
+static void wrm_setf(uint32_t a,float f) { memcpy((void *)((uintptr_t)a+g_xbox_mem_offset),&f,4); }
+static int wrm_sane(float f) { return f==f && f>-100000.0f && f<100000.0f; }
+static void wrm_zero(uint32_t a,uint32_t n) { memset((void *)((uintptr_t)a+g_xbox_mem_offset),0,n); }
+
+/* The map's custom set (index 0x11; slots 1-10 in the map-info chunk, 11-20
+ * in the sets area's chunk), as pc_mapmaker_realbosses.inc reads it.
+ * 1: holds the worm, 0: does not (or not the map's set), -1: unreadable. */
+static int wrm_set_has(void)
+{
+    uint32_t container=WORD_AT(WRM_CONTAINER),c,end,steps,info=0,isz=0,extra=0,n,k;
+    if(!container || !MAPMAKER_PTR_OK(container,WRM_SCAN) || WORD_AT(container)!=WRM_MAGIC) return -1;
+    c=container+8u;end=container+WRM_SCAN;
+    for(steps=0;steps<0x40000u && end-c>=8u;steps++) {
+        uint32_t tag=WORD_AT(c),sz=WORD_AT(c+4u),d=c+8u;
+        if(tag==WRM_TAG_END || sz>end-c-8u) break;
+        if(tag==WRM_TAG_INFO && sz>=0x18u && !info) { info=d;isz=sz; }
+        else if(tag==WRM_TAG_SETS && sz>=0x30u && !extra && WRM_H(d)==1u && WRM_B(d+2u)==WRM_INFO_SLOTS &&
+                WRM_B(d+3u)>=1u && WRM_B(d+3u)<=WRM_INFO_SLOTS) extra=d;
+        c+=8u+sz;
+    }
+    if(!info) return -1;
+    if(WRM_H(info+0x14u)!=WRM_SET_MAP) return 0;
+    n=WRM_B(info+0x16u);
+    if(n>WRM_INFO_SLOTS) n=WRM_INFO_SLOTS;
+    if(0x18u+n*4u>isz) n=(isz-0x18u)/4u;
+    for(k=0;k<n;k++) if(WRM_H(info+0x18u+k*4u)==WRM_ID) return 1;
+    for(k=0;extra && k<WRM_B(extra+3u);k++) if(WRM_H(extra+4u+k*4u)==WRM_ID) return 1;
+    return 0;
+}
+static int wrm_pak_mounted(void) { return (int32_t)guest_call(sub_00062260,1,WRM_PAK)!=-1; }
+static int wrm_state_ok(void) { return wrm_lv.state && WORD_AT(WRM_STATE)==wrm_lv.state; }
+
+/* WRAP sub_001C8540 (the level's anim paks; sub_001CA2F0 registers names next). */
+void pc_mapmaker_worm_anims(void (*original)(void))
+{
+    int has;
+    uint32_t mounted;
+    original();
+    if(!wrm_play() || wrm.optout || (has=wrm_set_has())==0 || wrm_pak_mounted()) return;
+    if((mounted=WORD_AT(WRM_MOUNTS))+WRM_MOUNT_KEEP>WRM_MOUNT_MAX)
+        wrm_log("pak mount table full; the mansion worm keeps the bot behaviour",mounted,WRM_MOUNT_MAX);
+    else if(!guest_call(sub_0005A130,1,WRM_PAK)) wrm_log("lv1_2.pak did not mount; bot behaviour",mounted,(uint32_t)has);
+    else wrm_log(has<0?"mounted lv1_2.pak (map container unreadable)":"mounted lv1_2.pak for the mansion worm",mounted+1u,0);
+}
+
+/* WRAP sub_0025F720 (story level init): after the original, the worm block
+ * and the stock worm init with this area's stand-ins; worms 1-4 parked. */
+void pc_mapmaker_worm_level(void (*original)(void))
+{
+    int has;
+    uint32_t st,scratch,objects,route_done,k,w;
+    original();
+    memset(&wrm_lv,0,sizeof wrm_lv);                  /* a new level: nothing of the last one */
+    if(!wrm_play() || wrm.optout || (has=wrm_set_has())==0) return;
+    WORD_AT(WRM_STATE)=0;                              /* a stale pointer of an earlier level */
+    guest_call(sub_001D1E80,0);
+    st=WORD_AT(WRM_STATE);
+    scratch=guest_call(sub_0003DFA0,2,WRM_SCRATCH,1u);
+    if(!st || !MAPMAKER_PTR_OK(st,WRM_STATE_SIZE) || !scratch || !MAPMAKER_PTR_OK(scratch,WRM_SCRATCH)) {
+        wrm_log("no level memory for the mansion worm; bot behaviour",st,scratch);
+        WORD_AT(WRM_STATE)=0;
+        return;
+    }
+    wrm_zero(scratch,WRM_SCRATCH);
+    WORD_AT(scratch+WRM_FAKE_TABLE+WRM_OBJECT*4u)=scratch+WRM_FAKE_OBJECT;
+    wrm_lv.effect=guest_call(sub_00378400,2,WRM_EFFECT_FN,5u);
+    objects=WORD_AT(WRM_OBJECTS);route_done=WORD_AT(WRM_ROUTE_DONE);
+    WORD_AT(WRM_OBJECTS)=scratch+WRM_FAKE_TABLE;      /* object 0x18: a zeroed stand-in */
+    WORD_AT(WRM_ROUTE_DONE)=0;                         /* the mansion pad ids: not converted */
+    guest_call(sub_001D2350,0);
+    WORD_AT(WRM_OBJECTS)=objects;WORD_AT(WRM_ROUTE_DONE)=route_done;
+    for(k=1;k<WRM_WORMS;k++) {                         /* one worm per map: the others gone */
+        w=st+k*WRM_WORM;
+        WORD_AT(w+WRM_W_STATE)=WRM_GONE;
+        if(WORD_AT(w+WRM_W_EMITTER)) guest_call(sub_0010E2A0,1,WORD_AT(w+WRM_W_EMITTER));
+    }
+    WORD_AT(WRM_ENABLE)=0;                             /* until the head's first tick */
+    wrm_lv.state=st;wrm_lv.scratch=scratch;
+    wrm_log(has<0?"mansion worm state allocated (map container unreadable)":"mansion worm state allocated",st,wrm_lv.effect);
+}
+
+/* WRAP sub_0015B830 (cdecl AI pool entry): one mansion worm per map is noted;
+ * its spawn record keeps the MapMaker class (the head's think stops when the
+ * worm binds it, as in stock). */
+void pc_mapmaker_worm_ai_start(void (*original)(void))
+{
+    uint32_t a,ent,rec;
+    if(!MAPMAKER_STACK_OK(8) || !wrm_play()) { original();return; }
+    a=WORD_AT(g_esp+4u);
+    if(!MAPMAKER_PTR_OK(a,WRM_ACTOR) || !MAPMAKER_PTR_OK(rec=WORD_AT(a+WRM_ACTOR_RECORD),12u)) { original();return; }
+    ent=WORD_AT(a);
+    if(WRM_H(a+WRM_ACTOR_CHAR)!=WRM_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && WRM_H(ent+WRM_ENT_MODEL)==WRM_MODEL)) { original();return; }
+    if(wrm.optout) wrm_log("TSFP_MAPMAKER_REAL_BOSS=0: mansion worm with bot behaviour",a,0);
+    else if(!wrm_pak_mounted()) wrm_log("lv1_2.pak not mounted: mansion worm with bot behaviour",a,0);
+    else if(!wrm_state_ok()) wrm_log("no mansion worm state this level: bot behaviour",a,WORD_AT(WRM_STATE));
+    else if(wrm_lv.record && wrm_lv.record!=rec) {
+        if(wrm.extras++<4u) wrm_log("only one mansion worm per map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
+    } else {
+        wrm_lv.record=rec;wrm_lv.actor=a;
+        wrm_log("mansion worm noted; it binds on its first frame",a,WORD_AT(rec+8u));
+    }
+    original();
+}
+
+/* This level's worm state is in place and ent is its head. */
+static int wrm_head(uint32_t ent)
+{
+    uint32_t a;
+    if(!wrm_lv.record || !wrm_state_ok()) return 0;
+    if(!MAPMAKER_PTR_OK(ent,0x200u) || !MAPMAKER_PTR_OK(a=WORD_AT(ent+WRM_ENT_AI),WRM_ACTOR)) return 0;
+    return WORD_AT(a+WRM_ACTOR_RECORD)==wrm_lv.record && WORD_AT(WRM_SCENE)==100u && wrm_on();
+}
+
+/* Six route pads around the spawn point (the box the worm targets), nearest
+ * first with a gap between them, then in angle order (the stock patrol goes
+ * to (i + 1) mod 6). Fewer repeat; none: the head's own pad; returns the
+ * number found. */
+static unsigned wrm_route(uint32_t a,float sx,float sy,float sz)
+{
+    uint32_t base=WORD_AT(WRM_PADS),n=WORD_AT(WRM_PAD_COUNT),i,k,j,p,t;
+    float px[WRM_ROUTE_N],pz[WRM_ROUTE_N],ang[WRM_ROUTE_N],d,dx,dz;
+    uint32_t reject[16];
+    unsigned found=0,rejects=0,r;
+    if(n>WRM_PAD_SCAN) n=WRM_PAD_SCAN;
+    while(found<WRM_ROUTE_N) {
+        float bd=-1.0f;
+        uint32_t best=0xFFFFFFFFu;
+        for(i=0;base && i<n;i++) {
+            p=base+i*WRM_PAD;
+            if(!MAPMAKER_PTR_OK(p,WRM_PAD) || !(WORD_AT(p+4u)&1u)) continue;
+            dx=wrm_getf(p+0xCu)-sx;dz=wrm_getf(p+0x14u)-sz;
+            if(!wrm_sane(dx) || !wrm_sane(dz) || fabsf(dx)>WRM_BOX_HX || fabsf(dz)>WRM_BOX_HZ ||
+               fabsf(wrm_getf(p+0x10u)-sy)>WRM_PAD_DY) continue;
+            for(r=0;r<rejects && reject[r]!=i;r++) {}
+            if(r<rejects) continue;
+            for(k=0;k<found;k++) {
+                float ex=wrm_getf(p+0xCu)-px[k],ez=wrm_getf(p+0x14u)-pz[k];
+                if(wrm_lv.pad[k]==i || ex*ex+ez*ez<WRM_PAD_GAP*WRM_PAD_GAP) break;
+            }
+            if(k<found) continue;
+            d=dx*dx+dz*dz;
+            if(bd<0.0f || d<bd) { bd=d;best=i; }
+        }
+        if(best==0xFFFFFFFFu) break;
+        if(guest_call(sub_0009A420,1,best)!=base+best*WRM_PAD) {     /* the stock lookup refuses it */
+            if(rejects>=16u) break;
+            reject[rejects++]=best;
+            continue;
+        }
+        p=base+best*WRM_PAD;
+        wrm_lv.pad[found]=best;px[found]=wrm_getf(p+0xCu);pz[found]=wrm_getf(p+0x14u);
+        ang[found]=atan2f(pz[found]-sz,px[found]-sx);
+        found++;
+    }
+    for(k=1;k<found;k++)                                  /* angle order: a loop around the spawn */
+        for(j=k;j>0 && ang[j-1]>ang[j];j--) {
+            float f=ang[j];ang[j]=ang[j-1];ang[j-1]=f;
+            t=wrm_lv.pad[j];wrm_lv.pad[j]=wrm_lv.pad[j-1];wrm_lv.pad[j-1]=t;
+        }
+    if(!found) {
+        int32_t own=(int32_t)WORD_AT(a+WRM_ACTOR_PAD);
+        if(own<0 || (uint32_t)own>=n || guest_call(sub_0009A420,1,(uint32_t)own)!=base+(uint32_t)own*WRM_PAD) return 0;
+        wrm_lv.pad[0]=(uint32_t)own;
+        found=1;
+    }
+    for(k=found;k<WRM_ROUTE_N;k++) wrm_lv.pad[k]=wrm_lv.pad[k%found];
+    return found;
+}
+
+/* The head's first tick: worm 0 at the spawn point, the mansion box around
+ * it, the route, enable. */
+static void wrm_setup(uint32_t ent)
+{
+    uint32_t w=wrm_lv.state,a=WORD_AT(ent+WRM_ENT_AI),k;
+    float sx=wrm_getf(ent+WRM_ENT_X),sy=wrm_getf(ent+WRM_ENT_X+4u),sz=wrm_getf(ent+WRM_ENT_X+8u);
+    unsigned pads;
+    if(!wrm_sane(sx) || !wrm_sane(sy) || !wrm_sane(sz)) {
+        wrm_lv.failed=1;
+        wrm_log("mansion worm spawn not a usable point; bot behaviour",WORD_AT(ent+WRM_ENT_X),WORD_AT(ent+WRM_ENT_X+8u));
+        return;
+    }
+    if(!(pads=wrm_route(a,sx,sy,sz))) {
+        wrm_lv.failed=1;
+        wrm_log("no pads near the mansion worm's spawn; bot behaviour",WORD_AT(WRM_PAD_COUNT),WORD_AT(a+WRM_ACTOR_PAD));
+        return;
+    }
+    wrm_lv.dx=sx-WRM_BOX_X;wrm_lv.dz=sz-WRM_BOX_Z;wrm_lv.dy=sy-WRM_GROUND;
+    for(k=0;k<2u+WRM_W_TRAILS;k++) {                   /* position, previous, trail */
+        uint32_t p=k==0?w:k==1?w+0xCu:w+WRM_W_TRAIL+(k-2u)*12u;
+        wrm_setf(p,sx);wrm_setf(p+4u,sy);wrm_setf(p+8u,sz);
+    }
+    WORD_AT(w+WRM_W_PAD)=0xFFFFFFFFu;WORD_AT(w+WRM_W_PAD+4u)=0xFFFFFFFFu;
+    WORD_AT(WRM_ENABLE)=1u;
+    wrm_lv.ready=1;
+    fprintf(stderr,"[mapmaker] worm: mansion garden moved by (%.2f, %.2f), floor %.2f (mission 5: -2.4), %u route pads\n",
+            (double)wrm_lv.dx,(double)wrm_lv.dz,(double)sy,pads);
+    fflush(stderr);
+}
+/* Shift (on) or restore (off) the constants (all for the update, the last
+ * WRM_NDRAW plus the wall for the draw) and swap in the route pads. A
+ * constant that does not hold its stock bits is left alone. */
+static void wrm_shift(int on,int draw)
+{
+    unsigned k,first=draw?WRM_NCONST-WRM_NDRAW:0u;
+    float off;
+    if(on) {
+        for(k=first;k<WRM_NCONST;k++) {
+            wrm_lv.saved[k]=WORD_AT(wrm_consts[k].addr);
+            if(wrm_lv.saved[k]!=wrm_consts[k].bits) continue;
+            off=wrm_consts[k].axis==0?wrm_lv.dx:wrm_consts[k].axis==1?wrm_lv.dy:wrm_lv.dz;
+            wrm_setf(wrm_consts[k].addr,wrm_getf(wrm_consts[k].addr)+off);
+        }
+        if(draw) {
+            wrm_lv.wall=WORD_AT(WRM_WALL);
+            if(wrm_lv.wall==WRM_WALL_BITS) WORD_AT(WRM_WALL)=WRM_FLT_MAX;   /* never past the mansion wall */
+        } else {
+            for(k=0;k<WRM_ROUTE_N;k++) { wrm_lv.route[k]=WORD_AT(WRM_ROUTE+k*4u);WORD_AT(WRM_ROUTE+k*4u)=wrm_lv.pad[k]; }
+            wrm_lv.swapped=1;
+        }
+        wrm_lv.shifted=1;
+    } else if(wrm_lv.shifted) {
+        for(k=first;k<WRM_NCONST;k++) WORD_AT(wrm_consts[k].addr)=wrm_lv.saved[k];
+        if(draw) WORD_AT(WRM_WALL)=wrm_lv.wall;
+        else if(wrm_lv.swapped) {
+            for(k=0;k<WRM_ROUTE_N;k++) WORD_AT(WRM_ROUTE+k*4u)=wrm_lv.route[k];
+            wrm_lv.swapped=0;
+        }
+        wrm_lv.shifted=0;
+    }
+}
+
+/* WRAP sub_000D8E30 (cdecl entity; every character's update, slot 3): for this
+ * map's worm head, the stock worm update instead of the character think. */
+void pc_mapmaker_worm_tick(void (*original)(void))
+{
+    uint32_t ent;
+    if(!wrm_lv.record || !MAPMAKER_STACK_OK(8) || !wrm_head(ent=WORD_AT(g_esp+4u))) { original();return; }
+    if(!wrm_lv.ready && !wrm_lv.failed) wrm_setup(ent);
+    if(wrm_lv.failed) { original();return; }
+    wrm_shift(1,0);
+    guest_call(sub_001DAAB0,0);
+    wrm_shift(0,0);
+    if(WORD_AT(WRM_HEADS)==ent && !WORD_AT(ent+WRM_SLOT3)) WORD_AT(ent+WRM_SLOT3)=WRM_CHAR_UPDATE;   /* bound: keep ticking */
+    if(!wrm.ticks++) wrm_log("mansion worm runs its story update",ent,WORD_AT(wrm_lv.state+WRM_W_STATE));
+    MAPMAKER_GUEST_RET();
+}
+
+/* WRAP sub_0015BA10 (cdecl record tag -> entity of the active AI, or 0): the
+ * worm's head lookup finds this map's worm for 'WRM1' and nothing else. */
+void pc_mapmaker_worm_tag(void (*original)(void))
+{
+    uint32_t tag,ent;
+    if(!wrm_lv.ready || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=WRM_RET_TAG || !wrm_state_ok()) { original();return; }
+    tag=WORD_AT(g_esp+4u);
+    ent=MAPMAKER_PTR_OK(wrm_lv.actor,WRM_ACTOR)?WORD_AT(wrm_lv.actor):0u;
+    g_eax=tag==WRM_TAG && wrm_head(ent)?ent:0u;
+    if(g_eax) wrm_log("mansion worm head bound",ent,tag);
+    MAPMAKER_GUEST_RET();
+}
+
+/* WRAP sub_001D1F30 (cdecl hit record; the head's hit callback): the stock
+ * callback with this level's stand-ins; the kill counter never reaches 5. */
+void pc_mapmaker_worm_hit(void (*original)(void))
+{
+    uint32_t info,ent,script,objects,effect,tag,st;
+    if(!wrm_lv.ready || !MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(info=WORD_AT(g_esp+4u),0x30u) ||
+       !wrm_head(ent=WORD_AT(info))) { original();return; }
+    script=WORD_AT(WRM_SCRIPT);objects=WORD_AT(WRM_OBJECTS);effect=WORD_AT(WRM_EFFECT);tag=WORD_AT(ent+WRM_ENT_TAG);
+    st=WORD_AT(wrm_lv.state+WRM_W_STATE);
+    WORD_AT(wrm_lv.scratch+WRM_KILLS)=0;
+    WORD_AT(WRM_SCRIPT)=wrm_lv.scratch;WORD_AT(WRM_OBJECTS)=wrm_lv.scratch+WRM_FAKE_TABLE;
+    WORD_AT(WRM_EFFECT)=wrm_lv.effect;WORD_AT(ent+WRM_ENT_TAG)=WRM_TAG;
+    original();
+    WORD_AT(WRM_SCRIPT)=script;WORD_AT(WRM_OBJECTS)=objects;WORD_AT(WRM_EFFECT)=effect;WORD_AT(ent+WRM_ENT_TAG)=tag;
+    WORD_AT(wrm_lv.scratch+WRM_KILLS)=0;
+    if(WORD_AT(wrm_lv.state+WRM_W_STATE)!=st && wrm.hits++<8u)
+        wrm_log("mansion worm hit (state before, after)",st,WORD_AT(wrm_lv.state+WRM_W_STATE));
+}
+
+/* WRAP sub_00126560 (frame, return 0x001CEE8C): the stock worm draw (bodies,
+ * surfaced heads) in scene 100. */
+void pc_mapmaker_worm_fx(void (*original)(void))
+{
+    int here=wrm_lv.ready && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==WRM_RET_FX;
+    original();
+    if(!here || !wrm_state_ok() || WORD_AT(WRM_SCENE)!=100u || !wrm_on()) return;
+    wrm_shift(1,1);
+    wrm_lv.drawing=1;
+    guest_call(sub_001DA990,0);
+    wrm_lv.drawing=0;
+    wrm_shift(0,1);
+    if(!wrm.draws++) wrm_log("mansion worm drawn",wrm_lv.state,WORD_AT(WRM_ENABLE));
+}
+
+/* WRAP sub_00234CD0 (cdecl tag; runs the level-script object with that tag):
+ * the update's 'SFCC' (0x001DC45A) is the mansion's script, whose run reaches
+ * level markers and tag lookups (sub_0025F0C0): dropped in scene 100. */
+void pc_mapmaker_worm_script(void (*original)(void))
+{
+    if(wrm_lv.ready && MAPMAKER_STACK_OK(8) && WORD_AT(g_esp)==WRM_RET_SCRIPT && WORD_AT(WRM_SCENE)==100u) {
+        if(!wrm.scripts++) wrm_log("mansion worm: the mansion script trigger dropped",WORD_AT(g_esp+4u),0);
+        MAPMAKER_GUEST_RET();
+        return;
+    }
+    original();
+}
+
+/* WRAP sub_001D9370 and sub_001D7200 (no arguments): the mansion's own parts
+ * of the worm draw, not in this area's draw. */
+void pc_mapmaker_worm_props(void (*original)(void))
+{
+    if(wrm_lv.drawing && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==WRM_RET_PROPS) { MAPMAKER_GUEST_RET();return; }
+    original();
+}
+void pc_mapmaker_worm_extra(void (*original)(void))
+{
+    if(wrm_lv.drawing && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==WRM_RET_EXTRA) { MAPMAKER_GUEST_RET();return; }
+    original();
+}
