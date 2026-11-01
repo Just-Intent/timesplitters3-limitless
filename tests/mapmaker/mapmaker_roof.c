@@ -730,12 +730,35 @@ int main(void)
         for(k=0;k<100;k++) tick();
         CHECK(nkilled==4 && FLOAT_AT(ent_of(1)+0x1CC)==100.0f);
     }
+    /* human players from their player structs ([0x007B0C48] + i*0x1584,
+     * entity +0x14, +4 < 0 empty), counted once when also in the live list */
+    {
+        int k;
+        uint32_t pl=0x001D0000u;
+        WORD_AT(0x007B0C48u)=pl;WORD_AT(0x00790950u)=2u;
+        make_actor(20,-5.0f,100.0f);make_actor(21,-50.0f,100.0f);
+        WORD_AT(pl+4)=0;WORD_AT(pl+0x14)=ent_of(20);                       /* player 0 */
+        WORD_AT(pl+0x1584u+4)=0xFFFFFFFFu;WORD_AT(pl+0x1584u+0x14)=ent_of(21);  /* empty slot */
+        WORD_AT(0x00900100u+0u)=0;WORD_AT(0x00900100u+4u)=0;              /* not in the live list */
+        WORD_AT(0x0074C37Cu)=2u;
+        tick();
+        CHECK(nkilled==4 && FLOAT_AT(ent_of(21)+0x1CC)==100.0f);           /* empty slot ignored */
+        FLOAT_AT(ent_of(20)+0x68)=-30.0f;tick();
+        CHECK(nkilled==5 && killed[4]==ent_of(20));                       /* a human not in the live list */
+        /* a human also in the live list (checked once, as the human) */
+        make_actor(0,-12.0f,100.0f);WORD_AT(pl+0x14)=ent_of(0);
+        for(k=0;k<59;k++) tick();
+        CHECK(nkilled==5);
+        tick();
+        CHECK(nkilled==6 && killed[5]==ent_of(0));
+        WORD_AT(0x00790950u)=0;
+    }
     /* the next map without unbounded tiles has no kill height */
     mapmaker_roof_set(piece(82),0);
     WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
     play();
     FLOAT_AT(ent_of(1)+0x1CC)=100.0f;tick();
-    CHECK(!mapmaker_roof_play.kill && nkilled==4);
+    CHECK(!mapmaker_roof_play.kill && nkilled==6);
     WORD_AT(0x0079094Cu)=102u;
     mapmaker_roof_set(piece(81),0);mapmaker_roof_set(piece(83),0);
 
