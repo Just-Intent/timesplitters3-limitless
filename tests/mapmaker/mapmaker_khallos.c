@@ -1,0 +1,769 @@
+/* Asset-free contract for src/interface/pc_mapmaker_khallos.inc: Khallos'
+ * flying chair (story mission 4) in MapMaker story play. prop3.pak and
+ * lv11.pak mounts, the chair model request, the chair created at a
+ * placeholder Story AI (id 0x33) and rebased to it, the rider bound from a
+ * nearby Khallos (id 2), the placeholder removed on the first frame, the
+ * proximity wake through the start-line constant, the moved frame of the
+ * update with its clamped steering box and the world-frame calls out of it,
+ * the hit that would trigger the train's death, the dead chair removed, the
+ * dropped level events and the bar label. Fake guest memory; fake originals
+ * pop their return address like the lifted callees, and every hook call
+ * checks esp. */
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static uint32_t memory[0x00900000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
+static uintptr_t g_xbox_mem_offset;
+#define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+#define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+#define BYTE_AT(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+#define HALF_AT(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
+typedef struct GuestRegisters { uint32_t a,c,d,sp,b,si,di; } GuestRegisters;
+static void save_registers(GuestRegisters *r) { r->a=g_eax;r->c=g_ecx;r->d=g_edx;r->sp=g_esp;r->b=g_ebx;r->si=g_esi;r->di=g_edi; }
+static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r->d;g_esp=r->sp;g_ebx=r->b;g_esi=r->si;g_edi=r->di; }
+
+#define HEAP 0x00300000u
+#define CONT 0x00200000u
+#define POOL 0x00400000u
+#define ENTS 0x00480000u
+#define RECS 0x004C0000u
+#define PLAYERS 0x00510000u
+#define RES 0x00520000u
+#define CHAIR 0x00560000u
+#define VEC 0x00570000u
+#define JETE 0x00577000u
+#define PLAYER 0x005A0000u
+#define ESP0 0x00600000u
+#define A(i) (POOL+(uint32_t)(i)*0xEA0u)
+#define ENT(i) (ENTS+(uint32_t)(i)*0x400u)
+#define REC(i) (RECS+(uint32_t)(i)*0x100u)
+#define PENT(i) (0x00580000u+(uint32_t)(i)*0x400u)
+#define PL(i) (PLAYERS+(uint32_t)(i)*0x1584u)
+#define PAK 0x0049E1D0u
+#define ANIM 0x0049D9C8u
+#define LIVE 0x0078F004u
+#define LINE 0x00500088u
+#define GAP 0x00500094u
+
+static int failures;
+#define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
+#define NEAR(a,b) ((a)-(b)<0.001f && (b)-(a)<0.001f)
+
+/* distinct bodies: identical ones may be folded */
+void sub_0003DFA0(void) { g_ecx=5; }   /* pc_mapmaker_limits.inc */
+void sub_00062260(void) { g_ecx=1; }
+void sub_000622D0(void) { g_ecx=2; }
+void sub_000A6F90(void) { g_ecx=3; }
+void sub_0015DDA0(void) { g_ecx=4; }
+void sub_000A5E40(void) { g_ecx=6; }
+void sub_000631C0(void) { g_ecx=7; }
+void sub_0005A130(void) { g_ecx=8; }
+void sub_000A9070(void) { g_ecx=9; }
+void sub_0010E2A0(void) { g_ecx=10; }
+void sub_0010EB90(void) { g_ecx=11; }
+/* row 3 = the chair: path PATH(3), request REQ(3) whose +0x10 holds the file when read */
+#define PATH(r) (0x00530000u+(uint32_t)(r)*0x40u)
+#define REQ(r) (0x00534000u+(uint32_t)(r)*0x40u)
+static int req_state[8], req_reads=1, req_after_original;
+static unsigned nrequest;
+static uint32_t requested;
+static uint32_t heap_next=HEAP;
+uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment) { uint32_t p;(void)alignment;p=heap_next;heap_next+=(bytes+15u)&~15u;return p; }
+
+static int pak_mounted, anim_mounted, mount_ok=1, anim_ok=1, spawn_ok=1, rise_variant, originals;
+static unsigned nmount, nanim, nspawn, nremove, ndestroy, nfree, nstop;
+static uint32_t mount_args[3], anim_arg, spawn_args[5], remove_arg[4], destroy_arg, free_arg, stop_args[8];
+static float spawn_pos[3], spawn_rot[3];
+static int spawn_after_original;
+static uint32_t guest_call(void (*f)(void),int n,...)
+{
+    va_list a;
+    uint32_t x[12]={0};
+    int i;
+    if(n>12) { fprintf(stderr,"guest_call with %d args\n",n);exit(3); }
+    va_start(a,n);
+    for(i=0;i<n && i<12;i++) x[i]=va_arg(a,uint32_t);
+    va_end(a);
+    if(f==sub_00062260) return ((x[0]==PAK && pak_mounted) || (x[0]==ANIM && anim_mounted))?4u:0xFFFFFFFFu;
+    if(f==sub_000622D0) {
+        nmount++;memcpy(mount_args,x,sizeof mount_args);
+        if(mount_ok && x[0]==PAK) pak_mounted=1;
+        return mount_ok?7u:0xFFFFFFFFu;
+    }
+    if(f==sub_0005A130) { nanim++;anim_arg=x[0];if(anim_ok && x[0]==ANIM) anim_mounted=1;return anim_ok?1u:0; }
+    if(f==sub_000A6F90) {   /* sub_000A6EC0: the object at pos/rot, then init case 0x376 */
+        nspawn++;memcpy(spawn_args,x,sizeof spawn_args);
+        spawn_after_original=originals;
+        for(i=0;i<3;i++) { spawn_pos[i]=FLOAT_AT(x[1]+(uint32_t)i*4u);spawn_rot[i]=FLOAT_AT(x[2]+(uint32_t)i*4u); }
+        if(!spawn_ok) return 0;
+        for(i=0;i<3;i++) FLOAT_AT(CHAIR+0x64u+(uint32_t)i*4u)=spawn_pos[i];
+        memset((void *)((uintptr_t)0x0078F000u+g_xbox_mem_offset),0,0x70);
+        if(rise_variant) { FLOAT_AT(LIVE)=-600.0f;return CHAIR; }   /* never sets [0x0078F000] */
+        WORD_AT(0x0078F000u)=CHAIR;FLOAT_AT(LIVE)=-576.2f;FLOAT_AT(LIVE+4u)=7.5f;FLOAT_AT(LIVE+8u)=0.0f;
+        FLOAT_AT(CHAIR+0x1CCu)=60.0f;WORD_AT(0x0078F054u)=JETE;
+        return CHAIR;
+    }
+    if(f==sub_0015DDA0) { if(nremove<4u) remove_arg[nremove]=x[0];nremove++;return 0; }
+    if(f==sub_000A9070) { ndestroy++;destroy_arg=x[0];return 0; }
+    if(f==sub_0010E2A0) { nfree++;free_arg=x[0];return 0; }
+    if(f==sub_0010EB90) { if(nstop<8u) stop_args[nstop]=x[0];nstop++;CHECK(x[1]==0);return 0; }
+    if(f==sub_000A5E40) {
+        int16_t r=(int16_t)HALF_AT(0x008CA000u+x[0]*2u);
+        requested=x[0];nrequest++;req_after_original=originals;
+        if(r>=0 && r<8) req_state[r]=req_reads?2:1;
+        return 0;
+    }
+    if(f==sub_000631C0) {
+        for(i=0;i<8;i++) if(x[0]==PATH(i) && req_state[i]) { WORD_AT(REQ(i)+0x10u)=req_state[i]==2?0x00538000u:0;return REQ(i); }
+        return 0;
+    }
+    return 0;
+}
+#include "pc_mapmaker_budget.inc"
+#include "pc_mapmaker_limits.inc"
+#include "pc_mapmaker_khallos.inc"
+
+static uint32_t orig_eax, pre_eax=0xDDDDu;
+static unsigned inner_events, nworld;
+static void fake(void) { originals++;g_eax=orig_eax;g_esp+=4u; }
+static void fake_ai(void) { originals++;g_esp+=4u; }
+static void fake_event(void) { inner_events++;g_esp+=4u; }
+
+/* A call from inside a fake original into a hook: ret and args pushed below esp. */
+static void inner(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,int line)
+{
+    uint32_t sp=g_esp;
+    g_esp-=16u;WORD_AT(g_esp)=ret;WORD_AT(g_esp+4u)=a1;WORD_AT(g_esp+8u)=a2;WORD_AT(g_esp+12u)=a3;
+    hook(orig);
+    if(g_esp!=sp-12u) { fprintf(stderr,"%s:%d: inner esp %+d\n",__FILE__,line,(int)(g_esp-(sp-12u)));failures++; }
+    g_esp=sp;
+}
+/* What a call out of the update saw: its position argument, player 0's y/z,
+ * the chair's y/z and live y/z, and whether the hook still said "inside". */
+static uint32_t rec_ptr;
+static float rec_pos[3], rec_p[2], rec_obj[2], rec_live[2];
+static int rec_inside;
+static void fake_world(void)
+{
+    int i;
+    nworld++;
+    for(i=0;i<3;i++) rec_pos[i]=rec_ptr?FLOAT_AT(rec_ptr+(uint32_t)i*4u):0.0f;
+    for(i=0;i<2;i++) { rec_p[i]=FLOAT_AT(PL(0)+0xB8u+(uint32_t)i*4u);rec_obj[i]=FLOAT_AT(CHAIR+0x68u+(uint32_t)i*4u);rec_live[i]=FLOAT_AT(LIVE+4u+(uint32_t)i*4u); }
+    rec_inside=khl_lv.inside;
+    g_esp+=4u;
+}
+struct seen { float pos[3], p[2], obj[2], live[2]; int inside; };
+static void keep(struct seen *s) { memcpy(s->pos,rec_pos,sizeof rec_pos);memcpy(s->p,rec_p,sizeof rec_p);memcpy(s->obj,rec_obj,sizeof rec_obj);memcpy(s->live,rec_live,sizeof rec_live);s->inside=rec_inside; }
+static void call_world(void (*hook)(void (*)(void)),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,uint32_t pos,struct seen *s,int line)
+{
+    uint32_t before[3];
+    int i;
+    for(i=0;i<3;i++) before[i]=pos?WORD_AT(pos+(uint32_t)i*4u):0;
+    rec_ptr=pos;
+    inner(hook,fake_world,ret,a1,a2,a3,line);
+    keep(s);
+    for(i=0;i<3;i++) if(pos && WORD_AT(pos+(uint32_t)i*4u)!=before[i]) { fprintf(stderr,"%s:%d: position not restored\n",__FILE__,line);failures++; }
+}
+/* sub_001EEBD0: the start line, the controller at its target this frame (or
+ * climbing 5 m a frame when dead), and the calls out of it. */
+static float seen_line, seen_gap, seen_live[3], seen_obj[3], seen_p[3], after_p[2], after_live[2], after_obj[2];
+static int seen_inside, fire=1;
+static unsigned nupdate;
+static struct seen s_flame, s_flash, s_flash2, s_shot, s_sound, s_engine;
+static void fake_update(void)
+{
+    uint32_t obj=WORD_AT(g_esp+4u),base=WORD_AT(0x007B0C48u),p=base,i;
+    float y;
+    originals++;nupdate++;
+    seen_line=FLOAT_AT(LINE);seen_gap=FLOAT_AT(GAP);
+    if(BYTE_AT(0x007DE455u)==10u && WORD_AT(0x00790950u)>1u && FLOAT_AT(base+0xA8u)>FLOAT_AT(base+0x1584u+0xA8u)) p=base+0x1584u;
+    if(!WORD_AT(0x0078F04Cu)) {
+        if(FLOAT_AT(p+0xA8u)>FLOAT_AT(LINE)) { g_esp+=4u;return; }
+        WORD_AT(0x0078F04Cu)=1u;WORD_AT(PLAYER+0xFF4u)=obj;
+        inner(pc_mapmaker_khallos_event,fake_event,0x001EEC72u,0x29u,0,0,__LINE__);
+    }
+    for(i=0;i<3u;i++) { seen_live[i]=FLOAT_AT(LIVE+i*4u);seen_obj[i]=FLOAT_AT(obj+0x64u+i*4u);seen_p[i]=FLOAT_AT(p+0xB4u+i*4u); }
+    seen_inside=khl_lv.inside;
+    FLOAT_AT(VEC)=seen_live[0];FLOAT_AT(VEC+4u)=seen_live[1]-0.3f;FLOAT_AT(VEC+8u)=seen_live[2];
+    call_world(pc_mapmaker_khallos_flame,0x001EED7Au,JETE,VEC,0,VEC,&s_flame,__LINE__);
+    for(i=0;i<2u;i++) { after_p[i]=FLOAT_AT(p+0xB8u+i*4u);after_live[i]=FLOAT_AT(LIVE+4u+i*4u);after_obj[i]=FLOAT_AT(obj+0x68u+i*4u); }
+    y=FLOAT_AT(obj+0x1CCu)<0.0f?seen_live[1]+5.0f:10.0f;
+    FLOAT_AT(LIVE)=FLOAT_AT(p+0xB4u)-FLOAT_AT(GAP);FLOAT_AT(LIVE+4u)=y;FLOAT_AT(LIVE+8u)=FLOAT_AT(obj+0x1CCu)<0.0f?seen_live[2]:0.0f;
+    for(i=0;i<3u;i++) FLOAT_AT(obj+0x64u+i*4u)=FLOAT_AT(LIVE+i*4u);
+    if(fire) {
+        FLOAT_AT(VEC+0x20u)=FLOAT_AT(LIVE);FLOAT_AT(VEC+0x24u)=FLOAT_AT(LIVE+4u);FLOAT_AT(VEC+0x28u)=FLOAT_AT(LIVE+8u)+1.0f;
+        call_world(pc_mapmaker_khallos_flash,0x001EF689u,2u,0x40000000u,VEC+0x20u,VEC+0x20u,&s_flash,__LINE__);
+        call_world(pc_mapmaker_khallos_flash,0x001EF6EAu,2u,0x40000000u,VEC+0x20u,VEC+0x20u,&s_flash2,__LINE__);
+        call_world(pc_mapmaker_khallos_shot,0x001EF75Bu,0x35u,VEC+0x20u,VEC+0x40u,VEC+0x20u,&s_shot,__LINE__);
+        for(i=0;i<3u;i++) FLOAT_AT(VEC+0x100u+0x1Cu+i*4u)=FLOAT_AT(obj+0x64u+i*4u);
+        call_world(pc_mapmaker_khallos_sound,0x001EF7B4u,VEC+0x100u,0,0,VEC+0x11Cu,&s_sound,__LINE__);
+    }
+    for(i=0;i<3u;i++) FLOAT_AT(0x00715F98u+i*4u)=FLOAT_AT(obj+0x64u+i*4u);
+    call_world(pc_mapmaker_khallos_engine,0x001EF824u,obj+0x22Cu,0x00715F98u,0x394u,0x00715F98u,&s_engine,__LINE__);
+    g_esp+=4u;
+}
+/* sub_001EF840: health -= damage, events 0x12/0x13, the train's death below 0. */
+static unsigned train_death;
+static float seen_damage;
+static void fake_damage(void)
+{
+    uint32_t r=WORD_AT(g_esp+4u),obj=WORD_AT(0x0078F000u);
+    originals++;
+    seen_damage=FLOAT_AT(r+0x20u);
+    if(obj && FLOAT_AT(obj+0x1CCu)>=0.0f && WORD_AT(r+0x30u) && WORD_AT(r+0x28u) && WORD_AT(0x0078F04Cu)==1u) {
+        FLOAT_AT(obj+0x1CCu)-=FLOAT_AT(r+0x20u);
+        if(35.0f>=FLOAT_AT(obj+0x1CCu)) inner(pc_mapmaker_khallos_event,fake_event,0x001EF9A2u,0x12u,0,0,__LINE__);
+        if(15.0f>=FLOAT_AT(obj+0x1CCu)) inner(pc_mapmaker_khallos_event,fake_event,0x001EF9C2u,0x13u,0,0,__LINE__);
+        if(0.0f>FLOAT_AT(obj+0x1CCu)) { train_death++;inner(pc_mapmaker_khallos_event,fake_event,0x001EFAECu,4u,0,0,__LINE__); }
+    }
+    g_esp+=4u;
+}
+
+static uint32_t call(void (*fn)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,int expect_orig,int line)
+{
+    int before=originals;
+    g_esp=ESP0;WORD_AT(ESP0)=ret;WORD_AT(ESP0+4u)=a1;WORD_AT(ESP0+8u)=a2;WORD_AT(ESP0+12u)=a3;
+    g_eax=pre_eax;
+    fn(orig);
+    if(g_esp!=ESP0+4u) { fprintf(stderr,"%s:%d: esp %+d\n",__FILE__,line,(int)(g_esp-ESP0));failures++; }
+    if(expect_orig>=0 && originals-before!=expect_orig) { fprintf(stderr,"%s:%d: original ran %d times\n",__FILE__,line,originals-before);failures++; }
+    g_esp=ESP0;pre_eax=0xDDDDu;
+    return g_eax;
+}
+#define CALL(fn,orig,ret,a1,a2,a3,n) call(fn,orig,ret,a1,a2,a3,n,__LINE__)
+static void set_env(const char *name,const char *value)
+{
+#ifdef _WIN32
+    _putenv_s(name,value?value:"");
+#else
+    if(value)setenv(name,value,1); else unsetenv(name);
+#endif
+    memset(&mapmaker_limits,0,sizeof mapmaker_limits);
+    khl.read=0;
+}
+static void container(uint32_t set_index,const uint16_t *ids,unsigned n,const uint16_t *extra,unsigned ne)
+{
+    uint32_t c=CONT+8u,k;
+    memset((void *)((uintptr_t)CONT+g_xbox_mem_offset),0,0x00080000u);
+    WORD_AT(0x00784014u)=CONT;WORD_AT(CONT)=0x00C77667u;
+    WORD_AT(c)=0x00C77668u;WORD_AT(c+4u)=0x18u+20u*4u;
+    HALF_AT(c+8u+0x14u)=(uint16_t)set_index;BYTE_AT(c+8u+0x16u)=(uint8_t)n;
+    for(k=0;k<n;k++) HALF_AT(c+8u+0x18u+k*4u)=ids[k];
+    c+=8u+0x18u+20u*4u;
+    if(extra) {
+        WORD_AT(c)=0x00C776F5u;WORD_AT(c+4u)=0x30u;
+        HALF_AT(c+8u)=1u;BYTE_AT(c+10u)=10u;BYTE_AT(c+11u)=(uint8_t)ne;
+        for(k=0;k<ne;k++) HALF_AT(c+12u+k*4u)=extra[k];
+        c+=8u+0x30u;
+    }
+    WORD_AT(c)=0x00C7766Au;WORD_AT(c+4u)=0;
+}
+static void actor(unsigned i,uint32_t id,float x,float y,float z,float yaw)
+{
+    memset((void *)((uintptr_t)A(i)+g_xbox_mem_offset),0,0xEA0u);
+    WORD_AT(A(i))=ENT(i);HALF_AT(A(i)+0x48u)=(uint16_t)id;WORD_AT(A(i)+0xBF0u)=REC(i);
+    WORD_AT(A(i)+0x14u)=0x11000000u;WORD_AT(A(i)+0x9D0u)=0xFFFFFFFFu;
+    WORD_AT(ENT(i)+0x7Cu)=A(i);
+    FLOAT_AT(ENT(i)+0x64u)=x;FLOAT_AT(ENT(i)+0x68u)=y;FLOAT_AT(ENT(i)+0x6Cu)=z;FLOAT_AT(ENT(i)+0x70u)=yaw;
+}
+static void resources(int chair,uint32_t init)
+{
+    uint32_t m;
+    for(m=0;m<0xA00u;m++) HALF_AT(0x008CA000u+m*2u)=0xFFFFu;
+    WORD_AT(0x00791D4Cu)=RES;
+    if(chair) { HALF_AT(0x008CA000u+0x376u*2u)=3;WORD_AT(RES+3u*0x30u+0x2Cu)=init; }
+    for(m=0;m<8u;m++) { WORD_AT(RES+m*0x30u+0x10u)=PATH(m);WORD_AT(RES+m*0x30u+0x14u)=0;WORD_AT(RES+m*0x30u+4u)=0;req_state[m]=0; }
+    HALF_AT(0x0078B860u+0x376u*2u)=1;WORD_AT(RES+1u*0x30u+0x2Cu)=0x001F4E00u;   /* the stock map: stale */
+}
+/* two players: entity (x, z, health) for the wake; +0xA8 and +0xB4..BC */
+static void players(float x0,float z0,float h0,float x1,float z1,float h1)
+{
+    WORD_AT(0x00790950u)=2u;WORD_AT(0x007B0C48u)=PLAYERS;
+    WORD_AT(PL(0)+0x14u)=PENT(0);WORD_AT(PL(1)+0x14u)=PENT(1);
+    FLOAT_AT(PENT(0)+0x64u)=x0;FLOAT_AT(PENT(0)+0x6Cu)=z0;FLOAT_AT(PENT(0)+0x1CCu)=h0;
+    FLOAT_AT(PENT(1)+0x64u)=x1;FLOAT_AT(PENT(1)+0x6Cu)=z1;FLOAT_AT(PENT(1)+0x1CCu)=h1;
+    FLOAT_AT(PL(0)+0xA8u)=x0;FLOAT_AT(PL(0)+0xB4u)=x0;FLOAT_AT(PL(0)+0xB8u)=3.7f;FLOAT_AT(PL(0)+0xBCu)=z0;
+    FLOAT_AT(PL(1)+0xA8u)=x1+1000.0f;FLOAT_AT(PL(1)+0xB4u)=x1;FLOAT_AT(PL(1)+0xB8u)=0.1f;FLOAT_AT(PL(1)+0xBCu)=z1;
+}
+static void play_scene(void) { WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10u; }
+static void constants(void) { FLOAT_AT(LINE)=-535.0f;FLOAT_AT(GAP)=11.0f; }
+/* a new level: chair placeholder at (40, 2, 30), Khallos 3 m off */
+static const uint16_t with_both[]={0x0C,0x33,0x02};
+static void level(int rider_first,int line)
+{
+    unsigned s=nspawn;
+    play_scene();
+    container(0x11,with_both,3,NULL,0);
+    resources(1,0x001F4E00u);
+    pak_mounted=0;anim_mounted=0;WORD_AT(0x006D7880u)=10u;WORD_AT(0x006D7C4Cu)=0;
+    call(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1,line);
+    call(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1,line);
+    call(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1,line);
+    actor(0,0x33,40.0f,2.0f,30.0f,1.5f);
+    actor(1,0x02,42.0f,2.0f,32.0f,0.0f);
+    WORD_AT(A(1)+0x10u)=1u;                                       /* MapMaker's class 0x10000000/1 */
+    if(rider_first) call(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(1),0,0,1,line);
+    call(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1,line);
+    if(!rider_first) call(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(1),0,0,1,line);
+    if(nspawn!=s+1u) { fprintf(stderr,"%s:%d: chair not spawned\n",__FILE__,line);failures++; }
+}
+#define UPDATE(n) CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR,0,0,n)
+
+int main(void)
+{
+    static const uint16_t chair_only[]={0x0C,0x33}, neither[]={0x0C,0xA8}, rider_only[]={0x0C,0x02}, extra[]={0x30,0x33};
+    unsigned n,k;
+    float dy,dz,tx;
+    uint32_t r;
+    g_xbox_mem_offset=(uintptr_t)memory;
+    constants();
+    WORD_AT(0x007B0C7Cu)=PLAYER;
+    set_env("TSFP_MAPMAKER_POOLS",NULL);
+    set_env("TSFP_MAPMAKER_KHALLOS",NULL);
+
+    /* ---- off: every hook is the original ---------------------------------- */
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);
+    play_scene();
+    container(0x11,with_both,3,NULL,0);
+    resources(1,0x001F4E00u);
+    WORD_AT(0x006D7880u)=10u;
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nmount==0 && nanim==0 && nrequest==0);
+    pak_mounted=1;
+    actor(0,0x33,40.0f,2.0f,30.0f,1.5f);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==0);
+    CALL(pc_mapmaker_khallos_event,fake,0x001EEC72u,0x29u,0,0,1);
+    orig_eax=0x1234u;
+    CHECK(CALL(pc_mapmaker_khallos_text,fake,0x0014CDA6u,0xFF1u,0,0,1)==0x1234u);
+    CALL(pc_mapmaker_khallos_flame,fake,0x001EED7Au,JETE,VEC,0,1);
+    pak_mounted=0;
+    set_env("TSFP_MAPMAKER_LIMITS","1");
+    set_env("TSFP_MAPMAKER_POOLS","0");                  /* limits need the pools */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==0);
+    set_env("TSFP_MAPMAKER_POOLS",NULL);
+
+    /* ---- mount: prop3.pak -------------------------------------------------- */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==1 && mount_args[0]==PAK && mount_args[1]==0 && mount_args[2]==1u && pak_mounted);
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);    /* already mounted */
+    CHECK(nmount==1);
+    pak_mounted=0;WORD_AT(0x006D7880u)=57u;                       /* 7 free: kept for stock */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==1);
+    WORD_AT(0x006D7880u)=56u;
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==2 && pak_mounted);
+    pak_mounted=0;WORD_AT(0x006D7880u)=10u;
+    container(0x11,rider_only,2,NULL,0);                          /* Khallos alone: no chair */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==2);
+    container(0x0C,with_both,3,NULL,0);                           /* a preset set */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==2);
+    container(0x11,neither,2,extra,2);                            /* slot 12 */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==3 && pak_mounted);
+    pak_mounted=0;
+    container(0x11,with_both,3,NULL,0);
+    BYTE_AT(CONT+8u+8u+0x16u)=1u;                                 /* slot count 1: id 0x0C only */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==3);
+    WORD_AT(CONT)=0;                                              /* unreadable container */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==4 && pak_mounted);
+    pak_mounted=0;
+    container(0x11,with_both,3,NULL,0);
+    BYTE_AT(0x007DE455u)=3u;                                      /* not story */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==4);
+    play_scene();WORD_AT(0x0079094Cu)=11u;                        /* the train itself */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==4);
+    play_scene();
+    set_env("TSFP_MAPMAKER_KHALLOS","0");
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nmount==4 && nanim==0 && nrequest==0);
+    actor(0,0x33,40.0f,2.0f,30.0f,1.5f);pak_mounted=1;
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==0);
+    pak_mounted=0;
+    set_env("TSFP_MAPMAKER_KHALLOS",NULL);
+    mount_ok=0;
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==5 && !pak_mounted);
+    mount_ok=1;
+    WORD_AT(0x006D7C4Cu)=1u;                                      /* the original does nothing */
+    khl_lv.obj=0x1234u;
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==5 && khl_lv.obj==0x1234u);
+    WORD_AT(0x006D7C4Cu)=0;
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(nmount==6 && !khl_lv.obj);                              /* a new level forgets the chair */
+
+    /* ---- anims: lv11.pak only with the chair and Khallos in the set ---------- */
+    container(0x11,chair_only,2,NULL,0);
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nanim==0);
+    container(0x11,rider_only,2,NULL,0);
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nanim==0);
+    container(0x11,chair_only,2,rider_only+1,1);                  /* Khallos in slot 11 */
+    WORD_AT(0x006D7880u)=57u;
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nanim==0);
+    WORD_AT(0x006D7880u)=10u;
+    anim_ok=0;
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nanim==1 && !anim_mounted);
+    anim_ok=1;
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nanim==2 && anim_arg==ANIM && anim_mounted);
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);    /* already mounted */
+    CHECK(nanim==2);
+    anim_mounted=0;
+    WORD_AT(CONT)=0;                                              /* unreadable */
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nanim==3 && anim_mounted);
+    anim_mounted=0;
+    container(0x11,with_both,3,NULL,0);
+    WORD_AT(0x0079094Cu)=102u;                                    /* the editor */
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nanim==3);
+    play_scene();
+
+    /* ---- request ------------------------------------------------------------ */
+    container(0x11,neither,2,NULL,0);
+    pak_mounted=1;
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==0);
+    container(0x11,with_both,3,NULL,0);
+    pak_mounted=0;
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==0);
+    pak_mounted=1;
+    resources(0,0x001F4E00u);
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==0);
+    resources(1,0x001F4E00u);
+    WORD_AT(0x0079094Cu)=11u;
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==0);
+    play_scene();
+    req_reads=0;
+    n=originals;
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==1 && requested==0x376u && req_after_original==(int)n+1 && khl_lv.requested);
+
+    /* ---- ai_start: the placeholder becomes the chair ------------------------- */
+    actor(0,0x33,40.0f,2.0f,30.0f,1.5f);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);   /* requested, not read */
+    CHECK(nspawn==0);
+    req_reads=1;resources(1,0x001F4E00u);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);   /* never requested */
+    CHECK(nspawn==0);
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    WORD_AT(RES+3u*0x30u+0x14u)=PATH(7);                                 /* a second path, unrequested */
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==0);
+    req_state[7]=2;
+    pak_mounted=0;
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==0);
+    pak_mounted=1;
+    WORD_AT(RES+3u*0x30u+0x2Cu)=0x002560C0u;                             /* another init */
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==0);
+    WORD_AT(RES+3u*0x30u+0x2Cu)=0x001F4E00u;
+    actor(2,0x34,40.0f,2.0f,30.0f,1.5f);                                 /* another character */
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
+    CHECK(nspawn==0);
+    resources(1,0x001F4E00u);
+    WORD_AT(RES+3u*0x30u+4u)=0x00539000u;                                /* loaded before */
+    spawn_ok=0;
+    WORD_AT(0x0078F000u)=0;FLOAT_AT(LIVE)=-1.0f;
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==1 && !khl_lv.obj && FLOAT_AT(LIVE)==-1.0f && ndestroy==0);
+    spawn_ok=1;rise_variant=1;
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==2 && !khl_lv.obj && ndestroy==1 && destroy_arg==CHAIR);
+    rise_variant=0;
+    n=originals;
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==3 && khl_lv.obj==CHAIR && spawn_after_original==(int)n+1);
+    CHECK(spawn_args[0]==0x376u && spawn_args[3]==0 && spawn_args[4]==0);
+    CHECK(NEAR(spawn_pos[0],40.0f) && NEAR(spawn_pos[1],2.0f) && NEAR(spawn_pos[2],30.0f));
+    CHECK(NEAR(spawn_rot[0],0.0f) && NEAR(spawn_rot[1],1.5f) && NEAR(spawn_rot[2],0.0f));
+    CHECK(FLOAT_AT(LIVE)==40.0f && FLOAT_AT(LIVE+4u)==3.0f && FLOAT_AT(LIVE+8u)==30.0f);   /* spawn + lift */
+    CHECK(FLOAT_AT(CHAIR+0x64u)==40.0f && FLOAT_AT(CHAIR+0x68u)==3.0f && FLOAT_AT(CHAIR+0x6Cu)==30.0f);
+    actor(2,0x33,0.0f,0.0f,0.0f,0.0f);                                   /* a second placeholder */
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
+    CHECK(nspawn==3 && khl_lv.obj==CHAIR);
+    WORD_AT(0x0079094Cu)=102u;
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
+    CHECK(nspawn==3);
+    play_scene();
+
+    /* ---- text: the bar label -------------------------------------------------- */
+    r=CALL(pc_mapmaker_khallos_text,fake,0x0014CDA6u,0xFF1u,0,0,0);
+    CHECK(r && !strcmp((const char *)((uintptr_t)r+g_xbox_mem_offset),"Khallos"));
+    orig_eax=0x4321u;
+    CHECK(CALL(pc_mapmaker_khallos_text,fake,0x00300000u,0xFF1u,0,0,1)==0x4321u);   /* other caller */
+    CHECK(CALL(pc_mapmaker_khallos_text,fake,0x0014CDA6u,0xFF2u,0,0,1)==0x4321u);
+    BYTE_AT(0x007DE455u)=3u;
+    CHECK(CALL(pc_mapmaker_khallos_text,fake,0x0014CDA6u,0xFF1u,0,0,1)==0x4321u);
+    play_scene();
+
+    /* ---- rider: a Khallos near the chair, with lv11.pak ------------------------ */
+    level(1,__LINE__);                                                   /* Khallos started first */
+    CHECK(khl_lv.rider==A(1) && WORD_AT(A(1)+0x10u)==0 && WORD_AT(A(1)+0x14u)==8u && WORD_AT(A(1)+0x9D0u)==0);
+    level(0,__LINE__);                                                   /* Khallos started after */
+    CHECK(khl_lv.rider==A(1) && WORD_AT(A(1)+0x14u)==8u);
+    actor(3,0x02,40.5f,2.0f,30.5f,0.0f);                                 /* nearer, but a rider exists */
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);
+    CHECK(khl_lv.rider==A(1) && WORD_AT(A(3)+0x14u)==0x11000000u);
+    /* the nearest of two */
+    play_scene();
+    container(0x11,with_both,3,NULL,0);
+    resources(1,0x001F4E00u);pak_mounted=0;anim_mounted=0;
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    actor(1,0x02,43.0f,2.0f,33.0f,0.0f);                                 /* 4.2 m */
+    actor(3,0x02,41.0f,2.0f,29.0f,0.0f);                                 /* 1.4 m */
+    actor(4,0x02,40.0f,2.0f,35.5f,0.0f);                                 /* 5.5 m */
+    actor(0,0x33,40.0f,2.0f,30.0f,1.5f);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(1),0,0,1);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(3),0,0,1);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(4),0,0,1);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(khl_lv.rider==A(3) && WORD_AT(A(1)+0x14u)==0x11000000u && WORD_AT(A(4)+0x14u)==0x11000000u);
+    /* too far, or the entry reused, or no anims: no rider */
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    actor(4,0x02,40.0f,2.0f,35.5f,0.0f);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(4),0,0,1);
+    actor(5,0x34,40.5f,2.0f,30.5f,0.0f);                                 /* near, but not Khallos */
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(5),0,0,1);
+    actor(0,0x33,40.0f,2.0f,30.0f,1.5f);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(khl_lv.obj==CHAIR && !khl_lv.rider && WORD_AT(A(4)+0x14u)==0x11000000u && WORD_AT(A(5)+0x14u)==0x11000000u);
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    actor(1,0x02,41.0f,2.0f,31.0f,0.0f);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(1),0,0,1);
+    WORD_AT(A(1)+0xBF0u)=REC(6);                                         /* the pool entry was reused */
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(khl_lv.obj==CHAIR && !khl_lv.rider && WORD_AT(A(1)+0x14u)==0x11000000u);
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    anim_mounted=0;
+    actor(1,0x02,41.0f,2.0f,31.0f,0.0f);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(1),0,0,1);
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(khl_lv.obj==CHAIR && !khl_lv.rider && WORD_AT(A(1)+0x14u)==0x11000000u);
+
+    /* ---- update: placeholder removed, waiting, the wake ------------------------- */
+    level(1,__LINE__);
+    constants();
+    players(100.0f,100.0f,1.0f,100.0f,100.0f,1.0f);                       /* far */
+    WORD_AT(PLAYER+0xFF4u)=ENT(0);
+    CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,0x00570000u,0,0,1);   /* another object */
+    CHECK(nremove==0 && seen_line==-535.0f);
+    n=nupdate;
+    UPDATE(1);
+    CHECK(nremove==1 && remove_arg[0]==ENT(0) && WORD_AT(PLAYER+0xFF4u)==0);
+    CHECK(seen_line<-1e30f && FLOAT_AT(LINE)==-535.0f && !WORD_AT(0x0078F04Cu));   /* forced "not yet", restored */
+    CHECK(FLOAT_AT(LIVE+4u)==3.0f && FLOAT_AT(LIVE+8u)==30.0f);                  /* not moved */
+    UPDATE(1);
+    CHECK(nremove==1);
+    players(40.0f+20.0f,30.0f+20.0f,0.0f,100.0f,100.0f,1.0f);             /* 28 m but dead */
+    UPDATE(1);
+    CHECK(!WORD_AT(0x0078F04Cu));
+    players(40.0f-1.0f,30.0f+31.0f,1.0f,100.0f,100.0f,1.0f);              /* 31 m */
+    UPDATE(1);
+    CHECK(!WORD_AT(0x0078F04Cu));
+    players(100.0f,100.0f,1.0f,40.0f+29.0f,30.0f,1.0f);                   /* the second player, 29 m (x) */
+    WORD_AT(0x00790950u)=2u;
+    inner_events=0;
+    UPDATE(1);
+    CHECK(WORD_AT(0x0078F04Cu)==1u && WORD_AT(PLAYER+0xFF4u)==CHAIR && seen_line>1e30f && FLOAT_AT(LINE)==-535.0f);
+    CHECK(inner_events==0 && khl_lv.events>=1u);                          /* event 0x29 dropped */
+    CHECK(nupdate==n+5u);
+
+    /* ---- update: the moved frame ------------------------------------------------- */
+    players(45.0f,33.0f,1.0f,100.0f,100.0f,1.0f);                        /* first player steered */
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    FLOAT_AT(PL(0)+0xB8u)=0.1f;FLOAT_AT(PL(0)+0xBCu)=33.1f;              /* values that do not survive (v-d)+d */
+    FLOAT_AT(PL(1)+0xB8u)=2.3f;FLOAT_AT(PL(1)+0xBCu)=100.3f;
+    FLOAT_AT(LIVE)=40.0f;FLOAT_AT(LIVE+4u)=4.0f;FLOAT_AT(LIVE+8u)=31.0f;FLOAT_AT(CHAIR+0x68u)=4.0f;FLOAT_AT(CHAIR+0x6Cu)=31.0f;
+    dy=2.0f+1.0f-7.5f;dz=33.1f;tx=45.0f-11.0f;
+    UPDATE(1);
+    CHECK(seen_inside==1 && !khl_lv.inside);
+    CHECK(NEAR(seen_gap,45.0f-tx) && FLOAT_AT(GAP)==11.0f && FLOAT_AT(LINE)==-535.0f);
+    CHECK(NEAR(seen_live[1],4.0f-dy) && NEAR(seen_live[2],31.0f-dz) && NEAR(seen_obj[1],4.0f-dy) && NEAR(seen_obj[2],31.0f-dz));
+    CHECK(NEAR(seen_p[0],45.0f) && NEAR(seen_p[1],0.1f-dy) && NEAR(seen_p[2],0.0f));
+    /* after a call out: the moved frame again, bit for bit */
+    CHECK(after_p[0]==seen_p[1] && after_p[1]==seen_p[2] && after_live[0]==seen_live[1] && after_live[1]==seen_live[2]);
+    CHECK(after_obj[0]==seen_obj[1] && after_obj[1]==seen_obj[2]);
+    CHECK(NEAR(FLOAT_AT(LIVE),tx) && NEAR(FLOAT_AT(LIVE+4u),10.0f+dy) && NEAR(FLOAT_AT(LIVE+8u),dz));   /* world target */
+    CHECK(NEAR(FLOAT_AT(CHAIR+0x64u),tx) && NEAR(FLOAT_AT(CHAIR+0x68u),10.0f+dy) && NEAR(FLOAT_AT(CHAIR+0x6Cu),dz));
+    CHECK(FLOAT_AT(PL(0)+0xB8u)==0.1f && FLOAT_AT(PL(0)+0xBCu)==33.1f);   /* players bit for bit */
+    CHECK(FLOAT_AT(PL(1)+0xB8u)==2.3f && FLOAT_AT(PL(1)+0xBCu)==100.3f && FLOAT_AT(PL(0)+0xB4u)==45.0f);
+    /* every call out of it saw the world */
+    CHECK(NEAR(s_flame.pos[0],40.0f) && NEAR(s_flame.pos[1],4.0f-0.3f) && NEAR(s_flame.pos[2],31.0f));
+    CHECK(s_flame.p[0]==0.1f && s_flame.p[1]==33.1f && NEAR(s_flame.obj[0],4.0f) && NEAR(s_flame.live[1],31.0f) && !s_flame.inside);
+    CHECK(NEAR(s_flash.pos[1],10.0f+dy) && NEAR(s_flash.pos[2],dz+1.0f) && NEAR(s_flash.obj[0],10.0f+dy) && s_flash.p[0]==0.1f);
+    CHECK(NEAR(s_flash2.pos[2],dz+1.0f) && NEAR(s_flash2.live[1],dz));
+    CHECK(NEAR(s_shot.pos[0],tx) && NEAR(s_shot.pos[2],dz+1.0f) && s_shot.p[1]==33.1f && NEAR(s_shot.obj[1],dz));
+    CHECK(NEAR(s_sound.pos[1],10.0f+dy) && NEAR(s_sound.pos[2],dz) && !s_sound.inside);
+    CHECK(NEAR(s_engine.pos[1],10.0f+dy) && NEAR(s_engine.pos[2],dz) && NEAR(s_engine.live[0],10.0f+dy) && s_engine.p[1]==33.1f);
+    /* the steering box: x and z clamped around the spawn */
+    players(80.0f,90.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    UPDATE(1);
+    CHECK(NEAR(FLOAT_AT(LIVE),40.0f+12.0f) && NEAR(FLOAT_AT(LIVE+8u),30.0f+12.0f) && NEAR(seen_gap,80.0f-52.0f));
+    players(-10.0f,-50.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    UPDATE(1);
+    CHECK(NEAR(FLOAT_AT(LIVE),40.0f-12.0f) && NEAR(FLOAT_AT(LIVE+8u),30.0f-12.0f));
+    /* the second player when the first one's +0xA8 is larger (story, two players) */
+    players(45.0f,33.0f,1.0f,50.0f,25.0f,1.0f);
+    FLOAT_AT(PL(0)+0xA8u)=10.0f;FLOAT_AT(PL(1)+0xA8u)=5.0f;
+    UPDATE(1);
+    CHECK(NEAR(FLOAT_AT(LIVE),50.0f-11.0f) && NEAR(FLOAT_AT(LIVE+8u),25.0f) && NEAR(seen_p[2],0.0f));
+    WORD_AT(0x00790950u)=1u;                                              /* one player: always the first */
+    UPDATE(1);
+    CHECK(NEAR(FLOAT_AT(LIVE),45.0f-11.0f) && NEAR(FLOAT_AT(LIVE+8u),33.0f));
+    WORD_AT(0x00790950u)=2u;
+    /* calls out of other code, or from other places: untouched */
+    CHECK(khl_lv.d[1]!=0.0f && khl_lv.d[2]!=0.0f);                     /* a frame they could wrongly use */
+    nworld=0;
+    FLOAT_AT(VEC)=1.0f;FLOAT_AT(VEC+4u)=2.0f;FLOAT_AT(VEC+8u)=3.0f;
+    FLOAT_AT(VEC+0x11Cu)=1.0f;FLOAT_AT(VEC+0x120u)=2.0f;FLOAT_AT(VEC+0x124u)=3.0f;
+#define UNMOVED(hook,ret,a1,a2,a3,pos) do { rec_ptr=(pos);rec_pos[1]=rec_pos[2]=0; \
+        CALL(hook,fake_world,ret,a1,a2,a3,-1);CHECK(rec_pos[1]==2.0f && rec_pos[2]==3.0f); } while(0)
+    UNMOVED(pc_mapmaker_khallos_flame,0x001EED7Au,JETE,VEC,0,VEC);     /* not inside the update */
+    UNMOVED(pc_mapmaker_khallos_shot,0x001EF75Bu,0x35u,VEC,0,VEC);
+    UNMOVED(pc_mapmaker_khallos_engine,0x001EF824u,0,VEC,0,VEC);
+    khl_lv.inside=1;
+    UNMOVED(pc_mapmaker_khallos_flame,0x00123456u,JETE,VEC,0,VEC);     /* other callers */
+    UNMOVED(pc_mapmaker_khallos_flash,0x001EF68Au,2u,0,VEC,VEC);
+    UNMOVED(pc_mapmaker_khallos_shot,0x001EF75Cu,0x35u,VEC,0,VEC);
+    UNMOVED(pc_mapmaker_khallos_sound,0x001EF7B5u,VEC+0x100u,0,0,VEC+0x11Cu);
+    UNMOVED(pc_mapmaker_khallos_engine,0x001EF825u,0,VEC,0,VEC);
+    khl_lv.inside=0;
+    CHECK(nworld==8u && FLOAT_AT(VEC+4u)==2.0f && FLOAT_AT(VEC+8u)==3.0f);
+
+    /* ---- damage: hits, and the hit that would trigger the train's death ---------- */
+    {
+        uint32_t hit=0x00575000u;
+        WORD_AT(hit+0x28u)=VEC;WORD_AT(hit+0x30u)=VEC+0x40u;
+        FLOAT_AT(CHAIR+0x1CCu)=60.0f;FLOAT_AT(hit+0x20u)=20.0f;
+        inner_events=0;n=khl_lv.events;
+        CALL(pc_mapmaker_khallos_damage,fake_damage,0x000BC000u,hit,0,0,1);
+        CHECK(FLOAT_AT(CHAIR+0x1CCu)==40.0f && inner_events==0 && khl_lv.events==n);
+        CALL(pc_mapmaker_khallos_damage,fake_damage,0x000BC000u,hit,0,0,1);
+        CHECK(FLOAT_AT(CHAIR+0x1CCu)==20.0f && inner_events==0 && khl_lv.events==n+1u);   /* 0x12 dropped */
+        FLOAT_AT(hit+0x20u)=8.0f;
+        CALL(pc_mapmaker_khallos_damage,fake_damage,0x000BC000u,hit,0,0,1);
+        CHECK(FLOAT_AT(CHAIR+0x1CCu)==12.0f && inner_events==0 && khl_lv.events==n+3u);   /* 0x12 and 0x13 */
+        WORD_AT(hit+0x30u)=0;FLOAT_AT(hit+0x20u)=50.0f;                   /* no direction: stock ignores it */
+        CALL(pc_mapmaker_khallos_damage,fake_damage,0x000BC000u,hit,0,0,1);
+        CHECK(FLOAT_AT(CHAIR+0x1CCu)==12.0f && seen_damage==50.0f);
+        WORD_AT(hit+0x30u)=VEC+0x40u;
+        WORD_AT(0x0078F04Cu)=0;                                           /* not active: stock ignores it */
+        CALL(pc_mapmaker_khallos_damage,fake_damage,0x000BC000u,hit,0,0,1);
+        CHECK(FLOAT_AT(CHAIR+0x1CCu)==12.0f && seen_damage==50.0f);
+        WORD_AT(0x0078F04Cu)=1u;
+        WORD_AT(0x0078DF50u)=0x00576000u;WORD_AT(0x0078DF54u)=0;WORD_AT(0x0078DF58u)=0x00576100u;
+        WORD_AT(PLAYER+0xFF4u)=CHAIR;nstop=0;
+        FLOAT_AT(hit+0x20u)=12.5f;
+        CALL(pc_mapmaker_khallos_damage,fake_damage,0x000BC000u,hit,0,0,1);
+        CHECK(train_death==0 && seen_damage==12.0f && FLOAT_AT(hit+0x20u)==12.5f);
+        CHECK(FLOAT_AT(CHAIR+0x1CCu)==-0.5f && WORD_AT(PLAYER+0xFF4u)==0);
+        CHECK(nstop==3u && stop_args[0]==0x00576000u && stop_args[1]==0 && stop_args[2]==0x00576100u);
+        CALL(pc_mapmaker_khallos_damage,fake_damage,0x000BC000u,hit,0,0,1);   /* dead: stock ignores it */
+        CHECK(train_death==0 && FLOAT_AT(CHAIR+0x1CCu)==-0.5f && nstop==3u);
+        WORD_AT(0x0078F000u)=0x00570000u;                                 /* someone else's chair */
+        FLOAT_AT(0x00570000u+0x1CCu)=5.0f;
+        CALL(pc_mapmaker_khallos_damage,fake_damage,0x000BC000u,hit,0,0,1);
+        WORD_AT(0x0078F000u)=CHAIR;
+        CHECK(nstop==3u && seen_damage==12.5f && FLOAT_AT(0x00570000u+0x1CCu)==-7.5f);
+    }
+
+    /* ---- the dead chair climbs and is removed, with its rider ------------------ */
+    fire=0;
+    players(45.0f,33.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    FLOAT_AT(LIVE+4u)=3.0f;
+    WORD_AT(PLAYER+0xFF4u)=CHAIR;
+    for(k=0;k<4u;k++) UPDATE(1);                                          /* 3 + 5 a frame: 23 m */
+    CHECK(ndestroy==1 && !khl_lv.removed);
+    UPDATE(1);                                                            /* 28 m: past 25 above the spawn */
+    CHECK(ndestroy==2 && destroy_arg==CHAIR && khl_lv.removed && nfree==1 && free_arg==JETE && !WORD_AT(0x0078F054u));
+    CHECK(!WORD_AT(0x0078F000u) && WORD_AT(PLAYER+0xFF4u)==0 && nremove==2 && remove_arg[1]==ENT(1) && !khl_lv.rider);
+    n=nupdate;
+    UPDATE(0);                                                            /* removed: skipped */
+    CHECK(nupdate==n && ndestroy==2);
+    /* removal by time when it cannot climb */
+    level(1,__LINE__);
+    UPDATE(1);
+    players(45.0f,33.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    WORD_AT(0x0078F04Cu)=1u;
+    FLOAT_AT(CHAIR+0x1CCu)=-1.0f;
+    actor(1,0x02,0.0f,0.0f,0.0f,0.0f);WORD_AT(A(1)+0xBF0u)=REC(7);       /* the rider's entry was reused */
+    n=ndestroy;
+    for(k=0;k<239u;k++) { FLOAT_AT(LIVE+4u)=3.0f;UPDATE(1); }
+    CHECK(ndestroy==n && !khl_lv.removed);
+    FLOAT_AT(LIVE+4u)=3.0f;
+    UPDATE(1);
+    CHECK(ndestroy==n+1u && khl_lv.removed && nremove==3u);               /* only the placeholder: rider gone */
+    fire=1;
+
+    /* ---- events ------------------------------------------------------------------ */
+    n=khl_lv.events;
+    CALL(pc_mapmaker_khallos_event,fake,0x001EEC72u,0x29u,0,0,0);
+    CALL(pc_mapmaker_khallos_event,fake,0x001EF9A2u,0x12u,0,0,0);
+    CALL(pc_mapmaker_khallos_event,fake,0x001EF9C2u,0x13u,0,0,0);
+    CALL(pc_mapmaker_khallos_event,fake,0x001EFAECu,4u,0,0,0);
+    CHECK(khl_lv.events==n+4u);
+    CALL(pc_mapmaker_khallos_event,fake,0x00255A94u,0x16u,0,0,1);       /* someone else's */
+    CALL(pc_mapmaker_khallos_event,fake,0x001EEC6Du,0x29u,0,0,1);
+    WORD_AT(0x0079094Cu)=11u;
+    CALL(pc_mapmaker_khallos_event,fake,0x001EEC72u,0x29u,0,0,1);       /* the train keeps it */
+    play_scene();
+
+    /* ---- the placeholder's pool entry reused before the chair's first frame ---------- */
+    level(1,__LINE__);
+    WORD_AT(A(0)+0xBF0u)=REC(5);
+    n=nremove;
+    UPDATE(1);
+    CHECK(nremove==n && !khl_lv.place);
+    UPDATE(1);
+    CHECK(nremove==n);
+
+    /* ---- the train (scene 11) and a new level --------------------------------------- */
+    level(1,__LINE__);
+    WORD_AT(0x0079094Cu)=11u;
+    n=nremove;
+    UPDATE(1);
+    CHECK(nremove==n && seen_line==-535.0f);
+    play_scene();
+    container(0x11,neither,2,NULL,0);
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);           /* next level: no chair */
+    CHECK(!khl_lv.obj);
+    UPDATE(1);
+    CHECK(nremove==n && seen_line==-535.0f);
+
+    if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
+    printf("mapmaker khallos ok\n");
+    return 0;
+}
