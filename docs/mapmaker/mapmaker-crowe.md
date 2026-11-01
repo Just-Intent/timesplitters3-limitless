@@ -95,7 +95,12 @@ Checked as the brief asked (CONFIRMED unless marked):
   0x811, state 3). After the death (state 0x11: the animation, then 3 s) it
   calls `sub_002275F0(0)` (0x002923A3: level marker 0 to state 5), clears
   the focus and stays in state 0x12, which no case handles (jump table
-  0x002923DC has 18 states): the level script ends mission 10. It also sets
+  0x002923DC has 18 states): the level script ends mission 10. Every fight
+  call still updates the sparks, hazards and particles before its state
+  switch (`sub_002A7D60` at 0x00290D3E ages the particles, recounts the live
+  ones in `[0x0078B0CC]` and emits smoke at every destroyed part while the
+  parts mask +0x2E00 is set; the death leaves it at 0x2F), so in mission 10
+  the wreck smokes on until the mission ends (test `test_death_effects`). It also sets
   `[0x00739A90]` (`sub_000DCB60`: 1 when it finds no path, state 16; 0 at
   the death), a global flag that adds 0x20 to some collision tests
   (`sub_000DCB80`, `sub_000E97A0`).
@@ -113,12 +118,12 @@ image constants that only it reads, so it can be moved.
 | `sub_001C8540` -> `pc_mapmaker_crowe_anims` | after the original: when the map's custom set (index 0x11, slots 1-20, as realbosses reads it) holds 0x46 (or the container is unreadable) and lv14.pak is not mounted, mount it with `sub_0005A130` when >= 2 of the 30 mount slots are free |
 | `sub_0025F720` -> `pc_mapmaker_crowe_level` | after the original: forget the last level; when the set holds 0x46, clear `[0x0075F5E8]`, call the stock `sub_0028D6D0` (0x2E04 bytes of level heap plus the effect blocks), then `sub_002A62C0` for the particle block (a block another boss allocated this level stays if this one fails; otherwise the new one replaces it, which leaks 32 KB of level heap and keeps every boss working: they read the global). A failed allocation logs and keeps the bot AI |
 | `sub_0015B830` -> `pc_mapmaker_crowe_ai_start` | character 0x46 or model 0x5E8: class 0/0x40000 when lv14.pak is mounted and this level's state exists; one per map (extras keep the bot AI); notes the Story AI's Boss flag (chunk +0x29) for the HUD |
-| `sub_0028FE30` -> `pc_mapmaker_crowe_fight` | for this boss in scene 100: **relocate** on its first frame (state 0): the start cell (the 310.0 column's cell, a type-0 platform first, nearest the outer centre in z, whose centre the stock lookup maps back to it; with no such cell, the type-0 cell nearest the outer centre) is centred on the spawn x/z, every cell, the outer and the used edge rectangles (+0/+4/+8/+0xC/+0x10/+0x14) move by the same (dx, dz), sizes and types unchanged; dy = spawn height - 86. **Intro**: state 1 becomes 2 (+0x9D4 1, +0x20 2, +0x9D0 2, +0x9D8 0). **Floor**: during the original only, the image constants 86.0 (0x0049F3C4), 86.205, 88.25, 88.4 get + dy, 310.49 and 310.0 + dx, 80.95 + dz, and the stock bits are written back after (a constant that is not stock is left alone). **Start**: after that first state-0 frame, if the boss is not on the spawn x/z or +0x1198/+0x119C are not the start cell (only possible when no cell holds 310.0), both are set; the boss starts exactly at its Story AI spawn point. **End**: in state 0x12 it is removed with `sub_0015DDA0` (focus cleared) instead of the original, once |
+| `sub_0028FE30` -> `pc_mapmaker_crowe_fight` | for this boss in scene 100: **relocate** on its first frame (state 0): the start cell (the 310.0 column's cell, a type-0 platform first, nearest the outer centre in z, whose centre the stock lookup maps back to it; with no such cell, the type-0 cell nearest the outer centre) is centred on the spawn x/z, every cell, the outer and the used edge rectangles (+0/+4/+8/+0xC/+0x10/+0x14) move by the same (dx, dz), sizes and types unchanged; dy = spawn height - 86. **Intro**: state 1 becomes 2 (+0x9D4 1, +0x20 2, +0x9D0 2, +0x9D8 0). **Floor**: during the original only, the image constants 86.0 (0x0049F3C4), 86.205, 88.25, 88.4 get + dy, 310.49 and 310.0 + dx, 80.95 + dz, and the stock bits are written back after (a constant that is not stock is left alone). **Start**: after that first state-0 frame, if the boss is not on the spawn x/z or +0x1198/+0x119C are not the start cell (only possible when no cell holds 310.0), both are set; the boss starts exactly at its Story AI spawn point. **End**: in state 0x12 the original still runs (shifted constants), with +0x2E00 = 0 for the call so no new smoke is emitted; the sparks, hazards and particles play out, and once no particle is live (`[0x0078B0CC]` after the call) or after 300 calls the boss is removed with `sub_0015DDA0` (focus cleared), once |
 | `sub_0028DD50` -> `pc_mapmaker_crowe_near` | return 0x00290BE7 while shifted: 86.0 restored inside (a distance there), shifted again after |
 | `sub_002A85C0` -> `pc_mapmaker_crowe_sparks` | return 0x00290C02 while shifted: the pushed floor 86.4 + dy, the caller's slot restored |
 | `sub_0028E770` -> `pc_mapmaker_crowe_part` | return 0x0028ECF1, scene 100: only the stock explosion `sub_000EFBD0(0x20, 0x17, state+0x2BFC+part*0x5C, 0, 0, 0, 0, 1)` for parts 0..2, no prop; the original is not run |
 | `sub_002275F0` -> `pc_mapmaker_crowe_event` | return 0x002923A8: level marker 0 is the map's own logic marker: dropped |
-| `sub_00126560` -> `pc_mapmaker_crowe_fx` | return 0x001CEE8C: after the original, `sub_0028D710` with this level's state |
+| `sub_00126560` -> `pc_mapmaker_crowe_fx` | return 0x001CEE8C: after the original, `sub_0028D710` with this level's state, until the boss is removed (then nothing it draws can stay frozen) |
 | `sub_0014CC80` -> `pc_mapmaker_crowe_hud` | focus on this boss: cleared for the stock bar, restored after (Boss Off = no health; Boss bar = the bosses area's; Sub-boss = the meter) |
 | `sub_0013A400` -> `pc_mapmaker_crowe_meter` | return 0x0014D264, this boss's record: the overhead meter hidden unless its Story AI chose the Sub-boss bar |
 
@@ -128,7 +133,8 @@ Crowe`, `split Crowe state allocated`, `split Crowe gets its story AI (class
 the spawn (x, z)`, `split Crowe start put back on the spawn point` (should
 not appear), `no intro
 cutscene; the fight starts`, `split Crowe effects drawn`, `part destroyed:
-explosion only`, `level marker dropped`, `split Crowe defeated: removed`,
+explosion only`, `level marker dropped`, `split Crowe defeated: its effects
+play out`, `split Crowe defeated: removed (frames, live particles)`,
 `overhead health meter hidden`.
 
 ## Risks (INFERRED, need a playtest)
@@ -162,6 +168,11 @@ explosion only`, `level marker dropped`, `split Crowe defeated: removed`,
   that call that reads them except `sub_0028DD50`, handled.
 - **Respawn**: a second spawn of the same Story AI in one level keeps the
   first relocation (and stock state 0 then snaps it to that grid).
+- **Fixed after a later playtest**: when the boss died and was removed, its
+  smoke and explosions stayed on screen frozen. The removal stopped the fight
+  call that updates them while the draw went on. Now the fight call keeps
+  running after the death without new smoke until the particles are gone,
+  then the boss is removed and its draw stops.
 - **Fixed after the v0.4.0-mapmaker.21 playtest**: the boss started about
   one platform (about 6 units in x) away from its spawn point, sometimes
   behind a wall. The relocation centred the platform nearest the arena's
@@ -246,8 +257,11 @@ needs none of it):
    tiles off), then walks between platforms around its spawn, turns 90 degrees,
    fires; falling hazards drop near you and explode on the floor (not in
    the air). Shoot its turrets: each explodes (`part destroyed`), no debris.
-4. Kill it: death animation, then after about 3 s it disappears (`level
-   marker dropped`, `defeated: removed`); map logic marker 0 does not change.
+4. Kill it: death animation, then after about 3 s the smoke stops and the
+   remaining smoke, sparks and explosions finish within about a second, then
+   it disappears with them (`level marker dropped`, `effects play out`,
+   `defeated: removed`). Nothing should stay frozen on screen; map logic
+   marker 0 does not change.
 5. Boss Off: no health shown; Boss bar (x1): one bar with the AI's name;
    Sub-boss bar: the meter. A second Split Crowe AI fights as a bot (`only
    one split Crowe per map`). Mission 10 still plays stock.

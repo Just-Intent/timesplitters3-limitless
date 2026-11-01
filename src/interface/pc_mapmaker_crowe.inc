@@ -64,8 +64,15 @@
  *  - Level event: at the end of its death, sub_002275F0(0) (call 0x002923A3,
  *    return 0x002923A8) sets level marker 0 to state 5; in MapMaker that is
  *    the map's own logic marker 0: dropped. The death then leaves it in state
- *    0x12 (nothing, the level script ends mission 10): fight removes the AI
- *    with sub_0015DDA0 on its next frame. No sub_002274C0 and no tag lookup
+ *    0x12 (no case; the level script ends mission 10). Every fight call, before
+ *    its state switch, still updates the sparks (sub_002A85C0), hazards and
+ *    particles (sub_002A7D60 at 0x00290D3E, which ages them, recounts the live
+ *    ones in [0x0078B0CC] and emits smoke at every destroyed part while the
+ *    parts mask +0x2E00 is set, which the death leaves at 0x2F): stock smokes
+ *    on until the mission ends. fight keeps calling the original in state
+ *    0x12 with +0x2E00 = 0 for the call (no new smoke), and once no particle
+ *    is live (or after 300 calls) removes the AI with sub_0015DDA0; fx then
+ *    stops drawing, so nothing it drew stays frozen. No sub_002274C0 and no tag lookup
  *    (sub_0023FF20) is reachable from the fight (test).
  *  - Draw: the frame sub_001CEBC0 draws the boss's effects (sub_0028D710,
  *    no args, returns when [0x0075F5E8] or its +0 is 0) only in scene 14
@@ -102,6 +109,9 @@
 #define CRW_STATE_SIZE 0x2E04u
 #define CRW_PARTS 0x0078B0D0u           /* 0x7D00 bytes, sub_002A62C0 */
 #define CRW_PARTS_SIZE 0x7D00u
+#define CRW_LIVE 0x0078B0CCu            /* live particles, recounted by sub_002A7D60 every fight call */
+#define CRW_PARTS_ON 0x2E00u            /* state: parts present (0x2F); the smoke is emitted while non-zero */
+#define CRW_FADE_MAX 300u               /* fight calls after the death before the boss goes anyway */
 #define CRW_FX0 0x0078B090u             /* effect blocks, sub_002A8300 */
 #define CRW_FX1 0x0078B098u
 #define CRW_GRID 0x970u                 /* 35 cells of 0x28 */
@@ -178,6 +188,7 @@ static struct {
     uint32_t state, record, actor;
     uint8_t boss;
     int relocated, removed, shifted, place;
+    unsigned fading;                    /* fight calls since the death */
     uint32_t row, col;                  /* the start cell */
     float dx, dy, dz, sx, sz;           /* grid offset, spawn point */
     uint32_t saved[CRW_NCONST];
@@ -447,13 +458,24 @@ void pc_mapmaker_crowe_fight(void (*original)(void))
     if(!crw_lv.record || !MAPMAKER_STACK_OK(8) || !crw_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
     a=WORD_AT(ent+CRW_ENT_AI);
     if(WORD_AT(a+CRW_AI_STATE)==0x12u) {                  /* defeated: stock waits for the level script */
+        uint32_t parts;
         if(crw_lv.removed) { original();return; }
+        /* the fight keeps updating its sparks, hazards and particles; no new
+         * smoke (the parts mask off for this call): they play out, then the
+         * boss goes */
+        parts=WORD_AT(crw_lv.state+CRW_PARTS_ON);
+        WORD_AT(crw_lv.state+CRW_PARTS_ON)=0;
+        crw_shift(1);
+        original();
+        crw_shift(0);
+        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;
+        if(!crw_lv.fading++) crw_log("split Crowe defeated: its effects play out",a,WORD_AT(CRW_LIVE));
+        if(WORD_AT(CRW_LIVE) && crw_lv.fading<CRW_FADE_MAX) return;
         crw_lv.removed=1;
         player=WORD_AT(CRW_PLAYER);
         if(MAPMAKER_PTR_OK(player,CRW_FOCUS+4u) && WORD_AT(player+CRW_FOCUS)==ent) WORD_AT(player+CRW_FOCUS)=0;
         guest_call(sub_0015DDA0,1,ent);
-        crw_log("split Crowe defeated: removed",a,ent);
-        MAPMAKER_GUEST_RET();
+        crw_log("split Crowe defeated: removed (frames, live particles)",crw_lv.fading,WORD_AT(CRW_LIVE));
         return;
     }
     if(WORD_AT(a+CRW_AI_STATE)==0u && !crw_lv.relocated) crw_relocate(ent);
@@ -515,7 +537,7 @@ void pc_mapmaker_crowe_event(void (*original)(void))
  * draw sub_0028D710 runs only in scene 14). */
 void pc_mapmaker_crowe_fx(void (*original)(void))
 {
-    int here=crw_lv.state && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX;
+    int here=crw_lv.state && !crw_lv.removed && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX;
     original();
     if(!here || !crw_state_ok() || WORD_AT(CRW_SCENE)!=100u || !crw_on()) return;
     guest_call(sub_0028D710,0);
