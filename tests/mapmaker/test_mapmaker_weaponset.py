@@ -82,6 +82,18 @@ MUTATIONS = {
     'label-colour-index': ('WORD_AT(entry-0x18u+4u*(v%WS_STOCK))', 'WORD_AT(entry-0x18u+4u*(v%WS_SLOTS))'),
     'label-stock-rows': ('(v=WORD_AT(item+0x14u))<WS_STOCK || v>=WS_SLOTS) return;', '(v=WORD_AT(item+0x14u))>=WS_SLOTS) return;'),
     'label-frame': ('entry=g_esp+0x44u', 'entry=g_esp+0x40u'),
+    # the weapon name after a two-digit label (slots 10-20)
+    'name-not-moved': ('            WS_F(g_esp+0x2Cu)+=shift;\n', ''),
+    'name-fit-wide': ('            WS_F(g_esp+8u)-=shift;\n', ''),
+    'name-any-caller': ('WORD_AT(g_esp)==WS_NAME_RET && ws.rows==WS_SLOTS', 'ws.rows==WS_SLOTS'),
+    'name-stock-rows': ('WORD_AT(g_esp)==WS_NAME_RET && ws.rows==WS_SLOTS', 'WORD_AT(g_esp)==WS_NAME_RET'),
+    'name-from-slot-11': ('#define WS_TWO_DIGITS 9u', '#define WS_TWO_DIGITS 10u'),
+    'name-past-end': ('(v=WORD_AT(item+0x14u))>=WS_TWO_DIGITS && v<WS_SLOTS &&', '(v=WORD_AT(item+0x14u))>=WS_TWO_DIGITS &&'),
+    'name-one-digit': ('!WS_B(label) || !WS_B(label+1u)) return 0.f;', '!WS_B(label)) return 0.f;'),
+    'name-no-fallback': ('return w>0.f && w<=WS_NAME_SHIFT_MAX?w:WS_NAME_SHIFT;', 'return w;'),
+    'name-frame': ('item=WORD_AT(g_esp+0x50u);', 'item=WORD_AT(g_esp+0x4Cu);'),
+    'name-whole-label': ('WS_B(WS_MEASURE+8u)=WS_B(label);WS_B(WS_MEASURE+9u)=0;',
+                         'WS_B(WS_MEASURE+8u)=WS_B(label);WS_B(WS_MEASURE+9u)=WS_B(label+1u);WS_B(WS_MEASURE+10u)=0;'),
     'diag-silent': ('    ws_diag_n++;\n    if(moves)', '    if(moves)'),
     'diag-open-starved': ('    if(moves ? ws_diag_moves>=48u : ws_diag_opens>=256u) return;', '    if(ws_diag_moves>=48u) return;'),
     'diag-no-open': ('        ws_diag(0,"slot pane open:', '        if(0) ws_diag(0,"slot pane open:'),
@@ -211,6 +223,28 @@ def test_hook_return_addresses():
     assert ret_of(a, 0x002D3DF1, 0x64e70) == 0x002D3DF6 and a[0x002D3DF1].function == 0x002D3D30
     # the pane system calls a builder from the descriptor (+0 copied to menu +8) at 0x00078F72
     assert a[0x00078F72].mnemonic == 'call' and 8 in disp(a[0x00078F67])
+
+
+def test_row_name_follows_label():
+    """The slot row draws the label at x + 5 and the weapon name at x + 20 (frame +0x18)."""
+    a = by_address()
+    # x = (int)(rect.x + 5.0f) at frame +0x14 (0x002D3D53 with the getter's argument pushed)
+    assert a[0x002D3D45].mnemonic == 'addss' and 0x004760CC in disp(a[0x002D3D45])
+    assert 0x18 in disp(a[0x002D3D53])
+    # the label is drawn from frame +0x40 at x + 5 (0x002D3F1E: esp = frame - 0x40, +0x54 = frame +0x14)
+    assert 0x54 in disp(a[0x002D3F1E]) and ('imm', 5) in a[0x002D3F40].ops and '0x41e30' in a[0x002D3F4C].text
+    assert a[0x002D3F27].mnemonic == 'lea' and 0x48 in disp(a[0x002D3F27])
+    # the name: x + 0x14 stored at frame +0x18 (esp = frame - 0x10), width rect +8 - x pushed for the fit
+    assert 0x14 in disp(a[0x002D3F5C]) and ('imm', 0x14) in a[0x002D3F6A].ops
+    assert a[0x002D3F8A].mnemonic == 'movss' and 0x28 in disp(a[0x002D3F8A])
+    assert a[0x002D3F84].mnemonic == 'movss' and 0 in disp(a[0x002D3F84])
+    # sub_0003D7B0(name id) at 0x002D3F90 between the store and the fit sub_00040A40(text, width, 0, 1)
+    assert ret_of(a, 0x002D3F90, 0x3d7b0) == 0x002D3F95 and a[0x002D3F90].function == 0x002D3D30
+    assert '0x40a40' in a[0x002D3F99].text and ('imm', 1) in a[0x002D3F68].ops and ('imm', 0) in a[0x002D3F6D].ops
+    # the name is drawn at frame +0x18 (0x002D3FD1: esp = frame - 0xC)
+    assert a[0x002D3FD1].mnemonic == 'mov' and 0x24 in disp(a[0x002D3FD1]) and '0x41e30' in a[0x002D3FDC].text
+    # the fit routine measures with sub_0003FCF0(&w, &h, text, 0) and compares w with the width
+    assert '0x3fcf0' in a[0x00040A54].text and ('imm', 0) in a[0x00040A47].ops
 
 
 def test_scrolling_list_facts():

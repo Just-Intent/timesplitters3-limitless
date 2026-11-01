@@ -16,7 +16,7 @@ or the disassembly); **INFERRED** = reasoned.
 
 | | Stock | Now (`TSFP_MAPMAKER_LIMITS=1`, local MapMaker match) |
 | --- | --- | --- |
-| Bot rows on the Bots screen | 10 | 20 (two pages) |
+| Bot rows on the Bots screen | 10 | 20 (two pages; the editor's Test map setup: one 20-row list, [mapmaker-sets.md](mapmaker-sets.md)) |
 | Bots per match | 10 | 20 |
 | Characters (players + bots) | 16 by the arrays, 14-16 by the map table | 24 (4 players + 20 bots) |
 

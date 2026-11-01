@@ -2,9 +2,11 @@
 
 Status 2026-10-31: character slots implemented in
 `src/interface/pc_mapmaker_sets.inc` (area `sets`), fixture-tested
-(`tests/mapmaker/test_mapmaker_sets.py`: 40 mutations plus decode and XBE
+(`tests/mapmaker/test_mapmaker_sets.py`: mutations plus decode and XBE
 facts; `tests/mapmaker/test_mapmaker_sets_classified.py`: every slot
-constant around the set classified). Not built or played. No guest-code
+constant around the set classified). 2026-11-01: the editor's slot screen
+is a 20-row scrolling list instead of two pages ("Editor" below). Not built
+or played. No guest-code
 table (`config/guest-code-patches/sets.json` does not exist; wrappers only).
 Weapon sets have their own area: [mapmaker-weaponset.md](mapmaker-weaponset.md).
 
@@ -69,22 +71,78 @@ limit.
 - Load (`sub_00301A90`): members 10..19 from the chunk, else empty (id -1,
   variant -1). New map (`sub_002FEBF0`): the preset copy leaves id 0 there,
   so they are cleared to empty.
-- Slot screen (`TSFP_MAPMAKER_LIMITS=1`, custom set index >= 0xC, scene
-  102). Screen 0x0052375C = {`sub_002C2C20` builder, `sub_002C0490` update};
-  its slot pane 0x0052372C. The update reloads the work copy when the set
-  index differs from `[0x0078AEAC]` and stores it every frame
-  (`sub_002BFFD0` -> `sub_00314210`). `pc_mapmaker_sets_screen` reads the
-  pane's highlighted row (`+0x18C`) and input (`+0xC4`): Down on row 10 shows
-  slots 11-20 (cursor on the first row), Up on that row returns (cursor on row
-  10). On a flip it stores the current page, clears the direction bits, moves
-  the highlight (`sub_00071970`, `sub_00076EF0`) and sets `[0x0078AEAC]` to -1
-  so the original reloads. While page 2 is shown, the fill's set pointer
-  (`sub_002C0290` returning to 0x002C0319, `sub_00312950` returning to
-  0x003141B5) moves by 10 members and the store (`sub_00312950` returning to
-  0x00314218) writes a scratch set, copied to members 10..19; the count
-  (used rows of 1-10) keeps its stock meaning. The title pointer (menu
-  `+0x204`, stored by `sub_00075B70`) is pointed at a copy with "(1-10)" or
-  "(11-20)". Opening the screen or changing the index returns to page 1.
+- Slot screen (2026-11-01, replaces the paging; `TSFP_MAPMAKER_LIMITS=1`,
+  scene 102, any set): a 20-row scrolling list built like the weapon set's
+  ([mapmaker-weaponset.md](mapmaker-weaponset.md), "Editor"). User request:
+  "weapon set and bot set customization screen scrolling work differently ...
+  use the same scrolling behavior and add a scroll bar for bot set
+  customization". Screen 0x0052375C = {`sub_002C2C20` builder,
+  `sub_002C0490` update}; its slot pane 0x0052372C = {`sub_002C19F0`,
+  `sub_002C1570`}; the picker 0x0052374C = {`sub_002C1EA0`, `sub_002C1E10`}.
+  CONFIRMED stock (decode test `test_slot_list_facts`):
+  - The editor branch of the pane builder adds frame `sub_00075B70(0x10, 0,
+    45.0f, 0, 0x002C1450)`, `sub_00071BE0(1, 5.0f, 5.0f)`, title 0xE8B
+    (value -1, flags 0x04032404), set list 0x004766D8 (value -2, flags
+    0x08030C00), `sub_002C1830(menu)`, `sub_00079710(0)`, ten row groups
+    (`sub_00078320(0, 1, 4)`, one item `sub_000792B0(0, row, 0, 40.0f, 4.0f,
+    sub_002C1490, sub_002C0660)`, `sub_00078380()`), `sub_00077140(menu)`,
+    `sub_00077360(menu, 5.0f, 9.2f)`, footer 0xE88 / 0x3B2 / 0x1A27.
+  - The row callbacks index the 10-row work copy 0x0075FD90 (0x1C a row) by
+    row: the draw by item +0x14 (0x002C0667; the editor names rows below 10
+    only, 0x002C08AF; the highlight compares the item pointer, 0x002C0A2B),
+    the row action and the pane update by pane `+0x184 - 2` (0x002C1499,
+    0x002C157E; the editor stops at 10, 0x002C14B3 / 0x002C16D8; the update
+    shows hints, clears the row on X 0x002C1718 and sets the preview
+    `[0x0078AEA8]` 0x002C17F2), the picker's pick by the slot pane's `+0x184
+    - 2` (0x002C1CC7..0x002C1D56; it moves the slot highlight on while
+    `+0x18C < 9`, 0x002C1D8E). The work copy is followed by other data
+    (0x0075FEA8..), so it cannot grow in place; more than 100 references
+    read it.
+  - Builder hook `pc_mapmaker_sets_build` (`sub_002C19F0`, editor, switch
+    on): the same calls with twenty row groups inside `sub_000780E0(40.0f,
+    0)` .. `sub_000781A0()` (ten rows of 4.0, INFERRED unit as the weapon
+    pane's; the pane keeps its stock size). A group end counts one row
+    (`+0x180`, 0x000783C8), items made in the region get flag 0x40
+    (0x0007914A) and a row's last item (`+0xB0`, set by `sub_00078380`) adds
+    its height to the content `+0x5C` (0x000753CD). No stock menu puts
+    groups inside a region (INFERRED to work: the layout code has no
+    group-specific branch for it). Row index stays value + 2.
+  - Rows 11-20 (values 10..19) are ten host-side shadow rows. Each stock
+    callback runs for row 10 + k with shadow row k lent to work-copy row k
+    and the row index shifted (item +0x14 = k, or pane `+0x184` = k + 2 and
+    `+0x18C` = k), then everything is put back and the row is stored to
+    member 10 + k (word id, byte difficulty +3, word variant +6, as
+    `sub_00314210`). Hooks: draw `sub_002C0660`, row action `sub_002C1490`,
+    pane update `sub_002C1570`, pick `sub_002C1C90` (chained outside
+    realbosses' pick, so its boss-row fix-up sees the lent row; during the
+    pick `+0x18C` is 9 so the stock move stays off, and the hook moves the
+    highlight to the next slot itself; slot 10 also moves on to 11).
+  - Loading the shadow (`pc_mapmaker_sets_screen` on `sub_002C0490`, when the
+    pane was built or the set index changed): the update runs once with the
+    fill getters on members 10..19 (`sub_002C0290` returning to 0x002C0319,
+    `sub_00312950` returning to 0x003141B5, the tail store to the scratch set)
+    and `[0x0078AEAC]` = -1, so the stock reload, with the portraits it asks
+    `sub_002BE600` for at return 0x002C054C (realbosses' boss rows), fills
+    the work copy with slots 11-20; those rows become the shadow, the work
+    copy and `[0x0078AEAC]` are put back, the return address is pushed again
+    and the original runs as stock for slots 1-10. Presets (index < 0xC) get
+    empty rows 11-20 and nothing is stored there (their members 10..19 are id
+    0, a real character).
+  - Difficulty default: a pick into an empty row copies the difficulty of the
+    nearest used row above it in the work copy (0x002C1CFA); for slots 11-20
+    that search sees slots 1-10, not 11..k. Team/difficulty are not shown in
+    the editor (one column) and the Test map takes rows 1-10's for slots
+    11-20 (matchbots).
+  - The title is the stock one (no "(1-10)" / "(11-20)").
+  - Diagnostics (stderr, own budget): every build `[mapmaker] sets: slot pane
+    build (20 rows, scrolling) ret=... menu=... set=N` (or `(stock 10 rows:
+    ...)`), the first pane update `slot pane open: pane=... items=22
+    content=... view=a..b scroll=... slot=...` and moves `list: slot N
+    highlighted, scroll S of MAX` (rows 11-20 or a scroll change; at most
+    48). INFERRED: the pane gets the same current style as the weapon pane
+    (`sub_00075B70` takes `sub_000802F0()`), which the editor wheel
+    (`mapmaker_pointer_wheel`, style flag 0x40) needs.
+  - Not built or played.
 - Story AI character (`sub_00078590` returning to 0x0031CD32): ten more
   options, value 10..19, named like the stock ones (`sub_002BE650(id,
   variant)` through `sub_0003D7B0`, empty text 0xD7C). Without the switch they
@@ -187,16 +245,21 @@ with `TSFP_MAPMAKER_LIMITS=1` this screen pages in MapMaker Arcade (rows
 11-20 kept by its hooks, the map set's slots 11-20 as their default) and
 the match gets up to 20 bots / 24 characters; System Link stays at 10.
 
-What changed: the editor's Test map setup Bots screen (scene 102) is paged by
-the existing hooks, and its rows become the test's bots. A match start after
-the screen closed on "(11-20)" refills rows 1-10 first
-(`pc_mapmaker_sets_match_start`: `sub_002C0310` with the index in eax,
-getters unshifted), so the test's bots stay slots 1-10 as in stock.
+What changed: the editor's Test map setup Bots screen (scene 102) is the same
+20-row list as Map Settings, and its rows become the test's bots. The list
+always leaves rows 1-10 in the work copy; should the getters still be
+shifted at a match start, `pc_mapmaker_sets_match_start` refills rows 1-10
+first (`sub_002C0310` with the index in eax, getters unshifted), so the
+test's bots stay slots 1-10 as in stock. The front end and in-play pause
+Bots screens (scenes 100/101) keep the matchbots paging: their rows have
+team and difficulty columns with their own callbacks, and are the match's
+roster.
 
 ## Extension memory
 
-0x00903700..0x0090373F title text, 0x00903740..0x009037E3 page-2 store
-scratch; 0x009037E4..0x009037FF reserved for this area.
+0x00903700..0x0090373F title text (matchbots' pages), 0x00903740..0x009037E3
+store scratch for members 10..19; 0x009037E4..0x009037FF reserved for this
+area. The list's shadow rows (10 x 0x1C) are host memory.
 
 ## Hooks (WRAP lines for the integrator, area `sets`)
 
@@ -214,7 +277,25 @@ WRAP sub_00315D20 -> pc_mapmaker_sets_icon         (new; per drawn item icon, re
 WRAP sub_0033EBF0 -> pc_mapmaker_sets_play_set     (new; level load)
 WRAP sub_0023F320 -> pc_mapmaker_sets_preload      (new; level load; argument in ebx, untouched)
 WRAP sub_002D2C70 -> pc_mapmaker_sets_match_start  (chained: story's pc_mapmaker_story_char_config; order free)
+WRAP sub_002C19F0 -> pc_mapmaker_sets_build        (new, 2026-11-01; slot pane builder, replaces it for the 20-row list)
+WRAP sub_002C0660 -> pc_mapmaker_sets_row_draw     (new, 2026-11-01; per drawn slot row)
+WRAP sub_002C1490 -> pc_mapmaker_sets_row_action   (new, 2026-11-01; slot row action)
+WRAP sub_002C1570 -> pc_mapmaker_sets_pane         (new, 2026-11-01; slot pane update, per frame)
+WRAP sub_002C1C90 -> pc_mapmaker_sets_pick         (2026-11-01; chained: OUTSIDE realbosses' pc_mapmaker_realbosses_pick)
 ```
+
+`pc_mapmaker_sets_screen` (existing WRAP) now calls its original twice when
+it loads the shadow rows: it pushes the return address again between the
+calls, so the layers below it (the generated original) run twice that frame.
+`pc_mapmaker_sets_pick` must wrap `pc_mapmaker_realbosses_pick`, not the
+other way round, or the boss rows picked into slots 11-20 keep row 150+ as
+their id. The builder replaces the original (`MAPMAKER_GUEST_RET`). New
+`guest_call` targets: `sub_00071BE0`, `sub_002C1830`, `sub_00078320`,
+`sub_000792B0`, `sub_00078380`, `sub_00077140`, `sub_00077360` (stubs in
+`tests/mapmaker/mapmaker_area_stubs.h`), plus the weapon builder's
+`sub_00075B70`, `sub_00079D60`, `sub_00079710`, `sub_000780E0`,
+`sub_000781A0`, `sub_00074A00` and `sub_00074460`. The `pc_menu_mouse_guest.inc`
+pass-through list and `pc_display_menu.h` need the five new hook names.
 
 All cdecl, plain `ret`; every hook calls its original once. Include the
 `.inc` after `pc_mapmaker_limits.inc` (it uses `mapmaker_limits_read`).
@@ -230,9 +311,13 @@ byte on the weapon/ammo pickup records, fork chunk 0x00C776F6):
 ## User test steps
 
 1. `TSFP_MAPMAKER_LIMITS=1`. Editor -> Map Settings -> character set: custom.
-   The title reads "(1-10)". Move to the last row and press Down: the title
-   reads "(11-20)" and the rows are empty. Pick characters into a few of them;
-   press Up on the first row: slots 1-10 are unchanged.
+   The slot list shows ten rows with a scrollbar, like the weapon set's;
+   stderr has `[mapmaker] sets: slot pane build (20 rows, scrolling)` and
+   `slot pane open: ... items=22`. Scroll with the wheel, the scrollbar or by
+   moving the pointer/Down past row 10: rows 11-20 (empty). Pick characters
+   into a few of them (A, choose; after a pick the cursor moves to the next
+   row; X clears). Slots 1-10 are unchanged. A preset set: rows 11-20 stay
+   empty and inert. If no `slot pane build` line appears, send the log.
 2. Place a Story AI, open it: the character choice lists 20 slots; pick one
    from 11-20 (named like 1-10; the Giant Trophy Monster by that name). Back
    in the Story AI list and the editor overview, its icon is the Story AI
@@ -244,9 +329,9 @@ byte on the weapon/ammo pickup records, fork chunk 0x00C776F6):
 4. A map with slots 11-20 empty and no AI on them: saves as before (stock
    size). A map using them: a stock build refuses to load it; System Link
    refuses it.
-5. Without the switch: no paging, 10 choices; the map from step 2 still loads
-   and plays with its 20 slots.
-6. Editor -> Test map setup -> Bots: pages like Map Settings. Leave it on
-   "(11-20)", back out and start the test (Arcade type): rows 1-10 are the
-   first ten bots, slots 11-20 more bots (matchbots area). Front end /
-   in-game pause -> setup -> Bots on a MapMaker map: paged too (matchbots).
+5. Without the switch: ten rows (`slot pane build (stock 10 rows: ...)`), 10
+   choices; the map from step 2 still loads and plays with its 20 slots.
+6. Editor -> Test map setup -> Bots: the same 20-row list. Scroll down, back
+   out and start the test (Arcade type): rows 1-10 are the first ten bots,
+   slots 11-20 more bots (matchbots area). Front end / in-game pause -> setup
+   -> Bots on a MapMaker map: still two pages (matchbots).
