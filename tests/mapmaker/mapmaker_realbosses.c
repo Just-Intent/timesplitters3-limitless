@@ -889,15 +889,19 @@ int main(void)
         CHECK(WORD_AT(A(8)+0x9D0u)==2u && WORD_AT(A(8)+0x20u)==1u && rbs_walk.woken==1u);   /* roar, then fight */
         CHECK(nfx==f0+6u);                                                        /* beams still drawn */
         nfx=f0;
-        /* the roar: state 2 waits for an animation to finish, and a new controller has none */
+        /* the roar: state 2 waits for an animation to finish; a creature starts in its bind pose */
 #define WCTL 0x00730000u
-        WORD_AT(ENT(8)+4u)=WCTL;WORD_AT(WCTL+0xD4u)=0x123u;                    /* animated: the stock path */
+        WORD_AT(ENT(8)+4u)=WCTL;WORD_AT(WCTL+0xD4u)=0x6EEu;                    /* its own (the first): the stock path */
         WORD_AT(A(8)+0x20u)=2u;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
         CHECK(nanim==0);
-        WORD_AT(WCTL+0xD4u)=0;WORD_AT(WCTL+0x12Cu)=0x124u;                       /* blending into one */
+        WORD_AT(WCTL+0xD4u)=0;WORD_AT(WCTL+0x12Cu)=0x6F1u;                       /* blending into its own */
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
         CHECK(nanim==0);
+        WORD_AT(WCTL+0x12Cu)=0;WORD_AT(WCTL+0xD4u)=0x6FCu;                       /* the last of its own */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==0);
+        WORD_AT(WCTL+0xD4u)=0xFEu;                                               /* the bind pose (v0.4.0-mapmaker.25) */
         WORD_AT(WCTL+0x12Cu)=0;WORD_AT(A(8)+0x20u)=4u;                           /* already fighting */
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
         CHECK(nanim==0);
@@ -920,13 +924,23 @@ int main(void)
         WORD_AT(WCTL+0xD4u)=0;
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
         CHECK(nanim==1);                                                         /* once a level */
+        rbs_walk.roars=0;WORD_AT(WCTL+0xD4u)=0x6EDu;                             /* just below its own */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==2);
+        rbs_walk.roars=0;WORD_AT(WCTL+0xD4u)=0x6FDu;                             /* just above */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==3);
+        rbs_walk.roars=0;WORD_AT(WCTL+0xD4u)=0;WORD_AT(WCTL+0x12Cu)=0x6EDu;     /* blend: not its own */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==4);
+        WORD_AT(WCTL+0x12Cu)=0;WORD_AT(WCTL+0xD4u)=0;
         rbs_walk.roars=0;WORD_AT(A(8)+0x20u)=1u;                                 /* state 1: wake and roar together */
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
-        CHECK(nanim==2 && WORD_AT(A(8)+0x9D0u)==2u && anim_args[1]==0x6F7u);
+        CHECK(nanim==5 && WORD_AT(A(8)+0x9D0u)==2u && anim_args[1]==0x6F7u);
         rbs_walk.roars=0;WORD_AT(WCTL+0xD4u)=0;WORD_AT(A(8)+0x20u)=2u;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;anim_ok=0;
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);                /* refused: logged, not retried */
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
-        CHECK(nanim==3 && rbs_walk.roars==1u);
+        CHECK(nanim==6 && rbs_walk.roars==1u);
         anim_ok=1;WORD_AT(ENT(8)+4u)=0;
         /* the guns: standing in state 0x13 in stage 1 with both guns off -> state 0x12 once */
         WORD_AT(A(8)+0x20u)=0x13u;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;BYTE_AT(WKST+0x98u)=1u;
@@ -959,7 +973,7 @@ int main(void)
         CHECK(WORD_AT(A(8)+0x9D0u)==0x12u && rbs_walk.armed==1u && rbs_walk.last==0x13u);
         WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;
         CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
-        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu && nanim==3u);                    /* once a level, no roar */
+        CHECK(WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu && nanim==6u);                    /* once a level, no roar */
         CHECK(rbs_walk.moves>=3u);
         WORD_AT(WKST+0x4CCu)=0;WORD_AT(WKST+0x52Cu)=0;nfx=f0;
         WORD_AT(A(8)+0x20u)=0;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;
