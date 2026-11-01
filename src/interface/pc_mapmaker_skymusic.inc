@@ -39,16 +39,22 @@
  *    written even with the switch off (an out-of-range field is never saved).
  *  - load (WRAP sub_00301A90, after the original, scene 102): the bits turn
  *    the editor fields back into the extra values.
- *  - play (scene 100): mount (WRAP sub_00062790, after the original) the
- *    sky's / sandstorm's level pak index-only like chr.pak
+ *  - play (scene 100): mount (WRAP sub_00062790) only starts a new level
+ *    (there the scene may still be the old one and the map is not read;
+ *    v0.4.0-mapmaker.25 mounted there and no extra sky or sandstorm showed).
+ *    The sky's / sandstorm's level pak is mounted index-only like chr.pak
  *    (sub_000622D0(path, 0, 1)), at most two, keeping 8 of the 64 mount
- *    slots free; level (WRAP sub_0023F390) gives the map start the extra sky
- *    record in info +0x10 while it runs (it sets the level sky and requests
- *    the model before the load pass); weather_load (WRAP sub_00119960, after)
- *    turns the sandstorm on and requests its models; weather_start (WRAP
- *    sub_0011B310, after) points the weather list at scene 2's type-5 entry
- *    once the sandstorm buffers exist; music (WRAP sub_00045DE0) plays the
- *    extra track when the map's index is -1.
+ *    slots free, by the first of: the cloud setup (pc_mapmaker_sky.inc via
+ *    mapmaker_sky.extra_prepare), the map start, the weather load. level
+ *    (WRAP sub_0023F390) gives the map start the extra sky record in info
+ *    +0x10 while it runs (it sets the level sky and requests the model
+ *    before the load pass); sky_built (WRAP sub_0011D2C0, probe) logs what
+ *    each view's sky prop was built from; weather_load (WRAP sub_00119960,
+ *    after) turns the sandstorm on and requests its models; weather_start
+ *    (WRAP sub_0011B310, after) and weather_list (WRAP sub_00119AB0, the
+ *    level setup's list, which runs after the weather start) keep scene 2's
+ *    type-5 entry once the sandstorm buffers exist; music (WRAP sub_00045DE0)
+ *    plays the extra track when the map's index is -1.
  * A stock or older build loads such a map with the fallbacks. Requires the
  * includer's WORD_AT, guest_call, g_eax, g_esp, g_xbox_mem_offset,
  * xbox_HeapAlloc, mapmaker_limits/mapmaker_limits_read, MAPMAKER_PTR_OK and
@@ -98,6 +104,9 @@
 #define SMX_SAND_LIST 0x00507898u            /* scene 2: one entry, type 5 */
 #define SMX_PATH_MAX 32u
 #define SMX_SCAN 0x00080000u
+#define SMX_LEVEL100 0x00518778u             /* level table entry of scene 100 (+0x10 sky) */
+#define SMX_STATE_FLAGS 0x007DE398u          /* 0x800000: sub_00062790 mounts for ... */
+#define SMX_PENDING_SCENE 0x007DE394u        /* ... this scene byte */
 
 static const struct { uint32_t id; const char *label; } smx_music[]={
     {0x18u,"Front End Menu"},{0x01u,"Intro"},{0x2Bu,"Game Over"},{0x33u,"Mission Complete"},
@@ -116,13 +125,16 @@ static const struct { const char *label, *pak; uint32_t list; } smx_weather[]={
 };
 #define SMX_WEATHER_COUNT ((uint32_t)(sizeof smx_weather/sizeof smx_weather[0]))
 
-extern void sub_00071800(void),sub_00062260(void),sub_000622D0(void),sub_000A5E40(void);
+extern void sub_00071800(void),sub_00062260(void),sub_000622D0(void),sub_000A5E40(void),sub_000631C0(void);
 
 static struct {
     uint32_t labels;                         /* guest: every row label */
     uint32_t music_text[SMX_MUSIC_COUNT], sky_text[MAPMAKER_SKY_EXTRA_COUNT], weather_text[SMX_WEATHER_COUNT];
     uint32_t paths;                          /* guest: pak paths, SMX_PATH_MAX each */
     const char *path_of[MAPMAKER_SKY_EXTRA_COUNT+SMX_WEATHER_COUNT];
+    uint32_t sky_row;                        /* this level: extra sky row whose pak was tried */
+    uint32_t level_logs;                     /* this level: sky probe lines */
+    uint32_t frames;                         /* this level: weather frames seen (probe) */
     int sand_ready;                          /* this level: the sandstorm pak is mounted */
     int sand_on;                             /* this level: sandstorm flag set by us */
     unsigned long long rows, logged;
@@ -136,8 +148,14 @@ static int smx_on(void)
 static uint32_t smx_scene(void) { return WORD_AT(SMX_SCENE); }
 static void smx_log(const char *what,uint32_t a,uint32_t b)
 {
-    if(smx.logged++>=24u) return;
+    if(smx.logged++>=96u) return;
     fprintf(stderr,"[mapmaker] skymusic: %s (%u, %u)\n",what,a,b);
+    fflush(stderr);
+}
+static void smx_logs(const char *what,const char *pak,uint32_t a)
+{
+    if(smx.logged++>=96u) return;
+    fprintf(stderr,"[mapmaker] skymusic: %s: %s (%u)\n",what,pak,a);
     fflush(stderr);
 }
 static uint8_t *smx_byte(uint32_t a) { return (uint8_t *)((uintptr_t)a+g_xbox_mem_offset); }
@@ -261,73 +279,122 @@ static uint32_t smx_path(const char *pak)
 /* Mount a level pak index-only (entries read on demand, as chr.pak); 1 when mounted. */
 static int smx_mount(const char *pak)
 {
-    uint32_t path=smx_path(pak),mounted;
+    uint32_t path=smx_path(pak),count;
+    int32_t slot;
     if(!path) { smx_log("no memory for a pak path",0,0);return 0; }
-    if((int32_t)guest_call(sub_00062260,1,path)!=-1) return 1;
-    if((mounted=WORD_AT(SMX_MOUNTS))+SMX_MOUNT_KEEP>SMX_MOUNT_MAX) {
-        smx_log("pak mount table too full for an extra sky or weather pak",mounted,SMX_MOUNT_MAX);
+    if((slot=(int32_t)guest_call(sub_00062260,1,path))!=-1) { smx_logs("pak already mounted",pak,(uint32_t)slot);return 1; }
+    if((count=WORD_AT(SMX_MOUNTS))+SMX_MOUNT_KEEP>SMX_MOUNT_MAX) {
+        smx_logs("pak mount table too full; not mounted",pak,count);
         return 0;
     }
-    if((int32_t)guest_call(sub_000622D0,3,path,0u,1u)<0) { smx_log("an extra sky or weather pak did not mount",mounted,0);return 0; }
-    smx_log("mounted an extra sky or weather pak",mounted+1u,0);
+    if((slot=(int32_t)guest_call(sub_000622D0,3,path,0u,1u))<0) { smx_logs("pak did not mount",pak,count);return 0; }
+    smx_logs("mounted pak (slot)",pak,(uint32_t)slot);
     return 1;
 }
 
-/* WRAP sub_00062790 (the level's pak mounts, no args; before the cloud
- * setup and the map start). */
-void pc_mapmaker_skymusic_mount(void (*original)(void))
-{
-    uint32_t info,k;
-    if(WORD_AT(SMX_MOUNT_SKIP)) { original();return; }   /* the original does nothing */
-    original();
-    mapmaker_sky.extra_ready=0;smx.sand_ready=0;smx.sand_on=0;   /* a new level */
-    if(!(info=smx_play_info())) return;
-    if((k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),MAPMAKER_SKY_EXTRA_MASK,MAPMAKER_SKY_EXTRA_SHIFT,MAPMAKER_SKY_EXTRA_COUNT))!=0)
-        mapmaker_sky.extra_ready=smx_mount(mapmaker_sky_extras[k-1u].pak);
-    if((k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),SMX_WEATHER_MASK,SMX_WEATHER_SHIFT,SMX_WEATHER_COUNT))!=0)
-        smx.sand_ready=smx_mount(smx_weather[k-1u].pak);
-}
-
 /* 1 when scene 100's resource table has a row for the model (sub_000A5E40
- * requests only those; the castle tank area found rows missing). */
+ * requests only those). */
 static int smx_model_ok(uint32_t model)
 {
     uint32_t t=WORD_AT(SMX_RES);
     if(model>=SMX_RESMAP_MODELS || !t) return 0;
     return (int16_t)smx_get16(SMX_RESMAP+model*2u)>=0;
 }
+static uint32_t smx_sky_model(uint32_t row) { return WORD_AT(SMX_SKY_TABLE+(uint32_t)mapmaker_sky_extras[row-1u].sky*0x34u+4u); }
+
+/* The map's extra sky row with its pak mounted now (mounting it if needed),
+ * or 0. Called by the cloud setup (pc_mapmaker_sky.inc) and the map start;
+ * mounts at most once per level. */
+static uint32_t smx_prepare_sky(uint32_t info)
+{
+    uint32_t k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),MAPMAKER_SKY_EXTRA_MASK,MAPMAKER_SKY_EXTRA_SHIFT,MAPMAKER_SKY_EXTRA_COUNT);
+    if(!k || smx_scene()!=100u || !smx_on()) return 0;
+    if(smx.sky_row!=k) {
+        smx.sky_row=k;
+        smx_log("map has extra sky (row, record)",k,(uint32_t)mapmaker_sky_extras[k-1u].sky);
+        mapmaker_sky.extra_ready=smx_mount(mapmaker_sky_extras[k-1u].pak);
+    }
+    return mapmaker_sky.extra_ready?k:0u;
+}
+
+/* WRAP sub_00062790 (the level's pak mounts, no args): a new level. The
+ * mounts are made later, where the scene is 100 and the map is read: here
+ * the original may mount for a pending scene ([0x007DE394] while
+ * [0x007DE398] has 0x800000) and [0x0079094C] can still be the old one. */
+void pc_mapmaker_skymusic_mount(void (*original)(void))
+{
+    uint32_t pending=WORD_AT(SMX_STATE_FLAGS)&0x00800000u?(uint32_t)(int32_t)(int8_t)*smx_byte(SMX_PENDING_SCENE):smx_scene();
+    if(WORD_AT(SMX_MOUNT_SKIP)) { original();return; }   /* the original does nothing */
+    original();
+    mapmaker_sky.extra_ready=0;mapmaker_sky.extra_prepare=smx_prepare_sky;
+    smx.sky_row=0;smx.sand_ready=0;smx.sand_on=0;smx.level_logs=0;smx.frames=0;
+    if(pending==100u && smx_on()) smx_log("new MapMaker level (scene now, mounted paks)",smx_scene(),WORD_AT(SMX_MOUNTS));
+}
 
 /* WRAP sub_0023F390 (map start: level sky, weather, fog from the info chunk;
- * no args). An extra sky is put in info +0x10 while it runs. */
+ * no args). An extra sky is put in info +0x10 while it runs, so the stock
+ * code sets the level's sky and requests its model before the load pass. */
 void pc_mapmaker_skymusic_level(void (*original)(void))
 {
     uint32_t info=smx_play_info(),k,model;
     int old;
-    if(!info || !mapmaker_sky.extra_ready ||
-       !(k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),MAPMAKER_SKY_EXTRA_MASK,MAPMAKER_SKY_EXTRA_SHIFT,MAPMAKER_SKY_EXTRA_COUNT))) {
+    if(!info || !(k=smx_prepare_sky(info))) {
+        if(info && smx_bits(WORD_AT(info+SMX_INFO_FLAGS),MAPMAKER_SKY_EXTRA_MASK,MAPMAKER_SKY_EXTRA_SHIFT,MAPMAKER_SKY_EXTRA_COUNT))
+            smx_log("map start: extra sky pak not mounted; MapMaker sky kept",(uint32_t)smx_get16(info+SMX_INFO_SKY)&0xFFFFu,0);
         original();
         return;
     }
-    model=WORD_AT(SMX_SKY_TABLE+(uint32_t)mapmaker_sky_extras[k-1u].sky*0x34u+4u);
+    model=smx_sky_model(k);
     if(!smx_model_ok(model)) {
-        smx_log("extra sky model has no resource row; the map keeps its MapMaker sky",model,(uint32_t)mapmaker_sky_extras[k-1u].sky);
+        smx_log("map start: extra sky model has no resource row; MapMaker sky kept",model,(uint32_t)mapmaker_sky_extras[k-1u].sky);
         original();
         return;
     }
     old=smx_get16(info+SMX_INFO_SKY);
+    fprintf(stderr,"[mapmaker] skymusic: map start: extra sky row %u resolved to record %d model 0x%X (resource row %d), map's stock sky %d, level sky before %u\n",
+            k,mapmaker_sky_extras[k-1u].sky,model,smx_get16(SMX_RESMAP+model*2u),old,WORD_AT(SMX_LEVEL100+0x10u));
     smx_set16(info+SMX_INFO_SKY,(uint32_t)mapmaker_sky_extras[k-1u].sky);
     original();
     smx_set16(info+SMX_INFO_SKY,(uint32_t)old);
+    smx_log("map start: level sky record after, model requested",WORD_AT(SMX_LEVEL100+0x10u),model);
+}
+
+/* WRAP sub_0011D2C0 (a view's sky prop; cdecl view): probe only. Logs the
+ * record and model the view's sky was built from and whether the model's
+ * file was read (resource row +4 loaded, or its request holds data). */
+void pc_mapmaker_skymusic_sky_built(void (*original)(void))
+{
+    uint32_t view=MAPMAKER_PTR_OK(g_esp,8u)?WORD_AT(g_esp+4u):0u,info,rec,model,row,e=0,req=0,data=0,prop;
+    original();
+    if(!(info=smx_play_info()) ||
+       !smx_bits(WORD_AT(info+SMX_INFO_FLAGS),MAPMAKER_SKY_EXTRA_MASK,MAPMAKER_SKY_EXTRA_SHIFT,MAPMAKER_SKY_EXTRA_COUNT) ||
+       smx.level_logs>=2u) return;
+    smx.level_logs++;
+    rec=WORD_AT(SMX_LEVEL100+0x10u);
+    model=rec<68u?WORD_AT(SMX_SKY_TABLE+rec*0x34u+4u):0xFFFFFFFFu;
+    prop=MAPMAKER_PTR_OK(view,0xE08u)?WORD_AT(view+0xE04u):0u;
+    row=model<SMX_RESMAP_MODELS?(uint32_t)smx_get16(SMX_RESMAP+model*2u)&0xFFFFu:0xFFFFu;
+    if(row<0x8000u && WORD_AT(SMX_RES)) e=WORD_AT(SMX_RES)+row*0x30u;
+    if(e && MAPMAKER_PTR_OK(e,0x30u) && WORD_AT(e+0x10u)) {
+        req=guest_call(sub_000631C0,1,WORD_AT(e+0x10u));
+        data=req && MAPMAKER_PTR_OK(req,0x14u)?WORD_AT(req+0x10u):0u;
+    }
+    fprintf(stderr,"[mapmaker] skymusic: sky built: record %u model 0x%X prop 0x%08X prop model 0x%X row %d loaded %u request 0x%08X data 0x%08X\n",
+            rec,model,prop,prop && MAPMAKER_PTR_OK(prop,0x98u)?WORD_AT(prop+0x94u):0u,(int)(int16_t)row,
+            e && MAPMAKER_PTR_OK(e,8u)?WORD_AT(e+4u):0u,req,data);
+    fflush(stderr);
 }
 
 /* WRAP sub_00119960 (weather load, no args; zeroes the weather flags, then
- * story scenes set theirs). A sandstorm map: flag and models, as 0x00119A47. */
+ * story scenes set theirs). A sandstorm map: mount its pak, then flag and
+ * models, as 0x00119A47. */
 void pc_mapmaker_skymusic_weather_load(void (*original)(void))
 {
     uint32_t info,k,model;
     original();
-    if(!(info=smx_play_info()) || !smx.sand_ready ||
-       !smx_bits(WORD_AT(info+SMX_INFO_FLAGS),SMX_WEATHER_MASK,SMX_WEATHER_SHIFT,SMX_WEATHER_COUNT)) return;
+    if(!(info=smx_play_info()) ||
+       !(k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),SMX_WEATHER_MASK,SMX_WEATHER_SHIFT,SMX_WEATHER_COUNT))) return;
+    if(!smx.sand_ready && !(smx.sand_ready=smx_mount(smx_weather[k-1u].pak))) { smx_log("sandstorm pak not mounted; no sandstorm",0,0);return; }
     for(k=0;k<4u;k++) {
         model=WORD_AT(SMX_SAND_MODELS+k*0x44u);
         if(model!=0xFFFFFFFFu && !smx_model_ok(model)) { smx_log("sandstorm model has no resource row; no sandstorm",model,0);return; }
@@ -338,7 +405,15 @@ void pc_mapmaker_skymusic_weather_load(void (*original)(void))
         if(model!=0xFFFFFFFFu) guest_call(sub_000A5E40,1,model);
     }
     smx.sand_on=1;
-    smx_log("sandstorm on",WORD_AT(SMX_SAND_MODELS),4u);
+    smx_log("sandstorm on, models requested (first, count)",WORD_AT(SMX_SAND_MODELS),4u);
+}
+
+/* The sandstorm may be drawn: armed by us this level and its buffers exist. */
+static int smx_sand_list_ok(void)
+{
+    if(smx.sand_on!=1 || smx_scene()!=100u || !WORD_AT(SMX_SANDSTORM)) return 0;
+    if(!WORD_AT(SMX_WX_BUF1) || !WORD_AT(SMX_WX_BUF2)) { smx_log("sandstorm buffers missing; not drawn",WORD_AT(SMX_WX_BUF1),WORD_AT(SMX_WX_BUF2));return 0; }
+    return 1;
 }
 
 /* WRAP sub_0011B310 (weather start: resets the list to the type-0 default,
@@ -346,11 +421,45 @@ void pc_mapmaker_skymusic_weather_load(void (*original)(void))
 void pc_mapmaker_skymusic_weather_start(void (*original)(void))
 {
     original();
-    if(smx.sand_on!=1 || smx_scene()!=100u || !WORD_AT(SMX_SANDSTORM)) return;
-    if(!WORD_AT(SMX_WX_BUF1) || !WORD_AT(SMX_WX_BUF2)) { smx_log("sandstorm buffers missing; not drawn",0,0);return; }
+    if(!smx_sand_list_ok()) return;
     WORD_AT(SMX_WX_LIST)=smx_weather[0].list;
     WORD_AT(SMX_WX_COUNT)=1u;
     WORD_AT(SMX_WX_INDEX)=0;
+    smx_log("weather start: sandstorm list set (first prop, list)",WORD_AT(SMX_SAND_MODELS+0x24u),smx_weather[0].list);
+}
+
+/* WRAP sub_00119AB0 (cdecl count, list: the level's weather list). Its only
+ * caller, the level setup sub_0006D7A0 (from sub_0006EC10 at 0x0003D64A,
+ * right after the weather start), passes scene 100's empty list, which
+ * selects the type-0 default: a sandstorm map gets its type-5 list instead. */
+void pc_mapmaker_skymusic_weather_list(void (*original)(void))
+{
+    if(MAPMAKER_PTR_OK(g_esp,12u) && smx_sand_list_ok()) {
+        WORD_AT(g_esp+4u)=1u;
+        WORD_AT(g_esp+8u)=smx_weather[0].list;
+        smx_log("level setup: sandstorm list kept (count, list)",1u,smx_weather[0].list);
+    }
+    original();
+}
+
+/* WRAP sub_0011BBC0 (weather frame update, no args; called every frame from
+ * sub_001CE420 at 0x001CE55F/0x001CE596 with no scene test; it runs the
+ * sandstorm (sub_0011ACF0) only while [0x0073D9AC] and the current list
+ * entry has type 5, 0x0011BC4F): probe only. On a sandstorm map it logs, on
+ * the 1st, 60th and 600th frame of the level, the list, the entry's type,
+ * the flag and the buffers. */
+void pc_mapmaker_skymusic_weather_frame(void (*original)(void))
+{
+    uint32_t list,index,type;
+    original();
+    if(smx.sand_on!=1 || smx_scene()!=100u) return;
+    smx.frames++;
+    if(smx.frames!=1u && smx.frames!=60u && smx.frames!=600u) return;
+    list=WORD_AT(SMX_WX_LIST);index=WORD_AT(SMX_WX_INDEX);
+    type=MAPMAKER_PTR_OK(list+index*0x28u,4u)?WORD_AT(list+index*0x28u):0xFFFFFFFFu;
+    fprintf(stderr,"[mapmaker] skymusic: weather frame %u: list 0x%08X index %u type %d sandstorm %u buffers 0x%08X 0x%08X (type 5 draws)\n",
+            smx.frames,list,index,(int)type,WORD_AT(SMX_SANDSTORM),WORD_AT(SMX_WX_BUF1),WORD_AT(SMX_WX_BUF2));
+    fflush(stderr);
 }
 
 /* WRAP sub_00045DE0 (start the level music: eax = music id, -1 = the
@@ -360,7 +469,9 @@ void pc_mapmaker_skymusic_music(void (*original)(void))
     uint32_t info,k;
     if(MAPMAKER_PTR_OK(g_esp,4u) && WORD_AT(g_esp)==SMX_RET_MUSIC_PLAY && g_eax==0xFFFFFFFFu &&
        (info=smx_play_info())!=0 &&
-       (k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),SMX_MUSIC_MASK,SMX_MUSIC_SHIFT,SMX_MUSIC_COUNT))!=0)
+       (k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),SMX_MUSIC_MASK,SMX_MUSIC_SHIFT,SMX_MUSIC_COUNT))!=0) {
         g_eax=smx_music[k-1u].id;
+        smx_log("music: extra track (row, id)",k,g_eax);
+    }
     original();
 }

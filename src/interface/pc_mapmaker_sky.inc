@@ -89,6 +89,7 @@ static struct {
     uint32_t editor;    /* editor object the state below belongs to */
     int live, bound, value;
     int extra_ready;    /* this level's extra-sky pak is mounted (pc_mapmaker_skymusic.inc) */
+    uint32_t (*extra_prepare)(uint32_t info); /* skymusic: mount the row's pak now; row or 0 */
     int have_pristine, patched;
     uint32_t pristine[MAPMAKER_SKY_LAST-MAPMAKER_SKY_FIRST+1][MAPMAKER_SKY_CLOUD_WORDS];
     unsigned long long no_storage, no_info, applied;
@@ -201,7 +202,9 @@ void pc_mapmaker_sky_compile(void (*original)(void))
 static uint32_t mapmaker_sky_extra_of(uint32_t info)
 {
     uint32_t k=(WORD_AT(info+0x244u)&MAPMAKER_SKY_EXTRA_MASK)>>MAPMAKER_SKY_EXTRA_SHIFT;
-    return k<=MAPMAKER_SKY_EXTRA_COUNT && mapmaker_sky.extra_ready?k:0u;
+    if(!k || k>MAPMAKER_SKY_EXTRA_COUNT) return 0;
+    if(mapmaker_sky.extra_prepare) return mapmaker_sky.extra_prepare(info);
+    return mapmaker_sky.extra_ready?k:0u;
 }
 
 /* The map's effective sky: an extra sky, else info +0x10 if not negative,
