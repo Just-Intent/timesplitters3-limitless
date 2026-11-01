@@ -61,6 +61,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_sky.inc"
 #include "pc_mapmaker_skymask.inc"
 #include "pc_mapmaker_roof.inc"
+#include "pc_mapmaker_tileflags.inc"
 #include "pc_mapmaker_bosses.inc"
 #include "pc_mapmaker_characters.inc"
 #include "pc_mapmaker_realbosses.inc"
@@ -755,6 +756,9 @@ void pc_mapmaker_roof_copy(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_piece_free(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_text(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_format(void (*original)(void)) { original(); }
+void pc_mapmaker_tileflags_tiles(void (*original)(void)) { original(); }
+void pc_mapmaker_tileflags_build(void (*original)(void)) { original(); }
+void pc_mapmaker_tileflags_tick(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_caption(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_picker_end(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_pick(void (*original)(void)) { original(); }

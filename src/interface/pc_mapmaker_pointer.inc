@@ -289,9 +289,13 @@ static int mapmaker_pointer_pan(float dx,float dy)
 /* Editor screen: right-drag grabs the map; the window edge pans. A right
  * click without a drag keeps its original meaning (the menu Back action, which
  * the editor uses to rotate the held piece), sent on release, except over an
- * empty cell with no piece held, where it presses Y (clears the selection).
+ * empty cell with no piece held, where it presses Y (clears the selection),
+ * and over a placed tile in Tiles mode with no piece held, where it opens the
+ * tile's roof menu (pc_mapmaker_tileflags.inc; Back there would select the
+ * tile, which Escape and the B button still do).
  * Fields from static analysis: editor+0x2F7C held piece, +0x2F18 cell under
  * the pointer. */
+int pc_mapmaker_tileflags_click(void);
 static int mapmaker_pointer_right_clears(void)
 {
     uint32_t editor=guest_writable(MAPMAKER_EDITOR,4)?WORD_AT(MAPMAKER_EDITOR):0u;
@@ -304,6 +308,7 @@ static void mapmaker_pointer_navigate(uint32_t menu,float x,float y,float gw,flo
     if(!right && mapmaker_pointer.last_right && mapmaker_pointer.have_last) {
         if(mapmaker_pointer.right_travel<MAPMAKER_RIGHT_CLICK && guest_writable(menu,0x23c)) {
             if(mapmaker_pointer_right_clears()) pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_Y);
+            else if(pc_mapmaker_tileflags_click()) {}       /* the tile's roof menu opens next tile tick */
             else WORD_AT(menu+0xc4)|=0x20u; /* as the shared hook's right click */
         }
         mapmaker_pointer.right_travel=MAPMAKER_RIGHT_CLICK;

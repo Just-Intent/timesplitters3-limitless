@@ -46,6 +46,9 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     va_end(a);
     return 0;
 }
+/* pc_mapmaker_tileflags.inc's right-click entry: 1 = it opens the roof menu */
+static int tileflags_take, tileflags_clicks;
+int pc_mapmaker_tileflags_click(void) { tileflags_clicks++;return tileflags_take; }
 #include "pc_mapmaker_pointer.inc"
 
 static int failures;
@@ -314,8 +317,13 @@ int main(void)
     cursor.right=1;game_frame();cursor.right=0;game_frame();
     CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0x20u);
     WORD_AT(MENU+0xc4)=0;WORD_AT(ED+0x2f7c)=0;WORD_AT(ED+0x2f18)=0x00350000u; /* occupied cell */
+    tileflags_clicks=0;
     cursor.right=1;game_frame();cursor.right=0;game_frame();
-    CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0x20u);
+    CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0x20u && tileflags_clicks==1);
+    WORD_AT(MENU+0xc4)=0;tileflags_take=1;                   /* a placed tile: its roof menu, no Back */
+    cursor.right=1;game_frame();cursor.right=0;game_frame();
+    CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0 && tileflags_clicks==2);
+    tileflags_take=0;
     WORD_AT(MENU+0xc4)=0;WORD_AT(ED+0x2f18)=0;WORD_AT(ED+0x2f7c)=0x00340000u;
     /* Right-drag on the editor screen grabs the map, and does not rotate. */
     move(300.f,200.f);cursor.right=1;game_frame();

@@ -484,6 +484,66 @@ function.
    re-save it there and it becomes a normal tile (expected).
 7. Story smoke test: one indoor and one outdoor level unchanged.
 
+## Tile roof menu (right click, `TSFP_MAPMAKER_LIMITS=1`)
+
+User request (2026-11-01): "right clicking any tile, instead of selecting it
+(only when the tiles option is active in the main mapmaker menu) opens up a
+menu to flag the tile either as no roof or open air, probably as options in a
+combobox". Files: `src/interface/pc_mapmaker_tileflags.inc` (area `sky`, included
+after the roof file), the right-click branch in `src/interface/pc_mapmaker_pointer.inc`
+and the hover label in `pc_mapmaker_roof.inc`; tests
+`tests/mapmaker/test_mapmaker_tileflags.py` (fixture `mapmaker_tileflags.c`, 31
+mutations, decode/XBE checks). Not built or played yet.
+
+The flags are the roof marks above. Nothing in them is tile-8 specific: the
+mask hook clears the ceiling bit (No roof) or the ceiling and every side node
+bit (Open air) of whatever piece is marked, the rebuild stores word `+0x26`
+for any record, and the load matches tile, position and rotation. A tile
+whose model has no separate ceiling or wall nodes (mask 0) keeps those parts:
+the flag changes only what the catalogue's connection points describe.
+
+Stock behaviour (CONFIRMED, decode): the editor's frame input
+`sub_003063C0` dispatches on the toolbar slot `editor+0x254` (table
+`0x00306444`); slot 0, Tiles, is `sub_00303E10` (its only caller,
+`0x003063D9`). Back (menu `+0xC4 & 0x20`, what a right click sends) rotates a
+held piece (`+0x2F7C`, `sub_00303D00(1)` at `0x003042A8`), otherwise it flips
+selection bit 2 of the piece under the pointer (`+0x2F18`, byte `+0x14`,
+count `+0x2F9C`, `0x003042E4..0x0030431E`). In Objects mode Back on a
+selected object opens its options menu: `sub_002FB230(desc)` (`0x003051DB`;
+sets `editor+0x25C |= 0x4000000`, pushes `sub_00079860(root, desc, -1)` at
+`0x002FB2A5`; menu `+4` = desc, `0x000798B4`). Slot 0's toolbar row
+(`0x0052CD78`) has +8 = -1 and no open/close callbacks, so the close
+`sub_002FB3C0` only clears the flag. The pickup options descriptor
+`0x0052DECC` is `{sub_00319300 build, sub_003192E0 tick, 0, 0}`.
+
+| piece | what it does |
+|---|---|
+| pointer right-click release (no drag, editor screen) | after the empty-cell Y case: `pc_mapmaker_tileflags_click()` takes it in Tiles mode with nothing held, a piece under the pointer and no editor menu open (remembers the piece, sends no Back); otherwise Back as before |
+| `sub_00303E10` -> `pc_mapmaker_tileflags_tiles` | with a remembered piece still under the pointer: allocates once a heap descriptor `{sub_00319300, sub_003192E0, 0, 0}`, a choice word and the texts, sets the word to the tile's current flag, opens the menu with `sub_002FB230`, and skips that frame's tile input (`MAPMAKER_GUEST_RET`) |
+| `sub_00319300` -> `pc_mapmaker_tileflags_build` | for that descriptor only (menu `+4`): the stock frame (`sub_00075B70(0x8400, 0, 50, 0, sub_002FB3C0)`, `+0x218` = 1, `sub_00071B10(1, 0.5, 1, 1)`, `sub_00071C50(0x20000)`), one choice row "Roof" built like the weaponset area's pickup Weapon choice (`sub_00079DE0(text, 1, 0x08000800, 0, 0)`, `sub_0007D4A0`, `sub_00071800` Normal 0 / No roof 1 / Open air 2, `sub_00078590(word)`, `sub_000783D0`), the stock Done row (text 0xB5E, `sub_00079D60` with `sub_002FB3C0`), `sub_00075E70` and the stock position call; the pickup menu itself is the original |
+| `sub_003192E0` -> `pc_mapmaker_tileflags_tick` | for that descriptor: when the word changed to 0..2, the piece (still the same tile id) gets that roof mark; if it was selected when the menu opened, every selected piece in the editor list does too; then the original (Back closes) |
+| `sub_00151030` (roof format hook) | the grid label of any other flagged piece reads "<number>.<name> (No Roof)" / "(Open Air)" (heap copy of the name); tile 8 keeps "46./47." |
+
+Selecting tiles: a mouse right click no longer selects a placed tile in
+Tiles mode; Escape (Back in the editor) and the gamepad B button still do. A
+right click with a piece held still rotates it; on an empty cell it still
+clears the selection. The palette's 46/47 entries stay, so older maps and the
+old way keep working. Undo: a flag change is not its own undo step (the next
+rebuild stores it).
+
+What the user tests:
+1. Tiles mode, nothing held: right-click a placed tile of any shape (not only
+   Small Open). A small menu opens with "Roof: Normal" and Done (log
+   `tileflags: roof menu opened for tile N`). Pick No roof or Open air with
+   left/right or the mouse, then Done: the 3D view shows the change (Open air
+   without walls); the hover label ends with "(No Roof)" / "(Open Air)".
+2. Select several tiles (Escape or B), right-click one of them: the choice
+   applies to all selected tiles (log `N tiles set to ...`).
+3. Save, reload, play: the flagged tiles are open in play; back in the editor
+   they keep their flags. Set one back to Normal: closed again.
+4. Right click with a piece held still rotates it; in Objects mode a right
+   click still opens a selected object's options; Escape still selects tiles.
+
 ## Tests
 
 - `tests/mapmaker/test_mapmaker_sky.py`: fixture (20 mutations: scene gates, limits

@@ -99,6 +99,11 @@ void sub_002BF830(void) {}
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines these */
 void sub_00075B70(void) {} void sub_00075E70(void) {} void sub_00079710(void) {}
 #endif
+/* tileflags (pc_mapmaker_tileflags.inc: right-click tile roof menu) */
+void sub_002FB230(void) {}
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines these */
+void sub_00071B10(void) {} void sub_00071C50(void) {}
+#endif
 /* tilesets (pc_mapmaker_tilesets.inc: pak mount) */
 void sub_000622D0(void) {}
 #endif

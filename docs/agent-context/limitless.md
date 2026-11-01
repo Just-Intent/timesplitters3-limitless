@@ -464,6 +464,16 @@ the unchecked 'WELL' lookup, ret 0x0029B331) and `sub_00126560` ->
 stock scene 81 only). `_event` drops events at rets 0x0029AEBE/0x0029B120
 and at 0x0029CB80 removes it (`sub_0015DDA0`). bigdraw adds 0x637. Tests
 `test_walker_*`, 34 walk mutations. Not built or played. Tank: not started.
+Tile roof menu (user, 2026-11-01): `src/interface/pc_mapmaker_tileflags.inc`
+(area `sky`, after roof). Right click (pointer.inc, after the empty-cell Y
+case) on a placed tile in Tiles mode (`editor+0x254` 0) with nothing held ->
+`pc_mapmaker_tileflags_click`; WRAP `sub_00303E10` opens a heap descriptor
+`{sub_00319300, sub_003192E0}` via `sub_002FB230`; WRAPs `sub_00319300`
+(build: one "Roof" choice Normal/No roof/Open air + stock Done) and
+`sub_003192E0` (tick: roof mark on the tile, or all selected tiles) act only
+for that descriptor (menu +4). Roof format hook suffixes any flagged tile's
+grid label. Escape/B still select. `tests/mapmaker/test_mapmaker_tileflags.py`.
+Not built or played.
 Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
