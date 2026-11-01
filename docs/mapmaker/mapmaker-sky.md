@@ -292,16 +292,30 @@ player.]"
   room's geometry instance for that call and restores it after. A room's
   geometry is the prop `[inst]` with `+0x34` = room (1-based), `+4` = inst and
   model `+0x94 = 0x907 + room` (`sub_00085CC0` `0x00085D6B..0x00085DD0`);
-  other props of the room are untouched.
+  other props of the room are untouched. The model id is a **16-bit** word
+  (`0x000A69E3` stores `word [ebp+0x94]`, `0x000A6F4F` reads it with
+  `movzx`; `+0x96` is another word, `0x000A6897`).
+- **Playtest v0.4.0-mapmaker.25 (2026-11-01): bounded tiles showed their
+  walls, unbounded falls did not kill.** Cause found for the walls
+  (CONFIRMED in code): the draw hook compared the whole dword at `+0x94`
+  with `0x907 + room`, so with any non-zero `+0x96` it never recognised the
+  room geometry and drew everything. It now compares the low 16 bits. For
+  the missing death no single static cause was proven; the fix removes the
+  fragile parts and logs every step (below): the record walk before the
+  build no longer has to end cleanly (it keeps the records it read), the
+  per-entry mask comparison only logs, and a second fall rule kills a
+  character that stays a floor below the lowest floor for 60 ticks, in case
+  a fall outside every room slows or stops before the kill height.
 - **Which rooms are bounded (CONFIRMED).** The play build `sub_0008A780`
   makes one 0x68-byte entry per piece record, in record order
   (`sub_00083F80`/`sub_00085030` at `0x0008AACE`/`0x0008AAAA`), then calls
   `sub_00085710(entry)` for each in order (`0x0008AC70..0x0008ACAB`, `edi +=
   0x68`). The build hook reads the records (marks, `+8`, floor byte `+6`)
-  before the original; the rooms hook takes entry k, checks that its `+0x44`
-  is record k's `+8` (`0x0008A920` copy `+0x14` -> `+0x44` at `0x00084F98` /
-  `0x000856EB`; on a mismatch it stops and logs, so the walls just stay
-  visible) and records rooms `+0x28 .. +0x28 + +0x14 - 1` of a bounded piece.
+  before the original (a walk that fails part way keeps the records read so
+  far); the rooms hook takes entry k, compares its `+0x44` with record k's
+  `+8` (`0x0008A920` copy `+0x14` -> `+0x44` at `0x00084F98` /
+  `0x000856EB`; a difference is only logged, since the order is fixed by the
+  code) and records rooms `+0x28 .. +0x28 + +0x14 - 1` of a bounded piece.
 - **Unbounded, falling off kills (CONFIRMED that stock has no void death).**
   The stock kills all need something a void fall lacks: the hazard-floor
   kills need a ground polygon (`sub_000D5EB0` `0x000D6661..0x000D673E`
@@ -313,9 +327,12 @@ player.]"
   a search of the kill helpers' callers and the floor fields. So a character
   that walked off an unbounded tile at the map edge would fall forever.
   On a map with at least one unbounded tile the tick hook kills every live
-  character whose y (entity `+0x68`, y is up) is below **5 x lowest floor -
+  character whose y (entity `+0x68`, y is up; the stock hazard kill compares
+  it with the floor height at `0x000D66A3`) is below **5 x lowest floor -
   20** (piece y = record byte `+6` * 5.0 `[0x004760CC]`, `0x0008A87E`,
-  `0x0008A8F0`; editor floors -2..2 give a kill height of -30 at most). It
+  `0x0008A8F0`; editor floors -2..2 give a kill height of -30 at most), or
+  stays below **5 x lowest floor - 5** (one floor under the map) for **60
+  ticks** in a row. It
   walks the live list (`0x007A3580`, relocated to `0x00900100` by
   `actors-list.json`, count `[0x0074C37C]`, entity = `[actor]`, entity `+0x7C`
   = actor) and calls the stock kill-now helper `sub_000BD090(entity)` for a
@@ -329,11 +346,26 @@ player.]"
   outside scene 100, it is one counter test and one scene read; otherwise a
   few loads and a 256-entry table. The tick hook is one flag test per frame
   unless the map has an unbounded tile, then a walk of at most 64 characters.
-- Log: `roof: N bounded open-air rooms (walls hidden, collision kept)`,
-  `roof: N unbounded open-air tiles; characters below y Y (lowest floor F)
-  die`, `roof: character I fell off the map (y Y); killed` (first 8), and the
-  warnings `room build does not follow the map records` / `map records
-  unreadable`.
+- Log (stderr, `game.err`), so a playtest shows which step fails:
+  - every MapMaker play build: `roof: play build: P pieces (walk W), B
+    bounded, U unbounded, floors L..H` (walk -1: the records did not end
+    cleanly; `roof: map records end unexpectedly after P pieces`);
+  - bounded: `roof: bounded piece K: rooms A..B (mask M)` per bounded piece,
+    `roof: N bounded open-air rooms (walls hidden, collision kept; K of P
+    pieces checked)`, then at the first draw of each bounded room `roof:
+    room R drawn bounded: H of N nodes hidden (instance mask M)`. Draws in a
+    bounded room that are not its geometry are logged six times (`not the
+    room geometry`, with the prop, instance and model id); a mask difference
+    as `room build entry K mask ..., its record's +8 ...`;
+  - unbounded: `roof: fall check on: characters die below y K, or below y O
+    for 60 ticks (lowest floor F)`, at the first tick `roof: fall check
+    running: N characters, character 0 at y Y health H` (with `(entry
+    check fails)` if the live-list entry does not point back), `roof:
+    character I is below the lowest floor (y Y)` and `roof: character I fell
+    off the map (y Y, T ticks below the floors); killed`.
+  No line `play build` at all means the build hook did not run (limits off,
+  or the wrapper is missing); no `fall check running` means the tick hook
+  did not run in scene 100.
 
 ### Palette entry ("tile category in each set")
 
@@ -686,7 +718,8 @@ What the user tests:
   grid label and numbers 46/47, Open air (bounded): saved walls, editor view,
   mark 0x5203 load, rooms by build order (with the mask cross-check), draw
   hiding and restore; Open air (unbounded): kill height from the lowest
-  floor, live/dead/entry checks, scene gate, 64-entry bound (80 mutations);
+  floor, live/dead/entry checks, scene gate, 64-entry bound, 16-bit model id, partial record walk, hidden-node count, the
+  60-tick out-of-map rule (87 mutations);
   plus XBE data (category tables, descriptor, tile 8, tile numbers 1..45,
   both formats, floor height 5.0) and decoder checks (record word +0x26
   unused, hook and label sites, record sizes, editor start load, node-mask

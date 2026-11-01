@@ -93,13 +93,21 @@ MUTATIONS = {
     'load-no-bounded': ('mode<=MAPMAKER_ROOF_OPEN_BOUNDED; }', 'mode<=MAPMAKER_ROOF_OPEN_AIR; }'),
     'bounded-no-suffix': ('" (Open Air, Unbounded)"," (Open Air, Bounded)"}', '" (Open Air, Unbounded)",""}'),
     'play-no-records': ('        read=mapmaker_roof_records(c,mapmaker_roof_play_record,NULL);\n', ''),
-    'rooms-no-order-check': ('    if(WORD_AT(build+0x44u)!=mapmaker_roof_play.mask[k]) {', '    if(0) {'),
+    'partial-walk-dropped': ('    if(mapmaker_roof_play.pieces) {\n        mapmaker_roof_play.building=', '    if(read>=0) {\n        mapmaker_roof_play.building='),
+    'mismatch-stops': ('                WORD_AT(build+0x44u),mapmaker_roof_play.mask[k]);\n', '                WORD_AT(build+0x44u),mapmaker_roof_play.mask[k]);\n    if(WORD_AT(build+0x44u)!=mapmaker_roof_play.mask[k]) return;\n'),
+    'draw-model-dword': ('(WORD_AT(prop+0x94u)&0xFFFFu)!=MAPMAKER_ROOF_ROOM_MODEL+room', 'WORD_AT(prop+0x94u)!=MAPMAKER_ROOF_ROOM_MODEL+room'),
+    'count-wrong-stride': ('m=WORD_AT(first+i*MAPMAKER_ROOF_NODE+0x5Cu);', 'm=WORD_AT(first+i*0xC0u+0x5Cu);'),
+    'count-hidden-anyway': ('if(m && (m&mask) && !(m&mask&~hide)) (*hidden)++;', 'if(m && !(m&mask&~hide)) (*hidden)++;'),
+    'out-rule-off': ('    if(!(y<mapmaker_roof_play.kill_y) && mapmaker_roof_play.out[i]<MAPMAKER_ROOF_OUT_FRAMES) continue;',
+                     '    if(!(y<mapmaker_roof_play.kill_y)) continue;'),
+    'out-rule-at-floor': ('#define MAPMAKER_ROOF_OUT_DEPTH 5.0f', '#define MAPMAKER_ROOF_OUT_DEPTH 0.0f'),
+    'out-not-reset': ('{ mapmaker_roof_play.out[i]=0;mapmaker_roof_play.below[i]=0;continue; }', '{ mapmaker_roof_play.below[i]=0;continue; }'),
     'rooms-wrong-base': ('mapmaker_roof_play.hide[base+j]=MAPMAKER_ROOF_SIDES;', 'mapmaker_roof_play.hide[j]=MAPMAKER_ROOF_SIDES;'),
     'rooms-one-room': ('    for(j=0;(int32_t)count>0 && j<count;j++) {', '    for(j=0;(int32_t)count>0 && j<1u;j++) {'),
     'rooms-not-reset': ('    memset(mapmaker_roof_play.hide,0,sizeof mapmaker_roof_play.hide);\n', ''),
     'draw-any-scene': (' || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY || !MAPMAKER_STACK_OK(8u) ||', ' || !MAPMAKER_STACK_OK(8u) ||'),
-    'draw-any-prop': ('       WORD_AT(prop+4u)!=inst || WORD_AT(prop+0x94u)!=MAPMAKER_ROOF_ROOM_MODEL+room) { original();return; }',
-                      '       WORD_AT(prop+4u)!=inst) { original();return; }'),
+    'draw-any-prop': ('    if(WORD_AT(prop+4u)!=inst || (WORD_AT(prop+0x94u)&0xFFFFu)!=MAPMAKER_ROOF_ROOM_MODEL+room) {',
+                      '    if(WORD_AT(prop+4u)!=inst) {'),
     'draw-room-off-by-one': ('!(hide=mapmaker_roof_play.hide[room-1u])', '!(hide=mapmaker_roof_play.hide[room])'),
     'draw-not-restored': ('    if(WORD_AT(inst+0x30u)==(mask&~hide)) WORD_AT(inst+0x30u)=mask;\n', ''),
     'draw-not-hidden': ('    WORD_AT(inst+0x30u)=mask&~hide;\n', ''),
@@ -108,16 +116,16 @@ MUTATIONS = {
     'kill-bounded-too': ('    if(mode==MAPMAKER_ROOF_OPEN_AIR) mapmaker_roof_play.unbounded++;', '    if(mode) mapmaker_roof_play.unbounded++;'),
     'kill-any-scene': ('    if(!mapmaker_roof_play.kill || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY) return;',
                        '    if(!mapmaker_roof_play.kill) return;'),
-    'kill-the-dead': ('        if(!(FLOAT_AT(ent+0x1CCu)>0.0f) || !(FLOAT_AT(ent+0x68u)<mapmaker_roof_play.kill_y)) continue;',
-                      '        if(!(FLOAT_AT(ent+0x68u)<mapmaker_roof_play.kill_y)) continue;'),
+    'kill-the-dead': ('        if(!(FLOAT_AT(ent+0x1CCu)>0.0f) || !(y<mapmaker_roof_play.out_y))',
+                      '        if(!(y<mapmaker_roof_play.out_y))'),
     'kill-no-entry-check': (' || WORD_AT(ent+0x7Cu)!=actor) continue;', ') continue;'),
     'kill-floor-ignored': ('mapmaker_roof_play.kill_y=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-MAPMAKER_ROOF_KILL_DEPTH;',
                            'mapmaker_roof_play.kill_y=-MAPMAKER_ROOF_KILL_DEPTH;'),
     'kill-no-margin': ('#define MAPMAKER_ROOF_KILL_DEPTH 20.0f', '#define MAPMAKER_ROOF_KILL_DEPTH 0.0f'),
     'kill-floor-unsigned': ('    int floor=(int8_t)(WORD_AT(record+4u)>>16&0xFFu);', '    int floor=(int)(WORD_AT(record+4u)>>16&0xFFu);'),
     'kill-unbounded-count': ('    if(n>MAPMAKER_ROOF_ACTORS_MAX) n=MAPMAKER_ROOF_ACTORS_MAX;\n', '    if(n>MAPMAKER_ROOF_ACTORS_MAX) n=2u;\n'),
-    'tick-pops-twice': ('void pc_mapmaker_roof_tick(void (*original)(void))\n{\n    uint32_t n,i,actor,ent;\n    original();',
-                        'void pc_mapmaker_roof_tick(void (*original)(void))\n{\n    uint32_t n,i,actor,ent;\n    original();g_esp+=4u;'),
+    'tick-pops-twice': ('void pc_mapmaker_roof_tick(void (*original)(void))\n{\n    uint32_t n,i,actor,ent;\n    float y;\n    original();',
+                        'void pc_mapmaker_roof_tick(void (*original)(void))\n{\n    uint32_t n,i,actor,ent;\n    float y;\n    original();g_esp+=4u;'),
 }
 
 
@@ -346,6 +354,12 @@ def test_bounded_and_fall_sites():
     assert at[0x0008A920].text == 'dword ptr [esp + 0xb4], edx'          # copy +0x14 = record +8
     assert at[0x00085D6B].text == 'eax, [ebp + 0x907]' and at[0x00085D9F].text == 'dword ptr [eax + 0x34], ebp'
     assert at[0x00085DD0].text == 'dword ptr [ecx + 0x30], edx'
+    # The prop's model id +0x94 is a 16-bit word next to another word +0x96.
+    assert at[0x000A69E3].text == 'word ptr [ebp + 0x94], di' and at[0x000A6897].text == 'word ptr [ebp + 0x96], ax'
+    assert at[0x000A6F4F].text == 'ecx, word ptr [esi + 0x94]'
+    # Node table walked by the draw: header [inst+4] = count, nodes 0xC8 bytes before it.
+    assert at[0x0008F5E6].text == 'esi, dword ptr [ebx + 4]' and at[0x0008F5EB].text == 'eax, eax, 0xc8'
+    assert at[0x0008F637].text == 'eax, dword ptr [esi + edi + 0x5c]'
     assert at[0x0008A87E].text == 'ebx, byte ptr [esi + 6]'
     assert at[0x0008A8F0].ops[1][4] == 0x004760CC
     assert calls(0x0003C440) == {0x0003D3CA}
