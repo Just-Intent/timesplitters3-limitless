@@ -75,7 +75,7 @@ static int bosses_area=1;
 int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)hook;return strcmp(area,"bosses") || bosses_area; }
 
 static unsigned nrows, nenable, nmount;
-static struct { uint32_t text, id, flags, cb; char label[32]; } rows[8];
+static struct { uint32_t text, id, flags, cb; char label[32]; } rows[12];
 static uint32_t enable_item, enable_flag=0xEEu, mount_arg;
 static int pak_mounted, skel_mounted, walk_mounted, mount_ok=1, alloc_ok=1, player_dead;
 static unsigned nwalk_alloc, nremove, nfx;
@@ -94,7 +94,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     for(i=0;i<n && i<12;i++) x[i]=va_arg(a,uint32_t);
     va_end(a);
     if(f==sub_00079D60) {
-        if(nrows<8) {
+        if(nrows<12) {
             rows[nrows].text=x[0];rows[nrows].id=x[1];rows[nrows].flags=x[2];rows[nrows].cb=x[4];
             memcpy(rows[nrows].label,(const char *)((uintptr_t)x[0]+g_xbox_mem_offset),31);rows[nrows].label[31]=0;
         }
@@ -307,13 +307,15 @@ int main(void)
     CHECK(nrows==0);
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_picker_end,fake,0x002C1FA5u,0,0,0,1);
-    CHECK(nrows==6 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
+    CHECK(nrows==9 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
     CHECK(!strcmp(rows[0].label,"Giant Trophy Monster"));
     CHECK(rows[1].id==151u && rows[1].flags==0x20900u && rows[1].cb==0x002C1C90u && !strcmp(rows[1].label,"Giant Skeleton"));
     CHECK(rows[2].id==152u && rows[2].flags==0x20900u && rows[2].cb==0x002C1C90u && !strcmp(rows[2].label,"Crow Walker"));
     CHECK(rows[3].id==153u && !strcmp(rows[3].label,"Giant Robot") && rows[4].id==154u && !strcmp(rows[4].label,"Split Crowe"));
     CHECK(rows[5].id==155u && !strcmp(rows[5].label,"Castle Tank") && rows[5].flags==0x20900u && rows[5].cb==0x002C1C90u);
-    CHECK(nenable==6 && enable_item==ITEM && enable_flag==0);
+    CHECK(rows[6].id==156u && !strcmp(rows[6].label,"Khallos (Chair)") && rows[7].id==157u && !strcmp(rows[7].label,"Mansion Worm"));
+    CHECK(rows[8].id==158u && !strcmp(rows[8].label,"Mothership"));
+    CHECK(nenable==9 && enable_item==ITEM && enable_flag==0);
     /* pick: row 150 -> id 0x15, variant -1; other slots untouched */
     for(k=0;k<10u;k++) { WORD_AT(0x0075FD90u+k*0x1Cu)=0x40u+k;WORD_AT(0x0075FD90u+k*0x1Cu+0x14u)=k;WORD_AT(0x0075FD90u+k*0x1Cu+0x18u)=0; }
     CALL(pc_mapmaker_realbosses_pick,fake_pick,0x00077000u,0x00330000u,0,0,1);
@@ -358,7 +360,9 @@ int main(void)
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,153u,0,0,0)==0x52420042u);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,154u,0,0,0)==0x52420046u);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,155u,0,0,0)==0x52420012u);
-    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,156u,0,0,1)==0);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,156u,0,0,0)==0x52420033u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,158u,0,0,0)==0x52420075u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,159u,0,0,1)==0);
     {   /* the ported bosses' rows: names, pick, row lookups and previews */
         uint32_t s=CALL(pc_mapmaker_realbosses_text,fake,0x00077000u,0x52420012u,0,0,0);
         CHECK(s && !strcmp((const char *)((uintptr_t)s+g_xbox_mem_offset),"Castle Tank"));

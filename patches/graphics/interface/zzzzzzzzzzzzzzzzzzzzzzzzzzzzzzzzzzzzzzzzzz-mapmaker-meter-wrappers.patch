@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,2516 @@
+@@ -1037,6 +1037,2946 @@
      sub_002FA720_gen();
  #endif
  }
@@ -183,7 +183,7 @@
 +static void sub_003006C0_layer4(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_compile")) pc_mapmaker_bosses_compile(sub_003006C0_layer3);
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_compile")) pc_mapmaker_skymusic_compile(sub_003006C0_layer3);
 +    else sub_003006C0_layer3();
 +#else
 +    sub_003006C0_layer3();
@@ -193,20 +193,30 @@
 +static void sub_003006C0_layer5(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_compile")) pc_mapmaker_sets_compile(sub_003006C0_layer4);
++    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_compile")) pc_mapmaker_bosses_compile(sub_003006C0_layer4);
 +    else sub_003006C0_layer4();
 +#else
 +    sub_003006C0_layer4();
 +#endif
 +}
 +
-+void sub_003006C0(void)
++static void sub_003006C0_layer6(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_compile")) pc_mapmaker_weaponset_compile(sub_003006C0_layer5);
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_compile")) pc_mapmaker_sets_compile(sub_003006C0_layer5);
 +    else sub_003006C0_layer5();
 +#else
 +    sub_003006C0_layer5();
++#endif
++}
++
++void sub_003006C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_compile")) pc_mapmaker_weaponset_compile(sub_003006C0_layer6);
++    else sub_003006C0_layer6();
++#else
++    sub_003006C0_layer6();
 +#endif
 +}
 +
@@ -376,7 +386,7 @@
 +static void sub_00301A90_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_load")) pc_mapmaker_bosses_load(sub_00301A90_layer2);
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_load")) pc_mapmaker_skymusic_load(sub_00301A90_layer2);
 +    else sub_00301A90_layer2();
 +#else
 +    sub_00301A90_layer2();
@@ -386,20 +396,30 @@
 +static void sub_00301A90_layer4(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_load")) pc_mapmaker_sets_load(sub_00301A90_layer3);
++    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_load")) pc_mapmaker_bosses_load(sub_00301A90_layer3);
 +    else sub_00301A90_layer3();
 +#else
 +    sub_00301A90_layer3();
 +#endif
 +}
 +
-+void sub_00301A90(void)
++static void sub_00301A90_layer5(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_load")) pc_mapmaker_weaponset_load(sub_00301A90_layer4);
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_load")) pc_mapmaker_sets_load(sub_00301A90_layer4);
 +    else sub_00301A90_layer4();
 +#else
 +    sub_00301A90_layer4();
++#endif
++}
++
++void sub_00301A90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_load")) pc_mapmaker_weaponset_load(sub_00301A90_layer5);
++    else sub_00301A90_layer5();
++#else
++    sub_00301A90_layer5();
 +#endif
 +}
 +
@@ -534,13 +554,23 @@
 +}
 +
 +extern void sub_0008A780_gen(void);
-+void sub_0008A780(void)
++static void sub_0008A780_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_compile")) pc_mapmaker_rooms_compile(sub_0008A780_gen);
 +    else sub_0008A780_gen();
 +#else
 +    sub_0008A780_gen();
++#endif
++}
++
++void sub_0008A780(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_play")) pc_mapmaker_roof_play(sub_0008A780_layer0);
++    else sub_0008A780_layer0();
++#else
++    sub_0008A780_layer0();
 +#endif
 +}
 +
@@ -1327,13 +1357,23 @@
 +}
 +
 +extern void sub_00085710_gen(void);
-+void sub_00085710(void)
++static void sub_00085710_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_sky_room_mask")) pc_mapmaker_sky_room_mask(sub_00085710_gen);
 +    else sub_00085710_gen();
 +#else
 +    sub_00085710_gen();
++#endif
++}
++
++void sub_00085710(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_rooms")) pc_mapmaker_roof_rooms(sub_00085710_layer0);
++    else sub_00085710_layer0();
++#else
++    sub_00085710_layer0();
 +#endif
 +}
 +
@@ -1478,13 +1518,33 @@
 +#endif
 +}
 +
-+void sub_0003D7B0(void)
++static void sub_0003D7B0_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_title")) pc_mapmaker_weaponset_title(sub_0003D7B0_layer2);
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_text")) pc_mapmaker_khallos_text(sub_0003D7B0_layer2);
 +    else sub_0003D7B0_layer2();
 +#else
 +    sub_0003D7B0_layer2();
++#endif
++}
++
++static void sub_0003D7B0_layer4(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_text")) pc_mapmaker_mothership_text(sub_0003D7B0_layer3);
++    else sub_0003D7B0_layer3();
++#else
++    sub_0003D7B0_layer3();
++#endif
++}
++
++void sub_0003D7B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_title")) pc_mapmaker_weaponset_title(sub_0003D7B0_layer4);
++    else sub_0003D7B0_layer4();
++#else
++    sub_0003D7B0_layer4();
 +#endif
 +}
 +
@@ -1529,6 +1589,164 @@
 +    else sub_003192E0_gen();
 +#else
 +    sub_003192E0_gen();
++#endif
++}
++
++extern void sub_0008F6B0_gen(void);
++void sub_0008F6B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_draw")) pc_mapmaker_roof_draw(sub_0008F6B0_gen);
++    else sub_0008F6B0_gen();
++#else
++    sub_0008F6B0_gen();
++#endif
++}
++
++extern void sub_0003C440_gen(void);
++void sub_0003C440(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_tick")) pc_mapmaker_roof_tick(sub_0003C440_gen);
++    else sub_0003C440_gen();
++#else
++    sub_0003C440_gen();
++#endif
++}
++
++extern void sub_00078590_gen(void);
++static void sub_00078590_layer0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_rows")) pc_mapmaker_skymusic_rows(sub_00078590_gen);
++    else sub_00078590_gen();
++#else
++    sub_00078590_gen();
++#endif
++}
++
++static void sub_00078590_layer1(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_health_rows")) pc_mapmaker_bosses_health_rows(sub_00078590_layer0);
++    else sub_00078590_layer0();
++#else
++    sub_00078590_layer0();
++#endif
++}
++
++static void sub_00078590_layer2(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_sai_choice")) pc_mapmaker_sets_sai_choice(sub_00078590_layer1);
++    else sub_00078590_layer1();
++#else
++    sub_00078590_layer1();
++#endif
++}
++
++void sub_00078590(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_sai_choice")) pc_mapmaker_weaponset_sai_choice(sub_00078590_layer2);
++    else sub_00078590_layer2();
++#else
++    sub_00078590_layer2();
++#endif
++}
++
++extern void sub_00062790_gen(void);
++static void sub_00062790_layer0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_mount")) pc_mapmaker_skymusic_mount(sub_00062790_gen);
++    else sub_00062790_gen();
++#else
++    sub_00062790_gen();
++#endif
++}
++
++static void sub_00062790_layer1(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_mount")) pc_mapmaker_tank_mount(sub_00062790_layer0);
++    else sub_00062790_layer0();
++#else
++    sub_00062790_layer0();
++#endif
++}
++
++static void sub_00062790_layer2(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_mount")) pc_mapmaker_khallos_mount(sub_00062790_layer1);
++    else sub_00062790_layer1();
++#else
++    sub_00062790_layer1();
++#endif
++}
++
++void sub_00062790(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_mount")) pc_mapmaker_mothership_mount(sub_00062790_layer2);
++    else sub_00062790_layer2();
++#else
++    sub_00062790_layer2();
++#endif
++}
++
++extern void sub_0023F390_gen(void);
++static void sub_0023F390_layer0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_level")) pc_mapmaker_skymusic_level(sub_0023F390_gen);
++    else sub_0023F390_gen();
++#else
++    sub_0023F390_gen();
++#endif
++}
++
++void sub_0023F390(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_preload")) pc_mapmaker_weaponset_preload(sub_0023F390_layer0);
++    else sub_0023F390_layer0();
++#else
++    sub_0023F390_layer0();
++#endif
++}
++
++extern void sub_00119960_gen(void);
++void sub_00119960(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_weather_load")) pc_mapmaker_skymusic_weather_load(sub_00119960_gen);
++    else sub_00119960_gen();
++#else
++    sub_00119960_gen();
++#endif
++}
++
++extern void sub_0011B310_gen(void);
++void sub_0011B310(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_weather_start")) pc_mapmaker_skymusic_weather_start(sub_0011B310_gen);
++    else sub_0011B310_gen();
++#else
++    sub_0011B310_gen();
++#endif
++}
++
++extern void sub_00045DE0_gen(void);
++void sub_00045DE0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_music")) pc_mapmaker_skymusic_music(sub_00045DE0_gen);
++    else sub_00045DE0_gen();
++#else
++    sub_00045DE0_gen();
 +#endif
 +}
 +
@@ -1630,13 +1848,33 @@
 +#endif
 +}
 +
-+void sub_001C8540(void)
++static void sub_001C8540_layer2(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_anims")) pc_mapmaker_crowe_anims(sub_001C8540_layer1);
 +    else sub_001C8540_layer1();
 +#else
 +    sub_001C8540_layer1();
++#endif
++}
++
++static void sub_001C8540_layer3(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_anims")) pc_mapmaker_khallos_anims(sub_001C8540_layer2);
++    else sub_001C8540_layer2();
++#else
++    sub_001C8540_layer2();
++#endif
++}
++
++void sub_001C8540(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_anims")) pc_mapmaker_worm_anims(sub_001C8540_layer3);
++    else sub_001C8540_layer3();
++#else
++    sub_001C8540_layer3();
 +#endif
 +}
 +
@@ -1671,13 +1909,43 @@
 +#endif
 +}
 +
-+void sub_0015B830(void)
++static void sub_0015B830_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_ai_start")) pc_mapmaker_tank_ai_start(sub_0015B830_layer2);
 +    else sub_0015B830_layer2();
 +#else
 +    sub_0015B830_layer2();
++#endif
++}
++
++static void sub_0015B830_layer4(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_ai_start")) pc_mapmaker_khallos_ai_start(sub_0015B830_layer3);
++    else sub_0015B830_layer3();
++#else
++    sub_0015B830_layer3();
++#endif
++}
++
++static void sub_0015B830_layer5(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_ai_start")) pc_mapmaker_worm_ai_start(sub_0015B830_layer4);
++    else sub_0015B830_layer4();
++#else
++    sub_0015B830_layer4();
++#endif
++}
++
++void sub_0015B830(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_ai_start")) pc_mapmaker_mothership_ai_start(sub_0015B830_layer5);
++    else sub_0015B830_layer5();
++#else
++    sub_0015B830_layer5();
 +#endif
 +}
 +
@@ -1764,13 +2032,23 @@
 +#endif
 +}
 +
-+void sub_0025F720(void)
++static void sub_0025F720_layer2(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_level")) pc_mapmaker_crowe_level(sub_0025F720_layer1);
 +    else sub_0025F720_layer1();
 +#else
 +    sub_0025F720_layer1();
++#endif
++}
++
++void sub_0025F720(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_level")) pc_mapmaker_worm_level(sub_0025F720_layer2);
++    else sub_0025F720_layer2();
++#else
++    sub_0025F720_layer2();
 +#endif
 +}
 +
@@ -1828,13 +2106,23 @@
 +#endif
 +}
 +
-+void sub_002274C0(void)
++static void sub_002274C0_layer2(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_event")) pc_mapmaker_tank_event(sub_002274C0_layer1);
 +    else sub_002274C0_layer1();
 +#else
 +    sub_002274C0_layer1();
++#endif
++}
++
++void sub_002274C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_event")) pc_mapmaker_khallos_event(sub_002274C0_layer2);
++    else sub_002274C0_layer2();
++#else
++    sub_002274C0_layer2();
 +#endif
 +}
 +
@@ -1881,13 +2169,23 @@
 +#endif
 +}
 +
-+void sub_00126560(void)
++static void sub_00126560_layer2(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_fx")) pc_mapmaker_crowe_fx(sub_00126560_layer1);
 +    else sub_00126560_layer1();
 +#else
 +    sub_00126560_layer1();
++#endif
++}
++
++void sub_00126560(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_fx")) pc_mapmaker_worm_fx(sub_00126560_layer2);
++    else sub_00126560_layer2();
++#else
++    sub_00126560_layer2();
 +#endif
 +}
 +
@@ -1990,17 +2288,6 @@
 +#endif
 +}
 +
-+extern void sub_00062790_gen(void);
-+void sub_00062790(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_mount")) pc_mapmaker_tank_mount(sub_00062790_gen);
-+    else sub_00062790_gen();
-+#else
-+    sub_00062790_gen();
-+#endif
-+}
-+
 +extern void sub_00255550_gen(void);
 +void sub_00255550(void)
 +{
@@ -2068,7 +2355,7 @@
 +}
 +
 +extern void sub_0015E7C0_gen(void);
-+void sub_0015E7C0(void)
++static void sub_0015E7C0_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_request")) pc_mapmaker_tank_request(sub_0015E7C0_gen);
@@ -2078,34 +2365,188 @@
 +#endif
 +}
 +
-+extern void sub_00078590_gen(void);
-+static void sub_00078590_layer0(void)
++static void sub_0015E7C0_layer1(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_health_rows")) pc_mapmaker_bosses_health_rows(sub_00078590_gen);
-+    else sub_00078590_gen();
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_request")) pc_mapmaker_khallos_request(sub_0015E7C0_layer0);
++    else sub_0015E7C0_layer0();
 +#else
-+    sub_00078590_gen();
++    sub_0015E7C0_layer0();
 +#endif
 +}
 +
-+static void sub_00078590_layer1(void)
++void sub_0015E7C0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_sai_choice")) pc_mapmaker_sets_sai_choice(sub_00078590_layer0);
-+    else sub_00078590_layer0();
++    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_request")) pc_mapmaker_mothership_request(sub_0015E7C0_layer1);
++    else sub_0015E7C0_layer1();
 +#else
-+    sub_00078590_layer0();
++    sub_0015E7C0_layer1();
 +#endif
 +}
 +
-+void sub_00078590(void)
++extern void sub_002522B0_gen(void);
++void sub_002522B0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_sai_choice")) pc_mapmaker_weaponset_sai_choice(sub_00078590_layer1);
-+    else sub_00078590_layer1();
++    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_gun")) pc_mapmaker_tank_gun(sub_002522B0_gen);
++    else sub_002522B0_gen();
 +#else
-+    sub_00078590_layer1();
++    sub_002522B0_gen();
++#endif
++}
++
++extern void sub_001EEBD0_gen(void);
++void sub_001EEBD0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_update")) pc_mapmaker_khallos_update(sub_001EEBD0_gen);
++    else sub_001EEBD0_gen();
++#else
++    sub_001EEBD0_gen();
++#endif
++}
++
++extern void sub_001EF840_gen(void);
++void sub_001EF840(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_damage")) pc_mapmaker_khallos_damage(sub_001EF840_gen);
++    else sub_001EF840_gen();
++#else
++    sub_001EF840_gen();
++#endif
++}
++
++extern void sub_0010E730_gen(void);
++void sub_0010E730(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_flame")) pc_mapmaker_khallos_flame(sub_0010E730_gen);
++    else sub_0010E730_gen();
++#else
++    sub_0010E730_gen();
++#endif
++}
++
++extern void sub_000DFFA0_gen(void);
++void sub_000DFFA0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_flash")) pc_mapmaker_khallos_flash(sub_000DFFA0_gen);
++    else sub_000DFFA0_gen();
++#else
++    sub_000DFFA0_gen();
++#endif
++}
++
++extern void sub_000EA9C0_gen(void);
++void sub_000EA9C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_shot")) pc_mapmaker_khallos_shot(sub_000EA9C0_gen);
++    else sub_000EA9C0_gen();
++#else
++    sub_000EA9C0_gen();
++#endif
++}
++
++extern void sub_00045820_gen(void);
++void sub_00045820(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_sound")) pc_mapmaker_khallos_sound(sub_00045820_gen);
++    else sub_00045820_gen();
++#else
++    sub_00045820_gen();
++#endif
++}
++
++extern void sub_000468A0_gen(void);
++void sub_000468A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_engine")) pc_mapmaker_khallos_engine(sub_000468A0_gen);
++    else sub_000468A0_gen();
++#else
++    sub_000468A0_gen();
++#endif
++}
++
++extern void sub_000D8E30_gen(void);
++void sub_000D8E30(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_tick")) pc_mapmaker_worm_tick(sub_000D8E30_gen);
++    else sub_000D8E30_gen();
++#else
++    sub_000D8E30_gen();
++#endif
++}
++
++extern void sub_0015BA10_gen(void);
++void sub_0015BA10(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_tag")) pc_mapmaker_worm_tag(sub_0015BA10_gen);
++    else sub_0015BA10_gen();
++#else
++    sub_0015BA10_gen();
++#endif
++}
++
++extern void sub_001D1F30_gen(void);
++void sub_001D1F30(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_hit")) pc_mapmaker_worm_hit(sub_001D1F30_gen);
++    else sub_001D1F30_gen();
++#else
++    sub_001D1F30_gen();
++#endif
++}
++
++extern void sub_001D9370_gen(void);
++void sub_001D9370(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_props")) pc_mapmaker_worm_props(sub_001D9370_gen);
++    else sub_001D9370_gen();
++#else
++    sub_001D9370_gen();
++#endif
++}
++
++extern void sub_001D7200_gen(void);
++void sub_001D7200(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_extra")) pc_mapmaker_worm_extra(sub_001D7200_gen);
++    else sub_001D7200_gen();
++#else
++    sub_001D7200_gen();
++#endif
++}
++
++extern void sub_00234CD0_gen(void);
++void sub_00234CD0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_script")) pc_mapmaker_worm_script(sub_00234CD0_gen);
++    else sub_00234CD0_gen();
++#else
++    sub_00234CD0_gen();
++#endif
++}
++
++extern void sub_00217050_gen(void);
++void sub_00217050(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_update")) pc_mapmaker_mothership_update(sub_00217050_gen);
++    else sub_00217050_gen();
++#else
++    sub_00217050_gen();
 +#endif
 +}
 +
@@ -2413,17 +2854,6 @@
 +    else sub_0033E3B0_gen();
 +#else
 +    sub_0033E3B0_gen();
-+#endif
-+}
-+
-+extern void sub_0023F390_gen(void);
-+void sub_0023F390(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_preload")) pc_mapmaker_weaponset_preload(sub_0023F390_gen);
-+    else sub_0023F390_gen();
-+#else
-+    sub_0023F390_gen();
 +#endif
 +}
 +
