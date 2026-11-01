@@ -45,6 +45,16 @@ void sub_00062260(void) { g_ecx=1; }
 void sub_000622D0(void) { g_ecx=2; }
 void sub_000A6F90(void) { g_ecx=3; }
 void sub_0015DDA0(void) { g_ecx=4; }
+void sub_000A5E40(void) { g_ecx=6; }
+void sub_000631C0(void) { g_ecx=7; }
+/* model requests: rows 3/4/5 (tank/turret/wreck) have path PATH(row) and,
+ * once requested, a request REQ(row) whose +0x10 holds the file when read */
+#define PATH(r) (0x00530000u+(uint32_t)(r)*0x40u)
+#define REQ(r) (0x00534000u+(uint32_t)(r)*0x40u)
+static int req_state[8], req_reads=1, req_after_original;
+static unsigned nrequest;
+#define READY() (req_state[3]=req_state[4]=req_state[5]=2)   /* the models were read */
+static uint32_t requested[8];
 static uint32_t heap_next=HEAP;
 static int heap_fail;
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment) { uint32_t p;(void)alignment;if(heap_fail)return 0;p=heap_next;heap_next+=(bytes+15u)&~15u;return p; }
@@ -80,6 +90,17 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         return TANK;
     }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
+    if(f==sub_000A5E40) {   /* queued; the load pass reads it before any AI starts */
+        int16_t r=(int16_t)HALF_AT(0x008CA000u+x[0]*2u);
+        if(nrequest<8u) requested[nrequest]=x[0];
+        nrequest++;req_after_original=originals;
+        if(r>=0 && r<8) req_state[r]=req_reads?2:1;
+        return 0;
+    }
+    if(f==sub_000631C0) {
+        for(i=0;i<8;i++) if(x[0]==PATH(i) && req_state[i]) { WORD_AT(REQ(i)+0x10u)=req_state[i]==2?0x00538000u:0;return REQ(i); }
+        return 0;
+    }
     return 0;
 }
 #include "pc_mapmaker_budget.inc"
@@ -178,6 +199,7 @@ static void resources(int tank,int turret,int wreck,uint32_t init)
     if(turret) HALF_AT(0x008CA000u+0x297u*2u)=4;
     if(wreck) HALF_AT(0x008CA000u+0x298u*2u)=5;
     HALF_AT(0x008CA000u+0x12u*2u)=6;
+    for(m=0;m<8u;m++) { WORD_AT(RES+m*0x30u+0x10u)=PATH(m);WORD_AT(RES+m*0x30u+0x14u)=0;WORD_AT(RES+m*0x30u+4u)=0;req_state[m]=0; }
     HALF_AT(0x0078B860u+0x281u*2u)=1;HALF_AT(0x0078B860u+0x297u*2u)=1;HALF_AT(0x0078B860u+0x298u*2u)=1;   /* the stock map: stale, never written */
     WORD_AT(RES+1u*0x30u+0x2Cu)=0;
 }
@@ -199,6 +221,7 @@ static uint32_t level_with_tank(int line)
     resources(1,1,1,0x002560C0u);
     pak_mounted=0;WORD_AT(0x006D7880u)=10u;WORD_AT(0x006D7C4Cu)=0;
     call(pc_mapmaker_tank_mount,fake,0x001CDB8Au,0,0,0,1,line);
+    call(pc_mapmaker_tank_request,fake,0x001CDC25u,0,0,0,1,line);
     actor(0,0x12,40.0f,2.0f,30.0f,1.5f);
     call(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1,line);
     if(nspawn!=s+1u) { fprintf(stderr,"%s:%d: tank not spawned\n",__FILE__,line);failures++; }
@@ -289,25 +312,75 @@ int main(void)
 
     /* ---- ai_start: the placeholder becomes the tank ------------------------- */
     actor(0,0x12,40.0f,2.0f,30.0f,1.5f);
+    READY();
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);   /* pak missing */
     CHECK(nspawn==0 && !tnk_lv.obj);
     pak_mounted=1;
     resources(0,1,1,0x002560C0u);
+    READY();
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(nspawn==0);
     resources(1,1,1,0x00251450u);                                     /* another init */
+    READY();
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(nspawn==0);
     resources(1,0,1,0x002560C0u);
+    READY();
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(nspawn==0);
     resources(1,1,0,0x002560C0u);
+    READY();
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(nspawn==0);
     resources(1,1,1,0x002560C0u);
+    READY();
     actor(1,0x13,40.0f,2.0f,30.0f,1.5f);                               /* another character */
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(1),0,0,1);
     CHECK(nspawn==0);
+    /* ---- request: the models are queued at story level init ---------------------- */
+    req_state[3]=req_state[4]=req_state[5]=0;
+    CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);   /* never requested */
+    CHECK(nspawn==0);
+    WORD_AT(RES+3u*0x30u+4u)=0x00539000u;WORD_AT(RES+4u*0x30u+4u)=1u;WORD_AT(RES+5u*0x30u+4u)=1u;   /* loaded before */
+    CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==1 && tnk_lv.obj==TANK);
+    resources(1,1,1,0x002560C0u);memset(&tnk_lv,0,sizeof tnk_lv);nspawn=0;
+    container(0x11,without,2,NULL,0);
+    CALL(pc_mapmaker_tank_request,fake,0x001CDC25u,0,0,0,1);         /* no tank in the set */
+    CHECK(nrequest==0);
+    container(0x11,with,3,NULL,0);
+    pak_mounted=0;
+    CALL(pc_mapmaker_tank_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==0);
+    pak_mounted=1;
+    resources(1,0,1,0x002560C0u);
+    CALL(pc_mapmaker_tank_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==0);
+    resources(1,1,1,0x002560C0u);
+    WORD_AT(0x0079094Cu)=4u;                                           /* the castle requests its own */
+    CALL(pc_mapmaker_tank_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==0);
+    play_scene();
+    set_env("TSFP_MAPMAKER_TANK","0");
+    CALL(pc_mapmaker_tank_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==0);
+    set_env("TSFP_MAPMAKER_TANK",NULL);
+    req_reads=0;                                                       /* requested, file not read */
+    n=originals;
+    CALL(pc_mapmaker_tank_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==3 && requested[0]==0x281u && requested[1]==0x297u && requested[2]==0x298u && req_after_original==(int)n+1);
+    CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==0);
+    req_reads=1;resources(1,1,1,0x002560C0u);
+    CALL(pc_mapmaker_tank_request,fake,0x001CDC25u,0,0,0,1);
+    req_state[5]=1;                                                    /* the wreck alone not read */
+    CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==0);
+    req_state[5]=2;
+    WORD_AT(RES+4u*0x30u+0x14u)=PATH(7);                               /* a second model path, unrequested */
+    CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(nspawn==0);
+    req_state[7]=2;
     spawn_ok=0;
     FLOAT_AT(0x0078B580u)=-9.0f;FLOAT_AT(0x0078B588u)=-3.2f;
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
