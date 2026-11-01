@@ -487,6 +487,8 @@ after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 `rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8. Tank adds WRAP
 `sub_0015E7C0` -> `pc_mapmaker_tank_request` (models requested at level init).
+After mapmaker.22: tank courtyard test/target search bounded (freeze); walker
+intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
 anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 (30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear
