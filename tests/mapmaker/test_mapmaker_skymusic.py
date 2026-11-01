@@ -46,24 +46,36 @@ MUTATIONS = {
     'load-any-scene': ('    if(!smx_on() || smx_scene()!=102u) return;\n    ed=', '    if(!smx_on()) return;\n    ed='),
     'load-unchecked-row': ('    return k<=count?k:0u;', '    return k;'),
     # mounts
-    'mount-no-reset': ('    mapmaker_sky.extra_ready=0;smx.sand_ready=0;smx.sand_on=0;   /* a new level */\n', ''),
+    'mount-no-reset': ('    smx.sky_row=0;smx.sand_ready=0;smx.sand_on=0;smx.level_logs=0;\n', ''),
+    'mount-at-level-start': ('    if(pending==100u && smx_on()) smx_log(', '    if(smx_play_info()) mapmaker_sky.extra_ready=smx_mount(mapmaker_sky_extras[1].pak);\n    if(pending==100u && smx_on()) smx_log('),
+    'mount-no-prepare-hook': ('mapmaker_sky.extra_ready=0;mapmaker_sky.extra_prepare=smx_prepare_sky;', 'mapmaker_sky.extra_ready=0;mapmaker_sky.extra_prepare=0;'),
     'mount-skip-ignored': ('    if(WORD_AT(SMX_MOUNT_SKIP)) { original();return; }   /* the original does nothing */\n', ''),
     'mount-whole-file': ('guest_call(sub_000622D0,3,path,0u,1u)', 'guest_call(sub_000622D0,3,path,1u,1u)'),
-    'mount-no-budget': ('    if((mounted=WORD_AT(SMX_MOUNTS))+SMX_MOUNT_KEEP>SMX_MOUNT_MAX) {', '    if((mounted=WORD_AT(SMX_MOUNTS))>SMX_MOUNT_MAX) {'),
-    'mount-twice': ('    if((int32_t)guest_call(sub_00062260,1,path)!=-1) return 1;\n', ''),
-    'mount-failure-ready': ('    if((int32_t)guest_call(sub_000622D0,3,path,0u,1u)<0) { smx_log("an extra sky or weather pak did not mount",mounted,0);return 0; }',
-                            '    guest_call(sub_000622D0,3,path,0u,1u);'),
+    'mount-no-budget': ('    if((count=WORD_AT(SMX_MOUNTS))+SMX_MOUNT_KEEP>SMX_MOUNT_MAX) {', '    if((count=WORD_AT(SMX_MOUNTS))>SMX_MOUNT_MAX) {'),
+    'mount-twice': ('    if((slot=(int32_t)guest_call(sub_00062260,1,path))!=-1) { smx_logs("pak already mounted",pak,(uint32_t)slot);return 1; }\n', ''),
+    'mount-failure-ready': ('    if((slot=(int32_t)guest_call(sub_000622D0,3,path,0u,1u))<0) { smx_logs("pak did not mount",pak,count);return 0; }',
+                            '    slot=(int32_t)guest_call(sub_000622D0,3,path,0u,1u);'),
+    'prepare-stale-row': ('    if(smx.sky_row!=k) {', '    if(!smx.sky_row) {'),
+    'prepare-any-scene': ('    if(!k || smx_scene()!=100u || !smx_on()) return 0;', '    if(!k || !smx_on()) return 0;'),
+    'prepare-ignores-failure': ('    }\n    return mapmaker_sky.extra_ready?k:0u;\n}', '    }\n    return k;\n}'),
     # map start
-    'level-without-pak': ('    if(!info || !mapmaker_sky.extra_ready ||', '    if(!info ||'),
+    'level-without-pak': ('    if(!info || !(k=smx_prepare_sky(info))) {', '    if(!info || !(k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),MAPMAKER_SKY_EXTRA_MASK,MAPMAKER_SKY_EXTRA_SHIFT,MAPMAKER_SKY_EXTRA_COUNT))) {'),
     'level-no-restore': ('    original();\n    smx_set16(info+SMX_INFO_SKY,(uint32_t)old);', '    original();'),
-    'level-no-row-check': ('    if(!smx_model_ok(model)) {\n        smx_log("extra sky model', '    if(0) {\n        smx_log("extra sky model'),
-    'sky-index-without-pak': ('return k<=MAPMAKER_SKY_EXTRA_COUNT && mapmaker_sky.extra_ready?k:0u;', 'return k<=MAPMAKER_SKY_EXTRA_COUNT?k:0u;'),
+    'level-no-row-check': ('    if(!smx_model_ok(model)) {\n        smx_log("map start: extra sky model', '    if(0) {\n        smx_log("map start: extra sky model'),
+    'sky-index-without-prepare': ('    if(mapmaker_sky.extra_prepare) return mapmaker_sky.extra_prepare(info);\n', ''),
+    # probe
+    'probe-every-view': ('       smx.level_logs>=2u) return;', '       0) return;'),
+    'probe-before-original': ('    uint32_t view=MAPMAKER_PTR_OK(g_esp,8u)?WORD_AT(g_esp+4u):0u,info,rec,model,row,e=0,req=0,data=0,prop;\n    original();\n',
+                              '    uint32_t view=MAPMAKER_PTR_OK(g_esp,8u)?WORD_AT(g_esp+4u):0u,info,rec,model,row,e=0,req=0,data=0,prop;\n    original();original();\n'),
     # weather
-    'sand-without-pak': ('    if(!(info=smx_play_info()) || !smx.sand_ready ||', '    if(!(info=smx_play_info()) ||'),
+    'sand-without-pak': ('    if(!smx.sand_ready && !(smx.sand_ready=smx_mount(smx_weather[k-1u].pak))) { smx_log("sandstorm pak not mounted; no sandstorm",0,0);return; }\n', ''),
     'sand-no-models': ('        if(model!=0xFFFFFFFFu) guest_call(sub_000A5E40,1,model);\n', ''),
     'sand-before-original': ('    uint32_t info,k,model;\n    original();\n', '    uint32_t info,k,model;\n'),
-    'sand-list-without-buffers': ('    if(!WORD_AT(SMX_WX_BUF1) || !WORD_AT(SMX_WX_BUF2)) { smx_log("sandstorm buffers missing; not drawn",0,0);return; }\n', ''),
-    'sand-list-any-map': ('    if(smx.sand_on!=1 || smx_scene()!=100u || !WORD_AT(SMX_SANDSTORM)) return;', '    if(smx_scene()!=100u) return;'),
+    'sand-list-without-buffers': ('    if(!WORD_AT(SMX_WX_BUF1) || !WORD_AT(SMX_WX_BUF2)) { smx_log(', '    if(0) { smx_log('),
+    'sand-list-any-map': ('    if(smx.sand_on!=1 || smx_scene()!=100u || !WORD_AT(SMX_SANDSTORM)) return 0;', '    if(smx_scene()!=100u) return 0;'),
+    'sand-start-list-kept': ('    WORD_AT(SMX_WX_LIST)=smx_weather[0].list;\n', ''),
+    'sand-level-list-reset': ('        WORD_AT(g_esp+8u)=smx_weather[0].list;\n', ''),
+    'sand-level-count-zero': ('        WORD_AT(g_esp+4u)=1u;\n', ''),
     # music
     'music-any-caller': ('    if(MAPMAKER_PTR_OK(g_esp,4u) && WORD_AT(g_esp)==SMX_RET_MUSIC_PLAY && g_eax==0xFFFFFFFFu &&',
                          '    if(MAPMAKER_PTR_OK(g_esp,4u) && g_eax==0xFFFFFFFFu &&'),
@@ -237,6 +249,16 @@ def test_decoded_sites():
     assert calls(0x0011C9F0) == {0x001CDBB7}
     assert calls(0x001CDB80) == {0x0003D590} and calls(0x001CDC50) == {0x0003D5A3}
     assert calls(0x00063390) >= {0x0003D5AD}
+    # The level setup after the weather start resets the weather list (the
+    # second sandstorm bug): sub_001CDE30 then sub_0006EC10 -> sub_0006D7A0 ->
+    # sub_00119AB0 (one caller); the views (sky props) are built in sub_001CDE30.
+    assert calls(0x001CDE30) == {0x0003D645} and calls(0x0006EC10) == {0x0003D64A}
+    assert calls(0x0006D7A0) == {0x0006ED4D, 0x0006EDD2} and calls(0x00119AB0) == {0x0006E87A}
+    assert calls(0x0011B430) == {0x001CE046, 0x001CE0BF} and calls(0x0011D2C0) == {0x000CC961}
+    assert calls(0x000CCA10) >= {0x001CDF9A}
+    at0 = {i.address: i for i in insns}
+    # sub_00062790 mounts for the pending scene byte while [0x007DE398] has 0x800000.
+    assert at0[0x000627A0].mnemonic == 'test' and at0[0x000627B4].text == 'edi, byte ptr [0x7de394]'
     # Integer accesses with displacement 0x210/0x220/0x224 in the editor code: the
     # defaults, the rebuild, the loader, the menu close, and an unrelated object.
     fields = {i.address for i in insns if 0x002F8000 <= i.address < 0x00340000 and not i.mnemonic.startswith('movss')
@@ -327,7 +349,7 @@ def test_wrappers_documented():
     doc = DOC.read_text(encoding='utf-8')
     text = SMX.read_text(encoding='utf-8')
     for target, name in (('00078590', 'rows'), ('003006C0', 'compile'), ('00301A90', 'load'), ('00062790', 'mount'),
-                         ('0023F390', 'level'), ('00119960', 'weather_load'), ('0011B310', 'weather_start'),
+                         ('0023F390', 'level'), ('00119960', 'weather_load'), ('0011B310', 'weather_start'), ('00119AB0', 'weather_list'), ('0011D2C0', 'sky_built'),
                          ('00045DE0', 'music')):
         assert f'WRAP sub_{target} -> pc_mapmaker_skymusic_{name}' in doc, name
         assert f'void pc_mapmaker_skymusic_{name}(void (*original)(void))' in text, name

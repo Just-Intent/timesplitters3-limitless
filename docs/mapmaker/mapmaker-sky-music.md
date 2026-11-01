@@ -7,7 +7,7 @@ but not available in mapmaker mode."
 Static analysis of the US XBE (title 45410066) and the game pak indexes (names,
 CRCs and sizes only; no game data is copied). CONFIRMED = read at the address,
 in the lifter's decoder or in a pak index; INFERRED = deduced. **Nothing here
-has been built or played.**
+has been built or played**, except the v0.4.0-mapmaker.25 playtest under Play.
 
 Files: `src/interface/pc_mapmaker_skymusic.inc` (new, area `sky`), the extra-sky
 table and the extra-sky cloud rule in `src/interface/pc_mapmaker_sky.inc`;
@@ -191,30 +191,78 @@ dword). System Link peers without this build see the same fallbacks.
 
 ### Play (scene 100)
 
-- **mount** (`sub_00062790`, after the original): for an extra sky, mount its
-  pak (table below); for the sandstorm, `pak/challenge/l_64_ch.pak`. Index
-  only, like `chr.pak` (`sub_000622D0(path, 0, 1)`: the file stays open and
-  entries are read on demand), at most two, skipped when already mounted
-  (`sub_00062260`), and refused when fewer than 8 of the 64 slots
-  (`paktable.json`) would stay free. The stock bulk unmount (`sub_00062720`)
-  removes them with the level. The path strings live in one heap block
-  (32 bytes per pak), kept for the session.
-- **cloud setup** (`pc_mapmaker_sky_clouds`, existing hook): with a mounted
-  extra sky the level's sky is that record while `sub_0011C9F0` runs, so its
-  own cloud layer (record 5) is used; story records are never patched. The
-  Clouds checkbox only patches MapMaker records 58..67, as before.
+**Playtest v0.4.0-mapmaker.25 (mapmaker-recon 54129718):** the new music
+played; the extra skies and the sandstorm did not show. Static re-check:
+
+- **Mounts in the wrong place (sky and sandstorm, the likely cause).** The
+  first build mounted both paks in the `sub_00062790` hook, the only hook that
+  reads the map before `sub_001CDC50`, and only when `[0x0079094C]` was 100.
+  But `sub_00062790` mounts for a *pending* scene: it takes the scene byte
+  `[0x007DE394]` instead of `[0x0079094C]` while `[0x007DE398]` has 0x800000
+  (`0x000627A0..0x000627B4`; `sub_00067280`, called just before at
+  `0x0003D58B`, sets that flag and copies the next game state). A level
+  started that way, or with the container not yet holding the new map,
+  mounted nothing and every later step skipped silently. Music reads the map
+  much later (`0x00045FB7`) and worked. **Fix:** `sub_00062790` now only starts
+  a new level (resets the per-level state, logs); the paks are mounted by the
+  first step that needs them, where the scene is 100 and the map is read: the
+  cloud setup (`sub_0011C9F0`, through `mapmaker_sky.extra_prepare`), the map
+  start (`sub_0023F390`) for the sky, the weather load (`sub_00119960`) for
+  the sandstorm. All three run before the load pass (`0x0003D5AD`).
+- **Sandstorm list reset (sandstorm, CONFIRMED).** After the weather start
+  (`sub_001CDE30` -> `sub_0011B430` -> `sub_0011B310`, `0x0003D645`) the level
+  setup `sub_0006EC10` (`0x0003D64A`) -> `sub_0006D7A0` -> `sub_00119AB0(count,
+  list)` (its only caller, `0x0006E87A`) passes scene 100's empty list
+  (`0x0078CC00`, zeroed by `sub_0023F390`), which selects the type-0 default
+  `0x004E63F8`: the type-5 entry set at the weather start was undone before
+  the first frame. **Fix:** `pc_mapmaker_skymusic_weather_list` gives that
+  call count 1 and scene 2's list when the sandstorm is armed and its buffers
+  exist. The restart path (`sub_0006ED70` at `0x0003D4E6`) uses the same call.
+- Checked and unchanged: the sky prop is built per view by `sub_0011D2C0`
+  (`sub_000CC920` <- `sub_000CCA10`, `0x001CDF9A` in `sub_001CDE30`, after the
+  load pass) from the level entry's sky (`sub_0006A6C0`: `[0x00518788]` ->
+  record -> model `+4`), which `sub_0023F390` sets (`0x0023F48F`) and nothing
+  writes later; `sub_000A5E40` requests in scene 100 regardless of the
+  streamed flag (`0x000A5E80`) through the relocated map `0x008CA000`
+  (`rooms.json`, `0x000A5E5A`); scene 100's resource table comes from the full
+  prop table (`sub_00242780` scene-100 branch). The tail jump
+  `sub_0011B430` -> `sub_0011B310` has no arguments.
+- **sky_built** (`sub_0011D2C0`, probe, after the original, at most two lines
+  per level): logs the level's sky record, its model, the view's prop and the
+  prop's model (`+0x94`), the model's resource row, its loaded flag (`+4`) and
+  its request's data (`sub_000631C0(row path) +0x10`), so the next playtest
+  shows whether the model file was read.
+
+Steps now:
+
+- **mount** (`sub_00062790`, after the original): a new level; nothing is
+  mounted here.
+- Mounting (first of the steps below that needs it): for an extra sky its pak
+  (table below), for the sandstorm `pak/challenge/l_64_ch.pak`. Index only,
+  like `chr.pak` (`sub_000622D0(path, 0, 1)`: the file stays open and entries
+  are read on demand), at most two, skipped when already mounted
+  (`sub_00062260`), tried once per level and row, refused when fewer than 8 of
+  the 64 slots (`paktable.json`) would stay free. The stock bulk unmount
+  (`sub_00062720`) removes them with the level. The path strings live in one
+  heap block (32 bytes per pak), kept for the session.
+- **cloud setup** (`pc_mapmaker_sky_clouds`, existing hook): with an extra
+  sky (its pak mounted now) the level's sky is that record while
+  `sub_0011C9F0` runs, so its own cloud layer (record 5) is used; story
+  records are never patched. The Clouds checkbox only patches MapMaker
+  records 58..67, as before.
 - **level** (`sub_0023F390`): while the original runs, info `+0x10` holds the
   extra record, so the stock code sets the level sky and requests its model
   (`0x0023F4BA`) before the load pass; the word is put back after. Not done
-  (fallback sky stays) when the pak did not mount or scene 100's resource
-  map (`0x008CA000`, moved by the rooms area) has no row for the model.
-- **weather_load** (`sub_00119960`, after): sandstorm map with its pak:
+  (fallback sky stays, logged) when the pak did not mount or the resource map
+  has no row for the model.
+- **weather_load** (`sub_00119960`, after): sandstorm map: mount its pak,
   `[0x0073D9AC]` = 1 and the four models requested (`sub_000A5E40`), as
   `0x00119A47..0x00119A65`; refused if a model has no resource row.
-- **weather_start** (`sub_0011B310`, after): when we armed the sandstorm and
-  its buffers exist (`[0x007AC824]`, `[0x007AC874]`), the weather list is
-  scene 2's `0x00507898` (one entry, type 5): `[0x007AC804]`, count
-  `[0x007AC800]` = 1, index `[0x007AC808]` = 0.
+- **weather_start** (`sub_0011B310`, after) and **weather_list**
+  (`sub_00119AB0`, before): when we armed the sandstorm and its buffers exist
+  (`[0x007AC824]`, `[0x007AC874]`), the weather list is scene 2's
+  `0x00507898` (one entry, type 5): `[0x007AC804]`, count `[0x007AC800]` = 1,
+  index `[0x007AC808]` = 0.
 - **music** (`sub_00045DE0`, return `0x00045FBC`, eax = -1): eax becomes the
   extra track's id.
 
@@ -252,32 +300,53 @@ is self-contained); a cutscene pak has only a few own entries.
 WRAP sub_00078590 -> pc_mapmaker_skymusic_rows           (chained: bosses, sets, weaponset; return-address test, order free)
 WRAP sub_003006C0 -> pc_mapmaker_skymusic_compile        (chained: container, aitemplates, sky compile, roof; acts after the original, any order)
 WRAP sub_00301A90 -> pc_mapmaker_skymusic_load           (chained: editor, aitemplates, roof; acts after the original, any order)
-WRAP sub_00062790 -> pc_mapmaker_skymusic_mount          (chained: tank, mothership; acts after the original, any order)
+WRAP sub_00062790 -> pc_mapmaker_skymusic_mount          (chained: tank, mothership, khallos; acts after the original, any order)
 WRAP sub_0023F390 -> pc_mapmaker_skymusic_level          (chained: weaponset preload; order free)
-WRAP sub_00119960 -> pc_mapmaker_skymusic_weather_load   (new)
-WRAP sub_0011B310 -> pc_mapmaker_skymusic_weather_start  (new; sub_0011B430 reaches it by a tail jump, sub_001CDD60 by a call)
-WRAP sub_00045DE0 -> pc_mapmaker_skymusic_music          (new; register argument eax, must see the guest g_eax at entry)
+WRAP sub_00119960 -> pc_mapmaker_skymusic_weather_load   (new in .25)
+WRAP sub_0011B310 -> pc_mapmaker_skymusic_weather_start  (new in .25; sub_0011B430 reaches it by a tail jump, sub_001CDD60 by a call)
+WRAP sub_00045DE0 -> pc_mapmaker_skymusic_music          (new in .25; register argument eax, must see the guest g_eax at entry)
+WRAP sub_00119AB0 -> pc_mapmaker_skymusic_weather_list   (NEW after .25; cdecl count, list; one caller 0x0006E87A; edits its two stack arguments before the original)
+WRAP sub_0011D2C0 -> pc_mapmaker_skymusic_sky_built      (NEW after .25; cdecl view; one caller 0x000CC961; probe after the original)
 ```
 
 All call their original exactly once (no `MAPMAKER_GUEST_RET`). Guest
 functions called: `sub_00071800` (list row; the tilesets hook on it acts only
 on its own return address), `sub_00062260` (is a pak mounted), `sub_000622D0`
-(mount), `sub_000A5E40` (request a model); all have link stubs in
+(mount), `sub_000A5E40` (request a model), `sub_000631C0` (find a model's
+request; probe only); all have link stubs in
 `tests/mapmaker/mapmaker_area_stubs.h`. Host: `xbox_HeapAlloc` (labels,
 paths). Include `pc_mapmaker_skymusic.inc` after `pc_mapmaker_sky.inc` (it uses
-`mapmaker_sky_extras`, `mapmaker_sky_info`, the `mapmaker_sky` state); a
-scratch build of `tests/input/menu_mouse.c` with it included after
-`pc_mapmaker_roof.inc` compiled without warnings from these files. Also for
-the integrator: prototypes in `pc_display_menu.h`, pass-through stubs in the
-non-display branch of `pc_menu_mouse_guest.inc`, the generated wrapper patch,
-the `docs/agent-context` guide entry, the CI registration of
-`tests/mapmaker/test_mapmaker_skymusic.py`, and a `docs/project/STATUS.md`
-note. None of those files was edited here.
+`mapmaker_sky_extras`, `mapmaker_sky_info`, the `mapmaker_sky` state, and sets
+`mapmaker_sky.extra_prepare`). For the two new wrappers the integrator also
+adds prototypes in `pc_display_menu.h`, pass-through stubs in the non-display
+branch of `pc_menu_mouse_guest.inc` and the generated wrapper patch; none of
+those files, nor `docs/agent-context`, was edited here.
 
-Log lines (stderr, at most 24): `[mapmaker] skymusic: extra music, sky and
-weather rows offered`, `mounted an extra sky or weather pak`, `sandstorm on`,
-and the refusals (`pak mount table too full ...`, `... did not mount`,
-`extra sky model has no resource row ...`, `sandstorm buffers missing ...`).
+Log lines (stderr, `[mapmaker] skymusic: `, at most 96 a session), in level
+order:
+
+- `new MapMaker level (scene now, mounted paks) (S, N)` at the pak mounts
+  when the level being loaded is scene 100 (S is `[0x0079094C]` at that time);
+- `map has extra sky (row, record) (K, R)`, then `mounted pak (slot): pak/... (N)`,
+  `pak already mounted: ...`, `pak mount table too full; not mounted: ...` or
+  `pak did not mount: ...`;
+- `sandstorm on, models requested (first, count) (1319, 4)` or
+  `sandstorm pak not mounted; no sandstorm` / `sandstorm model has no resource row ...`;
+- `map start: level sky record, model requested (R, M)` or
+  `map start: extra sky pak not mounted; MapMaker sky kept` /
+  `map start: extra sky model has no resource row; MapMaker sky kept`;
+- `music: extra track (row, id)`;
+- `sky built: record R model 0x.. prop 0x.. prop model 0x.. row N loaded L request 0x.. data 0x..`
+  (one line per view, two at most);
+- `weather start: sandstorm list set ...`, `level setup: sandstorm list kept (count, list) (1, 5273752)`,
+  or `sandstorm buffers missing; not drawn (a, b)`.
+
+Reading the next log: no `map has extra sky` line = the map's row bits are
+not seen in play; `mounted` but no `map start` line = the map start did not
+run the hook; `map start` with record R but `sky built: record` other than R
+= something rewrote the level sky; `sky built` with `data 0x00000000` and
+`loaded 0` = the model file was not read from the pak (pak path or contents);
+a correct prop model with no visible sky = drawing/textures.
 
 ## What the user tests
 
@@ -287,10 +356,11 @@ and the refusals (`pak mount table too full ...`, `... did not mount`,
    Horror; the weather list with Sandstorm (log: `rows offered`).
 3. Pick Story: Castle, Cutscene: Prologue, Sandstorm; save; load the map
    again: the three rows still show them. Play: the castle sky (look up in an
-   Open air tile or at the map edge), the cutscene track, sand blowing (log:
-   two `mounted` lines or one, `sandstorm on`). Try Story: Time to Split with
-   Sandstorm (one pak), each sky once, split screen 2-4 players.
-4. Quit back to the editor: still the extra choices; play again.
+   Open air tile or at the map edge), the cutscene track, sand blowing. Send
+   every `skymusic:` line. Try Story: Time to Split with Sandstorm (one pak),
+   two or three other skies, split screen 2 players.
+4. Quit back to the editor: still the extra choices; play again (second level
+   load: `pak already mounted`).
 5. A session without the switch (or an older build): the same map loads and
    plays with the MapMaker twin sky, tileset music and no weather; no crash.
 6. Story smoke test afterwards: scene 2 (sandstorm, intro sky) and one level
@@ -298,11 +368,16 @@ and the refusals (`pak mount table too full ...`, `... did not mount`,
 
 ## Not verified / risks
 
-- Nothing is built or played. Unknowns: that a sky model draws correctly from
-  an index-only level pak in scene 100 (textures with it, INFERRED); the
-  sandstorm's look over MapMaker tiles (it follows the camera, INFERRED) and
-  its ambient sound (none is started: the type-5 entry's sound fields were not
-  decoded); whether the jingles loop.
+- Played once (.25): music works; the sky and sandstorm fixes above are not
+  played yet. Unknowns: that a sky model draws correctly from an index-only
+  level pak in scene 100 (textures with it, INFERRED; the probe line will
+  tell whether the file was read); the sandstorm's look over MapMaker tiles
+  (it follows the camera, INFERRED) and its ambient sound (none is started:
+  the type-5 entry's sound fields were not decoded); whether the jingles loop.
+- Mounting moved from the pak-mount step into the load (`sub_001CDB80` /
+  `sub_001CDC50`); the index goes on the level heap like the stock mounts
+  (INFERRED harmless: the tank's pak is mounted at the end of the mount step
+  the same way).
 - Mount budget: each extra pak takes one of the 64 slots (index memory only,
-  some KB); the tank and mothership areas mount theirs in the same hook.
+  some KB).
 - English labels only, no help text.

@@ -40,9 +40,9 @@ MUTATIONS = {
     'compile-global-container': ('    clouds=mapmaker_sky_clouds_now(container);', '    clouds=mapmaker_sky_clouds_now(WORD_AT(0x00784014u));'),
     'extra-sky-ignored': ('    if(info && mapmaker_sky_extra_of(info)) {', '    if(0) {'),
     'extra-level-kept': ('        WORD_AT(MAPMAKER_SKY_LEVEL+0x10u)=old;\n        return;', '        return;'),
-    'extra-without-pak': ('return k<=MAPMAKER_SKY_EXTRA_COUNT && mapmaker_sky.extra_ready?k:0u;', 'return k<=MAPMAKER_SKY_EXTRA_COUNT?k:0u;'),
-    'extra-any-row': ('return k<=MAPMAKER_SKY_EXTRA_COUNT && mapmaker_sky.extra_ready?k:0u;', 'return k && mapmaker_sky.extra_ready?(k-1u)%MAPMAKER_SKY_EXTRA_COUNT+1u:0u;'),
-    'info-first-chunk-only':('if(tag==0x00C7766Au || size>MAPMAKER_SKY_CONTAINER_MAX) return 0;',
+    'extra-without-pak': ('    return mapmaker_sky.extra_ready?k:0u;\n}', '    return k;\n}'),
+    'extra-any-row': ('    if(!k || k>MAPMAKER_SKY_EXTRA_COUNT) return 0;', '    if(!k) return 0;'),
+    'info-first-chunk-only': ('if(tag==0x00C7766Au || size>MAPMAKER_SKY_CONTAINER_MAX) return 0;',
                               'if(tag!=0x00C77668u) return 0;'),
 }
 
