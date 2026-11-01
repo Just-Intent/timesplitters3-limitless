@@ -55,6 +55,9 @@ void sub_0015DDA0(void) { g_ecx=14; }
 void sub_0029CCB0(void) { g_ecx=15; }
 void sub_00019D70(void) { g_ecx=16; }
 void sub_002A7F30(void) { g_ecx=17; }
+void sub_0005F460(void) { g_ecx=18; }
+static unsigned nanim;
+static uint32_t anim_args[4], anim_ok=1;
 static unsigned nprincess;
 static uint32_t princess_ent;
 void sub_0029CEF0(void) { nprincess++;princess_ent=WORD_AT(g_esp+4u);g_esp+=4u; }   /* pops like the lifted callee */
@@ -124,6 +127,11 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     if(f==sub_0029CCB0) { nfx++;fx_scene=WORD_AT(0x0079094Cu);return 0; }
     if(f==sub_00019D70) { nrender++;return 0; }
     if(f==sub_002A7F30) { nfire++;fire_args[0]=x[0];fire_args[1]=x[1];return 0; }
+    if(f==sub_0005F460) {   /* play: the controller (entity +4) gets the animation */
+        nanim++;memcpy(anim_args,x,sizeof anim_args);
+        if(anim_ok) WORD_AT(WORD_AT(x[0]+4u)+0xD4u)=x[1];
+        return anim_ok;
+    }
     return 0;
 }
 #include "pc_mapmaker_budget.inc"
@@ -877,6 +885,45 @@ int main(void)
         CHECK(WORD_AT(A(8)+0x9D0u)==2u && WORD_AT(A(8)+0x20u)==1u && rbs_walk.woken==1u);   /* roar, then fight */
         CHECK(nfx==f0+6u);                                                        /* beams still drawn */
         nfx=f0;
+        /* the roar: state 2 waits for an animation to finish, and a new controller has none */
+#define WCTL 0x00730000u
+        WORD_AT(ENT(8)+4u)=WCTL;WORD_AT(WCTL+0xD4u)=0x123u;                    /* animated: the stock path */
+        WORD_AT(A(8)+0x20u)=2u;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==0);
+        WORD_AT(WCTL+0xD4u)=0;WORD_AT(WCTL+0x12Cu)=0x124u;                       /* blending into one */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==0);
+        WORD_AT(WCTL+0x12Cu)=0;WORD_AT(A(8)+0x20u)=4u;                           /* already fighting */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==0);
+        WORD_AT(A(8)+0x20u)=2u;BYTE_AT(WKST+0x98u)=0;                            /* first frame not done */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==0);
+        BYTE_AT(WKST+0x98u)=1u;WORD_AT(0x0079094Cu)=81u;                         /* mission 13 */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==0);
+        WORD_AT(0x0079094Cu)=100u;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE90u,0,0,0,1);               /* other caller */
+        CHECK(nanim==0);
+        WORD_AT(A(8)+0xBF0u)=REC(9);                                             /* slot reused */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==0);
+        WORD_AT(A(8)+0xBF0u)=REC(8);
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==1 && anim_args[0]==ENT(8) && anim_args[1]==0x6F7u && anim_args[2]==0 && anim_args[3]==0x3F800000u);
+        CHECK(WORD_AT(WCTL+0xD4u)==0x6F7u && WORD_AT(A(8)+0x9D0u)==0xFFFFFFFFu && rbs_walk.roars==1u);
+        WORD_AT(WCTL+0xD4u)=0;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==1);                                                         /* once a level */
+        rbs_walk.roars=0;WORD_AT(A(8)+0x20u)=1u;                                 /* state 1: wake and roar together */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==2 && WORD_AT(A(8)+0x9D0u)==2u && anim_args[1]==0x6F7u);
+        rbs_walk.roars=0;WORD_AT(WCTL+0xD4u)=0;WORD_AT(A(8)+0x20u)=2u;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;anim_ok=0;
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);                /* refused: logged, not retried */
+        CALL(pc_mapmaker_realbosses_fx,fake,0x001CEE8Cu,0,0,0,1);
+        CHECK(nanim==3 && rbs_walk.roars==1u);
+        anim_ok=1;WORD_AT(ENT(8)+4u)=0;nfx=f0;
         WORD_AT(A(8)+0x20u)=0;WORD_AT(A(8)+0x9D0u)=0xFFFFFFFFu;
         /* HUD and meter as the other real bosses */
         WORD_AT(PLAYER+0xFF4u)=ENT(8);
