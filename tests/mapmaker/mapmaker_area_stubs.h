@@ -96,4 +96,6 @@ void sub_002BF830(void) {}
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines these */
 void sub_00075B70(void) {} void sub_00075E70(void) {} void sub_00079710(void) {}
 #endif
+/* tilesets (pc_mapmaker_tilesets.inc: pak mount) */
+void sub_000622D0(void) {}
 #endif
