@@ -42,26 +42,24 @@ MUTATIONS = {
                       '    if(!crw_play() || crw.optout || (has=1)==0) return;\n    WORD_AT(CRW_STATE)=0;'),
     'level-ignores-optout': ('    if(!crw_play() || crw.optout || (has=crw_set_has())==0) return;\n    WORD_AT(CRW_STATE)=0;',
                              '    if(!crw_play() || (has=crw_set_has())==0) return;\n    WORD_AT(CRW_STATE)=0;'),
-    'level-keeps': ('    memset(&crw_lv,0,sizeof crw_lv);                  /* a new level', '    /* a new level'),
+    'level-keeps': ('    crw_reset();                                       /* a new level', '    (void)0;                                       /* a new level'),
     'level-stale-state': ('    WORD_AT(CRW_STATE)=0;                              /* a stale pointer', '    /* a stale pointer'),
     'level-no-particles': ('    guest_call(sub_002A62C0,0);\n', ''),
-    'level-particles-lost': ('        WORD_AT(CRW_PARTS)=old;WORD_AT(CRW_STATE)=0;\n', '        WORD_AT(CRW_STATE)=0;\n'),
+    'level-particles-lost': ('    for(j=0;j<CRW_NWIN;j++) WORD_AT(crw_win[j])=live[j];\n', ''),
     'level-no-alloc': ('    guest_call(sub_0028D6D0,0);\n', ''),
     'class-value': ('#define CRW_CLASS 0x40000u', '#define CRW_CLASS 0x80000u'),
     'class-after-original': ('        WORD_AT(rec)=0;WORD_AT(rec+4u)=CRW_CLASS;\n',
                              '        original();WORD_AT(rec)=0;WORD_AT(rec+4u)=CRW_CLASS;g_esp-=4u;\n'),
     'class-without-pak': ('    else if(!crw_pak_mounted()) crw_log("lv14', '    else if(0) crw_log("lv14'),
-    'class-without-state': ('    else if(!crw_state_ok()) crw_log(', '    else if(0) crw_log('),
-    'class-two': ('    else if(crw_lv.record && crw_lv.record!=rec) {', '    else if(0) {'),
+    'class-without-state': ('    else if(!crw_n) crw_log(', '    else if(0) crw_log('),
+    'class-two': ('    else if(k==crw_n && crw_n>=CRW_MAX) {', '    else if(k==crw_n && crw_n>=1u) {'),
     'class-ignores-optout': ('    if(crw.optout) crw_log("TSFP_MAPMAKER_REAL_BOSS=0', '    if(0) crw_log("TSFP_MAPMAKER_REAL_BOSS=0'),
     'class-any-character': ('    if(CRW_H(a+CRW_ACTOR_CHAR)!=CRW_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && CRW_H(ent+CRW_ENT_MODEL)==CRW_MODEL)) { original();return; }\n', ''),
     'boss-flag-ignored': ('            if((f&0xF8u)!=0xB0u) return 0;', '            return 0;'),
     'sub-is-bar': ('return (uint8_t)((f&4u)?CRW_BOSS_SUB:CRW_BOSS_BAR);', 'return (uint8_t)CRW_BOSS_BAR;'),
-    'boss-without-area': ('crw_lv.boss=pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")?', 'crw_lv.boss=1?'),
-    'boss-any-scene': ('WORD_AT(a+CRW_ACTOR_RECORD)==crw_lv.record && WORD_AT(CRW_SCENE)==100u && crw_on();',
-                       'WORD_AT(a+CRW_ACTOR_RECORD)==crw_lv.record && crw_on();'),
-    'boss-stale-state': ('    if(!crw_lv.record || !crw_state_ok()) return 0;', '    if(!crw_lv.record) return 0;'),
-    'boss-any-entity': ('    return WORD_AT(a+CRW_ACTOR_RECORD)==crw_lv.record && WORD_AT(CRW_SCENE)', '    return 1 && WORD_AT(CRW_SCENE)'),
+    'boss-without-area': ('crw_inst[k].boss=pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")?', 'crw_inst[k].boss=1?'),
+    'boss-any-scene': ('    return k>=0 && WORD_AT(CRW_SCENE)==100u && crw_on()?k:-1;', '    return k>=0 && crw_on()?k:-1;'),
+    'boss-any-entity': ('    for(k=0;k<crw_n;k++) if(crw_inst[k].record && crw_inst[k].record==rec && crw_inst[k].state) return (int)k;', '    for(k=0;k<crw_n;k++) if(crw_inst[k].state) return (int)k;'),
     'relocate-none': ('&& !crw_lv.relocated) crw_relocate(ent);', '&& !crw_lv.relocated) {}'),
     'relocate-twice': ('    if(WORD_AT(a+CRW_AI_STATE)==0u && !crw_lv.relocated) crw_relocate(ent);', '    if(WORD_AT(a+CRW_AI_STATE)==0u) crw_relocate(ent);'),
     'relocate-any-cell': ('            if(WORD_AT(c+0x20u)!=0) continue;              /* type 0', '            /* type 0'),
@@ -93,9 +91,26 @@ MUTATIONS = {
     'near-not-reshifted': ('    original();\n    WORD_AT(crw_consts[0].addr)=v;\n}', '    original();\n    WORD_AT(crw_consts[0].addr)=crw_lv.saved[0];\n}'),
     'sparks-no-shift': ('    crw_setf(slot,crw_getf(slot)+crw_lv.dy);\n', ''),
     'sparks-slot-left': ('    WORD_AT(slot)=v;                                   /* the caller', '    (void)v;                                   /* the caller'),
-    'sparks-any-time': ('    if(!crw_lv.shifted || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=CRW_RET_SPARKS)', '    if(!MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=CRW_RET_SPARKS)'),
     'intro-kept': ('        WORD_AT(a+0x9D4u)=1u;WORD_AT(a+CRW_AI_STATE)=2u;', '        WORD_AT(a+0x9D4u)=1u;'),
     'intro-next-stale': ('WORD_AT(a+CRW_AI_STATE)=2u;WORD_AT(a+0x9D0u)=2u;', 'WORD_AT(a+CRW_AI_STATE)=2u;'),
+    'multi-no-swap': ('    prev=crw_enter(k);\n    crw_fight(ent,original);', '    prev=crw_cur;crw_i=&crw_inst[k];\n    crw_fight(ent,original);'),
+    'multi-not-left': ('    crw_fight(ent,original);\n    crw_leave(prev);', '    crw_fight(ent,original);'),
+    'multi-nested-lost': ('    int prev=crw_cur;\n    if(prev==k) return prev;\n    crw_store(prev);', '    int prev=crw_cur;\n    if(prev==k) return prev;'),
+    'multi-leave-no-store': ('    if(crw_cur==prev) return;\n    crw_store(crw_cur);', '    if(crw_cur==prev) return;'),
+    'multi-window-short': ('0x0078B180u,0x0078B184u,0x0078B188u,\n};', '0x0078B180u,0x0078B184u,\n};'),
+    'multi-no-state-window': ('    CRW_STATE,\n    0x0078B080u,', '    0x0078B080u,'),
+    'multi-alloc-keeps-globals': ('    for(j=0;j<CRW_NWIN;j++) WORD_AT(crw_win[j])=live[j];\n    if(ok) crw_log(', '    if(ok) crw_log('),
+    'multi-alloc-not-captured': ('        for(j=0;j<CRW_NWIN;j++) crw_inst[k].win[j]=WORD_AT(crw_win[j]);\n', ''),
+    'multi-no-extra-alloc': ('    } else if(k==crw_n && !crw_alloc(k)) {', '    } else if(k==crw_n) {'),
+    'multi-reuse-slot-lost': ('    if(k==crw_n) for(k=0;k<crw_n && crw_inst[k].record;k++) {}   /* a slot allocated but unused */\n', ''),
+    'multi-count-kept': ('        if(k==crw_n) crw_n++;\n', ''),
+    'multi-cap-high': ('#define CRW_MAX 4u', '#define CRW_MAX 5u'),
+    'multi-draw-unswapped': ('        prev=crw_enter((int)k);\n        guest_call(sub_0028D710,0);', '        prev=crw_cur;\n        guest_call(sub_0028D710,0);'),
+    'message-unswapped': ('    crw_entry(WORD_AT(g_esp+4u),original);\n}\n/* WRAP sub_0028DA10', '    original();\n}\n/* WRAP sub_0028DA10'),
+    'think-unswapped': ('    crw_entry(WORD_AT(g_esp+4u),original);\n}\n/* WRAP sub_0028F730', '    original();\n}\n/* WRAP sub_0028F730'),
+    'hit-unswapped': ('    crw_entry(WORD_AT(info),original);', '    original();'),
+    'hit-attacker': ('    crw_entry(WORD_AT(info),original);', '    crw_entry(WORD_AT(info+4u),original);'),
+    'entry-not-left': ('    prev=crw_enter(k);\n    original();\n    crw_leave(prev);', '    prev=crw_enter(k);\n    original();'),
     'remove-missing': ('        guest_call(sub_0015DDA0,1,ent);\n', ''),
     'remove-twice': ('        crw_lv.removed=1;\n', ''),
     'remove-at-once': ('        if(WORD_AT(CRW_LIVE) && crw_lv.fading<CRW_FADE_MAX) return;\n', ''),
@@ -105,7 +120,7 @@ MUTATIONS = {
     'death-parts-lost': ('        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;\n', ''),
     'death-no-original': ('        crw_shift(1);\n        original();\n        crw_shift(0);\n        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;', '        MAPMAKER_GUEST_RET();\n        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;'),
     'death-unshifted': ('        crw_shift(1);\n        original();\n        crw_shift(0);\n        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;', '        original();\n        WORD_AT(crw_lv.state+CRW_PARTS_ON)=parts;'),
-    'fx-after-removal': ('    int here=crw_lv.state && !crw_lv.removed && MAPMAKER_STACK_OK(4)', '    int here=crw_lv.state && MAPMAKER_STACK_OK(4)'),
+    'fx-after-removal': ('        if(!crw_inst[k].state || !crw_inst[k].record || crw_inst[k].removed) continue;', '        if(!crw_inst[k].state || !crw_inst[k].record) continue;'),
     'remove-focus-kept': ('WORD_AT(player+CRW_FOCUS)==ent) WORD_AT(player+CRW_FOCUS)=0;', 'WORD_AT(player+CRW_FOCUS)==ent) {}'),
     'part-original': ('        guest_call(sub_000EFBD0,8,', '        original();g_esp-=4u;guest_call(sub_000EFBD0,8,'),
     'part-position': ('crw_lv.state+CRW_SHOT+part*CRW_PART_STRIDE', 'crw_lv.state+CRW_SHOT'),
@@ -118,17 +133,16 @@ MUTATIONS = {
     'event-any-scene': ('WORD_AT(g_esp)!=CRW_RET_EVENT || WORD_AT(CRW_SCENE)!=100u || !crw_on()', 'WORD_AT(g_esp)!=CRW_RET_EVENT || !crw_on()'),
     'event-without-boss': ('    if(!crw_lv.record || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=CRW_RET_EVENT', '    if(!MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=CRW_RET_EVENT'),
     'fx-missing': ('    guest_call(sub_0028D710,0);\n', ''),
-    'fx-any-caller': ('MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX;', 'MAPMAKER_STACK_OK(4);'),
-    'fx-stale': ('    if(!here || !crw_state_ok() || WORD_AT(CRW_SCENE)!=100u', '    if(!here || WORD_AT(CRW_SCENE)!=100u'),
+    'fx-any-caller': ('MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX,prev;', 'MAPMAKER_STACK_OK(4),prev;'),
+    'fx-stale': ('    if(!here || WORD_AT(CRW_SCENE)!=100u || !crw_on()) return;\n    for(k=0;k<crw_n;k++) {', '    if(!here) return;\n    for(k=0;k<crw_n;k++) {'),
     'hud-keeps-cleared': ('    original();\n    WORD_AT(player+CRW_FOCUS)=focus;\n', '    original();\n'),
-    'hud-any-entity': ('       WORD_AT(a+CRW_ACTOR_RECORD)!=crw_lv.record || !crw_play()) { original();return; }\n    WORD_AT(player',
-                       '       !crw_play()) { original();return; }\n    WORD_AT(player'),
+    'hud-any-entity': ('       CRW_H(focus+CRW_ENT_MODEL)!=CRW_MODEL || crw_find(focus)<0 || !crw_play()) { original();return; }', '       CRW_H(focus+CRW_ENT_MODEL)!=CRW_MODEL || !crw_play()) { original();return; }'),
     'hud-stock-bar': ('    WORD_AT(player+CRW_FOCUS)=0;\n    original();', '    original();'),
     'meter-shown': ('    if(!crw.meters++) crw_log("overhead health meter hidden on the split Crowe",a,0);\n    MAPMAKER_GUEST_RET();',
                     '    if(!crw.meters++) crw_log("overhead health meter hidden on the split Crowe",a,0);\n    original();'),
-    'meter-sub-hidden': ('       crw_lv.boss==CRW_BOSS_SUB || !crw_play())', '       !crw_play())'),
+    'meter-sub-hidden': ('    if(k==(int)crw_n || crw_inst[k].boss==CRW_BOSS_SUB || !crw_play())', '    if(k==(int)crw_n || !crw_play())'),
     'meter-any-caller': ('WORD_AT(g_esp)!=CRW_RET_METER) { original();return; }', '0) { original();return; }'),
-    'meter-any-actor': ('    if(!MAPMAKER_PTR_OK(a,CRW_ACTOR) || WORD_AT(a+CRW_ACTOR_RECORD)!=crw_lv.record ||', '    if(!MAPMAKER_PTR_OK(a,CRW_ACTOR) ||'),
+    'meter-any-actor': ('(!crw_inst[k].record || crw_inst[k].record!=WORD_AT(a+CRW_ACTOR_RECORD));k++) {}', '0;k++) {}'),
 }
 
 
@@ -503,3 +517,44 @@ def test_death_effects():
     assert ('imm', 0x2F) in a[0x002911D0].ops and ('imm', 0x2F) in a[0x002913EB].ops
     # the draw: hazards, parts, sparks and the shared particles, all from sub_0028D710
     assert target(a[0x0028D9D0]) == 0x002A8FC0 and target(a[0x0028DA03]) == 0x002A7F30
+
+
+def test_multi_instance_globals():
+    """Every split Crowe global: [0x0075F5E8] is read only below the hooked entries (fight, message handler,
+    think and hit callbacks, the draw and the allocation), and the effect/particle globals its code reaches
+    are exactly the swapped window."""
+    a = by_address()
+    graph, users, fx = {}, set(), {}
+    for i in decoded():
+        if i.call or (i.branch and i.mnemonic == 'jmp'):
+            t = target(i)
+            if t is not None:
+                graph.setdefault(i.function, set()).add(t)
+        for k, v in i.values():
+            if k == 'disp' and v == 0x0075F5E8:
+                users.add(i.function)
+            if k == 'disp' and 0x0078B080 <= v < 0x0078B1C0:
+                fx.setdefault(v, set()).add(i.function)
+
+    def reach(roots):
+        seen, todo = set(), list(roots)
+        while todo:
+            f = todo.pop()
+            if f not in seen:
+                seen.add(f)
+                todo.extend(graph.get(f, ()))
+        return seen
+    entries = {0x0028FE30, 0x00292430, 0x0028DA10, 0x0028F730, 0x0028D710, 0x0028D6D0, 0x002A62C0}
+    seen = reach(entries)
+    assert users and users <= seen | {0x0029002C}
+    window = {v for v, fs in fx.items() if fs & seen}
+    text = INC.read_text(encoding='utf-8')
+    for v in window:
+        assert f'0x{v:08X}u' in text, hex(v)
+    assert len(window) == 28                                       # + [0x0075F5E8] = 29 words
+    # the entries the swap needs: message handler, think (slot 2) and hit (+0x19C) callbacks
+    assert target(a[0x0027D3E9]) == 0x00292430
+    assert ('imm', 0x0028DA10) in a[0x00290EF7].ops and ('imm', 2) in a[0x00290EFC].ops
+    assert ('imm', 0x0028F730) in a[0x00290EEC].ops and target(a[0x00290EF2]) == 0x0009E720
+    # [0x0078B1E4] is a scratch value of one fight call (written, then read at 0x00291B61)
+    assert mem(a[0x00291AF6])[0][4] == 0x0078B1E4 and mem(a[0x00291B61])[0][4] == 0x0078B1E4
