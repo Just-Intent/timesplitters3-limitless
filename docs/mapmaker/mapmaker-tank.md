@@ -1,11 +1,34 @@
 # MapMaker castle tank (story mission 2 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_tank.inc` (area `tank`),
-fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 78 mutations, plus
-decode, US XBE data and game-pak checks of every site below). **Not played
-yet**, not wired: the wrappers are listed for the integrator
-[below](#wrappers-for-the-integrator). No guest-code table entry, no new save
-bytes. Switch: `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_TANK=0` turns only
+fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 79 mutations, plus
+decode, US XBE data and game-pak checks of every site below). Wired in
+v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
+No guest-code table entry of its own, no new save bytes.
+
+## Fixed after v0.4.0-mapmaker.20: the tank never appeared
+
+Playtest log: `mounted prop6.pak for the castle tank`, then `tank models
+missing from the resource table: the placeholder stays a bot (0x818B8C80,
+0x0)`. The hook looked the models up in the stock model -> row map
+`0x0078B860`. The rooms area's guest-code patches
+(`config/guest-code-patches/rooms.json`) move every access of that map to
+`0x008CA000` (0xA00 words), including the builder `sub_00242780` (0x002427C8,
+0x00242A34) and the spawn path (`sub_000A6F94`, `sub_000A6EC4`,
+`sub_000A688F`), so the stock address is never written and held a stale row
+(init 0). The tank now reads `0x008CA000` (CONFIRMED, test
+`test_resource_map_relocated`).
+
+No rows need adding: story scene 100 loads `prop/table/prop_all_xbas.raw`
+(`sub_00242780`: `sub_00065250` answers 1 in story mode -> 0x0049F01C,
+CONFIRMED), and every shipped copy of that table (all `arcade/l_*`,
+`challenge/l_*_ch`, `story/l_56_st` paks, 2512 rows) has 0x281 (type
+0x8000000, init index 26), 0x297 and 0x298 (CONFIRMED, game paks). The
+builder sizes the row table exactly (`sub_0003DFA0(count*0x30, 1)`,
+0x0024298C..0x0024299B; count `[0x0075EAA8]`, no spare rows), so appending
+would mean a reallocation as the rooms area does for its room models; it is
+not needed. If the tank still does not appear, the failure log now also
+prints the three rows found (`row+1`, 0 = none). Switch: `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_TANK=0` turns only
 the tank off (its placeholder then plays as an ordinary bot).
 
 User report (2026-10-31): the tank boss of story mission 2 was not available
@@ -99,7 +122,7 @@ do; 0x12 has no Arcade row).
    plain ret). The stock bulk unmount removes it with the level.
 2. **ai_start** (`sub_0015B830`): after the original, the first pool entry
    with character (a+0x48) 0x12, when the pak is mounted and the resource map
-   `0x0078B860` has 0x281 (row +0x2C == `sub_002560C0`), 0x297 and 0x298:
+   (`0x008CA000`, moved there by the rooms area) has 0x281 (row +0x2C == `sub_002560C0`), 0x297 and 0x298:
    `sub_000A6F90(0x281, &pos, &rot, 0, 0)` with pos = the placeholder's
    +0x64..+0x6C and rot = (0, its +0x70, 0). Layout (CONFIRMED):
    `sub_000A6F90` -> `sub_000A6EC0(type, model, pos, rot, a, b)` ->
@@ -143,7 +166,7 @@ Also for the integrator: the editor picker row (above), and the
 
 ## Risks (not verified in game)
 
-- Not played: the whole area is fixture- and decode-verified only.
+- Played once (v0.4.0-mapmaker.20): only the pak mount ran; the spawn failed on the stale map address (fixed above). Everything after the spawn is still unplayed.
 - Collision and driving of a 0x8000000 prop on MapMaker tile floors
   (`sub_002548F0` drives by its own position; INFERRED it follows the floor
   through stock object physics).

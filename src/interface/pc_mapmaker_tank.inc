@@ -28,7 +28,7 @@
  *    removes it with the rest.
  *  - ai_start (sub_0015B830): after the original, for the first pool entry
  *    whose character (a+0x48) is TNK_ID: when the pak is mounted and the
- *    resource map 0x0078B860 has 0x281 (init 0x002560C0), 0x297 and 0x298,
+ *    resource map (0x008CA000, moved by the rooms area) has 0x281 (init 0x002560C0), 0x297 and 0x298,
  *    create the tank at the placeholder's position, facing its yaw:
  *    sub_000A6F90(0x281, &pos, &rot, 0, 0) (pos -> +0x64, rot -> +0xC0/+0x70/
  *    +0xC8, sub_000A6880; the init runs inside, sub_000A6EC0 0x000A6F3A).
@@ -92,7 +92,13 @@
 #define TNK_TURRET 0x297u                /* CASTLETANKBOSSTURRET, made at its death */
 #define TNK_WRECK 0x298u                 /* CASTLETANKBOSSWRECK */
 #define TNK_INIT 0x002560C0u             /* resource init index 26 */
-#define TNK_RESMAP 0x0078B860u           /* int16 per model: resource index or -1 */
+/* int16 per model: resource row or -1. Stock 0x0078B860 (0x9D0 words); the
+ * rooms area's guest-code patches move every access, the builder's included
+ * (sub_00242780 0x002427C8/0x00242A34) and the spawn path's (0x000A6F94,
+ * 0x000A6EC4, 0x000A688F), to 0x008CA000 (0xA00 words): the stock address is
+ * never written (v0.4.0-mapmaker.20 playtest read a stale row there). */
+#define TNK_RESMAP 0x008CA000u
+#define TNK_RESMAP_MODELS 0xA00u
 #define TNK_RES 0x00791D4Cu              /* resource table, 0x30 per entry */
 #define TNK_RES_INIT 0x2Cu
 #define TNK_PAK 0x0049DF7Cu              /* "pak/stream/lv4/prop6.pak" */
@@ -229,8 +235,10 @@ static int tnk_pak_mounted(void) { return (int32_t)guest_call(sub_00062260,1,TNK
 /* The resource row of a model, or 0 when scene 100's table lacks it. */
 static uint32_t tnk_resource(uint32_t model)
 {
-    int16_t i=(int16_t)TNK_H(TNK_RESMAP+model*2u);
+    int16_t i;
     uint32_t t=WORD_AT(TNK_RES),e;
+    if(model>=TNK_RESMAP_MODELS) return 0;
+    i=(int16_t)TNK_H(TNK_RESMAP+model*2u);
     if(i<0 || !t) return 0;
     e=t+(uint32_t)i*0x30u;
     return MAPMAKER_PTR_OK(e,0x30u)?e:0;
@@ -270,6 +278,9 @@ void pc_mapmaker_tank_ai_start(void (*original)(void))
     if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted: the tank placeholder stays a bot",a,0);return; }
     if(!(e=tnk_resource(TNK_MODEL)) || WORD_AT(e+TNK_RES_INIT)!=TNK_INIT || !tnk_resource(TNK_TURRET) || !tnk_resource(TNK_WRECK)) {
         tnk_log("tank models missing from the resource table: the placeholder stays a bot",e,e?WORD_AT(e+TNK_RES_INIT):0);
+        tnk_log("resource rows of the tank / turret / wreck (row+1, 0 = none)",
+                (uint32_t)(int16_t)TNK_H(TNK_RESMAP+TNK_MODEL*2u)+1u,
+                ((uint32_t)(int16_t)TNK_H(TNK_RESMAP+TNK_TURRET*2u)+1u)<<16 | (((uint32_t)(int16_t)TNK_H(TNK_RESMAP+TNK_WRECK*2u)+1u)&0xFFFFu));
         return;
     }
     for(i=0;i<3u;i++) if(!tnk_sane(pos[i]=tnk_getf(ent+TNK_ENT_POS+i*4u))) { tnk_log("placeholder position unusable",a,i);return; }
