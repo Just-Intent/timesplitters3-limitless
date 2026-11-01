@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3240 @@
+@@ -1037,6 +1037,3306 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2260,6 +2260,72 @@
 +    else sub_002895A0_gen();
 +#else
 +    sub_002895A0_gen();
++#endif
++}
++
++extern void sub_00286430_gen(void);
++void sub_00286430(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_skel_slot")) pc_mapmaker_realbosses_skel_slot(sub_00286430_gen);
++    else sub_00286430_gen();
++#else
++    sub_00286430_gen();
++#endif
++}
++
++extern void sub_002998E0_gen(void);
++void sub_002998E0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_walk_fight")) pc_mapmaker_realbosses_walk_fight(sub_002998E0_gen);
++    else sub_002998E0_gen();
++#else
++    sub_002998E0_gen();
++#endif
++}
++
++extern void sub_0029CBF0_gen(void);
++void sub_0029CBF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_walk_message")) pc_mapmaker_realbosses_walk_message(sub_0029CBF0_gen);
++    else sub_0029CBF0_gen();
++#else
++    sub_0029CBF0_gen();
++#endif
++}
++
++extern void sub_00298BA0_gen(void);
++void sub_00298BA0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_walk_damage")) pc_mapmaker_realbosses_walk_damage(sub_00298BA0_gen);
++    else sub_00298BA0_gen();
++#else
++    sub_00298BA0_gen();
++#endif
++}
++
++extern void sub_00299140_gen(void);
++void sub_00299140(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_walk_slot")) pc_mapmaker_realbosses_walk_slot(sub_00299140_gen);
++    else sub_00299140_gen();
++#else
++    sub_00299140_gen();
++#endif
++}
++
++extern void sub_00298F60_gen(void);
++void sub_00298F60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_walk_slot")) pc_mapmaker_realbosses_walk_slot(sub_00298F60_gen);
++    else sub_00298F60_gen();
++#else
++    sub_00298F60_gen();
 +#endif
 +}
 +
