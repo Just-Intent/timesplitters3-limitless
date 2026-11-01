@@ -116,6 +116,9 @@ MUTATIONS = {
                             'WORD_AT(a+RBS_ACTOR_RECORD)==rbs_skel.record && rbs_on();'),
     'skel-boss-stale-state': ('    if(!rbs_skel.record || !rbs_skel.state || WORD_AT(RBS_SKEL_STATE)!=rbs_skel.state) return 0;',
                               '    if(!rbs_skel.record) return 0;'),
+    'skel-message-original': ('    sub_00286D30();\n}', '    original();\n}'),
+    'skel-message-any': ('|| !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }\n    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH', '|| !(ent=WORD_AT(g_esp+4u))) { original();return; }\n    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH'),
+    'skel-message-only-death': ('    sub_00286D30();\n}', '    if(WORD_AT(g_esp+8u)!=RBS_MSG_DEATH) { original();return; }\n    sub_00286D30();\n}'),
     'skel-risen-anim': ('#define RBS_SKEL_START 0x19Cu', '#define RBS_SKEL_START 0x23Bu'),
     'skel-risen-no-ret': ('    g_eax=guest_call(sub_00059DB0,2,ent,RBS_SKEL_START);\n    MAPMAKER_GUEST_RET();', '    g_eax=guest_call(sub_00059DB0,2,ent,RBS_SKEL_START);'),
     'skel-throw-any-action': ('    if(act>=8u || WORD_AT(RBS_SKEL_ACTIONS+act*4u)!=RBS_SKEL_THROW) { original();return; }', '    if(act>=8u) { original();return; }'),
@@ -538,3 +541,27 @@ def test_custom_set_sites():
     # sub_003006C0 (compile): count byte 10 at data +0x16, members data +0x18 (container +0x10 = data)
     assert mem(a[0x00300884])[0][4] == 0x26 and ('imm', 0xA) in a[0x00300884].ops
     assert mem(a[0x003007B5])[0][4] == 0x24 and mem(a[0x003007AE])[0][4] == 0x00784024
+
+def test_skeleton_death_message_sites():
+    """Death = message 2; only the mansion handler (scene 1) acts on it, the catacombs one swallows it."""
+    a = by_address()
+    # sub_0027CEF0, class 0x20000: sub_0028D0A0(entity, msg, a, b) at 0x0027D3A7
+    assert target(a[0x0027D3A7]) == 0x0028D0A0 and ends(a, 0x0027D3A7) == 0x0027D3AC
+    # sub_0028D0A0: scene 1 -> jmp sub_00286D30, else jmp sub_0028C560
+    assert mem(a[0x0028D0A0])[0][4] == 0x0079094C and ('imm', 1) in a[0x0028D0A0].ops
+    assert a[0x0028D0A9].mnemonic == 'jmp' and target(a[0x0028D0A9]) == 0x00286D30
+    assert a[0x0028D0AE].mnemonic == 'jmp' and target(a[0x0028D0AE]) == 0x0028C560
+    # catacombs: messages 1 and 2 -> or eax, -1 (consumed, nothing done)
+    assert a[0x0028C615].mnemonic == 'or' and ('imm', 0xFFFFFFFF) in a[0x0028C615].ops
+    # mansion: message 2 -> AI +0x9D0 = 6 with the death animation 0x1A6
+    assert ('imm', 6) in a[0x00286D64].ops and mem(a[0x00286D7A])[0][4] == 0x9D0
+    assert ('imm', 0x1A6) in a[0x00286D74].ops
+    # sub_0015DB20 (the AI death, from the damage code 0x000BB059): message 2, -1 skips the generic death
+    assert target(a[0x000BB059]) == 0x0015DB20
+    assert ('imm', 2) in a[0x0015DB34].ops and target(a[0x0015DB3B]) == 0x0015C310
+    assert ('imm', 0xFFFFFFFF) in a[0x0015DB43].ops
+    # state 6 ends with level event 3 and the AI removal sub_0015DDA0
+    assert target(a[0x0029E063]) == 0x002274C0 and target(a[0x0029E069]) == 0x0015DDA0
+    # the deerbeast's handler sub_00281620 has no scene test (it dies by the generic path)
+    assert not any(op[0] == 'mem' and op[4] == 0x0079094C for x in range(0x00281620, 0x002816C8)
+                   if x in a for op in a[x].ops)

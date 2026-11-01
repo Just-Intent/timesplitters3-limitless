@@ -2,7 +2,7 @@
 
 Status: implemented in `src/interface/pc_mapmaker_realbosses.inc` (area
 `realbosses`), fixture-tested (`tests/mapmaker/test_mapmaker_realbosses.py`:
-92 mutations, plus decode and US XBE data checks of every site below). The
+95 mutations, plus decode and US XBE data checks of every site below). The
 creature was played in v0.4.0-mapmaker.5 (user: working); the floating-meter
 fix, the health display choice, "Boss Off = no health" and the giant
 skeleton ([below](#the-giant-skeleton-mansion-boss)) are not built or played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
@@ -189,11 +189,49 @@ should rise through the floor (unplayed).
 | `sub_0025F720` -> `pc_mapmaker_realbosses_level` | after the original: forget the last level; when the set holds 0x28 (or the container is unreadable), clear the two pointers and call the stock `sub_00287E00` (52.6 KB, freed with the level heap like the stock blocks); a failed allocation is logged and the skeleton keeps the bot AI |
 | `sub_0015B830` (ai_start) | char 0x28 / model 0x5E9: class 0/0x20000 when lv1_6 is mounted and this level's state is in place; only the first spawn record per level (extras logged, keep the bot AI and look wrong: human animations on a non-human rig) |
 | `sub_0029FE00` -> `pc_mapmaker_realbosses_princess` | that boss in scene 100: call `sub_0029CEF0` directly (it pops the caller's return address, exactly the lifted tail jump) |
+| `sub_0028D0A0` -> `pc_mapmaker_realbosses_message` | its message handler: stock `sub_00286D30` (mansion) only in scene 1, else `sub_0028C560` (catacombs), which answers -1 to messages 1/2 and does nothing; for the boss in scene 100: the mansion handler (direct call = tail jump). See [the death](#the-death-fixed-after-v040-mapmaker13) |
 | `sub_002875F0` -> `pc_mapmaker_realbosses_risen` | state 1 "entrance done": stock is `sub_00059DB0(entity, 0x19C)` only in scene 1 (0x23B in 17, else 0: stuck rising); scene 1's answer for the boss |
 | `sub_00287E20` -> `pc_mapmaker_realbosses_throw` | the feeble throw (action type 6, 0x005208B8[a+0x9DC]; phase +0x4160 0 aim / 1 fire / 2 done) only runs in scene 1, else every frame resets it. Aim: the original with the scene word 1 (its only scene read is its first instruction; its callees read none, decode). Fire: the stock `sub_000EA9C0(0x34, s, s+0xC, 0.3, entity, a, 2, 1, entity+0x34, 0xE, 0xC, 0.1)` (s = state+0x413C), `sub_0010EB90([s+0x18], 0)`, phase 2, in the real scene. Done: return, as scene 1 |
 | `sub_002274C0` -> `pc_mapmaker_realbosses_event` | the death's level event 3 (call 0x0029E063, ret 0x0029E068) would fire the map's own logic marker 3: dropped and logged. It is the only level event the fight and its callbacks (`sub_000BC470`, `sub_00286430`, `sub_00289690`, `sub_00288BD0`) can reach |
 | `sub_0014CC80` (hud) | the HUD case 0x5E9 draws a bar only in scene 1 (0x0014CF05; else a catacombs meter when entity +0x1A0 == 1): the focus is cleared for the stock call as for the deerbeast |
 | `sub_0013A400` (meter) | the fight makes a +0x268 record (0x0029D101): hidden unless Sub-boss bar |
+
+### The death (fixed after v0.4.0-mapmaker.13)
+
+User report (mapmaker.13): the skeleton with the Boss bar lost all its
+health but did not die; the log had the mount, state, class and throw lines
+but never `level event dropped` (its death path). Cause (CONFIRMED, decode,
+`test_skeleton_death_message_sites`):
+
+- Its health is entity +0x1CC, the same value as the bar: the damage
+  callback `sub_00289690` (registered when it has risen, 0x0029D4BF)
+  subtracts the scaled hit and clamps at 0. The fight itself never tests it.
+- At 0 the stock damage code (`sub_000BABA0` 0x000BB059) calls the AI death
+  `sub_0015DB20`, which first sends message 2 through `sub_0015C310` ->
+  class handler `sub_0027CEF0` -> `sub_0028D0A0(entity, 2, ..)` (0x0027D3A7);
+  an answer of -1 skips the generic death (0x0015DB43).
+- `sub_0028D0A0` sends scene 1 to the mansion handler `sub_00286D30`:
+  message 2 sets AI +0x9D0 = 6 and plays the death animation 0x1A6
+  (0x00286D64..0x00286D80), and returns -1; state 6 (0x0029E021) waits for
+  the animation, clears the story focus, fires level event 3 and removes the
+  AI with `sub_0015DDA0` (0x0029E069: message 5, alive counters, groups).
+  Every other scene goes to the catacombs handler `sub_0028C560`, which
+  returns -1 for messages 1 and 2 doing nothing (0x0028C615). So in scene
+  100 the death was swallowed: no state 6, no death, no removal.
+
+Fix: WRAP `sub_0028D0A0` -> `pc_mapmaker_realbosses_message`: for the boss
+(as `_princess`: this level's record and state, scene 100) call the mansion
+handler directly, for every message, as in scene 1 (message 1, the hit while
+it kneels in state 5, takes 10 health with its effect; message 5 does
+nothing). The death then plays, event 3 is still dropped by `_event` (map
+logic untouched), and the AI is removed the stock way. Logged once:
+`giant skeleton killed: the mansion death`. The Boss multiplier scales the
+same +0x1CC, so the bar and the death agree. INFERRED: MapMaker logic that
+counts this AI as killed sees the stock removal; the generic kill
+statistics (`sub_00238E00`, after the -1 test) are skipped, as in mission 5.
+The giant trophy monster is not affected: its handler `sub_00281620` has no
+scene test, acts on message 1 only and returns 0 for 2, so it takes the
+generic death (played in mapmaker.5).
 
 Health: the fight sets 40/40 at its start (0x0029D0E5); the Boss row's
 multiplier is re-applied by the bosses area when the maximum changes. Boss
@@ -280,6 +318,7 @@ WRAP sub_0014CC80 -> pc_mapmaker_realbosses_hud            (already wrapped by b
 WRAP sub_0013A400 -> pc_mapmaker_realbosses_meter          (new; overhead meter, per frame per recorded actor)
 WRAP sub_0025F720 -> pc_mapmaker_realbosses_level          (new; story level init, after the original)
 WRAP sub_0029FE00 -> pc_mapmaker_realbosses_princess       (new; class 0x20000 dispatch, per AI frame)
+WRAP sub_0028D0A0 -> pc_mapmaker_realbosses_message        (new; class 0x20000 messages, incl. its death)
 WRAP sub_002875F0 -> pc_mapmaker_realbosses_risen          (new; per skeleton frame in state 1)
 WRAP sub_00287E20 -> pc_mapmaker_realbosses_throw          (new; per skeleton frame)
 WRAP sub_002274C0 -> pc_mapmaker_realbosses_event          (new; level events, return-address test first)
@@ -289,7 +328,7 @@ WRAP sub_000862C0 -> pc_mapmaker_bigdraw_rect             (new, area bigdraw; pr
 Include the `.inc` after `pc_mapmaker_bosses.inc` / `pc_mapmaker_characters.inc`
 (it uses `pc_mapmaker_area_enabled`, declared in the file and defined later in
 `pc_menu_mouse_guest.inc`). Link stubs for `sub_0005A130`, `sub_00062260`,
-`sub_00071630`, `sub_00071C70`, `sub_00287E00`, `sub_0029CEF0`, `sub_00059DB0`,
+`sub_00071630`, `sub_00071C70`, `sub_00287E00`, `sub_0029CEF0`, `sub_00286D30`, `sub_00059DB0`,
 `sub_000EA9C0` and `sub_0010EB90` are in `tests/mapmaker/mapmaker_area_stubs.h`;
 the off-build no-op hooks are in `pc_menu_mouse_guest.inc`, prototypes in `pc_display_menu.h`.
 `pc_mapmaker_bigdraw.inc` (area `bigdraw`) is included right after it (needs
@@ -337,6 +376,11 @@ stubs). No extension memory.
    found: giant trophy monster slot N, giant skeleton slot M` with the slots
    you used, `mounted lv1_6.pak`, `mounted lv1_3.pak`, `giant skeleton state
    allocated` and both "gets the ... AI" lines.
+   Death: give the skeleton the Boss bar (any multiplier) and empty it: it
+   plays its death animation and disappears; stderr `giant skeleton killed:
+   the mansion death`, then `level event dropped`; a logic trigger on that
+   AI being killed fires, map logic marker 3 does not change. The trophy
+   monster still dies as before.
 8. Whole height: put the Giant Skeleton in a tile next to an open area and
    watch it rise from a neighbouring tile and from further away: the whole
    body shows above the tile walls (stderr `real boss drawn over the whole
