@@ -34,7 +34,7 @@ MUTATIONS = {
     'mount-any-map': ('if(!tnk_play() || tnk.optout || (has=tnk_map_has())==0) return;', 'if(!tnk_play() || tnk.optout || (has=1)==0) return;'),
     'mount-ignores-optout': ('if(!tnk_play() || tnk.optout || (has=tnk_map_has())==0) return;', 'if(!tnk_play() || (has=tnk_map_has())==0) return;'),
     'mount-twice': ('    if(tnk_pak_mounted()) return;\n    if((mounted', '    if((mounted'),
-    'mount-fills-table': ('#define TNK_MOUNT_KEEP 2u', '#define TNK_MOUNT_KEEP 0u'),
+    'mount-fills-table': ('#define TNK_MOUNT_KEEP 8u', '#define TNK_MOUNT_KEEP 0u'),
     'mount-off-by-one': ('+TNK_MOUNT_KEEP>TNK_MOUNT_MAX) {', '+TNK_MOUNT_KEEP>=TNK_MOUNT_MAX) {'),
     'mount-preset': ('    if(TNK_H(info+TNK_INFO_SET)!=TNK_SET_MAP) return 0;\n', ''),
     'mount-no-unreadable': ('    if(!container || !MAPMAKER_PTR_OK(container,TNK_SCAN) || WORD_AT(container)!=TNK_MAGIC) return -1;',

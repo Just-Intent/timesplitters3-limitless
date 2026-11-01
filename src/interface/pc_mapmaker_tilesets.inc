@@ -59,7 +59,7 @@
 #define TS_CONTAINER 0x00784014u
 #define TS_CURRENT 0x00784020u             /* current tileset (editor and play) */
 #define TS_MOUNTS 0x006D7880u              /* mounted paks; table of 30 (0x000620F9) */
-#define TS_MOUNT_MAX 30u
+#define TS_MOUNT_MAX 64u               /* paktable.json: 64 slots at 0x00907000 */
 #define TS_MOUNT_KEEP 8u                   /* l_100, gun, chr, overlay and spare after us */
 #define TS_CONTAINER_MAX 0x00080000u
 #define TS_PAK_LEN 21u

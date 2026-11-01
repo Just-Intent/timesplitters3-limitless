@@ -275,10 +275,10 @@ int main(void)
     CHECK(nmount==1 && pak_mounted);
     CALL(pc_mapmaker_crowe_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==1);
-    pak_mounted=0;WORD_AT(0x006D7880u)=29u;
+    pak_mounted=0;WORD_AT(0x006D7880u)=57u;
     CALL(pc_mapmaker_crowe_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==1 && !pak_mounted);
-    WORD_AT(0x006D7880u)=28u;
+    WORD_AT(0x006D7880u)=56u;
     CALL(pc_mapmaker_crowe_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==2 && pak_mounted);
     /* TSFP_MAPMAKER_REAL_BOSS=0: no pak, no state */

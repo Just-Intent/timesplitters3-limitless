@@ -91,8 +91,8 @@
 #define CRW_CLASS 0x40000u              /* record +4 -> AI +0x14: sub_0028FE30 */
 #define CRW_PAK 0x0049DC78u             /* "pak/stream/lv14/anim/lv14.pak" */
 #define CRW_MOUNTS 0x006D7880u          /* mounted paks, table of 30 */
-#define CRW_MOUNT_MAX 30u
-#define CRW_MOUNT_KEEP 2u
+#define CRW_MOUNT_MAX 64u               /* paktable.json: 64 slots at 0x00907000 */
+#define CRW_MOUNT_KEEP 8u
 #define CRW_STATE 0x0075F5E8u           /* 0x2E04 bytes, sub_0028D6D0 */
 #define CRW_STATE_SIZE 0x2E04u
 #define CRW_PARTS 0x0078B0D0u           /* 0x7D00 bytes, sub_002A62C0 */

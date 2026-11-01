@@ -35,7 +35,7 @@ MUTATIONS = {
                             'WORD_AT(container)!=CRW_MAGIC) return 0;\n    c=container+8u;end=container+CRW_SCAN;\n    for(steps=0;steps<0x40000u && end-c>=8u;steps++) {\n        uint32_t tag=WORD_AT(c),sz=WORD_AT(c+4u),d=c+8u;'),
     'wrong-pak': ('#define CRW_PAK 0x0049DC78u', '#define CRW_PAK 0x0049DC58u'),
     'mount-twice': ('(has=crw_set_has())==0 || crw_pak_mounted()) return;', '(has=crw_set_has())==0) return;'),
-    'mount-fills-table': ('#define CRW_MOUNT_KEEP 2u', '#define CRW_MOUNT_KEEP 0u'),
+    'mount-fills-table': ('#define CRW_MOUNT_KEEP 8u', '#define CRW_MOUNT_KEEP 0u'),
     'mount-ignores-optout': ('    if(!crw_play() || crw.optout || (has=crw_set_has())==0 || crw_pak_mounted()) return;',
                              '    if(!crw_play() || (has=crw_set_has())==0 || crw_pak_mounted()) return;'),
     'level-any-map': ('    if(!crw_play() || crw.optout || (has=crw_set_has())==0) return;\n    WORD_AT(CRW_STATE)=0;',

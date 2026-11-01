@@ -398,10 +398,10 @@ int main(void)
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==0);
     container(0x11,with,3,boss_off,2);
-    WORD_AT(0x006D7880u)=29u;                                            /* table nearly full */
+    WORD_AT(0x006D7880u)=57u;                                            /* table nearly full */
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==0);
-    WORD_AT(0x006D7880u)=28u;
+    WORD_AT(0x006D7880u)=56u;
     set_env("TSFP_MAPMAKER_REAL_BOSS","0");
     CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nmount==0);
@@ -531,7 +531,7 @@ int main(void)
         /* anims: lv1_6.pak for a custom set holding 0x28 */
         container(0x11,skel,2,none3,3);
         m=nmount;skel_mounted=0;pak_mounted=0;
-        WORD_AT(0x006D7880u)=29u;
+        WORD_AT(0x006D7880u)=57u;
         CALL(pc_mapmaker_realbosses_anims,fake,0x0005C506u,0,0,0,1);
         CHECK(nmount==m && !skel_mounted);                                   /* table nearly full */
         WORD_AT(0x006D7880u)=10u;

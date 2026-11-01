@@ -1,3 +1,15 @@
+## MapMaker v0.4.0-mapmaker.20: in-game checks (2026-11-01)
+
+Local preview v0.4.0-mapmaker.20 (exe SHA-256 prefix 3b302ef8, source e5cc7189) on the second Windows 11 PC,
+with screenshots. Confirmed: the giant skeleton's fire shows; the Crow walker now appears (created in pool
+slot 2, story AI class 0x100000); the giant robot spawns and runs at the player. Found: the giant skeleton,
+the Crow walker and the split Crowe are drawn stretched (Crowe also on its side); the robot and Crowe do not
+attack; the castle tank never appears (its guard-robot placeholder stays a bot). Log causes: the pak mount
+table was at 29 of 30 slots (the robot and Crowe paks were refused, so both ran as bots on human anims;
+stretching also appeared in mapmaker.16 at 29 slots, not at 28); the tank models 0x281/0x297/0x298 are not
+in the scene-100 resource table. Fix after .20: the mount table moves to 64 slots (paktable.json); the tank
+resource entries are being added on the tank branch.
+
 ## MapMaker v0.4.0-mapmaker.17 and .18: in-game checks (2026-11-01)
 
 Local previews on the second Windows 11 PC. v0.4.0-mapmaker.18 (exe SHA-256 prefix 31911b8b, source 0325b04f):

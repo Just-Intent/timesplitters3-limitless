@@ -250,8 +250,8 @@
 #define RBS_EMPTY_TEXT 0x004766D8u      /* sub_0003D7B0(0) */
 #define RBS_PAK 0x0049D77Cu             /* "pak/stream/lv1/anim/lv1_3.pak" */
 #define RBS_MOUNTS 0x006D7880u          /* mounted paks, table of 30 (0x000620F9) */
-#define RBS_MOUNT_MAX 30u
-#define RBS_MOUNT_KEEP 2u               /* leave this many slots for stock streaming */
+#define RBS_MOUNT_MAX 64u               /* paktable.json: 64 slots at 0x00907000 */
+#define RBS_MOUNT_KEEP 8u               /* leave this many slots for stock streaming */
 #define RBS_CONTAINER 0x00784014u
 #define RBS_MAGIC 0x00C77667u
 #define RBS_TAG_INFO 0x00C77668u

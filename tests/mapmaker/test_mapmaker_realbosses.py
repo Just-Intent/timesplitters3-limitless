@@ -64,7 +64,7 @@ MUTATIONS = {
     'set-extra-only-trophy': ('        if(id==RBS_SKEL_ID && !*s) *s=RBS_INFO_SLOTS+k+1u;\n', ''),
     'set-info-only-trophy': ('        if(id==RBS_SKEL_ID && !*s) *s=k+1u;\n', ''),
     'mount-twice': ('    if(rbs_pak_mounted()) return;\n    if((mounted', '    if((mounted'),
-    'mount-fills-table': ('#define RBS_MOUNT_KEEP 2u', '#define RBS_MOUNT_KEEP 0u'),
+    'mount-fills-table': ('#define RBS_MOUNT_KEEP 8u', '#define RBS_MOUNT_KEEP 0u'),
     'mount-ignores-optout': ('    if(!rbs_play() || rbs.optout) return;\n    rbs_set_report("anim pak");', '    if(!rbs_play()) return;\n    rbs_set_report("anim pak");'),
     'wrong-pak': ('#define RBS_PAK 0x0049D77Cu', '#define RBS_PAK 0x0047E624u'),
     'class-after-original': ('        WORD_AT(rec)=RBS_CLASS_LO;WORD_AT(rec+4u)=RBS_CLASS_HI;\n',
