@@ -27,8 +27,8 @@ MUTATIONS = {
     'always-on': ('    return mapmaker_limits.limits;\n}', '    return 1;\n}'),
     'any-mode': ('return msh_on() && WORD_AT(MSH_SCENE)==100u && MSH_B(MSH_MODE)==10u; }', 'return msh_on() && WORD_AT(MSH_SCENE)==100u; }'),
     'any-scene': ('return msh_on() && WORD_AT(MSH_SCENE)==100u && MSH_B(MSH_MODE)==10u; }', 'return msh_on() && MSH_B(MSH_MODE)==10u; }'),
-    'mine-any-scene': ('obj==msh_lv.obj && WORD_AT(MSH_SCENE)==100u && msh_on(); }', 'obj==msh_lv.obj && msh_on(); }'),
-    'mine-any-object': ('return msh_lv.obj && obj==msh_lv.obj && WORD_AT', 'return msh_lv.obj && WORD_AT'),
+    'find-any-scene': ('    if(!obj || WORD_AT(MSH_SCENE)!=100u || !msh_on()) return 0;', '    if(!obj || !msh_on()) return 0;'),
+    'find-any-object': ('if(msh_lv.s[k].obj==obj) return k+1u;', 'return k+1u;'),
     'stale-resmap': ('#define MSH_RESMAP 0x008CA000u', '#define MSH_RESMAP 0x0078B860u'),
     'wrong-id': ('#define MSH_ID 0x75u', '#define MSH_ID 0x74u'),
     # mount
@@ -42,7 +42,7 @@ MUTATIONS = {
     'mount-preset': ('    if(MSH_H(info+MSH_INFO_SET)!=MSH_SET_MAP) return 0;\n', ''),
     'mount-no-slots-11-20': ('    for(k=0;extra && k<MSH_B(extra+3u);k++)', '    for(k=0;0 && extra && k<MSH_B(extra+3u);k++)'),
     'mount-no-unreadable': ('WORD_AT(container)!=MSH_MAGIC) return -1;', 'WORD_AT(container)!=MSH_MAGIC) return 0;'),
-    'mount-keeps-level': ('    memset(&msh_lv,0,sizeof msh_lv);                       /* a new level: forget the last ship */\n', ''),
+    'mount-keeps-level': ('    memset(&msh_lv,0,sizeof msh_lv);                       /* a new level: forget the last ships */\n', ''),
     # requests
     'request-never': ('    for(k=0;k<2u;k++) guest_call(sub_000A5E40,1,msh_models[k]);\n', ''),
     'request-ship-only': ('    for(k=0;k<2u;k++) guest_call(sub_000A5E40,1,msh_models[k]);', '    for(k=0;k<1u;k++) guest_call(sub_000A5E40,1,msh_models[k]);'),
@@ -54,7 +54,7 @@ MUTATIONS = {
     'spawn-before-original': ('    a=WORD_AT(g_esp+4u);\n    original();\n    if(!MAPMAKER_PTR_OK(a,MSH_ACTOR) || MSH_H(a+MSH_ACTOR_CHAR)!=MSH_ID',
                               '    a=WORD_AT(g_esp+4u);\n    if(!MAPMAKER_PTR_OK(a,MSH_ACTOR) || MSH_H(a+MSH_ACTOR_CHAR)!=MSH_ID'),
     'spawn-any-character': (' || MSH_H(a+MSH_ACTOR_CHAR)!=MSH_ID || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;', ' || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;'),
-    'spawn-two': ('    if(msh_lv.obj) {\n        if(msh_lv.extras', '    if(0) {\n        if(msh_lv.extras'),
+    'spawn-one-only': ('    if(msh_lv.n>=MSH_MAX) {', '    if(msh_lv.n>=1u) {'),
     'spawn-without-pak': ('    if(!msh_pak_mounted()) { msh_log("l_64_ch.pak not mounted: the mothership', '    if(0) { msh_log("l_64_ch.pak not mounted: the mothership'),
     'spawn-any-init': ('WORD_AT(e+MSH_RES_INIT)!=MSH_INIT || ', ''),
     'spawn-unready': ('    if((m=msh_models_unready())!=0) {', '    if((m=msh_models_unready())!=0 && 0) {'),
@@ -68,30 +68,45 @@ MUTATIONS = {
     'spawn-hovers-only': ('#define MSH_ATTACK 2u', '#define MSH_ATTACK 1u'),
     'spawn-failed-kept': ('    if(!obj || !MAPMAKER_PTR_OK(obj,0x200u)) { msh_log', '    if(0) { msh_log'),
     # constants
-    'box-not-rebased': ('    msh_rebase(pos[0],pos[1],pos[2]);\n', ''),
-    'box-axes-swapped': ('    msh_setf(MSH_BOX,z-MSH_RANGE);msh_setf(MSH_BOX+4u,z+MSH_RANGE);\n    msh_setf(MSH_BOX+8u,x-MSH_RANGE);msh_setf(MSH_BOX+12u,x+MSH_RANGE);',
-                         '    msh_setf(MSH_BOX,x-MSH_RANGE);msh_setf(MSH_BOX+4u,x+MSH_RANGE);\n    msh_setf(MSH_BOX+8u,z-MSH_RANGE);msh_setf(MSH_BOX+12u,z+MSH_RANGE);'),
-    'dust-not-rebased': ('    msh_setf(MSH_DUST,floor);\n', ''),
-    'never-restored': ('    memset(&msh_lv,0,sizeof msh_lv);                       /* a new level: forget the last ship */\n    msh_restore();\n',
-                       '    memset(&msh_lv,0,sizeof msh_lv);                       /* a new level: forget the last ship */\n'),
-    'restore-after-checks': ('    msh_restore();\n    if(!msh_play()', '    if(!msh_play()'),
-    'saved-each-time': ('    if(!msh.saved) {\n        for(k=0;k<4u;k++) msh.stock[k]', '    {\n        for(k=0;k<4u;k++) msh.stock[k]'),
+    'box-not-rebased': ('    msh_rebase(s,pos[0],pos[1],pos[2]);\n', ''),
+    'box-axes-swapped': ('v[1]=z-MSH_RANGE;v[2]=z+MSH_RANGE;v[3]=x-MSH_RANGE;v[4]=x+MSH_RANGE;', 'v[1]=x-MSH_RANGE;v[2]=x+MSH_RANGE;v[3]=z-MSH_RANGE;v[4]=z+MSH_RANGE;'),
+    'dust-not-rebased': ('v[0]=floor;v[1]', 'v[0]=0.0f;v[1]'),
     # update
     'placeholder-kept': ('            guest_call(sub_0015DDA0,1,ent);\n            msh_log("mothership placeholder AI removed",a,ent);',
                          '            msh_log("mothership placeholder AI removed",a,ent);'),
-    'placeholder-every-frame': ('        a=msh_lv.place;ent=msh_lv.place_ent;msh_lv.place=0;', '        a=msh_lv.place;ent=msh_lv.place_ent;'),
+    'placeholder-every-frame': ('        a=MS.place;ent=MS.place_ent;MS.place=0;', '        a=MS.place;ent=MS.place_ent;'),
     'placeholder-focus-kept': ('WORD_AT(player+MSH_FOCUS)==ent) WORD_AT(player+MSH_FOCUS)=0;', 'WORD_AT(player+MSH_FOCUS)==ent) {}'),
-    'fall-not-shifted': ('    shift=(state==MSH_FALL || state==MSH_CRASH) && msh_sane(msh_lv.floor);', '    shift=0;'),
-    'fall-only': ('    shift=(state==MSH_FALL || state==MSH_CRASH) && msh_sane(msh_lv.floor);', '    shift=state==MSH_FALL && msh_sane(msh_lv.floor);'),
-    'shift-always': ('    shift=(state==MSH_FALL || state==MSH_CRASH) && msh_sane(msh_lv.floor);', '    shift=msh_sane(msh_lv.floor);'),
-    'shift-not-restored': ('    original();\n    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+msh_lv.floor);', '    original();'),
-    'shift-up': ('msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)-msh_lv.floor);\n    original();\n    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+msh_lv.floor);',
-                 'msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+msh_lv.floor);\n    original();\n    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)-msh_lv.floor);'),
+    'fall-not-shifted': ('    shift=(state==MSH_FALL || state==MSH_CRASH) && msh_sane(MS.floor);', '    shift=0;'),
+    'fall-only': ('    shift=(state==MSH_FALL || state==MSH_CRASH) && msh_sane(MS.floor);', '    shift=state==MSH_FALL && msh_sane(MS.floor);'),
+    'shift-always': ('    shift=(state==MSH_FALL || state==MSH_CRASH) && msh_sane(MS.floor);', '    shift=msh_sane(MS.floor);'),
+    'shift-not-restored': ('    original();\n    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+MS.floor);', '    original();'),
+    'shift-up': ('msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)-MS.floor);\n    original();\n    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+MS.floor);', 'msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+MS.floor);\n    original();\n    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)-MS.floor);'),
     # text
     'text-any-caller': (" || WORD_AT(g_esp)!=MSH_RET_BAR_TEXT || !msh.label ||", ' || !msh.label ||'),
-    'text-any-scene': ('       !msh_lv.obj || !msh_play()) { original();return; }\n    g_eax=msh.label;', '       !msh_lv.obj || !msh_on()) { original();return; }\n    g_eax=msh.label;'),
-    'text-no-ship': ('       !msh_lv.obj || !msh_play()) { original();return; }\n    g_eax=msh.label;', '       !msh_play()) { original();return; }\n    g_eax=msh.label;'),
+    'text-any-scene': ('       !msh_lv.n || !msh_play()) { original();return; }\n    g_eax=msh.label;', '       !msh_lv.n || !msh_on()) { original();return; }\n    g_eax=msh.label;'),
+    'text-no-ship': ('       !msh_lv.n || !msh_play()) { original();return; }\n    g_eax=msh.label;', '       !msh_play()) { original();return; }\n    g_eax=msh.label;'),
     'text-no-ret': ('    g_eax=msh.label;\n    MAPMAKER_GUEST_RET();', '    g_eax=msh.label;'),
+    # several ships: each with its own statics
+    'max-three': ('#define MSH_MAX 4u', '#define MSH_MAX 3u'),
+    'restart-makes-another': ('    for(i=0;i<msh_lv.n;i++) if(msh_lv.s[i].place_ent==ent && msh_lv.s[i].obj) return;   /* started again */\n', ''),
+    'spawn-statics-left': ('    msh_load(keep);\n', ''),
+    'spawn-not-saved': ('{ memset(s,0,sizeof *s);msh_save(s->st); }', '{ memset(s,0,sizeof *s); }'),
+    'enter-unsaved': ('    msh_save(p?msh_lv.s[p-1u].st:msh_lv.rest);\n    msh_load(msh_lv.s[k-1u].st);', '    msh_load(msh_lv.s[k-1u].st);'),
+    'enter-outer-as-rest': ('    msh_save(p?msh_lv.s[p-1u].st:msh_lv.rest);', '    msh_save(msh_lv.rest);'),
+    'enter-not-loaded': ('    msh_load(msh_lv.s[k-1u].st);\n    msh_lv.act=k;', '    msh_lv.act=k;'),
+    'leave-unsaved': ('    if(p==k) return;\n    msh_save(msh_lv.s[k-1u].st);\n', '    if(p==k) return;\n'),
+    'leave-always-rest': ('    msh_load(p?msh_lv.s[p-1u].st:msh_lv.rest);', '    msh_load(msh_lv.rest);'),
+    'leave-still-active': ('    msh_lv.act=p;\n}', '}'),
+    'spans-no-ring': ('    {0x0078D500u,21u},', '    {0x0078D500u,0u},'),
+    'spans-no-timer': ('    {0x0075C0DCu,3u},', '    {0x0075C0DCu,0u},'),
+    'spans-no-handle': ('    {0x0078D360u,1u},', '    {0x0078D360u,0u},'),
+    'spans-no-box': ('    {MSH_DUST,5u},', '    {MSH_DUST,0u},'),
+    'update-not-left': ('    original();\n    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+MS.floor);\n    msh_leave(k,p);', '    original();\n    msh_setf(obj+MSH_ENT_POS+4u,msh_getf(obj+MSH_ENT_POS+4u)+MS.floor);'),
+    'update-unshifted-not-left': ('    if(!shift) { original();msh_leave(k,p);return; }', '    if(!shift) { original();return; }'),
+    'slot10-unswapped': ('    if(!msh_lv.n || !MAPMAKER_STACK_OK(8)) { original();return; }\n    msh_run(original,WORD_AT(g_esp+4u));', '    if(!msh_lv.n || !MAPMAKER_STACK_OK(8)) { original();return; }\n    original();'),
+    'damage-unswapped': ('    msh_run(original,WORD_AT(r));', '    original();'),
+    'damage-record-as-ship': ('    msh_run(original,WORD_AT(r));', '    msh_run(original,r);'),
+    'run-not-left': ('    original();\n    msh_leave(k,p);\n}\n\nstatic float msh_getf', '    original();\n}\n\nstatic float msh_getf'),
 }
 
 
@@ -253,6 +268,42 @@ def test_crash_floor_shared():
     assert target(a[0x002185B8]) == 0x000A9070
     # 'ZCTP' focus only when found
     assert ('imm', 0x5054435A) in a[0x0021855F].ops and a[0x0021856E].mnemonic == 'je'
+
+
+def test_per_ship_statics_and_entries():
+    """What the per-ship swap relies on: the statics the ship's code writes,
+    the callbacks its init registers and how each finds its object."""
+    a = by_address()
+    spans = [(0x0049EA84, 5), (0x0075C0DC, 3), (0x0075C0EC, 1), (0x0078D360, 1), (0x0078D500, 21)]
+    def kept(v):
+        return any(lo <= v < lo + 4 * n for lo, n in spans)
+    ship = {0x00217050, 0x002193A0, 0x00215B50, 0x002157B0}
+    stores = set()
+    for i in decoded():
+        if i.function in ship and i.mnemonic in ('mov', 'movss', 'fstp', 'fst') and i.ops and i.ops[0][0] == 'mem':
+            disp = i.ops[0][4]
+            if 0x0075C000 <= disp < 0x0075C200 or 0x0078D000 <= disp < 0x0078D900 or 0x0049E000 <= disp < 0x004A0000:
+                stores.add(disp)
+    # every static the ship's code stores to is kept per ship, except the smoke
+    # template's field 0x0078D0A0, written right before each use (0x002180D4)
+    assert stores and all(kept(v) or v == 0x0078D0A0 for v in stores), sorted(map(hex, stores))
+    assert {0x0075C0DC, 0x0075C0E0, 0x0075C0EC, 0x0078D500} <= stores
+    # the init case: update in slot 3, damage, slot 10, the engine sound level zeroed
+    assert a[0x0021AB03].ops[0][1] == 0x00217050 and a[0x0021AB0D].ops[0][1] == 3
+    assert a[0x0021AB6E].ops[0][1] == 0x002193A0 and target(a[0x0021AB74]) == 0x0009E720
+    assert a[0x0021AB79].ops[0][1] == 0x00215B50 and a[0x0021AB7E].ops[0][1] == 0xA
+    assert mem(a[0x0021ABB8])[0][4] == 0x0075C0E4
+    # the smoke effect: created into the handle 0x0078D360 from the template 0x0078D040
+    assert a[0x00218117].ops[0][1] == 0x0078D040 and a[0x0021811C].ops[0][1] == 0x0078D360 and target(a[0x00218127]) == 0x00111AE0
+    # damage: record at [esp+4] (after sub esp, 0xc and push esi), the object at +0, ship branch by model
+    assert a[0x002193A0].text.endswith('0xc') and mem(a[0x002193A4])[0][4] == 0x14
+    assert mem(a[0x002193A9])[0][4] == 0 and ('imm', 0x539) in a[0x002193AB].ops
+    # slot 10: the object is its first argument ([ebp + 8] after push ebp / mov ebp, esp)
+    assert a[0x00215B50].mnemonic == 'push' and mem(a[0x00215B96])[0][4] == 8
+    # the ring updater runs from the update; the HUD reads 0x0075C0E0 only in the intro scenes
+    assert calls_to(0x002157B0) == {0x002170CA}
+    assert calls_to(0x00217020) == {0x00118BDB, 0x00118BEE}
+    assert ('imm', 2) in a[0x00118BCD].ops and ('imm', 0x1A) in a[0x00118BD2].ops
 
 
 def test_no_level_event():

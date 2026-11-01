@@ -26,8 +26,8 @@ MUTATIONS = {
     'always-on': ('    return mapmaker_limits.limits;\n}', '    return 1;\n}'),
     'any-mode': ('return tnk_on() && WORD_AT(TNK_SCENE)==100u && TNK_B(TNK_MODE)==10u; }', 'return tnk_on() && WORD_AT(TNK_SCENE)==100u; }'),
     'any-scene': ('return tnk_on() && WORD_AT(TNK_SCENE)==100u && TNK_B(TNK_MODE)==10u; }', 'return tnk_on() && TNK_B(TNK_MODE)==10u; }'),
-    'mine-any-scene': ('obj==tnk_lv.obj && WORD_AT(TNK_SCENE)==100u && tnk_on(); }', 'obj==tnk_lv.obj && tnk_on(); }'),
-    'mine-any-object': ('return tnk_lv.obj && obj==tnk_lv.obj && WORD_AT', 'return tnk_lv.obj && WORD_AT'),
+    'mine-any-scene': ('obj && TK.obj==obj && WORD_AT(TNK_SCENE)==100u && tnk_on(); }', 'obj && TK.obj==obj && tnk_on(); }'),
+    'mine-any-object': ('return tnk_lv.act && obj && TK.obj==obj && WORD_AT', 'return tnk_lv.act && obj && WORD_AT'),
     'stale-resmap': ('#define TNK_RESMAP 0x008CA000u', '#define TNK_RESMAP 0x0078B860u'),
     # model requests at story level init
     'request-never': ('    for(k=0;k<3u;k++) guest_call(sub_000A5E40,1,tnk_models[k]);\n', ''),
@@ -66,7 +66,7 @@ MUTATIONS = {
     'spawn-any-character': ('TNK_H(a+TNK_ACTOR_CHAR)!=TNK_ID || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;',
                             '!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;'),
     'spawn-before-original': ('    a=WORD_AT(g_esp+4u);\n    original();\n', '    a=WORD_AT(g_esp+4u);\n'),
-    'spawn-two-tanks': ('    if(tnk_lv.obj) {\n        if(tnk_lv.extras', '    if(0) {\n        if(tnk_lv.extras'),
+    'spawn-two-tanks': ('    if(tnk_lv.n>=TNK_MAX) {', '    if(tnk_lv.n>=1u) {'),
     'spawn-without-pak': ('    if(!tnk_pak_mounted()) { tnk_log("prop6.pak not mounted: the tank', '    if(0) { tnk_log("prop6.pak not mounted: the tank'),
     'spawn-ignores-init': ('|| WORD_AT(e+TNK_RES_INIT)!=TNK_INIT ||', '||'),
     'spawn-wrong-model': ('obj=guest_call(sub_000A6F90,5,TNK_MODEL,', 'obj=guest_call(sub_000A6F90,5,TNK_WRECK,'),
@@ -74,34 +74,33 @@ MUTATIONS = {
     'spawn-no-yaw': ('tnk_setf(args+16u,yaw);', 'tnk_setf(args+16u,0.0f);'),
     'spawn-yaw-as-pitch': ('tnk_setf(args+12u,0.0f);tnk_setf(args+16u,yaw);', 'tnk_setf(args+12u,yaw);tnk_setf(args+16u,0.0f);'),
     'spawn-failed-kept': ('    if(!obj || !MAPMAKER_PTR_OK(obj,0x100u)) {', '    if(!MAPMAKER_PTR_OK(obj,0x100u) && 0) {'),
-    'goal-not-rebased': ('    tnk_setf(TNK_GOAL,tnk_getf(TNK_GOAL)+tnk_lv.d[0]);           /* the init\'s first drive target */\n', ''),
+    'goal-not-rebased': ('    memcpy(&f,&t->block[w],4);f+=t->d[0];memcpy(&t->block[w],&f,4);\n', ''),
     'centre-wrong': ('#define TNK_CX (-12.05f)', '#define TNK_CX (-9.0f)'),
     'centre-z-wrong': ('#define TNK_CZ 1.5f', '#define TNK_CZ (-3.2f)'),
-    'offset-sign': ('tnk_lv.d[0]=pos[0]-TNK_CX;', 'tnk_lv.d[0]=TNK_CX-pos[0];'),
+    'offset-sign': ('t->d[0]=pos[0]-TNK_CX;', 't->d[0]=TNK_CX-pos[0];'),
     # placeholder removal
     'remove-never': ('        guest_call(sub_0015DDA0,1,ent);\n', ''),
-    'remove-every-frame': ('    a=tnk_lv.place;ent=tnk_lv.place_ent;tnk_lv.place=0;', '    a=tnk_lv.place;ent=tnk_lv.place_ent;'),
-    'remove-unchecked': ('WORD_AT(a+TNK_ACTOR_RECORD)==tnk_lv.place_rec && WORD_AT(a)==ent &&', 'WORD_AT(a)==ent &&'),
+    'remove-every-frame': ('    a=TK.place;ent=TK.place_ent;TK.place=0;', '    a=TK.place;ent=TK.place_ent;'),
+    'remove-unchecked': ('WORD_AT(a+TNK_ACTOR_RECORD)==TK.place_rec && WORD_AT(a)==ent &&', 'WORD_AT(a)==ent &&'),
     'remove-focus-kept': ('WORD_AT(player+TNK_FOCUS)==ent) WORD_AT(player+TNK_FOCUS)=0;', 'WORD_AT(player+TNK_FOCUS)==ent) {}'),
-    'remove-any-object': ('    if(!MAPMAKER_STACK_OK(8) || !tnk_mine(WORD_AT(g_esp+4u))) { original();return; }\n    tnk_note_state',
-                          '    if(!MAPMAKER_STACK_OK(8)) { original();return; }\n    tnk_note_state'),
+    'find-any-object': ('if(tnk_lv.t[k].obj==obj) return k+1u;', 'return k+1u;'),
     # wake
     'wake-stock': ('    g_eax=0;\n    x=tnk_getf', '    original();return;\n    x=tnk_getf'),
     'wake-always': ('        if(dx*dx+dz*dz<=TNK_WAKE*TNK_WAKE) { g_eax=1;break; }', '        { g_eax=1;break; }'),
     'wake-dead-player': ('|| !((h=tnk_getf(ent+TNK_ENT_HEALTH))>0.0f)) continue;', ') continue;'),
     'wake-x-only': ('dx*dx+dz*dz<=TNK_WAKE', 'dx*dx<=TNK_WAKE'),
     'wake-first-player-only': ('    for(k=0;k<n && MAPMAKER_PTR_OK', '    for(k=0;k<n && k<1u && MAPMAKER_PTR_OK'),
-    'wake-no-ret': ('    if(g_eax && !tnk_lv.wakes++) tnk_log("castle tank fight started: a player came near",k,tnk_lv.obj);\n    MAPMAKER_GUEST_RET();',
-                    '    if(g_eax && !tnk_lv.wakes++) tnk_log("castle tank fight started: a player came near",k,tnk_lv.obj);'),
-    'wake-any-scene': ('    if(!tnk_lv.obj || !MAPMAKER_STACK_OK(4) || WORD_AT(TNK_SCENE)!=100u || !tnk_on()) { original();return; }\n    g_eax=0;\n    x=',
-                       '    if(!tnk_lv.obj || !MAPMAKER_STACK_OK(4) || !tnk_on()) { original();return; }\n    g_eax=0;\n    x='),
+    'wake-no-ret': ('    if(g_eax && !TK.wakes++) tnk_log("castle tank fight started: a player came near",tnk_lv.act,TK.obj);\n    MAPMAKER_GUEST_RET();',
+                    '    if(g_eax && !TK.wakes++) tnk_log("castle tank fight started: a player came near",tnk_lv.act,TK.obj);'),
+    'wake-any-scene': ('    if(!tnk_lv.act || !MAPMAKER_STACK_OK(4) || WORD_AT(TNK_SCENE)!=100u || !tnk_on()) { original();return; }\n    g_eax=0;\n    x=',
+                       '    if(!tnk_lv.act || !MAPMAKER_STACK_OK(4) || !tnk_on()) { original();return; }\n    g_eax=0;\n    x='),
     # area: the courtyard around the spawn, and the bounded drive target search
     'area-never': ('    g_eax=(uint32_t)tnk_yard(x,z);\n', '    g_eax=0;\n'),
     'area-stock': ('    g_eax=(uint32_t)tnk_yard(x,z);\n', '    original();g_esp-=4u;\n'),
-    'area-unmoved': ('    if(!tnk_lv.shifted) { x-=tnk_lv.d[0];z-=tnk_lv.d[2]; }\n', ''),
-    'area-moved-twice': ('    if(!tnk_lv.shifted) { x-=tnk_lv.d[0];z-=tnk_lv.d[2]; }\n', '    x-=tnk_lv.d[0];z-=tnk_lv.d[2];\n'),
-    'area-moved-plus': ('x-=tnk_lv.d[0];z-=tnk_lv.d[2]; }', 'x+=tnk_lv.d[0];z+=tnk_lv.d[2]; }'),
-    'area-x-only': ('x-=tnk_lv.d[0];z-=tnk_lv.d[2]; }', 'x-=tnk_lv.d[0]; }'),
+    'area-unmoved': ('    if(!tnk_lv.shifted) { x-=TK.d[0];z-=TK.d[2]; }\n', ''),
+    'area-moved-twice': ('    if(!tnk_lv.shifted) { x-=TK.d[0];z-=TK.d[2]; }\n', '    x-=TK.d[0];z-=TK.d[2];\n'),
+    'area-moved-plus': ('x-=TK.d[0];z-=TK.d[2]; }', 'x+=TK.d[0];z+=TK.d[2]; }'),
+    'area-x-only': ('x-=TK.d[0];z-=TK.d[2]; }', 'x-=TK.d[0]; }'),
     'area-y-for-z': ('x=tnk_getf(g_ecx);z=tnk_getf(g_ecx+8u);', 'x=tnk_getf(g_ecx);z=tnk_getf(g_ecx+4u);'),
     'yard-inclusive': ('if(x2>x && x>x1 && z2>z && z>z1) return 1;', 'if(x2>=x && x>=x1 && z2>=z && z>=z1) return 1;'),
     'yard-no-x-swap': ('        if(x1>x2) { t=x1;x1=x2;x2=t; }\n', ''),
@@ -110,32 +109,61 @@ MUTATIONS = {
     'yard-z-misread': ('z1=tnk_getf(r+4u);x2=tnk_getf(r+8u);', 'z1=tnk_getf(r+8u);x2=tnk_getf(r+4u);'),
     'area-any-scene': ('|| WORD_AT(TNK_SCENE)!=100u || !tnk_on() || !MAPMAKER_PTR_OK(g_ecx,12u)) { original();return; }',
                        '|| !tnk_on() || !MAPMAKER_PTR_OK(g_ecx,12u)) { original();return; }'),
-    'area-without-tank': ('    if(!tnk_lv.obj || !MAPMAKER_STACK_OK(4) || WORD_AT(TNK_SCENE)!=100u || !tnk_on() || !MAPMAKER_PTR_OK(g_ecx,12u))',
+    'area-without-tank': ('    if(!tnk_lv.act || !MAPMAKER_STACK_OK(4) || WORD_AT(TNK_SCENE)!=100u || !tnk_on() || !MAPMAKER_PTR_OK(g_ecx,12u))',
                           '    if(!MAPMAKER_STACK_OK(4) || WORD_AT(TNK_SCENE)!=100u || !tnk_on() || !MAPMAKER_PTR_OK(g_ecx,12u))'),
     'search-unbounded': ('        g_eax=1;\n    }\n    MAPMAKER_GUEST_RET();', '    }\n    MAPMAKER_GUEST_RET();'),
-    'search-any-caller': ('    if(!g_eax && WORD_AT(g_esp)==TNK_RET_SEARCH && ++tnk_lv.misses', '    if(!g_eax && ++tnk_lv.misses'),
-    'search-counts-inside': ('    if(!g_eax && WORD_AT(g_esp)==TNK_RET_SEARCH && ++tnk_lv.misses',
-                             '    if(WORD_AT(g_esp)==TNK_RET_SEARCH && ++tnk_lv.misses>=TNK_SEARCH_MAX && !g_eax'),
+    'search-any-caller': ('    if(!g_eax && WORD_AT(g_esp)==TNK_RET_SEARCH && ++TK.misses', '    if(!g_eax && ++TK.misses'),
+    'search-counts-inside': ('    if(!g_eax && WORD_AT(g_esp)==TNK_RET_SEARCH && ++TK.misses',
+                             '    if(WORD_AT(g_esp)==TNK_RET_SEARCH && ++TK.misses>=TNK_SEARCH_MAX && !g_eax'),
     'search-early': ('#define TNK_SEARCH_MAX 64u', '#define TNK_SEARCH_MAX 16u'),
-    'search-not-reset': ('    tnk_lv.misses=0;\n    if(tnk_lv.shifted)', '    if(tnk_lv.shifted)'),
-    'search-log-every': ('        if(tnk_lv.misses==TNK_SEARCH_MAX) tnk_lvlog', '        tnk_lvlog'),
+    'search-not-reset': ('    TK.misses=0;\n    if(tnk_lv.shifted)', '    if(tnk_lv.shifted)'),
+    'search-log-every': ('        if(TK.misses==TNK_SEARCH_MAX) tnk_lvlog', '        tnk_lvlog'),
     # the cannon tracks a player target in state 4
-    'gun-never': ('    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=tnk_lv.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);\n', ''),
-    'gun-after-turn': ('    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=tnk_lv.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);\n    original();', '    original();\n    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=tnk_lv.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);'),
+    'gun-never': ('    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=TK.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);\n', ''),
+    'gun-after-turn': ('    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=TK.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);\n    original();', '    original();\n    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=TK.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);'),
     'gun-any-gun': ('    if(g_ebx!=TNK_CANNON || !tnk_mine(g_edi)', '    if(!tnk_mine(g_edi)'),
     'gun-any-state': ('|| WORD_AT(TNK_STATE)!=TNK_STATE_GUNS ||', '||'),
-    'gun-any-object': ('    if(g_ebx!=TNK_CANNON || !tnk_mine(g_edi)', '    if(g_ebx!=TNK_CANNON || !tnk_lv.obj'),
+    'gun-any-object': ('    if(g_ebx!=TNK_CANNON || !tnk_mine(g_edi)', '    if(g_ebx!=TNK_CANNON || !tnk_lv.act'),
     'gun-ai-targets': ('(uint32_t)idx>=n || ', ''),
     'gun-no-actor': ('    if(!act || !MAPMAKER_PTR_OK(act,0x10u)) return 0;\n', ''),
     'gun-no-target': ('    if(!t || !MAPMAKER_PTR_OK(t,0x100u)) return 0;\n    act=', '    act='),
     'gun-actor-point': ('#define TNK_PLAYER_AIM 0xB4u', '#define TNK_PLAYER_AIM 0xBB4u'),
-    'gun-log-every-frame': ('WORD_AT(aim)!=tnk_lv.cannon[0] || WORD_AT(aim+4u)!=tnk_lv.cannon[1] || WORD_AT(aim+8u)!=tnk_lv.cannon[2]', '1'),
-    'gun-not-remembered': ('WORD_AT(aim+i*4u)=tnk_lv.cannon[i]=WORD_AT(', 'WORD_AT(aim+i*4u)=WORD_AT('),
-    'gun-log-unbudgeted': ('        if(tnk_lv.aims<TNK_AIM_LOGS) {', '        {'),
+    'gun-log-every-frame': ('WORD_AT(aim)!=TK.cannon[0] || WORD_AT(aim+4u)!=TK.cannon[1] || WORD_AT(aim+8u)!=TK.cannon[2]', '1'),
+    'gun-not-remembered': ('WORD_AT(aim+i*4u)=TK.cannon[i]=WORD_AT(', 'WORD_AT(aim+i*4u)=WORD_AT('),
+    'gun-log-unbudgeted': ('        if(TK.aims<TNK_AIM_LOGS) {', '        {'),
+    # several tanks: each with its own statics
+    'max-three': ('#define TNK_MAX 4u', '#define TNK_MAX 3u'),
+    'restart-makes-another': ('    for(i=0;i<tnk_lv.n;i++) if(tnk_lv.t[i].place_ent==ent && tnk_lv.t[i].obj) return;   /* started again */\n', ''),
+    'find-any-scene': ('    if(!obj || WORD_AT(TNK_SCENE)!=100u || !tnk_on()) return 0;', '    if(!obj || !tnk_on()) return 0;'),
+    'enter-rest-unsaved': ('    else tnk_save(tnk_lv.rest,tnk_lv.rest_sounds);\n', ''),
+    'enter-outer-unsaved': ('    if(p) tnk_save(tnk_lv.t[p-1u].block,tnk_lv.t[p-1u].sounds);\n', ''),
+    'enter-not-loaded': ('    tnk_load(tnk_lv.t[k-1u].block,tnk_lv.t[k-1u].sounds);\n    tnk_lv.act=k;', '    tnk_lv.act=k;'),
+    'leave-unsaved': ('    if(p==k) return;\n    tnk_save(tnk_lv.t[k-1u].block,tnk_lv.t[k-1u].sounds);\n', '    if(p==k) return;\n'),
+    'leave-outer-not-back': ('    if(p) tnk_load(tnk_lv.t[p-1u].block,tnk_lv.t[p-1u].sounds);\n    else tnk_load', '    if(p) {}\n    else tnk_load'),
+    'leave-rest-not-back': ('    else tnk_load(tnk_lv.rest,tnk_lv.rest_sounds);\n', ''),
+    'leave-still-active': ('    tnk_lv.act=p;\n}', '}'),
+    'sounds-unsaved': ('    memcpy(sounds,TNK_P(TNK_SOUNDS),TNK_SOUNDS_WORDS*4u);\n', ''),
+    'sounds-not-loaded': ('    memcpy(TNK_P(TNK_SOUNDS),sounds,TNK_SOUNDS_WORDS*4u);\n', ''),
+    'block-short': ('#define TNK_BLOCK_WORDS 0x19u', '#define TNK_BLOCK_WORDS 0x0Du'),
+    'tables-shared': ('t->block[i]=tabs+(w-TNK_TABS);', 't->block[i]=w;'),
+    'tables-not-copied': ('            memcpy(TNK_P(tabs),TNK_P(TNK_TABS),TNK_TABS_SIZE);\n', ''),
+    'tables-one-copy': ('    tabs=tnk.tabs+tnk_lv.n*TNK_TABS_SIZE;', '    tabs=tnk.tabs;'),
+    'spawn-statics-left': ('        tnk_load(keep,keep_sounds);\n', ''),
+    'spawn-xbe-left': ('        memcpy(TNK_P(TNK_TABS),keep_tabs,TNK_TABS_SIZE);\n', ''),
+    'spawn-not-saved': ('            tnk_save(t->block,t->sounds);\n', ''),
+    'update-not-left': ('already gone",a,ent);\n    original();\n    tnk_leave(k,p);', 'already gone",a,ent);\n    original();'),
+    'update-first-frame-not-left': ('    if(!TK.place) { original();tnk_leave(k,p);return; }', '    if(!TK.place) { original();return; }'),
+    'slot7-unswapped': ('void pc_mapmaker_tank_slot7(void (*original)(void))\n{\n    if(!MAPMAKER_STACK_OK(8)) { original();return; }\n    tnk_run(original,WORD_AT(g_esp+4u));', 'void pc_mapmaker_tank_slot7(void (*original)(void))\n{\n    if(!MAPMAKER_STACK_OK(8)) { original();return; }\n    original();'),
+    'slot2-unswapped': ('void pc_mapmaker_tank_slot2(void (*original)(void))\n{\n    if(!MAPMAKER_STACK_OK(8)) { original();return; }\n    tnk_run(original,WORD_AT(g_esp+4u));', 'void pc_mapmaker_tank_slot2(void (*original)(void))\n{\n    if(!MAPMAKER_STACK_OK(8)) { original();return; }\n    original();'),
+    'damage-unswapped': ('    tnk_run(original,WORD_AT(r));', '    original();'),
+    'damage-record-as-tank': ('    tnk_run(original,WORD_AT(r));', '    tnk_run(original,r);'),
+    'bar-unswapped': ('    tnk_run(original,WORD_AT(pl+TNK_FOCUS));', '    original();'),
+    'bar-player-itself': ('    tnk_run(original,WORD_AT(pl+TNK_FOCUS));', '    tnk_run(original,pl);'),
+    'run-not-left': ('    original();\n    tnk_leave(k,p);\n}\n\nstatic float tnk_getf', '    original();\n}\n\nstatic float tnk_getf'),
     # fight-state lines
     'state-log-never': ('    if(s==was) return;\n', '    return;\n'),
     'state-log-every-frame': ('    if(s==was) return;\n', ''),
-    'state-log-not-kept': ('    tnk_lv.seen_state=s;\n', ''),
+    'state-log-not-kept': ('    TK.seen_state=s;\n', ''),
     'state-log-unbudgeted': ('    if(tnk_lv.logs>TNK_LV_LOGS) return;\n', ''),
     'state-log-no-frame': ('    tnk_note_state("fight state at frame start (state, previous)");\n', ''),
     'state-log-no-target': ('    tnk_note_state("fight state at drive target (state, previous)");\n', ''),
@@ -145,16 +173,16 @@ MUTATIONS = {
     'target-unshifted': ('    tnk_shifted(original,0);\n}', '    original();\n}'),
     'target-double-shift': ('    if(tnk_lv.shifted) { original();return; }\n    tnk_shifted(original,0);', '    tnk_shifted(original,0);'),
     'target-any-tank': ('    if(!tnk_mine(g_edi)) { original();return; }\n    tnk_note_state("fight state at drive',
-                        '    if(!tnk_lv.obj) { original();return; }\n    tnk_note_state("fight state at drive'),
+                        '    if(!tnk_lv.act) { original();return; }\n    tnk_note_state("fight state at drive'),
     'shift-no-restore': ('        tnk_setf(tank+TNK_ENT_POS+i*4u,tk[i]);\n', ''),
-    'shift-restore-add': ('        tnk_setf(tank+TNK_ENT_POS+i*4u,tk[i]);\n', '        tnk_setf(tank+TNK_ENT_POS+i*4u,tnk_getf(tank+TNK_ENT_POS+i*4u)+tnk_lv.d[i]);\n'),
-    'shift-target-kept': ('        if(tok) { tp[i]=tnk_getf(t+TNK_ENT_POS+i*4u);tnk_setf(t+TNK_ENT_POS+i*4u,tp[i]-tnk_lv.d[i]); }\n',
+    'shift-restore-add': ('        tnk_setf(tank+TNK_ENT_POS+i*4u,tk[i]);\n', '        tnk_setf(tank+TNK_ENT_POS+i*4u,tnk_getf(tank+TNK_ENT_POS+i*4u)+TK.d[i]);\n'),
+    'shift-target-kept': ('        if(tok) { tp[i]=tnk_getf(t+TNK_ENT_POS+i*4u);tnk_setf(t+TNK_ENT_POS+i*4u,tp[i]-TK.d[i]); }\n',
                           '        if(tok) { tp[i]=tnk_getf(t+TNK_ENT_POS+i*4u); }\n'),
-    'shift-goal-in-world': ('        tnk_setf(TNK_GOAL+i*4u,tnk_getf(TNK_GOAL+i*4u)-tnk_lv.d[i]);\n', ''),
-    'shift-goal-not-back': ('        else tnk_setf(TNK_GOAL+i*4u,tnk_getf(TNK_GOAL+i*4u)+tnk_lv.d[i]);\n', '\n'),
+    'shift-goal-in-world': ('        tnk_setf(TNK_GOAL+i*4u,tnk_getf(TNK_GOAL+i*4u)-TK.d[i]);\n', ''),
+    'shift-goal-not-back': ('        else tnk_setf(TNK_GOAL+i*4u,tnk_getf(TNK_GOAL+i*4u)+TK.d[i]);\n', '\n'),
     'shift-goal-drift': ('        if(WORD_AT(TNK_GOAL+i*4u)==cas[i]) WORD_AT(TNK_GOAL+i*4u)=old[i];   /* not chosen: exactly as before */\n        else ',
                          '        '),
-    'shift-no-y': ('tnk_lv.d[1]=pos[1]-TNK_CY;', 'tnk_lv.d[1]=0.0f;'),
+    'shift-no-y': ('t->d[1]=pos[1]-TNK_CY;', 't->d[1]=0.0f;'),
     'shift-flag-kept': ('    tnk_lv.shifted=0;\n', ''),
     'state-unshifted': ('    tnk_shifted(original,1);\n}', '    tnk_shifted(original,0);\n}'),
     'state-every-change': ('|| WORD_AT(TNK_STATE)!=TNK_STATE_LOW || WORD_AT(TNK_PREV)==TNK_STATE_LOW) { original();return; }',
@@ -164,10 +192,10 @@ MUTATIONS = {
     'guns-one-only': ('        for(k=0;k<TNK_GUN_COUNT;k++)\n', '        for(k=0;k<1u;k++)\n'),
     'guns-wrong-field': ('#define TNK_GUN_AIM 0x10u', '#define TNK_GUN_AIM 0x0u'),
     # wreck, event, text
-    'wreck-stock-park': ('    tnk_setf(tank+TNK_ENT_POS+4u,tnk_lv.spawn[1]+TNK_PARK);\n', ''),
+    'wreck-stock-park': ('    tnk_setf(tank+TNK_ENT_POS+4u,TK.spawn[1]+TNK_PARK);\n', ''),
     'wreck-before-original': ('    uint32_t tank=g_esi;\n    original();\n    if(!tnk_mine(tank)) return;',
                               '    uint32_t tank=g_esi;\n    if(!tnk_mine(tank)) { original();return; }\n    g_esp-=4u;original();'),
-    'wreck-any-object': ('    if(!tnk_mine(tank)) return;\n    tnk_setf', '    if(!tnk_lv.obj) return;\n    tnk_setf'),
+    'wreck-any-object': ('    if(!tnk_mine(tank)) return;\n    tnk_setf', '    if(!tnk_lv.act) return;\n    tnk_setf'),
     'event-kept': ('    if(tnk_lv.events++<4u) tnk_log("tank level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),WORD_AT(g_esp+8u));\n    MAPMAKER_GUEST_RET();',
                    '    if(tnk_lv.events++<4u) tnk_log("tank level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),WORD_AT(g_esp+8u));\n    original();'),
     'event-any-caller': ('WORD_AT(g_esp)!=TNK_RET_EVENT || WORD_AT(TNK_SCENE)', 'WORD_AT(TNK_SCENE)'),
@@ -405,6 +433,50 @@ def test_cannon_aim():
     assert mem(a[0x00251F3B])[0][4] == 0xB8 and mem(a[0x00251F54])[0][4] == 0xBC
     # state 7 drives at the cannon's aim point: the hook leaves state 7 alone
     assert mem(a[0x00254710])[0][4] == 0x140 and mem(a[0x00254718])[0][4] == 0x148
+
+
+def test_per_tank_statics_and_entries():
+    """What the per-tank swap relies on: the statics the tank code uses, the
+    tables reached only through the block, and every way into the code."""
+    a = by_address()
+    tank = [i for i in decoded() if 0x00251700 <= i.function < 0x00256400]
+    def absolute(lo, hi):
+        out = {}
+        for i in tank:
+            for op in i.ops:
+                v = op[4] if op[0] == 'mem' and op[1] is None and op[2] is None else (op[1] if op[0] == 'imm' else None)
+                if v is not None and lo <= v < hi:
+                    out.setdefault(v, set()).add(i.function)
+        return out
+    # sub_00251AA0 zeroes 0x19 words from 0x0078B560 and points the block at the XBE tables
+    assert ('imm', 0x19) in a[0x00251AA7].ops and ('imm', 0x0078B560) in a[0x00251AAC].ops and a[0x00251AB1].mnemonic == 'rep stosd'
+    stores = {mem(a[x])[0][4]: a[x].ops[1][1] for x in (0x00251AF7, 0x00251B01, 0x00251B0B, 0x00251B15)}
+    assert stores == {0x0078B560: 0x0051B9C8, 0x0078B564: 0x0051B998, 0x0078B568: 0x0051B920, 0x0078B56C: 0x0051BB44}
+    # the sound records: 0x1C each from 0x0075F468 to 0x0075F4D8, reset per record
+    assert ('imm', 0x0075F468) in a[0x00251B7D].ops and ('imm', 0x1C) in a[0x00251B88].ops and ('imm', 0x0075F4D8) in a[0x00251B8E].ops
+    # every fight static the tank code names is in the block, or in the castle script's words
+    statics = absolute(0x0078B500, 0x0078B700)
+    assert all(0x0078B560 <= v < 0x0078B5C4 or (0x0078B5E0 <= v <= 0x0078B5F4 and fs == {0x002532D0}) for v, fs in statics.items())
+    # the tables are named only by the reset (everything else goes through the block);
+    # the tags, courtyard and the turret model id after them are read-only
+    tables = absolute(0x0051B920, 0x0051BB44)
+    assert set().union(*tables.values()) == {0x00251AA0}
+    sounds = absolute(0x0075F468, 0x0075F4D8)
+    assert set().union(*sounds.values()) <= {0x00251AA0, 0x00253FC0, 0x00255550}
+    # the callbacks the init registers: update slot 3, slot 7, slot 2, damage (+0x19C)
+    assert [a[x].ops[0][1] for x in (0x002560C5, 0x002560CA, 0x002560D2, 0x002560D7, 0x002560DF, 0x002560E4, 0x002560EC)] ==         [0x00255550, 3, 0x00253840, 7, 0x00253D60, 2, 0x00255FD0]
+    assert target(a[0x002560F2]) == 0x0009E720 and mem(a[0x0009E728])[0][4] == 0x19C
+    # each finds its object: slots 7 and 2 at [esp+4] (after their own pushes), damage at record +0
+    assert a[0x00253840].text.endswith('0x80') and mem(a[0x0025384D])[0][4] == 0x84
+    assert mem(a[0x00253D64])[0][4] == 0x14 and [a[x].mnemonic for x in (0x00253D60, 0x00253D61, 0x00253D62, 0x00253D63)] == ['push'] * 4
+    assert mem(a[0x00255FD9])[0][4] == 4 and mem(a[0x00256000])[0][4] == 0 and target(a[0x0025600D]) == 0x00255EF0
+    assert mem(a[0x00255EF4])[0][4] == 0x1CC                    # sub_00255EF0: its first argument is the tank
+    # the boss bar's timer: only sub_0014CC80, for the object in player 1's focus
+    assert calls_to(0x00251800) == {0x0014CD28}
+    assert mem(a[0x0014CCBD])[0][4] == 0x007B0C7C and mem(a[0x0014CCC3])[0][4] == 0xFF4
+    # the castle's own ways in: its 'KNAT' object, its level scripts
+    assert calls_to(0x00256040) == {0x001E4059} and ('imm', 0x54414E4B) in a[0x001E4044].ops
+    assert calls_to(0x002533E0) == {0x001E782A}
 
 
 def test_death_park_point():

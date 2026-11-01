@@ -6,6 +6,45 @@ decode, US XBE data and game-pak checks of every site below). Wired in
 v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
 No guest-code table entry of its own, no new save bytes.
 
+## Several tanks per map (after v0.4.0-mapmaker.23)
+
+Up to **4** castle tanks per map (`TNK_MAX`); a fifth placeholder stays a
+guard robot bot (logged `at most 4 castle tanks per map`). The tank's code
+keeps its whole fight in statics (CONFIRMED, test
+`test_per_tank_statics_and_entries`), so each tank gets its own copy and the
+area swaps it in around every way into that code:
+
+| what | where | per tank |
+|---|---|---|
+| fight block | `0x0078B560..0x0078B5C3`, the 0x19 words `sub_00251AA0` zeroes (state, previous, timers, drive target, target entity, table pointers ...) | host copy, loaded on entry, saved on return |
+| sound wobble records | `0x0075F468..0x0075F4D7`, 4 x 0x1C (`sub_000E1100`/`sub_000E1200`, plain numbers) | host copy, loaded and saved with the block |
+| parts / drive / gun tables | `0x0051B920` (0x78), `0x0051B998` (0x30), `0x0051B9C8` (0x17C, the five gun records), named only by `sub_00251AA0`; all other code reaches them through block +8/+4/+0 | a guest copy per tank (4 x 0x224 bytes, allocated once per session); the tank's block points at its copy, so the addresses never change for a tank |
+| shared, unchanged | tags `0x0051BB44`, courtyard `0x0051BB58`, turret model id `0x0051BB88` (read-only); effect templates `0x0075F288..0x0075F3E0` (every init builds the same ones); castle script words `0x0078B5E0..F4` (`sub_002532D0` only) | - |
+
+Ways into the tank's code, each run with that tank's state (the statics
+hold exactly what they held before once it returns, also when one tank's
+code runs inside another's, e.g. a shell from tank 2 damaging tank 1):
+
+- update `sub_00255550` (slot 3, object at `[esp+4]`), slot 7
+  `sub_00253840` and slot 2 `sub_00253D60` (object at `[esp+4]`), damage
+  `sub_00255FD0` (damage record at `[esp+4]`, the hit object at +0, as
+  `sub_00255EF0` uses it);
+- the boss bar's state-9 timer `sub_00251800` (only `sub_0014CC80` calls it,
+  for the object in player 1's focus `[0x007B0C7C]+0xFF4`);
+- the spawn: the init (`sub_002560C0` -> `sub_00251AA0`) resets the statics
+  and the XBE tables; the result is copied to the new tank and both are put
+  back as they were.
+- Not needed: `sub_00256040` (called only by the castle's `sub_001E4030` for
+  its tagged 'KNAT' object) and `sub_002533E0` (castle script
+  `sub_001E77E0`).
+
+The other hooks (wake, area, target, state, gun, wreck) run inside an entry
+and act on the active tank: its own castle frame offset d, spawn, wake,
+search count, cannon aim and log lines (`[mapmaker] tank N: ...`). Each tank
+removes its own placeholder on its first frame and is parked under its own
+spawn at its death. The boss bar shows the tank that last took player 1's
+focus (stock: the update sets it when a fight starts).
+
 ## Fixed after v0.4.0-mapmaker.23: the cannon did not aim at the player
 
 Playtest (v0.4.0-mapmaker.23): the tank works; the fight cycles states
@@ -170,7 +209,7 @@ game paks and checked by the test; INFERRED = reasoning.
 | model files | all three only in `pak/stream/lv4/prop6.pak` (string 0x0049DF7C); not in `chr.pak`, `gun.pak` or `l_100.pak` (CONFIRMED, CRC32 index). Textures: not checked separately (INFERRED: inside the .xbr or the same pak) |
 | scene-100 resource rows | 0x281, 0x297, 0x298 are rows of `prop_all_xbas`, the table MapMaker play loads (CONFIRMED) |
 | callbacks (init) | update `sub_00255550` (slot 3), damage `sub_00255FD0` (only damage types 8 and 0xC hurt it), static reset `sub_00251AA0`; health +0x1CC from the difficulty byte (CONFIRMED) |
-| state | static `0x0078B560..0x0078B5F4`: state `[0x0078B594]` 0..10, previous `[0x0078B598]`, drive target `[0x0078B580..88]`, target entity `[0x0078B5B0]`, five gun records `[0x0078B560]` = 0x0051B9C8 (0x4C each, aim point +0x10) (CONFIRMED) -> **one tank per map** |
+| state | static `0x0078B560..0x0078B5F4`: state `[0x0078B594]` 0..10, previous `[0x0078B598]`, drive target `[0x0078B580..88]`, target entity `[0x0078B5B0]`, five gun records `[0x0078B560]` = 0x0051B9C8 (0x4C each, aim point +0x10) (CONFIRMED) -> **a copy per tank** (above) |
 | scene tests | none in the tank's code (CONFIRMED) |
 
 The fight (CONFIRMED from `sub_00255550` and its jump tables 0x00255BDC/
@@ -227,7 +266,7 @@ define) if the integrator prefers another id.
   chunk +0x18 or the sets chunk's slots 11-20); the Story AI chunk is stock.
 - Stock or older builds: the Story AI plays as a guard robot bot.
 - With `TSFP_MAPMAKER_TANK=0`, or when the pak/models cannot be loaded, or
-  for a second placeholder in the same map: a guard robot bot (logged).
+  for a fifth placeholder in the same map: a guard robot bot (logged).
 - The Story AI's own settings (health, Boss flag, logic) do not apply to the
   tank: it is a prop with its own health and damage rules, and its defeat is
   not seen by MapMaker logic (no level event, no AI death).
@@ -251,8 +290,8 @@ do; 0x12 has no Arcade row).
    plain ret). The stock bulk unmount removes it with the level.
 1b. **request** (`sub_0015E7C0`): the three models are requested for the
    load pass (see the v0.4.0-mapmaker.21 fix above).
-2. **ai_start** (`sub_0015B830`): after the original, the first pool entry
-   with character (a+0x48) 0x12, when the pak is mounted and the resource map
+2. **ai_start** (`sub_0015B830`): after the original, each pool entry
+   with character (a+0x48) 0x12 (up to 4 tanks), when the pak is mounted and the resource map
    (`0x008CA000`, moved there by the rooms area) has 0x281 (row +0x2C == `sub_002560C0`), 0x297 and 0x298,
    and all three are loaded or their requests hold the read file:
    `sub_000A6F90(0x281, &pos, &rot, 0, 0)` with pos = the placeholder's
@@ -283,6 +322,10 @@ unchanged when the switch is off or outside scene 100.
 | `WRAP sub_00251CD0 -> pc_mapmaker_tank_area` | courtyard test (ecx = point, eax) | new; behaviour changed after v0.4.0-mapmaker.22 (no wiring change) |
 | `WRAP sub_00254690 -> pc_mapmaker_tank_target` | drive target (edi = tank) | new; must see the guest `g_edi` |
 | `WRAP sub_002522B0 -> pc_mapmaker_tank_gun` | gun turn (no args; ebx = gun, edi = tank) | **new after v0.4.0-mapmaker.23**; must see the guest `g_ebx` and `g_edi` at entry; works before the original |
+| `WRAP sub_00253840 -> pc_mapmaker_tank_slot7` | tank callback slot 7 (cdecl object, arg) | **new for several tanks** |
+| `WRAP sub_00253D60 -> pc_mapmaker_tank_slot2` | tank callback slot 2 (cdecl object) | **new for several tanks** |
+| `WRAP sub_00255FD0 -> pc_mapmaker_tank_damage` | tank damage callback (cdecl damage record) | **new for several tanks** |
+| `WRAP sub_00251800 -> pc_mapmaker_tank_bar` | boss bar state-9 timer (no args, returns on the x87 stack) | **new for several tanks**; the hook only swaps memory around the original |
 | `WRAP sub_00255390 -> pc_mapmaker_tank_state` | state entry (eax = tank) | new; must see the guest `g_eax` at entry |
 | `WRAP sub_00255C20 -> pc_mapmaker_tank_wreck` | death (esi = tank) | new |
 | `WRAP sub_002274C0 -> pc_mapmaker_tank_event` | level event (cdecl) | **shared** with `pc_mapmaker_realbosses_event` (and other boss ports); order free: each matches only its own return addresses |
@@ -291,7 +334,7 @@ unchanged when the switch is off or outside scene 100.
 Guest functions called: `sub_00062260` (is a pak mounted), `sub_000622D0`
 (mount), `sub_000A5E40` (request a model), `sub_000631C0` (find a model's
 request), `sub_000A6F90` (create the tank), `sub_0015DDA0` (remove the
-placeholder AI). Host: `xbox_HeapAlloc` (labels, 32-byte argument buffer,
+placeholder AI). Host: `xbox_HeapAlloc` (labels, 32-byte argument buffer, the 4 x 0x224-byte tank tables,
 once per session). The area stubs (`tests/mapmaker/mapmaker_area_stubs.h`)
 need `sub_000622D0`, `sub_000A6F90`, `sub_000A5E40` and `sub_000631C0` when
 the include chain links this area (`sub_00062260` and `sub_0015DDA0` are
