@@ -1,10 +1,11 @@
 # MapMaker Khallos in the flying chair (story mission 4 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_khallos.inc` (area
-`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 149
+`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 178
 mutations, plus decode, US XBE data and game-pak checks of every site below).
-**Not wired, not built, not played**: the integrator adds the wrappers
-[below](#wrappers-for-the-integrator) and the picker row. No guest-code table,
+Wired in v0.4.0-mapmaker.25 (picker row 156); **up to four chairs per map**
+since then ([Several chairs](#several-chairs)), with three new wrappers and
+more logging ([Not appearing in .25](#not-appearing-in-v040-mapmaker25)). No guest-code table,
 no new save bytes. Switch: `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_KHALLOS=0`
 turns only this boss off (its placeholder then plays as an ordinary bot).
 
@@ -23,7 +24,7 @@ data or the game paks and checked by the test; INFERRED = reasoning.
 | chair | a **prop**: model 0x376 `TRAIN_KHALLOSJETPACK`, resource type 0x4000000, path `train/khallosjetpack`, init index 30 -> `sub_001F4E00` case 0x376 (jump table 0x001F596C/0x001F58B4 -> 0x001F5281) (CONFIRMED) |
 | model file | only `pak/stream/lv11/prop3/4/6/7.pak`; not `chr.pak`, `gun.pak`, `l_100.pak`. Only prop1-4 have XBE path strings; this area mounts prop3.pak (string 0x0049E1D0, 694 KB) (CONFIRMED). Textures: not checked separately (INFERRED: inside the .xbr, as for the tank) |
 | scene-100 row | 0x376 is a row of `prop_all_xbas` (the table MapMaker play loads) (CONFIRMED) |
-| init | `sub_001EEA30` (esi = chair): zeroes `0x0078F000..0x0078F06F`, `[0x0078F000]` = chair, live position `[0x0078F004..0C]` = (-576.2, 7.5, 0), active flag `[0x0078F04C]` = 0, jet emitter `[0x0078F054]`, health 60 (+0x1CC/+0x1D8); update `sub_001EEBD0` (slot 3), damage `sub_001EF840` (CONFIRMED) -> **one chair per map** |
+| init | `sub_001EEA30` (esi = chair): zeroes `0x0078F000..0x0078F06F`, `[0x0078F000]` = chair, live position `[0x0078F004..0C]` = (-576.2, 7.5, 0), active flag `[0x0078F04C]` = 0, jet emitter `[0x0078F054]`, health 60 (+0x1CC/+0x1D8); update `sub_001EEBD0` (slot 3), damage `sub_001EF840` (CONFIRMED) -> kept per chair by this area ([Several chairs](#several-chairs)) |
 | other variant | when `[[0x007B0C7C]+0x1568]` is 0xE or 0xF the init takes the train's "rising away" variant (`sub_001EFBA0`), which never sets `[0x0078F000]` at creation (CONFIRMED). Meaning of +0x1568 unknown |
 | seated Khallos | a **separate story AI of class 8** (AI +0x14 = 8, +0x10 = 0: `sub_0027D590` 0x0027D5B4 -> `sub_00263260`): plays `khallosidle` (0xBFB) and copies the chair's live position + its rotated seat offset (chair +0x274) and angles every frame (CONFIRMED). The research's open question "is the rider part of the mesh" is answered: no rider in the mesh is needed, the train seats an AI (INFERRED from the handler) |
 | rider anim | `khallosidle` 0xBFB is named only by `pak/stream/lv11/anim/lv11.pak` (string 0x0049D9C8, table 0x00484410, 33 anims 0xB99..0xBFB, 300,416 B), registered by `sub_001CA2F0` at 0x001CA8D8 when mounted; no id collides with a global anim pak (CONFIRMED) |
@@ -52,6 +53,46 @@ The fight (`sub_001EEBD0`, CONFIRMED; meanings INFERRED):
   the train setup (`sub_001F1260`, `sub_001F5A10`) fills.
 - **After death** the update rockets the chair away (thrust x4) for ever; the
   chair is never removed (the train's script takes over, INFERRED).
+
+## Not appearing in v0.4.0-mapmaker.25
+
+Playtest log (`logs/mapmaker25-bossmap.err`, one map per boss): in the chair's
+map each level logs `mounted prop3.pak` and `requested the chair model`, then
+nothing. That level shows **no AI start of any character**: the realbosses
+area logs every AI start while its walker state exists (allocated in every
+level, cap 12 per level never reached), and the tank's and the trophy
+monster's maps show the same gap, while the walker, Crowe, robot, skeleton,
+worm and mothership maps start theirs. So the placeholder AI never reached
+`sub_0015B830`: the cause is upstream of this area (shared with the tank and
+the trophy monster; reported to the main session). Ruled out: the
+mothership's `l_64_ch.pak` prop table (identical to `l_100.pak`'s, checked),
+and the character maker's model map (`0x000DAC6F` is relocated by the rooms
+area). New log lines to pin it down next time: every placeholder or Khallos
+character made by `sub_000DAC30` (with its pool slot and object, or `NOT
+made`), every AI start of id 0x33, and each step of the chair (created, anchor
+rebased, rider, fight, shot down, removed).
+
+## Several chairs
+
+User (2026-11-01): "All of these one-per-map limits need fixed." The chair's
+code keeps its state in globals (CONFIRMED, `test_multi_chair_globals`):
+
+| global | users | here |
+|---|---|---|
+| `0x0078F000..0x0078F06F` (object, live position, velocity, thrust, active flag, jet emitter, gun toggle, fire timer, the rider's sway +0x60..+0x6C) | the init `sub_001EEA30`, the update, the damage callback, the rising variant, the init switch `sub_001F4E00`, the seated Khallos' handler `sub_00263260` and his pose callback `sub_00263150` | **per chair** |
+| `[0x0078DF50..58]` the death's emitters (made by the init through `sub_00378530`) | the init, the damage callback | **per chair** |
+| `[0x00500088]`, `[0x00500094]` | the update only (set and restored around each call already) | per call |
+
+The globals of chair k are loaded around every entry into that code and
+saved back after, the previous values restored (nests): the creation (the
+init writes the new chair's values; a failed creation puts the old ones back),
+the update, the damage callback (it reads `[0x0078F000]`, not the object hit;
+the dispatcher `sub_000BB490` passes the object hit at record +0, which picks
+the chair), and the seated Khallos' handler and pose callback (the chair he
+rides). Each chair has its own placeholder (removed on its first frame), its
+own rider (the nearest unbound Khallos within 5 m), its own frame (moved to
+its own spawn) and its own removal. Cap: four (`KHL_MAX`); a fifth
+placeholder stays a soldier (logged).
 
 ## Train assumptions and what this area does about them
 
@@ -116,7 +157,7 @@ Khallos is untouched.
 - Save format: **unchanged** (stock custom-set members, stock Story AI chunks).
 - Stock or older builds: a soldier bot and a Khallos bot.
 - With `TSFP_MAPMAKER_KHALLOS=0`, when the pak or model cannot be loaded, the
-  train's other variant runs, or for a second placeholder: a soldier bot (logged).
+  train's other variant runs, or for a fifth placeholder: a soldier bot (logged).
 - The Story AI's own settings (health, Boss flag, logic) do not apply to the
   chair: it is a prop with its own health (60) and damage rules, and its defeat
   is not seen by MapMaker logic. The rider is removed with the chair (whether
@@ -175,6 +216,9 @@ level's chair.
 | `WRAP sub_000EA9C0 -> pc_mapmaker_khallos_shot` | projectile (cdecl), hot | new; inside the update at 0x001EF75B |
 | `WRAP sub_00045820 -> pc_mapmaker_khallos_sound` | sound (cdecl record), hot | new; inside the update at 0x001EF7B4 |
 | `WRAP sub_000468A0 -> pc_mapmaker_khallos_engine` | looping sound (cdecl), hot | new; inside the update at 0x001EF824 |
+| `WRAP sub_00263260 -> pc_mapmaker_khallos_rider` | seated Khallos' handler (cdecl entity) | **new (several chairs)**; only for this level's riders |
+| `WRAP sub_00263150 -> pc_mapmaker_khallos_rider_pose` | his pose callback (cdecl entity) | **new (several chairs)**; reached through a stored pointer, so the lifted function is wrapped |
+| `WRAP sub_000DAC30 -> pc_mapmaker_khallos_create` | character maker (cdecl id, .., pool slot) | **new (log only)**; **shared** with `pc_mapmaker_realbosses_create`, order free |
 
 The five world-call wrappers test one flag first (set only while the chair's
 update runs in the moved frame), so they cost one load elsewhere. Host code
@@ -233,5 +277,11 @@ guide entry for this area.
 4. Shoot it: hits spin it; map logic markers are unaffected.
 5. Bring it to 0: it shoots upward and vanishes, with its rider (log `chair
    shot down`, `flew off and was removed`, `rider removed with the chair`).
-6. A second placeholder stays a soldier; `TSFP_MAPMAKER_KHALLOS=0` gives a
-   soldier; story mission 4 still plays stock.
+6. Two to four placeholders: each becomes a chair flying around its own
+   spawn (log `chair N spawn (...)`); shooting one down removes only that one
+   (and its rider). A fifth stays a soldier; `TSFP_MAPMAKER_KHALLOS=0` gives
+   a soldier; story mission 4 still plays stock.
+7. If no chair appears: the log should now say whether the placeholder
+   character was made (`chair placeholder character made` / `NOT made`) and
+   whether its AI started (`chair placeholder AI starts`). Neither line means
+   the map never spawned that Story AI.

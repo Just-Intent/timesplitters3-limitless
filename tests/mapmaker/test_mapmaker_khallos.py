@@ -22,52 +22,42 @@ MUTATIONS = {
     'always-on': ('    return mapmaker_limits.limits;\n}', '    return 1;\n}'),
     'any-mode': ('return khl_on() && WORD_AT(KHL_SCENE)==100u && KHL_B(KHL_MODE)==10u; }', 'return khl_on() && WORD_AT(KHL_SCENE)==100u; }'),
     'any-scene': ('return khl_on() && WORD_AT(KHL_SCENE)==100u && KHL_B(KHL_MODE)==10u; }', 'return khl_on() && KHL_B(KHL_MODE)==10u; }'),
-    'mine-any-scene': ('obj==khl_lv.obj && WORD_AT(KHL_SCENE)==100u && khl_on(); }', 'obj==khl_lv.obj && khl_on(); }'),
-    'mine-any-object': ('return khl_lv.obj && obj==khl_lv.obj && WORD_AT', 'return khl_lv.obj && WORD_AT'),
+    'mine-any-scene': ('    if(!obj || !khl_lv.n || WORD_AT(KHL_SCENE)!=100u || !khl_on()) return -1;', '    if(!obj || !khl_lv.n || !khl_on()) return -1;'),
+    'mine-any-object': ('    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].obj==obj) return (int)k;', '    for(k=0;k<khl_lv.n;k++) return (int)k;'),
     'stale-resmap': ('#define KHL_RESMAP 0x008CA000u', '#define KHL_RESMAP 0x0078B860u'),
     'wrong-id': ('#define KHL_ID 0x33u', '#define KHL_ID 0x34u'),
-    # mount
     'mount-wrong-pak': ('#define KHL_PAK 0x0049E1D0u', '#define KHL_PAK 0x0049E1B4u'),
     'mount-loads-whole': ('guest_call(sub_000622D0,3,KHL_PAK,0u,1u)', 'guest_call(sub_000622D0,3,KHL_PAK,1u,1u)'),
     'mount-any-map': ('if(!khl_play() || khl.optout || (has=khl_map_has(KHL_ID))==0) return;', 'if(!khl_play() || khl.optout || (has=1)==0) return;'),
     'mount-ignores-optout': ('if(!khl_play() || khl.optout || (has=khl_map_has(KHL_ID))==0) return;', 'if(!khl_play() || (has=khl_map_has(KHL_ID))==0) return;'),
     'mount-twice': ('    if(khl_mounted(KHL_PAK)) return;\n    if((mounted', '    if((mounted'),
     'mount-fills-table': ('#define KHL_MOUNT_KEEP 8u', '#define KHL_MOUNT_KEEP 0u'),
-    'mount-off-by-one': ('if((mounted=WORD_AT(KHL_MOUNTS))+KHL_MOUNT_KEEP>KHL_MOUNT_MAX) {\n        khl_log("pak mount table full; the chair',
-                         'if((mounted=WORD_AT(KHL_MOUNTS))+KHL_MOUNT_KEEP>=KHL_MOUNT_MAX) {\n        khl_log("pak mount table full; the chair'),
+    'mount-off-by-one': ('if((mounted=WORD_AT(KHL_MOUNTS))+KHL_MOUNT_KEEP>KHL_MOUNT_MAX) {\n        khl_log("pak mount table full; the chair', 'if((mounted=WORD_AT(KHL_MOUNTS))+KHL_MOUNT_KEEP>=KHL_MOUNT_MAX) {\n        khl_log("pak mount table full; the chair'),
     'mount-preset': ('    if(KHL_H(info+KHL_INFO_SET)!=KHL_SET_MAP) return 0;\n', ''),
     'mount-no-unreadable': ('WORD_AT(container)!=KHL_MAGIC) return -1;', 'WORD_AT(container)!=KHL_MAGIC) return 0;'),
     'mount-skips-extra': ('    for(k=0;extra && k<KHL_B(extra+3u);k++)', '    for(k=0;0 && extra && k<KHL_B(extra+3u);k++)'),
     'mount-ignores-count': ('    if(n>KHL_INFO_SLOTS) n=KHL_INFO_SLOTS;', '    n=KHL_INFO_SLOTS;'),
     'mount-resets-when-idle': ('    if(WORD_AT(KHL_MOUNT_SKIP)) { original();return; }    /* the original does nothing */\n', ''),
-    'mount-keeps-old-chair': ('    memset(&khl_lv,0,sizeof khl_lv);                       /* a new level: forget the last chair */\n', ''),
-    # anims
+    'mount-keeps-old-chair': ('    memset(khl_ch,0,sizeof khl_ch);\n    khl_lv.cur=-1;', '    khl_lv.cur=-1;'),
     'anims-wrong-pak': ('#define KHL_ANIM_PAK 0x0049D9C8u', '#define KHL_ANIM_PAK 0x0049D8C8u'),
     'anims-without-rider': ('|| !khl_map_has(KHL_ID) || !khl_map_has(KHL_RIDER_ID)) return;', '|| !khl_map_has(KHL_ID)) return;'),
     'anims-without-chair': ('|| !khl_map_has(KHL_ID) || !khl_map_has(KHL_RIDER_ID)) return;', '|| !khl_map_has(KHL_RIDER_ID)) return;'),
     'anims-twice': ('    if(khl_mounted(KHL_ANIM_PAK)) return;\n', ''),
     'anims-fills-table': ('khl_log("pak mount table full; no seated Khallos",mounted,KHL_MOUNT_MAX);\n        return;', 'khl_log("pak mount table full; no seated Khallos",mounted,KHL_MOUNT_MAX);'),
     'anims-any-scene': ('    if(!khl_play() || khl.optout || !khl_map_has(KHL_ID)', '    if(!khl_on() || khl.optout || !khl_map_has(KHL_ID)'),
-    'anims-before-original': ('    uint32_t mounted;\n    original();\n    if(!khl_play() || khl.optout || !khl_map_has(KHL_ID)',
-                              '    uint32_t mounted;\n    if(!khl_play() || khl.optout || !khl_map_has(KHL_ID)'),
-    # request
+    'anims-before-original': ('    uint32_t mounted;\n    original();\n    if(!khl_play() || khl.optout || !khl_map_has(KHL_ID)', '    uint32_t mounted;\n    if(!khl_play() || khl.optout || !khl_map_has(KHL_ID)'),
     'request-never': ('    guest_call(sub_000A5E40,1,KHL_MODEL);\n', ''),
     'request-wrong-model': ('    guest_call(sub_000A5E40,1,KHL_MODEL);', '    guest_call(sub_000A5E40,1,0x377u);'),
-    'request-before-original': ('    original();\n    if(!khl_play() || khl.optout || khl_map_has(KHL_ID)==0) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init',
-                                '    if(!khl_play() || khl.optout || khl_map_has(KHL_ID)==0) { original();return; }\n    guest_call(sub_000A5E40,1,KHL_MODEL);original();g_esp-=4u;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init'),
-    'request-any-map': ('    if(!khl_play() || khl.optout || khl_map_has(KHL_ID)==0) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init',
-                        '    if(!khl_play() || khl.optout) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init'),
-    'request-any-scene': ('    if(!khl_play() || khl.optout || khl_map_has(KHL_ID)==0) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init',
-                          '    if(!khl_on() || khl.optout || khl_map_has(KHL_ID)==0) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init'),
+    'request-before-original': ('    original();\n    if(!khl_play() || khl.optout || khl_map_has(KHL_ID)==0) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init', '    if(!khl_play() || khl.optout || khl_map_has(KHL_ID)==0) { original();return; }\n    guest_call(sub_000A5E40,1,KHL_MODEL);original();g_esp-=4u;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init'),
+    'request-any-map': ('    if(!khl_play() || khl.optout || khl_map_has(KHL_ID)==0) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init', '    if(!khl_play() || khl.optout) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init'),
+    'request-any-scene': ('    if(!khl_play() || khl.optout || khl_map_has(KHL_ID)==0) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init', '    if(!khl_on() || khl.optout || khl_map_has(KHL_ID)==0) return;\n    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init'),
     'request-without-pak': ('    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted at level init', '    if(0) { khl_log("prop3.pak not mounted at level init'),
     'request-without-row': ('    if(!khl_resource(KHL_MODEL)) { khl_log("no resource row', '    if(0) { khl_log("no resource row'),
     'ready-ignored': ('    if(!khl_model_ready(e,&req)) {', '    if(0 && !khl_model_ready(e,&req)) {'),
     'ready-empty-request': ('    return r && MAPMAKER_PTR_OK(r,0x14u) && WORD_AT(r+KHL_REQ_DATA)!=0;', '    return r && MAPMAKER_PTR_OK(r,0x14u);'),
     'ready-no-lod': ('    return !(path=WORD_AT(e+KHL_RES_LOD)) || khl_path_ready(path,req);', '    (void)path;return 1;'),
     'ready-loaded-ignored': ('    if(WORD_AT(e+KHL_RES_LOADED)) return 1;             /* loaded before: no file read */\n', ''),
-    # spawn
     'spawn-before-original': ('    a=WORD_AT(g_esp+4u);\n    original();\n', '    a=WORD_AT(g_esp+4u);\n'),
-    'spawn-two-chairs': ('    if(khl_lv.obj) {\n        if(khl_lv.extras', '    if(0) {\n        if(khl_lv.extras'),
     'spawn-without-pak': ('    if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted: the chair', '    if(0) { khl_log("prop3.pak not mounted: the chair'),
     'spawn-ignores-init': ('|| WORD_AT(e+KHL_RES_INIT)!=KHL_INIT) {', ') {'),
     'spawn-wrong-model': ('obj=guest_call(sub_000A6F90,5,KHL_MODEL,', 'obj=guest_call(sub_000A6F90,5,0x377u,'),
@@ -75,32 +65,29 @@ MUTATIONS = {
     'spawn-no-yaw': ('khl_setf(args+16u,yaw);', 'khl_setf(args+16u,0.0f);'),
     'spawn-failed-kept': ('    if(!obj || !MAPMAKER_PTR_OK(obj,0x100u)) {', '    if(!MAPMAKER_PTR_OK(obj,0x100u) && 0) {'),
     'variant-kept': ("    if(WORD_AT(KHL_OBJ)!=obj) {                            /* the train's rising variant */", '    if(0) {'),
-    'variant-not-removed': ('        guest_call(sub_000A9070,1,obj);\n        khl_log("the chair took', '        khl_log("the chair took'),
+    'variant-not-removed': ('        guest_call(sub_000A9070,1,obj);\n        khl_out(k,keep);\n        khl_log("the chair took', '        khl_out(k,keep);\n        khl_log("the chair took'),
     'anchor-not-rebased': ('    khl_setf(KHL_POS,pos[0]);khl_setf(KHL_POS+4u,pos[1]+KHL_LIFT);khl_setf(KHL_POS+8u,pos[2]);\n', ''),
     'anchor-no-lift': ('khl_setf(KHL_POS+4u,pos[1]+KHL_LIFT);', 'khl_setf(KHL_POS+4u,pos[1]);'),
     'object-not-placed': ('    for(i=0;i<3u;i++) khl_setf(obj+KHL_ENT_POS+i*4u,khl_getf(KHL_POS+i*4u));\n', ''),
-    # rider
     'rider-any-character': ('    if(id==KHL_RIDER_ID) {', '    if(id==KHL_RIDER_ID || id==0x34u) {'),
-    'rider-any-distance': ('        if(dx*dx+dz*dz<=bd) { bd=dx*dx+dz*dz;best=k; }', '        if(1) { bd=dx*dx+dz*dz;best=k; }'),
-    'rider-first-not-nearest': ('        if(dx*dx+dz*dz<=bd) { bd=dx*dx+dz*dz;best=k; }', '        if(dx*dx+dz*dz<=bd && best==KHL_CANDS) { best=k; }'),
-    'rider-x-only': ('dx=khl_lv.cand_x[k]-khl_lv.spawn[0];dz=khl_lv.cand_z[k]-khl_lv.spawn[2];', 'dx=khl_lv.cand_x[k]-khl_lv.spawn[0];dz=0.0f;'),
+    'rider-any-distance': ('        if(dx*dx+dz*dz<=bd) { bd=dx*dx+dz*dz;best=c; }', '        if(1) { bd=dx*dx+dz*dz;best=c; }'),
+    'rider-first-not-nearest': ('        if(dx*dx+dz*dz<=bd) { bd=dx*dx+dz*dz;best=c; }', '        if(dx*dx+dz*dz<=bd && best==KHL_CANDS) { best=c; }'),
+    'rider-x-only': ('dx=khl_lv.cand_x[c]-khl_ch[k].spawn[0];dz=khl_lv.cand_z[c]-khl_ch[k].spawn[2];', 'dx=khl_lv.cand_x[c]-khl_ch[k].spawn[0];dz=0.0f;'),
     'rider-without-anims': ('    if(!khl_mounted(KHL_ANIM_PAK)) { khl_log("lv11.pak not mounted', '    if(0) { khl_log("lv11.pak not mounted'),
-    'rider-stale-entry': ('        if(!khl_same_ai(khl_lv.cand[k],khl_lv.cand_ent[k],khl_lv.cand_rec[k])) continue;\n', ''),
-    'rider-two': ('    if(!khl_lv.obj || khl_lv.rider || khl_lv.removed) return;', '    if(!khl_lv.obj || khl_lv.removed) return;'),
+    'rider-stale-entry': ('        if(khl_lv.cand_bound[c] || !khl_same_ai(khl_lv.cand[c],khl_lv.cand_ent[c],khl_lv.cand_rec[c])) continue;', '        if(khl_lv.cand_bound[c]) continue;'),
+    'rider-two': ('    if(!khl_ch[k].obj || khl_ch[k].rider || khl_ch[k].removed) return;', '    if(!khl_ch[k].obj || khl_ch[k].removed) return;'),
     'rider-wrong-class': ('#define KHL_RIDER_CLASS 8u', '#define KHL_RIDER_CLASS 0x80u'),
     'rider-class-hi-kept': ('    WORD_AT(a+KHL_AI_CLASS_HI)=0;WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;', '    WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;'),
     'rider-no-state': ("    WORD_AT(a+KHL_AI_NEXT)=0;                             /* the handler's state 0: sit down */\n", ''),
-    'rider-not-after-chair': ('            khl_bind_rider();\n        }\n        return;', '        }\n        return;'),
-    'rider-not-at-chair': ('    fflush(stderr);\n    khl_bind_rider();\n}', '    fflush(stderr);\n}'),
+    'rider-not-after-chair': ('            for(k=0;k<khl_lv.n;k++) khl_bind_rider(k);\n', ''),
+    'rider-not-at-chair': ('    fflush(stderr);\n    khl_bind_rider(k);\n}', '    fflush(stderr);\n}'),
     'rider-not-removed': ('    khl_unfocus(ent);\n    guest_call(sub_0015DDA0,1,ent);\n    khl_log("rider removed', '    khl_unfocus(ent);\n    khl_log("rider removed'),
-    'rider-remove-unchecked': ('    if(!khl_same_ai(a,ent,khl_lv.rider_rec)) { khl_log("the rider is already gone",a,ent);return; }\n', ''),
-    # placeholder removal
-    'remove-never': ('            guest_call(sub_0015DDA0,1,ent);\n            khl_log("chair placeholder AI removed"', '            khl_log("chair placeholder AI removed"'),
-    'remove-every-frame': ('        a=khl_lv.place;ent=khl_lv.place_ent;khl_lv.place=0;', '        a=khl_lv.place;ent=khl_lv.place_ent;'),
-    'remove-unchecked': ('        if(khl_same_ai(a,ent,khl_lv.place_rec)) {', '        if(1) {'),
+    'rider-remove-unchecked': ('    if(!khl_same_ai(a,ent,khl_ch[k].rider_rec)) { khl_log("the rider is already gone",a,ent);return; }\n', ''),
+    'remove-never': ('            guest_call(sub_0015DDA0,1,ent);\n            khl_log("chair placeholder AI removed', '            khl_log("chair placeholder AI removed'),
+    'remove-every-frame': ('        a=khl_ch[k].place;ent=khl_ch[k].place_ent;khl_ch[k].place=0;', '        a=khl_ch[k].place;ent=khl_ch[k].place_ent;'),
+    'remove-unchecked': ('        if(khl_same_ai(a,ent,khl_ch[k].place_rec)) {', '        if(1) {'),
     'remove-focus-kept': ('    if(MAPMAKER_PTR_OK(player,KHL_FOCUS+4u) && WORD_AT(player+KHL_FOCUS)==ent) WORD_AT(player+KHL_FOCUS)=0;', '    (void)player;(void)ent;'),
     'same-ai-no-record': ('    return MAPMAKER_PTR_OK(a,KHL_ACTOR) && WORD_AT(a+KHL_ACTOR_RECORD)==rec && WORD_AT(a)==ent &&', '    return MAPMAKER_PTR_OK(a,KHL_ACTOR) && (rec|1u) && WORD_AT(a)==ent &&'),
-    # wake
     'wake-stock-line': ('        WORD_AT(KHL_LINE)=KHL_FLT_LOW;\n', ''),
     'wake-always': ('        if(dx*dx+dz*dz<=KHL_WAKE*KHL_WAKE) return 1;', '        return 1;'),
     'wake-dead-player': ('|| !(khl_getf(ent+KHL_ENT_HEALTH)>0.0f)) continue;', ') continue;'),
@@ -109,14 +96,13 @@ MUTATIONS = {
     'wake-line-not-forced': ('    WORD_AT(KHL_LINE)=KHL_FLT_MAX;\n    khl_setf(KHL_GAP,px-tx);', '    khl_setf(KHL_GAP,px-tx);'),
     'line-not-restored': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;\n    if(', '    WORD_AT(KHL_GAP)=gap;\n    if('),
     'line-wait-not-restored': ('        original();\n        WORD_AT(KHL_LINE)=line;\n        return;', '        original();\n        return;'),
-    # moved frame
     'frame-none': ('    khl_shift_in(obj);\n    khl_lv.inside=1;', '    khl_lv.inside=1;'),
     'frame-not-back': ('    khl_lv.inside=0;\n    khl_shift_out(obj);', '    khl_lv.inside=0;'),
-    'frame-no-lift': ('    khl_lv.d[1]=khl_lv.spawn[1]+KHL_LIFT-KHL_TRAIN_Y;', '    khl_lv.d[1]=khl_lv.spawn[1]-KHL_TRAIN_Y;'),
-    'frame-no-y': ('    khl_lv.d[1]=khl_lv.spawn[1]+KHL_LIFT-KHL_TRAIN_Y;', '    khl_lv.d[1]=0.0f;'),
-    'frame-z-spawn': ('    khl_lv.d[2]=khl_clamp(khl_getf(p+KHL_P_POS+8u),khl_lv.spawn[2]-KHL_ROAM,khl_lv.spawn[2]+KHL_ROAM);', '    khl_lv.d[2]=khl_lv.spawn[2];'),
-    'frame-z-unclamped': ('    khl_lv.d[2]=khl_clamp(khl_getf(p+KHL_P_POS+8u),khl_lv.spawn[2]-KHL_ROAM,khl_lv.spawn[2]+KHL_ROAM);', '    khl_lv.d[2]=khl_getf(p+KHL_P_POS+8u);'),
-    'gap-unclamped': ('    tx=khl_clamp(px-khl_getf(KHL_GAP),khl_lv.spawn[0]-KHL_ROAM,khl_lv.spawn[0]+KHL_ROAM);', '    tx=px-khl_getf(KHL_GAP);'),
+    'frame-no-lift': ('    khl_lv.d[1]=khl_ch[k].spawn[1]+KHL_LIFT-KHL_TRAIN_Y;', '    khl_lv.d[1]=khl_ch[k].spawn[1]-KHL_TRAIN_Y;'),
+    'frame-no-y': ('    khl_lv.d[1]=khl_ch[k].spawn[1]+KHL_LIFT-KHL_TRAIN_Y;', '    khl_lv.d[1]=0.0f;'),
+    'frame-z-spawn': ('    khl_lv.d[2]=khl_clamp(khl_getf(p+KHL_P_POS+8u),khl_ch[k].spawn[2]-KHL_ROAM,khl_ch[k].spawn[2]+KHL_ROAM);', '    khl_lv.d[2]=khl_ch[k].spawn[2];'),
+    'frame-z-unclamped': ('    khl_lv.d[2]=khl_clamp(khl_getf(p+KHL_P_POS+8u),khl_ch[k].spawn[2]-KHL_ROAM,khl_ch[k].spawn[2]+KHL_ROAM);', '    khl_lv.d[2]=khl_getf(p+KHL_P_POS+8u);'),
+    'gap-unclamped': ('    tx=khl_clamp(px-khl_getf(KHL_GAP),khl_ch[k].spawn[0]-KHL_ROAM,khl_ch[k].spawn[0]+KHL_ROAM);', '    tx=px-khl_getf(KHL_GAP);'),
     'gap-stock': ('    khl_setf(KHL_GAP,px-tx);\n', ''),
     'gap-not-restored': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;\n    if(', '    WORD_AT(KHL_LINE)=line;\n    if('),
     'roam-small': ('#define KHL_ROAM 12.0f', '#define KHL_ROAM 8.0f'),
@@ -125,18 +111,14 @@ MUTATIONS = {
     'steer-any-count': ('    if(KHL_B(KHL_MODE)==10u && WORD_AT(KHL_PLAYERS)>1u &&', '    if(KHL_B(KHL_MODE)==10u &&'),
     'steer-reversed': ('khl_getf(base+KHL_P_LINE)>khl_getf(base+KHL_PLAYER_STRIDE+KHL_P_LINE)', 'khl_getf(base+KHL_P_LINE)<khl_getf(base+KHL_PLAYER_STRIDE+KHL_P_LINE)'),
     'players-not-moved': ('            khl_setf(p,khl_getf(p)-khl_lv.d[1u+i]);\n', ''),
-    'players-recomputed': ('        for(i=0;i<2u;i++) WORD_AT(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u)=khl_lv.pworld[k][i];\n}',
-                           '        for(i=0;i<2u;i++) khl_setf(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u,khl_getf(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u)+khl_lv.d[1u+i]);\n}'),
+    'players-recomputed': ('        for(i=0;i<2u;i++) WORD_AT(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u)=khl_lv.pworld[k][i];\n}', '        for(i=0;i<2u;i++) khl_setf(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u,khl_getf(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u)+khl_lv.d[1u+i]);\n}'),
     'players-first-only': ('    if(n>4u) n=4u;\n    if(!MAPMAKER_PTR_OK(base,KHL_PLAYER_STRIDE*4u)) n=0;', '    if(n>1u) n=1u;\n    if(!MAPMAKER_PTR_OK(base,KHL_PLAYER_STRIDE*4u)) n=0;'),
     'object-not-moved': ('        khl_setf(obj+KHL_ENT_POS+i*4u,khl_getf(obj+KHL_ENT_POS+i*4u)-khl_lv.d[i]);\n', ''),
     'live-not-moved': ('        khl_setf(KHL_POS+i*4u,khl_getf(KHL_POS+i*4u)-khl_lv.d[i]);\n', ''),
     'inside-kept': ('    original();\n    khl_lv.inside=0;\n    khl_shift_out(obj);', '    original();\n    khl_shift_out(obj);'),
-    # world calls
-    'world-pos-not-moved': ('    if(has) for(i=0;i<3u;i++) { keep[i]=WORD_AT(pos+i*4u);khl_setf(pos+i*4u,khl_getf(pos+i*4u)+khl_lv.d[i]); }',
-                            '    if(has) for(i=0;i<3u;i++) { keep[i]=WORD_AT(pos+i*4u); }'),
+    'world-pos-not-moved': ('    if(has) for(i=0;i<3u;i++) { keep[i]=WORD_AT(pos+i*4u);khl_setf(pos+i*4u,khl_getf(pos+i*4u)+khl_lv.d[i]); }', '    if(has) for(i=0;i<3u;i++) { keep[i]=WORD_AT(pos+i*4u); }'),
     'world-pos-not-back': ('    if(has) for(i=0;i<3u;i++) WORD_AT(pos+i*4u)=keep[i];\n', ''),
-    'world-players-moved': ('    for(k=0;k<khl_lv.np;k++)\n        for(i=0;i<2u;i++) WORD_AT(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u)=khl_lv.pworld[k][i];\n    if(has)',
-                            '    if(has)'),
+    'world-players-moved': ('    for(k=0;k<khl_lv.np;k++)\n        for(i=0;i<2u;i++) WORD_AT(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u)=khl_lv.pworld[k][i];\n    if(has)', '    if(has)'),
     'world-players-not-back': ('        for(i=0;i<2u;i++) WORD_AT(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u)=khl_lv.pmoved[k][i];\n', ''),
     'world-self-moved': ('        khl_setf(obj+KHL_ENT_POS+4u+i*4u,khl_getf(obj+KHL_ENT_POS+4u+i*4u)+khl_lv.d[1u+i]);\n', ''),
     'world-live-moved': ('        khl_setf(KHL_POS+4u+i*4u,khl_getf(KHL_POS+4u+i*4u)+khl_lv.d[1u+i]);\n', ''),
@@ -147,41 +129,35 @@ MUTATIONS = {
     'flame-outside': ('    if(!khl_lv.inside || !MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=KHL_RET_FLAME)', '    if(!MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=KHL_RET_FLAME)'),
     'flash-wrong-arg': ('    khl_world_call(original,WORD_AT(g_esp+12u));', '    khl_world_call(original,WORD_AT(g_esp+8u));'),
     'flash-gun1-only': ('(WORD_AT(g_esp)!=KHL_RET_FLASH && WORD_AT(g_esp)!=KHL_RET_FLASH2)', '(WORD_AT(g_esp)!=KHL_RET_FLASH)'),
-    'shot-unshifted': ('    if(!khl_lv.inside || !MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=KHL_RET_SHOT) { original();return; }\n    khl_world_call(original,WORD_AT(g_esp+8u));',
-                       '    original();'),
+    'shot-unshifted': ('    if(!khl_lv.inside || !MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=KHL_RET_SHOT) { original();return; }\n    khl_world_call(original,WORD_AT(g_esp+8u));', '    original();'),
     'shot-any-caller': ('|| WORD_AT(g_esp)!=KHL_RET_SHOT) { original();return; }', ') { original();return; }'),
     'sound-wrong-offset': ('#define KHL_SOUND_POS 0x1Cu', '#define KHL_SOUND_POS 0x18u'),
     'sound-unshifted': ('    khl_world_call(original,MAPMAKER_PTR_OK(rec,KHL_SOUND_POS+12u)?rec+KHL_SOUND_POS:0u);', '    (void)rec;original();'),
-    'engine-unshifted': ('    if(!khl_lv.inside || !MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=KHL_RET_ENGINE) { original();return; }\n    khl_world_call(original,WORD_AT(g_esp+8u));',
-                         '    original();'),
+    'engine-unshifted': ('    if(!khl_lv.inside || !MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=KHL_RET_ENGINE) { original();return; }\n    khl_world_call(original,WORD_AT(g_esp+8u));', '    original();'),
     'engine-any-caller': ('|| WORD_AT(g_esp)!=KHL_RET_ENGINE) { original();return; }', ') { original();return; }'),
-    # damage
     'damage-stock': ('    khl_setf(r+KHL_REC_DAMAGE,h);                          /* the stock code leaves him at exactly 0 */\n', ''),
     'damage-not-restored': ('    WORD_AT(r+KHL_REC_DAMAGE)=bits;\n', ''),
     'damage-health-zero': ('    khl_setf(obj+KHL_ENT_HEALTH,h-dmg);\n', ''),
-    'damage-no-stops': ('    for(k=0;k<3u;k++) guest_call(sub_0010EB90,2,WORD_AT(KHL_SMOKE+k*4u),0u);\n', ''),
-    'damage-two-stops': ('    for(k=0;k<3u;k++) guest_call(sub_0010EB90', '    for(k=0;k<2u;k++) guest_call(sub_0010EB90'),
-    'damage-focus-kept': ("    khl_unfocus(obj);\n    khl_log(\"Khallos' chair shot down\"", "    khl_log(\"Khallos' chair shot down\""),
-    'damage-inactive': ('    if(WORD_AT(KHL_ACTIVE)!=1u || !MAPMAKER_PTR_OK(r,KHL_REC_DIR+4u)', '    if(!MAPMAKER_PTR_OK(r,KHL_REC_DIR+4u)'),
+    'damage-no-stops': ('    for(i=0;i<3u;i++) guest_call(sub_0010EB90,2,WORD_AT(KHL_SMOKE+i*4u),0u);\n', ''),
+    'damage-two-stops': ('    for(i=0;i<3u;i++) guest_call(sub_0010EB90', '    for(i=0;i<2u;i++) guest_call(sub_0010EB90'),
+    'damage-focus-kept': ('    khl_unfocus(obj);\n    khl_log("Khallos\' chair shot down', '    khl_log("Khallos\' chair shot down'),
+    'damage-inactive': ('    if(WORD_AT(KHL_ACTIVE)!=1u || obj!=khl_ch[k].obj ||', '    if(obj!=khl_ch[k].obj ||'),
     'damage-no-direction': ('|| !WORD_AT(r+KHL_REC_DIR) || !WORD_AT(r+KHL_REC_HIT) ||', '||'),
     'damage-dead-again': ('       !((h=khl_getf(obj+KHL_ENT_HEALTH))>=0.0f) || ', '       ((h=khl_getf(obj+KHL_ENT_HEALTH))!=h) || '),
     'damage-every-hit': ('|| !(h-(dmg=khl_getf(r+KHL_REC_DAMAGE))<0.0f)) { original();return; }', '|| ((dmg=khl_getf(r+KHL_REC_DAMAGE))!=dmg)) { original();return; }'),
-    'damage-any-chair': ('    if(!MAPMAKER_STACK_OK(8) || !khl_mine(obj) || khl_lv.removed) { original();return; }\n    r=', '    if(!MAPMAKER_STACK_OK(8) || khl_lv.removed) { original();return; }\n    r='),
-    # death and removal
-    'removal-never': ('    if(++khl_lv.dying>=KHL_GONE_FRAMES || khl_getf(KHL_POS+4u)>khl_lv.spawn[1]+KHL_GONE_UP) khl_remove(obj);', '    ++khl_lv.dying;'),
-    'removal-no-height': ('    if(++khl_lv.dying>=KHL_GONE_FRAMES || khl_getf(KHL_POS+4u)>khl_lv.spawn[1]+KHL_GONE_UP) khl_remove(obj);', '    if(++khl_lv.dying>=KHL_GONE_FRAMES) khl_remove(obj);'),
-    'removal-no-time': ('    if(++khl_lv.dying>=KHL_GONE_FRAMES || khl_getf(KHL_POS+4u)>khl_lv.spawn[1]+KHL_GONE_UP) khl_remove(obj);', '    if(++khl_lv.dying && khl_getf(KHL_POS+4u)>khl_lv.spawn[1]+KHL_GONE_UP) khl_remove(obj);'),
+    'damage-any-chair': ('|| (k=khl_chair(WORD_AT(r)))<0 || khl_ch[k].removed) { original();return; }', '|| (k=khl_lv.n?0:-1)<0 || khl_ch[k].removed) { original();return; }'),
+    'removal-never': ('    if(++khl_ch[k].dying>=KHL_GONE_FRAMES || khl_getf(KHL_POS+4u)>khl_ch[k].spawn[1]+KHL_GONE_UP) khl_remove(k,obj);', '    ++khl_ch[k].dying;'),
+    'removal-no-height': ('    if(++khl_ch[k].dying>=KHL_GONE_FRAMES || khl_getf(KHL_POS+4u)>khl_ch[k].spawn[1]+KHL_GONE_UP) khl_remove(k,obj);', '    if(++khl_ch[k].dying>=KHL_GONE_FRAMES) khl_remove(k,obj);'),
+    'removal-no-time': ('    if(++khl_ch[k].dying>=KHL_GONE_FRAMES || khl_getf(KHL_POS+4u)>khl_ch[k].spawn[1]+KHL_GONE_UP) khl_remove(k,obj);', '    if(++khl_ch[k].dying && khl_getf(KHL_POS+4u)>khl_ch[k].spawn[1]+KHL_GONE_UP) khl_remove(k,obj);'),
     'removal-alive': ('    if(!(khl_getf(obj+KHL_ENT_HEALTH)<0.0f)) return;\n', ''),
     'removal-early': ('#define KHL_GONE_UP 25.0f', '#define KHL_GONE_UP 20.0f'),
     'removal-not-destroyed': ('    guest_call(sub_000A9070,1,obj);\n    if(jet)', '    if(jet)'),
     'removal-jet-kept': ('    if(jet) { guest_call(sub_0010E2A0,1,jet);WORD_AT(KHL_JET)=0; }\n', ''),
     'removal-state-kept': ('    if(WORD_AT(KHL_OBJ)==obj) WORD_AT(KHL_OBJ)=0;\n', ''),
-    'removal-runs-on': ('    if(khl_lv.removed) { MAPMAKER_GUEST_RET();return; }   /* removed: nothing more to run */\n', ''),
+    'removal-runs-on': ('    if(khl_ch[k].removed) { MAPMAKER_GUEST_RET();return; }   /* removed: nothing more to run */\n', ''),
     'removal-focus-kept': ('    khl_unfocus(obj);\n    guest_call(sub_000A9070,1,obj);', '    guest_call(sub_000A9070,1,obj);'),
-    'removal-keeps-rider': ('    khl_log("the dead chair flew off and was removed",obj,khl_lv.dying);\n    khl_drop_rider();', '    khl_log("the dead chair flew off and was removed",obj,khl_lv.dying);'),
-    # event, text
-    'event-kept': ('    if(khl_lv.events++<6u) khl_log("chair level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),ret);\n    MAPMAKER_GUEST_RET();',
-                   '    if(khl_lv.events++<6u) khl_log("chair level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),ret);\n    original();'),
+    'removal-keeps-rider': ('    khl_log("the dead chair flew off and was removed (chair, frames)",k,khl_ch[k].dying);\n    khl_drop_rider(k);', '    khl_log("the dead chair flew off and was removed (chair, frames)",k,khl_ch[k].dying);'),
+    'event-kept': ('    if(khl_lv.events++<6u) khl_log("chair level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),ret);\n    MAPMAKER_GUEST_RET();', '    if(khl_lv.events++<6u) khl_log("chair level event dropped (MapMaker logic marker untouched)",WORD_AT(g_esp+4u),ret);\n    original();'),
     'event-any-caller': ('    if((ret!=KHL_RET_START && ret!=KHL_RET_HURT && ret!=KHL_RET_LOW && ret!=KHL_RET_DEAD) ||\n       WORD_AT(KHL_SCENE)!=100u', '    if(WORD_AT(KHL_SCENE)!=100u'),
     'event-no-start': ('(ret!=KHL_RET_START && ret!=KHL_RET_HURT', '(ret!=KHL_RET_HURT'),
     'event-no-hurt': ('ret!=KHL_RET_START && ret!=KHL_RET_HURT && ret!=KHL_RET_LOW', 'ret!=KHL_RET_START && ret!=KHL_RET_LOW'),
@@ -191,7 +167,38 @@ MUTATIONS = {
     'text-any-caller': ('WORD_AT(g_esp+4u)!=KHL_BAR_TEXT || WORD_AT(g_esp)!=KHL_RET_BAR_TEXT ||', 'WORD_AT(g_esp+4u)!=KHL_BAR_TEXT ||'),
     'text-any-mode': ('|| !khl.label || !khl_play()) {', '|| !khl.label || !khl_on()) {'),
     'text-no-ret': ('    g_eax=khl.label;\n    MAPMAKER_GUEST_RET();', '    g_eax=khl.label;'),
+    'mine-first-only': ('    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].obj==obj) return (int)k;', '    for(k=0;k<1u && k<khl_lv.n;k++) if(khl_ch[k].obj==obj) return (int)k;'),
+    'mount-keeps-count': ('    memset(&khl_lv,0,sizeof khl_lv);                       /* a new level: forget the last chairs */\n', ''),
+    'spawn-one-chair': ('    if(khl_lv.n>=KHL_MAX) {', '    if(khl_lv.n>=1u) {'),
+    'spawn-unlimited': ('    if(khl_lv.n>=KHL_MAX) {', '    if(khl_lv.n>=KHL_MAX+1u) {'),
+    'spawn-same-placeholder-twice': ('    if(k<khl_lv.n) { khl_log("this chair placeholder already has its chair",a,k);return; }\n', ''),
+    'spawn-globals-not-scratch': ("    khl_in(k,keep);                                       /* the init writes the new chair's globals */\n", '    memcpy(keep,(void *)((uintptr_t)KHL_OBJ+g_xbox_mem_offset),4u*KHL_BLOCK_N);memcpy(keep+KHL_BLOCK_N,(void *)((uintptr_t)KHL_SMOKE+g_xbox_mem_offset),4u*KHL_SMOKE_N);\n'),
+    'spawn-chair-not-kept': ('    khl_out(k,keep);\n    khl_ch[k].obj=obj;', '    memcpy((void *)((uintptr_t)KHL_OBJ+g_xbox_mem_offset),keep,4u*KHL_BLOCK_N);\n    khl_ch[k].obj=obj;'),
+    'spawn-failed-not-back': ('        khl_out(k,keep);\n        khl_log("the chair was not created', '        khl_log("the chair was not created'),
+    'variant-not-back': ('        guest_call(sub_000A9070,1,obj);\n        khl_out(k,keep);', '        guest_call(sub_000A9070,1,obj);'),
+    'rider-two-chairs': ('        if(khl_lv.cand_bound[c] || !khl_same_ai(khl_lv.cand[c],khl_lv.cand_ent[c],khl_lv.cand_rec[c])) continue;', '        if(!khl_same_ai(khl_lv.cand[c],khl_lv.cand_ent[c],khl_lv.cand_rec[c])) continue;'),
+    'rider-not-swapped': ('    khl_swapped(original,(unsigned)k);\n}\n/* WRAP sub_00263150', '    original();\n}\n/* WRAP sub_00263150'),
+    'rider-any-entity': ('    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].rider && khl_ch[k].rider_ent==ent) return (int)k;', '    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].rider) return (int)k;'),
+    'frame-first-chair-spawn': ('    khl_lv.d[1]=khl_ch[k].spawn[1]+KHL_LIFT-KHL_TRAIN_Y;', '    khl_lv.d[1]=khl_ch[0].spawn[1]+KHL_LIFT-KHL_TRAIN_Y;'),
+    'gap-first-chair': ('    tx=khl_clamp(px-khl_getf(KHL_GAP),khl_ch[k].spawn[0]-KHL_ROAM,khl_ch[k].spawn[0]+KHL_ROAM);', '    tx=khl_clamp(px-khl_getf(KHL_GAP),khl_ch[0].spawn[0]-KHL_ROAM,khl_ch[0].spawn[0]+KHL_ROAM);'),
+    'damage-not-swapped': ('    khl_in((unsigned)k,keep);\n    prev=khl_lv.cur;khl_lv.cur=k;\n    khl_hit(original,(unsigned)k,r);', '    prev=khl_lv.cur;khl_lv.cur=k;\n    khl_hit(original,(unsigned)k,r);'),
+    'damage-not-back': ('    khl_hit(original,(unsigned)k,r);\n    khl_lv.cur=prev;\n    khl_out((unsigned)k,keep);', '    khl_hit(original,(unsigned)k,r);\n    khl_lv.cur=prev;(void)keep;'),
+    'update-not-swapped': ('    khl_in((unsigned)k,keep);\n    prev=khl_lv.cur;khl_lv.cur=k;\n    khl_frame(', '    prev=khl_lv.cur;khl_lv.cur=k;\n    khl_frame('),
+    'update-not-back': ('    khl_frame(original,(unsigned)k,obj);\n    khl_lv.cur=prev;\n    khl_out((unsigned)k,keep);', '    khl_frame(original,(unsigned)k,obj);\n    khl_lv.cur=prev;(void)keep;'),
+    'swap-no-smoke': ('#define KHL_SMOKE_N 3u', '#define KHL_SMOKE_N 1u'),
+    'swap-short-block': ('#define KHL_BLOCK_N 0x1Cu', '#define KHL_BLOCK_N 0x16u'),
+    'swap-smoke-not-kept': ('    for(i=0;i<KHL_SMOKE_N;i++) { khl_ch[k].smoke[i]=WORD_AT(KHL_SMOKE+i*4u);WORD_AT(KHL_SMOKE+i*4u)=keep[KHL_BLOCK_N+i]; }', '    for(i=0;i<KHL_SMOKE_N;i++) { WORD_AT(KHL_SMOKE+i*4u)=keep[KHL_BLOCK_N+i]; }'),
+    'swap-block-not-kept': ('    for(i=0;i<KHL_BLOCK_N;i++) { khl_ch[k].block[i]=WORD_AT(KHL_OBJ+i*4u);WORD_AT(KHL_OBJ+i*4u)=keep[i]; }', '    for(i=0;i<KHL_BLOCK_N;i++) { WORD_AT(KHL_OBJ+i*4u)=keep[i]; }'),
+    'swap-cur-kept': ('    original();\n    khl_lv.cur=prev;\n    khl_out(k,keep);', '    original();\n    khl_out(k,keep);'),
+    'world-chair-zero': ('obj=khl_ch[khl_lv.cur].obj,k,i,keep[3]={0};', 'obj=khl_ch[0].obj,k,i,keep[3]={0};'),
+    'removal-first-chair': ('    khl_ch[k].removed=1;\n    khl_log("the dead chair', '    khl_ch[0].removed=1;\n    khl_log("the dead chair'),
+    'create-any-id': ('    if((id!=KHL_ID && id!=KHL_RIDER_ID) || khl_lv.creates>=KHL_CREATES || !khl_play()) return;', '    if(khl_lv.creates>=KHL_CREATES || !khl_play()) return;'),
+    'create-before-original': ('    uint32_t id=MAPMAKER_STACK_OK(16)?WORD_AT(g_esp+4u):0u,slot=id?WORD_AT(g_esp+12u):0u;\n    original();', '    uint32_t id=MAPMAKER_STACK_OK(16)?WORD_AT(g_esp+4u):0u,slot=id?WORD_AT(g_esp+12u):0u;\n    original();g_esp-=4u;original();'),
+    'create-any-scene': ('khl_lv.creates>=KHL_CREATES || !khl_play()) return;', 'khl_lv.creates>=KHL_CREATES || !khl_on()) return;'),
+    'seen-not-logged': ('    if(id==KHL_ID && khl_lv.seen++<KHL_CREATES) khl_log', '    if(0 && id==KHL_ID && khl_lv.seen++<KHL_CREATES) khl_log'),
+    'pose-not-swapped': ('    khl_swapped(original,(unsigned)k);\n}\n\n/* WRAP sub_002274C0', '    original();\n}\n\n/* WRAP sub_002274C0'),
 }
+
 
 
 def build(tmp_path, mutation):
@@ -535,3 +542,31 @@ def test_models_and_paks():
         p = props[m][1]
         assert _crc(model.format(p, p.split('/')[-1])) in paks['chr.pak']
     assert (GAME / 'stream/lv11/anim/lv11.pak').stat().st_size == 300416
+
+
+def test_multi_chair_globals():
+    """What several chairs rely on: the chair statics are touched only by chair
+    code and the seated Khallos; the damage callback is called with the object
+    hit at record +0; the death's emitters come from the init."""
+    a = by_address()
+    block = range(0x0078F000, 0x0078F070, 4)
+    users = {}
+    for i in decoded():
+        for _, v in i.values():
+            if v in block:
+                users.setdefault(i.function, set()).add(v)
+    assert set(users) == {STATE_INIT, UPDATE, DAMAGE, RISING, INIT, 0x00263260, 0x00263150}
+    assert max(max(v) for v in users.values()) == 0x0078F06C          # 0x1C words cover them all
+    assert {0x0078F060, 0x0078F064, 0x0078F068, 0x0078F06C} <= users[0x00263260]   # the rider's sway
+    assert users[0x00263150] <= {0x0078F068, 0x0078F06C}                             # read by its pose callback
+    assert {i.function for i in decoded() if i.mnemonic == 'push' and ('imm', 0x00263150) in i.ops} == {0x00263260}
+    assert mem(a[0x00263162])[0][4] == 0xA0 and ('imm', 0x98) in a[0x00263150].ops      # entity arg 1
+    # the damage dispatcher: callback = [[record] + 0x19C], called with the record
+    assert ('imm', 0x19C) not in a[0x0009E728].ops and mem(a[0x0009E728])[0][4] == 0x19C
+    assert 'edx' in a[0x000BB614].text and mem(a[0x000BB614])[0][1] == 'ebx' and mem(a[0x000BB614])[0][4] == 0
+    assert mem(a[0x000BB616])[0][4] == 0x19C and a[0x000BB638].mnemonic == 'call' and 'eax' in a[0x000BB638].text
+    assert a[0x000BB61E].mnemonic == 'push' and 'ebx' in a[0x000BB61E].text
+    # the death's three emitters: the init hands 0x0078DF50 to the emitter maker
+    assert ('imm', 0x0078DF50) in a[0x001EEB7A].ops and target(a[0x001EEB7F]) == 0x00378530
+    # the character maker a placeholder goes through (logged): sub_000DAC30(id, .., pool slot)
+    assert calls_to(0x000DAC30) >= {0x0015DFD5}

@@ -35,6 +35,18 @@
  * 0x0049D9C8) and copies the chair's live position plus its rotated seat
  * offset and its angles every frame.
  *
+ * Several chairs (user, 2026-11-01: "All of these one-per-map limits need
+ * fixed"): up to KHL_MAX (4) per map. The chair statics (the 0x70 bytes from
+ * 0x0078F000 the init zeroes: object, live position, velocity, active flag,
+ * jet emitter, gun toggle, fire timer, the rider's sway at +0x60..+0x6C) and
+ * the death's emitters [0x0078DF50..58] are kept per chair and loaded around
+ * every way into the chair code: the creation (the init writes them), the
+ * update, the damage callback (sub_001EF840 reads [0x0078F000], not the hit
+ * object; the dispatcher sub_000BB490 passes the object hit at record +0),
+ * and the seated Khallos' handler sub_00263260; the previous values are put
+ * back after (nests). Each chair has its own placeholder, rider, frame and
+ * removal.
+ *
  * Placement (no new save bytes): a Story AI whose character is the
  * placeholder id KHL_ID 0x33 (the fifth copy of the story-only cutscene
  * soldier `soldiermodel_talk`, no Arcade row, used by no other port). A
@@ -85,6 +97,9 @@
  *  - event (sub_002274C0): the chair's events 0x29, 0x12, 0x13 and 4
  *    (returns 0x001EEC72, 0x001EF9A2, 0x001EF9C2, 0x001EFAEC) are dropped in
  *    scene 100: they would be the map's own logic markers.
+ *  - create (sub_000DAC30, character creation) and every AI start of id
+ *    0x33: logged (v0.4.0-mapmaker.25: the chair never appeared and no AI
+ *    start was logged for its placeholder).
  *  - text (sub_0003D7B0): the bar for model 0x376 is labelled with text
  *    0xFF1 (return 0x0014CDA6), a level text id in scene 100: "Khallos".
  *  - flame (sub_0010E730, return 0x001EED7A, emitter position arg 2), flash
@@ -180,6 +195,11 @@
 #define KHL_REC_HIT 0x28u
 #define KHL_REC_DIR 0x30u
 #define KHL_CANDS 8u
+#define KHL_MAX 4u                       /* chairs per map */
+#define KHL_BLOCK_N 0x1Cu                /* words of chair statics from 0x0078F000 (sub_001EEA30 zeroes these) */
+#define KHL_SMOKE_N 3u                   /* the death's emitters [0x0078DF50..58] */
+#define KHL_LOGS 48u                     /* log lines per level */
+#define KHL_CREATES 8u                   /* placeholder/Khallos creation and AI start lines per level */
 #define KHL_RET_START 0x001EEC72u        /* event 0x29 (call 0x001EEC6D) */
 #define KHL_RET_HURT 0x001EF9A2u         /* event 0x12 */
 #define KHL_RET_LOW 0x001EF9C2u          /* event 0x13 */
@@ -203,23 +223,30 @@ extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
 /* Kept for the session: settings, label and the spawn argument buffer. */
 static struct { int read, optout; uint32_t label, args; unsigned logged; } khl;
-/* This level's chair (cleared by every level's pak mount). */
+/* This level's chairs: each its own copy of the chair statics and emitters,
+ * its placeholder, rider and spawn (cleared by every level's pak mount). */
 static struct {
     uint32_t obj, place, place_ent, place_rec;
     uint32_t rider, rider_ent, rider_rec;
+    uint32_t block[KHL_BLOCK_N], smoke[KHL_SMOKE_N];
+    float spawn[3];
+    int removed;
+    unsigned dying;
+} khl_ch[KHL_MAX];
+static struct {
     uint32_t cand[KHL_CANDS], cand_ent[KHL_CANDS], cand_rec[KHL_CANDS];
     float cand_x[KHL_CANDS], cand_z[KHL_CANDS];
-    unsigned ncand;
-    float spawn[3], d[3];
-    int requested, removed, inside;
-    unsigned extras, events, dying, np;
+    int cand_bound[KHL_CANDS];
+    unsigned ncand, n, extras, events, seen, creates, np;
+    int requested, inside, cur;
+    float d[3];                            /* the moved frame of the update running now */
     uint32_t pworld[4][2], pmoved[4][2];   /* players' +0xB8/+0xBC: world and moved bits */
     uint32_t self[4];                      /* live y/z and object y/z (moved) while unshifted */
 } khl_lv;
 
 static void khl_log(const char *what,uint32_t a,uint32_t b)
 {
-    if(khl.logged>=32u) return;
+    if(khl.logged>=KHL_LOGS) return;
     khl.logged++;
     fprintf(stderr,"[mapmaker] khallos: %s (0x%X, 0x%X)\n",what,(unsigned)a,(unsigned)b);
     fflush(stderr);
@@ -235,13 +262,53 @@ static int khl_on(void)
     return mapmaker_limits.limits;
 }
 static int khl_play(void) { return khl_on() && WORD_AT(KHL_SCENE)==100u && KHL_B(KHL_MODE)==10u; }
-/* This level's chair, in scene 100. */
-static int khl_mine(uint32_t obj) { return khl_lv.obj && obj==khl_lv.obj && WORD_AT(KHL_SCENE)==100u && khl_on(); }
+/* The chair index of this object (one of this level's chairs, scene 100), or -1. */
+static int khl_chair(uint32_t obj)
+{
+    unsigned k;
+    if(!obj || !khl_lv.n || WORD_AT(KHL_SCENE)!=100u || !khl_on()) return -1;
+    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].obj==obj) return (int)k;
+    return -1;
+}
+/* The chair this entity rides, or -1. */
+static int khl_ridden(uint32_t ent)
+{
+    unsigned k;
+    if(!ent || !khl_lv.n || WORD_AT(KHL_SCENE)!=100u || !khl_on()) return -1;
+    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].rider && khl_ch[k].rider_ent==ent) return (int)k;
+    return -1;
+}
 
 static float khl_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)a+g_xbox_mem_offset),4);return f; }
 static void khl_setf(uint32_t a,float f) { memcpy((void *)((uintptr_t)a+g_xbox_mem_offset),&f,4); }
 static int khl_sane(float f) { return f==f && f>-100000.0f && f<100000.0f; }
 static float khl_clamp(float v,float lo,float hi) { return v<lo?lo:v>hi?hi:v; }
+
+/* The chair globals (statics block and the death's emitters) of chair k in,
+ * the previous ones kept; khl_out stores chair k's and puts them back. */
+static void khl_in(unsigned k,uint32_t *keep)
+{
+    uint32_t i;
+    for(i=0;i<KHL_BLOCK_N;i++) { keep[i]=WORD_AT(KHL_OBJ+i*4u);WORD_AT(KHL_OBJ+i*4u)=khl_ch[k].block[i]; }
+    for(i=0;i<KHL_SMOKE_N;i++) { keep[KHL_BLOCK_N+i]=WORD_AT(KHL_SMOKE+i*4u);WORD_AT(KHL_SMOKE+i*4u)=khl_ch[k].smoke[i]; }
+}
+static void khl_out(unsigned k,const uint32_t *keep)
+{
+    uint32_t i;
+    for(i=0;i<KHL_BLOCK_N;i++) { khl_ch[k].block[i]=WORD_AT(KHL_OBJ+i*4u);WORD_AT(KHL_OBJ+i*4u)=keep[i]; }
+    for(i=0;i<KHL_SMOKE_N;i++) { khl_ch[k].smoke[i]=WORD_AT(KHL_SMOKE+i*4u);WORD_AT(KHL_SMOKE+i*4u)=keep[KHL_BLOCK_N+i]; }
+}
+/* The original with chair k's globals (nests). */
+static void khl_swapped(void (*original)(void),unsigned k)
+{
+    uint32_t keep[KHL_BLOCK_N+KHL_SMOKE_N];
+    int prev=khl_lv.cur;
+    khl_in(k,keep);
+    khl_lv.cur=(int)k;
+    original();
+    khl_lv.cur=prev;
+    khl_out(k,keep);
+}
 
 /* The map's own custom set (slots 1-10 in the map-info chunk, 11-20 in the
  * sets area's chunk). 1: holds id; 0: does not (or a preset set); -1: unreadable. */
@@ -320,32 +387,33 @@ static int khl_same_ai(uint32_t a,uint32_t ent,uint32_t rec)
            MAPMAKER_PTR_OK(ent,0x100u) && WORD_AT(ent+KHL_ENT_AI)==a;
 }
 
-/* The rider: the nearest noted Khallos within KHL_RIDE of the chair's spawn. */
-static void khl_bind_rider(void)
+/* Chair k's rider: the nearest unbound noted Khallos within KHL_RIDE of its spawn. */
+static void khl_bind_rider(unsigned k)
 {
-    unsigned k,best=KHL_CANDS;
+    unsigned c,best=KHL_CANDS;
     float bd=KHL_RIDE*KHL_RIDE,dx,dz;
     uint32_t a;
-    if(!khl_lv.obj || khl_lv.rider || khl_lv.removed) return;
-    for(k=0;k<khl_lv.ncand;k++) {
-        if(!khl_same_ai(khl_lv.cand[k],khl_lv.cand_ent[k],khl_lv.cand_rec[k])) continue;
-        dx=khl_lv.cand_x[k]-khl_lv.spawn[0];dz=khl_lv.cand_z[k]-khl_lv.spawn[2];
-        if(dx*dx+dz*dz<=bd) { bd=dx*dx+dz*dz;best=k; }
+    if(!khl_ch[k].obj || khl_ch[k].rider || khl_ch[k].removed) return;
+    for(c=0;c<khl_lv.ncand;c++) {
+        if(khl_lv.cand_bound[c] || !khl_same_ai(khl_lv.cand[c],khl_lv.cand_ent[c],khl_lv.cand_rec[c])) continue;
+        dx=khl_lv.cand_x[c]-khl_ch[k].spawn[0];dz=khl_lv.cand_z[c]-khl_ch[k].spawn[2];
+        if(dx*dx+dz*dz<=bd) { bd=dx*dx+dz*dz;best=c; }
     }
     if(best==KHL_CANDS) return;
     a=khl_lv.cand[best];
-    if(!khl_mounted(KHL_ANIM_PAK)) { khl_log("lv11.pak not mounted: Khallos near the chair stays a bot",a,0);return; }
+    if(!khl_mounted(KHL_ANIM_PAK)) { khl_log("lv11.pak not mounted: Khallos near the chair stays a bot",a,k);return; }
     WORD_AT(a+KHL_AI_CLASS_HI)=0;WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;
     WORD_AT(a+KHL_AI_NEXT)=0;                             /* the handler's state 0: sit down */
-    khl_lv.rider=a;khl_lv.rider_ent=khl_lv.cand_ent[best];khl_lv.rider_rec=khl_lv.cand_rec[best];
-    khl_log("Khallos rides the chair",a,khl_lv.obj);
+    khl_lv.cand_bound[best]=1;
+    khl_ch[k].rider=a;khl_ch[k].rider_ent=khl_lv.cand_ent[best];khl_ch[k].rider_rec=khl_lv.cand_rec[best];
+    khl_log("Khallos rides the chair (rider, chair)",a,k);
 }
-static void khl_drop_rider(void)
+static void khl_drop_rider(unsigned k)
 {
-    uint32_t a=khl_lv.rider,ent=khl_lv.rider_ent;
+    uint32_t a=khl_ch[k].rider,ent=khl_ch[k].rider_ent;
     if(!a) return;
-    khl_lv.rider=0;
-    if(!khl_same_ai(a,ent,khl_lv.rider_rec)) { khl_log("the rider is already gone",a,ent);return; }
+    khl_ch[k].rider=0;
+    if(!khl_same_ai(a,ent,khl_ch[k].rider_rec)) { khl_log("the rider is already gone",a,ent);return; }
     khl_unfocus(ent);
     guest_call(sub_0015DDA0,1,ent);
     khl_log("rider removed with the chair",a,ent);
@@ -358,7 +426,9 @@ void pc_mapmaker_khallos_mount(void (*original)(void))
     uint32_t mounted;
     if(WORD_AT(KHL_MOUNT_SKIP)) { original();return; }    /* the original does nothing */
     original();
-    memset(&khl_lv,0,sizeof khl_lv);                       /* a new level: forget the last chair */
+    memset(&khl_lv,0,sizeof khl_lv);                       /* a new level: forget the last chairs */
+    memset(khl_ch,0,sizeof khl_ch);
+    khl_lv.cur=-1;
     khl.logged=0;                                          /* and log it afresh */
     if(!khl_play() || khl.optout || (has=khl_map_has(KHL_ID))==0) return;
     if(khl_mounted(KHL_PAK)) return;
@@ -397,29 +467,49 @@ void pc_mapmaker_khallos_request(void (*original)(void))
     khl_log("requested the chair model",KHL_MODEL,0);
 }
 
-/* WRAP sub_0015B830 (cdecl AI pool entry): the placeholder becomes the chair,
- * a Khallos next to it its rider. */
+/* WRAP sub_000DAC30 (cdecl character id, ..., pool slot: makes a character
+ * object, 0 on failure). Log only: each placeholder or Khallos character made
+ * in MapMaker story play and what came back (v0.4.0-mapmaker.25: the chair
+ * never appeared and no AI start was logged for its placeholder). */
+void pc_mapmaker_khallos_create(void (*original)(void))
+{
+    uint32_t id=MAPMAKER_STACK_OK(16)?WORD_AT(g_esp+4u):0u,slot=id?WORD_AT(g_esp+12u):0u;
+    original();
+    if((id!=KHL_ID && id!=KHL_RIDER_ID) || khl_lv.creates>=KHL_CREATES || !khl_play()) return;
+    khl_lv.creates++;
+    khl_log(g_eax?(id==KHL_ID?"chair placeholder character made (pool slot, object)":"Khallos character made (pool slot, object)"):
+                  (id==KHL_ID?"chair placeholder character NOT made (pool slot, 0)":"Khallos character NOT made (pool slot, 0)"),slot,g_eax);
+}
+
+/* WRAP sub_0015B830 (cdecl AI pool entry): each placeholder becomes a chair
+ * (up to KHL_MAX), a Khallos next to one its rider. */
 void pc_mapmaker_khallos_ai_start(void (*original)(void))
 {
-    uint32_t a,ent,e,obj,args,i,id,req;
+    uint32_t a,ent,e,obj,args,i,id,req,keep[KHL_BLOCK_N+KHL_SMOKE_N];
+    unsigned k;
     float pos[3],yaw;
-    if(!MAPMAKER_STACK_OK(8) || !khl_play() || khl.optout) { original();return; }
+    if(!MAPMAKER_STACK_OK(8) || !khl_play()) { original();return; }
     a=WORD_AT(g_esp+4u);
     original();
-    if(!MAPMAKER_PTR_OK(a,KHL_ACTOR) || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;
+    if(!MAPMAKER_PTR_OK(a,KHL_ACTOR)) return;
     id=KHL_H(a+KHL_ACTOR_CHAR);
+    if(id==KHL_ID && khl_lv.seen++<KHL_CREATES) khl_log("chair placeholder AI starts (pool entry, entity)",a,WORD_AT(a));
+    if(khl.optout) { if(id==KHL_ID) khl_log("TSFP_MAPMAKER_KHALLOS=0: the chair placeholder stays a bot",a,0);return; }
+    if(!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) { if(id==KHL_ID) khl_log("chair placeholder without an entity: stays a bot",a,ent);return; }
     if(id==KHL_RIDER_ID) {
         if(khl_lv.ncand<KHL_CANDS) {
             i=khl_lv.ncand++;
             khl_lv.cand[i]=a;khl_lv.cand_ent[i]=ent;khl_lv.cand_rec[i]=WORD_AT(a+KHL_ACTOR_RECORD);
             khl_lv.cand_x[i]=khl_getf(ent+KHL_ENT_POS);khl_lv.cand_z[i]=khl_getf(ent+KHL_ENT_POS+8u);
-            khl_bind_rider();
+            for(k=0;k<khl_lv.n;k++) khl_bind_rider(k);
         }
         return;
     }
     if(id!=KHL_ID) return;
-    if(khl_lv.obj) {
-        if(khl_lv.extras++<4u) khl_log("only one flying chair per map: this placeholder stays a bot",a,khl_lv.obj);
+    for(k=0;k<khl_lv.n && !(khl_ch[k].place_rec==WORD_AT(a+KHL_ACTOR_RECORD) && khl_ch[k].place==a);k++) {}
+    if(k<khl_lv.n) { khl_log("this chair placeholder already has its chair",a,k);return; }
+    if(khl_lv.n>=KHL_MAX) {
+        if(khl_lv.extras++<4u) khl_log("more chairs than KHL_MAX (4) per map: this placeholder stays a bot",a,khl_lv.n);
         return;
     }
     if(!khl_mounted(KHL_PAK)) { khl_log("prop3.pak not mounted: the chair placeholder stays a bot",a,0);return; }
@@ -442,22 +532,33 @@ void pc_mapmaker_khallos_ai_start(void (*original)(void))
     args=khl.args;
     for(i=0;i<3u;i++) khl_setf(args+i*4u,pos[i]);
     khl_setf(args+12u,0.0f);khl_setf(args+16u,yaw);khl_setf(args+20u,0.0f);
+    k=khl_lv.n;
+    memset(khl_ch[k].block,0,sizeof khl_ch[k].block);memset(khl_ch[k].smoke,0,sizeof khl_ch[k].smoke);
+    khl_in(k,keep);                                       /* the init writes the new chair's globals */
     obj=guest_call(sub_000A6F90,5,KHL_MODEL,args,args+12u,0u,0u);
-    if(!obj || !MAPMAKER_PTR_OK(obj,0x100u)) { khl_log("the chair was not created (model not loaded?): placeholder stays a bot",a,obj);return; }
+    if(!obj || !MAPMAKER_PTR_OK(obj,0x100u)) {
+        khl_out(k,keep);
+        khl_log("the chair was not created (model not loaded?): placeholder stays a bot",a,obj);
+        return;
+    }
     if(WORD_AT(KHL_OBJ)!=obj) {                            /* the train's rising variant */
         guest_call(sub_000A9070,1,obj);
-        khl_log("the chair took the train's other variant (player +0x1568): removed, placeholder stays a bot",obj,WORD_AT(KHL_OBJ));
+        khl_out(k,keep);
+        khl_log("the chair took the train's other variant (player +0x1568): removed, placeholder stays a bot",obj,khl_ch[k].block[0]);
         return;
     }
     khl_setf(KHL_POS,pos[0]);khl_setf(KHL_POS+4u,pos[1]+KHL_LIFT);khl_setf(KHL_POS+8u,pos[2]);
     for(i=0;i<3u;i++) khl_setf(obj+KHL_ENT_POS+i*4u,khl_getf(KHL_POS+i*4u));
-    khl_lv.obj=obj;khl_lv.place=a;khl_lv.place_ent=ent;khl_lv.place_rec=WORD_AT(a+KHL_ACTOR_RECORD);
-    for(i=0;i<3u;i++) khl_lv.spawn[i]=pos[i];
+    khl_out(k,keep);
+    khl_ch[k].obj=obj;khl_ch[k].place=a;khl_ch[k].place_ent=ent;khl_ch[k].place_rec=WORD_AT(a+KHL_ACTOR_RECORD);
+    for(i=0;i<3u;i++) khl_ch[k].spawn[i]=pos[i];
+    khl_lv.n=k+1u;
     khl_string(&khl.label,KHL_LABEL,sizeof KHL_LABEL);     /* off the text hook's path */
-    khl_log("Khallos' chair created at the placeholder",a,obj);
-    fprintf(stderr,"[mapmaker] khallos: spawn (%.2f, %.2f, %.2f)\n",(double)pos[0],(double)pos[1],(double)pos[2]);
+    khl_log("Khallos' chair created at the placeholder (placeholder, chair)",a,obj);
+    fprintf(stderr,"[mapmaker] khallos: chair %u spawn (%.2f, %.2f, %.2f), anchor rebased to (%.2f, %.2f, %.2f)\n",k,
+            (double)pos[0],(double)pos[1],(double)pos[2],(double)pos[0],(double)(pos[1]+KHL_LIFT),(double)pos[2]);
     fflush(stderr);
-    khl_bind_rider();
+    khl_bind_rider(k);
 }
 
 /* 1 when a living player stands within KHL_WAKE metres (x/z) of the chair. */
@@ -517,7 +618,7 @@ static void khl_shift_out(uint32_t obj)
  * back for it (pos, a guest vector or 0, moved by +d), then restored bit for bit. */
 static void khl_world_call(void (*original)(void),uint32_t pos)
 {
-    uint32_t base=WORD_AT(KHL_PLAYER_BASE),obj=khl_lv.obj,k,i,keep[3]={0};
+    uint32_t base=WORD_AT(KHL_PLAYER_BASE),obj=khl_ch[khl_lv.cur].obj,k,i,keep[3]={0};
     int has=pos && MAPMAKER_PTR_OK(pos,12u);
     for(i=0;i<2u;i++) {
         khl_lv.self[i]=WORD_AT(KHL_POS+4u+i*4u);khl_lv.self[2u+i]=WORD_AT(obj+KHL_ENT_POS+4u+i*4u);
@@ -535,31 +636,31 @@ static void khl_world_call(void (*original)(void),uint32_t pos)
         for(i=0;i<2u;i++) WORD_AT(base+k*KHL_PLAYER_STRIDE+KHL_P_POS+4u+i*4u)=khl_lv.pmoved[k][i];
     for(i=0;i<2u;i++) { WORD_AT(KHL_POS+4u+i*4u)=khl_lv.self[i];WORD_AT(obj+KHL_ENT_POS+4u+i*4u)=khl_lv.self[2u+i]; }
 }
-static void khl_remove(uint32_t obj)
+/* Chair k (its globals in) is gone: removed as the train's rising variant
+ * removes its own chair, its rider with it. */
+static void khl_remove(unsigned k,uint32_t obj)
 {
     uint32_t jet=WORD_AT(KHL_JET);
     khl_unfocus(obj);
     guest_call(sub_000A9070,1,obj);
     if(jet) { guest_call(sub_0010E2A0,1,jet);WORD_AT(KHL_JET)=0; }
     if(WORD_AT(KHL_OBJ)==obj) WORD_AT(KHL_OBJ)=0;
-    khl_lv.removed=1;
-    khl_log("the dead chair flew off and was removed",obj,khl_lv.dying);
-    khl_drop_rider();
+    khl_ch[k].removed=1;
+    khl_log("the dead chair flew off and was removed (chair, frames)",k,khl_ch[k].dying);
+    khl_drop_rider(k);
 }
 
-/* WRAP sub_001EEBD0 (cdecl chair; its per-frame callback). */
-void pc_mapmaker_khallos_update(void (*original)(void))
+/* Chair k's frame, its globals in. */
+static void khl_frame(void (*original)(void),unsigned k,uint32_t obj)
 {
-    uint32_t obj,p,line,gap,a,ent;
+    uint32_t p,line,gap,a,ent;
     float px,tx;
-    if(!MAPMAKER_STACK_OK(8) || !khl_mine(obj=WORD_AT(g_esp+4u))) { original();return; }
-    if(khl_lv.removed) { MAPMAKER_GUEST_RET();return; }   /* removed: nothing more to run */
-    if(khl_lv.place) {                                     /* first frame: the placeholder leaves */
-        a=khl_lv.place;ent=khl_lv.place_ent;khl_lv.place=0;
-        if(khl_same_ai(a,ent,khl_lv.place_rec)) {
+    if(khl_ch[k].place) {                                  /* first frame: the placeholder leaves */
+        a=khl_ch[k].place;ent=khl_ch[k].place_ent;khl_ch[k].place=0;
+        if(khl_same_ai(a,ent,khl_ch[k].place_rec)) {
             khl_unfocus(ent);
             guest_call(sub_0015DDA0,1,ent);
-            khl_log("chair placeholder AI removed",a,ent);
+            khl_log("chair placeholder AI removed (placeholder, chair)",a,k);
         } else khl_log("chair placeholder AI already gone",a,ent);
     }
     line=WORD_AT(KHL_LINE);gap=WORD_AT(KHL_GAP);
@@ -569,13 +670,13 @@ void pc_mapmaker_khallos_update(void (*original)(void))
         WORD_AT(KHL_LINE)=line;
         return;
     }
-    if(!WORD_AT(KHL_ACTIVE)) khl_log("Khallos' fight started: a player came near",obj,0);
+    if(!WORD_AT(KHL_ACTIVE)) khl_log("Khallos' fight started: a player came near (chair, chair)",obj,k);
     if(!(p=khl_steered())) { WORD_AT(KHL_LINE)=KHL_FLT_MAX;original();WORD_AT(KHL_LINE)=line;return; }
     px=khl_getf(p+KHL_P_POS);
-    tx=khl_clamp(px-khl_getf(KHL_GAP),khl_lv.spawn[0]-KHL_ROAM,khl_lv.spawn[0]+KHL_ROAM);
+    tx=khl_clamp(px-khl_getf(KHL_GAP),khl_ch[k].spawn[0]-KHL_ROAM,khl_ch[k].spawn[0]+KHL_ROAM);
     khl_lv.d[0]=0.0f;
-    khl_lv.d[1]=khl_lv.spawn[1]+KHL_LIFT-KHL_TRAIN_Y;
-    khl_lv.d[2]=khl_clamp(khl_getf(p+KHL_P_POS+8u),khl_lv.spawn[2]-KHL_ROAM,khl_lv.spawn[2]+KHL_ROAM);
+    khl_lv.d[1]=khl_ch[k].spawn[1]+KHL_LIFT-KHL_TRAIN_Y;
+    khl_lv.d[2]=khl_clamp(khl_getf(p+KHL_P_POS+8u),khl_ch[k].spawn[2]-KHL_ROAM,khl_ch[k].spawn[2]+KHL_ROAM);
     WORD_AT(KHL_LINE)=KHL_FLT_MAX;
     khl_setf(KHL_GAP,px-tx);
     khl_shift_in(obj);
@@ -585,26 +686,67 @@ void pc_mapmaker_khallos_update(void (*original)(void))
     khl_shift_out(obj);
     WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;
     if(!(khl_getf(obj+KHL_ENT_HEALTH)<0.0f)) return;
-    if(++khl_lv.dying>=KHL_GONE_FRAMES || khl_getf(KHL_POS+4u)>khl_lv.spawn[1]+KHL_GONE_UP) khl_remove(obj);
+    if(++khl_ch[k].dying>=KHL_GONE_FRAMES || khl_getf(KHL_POS+4u)>khl_ch[k].spawn[1]+KHL_GONE_UP) khl_remove(k,obj);
 }
 
-/* WRAP sub_001EF840 (cdecl hit record): no train death in a MapMaker map. */
-void pc_mapmaker_khallos_damage(void (*original)(void))
+/* WRAP sub_001EEBD0 (cdecl chair; its per-frame callback). */
+void pc_mapmaker_khallos_update(void (*original)(void))
 {
-    uint32_t obj=WORD_AT(KHL_OBJ),r,bits,k;
+    uint32_t obj,keep[KHL_BLOCK_N+KHL_SMOKE_N];
+    int k,prev;
+    if(!MAPMAKER_STACK_OK(8) || (k=khl_chair(obj=WORD_AT(g_esp+4u)))<0) { original();return; }
+    if(khl_ch[k].removed) { MAPMAKER_GUEST_RET();return; }   /* removed: nothing more to run */
+    khl_in((unsigned)k,keep);
+    prev=khl_lv.cur;khl_lv.cur=k;
+    khl_frame(original,(unsigned)k,obj);
+    khl_lv.cur=prev;
+    khl_out((unsigned)k,keep);
+}
+
+/* Chair k's hit (its globals in): no train death in a MapMaker map. */
+static void khl_hit(void (*original)(void),unsigned k,uint32_t r)
+{
+    uint32_t obj=WORD_AT(KHL_OBJ),bits,i;
     float h,dmg;
-    if(!MAPMAKER_STACK_OK(8) || !khl_mine(obj) || khl_lv.removed) { original();return; }
-    r=WORD_AT(g_esp+4u);
-    if(WORD_AT(KHL_ACTIVE)!=1u || !MAPMAKER_PTR_OK(r,KHL_REC_DIR+4u) || !WORD_AT(r+KHL_REC_DIR) || !WORD_AT(r+KHL_REC_HIT) ||
+    if(WORD_AT(KHL_ACTIVE)!=1u || obj!=khl_ch[k].obj || !MAPMAKER_PTR_OK(r,KHL_REC_DIR+4u) || !WORD_AT(r+KHL_REC_DIR) || !WORD_AT(r+KHL_REC_HIT) ||
        !((h=khl_getf(obj+KHL_ENT_HEALTH))>=0.0f) || !(h-(dmg=khl_getf(r+KHL_REC_DAMAGE))<0.0f)) { original();return; }
     bits=WORD_AT(r+KHL_REC_DAMAGE);
     khl_setf(r+KHL_REC_DAMAGE,h);                          /* the stock code leaves him at exactly 0 */
     original();
     WORD_AT(r+KHL_REC_DAMAGE)=bits;
     khl_setf(obj+KHL_ENT_HEALTH,h-dmg);
-    for(k=0;k<3u;k++) guest_call(sub_0010EB90,2,WORD_AT(KHL_SMOKE+k*4u),0u);
+    for(i=0;i<3u;i++) guest_call(sub_0010EB90,2,WORD_AT(KHL_SMOKE+i*4u),0u);
     khl_unfocus(obj);
-    khl_log("Khallos' chair shot down",obj,0);
+    khl_log("Khallos' chair shot down (chair, chair)",obj,k);
+}
+/* WRAP sub_001EF840 (cdecl hit record, +0 the object hit: sub_000BB490). */
+void pc_mapmaker_khallos_damage(void (*original)(void))
+{
+    uint32_t r,keep[KHL_BLOCK_N+KHL_SMOKE_N];
+    int k,prev;
+    if(!MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(r=WORD_AT(g_esp+4u),4u) || (k=khl_chair(WORD_AT(r)))<0 || khl_ch[k].removed) { original();return; }
+    khl_in((unsigned)k,keep);
+    prev=khl_lv.cur;khl_lv.cur=k;
+    khl_hit(original,(unsigned)k,r);
+    khl_lv.cur=prev;
+    khl_out((unsigned)k,keep);
+}
+
+/* WRAP sub_00263260 (cdecl entity; the seated Khallos, class 8): with the
+ * globals of the chair he rides. */
+void pc_mapmaker_khallos_rider(void (*original)(void))
+{
+    int k;
+    if(!khl_lv.n || !MAPMAKER_STACK_OK(8) || (k=khl_ridden(WORD_AT(g_esp+4u)))<0) { original();return; }
+    khl_swapped(original,(unsigned)k);
+}
+/* WRAP sub_00263150 (cdecl entity; the slot-2 callback the seated Khallos'
+ * handler installs, reads the chair sway [0x0078F068/6C]): same. */
+void pc_mapmaker_khallos_rider_pose(void (*original)(void))
+{
+    int k;
+    if(!khl_lv.n || !MAPMAKER_STACK_OK(8) || (k=khl_ridden(WORD_AT(g_esp+4u)))<0) { original();return; }
+    khl_swapped(original,(unsigned)k);
 }
 
 /* WRAP sub_002274C0 (cdecl event, arg): the chair's four events. */
