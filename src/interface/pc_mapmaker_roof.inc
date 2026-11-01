@@ -69,12 +69,18 @@
  *   ([0x00784014], 2) at 0x00303076; the pool is rebuilt, pointers change)
  *   found no marks, so the next rebuild closed every tile.
  * Play reads record +8 unchanged (sub_0008A780 0x0008A91D); it never
- * recomputes the mask, so no play-time hook is needed.
+ * recomputes the mask, so No roof and Open air (unbounded) need no play-time
+ * hook. Open air (bounded), mode 3 / mark 0x5203 (user request 2026-11-01,
+ * set from the tile roof menu only), saves the No roof mask so the walls keep
+ * their collision; the play hooks at the end of this file leave its side
+ * nodes out of the draw. Marks 0x5201/0x5202 keep their meaning, so maps
+ * saved before the split load unchanged (0x5202 = Open air (unbounded)).
  * The saved tile is the ordinary base tile id with the open mask in +8, so the
  * stock game loads and plays it open (no new id: the 45-entry tables
  * 0x00783F40, 0x00785000, 0x00789440 and 0x00785080 + (tileset*45)*64 index
  * every tile id). Requires the includer's WORD_AT, FLOAT_AT, g_esp, g_eax,
- * xbox_HeapAlloc, mapmaker_limits/mapmaker_limits_read and MAPMAKER_PTR_OK. */
+ * xbox_HeapAlloc, mapmaker_limits/mapmaker_limits_read and MAPMAKER_PTR_OK, and
+ * guest_call for the fall kill (sub_000BD090). */
 #include <stdio.h>
 #include <string.h>
 
@@ -90,11 +96,14 @@
 #endif
 
 #define MAPMAKER_ROOF_BASE_TILE 8u              /* 1x1, four sides + up (connections 0x00528F48) */
-#define MAPMAKER_ROOF_OPEN_ROOF 1u
-#define MAPMAKER_ROOF_OPEN_AIR 2u
+#define MAPMAKER_ROOF_OPEN_ROOF 1u              /* No roof */
+#define MAPMAKER_ROOF_OPEN_AIR 2u               /* Open air (unbounded): no walls, no wall collision */
+#define MAPMAKER_ROOF_OPEN_BOUNDED 3u           /* Open air (bounded): walls not drawn, collision kept */
 #define MAPMAKER_ROOF_CEILING 0x02000000u
 #define MAPMAKER_ROOF_AIR 0x02FFFFFFu           /* ceiling + side banks 0..23; keeps floor 0x01000000 */
+#define MAPMAKER_ROOF_SIDES 0x00FFFFFFu         /* side banks only: hidden from the draw of bounded rooms */
 #define MAPMAKER_ROOF_MARK 0x5200u              /* record word +0x26: 0x5200 | mode */
+#define MAPMAKER_ROOF_RET_VIEW 0x0032FEC4u      /* editor 3D view: sub_002FC680 at 0x0032FEBF */
 #define MAPMAKER_ROOF_RECORD 0x28u
 #define MAPMAKER_ROOF_CATS_FULL 0x0052DAC0u     /* 8 x {text, list, count} */
 #define MAPMAKER_ROOF_CATS_BASIC 0x0052DB20u    /* 3 x {text, list, count} */
@@ -106,7 +115,7 @@
 #define MAPMAKER_ROOF_NAME_TEXT 0x0A3Fu         /* catalogue[8] +8 (0x00529F18): "Small Open" */
 #define MAPMAKER_ROOF_RET_CAPTION 0x0032E5D4u   /* palette caption, sub_0003D7B0 at 0x0032E5CF */
 #define MAPMAKER_ROOF_RET_PIECE_NAME 0x00317C60u /* sub_00317C40: name of piece editor +0x2F18 */
-#define MAPMAKER_ROOF_LABEL_BYTES 32u
+#define MAPMAKER_ROOF_LABEL_BYTES 40u
 #define MAPMAKER_ROOF_RET_HOVER 0x0031171Du      /* tile label: sub_0003D7B0 at 0x00311718 */
 #define MAPMAKER_ROOF_RET_HOVER_FORMAT 0x00311729u /* sub_00151030("%d.%s", number, name) at 0x00311724 */
 #define MAPMAKER_ROOF_HOVER_FORMAT 0x0049F7C0u   /* "%d.%s" */
@@ -114,7 +123,19 @@
 #define MAPMAKER_ROOF_NUMBER 46u                /* stock tiles are numbered 1..45 (catalogue +4) */
 #define MAPMAKER_ROOF_SUFFIX_BYTES 64u
 #define MAPMAKER_ROOF_ITEM_MIN 0x18u           /* item sub-record: (count byte +0x14 * 4 + 0x1B) & ~3 */
-static const char mapmaker_roof_names[2][MAPMAKER_ROOF_LABEL_BYTES]={"Small Open (No Roof)","Small Open (Open Air)"};
+#define MAPMAKER_ROOF_SCENE_PLAY 100u
+#define MAPMAKER_ROOF_ROOMS 256u                /* per-room tables (rooms.json: 256 entries) */
+#define MAPMAKER_ROOF_ROOM_MODEL 0x907u         /* room r is drawn by a prop of model 0x907 + r */
+#define MAPMAKER_ROOF_PLAY_PIECES 2048u
+#define MAPMAKER_ROOF_BUILD_SIZE 0x48u          /* reads +0x14 rooms, +0x28 first room, +0x44 mask */
+#define MAPMAKER_ROOF_FLOOR_HEIGHT 5.0f         /* play y = record floor byte +6 * [0x004760CC] */
+#define MAPMAKER_ROOF_KILL_DEPTH 20.0f          /* kill this far below the lowest floor (4 floors) */
+#define MAPMAKER_ROOF_ACTORS 0x00900100u        /* live characters (actors-list.json, was 0x007A3580) */
+#define MAPMAKER_ROOF_ACTOR_COUNT 0x0074C37Cu
+#define MAPMAKER_ROOF_ACTORS_MAX 64u
+/* Palette entries 46 / 47 (tile 8 presets). Bounded has no palette entry. */
+static const char mapmaker_roof_names[2][MAPMAKER_ROOF_LABEL_BYTES]={"Small Open (No Roof)","Small Open (Open Air, Unbounded)"};
+static const char mapmaker_roof_tails[3][24]={" (No Roof)"," (Open Air, Unbounded)"," (Open Air, Bounded)"};
 
 static struct {
     uint32_t key[MAPMAKER_ROOF_SLOTS];
@@ -131,10 +152,30 @@ static struct {
     unsigned long long placed, mismatch, unmatched, restored, full, no_list, carried, freed;
 } mapmaker_roof;
 
+/* Play time data for bounded open-air rooms (map build sub_0008A780). */
+static struct {
+    uint8_t mode[MAPMAKER_ROOF_PLAY_PIECES];  /* per piece record, in record order */
+    uint32_t mask[MAPMAKER_ROOF_PLAY_PIECES]; /* the record's +8, checked against the build */
+    unsigned pieces, next, rooms, bounded, unbounded;
+    int building, kill, low;
+    float kill_y;                              /* characters below this die (unbounded maps) */
+    uint32_t hide[MAPMAKER_ROOF_ROOMS];        /* node bits left out of the draw, by room index */
+    unsigned long long builds, mismatch, beyond, malformed, kills;
+} mapmaker_roof_play;
+extern void sub_000BD090(void);
+
+/* Bits the saved and played mask loses (what draw and collision both see). */
 static uint32_t mapmaker_roof_clear(unsigned mode)
 {
-    return mode==MAPMAKER_ROOF_OPEN_AIR?MAPMAKER_ROOF_AIR:mode==MAPMAKER_ROOF_OPEN_ROOF?MAPMAKER_ROOF_CEILING:0u;
+    return mode==MAPMAKER_ROOF_OPEN_AIR?MAPMAKER_ROOF_AIR:
+           mode==MAPMAKER_ROOF_OPEN_ROOF || mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_CEILING:0u;
 }
+/* Bits that are not drawn (editor 3D view, palette preview). */
+static uint32_t mapmaker_roof_shown(unsigned mode)
+{
+    return mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_AIR:mapmaker_roof_clear(mode);
+}
+static int mapmaker_roof_known(unsigned mode) { return mode>=MAPMAKER_ROOF_OPEN_ROOF && mode<=MAPMAKER_ROOF_OPEN_BOUNDED; }
 static int mapmaker_roof_editor(void)
 {
     mapmaker_limits_read();
@@ -175,14 +216,16 @@ static void mapmaker_roof_forget_all(void)
 }
 
 /* WRAP sub_002FC680 (piece mask: piece, record or 0). Per placed piece in
- * the editor's 3D view, so the idle path is one counter test. */
+ * the editor's 3D view, so the idle path is one counter test. The writer
+ * (0x00300CA4/0x00300CB5) gets the saved mask, the 3D view (0x0032FEBF) the
+ * drawn one: a bounded tile shows without walls but saves them. */
 void pc_mapmaker_roof_mask(void (*original)(void))
 {
-    uint32_t piece=mapmaker_roof.marked && MAPMAKER_STACK_OK(8u)?WORD_AT(g_esp+4u):0u;
+    uint32_t piece=mapmaker_roof.marked && MAPMAKER_STACK_OK(8u)?WORD_AT(g_esp+4u):0u,ret=piece?WORD_AT(g_esp):0u;
     unsigned mode;
     original();
     if(!piece || !(mode=mapmaker_roof_mode(piece)) || !mapmaker_roof_editor()) return;
-    g_eax&=~mapmaker_roof_clear(mode);
+    g_eax&=~(ret==MAPMAKER_ROOF_RET_VIEW?mapmaker_roof_shown(mode):mapmaker_roof_clear(mode));
 }
 
 /* WRAP sub_002FC470 (vertical bits only: piece). */
@@ -318,7 +361,7 @@ static int mapmaker_roof_match(uint32_t record,void *ctx)
     uint32_t mark=WORD_AT(record+0x24u)>>16,piece=WORD_AT(0x0078400Cu);
     unsigned mode=mark&0xFFu,steps;
     (void)ctx;
-    if((mark&0xFF00u)!=MAPMAKER_ROOF_MARK || (mode!=MAPMAKER_ROOF_OPEN_ROOF && mode!=MAPMAKER_ROOF_OPEN_AIR)) return 1;
+    if((mark&0xFF00u)!=MAPMAKER_ROOF_MARK || !mapmaker_roof_known(mode)) return 1;
     for(steps=0;piece && steps<MAPMAKER_ROOF_LIST_STEPS && MAPMAKER_PTR_OK(piece,0x48u);steps++,piece=WORD_AT(piece+0x40u)) {
         uint32_t xyz=WORD_AT(record+4u);
         if(mapmaker_roof_mode(piece) || WORD_AT(piece+0x10u)!=WORD_AT(record)) continue;
@@ -425,7 +468,7 @@ void pc_mapmaker_roof_menu_hover(void (*original)(void))
     now=WORD_AT(inst+0x30u);
     if(inst!=mapmaker_roof.preview_inst || now!=mapmaker_roof.preview_applied) mapmaker_roof.preview_saved=now;
     mapmaker_roof.preview_inst=inst;
-    mapmaker_roof.preview_applied=mapmaker_roof.preview_saved&~mapmaker_roof_clear(mode);
+    mapmaker_roof.preview_applied=mapmaker_roof.preview_saved&~mapmaker_roof_shown(mode);
     WORD_AT(inst+0x30u)=mapmaker_roof.preview_applied;
 }
 
@@ -449,7 +492,7 @@ void pc_mapmaker_roof_menu_pick(void (*original)(void))
     if(!MAPMAKER_PTR_OK(piece,0x48u) || WORD_AT(piece+0x10u)!=MAPMAKER_ROOF_BASE_TILE) return;
     mapmaker_roof_set(piece,mode);
     if(mapmaker_roof.placed++<4u)
-        fprintf(stderr,"[mapmaker] roof: %s tile picked\n",mode==MAPMAKER_ROOF_OPEN_AIR?"open air":"open roof");
+        fprintf(stderr,"[mapmaker] roof: %s tile picked\n",mode==MAPMAKER_ROOF_OPEN_AIR?"open air (unbounded)":"open roof");
 }
 
 /* WRAP sub_0003D7B0 (text id -> string, cdecl, one argument). Runs for
@@ -481,8 +524,10 @@ static unsigned mapmaker_roof_label_mode(uint32_t s)
 }
 
 /* Any other flagged tile (set from the right-click roof menu,
- * pc_mapmaker_tileflags.inc): the grid label's name gets " (No Roof)" /
- * " (Open Air)" in a heap copy; the number stays the tile's own. */
+ * pc_mapmaker_tileflags.inc), and a bounded tile 8 (it has no palette entry
+ * and keeps the stock name): the grid label's name gets " (No Roof)" /
+ * " (Open Air, Unbounded)" / " (Open Air, Bounded)" in a heap copy; the
+ * number stays the tile's own. */
 static unsigned mapmaker_roof_hover_mode(void)
 {
     uint32_t editor=WORD_AT(0x007844A8u),piece;
@@ -492,17 +537,18 @@ static unsigned mapmaker_roof_hover_mode(void)
 }
 static void mapmaker_roof_suffix(unsigned mode)
 {
-    static const char tail[2][12]={" (No Roof)"," (Open Air)"};
+    const char *tail;
     uint32_t name=WORD_AT(g_esp+12u);
     char *out;
     size_t n=0;
-    if(mode!=MAPMAKER_ROOF_OPEN_ROOF && mode!=MAPMAKER_ROOF_OPEN_AIR) return;
+    if(!mapmaker_roof_known(mode)) return;
+    tail=mapmaker_roof_tails[mode-1u];
     if(!mapmaker_roof.suffixed && !(mapmaker_roof.suffixed=xbox_HeapAlloc(MAPMAKER_ROOF_SUFFIX_BYTES,4u))) return;
     if(!MAPMAKER_PTR_OK(mapmaker_roof.suffixed,MAPMAKER_ROOF_SUFFIX_BYTES) || !MAPMAKER_PTR_OK(name,1u)) return;
     out=(char *)((uintptr_t)mapmaker_roof.suffixed+g_xbox_mem_offset);
-    while(n<MAPMAKER_ROOF_SUFFIX_BYTES-sizeof tail[0] && MAPMAKER_PTR_OK(name+n,1u) &&
+    while(n<MAPMAKER_ROOF_SUFFIX_BYTES-sizeof mapmaker_roof_tails[0] && MAPMAKER_PTR_OK(name+n,1u) &&
           (out[n]=*(const char *)((uintptr_t)name+n+g_xbox_mem_offset))!=0) n++;
-    memcpy(out+n,tail[mode-1u],strlen(tail[mode-1u])+1u);
+    memcpy(out+n,tail,strlen(tail)+1u);
     WORD_AT(g_esp+12u)=mapmaker_roof.suffixed;
 }
 
@@ -533,6 +579,147 @@ void pc_mapmaker_roof_caption(void (*original)(void))
        (int32_t)g_eax>=0 && (mode=mapmaker_roof_label_mode(g_ecx))!=0)
         g_eax=MAPMAKER_ROOF_NUMBER+mode-1u;
     original();
+}
+
+/* ---- play: Open air (bounded) ---------------------------------------------
+ * A bounded tile is saved like No roof (record +8 keeps its wall bits, so the
+ * room's instance mask inst+0x30 has them and the node-mask tests of the
+ * geometry queries, 0x00166C77 etc., keep the walls) and is marked 0x5203.
+ * Only the draw leaves the side nodes out: sub_0008F5E0 tests the same
+ * inst+0x30 per node (0x0008F64A), and every call of it is inside
+ * sub_0008F6B0(inst, pass, layer) (0x0008F66F..0x0008F8BC), so that hook
+ * clears the side bits of a bounded room's geometry instance for the call and
+ * puts them back. A stock game plays the tile as No roof (walls drawn). */
+
+static int mapmaker_roof_play_record(uint32_t record,void *ctx)
+{
+    uint32_t mark=WORD_AT(record+0x24u)>>16;
+    unsigned k=mapmaker_roof_play.pieces,mode=(mark&0xFF00u)==MAPMAKER_ROOF_MARK?mark&0xFFu:0u;
+    int floor=(int8_t)(WORD_AT(record+4u)>>16&0xFFu);       /* byte +6 (0x0008A87E) */
+    (void)ctx;
+    if(!k || floor<mapmaker_roof_play.low) mapmaker_roof_play.low=floor;
+    if(mode==MAPMAKER_ROOF_OPEN_AIR) mapmaker_roof_play.unbounded++;
+    if(k>=MAPMAKER_ROOF_PLAY_PIECES) return 0;
+    mapmaker_roof_play.mode[k]=(uint8_t)(mode==MAPMAKER_ROOF_OPEN_BOUNDED?mode:0u);
+    mapmaker_roof_play.mask[k]=WORD_AT(record+8u);
+    if(mapmaker_roof_play.mode[k]) mapmaker_roof_play.bounded++;
+    mapmaker_roof_play.pieces=k+1u;
+    return 1;
+}
+
+/* WRAP sub_0008A780 (MapMaker play map build from the container
+ * [0x00784014]). It makes one 0x68-byte build entry per piece record, in
+ * record order (sub_00083F80 / sub_00085030, 0x0008AAAA/0x0008AACE), then
+ * calls sub_00085710(entry) for each in order (0x0008AC70..0x0008ACAB). The
+ * records are read before the original; the rooms hook does the rest. */
+void pc_mapmaker_roof_play(void (*original)(void))
+{
+    uint32_t c;
+    int read=-1;
+    memset(mapmaker_roof_play.hide,0,sizeof mapmaker_roof_play.hide);
+    mapmaker_roof_play.pieces=mapmaker_roof_play.next=mapmaker_roof_play.rooms=0;
+    mapmaker_roof_play.bounded=mapmaker_roof_play.unbounded=0;
+    mapmaker_roof_play.building=mapmaker_roof_play.kill=mapmaker_roof_play.low=0;
+    mapmaker_limits_read();
+    if(mapmaker_limits.limits && (c=WORD_AT(0x00784014u))!=0) {
+        read=mapmaker_roof_records(c,mapmaker_roof_play_record,NULL);
+        if(read<0 && (mapmaker_roof_play.bounded || mapmaker_roof_play.unbounded) && mapmaker_roof_play.malformed++<4u)
+            fprintf(stderr,"[mapmaker] roof: map records unreadable; bounded tiles show their walls, no fall kill height\n");
+    }
+    if(read>=0) {
+        mapmaker_roof_play.building=mapmaker_roof_play.bounded!=0;
+        mapmaker_roof_play.kill=mapmaker_roof_play.unbounded!=0;
+        mapmaker_roof_play.kill_y=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-MAPMAKER_ROOF_KILL_DEPTH;
+    }
+    original();
+    if((mapmaker_roof_play.building || mapmaker_roof_play.kill) && mapmaker_roof_play.builds++<16u) {
+        if(mapmaker_roof_play.building)
+            fprintf(stderr,"[mapmaker] roof: %u bounded open-air room%s (walls hidden, collision kept)\n",
+                    mapmaker_roof_play.rooms,mapmaker_roof_play.rooms==1u?"":"s");
+        if(mapmaker_roof_play.kill)
+            fprintf(stderr,"[mapmaker] roof: %u unbounded open-air tile%s; characters below y %.1f (lowest floor %d) die\n",
+                    mapmaker_roof_play.unbounded,mapmaker_roof_play.unbounded==1u?"":"s",
+                    (double)mapmaker_roof_play.kill_y,mapmaker_roof_play.low);
+    }
+    mapmaker_roof_play.building=0;
+}
+
+/* WRAP sub_00085710 (store one piece's per-room data, cdecl: the build entry;
+ * table[+0x28 + j] = +0x44 for j < +0x14). Only during a build that has
+ * bounded pieces: the entry's mask must be its record's +8 (0x0008A91D ->
+ * the copy's +0x14 -> +0x44 at 0x00084F98 / 0x000856EB), else nothing more
+ * is hidden. */
+void pc_mapmaker_roof_rooms(void (*original)(void))
+{
+    uint32_t build=mapmaker_roof_play.building && MAPMAKER_STACK_OK(8u)?WORD_AT(g_esp+4u):0u,base,count,j;
+    unsigned k;
+    original();
+    if(!build) return;
+    k=mapmaker_roof_play.next++;
+    if(k>=mapmaker_roof_play.pieces || !MAPMAKER_PTR_OK(build,MAPMAKER_ROOF_BUILD_SIZE)) return;
+    if(WORD_AT(build+0x44u)!=mapmaker_roof_play.mask[k]) {
+        if(mapmaker_roof_play.mismatch++<4u) fprintf(stderr,"[mapmaker] roof: room build does not follow the map records; bounded tiles after piece %u show their walls\n",k);
+        mapmaker_roof_play.pieces=k;
+        return;
+    }
+    if(mapmaker_roof_play.mode[k]!=MAPMAKER_ROOF_OPEN_BOUNDED) return;
+    base=WORD_AT(build+0x28u);count=WORD_AT(build+0x14u);
+    for(j=0;(int32_t)count>0 && j<count;j++) {
+        if(base+j>=MAPMAKER_ROOF_ROOMS) { mapmaker_roof_play.beyond++;break; }
+        if(!mapmaker_roof_play.hide[base+j]) mapmaker_roof_play.rooms++;
+        mapmaker_roof_play.hide[base+j]=MAPMAKER_ROOF_SIDES;
+    }
+}
+
+/* WRAP sub_0008F6B0 (draw one model instance: inst, pass, layer; cdecl).
+ * Runs for every drawn instance: without bounded rooms, or outside MapMaker
+ * play, it is one counter test and one scene read. A room's geometry is the
+ * prop [inst] with +0x34 = room (1-based), model +0x94 = 0x907 + room and
+ * +4 = inst (sub_00085CC0 0x00085D6B..0x00085DD0). */
+void pc_mapmaker_roof_draw(void (*original)(void))
+{
+    uint32_t inst,prop,room,hide,mask;
+    if(!mapmaker_roof_play.rooms || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY || !MAPMAKER_STACK_OK(8u) ||
+       !MAPMAKER_PTR_OK(inst=WORD_AT(g_esp+4u),0x34u) || !MAPMAKER_PTR_OK(prop=WORD_AT(inst),0x98u) ||
+       (room=WORD_AT(prop+0x34u))-1u>=MAPMAKER_ROOF_ROOMS || !(hide=mapmaker_roof_play.hide[room-1u]) ||
+       WORD_AT(prop+4u)!=inst || WORD_AT(prop+0x94u)!=MAPMAKER_ROOF_ROOM_MODEL+room) { original();return; }
+    mask=WORD_AT(inst+0x30u);
+    WORD_AT(inst+0x30u)=mask&~hide;
+    original();
+    if(WORD_AT(inst+0x30u)==(mask&~hide)) WORD_AT(inst+0x30u)=mask;
+}
+
+/* ---- play: falling off an Open air (unbounded) tile -------------------------
+ * The stock game has no death for a fall into the void: the hazard-floor
+ * kills (sub_000D5EB0 0x000D6661.., sub_0015F0D0 0x0015F161..) need a ground
+ * polygon, fall damage (sub_000D4100 0x000D44E0..) needs a landing, and the
+ * only height kill (y < -100, 0x0015F19B..) is for scene 61. A character that
+ * walks off an unbounded tile at the map edge would fall forever. On a map
+ * with at least one unbounded tile (mark 0x5202, also maps saved before the
+ * split), any live character more than MAPMAKER_ROOF_KILL_DEPTH below the
+ * lowest floor dies, through the stock kill-now helper sub_000BD090(entity)
+ * (cdecl; hit with no attacker -> sub_000BABA0, scored as a suicide), like
+ * the stock loop at 0x00067AF1..0x00067B78 does: list[i] = actor, entity =
+ * [actor], alive when health +0x1CC > 0. Position y is entity +0x68 (y up). */
+
+/* WRAP sub_0003C440 (game tick, no arguments; called once per frame from
+ * sub_0003D370 at 0x0003D3CA). Outside MapMaker play, or on a map without an
+ * unbounded tile, one flag test. */
+void pc_mapmaker_roof_tick(void (*original)(void))
+{
+    uint32_t n,i,actor,ent;
+    original();
+    if(!mapmaker_roof_play.kill || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY) return;
+    n=WORD_AT(MAPMAKER_ROOF_ACTOR_COUNT);
+    if(n>MAPMAKER_ROOF_ACTORS_MAX) n=MAPMAKER_ROOF_ACTORS_MAX;
+    for(i=0;i<n;i++) {
+        actor=WORD_AT(MAPMAKER_ROOF_ACTORS+i*4u);
+        if(!MAPMAKER_PTR_OK(actor,4u) || !MAPMAKER_PTR_OK(ent=WORD_AT(actor),0x1D0u) || WORD_AT(ent+0x7Cu)!=actor) continue;
+        if(!(FLOAT_AT(ent+0x1CCu)>0.0f) || !(FLOAT_AT(ent+0x68u)<mapmaker_roof_play.kill_y)) continue;
+        if(mapmaker_roof_play.kills++<8u)
+            fprintf(stderr,"[mapmaker] roof: character %u fell off the map (y %.1f); killed\n",i,(double)FLOAT_AT(ent+0x68u));
+        guest_call(sub_000BD090,1,ent);
+    }
 }
 
 #ifdef TSFP_MAPMAKER_ROOF_TEST

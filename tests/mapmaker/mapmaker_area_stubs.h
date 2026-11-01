@@ -39,6 +39,7 @@ void sub_003533F0(void) {}
 void sub_0003D7B0(void) {}
 #endif
 void sub_0007A270(void) {}
+void sub_000BD090(void) {}  /* roof: fall kill */
 void sub_00157440(void) {}
 void sub_00300670(void) {}
 void sub_0031BB60(void) {}
