@@ -170,6 +170,7 @@ void pc_mapmaker_realbosses_princess(void (*original)(void));
 void pc_mapmaker_realbosses_risen(void (*original)(void));
 void pc_mapmaker_realbosses_throw(void (*original)(void));
 void pc_mapmaker_realbosses_event(void (*original)(void));
+void pc_mapmaker_realbosses_message(void (*original)(void));
 void pc_mapmaker_bosses_rows(void (*original)(void));
 void pc_mapmaker_bosses_close(void (*original)(void));
 void pc_mapmaker_bosses_delete(void (*original)(void));

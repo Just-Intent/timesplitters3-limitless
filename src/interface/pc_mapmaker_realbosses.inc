@@ -59,7 +59,9 @@
  *  - anims (sub_001C8540, per-level anim pak mount; sub_0005C420 calls it at
  *    0x0005C501 and registers the names of every mounted anim pak with
  *    sub_001CA2F0 at 0x0005C558): after the original, when the map's custom
- *    set has id 0x15 (or the container cannot be read), lv1_3.pak is not yet
+ *    set (index 0x11; slots 1-10 in the map-info chunk, 11-20 in the sets
+ *    area's chunk 0x00C776F5, rbs_set_scan, logged as "set check found")
+ *    has id 0x15 (or the container cannot be read), lv1_3.pak is not yet
  *    mounted (sub_00062260) and the 30-slot mount table [0x006D7880] has at
  *    least two free slots, mount it with sub_0005A130 (= sub_000622D0(path,
  *    1, 1): read whole, level heap) exactly as the stock per-level anim paks
@@ -148,6 +150,10 @@
  *  - princess (sub_0029FE00(entity)): for that boss in scene 100, the mansion
  *    variant (a direct call: the callee pops the caller's return address,
  *    exactly the lifted tail jump).
+ *  - message (sub_0028D0A0(entity, msg, ..), its message handler): mansion
+ *    sub_00286D30 only in scene 1, else the catacombs sub_0028C560, which
+ *    swallows the death message 2 (sub_0015DB20): the boss never died. For
+ *    that boss in scene 100: the mansion handler (death state 6, anim 0x1A6).
  *  - risen (sub_002875F0(entity), state 1 of the fight: "has the entrance
  *    animation finished"): stock answers sub_00059DB0(entity, 0x19C) in
  *    scene 1, 0x23B in 17 and 0 elsewhere (the fight would stay in state 1);
@@ -221,7 +227,11 @@
 #define RBS_INFO_SET 0x14u              /* word: set index, >= 0xC custom */
 #define RBS_INFO_COUNT 0x16u            /* byte: members */
 #define RBS_INFO_MEMBERS 0x18u          /* 4 bytes each, word id */
-#define RBS_SET_MAX 20u
+#define RBS_SET_MAX 20u                 /* slots 1-10 here, 11-20 in RBS_TAG_SETS */
+#define RBS_INFO_SLOTS 10u              /* stock: count byte 10 (0x00300884), 10 members */
+#define RBS_SET_MAP 0x11u               /* the map's own set; others are presets/profile sets */
+#define RBS_TAG_SETS 0x00C776F5u        /* pc_mapmaker_sets.inc: +0 word 1, +2 10, +3 count, +4 members */
+#define RBS_SETS_SIZE 0x30u
 #define RBS_SAI_INDEX 0x22u
 #define RBS_SAI_BOSS 0x29u              /* bosses area: 0xB0 | sub-boss 4 | (level - 1) */
 #define RBS_BOSS_BAR 1u                 /* real[].boss: Boss-flagged, the bottom Boss bar */
@@ -258,12 +268,13 @@
 #define RBS_SKEL_THROW 6u               /* action type: feeble throw */
 #define RBS_SKEL_PHASE 0x4160u          /* state: 0 aim, 1 fire, 2 done */
 #define RBS_SKEL_SHOT 0x413Cu           /* state: origin (+0), direction (+0xC), effect (+0x18) */
-#define RBS_RET_EVENT 0x0029E068u       /* sub_0029CEF0: call sub_002274C0(3, 0) at 0x0029E063 */
+#define RBS_MSG_DEATH 2u                /* sub_0015DB20: message 2 = killed */
+#define RBS_RET_EVENT 0x0029E068u      /* sub_0029CEF0: call sub_002274C0(3, 0) at 0x0029E063 */
 #define RBS_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBS_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 extern void sub_00079D60(void),sub_00071630(void),sub_00071C70(void),sub_0005A130(void),sub_00062260(void);
-extern void sub_00287E00(void),sub_0029CEF0(void),sub_00059DB0(void),sub_000EA9C0(void),sub_0010EB90(void);
+extern void sub_00287E00(void),sub_0029CEF0(void),sub_00286D30(void),sub_00059DB0(void),sub_000EA9C0(void),sub_0010EB90(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
@@ -275,7 +286,7 @@ static struct {
 } rbs;
 /* The giant skeleton of this level: its state blocks (0 = none this level)
  * and the one spawn record that holds the boss class. */
-static struct { uint32_t state, parts, record; unsigned extras, events, throws; } rbs_skel;
+static struct { uint32_t state, parts, record; unsigned extras, events, throws, deaths; } rbs_skel;
 
 static void rbs_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -438,26 +449,65 @@ void pc_mapmaker_realbosses_model_request(void (*original)(void))
 }
 
 /* ---- play (scene 100) ---------------------------------------------------- */
-/* 1: the map's custom set has the id; 0: it has not; -1: unreadable. */
-static int rbs_map_has(uint32_t id)
+/* The map's custom set, slots 1-20: the map-info chunk holds slots 1-10, the
+ * sets area's chunk RBS_TAG_SETS slots 11-20 (pc_mapmaker_sets.inc; play
+ * copies them into the play set, sub_0033EBF0 hook). Stock play uses the
+ * map's members only for set index 0x11 (0x00240DB4..0x00240DBE,
+ * 0x0023F462..0x0023F46D); any other index plays a preset/profile set.
+ * 1: custom set read, *t / *s = first slot (1-based) of the trophy monster /
+ * the skeleton or 0; 0: not the map's set; -1: unreadable. */
+static int rbs_set_scan(uint32_t *t,uint32_t *s)
 {
-    uint32_t container=WORD_AT(RBS_CONTAINER),c,end,steps;
+    uint32_t container=WORD_AT(RBS_CONTAINER),c,end,steps,info=0,isz=0,extra=0,n,k,id;
+    *t=*s=0;
     if(!container || !MAPMAKER_PTR_OK(container,RBS_SCAN) || WORD_AT(container)!=RBS_MAGIC) return -1;
     c=container+8u;end=container+RBS_SCAN;
     for(steps=0;steps<0x40000u && end-c>=8u;steps++) {
-        uint32_t tag=WORD_AT(c),sz=WORD_AT(c+4u),d=c+8u,n,k;
+        uint32_t tag=WORD_AT(c),sz=WORD_AT(c+4u),d=c+8u;
         if(tag==RBS_TAG_END || sz>end-c-8u) break;
-        if(tag==RBS_TAG_INFO && sz>=RBS_INFO_MEMBERS) {
-            if(RBS_H(d+RBS_INFO_SET)<0xCu) return 0;          /* a preset set */
-            n=RBS_B(d+RBS_INFO_COUNT);
-            if(n>RBS_SET_MAX) n=RBS_SET_MAX;
-            if(RBS_INFO_MEMBERS+n*4u>sz) n=(sz-RBS_INFO_MEMBERS)/4u;
-            for(k=0;k<n;k++) if(RBS_H(d+RBS_INFO_MEMBERS+k*4u)==id) return 1;
-            return 0;
-        }
+        if(tag==RBS_TAG_INFO && sz>=RBS_INFO_MEMBERS && !info) { info=d;isz=sz; }
+        else if(tag==RBS_TAG_SETS && sz>=RBS_SETS_SIZE && !extra && RBS_H(d)==1u && RBS_B(d+2u)==RBS_INFO_SLOTS &&
+                RBS_B(d+3u)>=1u && RBS_B(d+3u)<=RBS_SET_MAX-RBS_INFO_SLOTS) extra=d;   /* as sets_take */
         c+=8u+sz;
     }
-    return -1;
+    if(!info) return -1;
+    if(RBS_H(info+RBS_INFO_SET)!=RBS_SET_MAP) return 0;   /* a preset or profile set */
+    n=RBS_B(info+RBS_INFO_COUNT);
+    if(n>RBS_INFO_SLOTS) n=RBS_INFO_SLOTS;
+    if(RBS_INFO_MEMBERS+n*4u>isz) n=(isz-RBS_INFO_MEMBERS)/4u;
+    for(k=0;k<n;k++) {
+        id=RBS_H(info+RBS_INFO_MEMBERS+k*4u);
+        if(id==RBS_ID && !*t) *t=k+1u;
+        if(id==RBS_SKEL_ID && !*s) *s=k+1u;
+    }
+    for(k=0;extra && k<RBS_B(extra+3u);k++) {          /* slots 11-20 */
+        id=RBS_H(extra+4u+k*4u);
+        if(id==RBS_ID && !*t) *t=RBS_INFO_SLOTS+k+1u;
+        if(id==RBS_SKEL_ID && !*s) *s=RBS_INFO_SLOTS+k+1u;
+    }
+    return 1;
+}
+/* 1: the map's custom set has the id; 0: it has not; -1: unreadable. */
+static int rbs_map_has(uint32_t id)
+{
+    uint32_t t,s;
+    int r=rbs_set_scan(&t,&s);
+    if(r<=0) return r;
+    return (id==RBS_ID?t:s)!=0;
+}
+/* What the set check found, for the log (own small budget, once per level hook). */
+static void rbs_set_report(const char *where)
+{
+    static unsigned n;
+    uint32_t t,s;
+    int r=rbs_set_scan(&t,&s);
+    if(n>=12u) return;
+    n++;
+    if(r<0) fprintf(stderr,"[mapmaker] realbosses: %s set check: map container unreadable; both real bosses assumed\n",where);
+    else if(!r) fprintf(stderr,"[mapmaker] realbosses: %s set check: not the map's own set; no real boss\n",where);
+    else fprintf(stderr,"[mapmaker] realbosses: %s set check found: giant trophy monster %s%u, giant skeleton %s%u\n",where,
+                 t?"slot ":"none ",(unsigned)t,s?"slot ":"none ",(unsigned)s);
+    fflush(stderr);
 }
 static int rbs_pak_mounted(void) { return (int32_t)guest_call(sub_00062260,1,RBS_PAK)!=-1; }
 static int rbs_skel_pak_mounted(void) { return (int32_t)guest_call(sub_00062260,1,RBS_SKEL_PAK)!=-1; }
@@ -469,6 +519,7 @@ void pc_mapmaker_realbosses_anims(void (*original)(void))
     uint32_t mounted;
     original();
     if(!rbs_play() || rbs.optout) return;
+    rbs_set_report("anim pak");
     if((has=rbs_map_has(RBS_SKEL_ID))!=0) {
         rbs_skel_label();                              /* the bar label, off the HUD path */
         if(rbs_skel_pak_mounted()) {}
@@ -497,7 +548,9 @@ void pc_mapmaker_realbosses_level(void (*original)(void))
     uint32_t st,pt;
     original();
     memset(&rbs_skel,0,sizeof rbs_skel);              /* a new level: nothing of the last one */
-    if(!rbs_play() || rbs.optout || (has=rbs_map_has(RBS_SKEL_ID))==0) return;
+    if(!rbs_play() || rbs.optout) return;
+    rbs_set_report("level init");
+    if((has=rbs_map_has(RBS_SKEL_ID))==0) return;
     WORD_AT(RBS_SKEL_STATE)=0;WORD_AT(RBS_SKEL_PARTS)=0;   /* stale pointers of an earlier level */
     guest_call(sub_00287E00,0);
     st=WORD_AT(RBS_SKEL_STATE);pt=WORD_AT(RBS_SKEL_PARTS);
@@ -524,6 +577,27 @@ void pc_mapmaker_realbosses_princess(void (*original)(void))
 {
     if(!rbs_skel.record || !MAPMAKER_STACK_OK(8) || !rbs_skel_boss(WORD_AT(g_esp+4u))) { original();return; }
     sub_0029CEF0();
+}
+
+/* WRAP sub_0028D0A0 (cdecl entity, message, a, b; the class 0x20000 message
+ * handler, called by sub_0027CEF0 at 0x0027D3A7 for sub_0015C310): stock
+ * tail-jumps to the mansion handler sub_00286D30 in scene 1 and to the
+ * catacombs one sub_0028C560 elsewhere, which answers -1 to messages 1 and 2
+ * and does nothing. Message 2 is the death (sub_0015DB20 at 0x0015DB34, from
+ * the damage code 0x000BB059 when health runs out): -1 skips the generic
+ * death, so in MapMaker the skeleton never died. The mansion handler sets
+ * state 6 with the death animation 0x1A6 (0x00286D7A); state 6 then drops
+ * the focus, fires level event 3 (dropped by _event) and removes the AI with
+ * sub_0015DDA0 (0x0029E069), as in mission 5. For the boss in scene 100: the
+ * mansion handler (a direct call: the callee pops the caller's return
+ * address, exactly the lifted tail jump). */
+void pc_mapmaker_realbosses_message(void (*original)(void))
+{
+    uint32_t ent;
+    if(!rbs_skel.record || !MAPMAKER_STACK_OK(20) || !rbs_skel_boss(ent=WORD_AT(g_esp+4u))) { original();return; }
+    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH && rbs_skel.deaths++<2u)
+        rbs_log("giant skeleton killed: the mansion death (state 6, animation 0x1A6)",ent,RBS_MSG_DEATH);
+    sub_00286D30();
 }
 
 /* WRAP sub_002875F0 (cdecl entity -> entrance finished): scene 1's answer. */
