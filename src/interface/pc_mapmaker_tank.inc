@@ -78,6 +78,17 @@
  *    marker 0x16: dropped in scene 100. No other level event is reachable from
  *    the tank's code (test; the castle script callback sub_002532D0 is only
  *    installed by the castle level setup sub_001E9CC0).
+ *  - gun (sub_002522B0, ebx = gun 0..4, edi = tank: turns a gun toward its
+ *    aim point, record +0x10, at a limited rate): in state 4 the cannon
+ *    (gun 4) gets its aim point only from sub_00251DD0 (its +0x38), at the
+ *    state entry and after each shot: a castle cover object near the target
+ *    (none in a map) or the target's actor +0xBB4. The machine guns
+ *    (sub_00251EF0) use the player record +0xB4 for a player instead; the
+ *    v0.4.0-mapmaker.23 playtest saw the cannon aim off the player. For our
+ *    tank in state 4 with a player target, the cannon's aim point is set to
+ *    that player's +0xB4 point before every turn, so it tracks the player
+ *    while it prepares to fire; each new stock aim (once per shot) is
+ *    logged against the player's position.
  *  - text (sub_0003D7B0): the boss bar for model 0x281 (sub_0014CC80, focus
  *    set by the update at 0x002555AA) names its two meters with text 0x165B
  *    (return 0x0014CD42) and 0x1635 (0x0014CD83, the state-9 timer from
@@ -156,6 +167,11 @@
 #define TNK_GUN_AIM 0x10u
 #define TNK_GUN_COUNT 5u
 #define TNK_STATE_LOW 7u                 /* "player below the courtyard" */
+#define TNK_STATE_GUNS 4u                /* "gun attack": the cannon fires */
+#define TNK_CANNON 4u                    /* gun record 4: the cannon */
+#define TNK_ACTOR_PLAYER 0x8u            /* actor: player index (sub_00251EF0 0x00251F04) */
+#define TNK_PLAYER_AIM 0xB4u             /* player record: aim point x, y, z */
+#define TNK_AIM_LOGS 32u                 /* cannon aim lines per level */
 #define TNK_YARD 0x0051BB58u             /* courtyard rectangles x1, z1, x2, z2 (castle frame) */
 #define TNK_YARD_COUNT 3u
 #define TNK_RET_SEARCH 0x00254848u       /* sub_00254690: the search's call to sub_00251CD0 */
@@ -195,6 +211,8 @@ static struct {
     unsigned extras, events, wakes;
     uint32_t seen_state;                 /* last fight state logged */
     unsigned misses, logs;               /* points outside in this search; lines this level */
+    uint32_t cannon[3];                  /* the cannon aim point last set here */
+    unsigned aims;                       /* cannon aim lines this level */
 } tnk_lv;
 
 static void tnk_log(const char *what,uint32_t a,uint32_t b)
@@ -539,6 +557,42 @@ void pc_mapmaker_tank_wreck(void (*original)(void))
     tnk_setf(tank+TNK_ENT_POS+4u,tnk_lv.spawn[1]+TNK_PARK);
     tnk_setf(tank+TNK_ENT_POS+8u,tnk_lv.spawn[2]);
     tnk_log("castle tank destroyed: wreck made, tank parked under its spawn",tank,0);
+}
+
+/* The player record of the tank's target, or 0 when it is not a player. */
+static uint32_t tnk_target_player(void)
+{
+    uint32_t t=WORD_AT(TNK_TARGET),act,n,base;
+    int32_t idx;
+    if(!t || !MAPMAKER_PTR_OK(t,0x100u)) return 0;
+    act=WORD_AT(t+TNK_ENT_AI);
+    if(!act || !MAPMAKER_PTR_OK(act,0x10u)) return 0;
+    idx=(int32_t)WORD_AT(act+TNK_ACTOR_PLAYER);n=WORD_AT(TNK_PLAYERS);base=WORD_AT(TNK_PLAYER_BASE);
+    if(idx<0 || (uint32_t)idx>=n || n>4u || !MAPMAKER_PTR_OK(base,TNK_PLAYER_STRIDE*n)) return 0;
+    return base+(uint32_t)idx*TNK_PLAYER_STRIDE;
+}
+
+/* WRAP sub_002522B0 (no args; ebx = gun, edi = tank): the cannon tracks a
+ * player target in state 4. */
+void pc_mapmaker_tank_gun(void (*original)(void))
+{
+    uint32_t g,p,aim,i,t;
+    if(g_ebx!=TNK_CANNON || !tnk_mine(g_edi) || WORD_AT(TNK_STATE)!=TNK_STATE_GUNS ||
+       !MAPMAKER_PTR_OK(g=WORD_AT(TNK_GUNS),TNK_GUN_STRIDE*TNK_GUN_COUNT) || !(p=tnk_target_player())) { original();return; }
+    aim=g+TNK_CANNON*TNK_GUN_STRIDE+TNK_GUN_AIM;
+    if(WORD_AT(aim)!=tnk_lv.cannon[0] || WORD_AT(aim+4u)!=tnk_lv.cannon[1] || WORD_AT(aim+8u)!=tnk_lv.cannon[2]) {
+        if(tnk_lv.aims<TNK_AIM_LOGS) {   /* stock chose a new aim point: once per shot and at the state entry */
+            t=WORD_AT(TNK_TARGET);
+            tnk_lv.aims++;
+            fprintf(stderr,"[mapmaker] tank: cannon aim: stock (%.2f, %.2f, %.2f), set to player (%.2f, %.2f, %.2f), player at (%.2f, %.2f, %.2f)\n",
+                    (double)tnk_getf(aim),(double)tnk_getf(aim+4u),(double)tnk_getf(aim+8u),
+                    (double)tnk_getf(p+TNK_PLAYER_AIM),(double)tnk_getf(p+TNK_PLAYER_AIM+4u),(double)tnk_getf(p+TNK_PLAYER_AIM+8u),
+                    (double)tnk_getf(t+TNK_ENT_POS),(double)tnk_getf(t+TNK_ENT_POS+4u),(double)tnk_getf(t+TNK_ENT_POS+8u));
+            fflush(stderr);
+        }
+    }
+    for(i=0;i<3u;i++) WORD_AT(aim+i*4u)=tnk_lv.cannon[i]=WORD_AT(p+TNK_PLAYER_AIM+i*4u);
+    original();
 }
 
 /* WRAP sub_002274C0 (cdecl event, arg): the tank's event 0x16. */

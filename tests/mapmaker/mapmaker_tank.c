@@ -141,6 +141,11 @@ static void fake_state(void)
 }
 /* sub_00255C20: wreck, turret, the tank parked at the castle point (0, 20, 0). */
 static void fake_wreck(void) { originals++;FLOAT_AT(g_esi+0x64u)=0;FLOAT_AT(g_esi+0x68u)=20.0f;FLOAT_AT(g_esi+0x6Cu)=0;g_esp+=4u; }
+/* sub_002522B0: records the cannon aim point it turned toward */
+#define CANNON (GUNS+4u*0x4Cu+0x10u)
+static float gun_seen[3];
+static void fake_gun(void) { int i;originals++;for(i=0;i<3;i++) gun_seen[i]=FLOAT_AT(CANNON+(uint32_t)i*4u);g_esp+=4u; }
+static void cannon(float x,float y,float z) { FLOAT_AT(CANNON)=x;FLOAT_AT(CANNON+4u)=y;FLOAT_AT(CANNON+8u)=z; }
 static int ai_originals;
 static void fake_ai(void) { originals++;ai_originals++;g_esp+=4u; }
 
@@ -563,6 +568,64 @@ int main(void)
     pre_eax=TANK;
     CALL(pc_mapmaker_tank_state,fake,0x00255BD5u,0,0,0,1);
     CHECK(NEAR(FLOAT_AT(GUNS+0x10u),-5.3f+dx));
+
+    /* ---- gun: the cannon tracks a player target in state 4 ------------------- */
+    players(44.0f,31.0f,1.0f,47.0f,36.0f,1.0f);
+    WORD_AT(PENT(0)+0x7Cu)=0x00590000u;WORD_AT(0x00590000u+8u)=0;
+    WORD_AT(PENT(1)+0x7Cu)=0x00590100u;WORD_AT(0x00590100u+8u)=1u;
+    FLOAT_AT(PLAYERS+0xB4u)=44.5f;FLOAT_AT(PLAYERS+0xB8u)=3.6f;FLOAT_AT(PLAYERS+0xBCu)=31.5f;
+    FLOAT_AT(PLAYERS+0x1584u+0xB4u)=47.5f;FLOAT_AT(PLAYERS+0x1584u+0xB8u)=3.7f;FLOAT_AT(PLAYERS+0x1584u+0xBCu)=36.5f;
+    cannon(1.0f,2.0f,3.0f);                                           /* stock: the actor's +0xBB4 */
+    WORD_AT(0x0078B594u)=4u;WORD_AT(0x0078B5B0u)=PENT(1);
+    g_edi=TANK;g_ebx=4u;n=tnk_lv.aims;
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(gun_seen[0]==47.5f && gun_seen[1]==3.7f && gun_seen[2]==36.5f);          /* set before the turn */
+    CHECK(FLOAT_AT(CANNON)==47.5f && FLOAT_AT(CANNON+8u)==36.5f && tnk_lv.aims==n+1u);  /* the new stock aim logged */
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(tnk_lv.aims==n+1u);                                          /* our own point: no line */
+    FLOAT_AT(PLAYERS+0x1584u+0xB4u)=48.0f;                             /* the player moves: tracked */
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(gun_seen[0]==48.0f && FLOAT_AT(CANNON)==48.0f && tnk_lv.aims==n+1u);
+    cannon(9.0f,2.0f,3.0f);                                            /* stock re-aims after a shot */
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(FLOAT_AT(CANNON)==48.0f && tnk_lv.aims==n+2u);
+    WORD_AT(0x0078B5B0u)=PENT(0);cannon(9.0f,2.0f,3.0f);              /* the first player */
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(gun_seen[0]==44.5f && gun_seen[1]==3.6f && gun_seen[2]==31.5f);
+    WORD_AT(0x0078B5B0u)=PENT(1);
+    tnk_lv.aims=TNK_AIM_LOGS;cannon(9.0f,2.0f,3.0f);                  /* budget used: still tracked */
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(FLOAT_AT(CANNON)==48.0f && tnk_lv.aims==TNK_AIM_LOGS);
+    /* left to stock: other guns, other states, another object, AI targets, no target, the castle */
+    cannon(9.0f,2.0f,3.0f);g_ebx=3u;
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(FLOAT_AT(CANNON)==9.0f);
+    g_ebx=4u;WORD_AT(0x0078B594u)=3u;
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    WORD_AT(0x0078B594u)=7u;                                           /* state 7 drives at the cannon's point */
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(FLOAT_AT(CANNON)==9.0f);
+    WORD_AT(0x0078B594u)=4u;g_edi=0x00570000u;
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(FLOAT_AT(CANNON)==9.0f);
+    g_edi=TANK;WORD_AT(0x00590100u+8u)=2u;                             /* an AI: index past the players */
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    WORD_AT(0x00590100u+8u)=0xFFFFFFFFu;
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    WORD_AT(0x00590100u+8u)=1u;WORD_AT(PENT(1)+0x7Cu)=0;
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    WORD_AT(PENT(1)+0x7Cu)=0x00590100u;WORD_AT(0x0078B5B0u)=0;
+    WORD_AT(0x7Cu)=0x00590000u;                                       /* what a null target would read */
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    WORD_AT(0x7Cu)=0;
+    CHECK(FLOAT_AT(CANNON)==9.0f);
+    WORD_AT(0x0078B5B0u)=PENT(1);WORD_AT(0x0079094Cu)=4u;
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(FLOAT_AT(CANNON)==9.0f);
+    play_scene();
+    CALL(pc_mapmaker_tank_gun,fake_gun,0x00255899u,0,0,0,1);
+    CHECK(FLOAT_AT(CANNON)==48.0f);
+    WORD_AT(0x0078B5B0u)=ENT(3);
 
     /* ---- event, wreck ------------------------------------------------------------ */
     CALL(pc_mapmaker_tank_event,fake,0x00255A94u,0x16u,0,0,0);
