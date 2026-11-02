@@ -285,6 +285,63 @@ So after the link raise only the room id width stops placement. Above 241
   relocations, model table/slots, light tables and the 1000-object pool
   (500 items + rooms + 64 characters).
 
+## Past 241: feasibility check (2026-11-01, not implemented)
+
+Attempted target: 327 real rooms (ids 1..0x147, spare 0x148, players
+0x149..0x14D, views 0x14E..0x153, global 0x154, id space 0x155 = 341, the
+most the 12-byte view rects allow at stride 0xFFC). Stopped at 241: the
+stage cannot be shown safe for story levels with the evidence below, and
+half of it would only add risk. Static analysis only.
+
+- Ids above 255 need the special ids above 255 too, so story levels would
+  run with 13 new special values. Each must stay intact wherever it is
+  stored. They reach 7 callees as arguments (`sub_000A2900`,
+  `sub_000A79B0`, `sub_000A46A0`, `sub_000F85C0` effect `+0x48`,
+  `sub_00341850`, `sub_000EA9C0` particle `+0xF0`, `sub_000DFEC0`) and 65
+  register loads. A first-order scan of 8-bit register stores in the 276
+  functions that hold a room constant or call a room lookup
+  (`sub_000888A0`, `sub_000873C0`, `sub_00087310`, `sub_0009FBE0`) found
+  none besides the known ones (buckets, `light+0x99`, view/id flags).
+  `prop+0x30`, stored from `sub_000873C0`'s result, is a count of rooms.
+  Not done: the second-order pass through struct fields. Engine-wide there
+  are 50 byte accesses at `+0x34`, 14 at `+0x38` and 1 at `+0xF0`, each to
+  be assigned to its struct. Tables of 256 entries indexed by room in stock
+  code were not found by the 0xC9..0xD6 scan and are not listed either.
+- Draw buckets hold only real rooms (`sub_00086C40` loops ids
+  1..`[0x7B975C]`; the global room is drawn by `push 0xFE` to
+  `sub_000A79B0`), so a word-id writer would not see special ids. The
+  writers' byte stores (`88 94 2b`, 7 B) need 8 B as word stores, so
+  `sub_00086C40`/`sub_000897D0` must be reimplemented. The byte counts
+  (`0x702DB0`/`0x702D60`) also cap a bucket at 255 rooms. A word table
+  [80][341] is 54,560 B.
+- Light record bytes `+0x96` word, `+0x98` (4 at `0x001145FB`), `+0x99` room,
+  `+0x9A` (argument, 0xFF = none), `+0x9B` (the source's `+0x30`), `+0x9C` dword: no
+  adjacent spare byte, so the room cannot become a word in place. A side
+  table needs the light index, which `sub_001123C0` only gets as a pointer
+  (pools `[0x0073D950]` stride 0xB8 and `[0x0073D960]` stride 0xC0). That
+  means reimplementing or wrapping `sub_001121E0`, `sub_001123C0`,
+  `sub_001124D0`, `sub_00112EA0`, `sub_00114030`, `sub_00114290` (which
+  reads `+0x99` at `0x00114829`/`0x00114851` in its body) and
+  `sub_00356490`.
+- View shadow: the flags at `+0x6C00` (256 B) run into the list at
+  `+0x6D00` past id 255, so flags and list need a second shadow region (a
+  0x11FF0 allocation, front-end view relocated again).
+- Memory map: the model table `0x008CA000` (0xA00 words, used by the
+  bosses, characters, khallos, mothership, sky music and tank areas) must
+  grow to about 0xA5C words over the light round robin `0x008CB400` and the
+  query buffers. The per-id tables `0x008C7000..0x008C8000` (objects,
+  probe) and `0x008C0800` (sky mask, roof: 256 entries) are also hard-coded.
+  The "spare" `0x008E0000..` in `00-header.json` is taken by the pads group
+  A* pool (0x20000 B) and from `0x00900000` by actors, story character and
+  grid.
+
+Smallest safe order for a later round: (1) the second-order byte audit as
+a decoder classification test, like `test_every_room_constant_is_classified`;
+(2) the light side table and the bucket writers, gated on scene 100 and on
+ids above 0xF1 so stock ids keep the original code paths; (3) the
+renumbering and relocations; (4) a story-level playtest pass before raising
+`MAPMAKER_LIMIT_PIECES`.
+
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
 Cause: `sub_000BB850` (explosion/area effect over the rooms touching a box)
