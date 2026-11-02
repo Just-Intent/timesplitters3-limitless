@@ -790,6 +790,8 @@ void pc_mapmaker_roof_caption(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_sky_built(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_weather_frame(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_weather_list(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_haze(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_grain_colour(void (*original)(void)) { original(); }
 void pc_mapmaker_openview_walk(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_picker_end(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_pick(void (*original)(void)) { original(); }
