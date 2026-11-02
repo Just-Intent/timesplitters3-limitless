@@ -492,7 +492,7 @@ intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 More boss areas (merged 2026-11-01, not played): `khallos` (id 0x33 chair prop 0x376),
 `worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`; wrapper
 lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
-skies, sandstorm, music; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
+sky/sand/music, +mem paks; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
 for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll
 list (5 new sets WRAPs; sets_pick outside realbosses_pick; mapmaker-sets.md).
 Multi-boss merge (.26): 28 WRAPs (walker/skeleton/robot/crowe/tank/mothership/khallos statics

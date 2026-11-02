@@ -54,30 +54,34 @@
  * records whose model is in a level pak MapMaker play does not mount. The
  * map keeps a MapMaker sky (fallback) in info +0x10 for stock builds and the
  * row number 1..17 in info flag bits 19..23; pc_mapmaker_skymusic.inc mounts
- * the pak and makes the map start use the record. */
+ * the pak and makes the map start use the record. The model is in the level
+ * pak, but its textures (textures/<id>.xbt) only in that level's memory pak
+ * (<dir>mem/l_N_<x>m.pak, mounted whole by story levels): both are mounted.
+ * The three rows with mem 0 use only textures the stock play paks hold. */
 #define MAPMAKER_SKY_EXTRA_SHIFT 19u
 #define MAPMAKER_SKY_EXTRA_MASK 0x00F80000u
 static const struct mapmaker_sky_extra {
     int sky, fallback;        /* sky table record; MapMaker sky stock builds get */
-    const char *pak, *label;
+    const char *pak, *mem;    /* the model's level pak; its textures' pak or 0 */
+    const char *label;
 } mapmaker_sky_extras[]={
-    { 5,64,"pak/arcade/l_20_ar.pak","Story: Cold Night"},
-    {35,58,"pak/arcade/l_59_ar.pak","Story: Castle"},
-    {39,63,"pak/cutscene/l_33_cs.pak","Story: Train"},
-    {41,60,"pak/arcade/l_38_ar.pak","Arcade: Virtua"},
-    {42,67,"pak/arcade/l_29_ar.pak","Arcade: Prison"},
-    {43,61,"pak/challenge/l_64_ch.pak","Story: Time to Split"},
-    {44,61,"pak/story/l_81_st.pak","Story: Nemo"},
-    {45,59,"pak/arcade/l_46_ar.pak","Arcade: Venice"},
-    {46,61,"pak/cutscene/l_40_cs.pak","Story: Street War"},
-    {47,62,"pak/arcade/l_48_ar.pak","Arcade: Vietnam"},
-    {48,62,"pak/arcade/l_49_ar.pak","Arcade: Temple"},
-    {49,60,"pak/arcade/l_15_ar.pak","Arcade: Spaceport"},
-    {50,63,"pak/challenge/l_76_ch.pak","Story: Depot"},
-    {51,64,"pak/arcade/l_53_ar.pak","Arcade: Sniper"},
-    {52,61,"pak/challenge/l_66_ch.pak","Story: NF1"},
-    {56,66,"pak/arcade/l_25_ar.pak","Arcade: Chinese"},
-    {57,59,"pak/arcade/l_39_ar.pak","Arcade: Horror"},
+    { 5,64,"pak/arcade/l_20_ar.pak","pak/arcademem/l_20_arm.pak","Story: Cold Night"},
+    {35,58,"pak/arcade/l_59_ar.pak","pak/arcademem/l_59_arm.pak","Story: Castle"},
+    {39,63,"pak/cutscene/l_33_cs.pak","pak/cutscenemem/l_33_csm.pak","Story: Train"},
+    {41,60,"pak/arcade/l_38_ar.pak",0,"Arcade: Virtua"},
+    {42,67,"pak/arcade/l_29_ar.pak",0,"Arcade: Prison"},
+    {43,61,"pak/challenge/l_64_ch.pak","pak/challengemem/l_64_chm.pak","Story: Time to Split"},
+    {44,61,"pak/story/l_81_st.pak","pak/storymem/l_81_stm.pak","Story: Nemo"},
+    {45,59,"pak/arcade/l_46_ar.pak","pak/arcademem/l_46_arm.pak","Arcade: Venice"},
+    {46,61,"pak/cutscene/l_40_cs.pak","pak/cutscenemem/l_40_csm.pak","Story: Street War"},
+    {47,62,"pak/arcade/l_48_ar.pak","pak/arcademem/l_48_arm.pak","Arcade: Vietnam"},
+    {48,62,"pak/arcade/l_49_ar.pak","pak/arcademem/l_49_arm.pak","Arcade: Temple"},
+    {49,60,"pak/arcade/l_15_ar.pak","pak/arcademem/l_15_arm.pak","Arcade: Spaceport"},
+    {50,63,"pak/challenge/l_76_ch.pak","pak/challengemem/l_76_chm.pak","Story: Depot"},
+    {51,64,"pak/arcade/l_53_ar.pak",0,"Arcade: Sniper"},
+    {52,61,"pak/challenge/l_66_ch.pak","pak/challengemem/l_66_chm.pak","Story: NF1"},
+    {56,66,"pak/arcade/l_25_ar.pak","pak/arcademem/l_25_arm.pak","Arcade: Chinese"},
+    {57,59,"pak/arcade/l_39_ar.pak","pak/arcademem/l_39_arm.pak","Arcade: Horror"},
 };
 #define MAPMAKER_SKY_EXTRA_COUNT ((uint32_t)(sizeof mapmaker_sky_extras/sizeof mapmaker_sky_extras[0]))
 
