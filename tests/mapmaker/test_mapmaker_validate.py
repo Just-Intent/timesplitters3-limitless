@@ -22,7 +22,9 @@ MUTATIONS = {
     'words-18': ('#define MAPMAKER_VALIDATE_HEADER_WORDS 17u', '#define MAPMAKER_VALIDATE_HEADER_WORDS 18u'),
     'words-15': ('#define MAPMAKER_VALIDATE_HEADER_WORDS 17u', '#define MAPMAKER_VALIDATE_HEADER_WORDS 15u'),
     'editor-pieces-1025': ('#define MAPMAKER_VALIDATE_EDITOR_PIECES 1024u', '#define MAPMAKER_VALIDATE_EDITOR_PIECES 1025u'),
-    'level-pieces-editor': ('#define MAPMAKER_VALIDATE_LEVEL_PIECES 505u', '#define MAPMAKER_VALIDATE_LEVEL_PIECES 1024u'),
+    'level-pieces-editor': ('#define MAPMAKER_VALIDATE_LEVEL_PIECES 512u', '#define MAPMAKER_VALIDATE_LEVEL_PIECES 1024u'),
+    'level-pieces-stock-frame': ('#define MAPMAKER_VALIDATE_LEVEL_PIECES 512u', '#define MAPMAKER_VALIDATE_LEVEL_PIECES 500u'),
+    'level-pieces-513': ('#define MAPMAKER_VALIDATE_LEVEL_PIECES 512u', '#define MAPMAKER_VALIDATE_LEVEL_PIECES 513u'),
     'no-pool-total': ('if(v->mode==MAPMAKER_VALIDATE_EDITOR && v->total>MAPMAKER_VALIDATE_EDITOR_PIECES)', 'if(0)'),
     'pieces-no-fit': ('if(p>end || end-p<0x28u)', 'if(p>end)'),
     'pads-ignored': ('p+=0x28u+pads*8u;', 'p+=0x28u;'),
@@ -138,3 +140,51 @@ def test_bounds_match_the_code():
     insn(0x00301FB5, 'mov', 'byte ptr [ebx + 0x241], 0') # editor forces the title NUL
     insn(0x00301BAC, 'cmp', 'dword ptr [eax], 0xc77667') # the refusal path the validator uses
     insn(0x003029C7, 'push', '0')
+
+
+# ---- the level fill pass frame (config/guest-code-patches/level.json) ----
+LEVEL = ROOT / 'config/guest-code-patches/level.json'
+LEVEL_FRAME_STOCK = 0x1030
+LEVEL_ARRAY = 0x90                    # [esp+i*8+0xA0] with 4 registers pushed: frame + 0x90
+
+
+def _define(path, name):
+    for line in path.read_text(encoding='utf-8').splitlines():
+        if line.startswith(f'#define {name} '):
+            return int(line.split()[2].rstrip('u'), 0)
+    raise AssertionError(name)
+
+
+def test_level_frame_holds_the_piece_cap():
+    import json
+    patches = json.loads(LEVEL.read_text(encoding='utf-8'))['patches']
+    frame = int(next(p for p in patches if p['id'] == 'level-frame')['value'], 16)
+    grow = frame - LEVEL_FRAME_STOCK
+    assert grow > 0 and grow % 0x10 == 0
+    # the validator's level bound is what the grown frame holds (stock: 500), and covers the editor's cap
+    level = _define(SOURCE, 'MAPMAKER_VALIDATE_LEVEL_PIECES')
+    assert level == (frame - LEVEL_ARRAY) // 8 and (LEVEL_FRAME_STOCK - LEVEL_ARRAY) // 8 == 500
+    assert _define(ROOT / 'src/interface/pc_mapmaker_limits.inc', 'MAPMAKER_LIMIT_PIECES') <= level
+    for p in patches:
+        assert p['kind'] == 'operand' and p['function'] == '0x00240C50' and p['operand'] == 1, p['id']
+        old = int.from_bytes(bytes.fromhex(p['original_hex'])[-4:], 'little')
+        assert int(p['value'], 16) == old + grow, p['id']
+    assert len(patches) == 10
+
+
+def test_level_frame_sites_match_the_code():
+    """Every frame-size and argument displacement of sub_00240C50 is in level.json."""
+    import json
+    from mapmaker_decoded import decoded
+    patches = {int(p['address'], 16): p for p in json.loads(LEVEL.read_text(encoding='utf-8'))['patches']}
+    sites = {}
+    for i in decoded():
+        if i.function != 0x00240C50:
+            continue
+        for kind, value in i.values():
+            if LEVEL_FRAME_STOCK <= value < LEVEL_FRAME_STOCK + 0x100 and (kind == 'imm' or i.frame()):
+                sites[i.address] = i
+    assert set(sites) == set(patches), sorted(hex(a) for a in set(sites) ^ set(patches))
+    for a, i in sites.items():
+        assert i.hex == patches[a]['original_hex'], hex(a)
+    assert sites[0x00240C50].mnemonic == 'mov' and sites[0x00242427].mnemonic == 'add'
