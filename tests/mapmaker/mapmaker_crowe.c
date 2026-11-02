@@ -51,6 +51,8 @@ void sub_002A62C0(void) { g_ecx=5; }
 void sub_0028D710(void) { g_ecx=6; }
 void sub_000EFBD0(void) { g_ecx=7; }
 void sub_0015DDA0(void) { g_ecx=8; }
+void sub_0005F460(void) { g_ecx=9; }
+void sub_00087310(void) { g_ecx=10; }
 static int bosses_area=1;
 int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)hook;return strcmp(area,"bosses") || bosses_area; }
 
@@ -58,6 +60,18 @@ static int pak_mounted, mount_ok=1, alloc_ok=1, parts_ok=1;
 static unsigned nmount, nalloc, nparts, ndraw, nexplode, nremove, alloc_idx;
 static uint32_t draw_state[8], draw_parts[8];
 static uint32_t mount_arg, draw_scene, explode_args[8], remove_arg;
+/* MapMaker rooms for the room query sub_00087310(box, out, max): boxes min
+ * xyz, max xyz; the count of those the box overlaps */
+static float rooms[8][6];
+static unsigned nrooms, nquery, nanim;
+static uint32_t query_box, anim_args[4];
+static float query_last[6];
+static void room(unsigned i,float x0,float y0,float z0,float x1,float y1,float z1)
+{
+    rooms[i][0]=x0;rooms[i][1]=y0;rooms[i][2]=z0;rooms[i][3]=x1;rooms[i][4]=y1;rooms[i][5]=z1;
+    if(i>=nrooms) nrooms=i+1u;
+}
+static void one_big_room(void) { nrooms=0;room(0,-1000.0f,-1000.0f,-1000.0f,1000.0f,1000.0f,1000.0f); }
 /* the stock grid: 5 x 7 cells (type 0 on even rows), outer, 14 edges (10 used).
  * The type-0 cell nearest the outer centre is column 3; 310.0 is in column 4
  * (grid_gap 1: in no cell, and cell 17 not a platform; 2: cell 18 not a
@@ -110,6 +124,19 @@ static uint32_t guest_call(void (*f)(void),int n,...)
                           ndraw++;draw_scene=WORD_AT(0x0079094Cu);return 0; }
     if(f==sub_000EFBD0) { nexplode++;memcpy(explode_args,x,sizeof explode_args);return 0; }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
+    if(f==sub_0005F460) { nanim++;memcpy(anim_args,x,sizeof anim_args);return 0; }
+    if(f==sub_00087310) {
+        uint32_t found=0,r,j;
+        float b[6];
+        nquery++;query_box=x[0];
+        if(x[1]!=x[0]+0x18u || x[2]!=8u || x[0]<g_esp || (x[0]&15u)) { fprintf(stderr,"room query arguments\n");exit(4); }
+        for(r=0;r<6u;r++) { memcpy(&b[r],(const void *)((uintptr_t)x[0]+r*4u+g_xbox_mem_offset),4);query_last[r]=b[r]; }
+        for(r=0;r<nrooms;r++) {
+            for(j=0;j<3u;j++) if(!(b[j]<rooms[r][3u+j] && b[3u+j]>rooms[r][j])) break;
+            if(j==3u) found++;
+        }
+        return found;
+    }
     return 0;
 }
 #include "pc_mapmaker_budget.inc"
@@ -205,12 +232,20 @@ static void egg_call(uint32_t hazard,uint32_t row,uint32_t col,uint32_t ret,int 
  * its own is ever out: they are skipped) */
 static void fake_cells(void)
 {
-    uint32_t st=WORD_AT(g_esp+4u)-4u;
+    uint32_t st=WORD_AT(g_esp+4u)-4u,r,c,cell;
     unsigned k;
+    float x=F(g_esp+8u),z=F(g_esp+0xCu);
     originals++;
     for(k=0;k<35u;k++) WORD_AT(st+0x970u+k*0x28u+0x24u)=0;
+    for(r=0;r<5u;r++) {                                   /* sub_002A9330: the player's cell, no write when none */
+        cell=st+0x970u+r*7u*0x28u;
+        if(!(z>F(cell+4u) && F(cell+0xCu)>z)) continue;
+        for(c=0;c<7u;c++) { cell=st+0x970u+(r*7u+c)*0x28u;if(x>F(cell) && F(cell+8u)>x) { WORD_AT(st+0x1190u)=r;WORD_AT(st+0x1194u)=c;break; } }
+        break;
+    }
     g_esp+=4u;
 }
+static uint32_t FB(float f) { uint32_t u;memcpy(&u,&f,4);return u; }
 static unsigned blocked_cells(uint32_t st)
 {
     unsigned k,n=0;
@@ -218,6 +253,7 @@ static unsigned blocked_cells(uint32_t st)
     return n;
 }
 #define BLOCKED(st,r,c) WORD_AT((st)+0x970u+((r)*7u+(c))*0x28u+0x24u)
+#define CELL(r,c) ((r)*7u+(c))
 static void set_env(const char *name,const char *value)
 {
 #ifdef _WIN32
@@ -349,6 +385,11 @@ static void multi(void)
     CHECK(crw_n==4u && nalloc==3u && crw_inst[2].record==REC(2));
     /* each fight with its own blocks; each arena under its own spawn */
     for(k=0;k<4u;k++) { SETF(ENT(k)+0x64u,10.0f+40.0f*k);SETF(ENT(k)+0x68u,4.0f+k);SETF(ENT(k)+0x6Cu,-20.0f);WORD_AT(A(k)+0x20u)=0; }
+    /* the map under them: bosses 0 and 1 on open floor, boss 2 over nothing (its
+     * start in no room: not checked), boss 3 with its columns 0 and 1 off the map */
+    nrooms=0;
+    room(0,-20.0f,0.0f,-40.0f,65.0f,20.0f,0.0f);
+    room(1,115.0f,0.0f,-40.0f,150.0f,20.0f,0.0f);
     for(k=0;k<4u;k++) {
         CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(k),0,0,1);
         CHECK(seen_state_ptr==CST+k*0x3000u && seen_parts_ptr==(k?0x00740000u+k*0x8000u:PRT));
@@ -356,6 +397,30 @@ static void multi(void)
         CHECK(near_eq(F(CST+k*0x3000u+0x970u+18u*0x28u+0x10u),10.0f+40.0f*k));   /* its start cell at its spawn */
         CHECK(near_eq(crw_inst[k].dy,4.0f+k-86.0f) && crw_inst[k].relocated);
     }
+    one_big_room();
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k] && !crw_inst[1].off[k] && !crw_inst[2].off[k] && crw_inst[3].off[k]==(k%7u<2u));
+    for(k=0;k<4u;k++) {                                       /* each boss's cells in its own grid */
+        prev_k=crw_enter((int)k);
+        CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+k*0x3000u+4u,FB(10.0f+40.0f*k),FB(-20.0f),1);
+        CHECK(blocked_cells(CST+k*0x3000u)==(k==3u?10u:0u));
+        crw_leave(prev_k);
+    }
+    /* boss 2's walk is blocked: its cells ahead, nobody else's */
+    WORD_AT(A(2)+0x20u)=9u;WORD_AT(CST+0x6000u+0x1D24u)=0u;WORD_AT(CST+0x6000u+0x2DE8u)=10u;
+    SETF(CST+0x6000u+0x1CECu,90.0f);SETF(CST+0x6000u+0x1CF0u,-4.0f);
+    for(k=0;k<91u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(2),0,0,1);
+    CHECK(WORD_AT(A(2)+0x20u)==10u && crw_inst[2].wall_left[CELL(3u,4u)]==1800u && crw_inst[2].wall_left[CELL(4u,4u)]==1800u);
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].wall_left[k] && !crw_inst[1].wall_left[k] && !crw_inst[3].wall_left[k]);
+    prev_k=crw_enter(2);
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+0x6004u,FB(90.0f),FB(-20.0f),1);
+    CHECK(blocked_cells(CST+0x6000u)==2u);
+    crw_leave(prev_k);
+    prev_k=crw_enter(0);
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+4u,FB(10.0f),FB(-20.0f),1);
+    CHECK(blocked_cells(CST)==0);
+    crw_leave(prev_k);
+    memset(crw_inst[2].wall_left,0,sizeof crw_inst[2].wall_left);
+    WORD_AT(A(2)+0x20u)=0;
     CHECK(WORD_AT(0x0078B090u)==0x00777000u && WORD_AT(0x0078B0D0u)==0x00778000u && WORD_AT(0x0075F5E8u)==0);
     /* a value a boss's call leaves behind is its own next time */
     WORD_AT(A(1)+0x20u)=4u;live_particles=9u;
@@ -441,6 +506,155 @@ static void multi(void)
     WORD_AT(PLAYER+0xFF4u)=0;
 }
 
+/* ---- v0.4.0-mapmaker.34: the Crowes walked into walls and off the map ---- */
+
+static void cells_at(float px,float pz) { CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+4u,FB(px),FB(pz),1); }
+static void walls(void)
+{
+    unsigned k;
+    uint32_t a=A(0),st=CST;
+    float z;
+    /* a walk that stops getting nearer its target ends where the boss stands
+     * (no teleport onto the target: into walls, off the map) as stock ends it
+     * on arrival; the cells ahead in its direction stay blocked */
+    WORD_AT(a+0x20u)=9u;SETF(st+0x1CECu,10.0f);SETF(st+0x1CF0u,-4.0f);   /* two rows on */
+    WORD_AT(st+0x1D24u)=0u;WORD_AT(st+0x2DE8u)=10u;SETF(st+0x2DF0u,3.0f);
+    WORD_AT(st+0x1198u)=2u;WORD_AT(st+0x119Cu)=4u;
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    nanim=0;crw_inst[0].air=crw_inst[0].stall=0;
+    for(k=0;k<90u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(WORD_AT(a+0x20u)==9u && nanim==0 && crw_inst[0].stall==89u);
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f) && near_eq(F(ENT(0)+0x68u),4.0f));
+    CHECK(nanim==1u && anim_args[0]==ENT(0) && anim_args[1]==0x810u && anim_args[2]==0 && anim_args[3]==0x3F99999Au);
+    CHECK(WORD_AT(a+0x20u)==10u && WORD_AT(a+0x9D0u)==10u && WORD_AT(a+0x9D4u)==9u && F(a+0x9D8u)==0.0f && F(st+0x2DF0u)==0.0f);
+    CHECK(!crw_inst[0].air && !crw_inst[0].stall);
+    CHECK(crw_inst[0].wall_left[CELL(3u,4u)]==1800u && crw_inst[0].wall_left[CELL(4u,4u)]==1800u);
+    CHECK(!crw_inst[0].wall_left[CELL(2u,4u)] && !crw_inst[0].wall_left[CELL(1u,4u)] && !crw_inst[0].wall_left[CELL(3u,3u)]);
+    prev_k=crw_enter(0);
+    cells_at(10.0f,-20.0f);
+    CHECK(blocked_cells(st)==2u && BLOCKED(st,3u,4u)==1u && BLOCKED(st,4u,4u)==1u);
+    crw_leave(prev_k);
+    /* they open again after 1800 of the boss's fight calls */
+    for(k=0;k<1799u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(crw_inst[0].wall_left[CELL(3u,4u)]==1u);
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    prev_k=crw_enter(0);
+    cells_at(10.0f,-20.0f);
+    CHECK(blocked_cells(st)==0);
+    crw_leave(prev_k);
+    /* the other directions: 1 col-, 2 row-, 3 col+; the state after is 4 when the walk's is not one */
+    WORD_AT(a+0x20u)=9u;WORD_AT(st+0x1D24u)=1u;WORD_AT(st+0x2DE8u)=9u;
+    for(k=0;k<91u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(WORD_AT(a+0x20u)==4u && nanim==2u);
+    for(k=0;k<4u;k++) CHECK(crw_inst[0].wall_left[CELL(2u,k)]==1800u);
+    CHECK(!crw_inst[0].wall_left[CELL(2u,5u)] && !crw_inst[0].wall_left[CELL(2u,6u)]);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    WORD_AT(a+0x20u)=9u;WORD_AT(st+0x1D24u)=3u;WORD_AT(st+0x2DE8u)=0x12u;
+    for(k=0;k<91u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(WORD_AT(a+0x20u)==4u && crw_inst[0].wall_left[CELL(2u,5u)]==1800u && crw_inst[0].wall_left[CELL(2u,6u)]==1800u);
+    CHECK(!crw_inst[0].wall_left[CELL(2u,3u)]);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    WORD_AT(a+0x20u)=9u;WORD_AT(st+0x1D24u)=2u;WORD_AT(st+0x2DE8u)=10u;
+    for(k=0;k<91u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(crw_inst[0].wall_left[CELL(1u,4u)]==1800u && crw_inst[0].wall_left[CELL(0u,4u)]==1800u && !crw_inst[0].wall_left[CELL(3u,4u)]);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    /* the boss in no cell: the walk still ends, nothing is blocked */
+    WORD_AT(a+0x20u)=9u;WORD_AT(st+0x1198u)=0xFFFFFFFFu;WORD_AT(st+0x2DE8u)=10u;
+    for(k=0;k<91u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(WORD_AT(a+0x20u)==10u && nanim==5u);
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].wall_left[k]);
+    WORD_AT(st+0x1198u)=2u;
+    /* a walk that keeps getting nearer is left alone until 600 calls */
+    WORD_AT(a+0x20u)=9u;WORD_AT(st+0x1D24u)=0u;SETF(st+0x1CF0u,400.0f);
+    for(k=0,z=-20.0f;k<599u;k++,z+=0.3f) { SETF(ENT(0)+0x6Cu,z);CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1); }
+    CHECK(WORD_AT(a+0x20u)==9u && nanim==5u && crw_inst[0].air==599u && !crw_inst[0].stall);
+    SETF(ENT(0)+0x6Cu,z);
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(WORD_AT(a+0x20u)==10u && nanim==6u && near_eq(F(ENT(0)+0x6Cu),z));
+    /* each walk counts from its own start */
+    WORD_AT(a+0x20u)=9u;SETF(ENT(0)+0x6Cu,-20.0f);
+    for(k=0;k<80u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    WORD_AT(a+0x20u)=4u;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    WORD_AT(a+0x20u)=9u;
+    for(k=0;k<80u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(WORD_AT(a+0x20u)==9u && nanim==6u);
+    /* ... the 600 too: two long walks one after the other */
+    for(k=0,z=-20.0f;k<500u;k++,z+=0.3f) { SETF(ENT(0)+0x6Cu,z);CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1); }
+    WORD_AT(a+0x20u)=4u;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    WORD_AT(a+0x20u)=9u;
+    for(k=0,z=-20.0f;k<500u;k++,z+=0.3f) { SETF(ENT(0)+0x6Cu,z);CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1); }
+    CHECK(WORD_AT(a+0x20u)==9u && nanim==6u && crw_inst[0].air==500u);
+    SETF(ENT(0)+0x6Cu,-20.0f);
+    WORD_AT(a+0x20u)=4u;
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+
+    /* cells over walls / off the map: the relocated grid (columns at x -14 + 6c,
+     * rows at z -36 + 8r, boss at 2,4 = (10, -20), y 4) over rooms: columns 2-4,
+     * column 5 but row 2, column 6; column 0 only on a floor above */
+    CHECK(level_gives_class());
+    nrooms=0;
+    room(0,-5.0f,0.0f,-40.0f,13.0f,10.0f,0.0f);
+    room(1,13.5f,0.0f,-40.0f,18.5f,10.0f,-24.0f);
+    room(2,13.5f,0.0f,-16.0f,18.5f,10.0f,0.0f);
+    room(3,19.0f,0.0f,-40.0f,25.0f,10.0f,0.0f);
+    room(4,-17.0f,20.0f,-40.0f,-11.0f,30.0f,0.0f);
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
+    WORD_AT(a+0x20u)=0;nquery=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(nquery==35u && WORD_AT(st+0x1198u)==2u && WORD_AT(st+0x119Cu)==4u);
+    for(k=0;k<35u;k++) CHECK(crw_inst[0].off[k]==(k%7u<2u || k==CELL(2u,5u)));
+    prev_k=crw_enter(0);
+    /* blocked: the 11 cells in no room, and 2,6 beyond the hole at 2,5 in line with the boss */
+    cells_at(10.0f,-12.0f);                                  /* the player inside, cell 3,4: stock's cell kept */
+    CHECK(blocked_cells(st)==12u && BLOCKED(st,2u,6u)==1u && BLOCKED(st,2u,5u)==1u && BLOCKED(st,2u,0u)==1u);
+    CHECK(!BLOCKED(st,1u,6u) && !BLOCKED(st,2u,3u) && !BLOCKED(st,2u,2u));
+    CHECK(WORD_AT(st+0x1190u)==3u && WORD_AT(st+0x1194u)==4u);
+    cells_at(-14.0f,-12.0f);                                 /* inside cell 3,0, which is in no room: still stock's */
+    CHECK(WORD_AT(st+0x1190u)==3u && WORD_AT(st+0x1194u)==0u);
+    /* the boss elsewhere: what lies beyond in its line */
+    WORD_AT(st+0x1198u)=0u;WORD_AT(st+0x119Cu)=3u;
+    cells_at(10.0f,-12.0f);
+    CHECK(blocked_cells(st)==11u && !BLOCKED(st,2u,6u));
+    WORD_AT(st+0x1198u)=2u;WORD_AT(st+0x119Cu)=6u;
+    cells_at(10.0f,-12.0f);
+    CHECK(blocked_cells(st)==14u && BLOCKED(st,2u,4u)==1u && BLOCKED(st,2u,3u)==1u && BLOCKED(st,2u,2u)==1u && !BLOCKED(st,1u,6u));
+    WORD_AT(st+0x1198u)=2u;WORD_AT(st+0x119Cu)=4u;
+    /* the player outside the arena: the nearest cell in a room stands in */
+    WORD_AT(st+0x1190u)=0xFFFFFFFFu;WORD_AT(st+0x1194u)=0xFFFFFFFFu;
+    cells_at(60.0f,-30.0f);                                  /* +x: 1,6 */
+    CHECK(WORD_AT(st+0x1190u)==1u && WORD_AT(st+0x1194u)==6u);
+    cells_at(-30.0f,-4.0f);                                  /* -x: 4,0 is in no room, 4,2 is the nearest that is */
+    CHECK(WORD_AT(st+0x1190u)==4u && WORD_AT(st+0x1194u)==2u);
+    cells_at(10.0f,-80.0f);                                  /* -z: 0,4 */
+    CHECK(WORD_AT(st+0x1190u)==0u && WORD_AT(st+0x1194u)==4u);
+    cells_at(NAN,-4.0f);                                     /* not a point: left alone */
+    CHECK(WORD_AT(st+0x1190u)==0u && WORD_AT(st+0x1194u)==4u);
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901C4u,CST+4u,FB(60.0f),FB(-30.0f),1);   /* another caller: stock */
+    CHECK(WORD_AT(st+0x1190u)==0u && blocked_cells(st)==0);
+    crw_leave(prev_k);
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+4u,FB(60.0f),FB(-30.0f),1);   /* outside the boss's code */
+    CHECK(WORD_AT(st+0x1190u)==0u && blocked_cells(st)==0);
+    /* no room under the start cell: the query is not trusted, nothing is off */
+    CHECK(level_gives_class());
+    nrooms=0;
+    WORD_AT(a+0x20u)=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
+    /* every cell off: the player's stand-in is the nearest cell */
+    for(k=0;k<35u;k++) crw_inst[0].off[k]=1u;
+    prev_k=crw_enter(0);
+    cells_at(60.0f,-4.0f);
+    CHECK(WORD_AT(st+0x1190u)==4u && WORD_AT(st+0x1194u)==6u && blocked_cells(st)==35u);
+    crw_leave(prev_k);
+    memset(crw_inst[0].off,0,sizeof crw_inst[0].off);
+    one_big_room();
+    WORD_AT(a+0x20u)=4u;
+}
+
 int main(void)
 {
     static const uint16_t with[]={0x0C,0x46,0xA8}, without[]={0x0C,0x28,0xA8}, x_with[]={0xFFFF,0x46};
@@ -448,6 +662,7 @@ int main(void)
     unsigned k;
     float gx,gz;
     g_xbox_mem_offset=(uintptr_t)memory;
+    one_big_room();
     WORD_AT(0x00783A50u)=R;
     stock_consts();
     WORD_AT(0x007B0C7Cu)=PLAYER;
@@ -542,6 +757,13 @@ int main(void)
     CHECK(near_eq(F(CST+0xF60u),290.0f-299.06f) && near_eq(F(CST+0xF60u+9u*0x28u+0x14u),62.5f-98.8f));
     CHECK(WORD_AT(CST+0xF60u+10u*0x28u)==0 && WORD_AT(CST+0xF60u+13u*0x28u+0x14u)==0);   /* unused edges */
     CHECK(near_eq(crw_inst[0].dy,4.0f-86.0f));
+    /* every moved cell asked the room query at the boss's height (one big room: none off),
+     * with a body box on the guest stack below the hook's frame */
+    CHECK(nquery==35u && query_box+0x38u<=ESP0 && WORD_AT(ESP0+4u)==ENT(0));
+    CHECK(near_eq(query_last[0],F(CST+0x970u+34u*0x28u+0x10u)-0.3f) && near_eq(query_last[3],F(CST+0x970u+34u*0x28u+0x10u)+0.3f));
+    CHECK(near_eq(query_last[2],F(CST+0x970u+34u*0x28u+0x14u)-0.3f) && near_eq(query_last[5],F(CST+0x970u+34u*0x28u+0x14u)+0.3f));
+    CHECK(near_eq(query_last[1],4.25f) && near_eq(query_last[4],5.5f));
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
     /* stock state 0 left the boss on the spawn point and the start cell */
     CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f) && near_eq(F(ENT(0)+0x68u),4.0f));
     CHECK(WORD_AT(CST+0x1198u)==2u && WORD_AT(CST+0x119Cu)==4u && crw_inst[0].row==2u && crw_inst[0].col==4u && !crw_inst[0].place);
@@ -669,22 +891,7 @@ int main(void)
     CHECK(blocked_cells(CST)==0);
     crw_leave(prev_k);
 
-    /* ---- a walk stopped short (another boss in the way) ends on its target - */
-    WORD_AT(A(0)+0x20u)=9u;SETF(CST+0x1CECu,13.0f);SETF(CST+0x1CF0u,-14.0f);
-    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
-    for(k=0;k<239u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f));
-    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(near_eq(F(ENT(0)+0x64u),13.0f) && near_eq(F(ENT(0)+0x6Cu),-14.0f) && near_eq(F(ENT(0)+0x68u),4.0f) && !crw_inst[0].air);
-    /* each walk waits from its own start */
-    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x6Cu,-20.0f);
-    for(k=0;k<239u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    WORD_AT(A(0)+0x20u)=4u;
-    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    WORD_AT(A(0)+0x20u)=9u;
-    for(k=0;k<239u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f));
-    WORD_AT(A(0)+0x20u)=4u;
+    walls();
 
     /* ---- bar and meter ---------------------------------------------------- */
     WORD_AT(PLAYER+0xFF4u)=ENT(0);
