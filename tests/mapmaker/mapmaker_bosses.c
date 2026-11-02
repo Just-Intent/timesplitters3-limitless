@@ -132,6 +132,16 @@ static uint8_t byte_at(uint32_t a) { return *(uint8_t *)((uintptr_t)a+g_xbox_mem
 /* ---- fake originals ------------------------------------------------------ */
 static unsigned orig_calls;
 static void fake_plain(void) { orig_calls++;g_esp+=4u; }
+/* sub_001CDD60: 1 + the scaled-health and bar-smoothing entries the area still had when it ran */
+static unsigned restart_saw;
+static unsigned bos_used(void)
+{
+    unsigned k,used=0;
+    for(k=0;k<BOS_LIST_MAX;k++) used+=bos_play.scaled[k].actor!=0;
+    for(k=0;k<BOS_SMOOTH;k++) used+=bos_play.smooth[k].entity!=0;
+    return used;
+}
+static void fake_restart(void) { orig_calls++;restart_saw=1u+bos_used();g_esp+=4u; }
 static void fake_compile(void)                   /* sub_003006C0: zero, one chunk per entry */
 {
     uint32_t c=WORD_AT(g_esp+4u),n=WORD_AT(ED+0x280u),i,p;
@@ -598,6 +608,22 @@ int main(void)
     WORD_AT(REC(1)+8u)=R+1u+1u;setf(ENT(1)+0x1D8u,1.0f);setf(ENT(1)+0x1CCu,1.0f);
     CHECK(!hud_frame(HUD0) && FLOAT_AT(ENT(1)+0x1D8u)==1.0f);
     WORD_AT(REC(1)+8u)=R+0u+1u;
+    /* the pause menu's restart (sub_001CDD60): the map start is skipped
+     * (sub_0006D7A0 tests [0x006F32EC]), so the area reads the map afresh
+     * itself: no bar smoothing or scaled health of the run before, the same
+     * settings and names */
+    setf(ENT(1)+0x1D8u,1.0f);setf(ENT(1)+0x1CCu,1.0f);
+    CHECK(hud_frame(HUD0) && bos_used());
+    {
+        unsigned calls=orig_calls;
+        restart_saw=0;
+        HOOK(pc_mapmaker_bosses_restart,fake_restart,0);
+        CHECK(orig_calls==calls+1u && restart_saw==1u);               /* forgotten before the original */
+        CHECK(!bos_used() && bos_play.active && bos_play.level[0]==3u && bos_play.level[8]==2u && bos_play.sub[8]==1u);
+        CHECK(!strcmp(bos_story_name(R+0u+1u),"Big Robot") && !strcmp(bos_story_name(R+1u+1u),"Guard"));
+        setf(ENT(1)+0x1D8u,1.0f);setf(ENT(1)+0x1CCu,1.0f);              /* the restarted boss: stock health */
+        CHECK(hud_frame(HUD0) && FLOAT_AT(ENT(1)+0x1D8u)==4.0f && FLOAT_AT(ENT(1)+0x1CCu)==4.0f);
+    }
     CHECK(hud_frame(HUD0) && FLOAT_AT(ENT(1)+0x1D8u)==4.0f);
 
     /* two bosses: the nearer one first */
@@ -792,6 +818,12 @@ int main(void)
 
     /* switch off at level start: nothing in play */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
+    {
+        unsigned calls=orig_calls;
+        CHECK(bos_play.active);
+        HOOK(pc_mapmaker_bosses_restart,fake_plain,0);                 /* off: the original only */
+        CHECK(orig_calls==calls+1u && bos_play.active);
+    }
     HOOK(pc_mapmaker_bosses_level,fake_plain,0);
     CHECK(!bos_play.active && !hud_frame(HUD0));
     list_set(6);CHECK(meters_frame()==0);list_set(5);

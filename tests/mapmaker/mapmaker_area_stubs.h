@@ -68,6 +68,7 @@ void sub_0015DDA0(void) {}
 void sub_0029CCB0(void) {}
 void sub_002A7F30(void) {}  /* realbosses: skeleton fire */
 void sub_0005F460(void) {}  /* realbosses: the Crow walker's roar */
+void sub_00287860(void) {} void sub_00297690(void) {}  /* realbosses: the stock skeleton/walker resets at a restart */
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it */
 void sub_00019D70(void) {}
 #endif

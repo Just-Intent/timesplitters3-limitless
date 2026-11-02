@@ -67,6 +67,15 @@
  *    lookups through sub_0025F0C0) dropped. The only other way from the
  *    update to a marker is the generic explosion sub_000BB6C0 (68 callers),
  *    which only reads one.
+ *  - restart (sub_001CDD60, "START restart": the teardown sub_001CDAF0 and
+ *    this, never the level setup sub_001CDB80 with the level hook): before
+ *    the original, each worm keeps its block (level memory, which a restart
+ *    does not free), scratch, effect type and spawn record, and forgets the
+ *    run before (bound head, route, ready/failed, live globals); its next AI
+ *    start runs the stock block init again on the same block (zeroed, no new
+ *    allocation), so the restarted worm is set up as on the level's start.
+ *    Without it the restarted head matched its old worm by record and ran on
+ *    the last fight's block (a killed worm stayed gone).
  *
  * Several worms: up to WRM_MAX map worms each get their own worm block (its
  * worm 0 theirs, 1-4 parked) and their own copy of the 9 globals the block's
@@ -226,6 +235,7 @@ static const uint32_t wrm_win[]={
 struct wrm_worm_s {
     uint32_t state, scratch, effect, record, actor;
     int ready, failed, shifted, drawing, swapped, surfaced;
+    int again;                        /* restarted: its block is set up again at its AI start */
     uint32_t head, room, last_state;  /* the bound head, its spawn room (0: none), the state last logged */
     unsigned states;                  /* state changes logged */
     float dx, dy, dz;
@@ -376,10 +386,12 @@ void pc_mapmaker_worm_register(void (*original)(void))
 static int wrm_alloc(unsigned k)
 {
     uint32_t live[WRM_NWIN],st,objects,route_done,i,w;
+    uint32_t reuse=k<wrm_n && wrm_inst[k].again?wrm_inst[k].state:0u;   /* restarted: its own block again */
     unsigned j;
     for(j=0;j<WRM_NWIN;j++) live[j]=WORD_AT(wrm_win[j]);
     WORD_AT(WRM_STATE)=0;
-    guest_call(sub_001D1E80,0);
+    if(reuse && MAPMAKER_PTR_OK(reuse,WRM_STATE_SIZE)) { wrm_zero(reuse,WRM_STATE_SIZE);WORD_AT(WRM_STATE)=reuse; }
+    else guest_call(sub_001D1E80,0);
     st=WORD_AT(WRM_STATE);
     if(!st || !MAPMAKER_PTR_OK(st,WRM_STATE_SIZE)) {
         wrm_log("no level memory for a mansion worm; bot behaviour",st,k);
@@ -401,7 +413,7 @@ static int wrm_alloc(unsigned k)
     for(j=0;j<WRM_NWIN;j++) wrm_inst[k].win[j]=WORD_AT(wrm_win[j]);
     for(j=0;j<WRM_NWIN;j++) WORD_AT(wrm_win[j])=live[j];
     wrm_inst[k].state=st;wrm_inst[k].scratch=wrm_scratch;wrm_inst[k].effect=wrm_effect;
-    wrm_log("mansion worm state allocated (worm, block)",k,st);
+    wrm_log(reuse?"mansion worm state set up again after the restart (worm, block)":"mansion worm state allocated (worm, block)",k,st);
     return 1;
 }
 /* The map worm whose spawn record ent's AI has, or -1. */
@@ -411,7 +423,8 @@ static int wrm_find(uint32_t ent)
     unsigned k;
     if(!wrm_n || !MAPMAKER_PTR_OK(ent,0x200u) || !MAPMAKER_PTR_OK(a=WORD_AT(ent+WRM_ENT_AI),WRM_ACTOR)) return -1;
     rec=WORD_AT(a+WRM_ACTOR_RECORD);
-    for(k=0;k<wrm_n;k++) if(wrm_inst[k].record && wrm_inst[k].record==rec && wrm_inst[k].state) return (int)k;
+    for(k=0;k<wrm_n;k++)                               /* not a restarted one before its AI start */
+        if(wrm_inst[k].record && wrm_inst[k].record==rec && wrm_inst[k].state && !wrm_inst[k].again) return (int)k;
     return -1;
 }
 
@@ -449,6 +462,34 @@ void pc_mapmaker_worm_level(void (*original)(void))
     if(has<0) wrm_log("mansion worm level set up with the map container unreadable",0,0);
 }
 
+/* WRAP sub_001CDD60 (the level restart, no args; only at 0x0003D4E1, after
+ * the teardown, never the level hook above): before the original, the
+ * outside globals come back and each worm keeps only its block, scratch,
+ * effect type and spawn record (the level's memory and effect list survive a
+ * restart: sub_001CDD60 allocates nothing, sub_003796A0 keeps the list); its
+ * AI start sets the block up again. The log budgets start afresh. */
+static void wrm_restart_reset(void)
+{
+    unsigned k,again=0;
+    if(wrm_cur>=0) wrm_leave(-1);
+    for(k=0;k<wrm_n && k<WRM_MAX;k++) {
+        uint32_t st=wrm_inst[k].state,scratch=wrm_inst[k].scratch,effect=wrm_inst[k].effect,rec=wrm_inst[k].record;
+        memset(&wrm_inst[k],0,sizeof wrm_inst[k]);        /* the run before: head, route, ready, live globals */
+        wrm_inst[k].state=st;wrm_inst[k].scratch=scratch;wrm_inst[k].effect=effect;wrm_inst[k].record=rec;
+        wrm_inst[k].again=1;
+        again++;
+    }
+    memset(&wrm_none,0,sizeof wrm_none);
+    wrm_cur=-1;wrm_i=&wrm_none;
+    wrm.logged=wrm.extras=wrm.ticks=wrm.hits=wrm.draws=wrm.scripts=wrm.surfacings=wrm.gones=0;
+    if(again) wrm_log("level restart: each mansion worm is set up again at its AI start (worms, scratch)",again,wrm_scratch);
+}
+void pc_mapmaker_worm_restart(void (*original)(void))
+{
+    if(wrm_on()) wrm_restart_reset();
+    original();
+}
+
 /* WRAP sub_0015B830 (cdecl AI pool entry): one mansion worm per map is noted;
  * its spawn record keeps the MapMaker class (the head's think stops when the
  * worm binds it, as in stock). */
@@ -469,6 +510,9 @@ void pc_mapmaker_worm_ai_start(void (*original)(void))
         if(wrm.extras++<4u) wrm_log("more than 4 mansion worms in the map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
     } else if(k==wrm_n && !wrm_alloc(k)) {
         if(wrm.extras++<4u) wrm_log("no memory for another mansion worm: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
+    } else if(k<wrm_n && wrm_inst[k].again && !wrm_alloc(k)) {
+        wrm_inst[k].state=0;                           /* never runs on the last fight's block */
+        if(wrm.extras++<4u) wrm_log("restarted mansion worm's block not set up again: bot behaviour",a,WORD_AT(rec+8u));
     } else {
         if(k==wrm_n) wrm_n++;
         wrm_inst[k].record=rec;wrm_inst[k].actor=a;

@@ -259,6 +259,20 @@ MUTATIONS = {
     'multi-walk-unswapped': ('    if(!(w=rbs_walk_of(ent))) { original();return; }\n    rbs_walk_in(w,&s);\n', '    if(!(w=rbs_walk_of(ent))) { original();return; }\n'),
     'multi-walk-damage-record': ('    rbs_walk_call(original,WORD_AT(r));', '    rbs_walk_call(original,r);'),
     'multi-walk-fx-first-only': ('    for(k=0;k<rbs_walkf.n;k++) rbs_walk_frame(&rbs_walks[k]);', '    if(rbs_walkf.n) rbs_walk_frame(&rbs_walks[0]);'),
+    # the pause menu's restart (sub_001CDD60: no level init)
+    'restart-skel-never': ('        guest_call(sub_00287860,0);                    /* the stock skeleton reset */\n', ''),
+    'restart-walk-never': ('        guest_call(sub_00297690,0);                    /* the stock walker reset */\n', ''),
+    'restart-skel-unswapped': ('        rbs_skel_in(t,&s);\n        guest_call(sub_00287860,0);                    /* the stock skeleton reset */\n        rbs_skel_out(t,&s);\n',
+                               '        guest_call(sub_00287860,0);\n'),
+    'restart-walk-unswapped': ('        rbs_walk_in(w,&s);\n        guest_call(sub_00297690,0);                    /* the stock walker reset */\n        rbs_walk_out(w,&s);\n',
+                               '        guest_call(sub_00297690,0);\n'),
+    'restart-skel-first-only': ('    for(k=0;k<rbs_skelf.n && k<RBS_INST_MAX;k++) {\n        RbsSkel *t', '    for(k=0;k<1u;k++) {\n        RbsSkel *t'),
+    'restart-walk-first-only': ('    for(k=0;k<rbs_walkf.n && k<RBS_INST_MAX;k++) {\n        RbsWalk *w', '    for(k=0;k<1u;k++) {\n        RbsWalk *w'),
+    'restart-skel-counters-kept': ('        t->throws=t->skipped=t->fire=0;t->floor=0.0f;t->floor_set=0;\n', ''),
+    'restart-walk-flags-kept': ('        w->actor=0;w->wells=w->drawn=w->ticks=w->beats=w->woken=w->roars=w->armed=w->moves=0;w->last=0;\n', ''),
+    'restart-any-scene': ('    if(WORD_AT(RBS_SCENE)!=100u) return;\n    for(k=0;k<rbs_skelf.n', '    for(k=0;k<rbs_skelf.n'),
+    'restart-when-off': ('    original();\n    if(!rbs_on()) return;\n    rbs.logged=0;', '    original();\n    rbs.logged=0;'),
+    'restart-keeps-log': ('    if(!rbs_on()) return;\n    rbs.logged=0;\n', '    if(!rbs_on()) return;\n'),
 }
 
 
@@ -931,3 +945,22 @@ def test_several_per_map_entries():
         assert not any(r & users.get(v, set()) for v in fx | {0x0078B1EC, 0x0078B1E8})
     # damage records: +0 the hit entity (0x002896E0 skeleton, 0x00298A5E walker)
     assert mem(a[0x002896E0])[0][4] == 0 and mem(a[0x00298A5E])[0][4] == 0
+
+
+def test_restart_resets_only_the_mission_bosses():
+    """The pause menu's restart (sub_001CDD60, wrapped:
+    pc_mapmaker_realbosses_restart) never runs the level init sub_0025F720;
+    its soft restart sub_0025F6A0 (sub_0015E4F0 from 0x001CDD74) resets the
+    skeleton's state sub_00287860 only in scenes 1 and 0x11 and the walker's
+    sub_00297690 only in 0x51. The stock inits end in the same resets."""
+    a = by_address()
+    def calls(f):
+        return {i.address for i in decoded() if i.call and target(i) == f}
+    assert calls(0x001CDD60) == {0x0003D4E1} and calls(0x0025F720) == {0x0015E818}
+    assert target(a[0x001CDD74]) == 0x0015E4F0 and target(a[0x0015E7B1]) == 0x0025F6A0
+    assert mem(a[0x0025F6A1])[0][4] == 0x0079094C
+    assert ('imm', 0x51) in a[0x0025F6E5].ops and target(a[0x0025F6EA]) == 0x00297690
+    assert ('imm', 1) in a[0x0025F6F1].ops and ('imm', 0x11) in a[0x0025F6F6].ops and target(a[0x0025F6FB]) == 0x00287860
+    assert calls(0x00287860) == {0x0025F6FB} and calls(0x00297690) == {0x0025F6EA}
+    assert target(a[0x00287E19]) == 0x00287860 and target(a[0x0029773D]) == 0x00297690   # init = allocate + reset
+    assert mem(a[0x00287861])[0][4] == 0x0078B1EC and mem(a[0x00297690])[0][4] == 0x0078B1E8
