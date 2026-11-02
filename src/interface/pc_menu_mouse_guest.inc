@@ -63,6 +63,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_roof.inc"
 #include "pc_mapmaker_tileflags.inc"
 #include "pc_mapmaker_skymusic.inc"
+#include "pc_mapmaker_camera.inc"
 #include "pc_mapmaker_openview.inc"
 #include "pc_mapmaker_bosses.inc"
 #include "pc_mapmaker_characters.inc"
@@ -793,6 +794,7 @@ void pc_mapmaker_skymusic_weather_list(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_haze(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_grain_colour(void (*original)(void)) { original(); }
 void pc_mapmaker_openview_walk(void (*original)(void)) { original(); }
+void pc_mapmaker_camera_gun_update(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_picker_end(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_pick(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_highlight(void (*original)(void)) { original(); }

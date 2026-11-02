@@ -604,10 +604,10 @@ not omit the patch from fresh/current-stack or renderer regression tests.
 ## Mounted gun input regression
 
 `python -m pytest tests/gameplay/test_mounted_mouse.py tests/input/test_terminal_mouse.py -q`
-runs the existing CI-selected suite. See [mounted ownership and validation](mounted-mouse.md)
+runs the CI-selected suite. See [mounted ownership and validation](mounted-mouse.md)
 for original guest mount/dismount execution, host-memory/adapter tests, timing
 mutations, and physical Windows/Mac acceptance limits. #385 adds instance-name,
-operator-versus-AI-target and inaccessible-operator regression cases.
+operator-vs-AI-target, inaccessible-operator and negative-speed cases.
 
 ## Launcher stalled-network regression
 
