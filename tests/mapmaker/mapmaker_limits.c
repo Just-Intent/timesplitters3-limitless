@@ -243,8 +243,15 @@ int main(void)
         MapMakerTotals heavy,none;
         memset(&none,0,sizeof none);
         heavy=none;heavy.pieces=511;heavy.cost[0]=14u*511u;heavy.cost[1]=14u*511u;heavy.cost[2]=46u*511u;
-        CHECK((mapmaker_limits_over(&heavy,&none,MAPMAKER_LIMIT_MEMORY,MAPMAKER_LIMIT_GROUPS,MAPMAKER_LIMIT_SUB)&
+        CHECK((mapmaker_limits_over(&heavy,&none,MAPMAKER_LIMIT_MEMORY,MAPMAKER_LIMIT_GROUPS,448u)&
                ~(unsigned)MAPMAKER_CAP_PIECES)==0);
+        /* Engine objects: 511 rooms + 448 items + 64 characters = 1023, the pool. */
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,449u)&MAPMAKER_CAP_OBJECTS);
+        CHECK(!(mapmaker_limits_over(&none,&heavy,0,0,448u)&MAPMAKER_CAP_OBJECTS));   /* held pieces count */
+        CHECK(mapmaker_limits_over(&none,&heavy,0,0,449u)&MAPMAKER_CAP_OBJECTS);
+        heavy.pieces=255;                                               /* 255 pieces keep 500 items */
+        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS));
+        heavy.pieces=511;
         heavy.pieces=520;heavy.cost[2]=46u*520u;
         CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_LINKS));
         heavy.pieces=521;heavy.cost[2]=46u*521u;

@@ -114,8 +114,21 @@ them untouched.
 
 - **Ceiling of 1024.** An object handle is `slot << 22 | serial`
   (0x000A69BE). It is decoded with `shr 0x16` in about 175 places, which
-  makes 1024 the hard ceiling (CONFIRMED). 1000 is used so that no handle can
-  ever equal −1 (−1 would need slot 1023 with an all-ones serial).
+  makes 1024 the hard ceiling (CONFIRMED). The serial is the global counter
+  `[0x0072F5E0]`, reset to 1 when it reaches 0x400000 (0x000A69C3..0x000A69D3),
+  so it runs 1..0x3FFFFF and only slot 1023 could form −1. 2026-11-02: the
+  pool is 1023 slots (was 1000): slots 0..1022 can never give −1. The slot-8
+  and slot-0 lists follow (`objects.json` new size 0xFFC each, slot-0 clear
+  1023 dwords; 0x008AC000..0x008ACFFC and 0x008AD000..0x008ADFFC, below the
+  logic block at 0x008B0000). Handles of slots 512 and up are negative as
+  int32, as they already were with 1000.
+- **Editor bound.** Each piece (room) and about each item takes one object in
+  play (462 at 236 pieces + 200 items), characters up to 64. With
+  `TSFP_MAPMAKER_LIMITS=1` the editor refuses placement when placed + held
+  pieces + items + 64 pass 1023 (`MAPMAKER_LIMIT_OBJECTS`,
+  `mapmaker_objects_needed` in `pc_mapmaker_limits.inc`; the meter shows the
+  same share). 255 pieces keep all 500 items; 511 pieces allow 448 items.
+  Past 1023 objects the handle format (10 slot bits) has to change.
 - **No other table blocks the raise.** The visibility bitset in
   `sub_000A0130` holds 2512 bits. The 214-entry tables are per room. The
   twin-pool index is used only as a time-slice key. `[0x72F5EC]` is indexed

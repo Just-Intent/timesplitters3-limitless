@@ -28,6 +28,11 @@ MUTATIONS = {
     'links-held-ignored': ('mapmaker_link_cost(p)+mapmaker_link_cost(h)>MAPMAKER_LIMIT_LINKS',
                            'mapmaker_link_cost(p)>MAPMAKER_LIMIT_LINKS'),
     'no-held-pieces': ('p->pieces+h->pieces>MAPMAKER_LIMIT_PIECES', 'p->pieces>MAPMAKER_LIMIT_PIECES'),
+    # Engine objects: pieces + items + 64 characters within the 1023-slot pool.
+    'objects-unchecked': ('    if(mapmaker_objects_needed(p->pieces+h->pieces,sub)>MAPMAKER_LIMIT_OBJECTS) over|=MAPMAKER_CAP_OBJECTS;\n', ''),
+    'objects-no-reserve': ('    return pieces+sub+MAPMAKER_OBJECTS_RESERVE;', '    return pieces+sub;'),
+    'objects-placed-only': ('mapmaker_objects_needed(p->pieces+h->pieces,sub)', 'mapmaker_objects_needed(p->pieces,sub)'),
+    'objects-stock-pool': ('#define MAPMAKER_LIMIT_OBJECTS 1023u', '#define MAPMAKER_LIMIT_OBJECTS 1000u'),
     # Pad groups 1024: 511 pieces at the measured 1.5 groups each fit.
     'groups-round3': ('#define MAPMAKER_LIMIT_GROUPS 1024\n', '#define MAPMAKER_LIMIT_GROUPS 600\n'),
     'groups-unbounded': ('#define MAPMAKER_LIMIT_GROUPS 1024\n', '#define MAPMAKER_LIMIT_GROUPS 2048\n'),

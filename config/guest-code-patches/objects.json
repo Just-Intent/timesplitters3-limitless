@@ -144,7 +144,7 @@
       "old": "0x007161C8",
       "size": "0xC8",
       "new": "0x008AC000",
-      "new_size": "0xFA0",
+      "new_size": "0xFFC",
       "sites": {
         "0x000A4CF0": "offset",
         "0x000A5D81": "offset",
@@ -163,7 +163,7 @@
         "0x000A5CB1": "keep"
       },
       "data_ok": [],
-      "reason": "sub_000A5CE0 slot-8 list (count [0x007B4FA8]) 50 -> 1000 entries (the engine object pool); 0x00716290 is a separate list head"
+      "reason": "sub_000A5CE0 slot-8 list (count [0x007B4FA8]) 50 -> 1023 entries (the engine object pool); 0x00716290 is a separate list head"
     },
     {
       "id": "obj-list0-relocate",
@@ -171,7 +171,7 @@
       "old": "0x007B4FC0",
       "size": "0x1BC",
       "new": "0x008AD000",
-      "new_size": "0xFA0",
+      "new_size": "0xFFC",
       "sites": {
         "0x000A0EC0": "offset",
         "0x000A5B4E": "offset",
@@ -187,7 +187,7 @@
         "0x000A71A5": "offset"
       },
       "data_ok": [],
-      "reason": "sub_000A5CE0 slot-0 list (count [0x007B6258]) 112 -> 1000 entries (the engine object pool); declared 4 bytes short: 0x007B5180 after it is the per-id drawn flag table that rooms.json relocates"
+      "reason": "sub_000A5CE0 slot-0 list (count [0x007B6258]) 112 -> 1023 entries (the engine object pool); declared 4 bytes short: 0x007B5180 after it is the per-id drawn flag table that rooms.json relocates"
     },
     {
       "id": "obj-list0-clear",
@@ -195,8 +195,8 @@
       "function": "0x000A5AF0",
       "address": "0x000A5B49",
       "original_hex": "b970000000",
-      "new_hex": "b9e8030000",
-      "reason": "clear the relocated slot-0 list: 112 -> 1000 dwords"
+      "new_hex": "b9ff030000",
+      "reason": "clear the relocated slot-0 list: 112 -> 1023 dwords"
     },
     {
       "id": "obj-bucket-bytes",
