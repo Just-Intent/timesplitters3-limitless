@@ -239,11 +239,18 @@ MUTATIONS = {
     'late-past-cap': ('    unsigned k=rbs_skelf.n;\n    if(k>=RBS_INST_MAX) return 0;', '    unsigned k=rbs_skelf.n;\n    if(k>=RBS_INST_MAX+1u) return 0;'),
     'multi-statics-left': ('    memcpy(rbs_g(RBS_FX),base,RBS_FX_SIZE);            /* the statics as they were */\n', ''),
     'multi-no-home': ('        WORD_AT(RBS_SKEL_STATE)=rbs_skelf.n?rbs_skels[0].state:0u;\n', ''),
-    'multi-fx-not-kept': ('    if(!s->swapped) return;\n    memcpy(fx,rbs_g(RBS_FX),RBS_FX_SIZE);\n', '    if(!s->swapped) return;\n'),
-    'multi-fx-not-restored': ('    WORD_AT(global)=s->ptr;\n    memcpy(rbs_g(RBS_FX),s->fx,RBS_FX_SIZE);\n', '    WORD_AT(global)=s->ptr;\n'),
-    'multi-ptr-not-restored': ('    memcpy(fx,rbs_g(RBS_FX),RBS_FX_SIZE);\n    WORD_AT(global)=s->ptr;\n', '    memcpy(fx,rbs_g(RBS_FX),RBS_FX_SIZE);\n'),
-    'multi-fx-not-swapped': ('    WORD_AT(global)=state;\n    memcpy(rbs_g(RBS_FX),fx,RBS_FX_SIZE);\n', '    WORD_AT(global)=state;\n'),
-    'multi-nested-swaps': ('    if(rbs_skelf.cur==k) return;\n', ''),
+    'multi-fx-not-restored': ('    if(s->swapped) WORD_AT(global)=s->ptr;\n    mapmaker_fx_leave(s->fx);\n', '    if(s->swapped) WORD_AT(global)=s->ptr;\n'),
+    'multi-ptr-not-restored': ('    if(s->swapped) WORD_AT(global)=s->ptr;\n', ''),
+    'multi-fx-not-swapped': ('    s->fx=mapmaker_fx_enter(fx);\n', '    s->fx=mapmaker_fx_holder;\n'),
+    'multi-nested-swaps': ('rbs_in(RBS_SKEL_STATE,k->state,&k->fx,rbs_skelf.cur==k,s);', 'rbs_in(RBS_SKEL_STATE,k->state,&k->fx,0,s);'),
+    # v0.4.0-mapmaker.28: the same instance again skipped the statics too
+    'multi-same-skips-fx': ('    s->fx=mapmaker_fx_enter(fx);\n    s->swapped=0;\n    if(same) return;\n',
+                            '    s->fx=mapmaker_fx_holder;\n    s->swapped=0;\n    if(same) return;\n    s->fx=mapmaker_fx_enter(fx);\n'),
+    'multi-level-forget-none': ('    mapmaker_fx_forget(rbs_skels,sizeof rbs_skels);mapmaker_fx_forget(rbs_walks,sizeof rbs_walks);\n', ''),
+    # the shared holder itself (pc_mapmaker_bossfx.inc)
+    'fx-park-lost': ('    memcpy(prev?prev->b:mapmaker_fx_outside.b,live,MAPMAKER_FX_SIZE);\n', '', 'pc_mapmaker_bossfx.inc'),
+    'fx-holder-kept': ('    mapmaker_fx_holder=c;\n', '', 'pc_mapmaker_bossfx.inc'),
+    'fx-forget-none': ('    if(h && h>=lo && h<lo+bytes) mapmaker_fx_enter(0);\n', '', 'pc_mapmaker_bossfx.inc'),
     'multi-cur-kept': ('    rbs_skelf.cur=(RbsSkel *)s->prev;\n', ''),
     'multi-reuse-ignored': ('    for(k=0;k<rbs_skelf.n;k++) if(rbs_skels[k].record==rec) return &rbs_skels[k];\n', ''),
     'multi-skel-slot-unswapped': ('    rbs_skel_in(k,&s);\n    original();\n    rbs_skel_out(k,&s);\n}\n', '    original();\n}\n'),
@@ -258,10 +265,13 @@ MUTATIONS = {
 def build(tmp_path, mutation):
     compiler, env = native_compiler(tmp_path)
     if mutation != 'fixed':
-        old, new = MUTATIONS[mutation]
-        text = INC.read_text(encoding='utf-8')
+        old, new, *name = MUTATIONS[mutation]
+        path = INC.parent / name[0] if name else INC
+        text = path.read_text(encoding='utf-8')
         assert text.count(old) == 1, mutation
-        (tmp_path / INC.name).write_text(text.replace(old, new), encoding='utf-8')
+        (tmp_path / path.name).write_text(text.replace(old, new), encoding='utf-8')
+        if name:                                       # the includer next to it, so the copy is the one found
+            (tmp_path / INC.name).write_text(INC.read_text(encoding='utf-8'), encoding='utf-8')
     exe = tmp_path / ('realbosses.exe' if os.name == 'nt' else 'realbosses')
     source = ROOT / 'tests/mapmaker/mapmaker_realbosses.c'
     if os.name == 'nt':

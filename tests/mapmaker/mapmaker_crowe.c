@@ -158,7 +158,8 @@ static void fake_start(uint32_t ent)
     SETF(ent+0x64u,F(cell+0x10u));SETF(ent+0x6Cu,F(cell+0x14u));
 }
 static uint32_t live_particles, seen_parts_on, seen_state_ptr, seen_parts_ptr;
-static int prev_k;
+static CrwPrev prev_k;
+#define FXW(fx,a) (*(uint32_t *)((uint8_t *)&(fx)+((a)-0x0078B080u)))   /* a static in an instance's saved copy */
 static unsigned w_removed;
 static void fake_fight(void)
 {
@@ -273,9 +274,34 @@ static void fake_fight_nest(void)   /* boss A's fight sends boss B a message */
     CHECK(WORD_AT(0x0078B0CCu)==77u);                      /* A's values survive B's call */
     g_esp+=4u;
 }
+/* boss A's fight hits another area's boss (a Crow walker: its own statics
+ * swapped in), whose damage code hits A again (A's hit callback) */
+static MapmakerFx other;
+static uint32_t foreign_seen, again_parts, again_count, foreign_after;
+static void fake_entry_again(void)
+{
+    originals++;again_parts=WORD_AT(0x0078B0D0u);again_count=WORD_AT(0x0078B0CCu);
+    WORD_AT(0x0078B0CCu)=again_count+1u;g_esp+=4u;
+}
+static void fake_fight_foreign(void)
+{
+    MapmakerFx *p;
+    originals++;
+    WORD_AT(0x0078B0CCu)=55u;                               /* A's live count */
+    p=mapmaker_fx_enter(&other);                            /* the walker's damage callback */
+    foreign_seen=WORD_AT(0x0078B0D0u);
+    WORD_AT(PLAYER+0x300u)=ENT(0);WORD_AT(PLAYER+0x304u)=ENT(5);
+    inner(pc_mapmaker_crowe_hit,fake_entry_again,0x000BA3E0u,PLAYER+0x300u);
+    foreign_after=WORD_AT(0x0078B0D0u);
+    WORD_AT(0x0078B0CCu)=3u;                                /* the walker's count */
+    mapmaker_fx_leave(p);
+    CHECK(WORD_AT(0x0078B0CCu)==56u && WORD_AT(0x0075F5E8u)==CST);   /* A's update inside kept */
+    g_esp+=4u;
+}
 static void multi(void)
 {
     unsigned k;
+    WORD_AT(0x0078B1D8u)=0x5A5A5A5Au;                       /* a walker-only static outside */
     level();
     for(k=0;k<6u;k++) actor(k,0x46,0x5E8,k);
     actor(4,0x0C,0x5E8,4);                                   /* by model */
@@ -286,8 +312,9 @@ static void multi(void)
     for(k=0;k<4u;k++) CHECK(crw_inst[k].record==REC(k) && crw_inst[k].state==CST+k*0x3000u && WORD_AT(REC(k)+4u)==0x40000u);
     CHECK(WORD_AT(REC(4)+4u)==0 && WORD_AT(REC(4))==0x11000000u && WORD_AT(REC(5)+4u)==0);   /* the fifth and sixth: bots */
     CHECK(WORD_AT(0x0078B090u)==0x00777000u && WORD_AT(0x0078B0D0u)==0x00778000u && WORD_AT(0x0075F5E8u)==0);
-    CHECK(crw_inst[1].win[5]==0x00732000u && crw_inst[1].win[9]==0x00748000u && crw_inst[1].win[1]==0xA1u);
-    CHECK(crw_inst[3].win[0]==CST+0x9000u && crw_inst[3].win[CRW_NWIN-1u]==0xC3u && crw_inst[2].win[10]==0xB2u);
+    CHECK(FXW(crw_inst[1].fx,0x0078B090u)==0x00732000u && FXW(crw_inst[1].fx,0x0078B0D0u)==0x00748000u && FXW(crw_inst[1].fx,0x0078B080u)==0xA1u);
+    CHECK(crw_inst[3].state==CST+0x9000u && FXW(crw_inst[3].fx,0x0078B188u)==0xC3u && FXW(crw_inst[2].fx,0x0078B0ECu)==0xB2u);
+    CHECK(FXW(crw_inst[2].fx,0x0078B1D8u)==0x5A5A5A5Au && !mapmaker_fx_holder);   /* the rest of the window from outside */
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);   /* the same record again */
     CHECK(crw_n==4u && nalloc==3u && crw_inst[2].record==REC(2));
     /* each fight with its own blocks; each arena under its own spawn */
@@ -303,12 +330,18 @@ static void multi(void)
     /* a value a boss's call leaves behind is its own next time */
     WORD_AT(A(1)+0x20u)=4u;live_particles=9u;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(1),0,0,1);
-    CHECK(crw_inst[1].win[8]==9u && WORD_AT(0x0078B0CCu)!=9u);
+    CHECK(FXW(crw_inst[1].fx,0x0078B0CCu)==9u && WORD_AT(0x0078B0CCu)!=9u);
     live_particles=0;
     /* one boss's code inside another's: each sees its own, the first gets its own back */
     WORD_AT(A(0)+0x20u)=4u;
     CALL(pc_mapmaker_crowe_fight,fake_fight_nest,0x0027DE3Eu,ENT(0),0,0,2);   /* its original and the inner message */
-    CHECK(nest_before==CST && nest_inner==CST+0x3000u && nest_after==CST && crw_cur==-1 && crw_inst[0].win[8]==77u);
+    CHECK(nest_before==CST && nest_inner==CST+0x3000u && nest_after==CST && crw_cur==-1 && FXW(crw_inst[0].fx,0x0078B0CCu)==77u);
+    /* A again inside another area's boss inside A's fight: A's latest values, everyone's back */
+    memset(&other,0,sizeof other);FXW(other,0x0078B0D0u)=0x00799000u;
+    CALL(pc_mapmaker_crowe_fight,fake_fight_foreign,0x0027DE3Eu,ENT(0),0,0,2);
+    CHECK(foreign_seen==0x00799000u && again_parts==PRT && again_count==55u && foreign_after==0x00799000u);
+    CHECK(FXW(other,0x0078B0CCu)==3u && FXW(crw_inst[0].fx,0x0078B0CCu)==56u && !mapmaker_fx_holder && crw_cur==-1);
+    CHECK(WORD_AT(0x0078B0D0u)==0x00778000u && WORD_AT(0x0075F5E8u)==0);
     /* messages, the think callback, the hit callback: the boss's own */
     CALL(pc_mapmaker_crowe_message,fake_entry,0x0027D3EEu,ENT(2),2u,0,1);
     CHECK(entry_state==CST+0x6000u && entry_parts==0x00750000u && WORD_AT(0x0075F5E8u)==0);
@@ -420,7 +453,7 @@ int main(void)
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(seen_class[1]==0 && !crw_inst[0].record);
     pak_mounted=1;
-    CHECK(WORD_AT(0x0075F5E8u)==0 && crw_inst[0].state==CST && crw_inst[0].win[0]==CST && crw_n==1u);   /* only its copy */
+    CHECK(WORD_AT(0x0075F5E8u)==0 && crw_inst[0].state==CST && FXW(crw_inst[0].fx,0x0078B0D0u)==PRT && crw_n==1u);   /* only its copy */
     set_env("TSFP_MAPMAKER_REAL_BOSS","0");
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(seen_class[1]==0 && !crw_inst[0].record);
@@ -513,9 +546,19 @@ int main(void)
     WORD_AT(0x0079094Cu)=14u;
     CALL(pc_mapmaker_crowe_event,fake,0x002923A8u,0,0,0,1);
     WORD_AT(0x0079094Cu)=100u;
+    /* the egg drop (v0.4.0-mapmaker.28 crash): skipped, the six arguments the caller's */
+    CALL(pc_mapmaker_crowe_eggs,fake,0x00291E84u,CST+0x11A0u,CST+0x970u,ESP1,0);
+    CHECK(crw.eggs==1u && WORD_AT(ESP0+4u)==CST+0x11A0u);
+    CALL(pc_mapmaker_crowe_eggs,fake,0x00291E89u,CST+0x11A0u,0,0,1);     /* another caller */
+    WORD_AT(0x0079094Cu)=14u;
+    CALL(pc_mapmaker_crowe_eggs,fake,0x00291E84u,CST+0x11A0u,0,0,1);     /* mission 10: its eggs */
+    WORD_AT(0x0079094Cu)=100u;
+    CHECK(crw.eggs==1u);
     crw_leave(prev_k);
     CALL(pc_mapmaker_crowe_part,fake,0x0028ECF1u,1u,0,0,1);              /* outside a boss's code: stock */
     CHECK(nexplode==1);
+    CALL(pc_mapmaker_crowe_eggs,fake,0x00291E84u,CST+0x11A0u,0,0,1);
+    CHECK(crw.eggs==1u);
     ndraw=0;
     CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==1 && draw_scene==100u);
