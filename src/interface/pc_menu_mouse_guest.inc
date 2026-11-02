@@ -61,6 +61,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_sky.inc"
 #include "pc_mapmaker_skymask.inc"
 #include "pc_mapmaker_roof.inc"
+#include "pc_mapmaker_openview.inc"
 #include "pc_mapmaker_tileflags.inc"
 #include "pc_mapmaker_skymusic.inc"
 #include "pc_mapmaker_bosses.inc"
@@ -770,6 +771,7 @@ void pc_mapmaker_roof_play(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_rooms(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_draw(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_tick(void (*original)(void)) { original(); }
+void pc_mapmaker_openview_walk(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_rows(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_compile(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_load(void (*original)(void)) { original(); }

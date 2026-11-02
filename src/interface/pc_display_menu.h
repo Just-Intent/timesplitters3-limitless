@@ -160,6 +160,7 @@ void pc_mapmaker_roof_play(void (*original)(void));
 void pc_mapmaker_roof_rooms(void (*original)(void));
 void pc_mapmaker_roof_draw(void (*original)(void));
 void pc_mapmaker_roof_tick(void (*original)(void));
+void pc_mapmaker_openview_walk(void (*original)(void));
 void pc_mapmaker_skymusic_rows(void (*original)(void));
 void pc_mapmaker_skymusic_compile(void (*original)(void));
 void pc_mapmaker_skymusic_load(void (*original)(void));
