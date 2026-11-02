@@ -493,10 +493,10 @@ More boss areas (2026-11-01): `khallos` (id 0x33 chair prop 0x376; .28 WRAP sub_
 lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
 sky/sand/music, +mem paks, MM sand grains; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
 for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll
-list (5 new sets WRAPs; sets_pick outside realbosses_pick; mapmaker-sets.md).
+list (sets_pick outside realbosses_pick; mapmaker-sets.md).
 Multi-boss merge (.26): 28 WRAPs (walker/skeleton/robot/crowe/tank/mothership/khallos statics
 swaps, worm anim register, sky weather); sub_000DAC30 chain: actors, realbosses,
-tank, khallos (log only). See boss docs.
+tank, khallos (log only).
 .27: sets_spawn_masks (sub_00240C50): slots 11-20 get slot 1's mask;
 worm block at AI start; late walker/skel; fall drop.
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
