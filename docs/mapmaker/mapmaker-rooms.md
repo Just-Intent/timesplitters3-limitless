@@ -780,6 +780,42 @@ fixtures use the defines. Story risk: every scene allocates the view array
 (72 KB instead of 48 KB, `sub_0003DFA0(.., 1)`); splitscreen, camera screens
 and the front end use the new layout.
 
+## Stage 9: rooms sub-range repacked for 511 (2026-11-02, static only)
+
+Done before stage 8 (the renumbering), so that every table already has the
+room the 511 id space needs when the ids move: each commit is safe alone.
+Blocks (`ROOMS_BLOCKS` in `test_mapmaker_rooms.py`; a table can use less
+than its block until stage 8):
+
+| block | base | bytes | was |
+| --- | --- | --- | --- |
+| t1 float/room | `0x008C0000` | 0x800 (512 rooms) | 0x400 |
+| t3 dword/room (sky mask reads it) | `0x008C0800` | 0x800 | 0x400 |
+| t2 dword/room | `0x008C1000` | 0x800 | `0x008C0400` |
+| t4 float[3]/room | `0x008C1800` | 0x1800 | `0x008C0C00` |
+| bucket staging row (`MAPMAKER_ROOMS_BUCKET_ROW`) | `0x008C3000` | 0x1000 | `0x008C1800`, 0x5000 (the byte rows were only read by the replaced bodies) |
+| t6, t7 (room list, capacity `0x00088D71` 0x200) | `0x008C4000`, `0x008C4800` | 0x800 each | `0x008C6800`, `0x008C6C00` |
+| per-id p2, p3, p5 | `0x008C5000`, `0x008C5840`, `0x008C6080` | 0x840 each | `0x008C7440`, `0x008C7880`, `0x008C8100` |
+| per-id p1, p4 (+ global entry) | `0x008C7000`, `0x008C7CC0` | 0x840 each | same bases |
+| per-id drawn flag | `0x008C8500` | 0x840 | `0x008CC800` |
+| model table (stage 10) | `0x008CA000` | 0xB08 words | 0xA08 words |
+| light round robin | `0x008CB700` | 0x100 (64 groups) | `0x008CB440`, 32 |
+| query buffers | `0x008CB800` | 2 x 0x800 | same |
+| front-end view | `0x008CD000` | 0x3000 | same |
+| light heads [3][0x20C] | `0x008D0000` | 0x1890 | `0x008C8540` |
+| light colour [0x20C][3] (+4) | `0x008D18A0` | 0x1894 | `0x008C9200` |
+
+Free: `0x008C68C0..0x008C7000`, `0x008C7840..0x008C7CC0`,
+`0x008C8D40..0x008CA000`, `0x008CB610..0x008CB700`, `0x008CC800..0x008CD000`,
+`0x008D3140..0x008DFFFF`. Per-room clears `0x0008A796/A2/B0` count 0x200.
+Other areas follow: objects pool clear (p2/p5 addresses), `MAPMAKER_ROOF_ROOMS`
+512 (roof and openview arrays), `MAPMAKER_CAMERA_ROOMS` 511 (camera
+diagnostics), light side table groups 64; the dev sky-mask switch keeps rooms
+0..255 (`MAPMAKER_SKYMASK_ROOMS`, a diagnostic). Tests: `test_rooms_blocks`
+(+4 mutations), `test_other_areas_use_the_moved_tables` (per-room sizes and
+C arrays), `test_extension_map_rooms_sub_range` (blocks), objects/openview/
+skymask fixtures.
+
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
 Cause: `sub_000BB850` (explosion/area effect over the rooms touching a box)

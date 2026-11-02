@@ -208,10 +208,10 @@ void pc_mapmaker_rooms_props(void (*original)(void))
 #define MAPMAKER_ROOMS_LIGHT_ONE 0x0073D960u    /* -> the one 0xC0 record (type-1 source) */
 #define MAPMAKER_ROOMS_LIGHT_STRIDE 0xB8u
 #define MAPMAKER_ROOMS_LIGHT_SLOTS 512u
-#define MAPMAKER_ROOMS_LIGHT_HEADS 0x008C8540u  /* light heads [3][row] (relocated 0x0073C350) */
+#define MAPMAKER_ROOMS_LIGHT_HEADS 0x008D0000u  /* light heads [3][row] (relocated 0x0073C350) */
 #define MAPMAKER_ROOMS_LIGHT_ROW 0x10Cu         /* head row width = the global room id */
-#define MAPMAKER_ROOMS_LIGHT_GROUPS 0x008CB440u /* round robin per room/16 (relocated 0x0073D910) */
-#define MAPMAKER_ROOMS_LIGHT_GROUP_COUNT 32u    /* its entries (ids up to 0x1FF) */
+#define MAPMAKER_ROOMS_LIGHT_GROUPS 0x008CB700u /* round robin per room/16 (relocated 0x0073D910) */
+#define MAPMAKER_ROOMS_LIGHT_GROUP_COUNT 64u    /* its entries (ids up to 0x3FF) */
 #define MAPMAKER_ROOMS_LIGHT_PER 0x0073D954u    /* records per room group */
 #define MAPMAKER_ROOMS_LIGHT_OTHERS 256u        /* records outside the pool (see below) */
 
@@ -366,7 +366,7 @@ void pc_mapmaker_rooms_light_create(void (*original)(void))
  * The view's rooms are drawn by portal-walk depth: room r of the current
  * view has its depth dword at shadow rect +0 (view +0x1000 + 12*r; -1 = not
  * reached). Stock sub_00086C40 (every scene, once per view drawn) put each
- * room id as a BYTE in row [depth] of 0x7042B8 (now 0x008C1800, rows of 256)
+ * room id as a BYTE in row [depth] of 0x7042B8 (stock, rows of 200)
  * with a byte count per row at 0x702DB0; rooms whose record +0xB2 has bit 8
  * went into at most 10 per depth at 0x702A40, appended as new depths after
  * [view+0xD28]. It then drew through sub_00086AE0 -> sub_000867F0, whose two
@@ -397,7 +397,7 @@ void pc_mapmaker_rooms_light_create(void (*original)(void))
 #define MAPMAKER_ROOMS_ID_GLOBAL 0x10Cu          /* rooms.json: global room id */
 #define MAPMAKER_ROOMS_DEPTHS 0x50u
 #define MAPMAKER_ROOMS_SORTED 10u                /* stock 0x702A40 rows: 10 per depth */
-#define MAPMAKER_ROOMS_BUCKET_ROW 0x008C1800u    /* staging row (rooms.json: reader stride 0) */
+#define MAPMAKER_ROOMS_BUCKET_ROW 0x008C3000u    /* staging row (rooms.json: reader stride 0) */
 #define MAPMAKER_ROOMS_BUCKET_COUNTS 0x00702DB0u /* reader count bytes per depth (stock) */
 #define MAPMAKER_ROOMS_BUCKET_SEGMENT 255u
 #define MAPMAKER_ROOMS_BUCKET_ROOMS 2048u        /* room ids the C lists hold (1..2047) */

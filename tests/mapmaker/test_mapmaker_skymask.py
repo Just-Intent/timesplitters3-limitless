@@ -116,7 +116,7 @@ def test_room_mask_table_has_one_writer():
     rooms = json.loads((ROOT / 'config/guest-code-patches/rooms.json').read_text(encoding='utf-8'))
     entries = rooms['patches']
     reloc = next(e for e in entries if e.get('id') == 'rooms-reloc-t3-0x703460')
-    assert int(reloc['new'], 16) == 0x008C0800 and int(reloc['new_size'], 16) == 256 * 4
+    assert int(reloc['new'], 16) == 0x008C0800 and int(reloc['new_size'], 16) >= 256 * 4   # 512 rooms; the switch keeps 0..255
     for site in (0x00083974, 0x000857A3, 0x00085DCA, 0x0008A79B):
         assert reloc['sites'][f'0x{site:08X}'] == 'offset'
 

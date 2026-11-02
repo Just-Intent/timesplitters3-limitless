@@ -115,3 +115,13 @@ C readers: `MAPMAKER_ROOMS_VIEW_*`, `OPENVIEW_RECT`, `MAPMAKER_CAMERA_VIEW_RECTS
 `SMX_PLAYER` (pinned by `test_other_areas_use_the_moved_tables`). Tests:
 `test_view_stride_table` (+10 mutations), `test_every_view_stride_is_classified`
 (decode). Details: mapmaker-rooms.md "Stage 7".
+
+## Stage 9: sub-range repacked for 511 (before stage 8)
+
+Per-room tables 512 entries, per-id tables room for 0x20D ids, light heads
+`0x008D0000`, colour `0x008D18A0`, round robin `0x008CB700` (64), drawn flag
+`0x008C8500`, staging row `0x008C3000`; fixed: t3 `0x008C0800` (sky mask),
+p1/p4 `0x008C7000`/`0x008C7CC0` (probe), model table `0x008CA000`. Objects
+clears p2/p5 at `0x008C5000`/`0x008C6080`; `MAPMAKER_ROOF_ROOMS` 512,
+`MAPMAKER_CAMERA_ROOMS` 511. Map: `ROOMS_BLOCKS` (`test_rooms_blocks`) and
+mapmaker-rooms.md "Stage 9".

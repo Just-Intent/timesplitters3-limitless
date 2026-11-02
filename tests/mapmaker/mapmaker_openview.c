@@ -246,7 +246,7 @@ int main(void)
 
     /* Bad tables: nothing written, the original still runs. */
     play_build();
-    WORD_AT(0x007B975Cu)=0x100u;call();CHECK(unseen(3));     /* more rooms than ids */
+    WORD_AT(0x007B975Cu)=MAPMAKER_ROOF_ROOMS;call();CHECK(unseen(3));     /* more rooms than ids */
     WORD_AT(0x007B975Cu)=ROOMS;
     WORD_AT(0x007B0CC0u)=0x00000100u;call();                  /* view below guest RAM */
     WORD_AT(0x007B0CC0u)=VIEW;

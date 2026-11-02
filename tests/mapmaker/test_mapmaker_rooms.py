@@ -176,6 +176,7 @@ def id_space_problems(patches):
         need(int(r[t]['new_size'], 16) >= ID_SPACE * 4, t)
     bases = [int(r[t]['new'], 16) for t in ('rooms-reloc-p1-0x7b54e0', 'rooms-reloc-p2-0x7b5840', 'rooms-reloc-p3-0x7b5ba0',
                                             'rooms-reloc-p4-0x7b5f00', 'rooms-reloc-p5-0x7b6260')]
+    bases.sort()
     need(all(b - a >= ID_SPACE * 4 for a, b in zip(bases, bases[1:])), 'per-id table step')
     need(v('0x0009E4E6') == ID_SPACE * 4 and v('0x000A1ED5') == GLOBAL * 4, 'per-id loop ends')
     # per-id flag bytes [0x7B977C]: allocation, clear (dwords + a stosw) and the special displacements
@@ -234,7 +235,7 @@ def _mutate(entry_id, **fields):
 ID_SPACE_MUTATIONS = {
     'p2-256-entries': lambda: _mutate('rooms-reloc-p2-0x7b5840', new_size='0x400'),
     'p1-global-stale': lambda: _mutate('rooms-reloc-p1-global', new='0x008C73F8'),
-    'p-step-0x400': lambda: _mutate('rooms-reloc-p3-0x7b5ba0', new='0x008C7800'),
+    'p-step-0x400': lambda: _mutate('rooms-reloc-p3-0x7b5ba0', new='0x008C5400'),
     'loop-end-0xFF': lambda: _mutate('0x0009E4E6', value='0x3FC'),
     'id-flags-clear-short': lambda: _mutate('0x00089734', value='0x40'),
     'id-flag-global-stale': lambda: _mutate('0x00089746', value='0xFE'),
@@ -283,7 +284,15 @@ def test_other_areas_use_the_moved_tables():
     assert c_define(probe, 'MAPMAKER_PROBE_ROOM_LISTS') == new('rooms-reloc-p4-0x7b5f00')
     assert c_define(probe, 'MAPMAKER_PROBE_ROOM_IDS') == ID_SPACE and c_define(probe, 'MAPMAKER_PROBE_MODEL_ROOMS_END') == 0xA08
     assert c_define('src/interface/pc_mapmaker_skymask.inc', 'MAPMAKER_SKYMASK_TABLE') == new('rooms-reloc-t3-0x703460')
-    assert c_define('src/interface/pc_mapmaker_roof.inc', 'MAPMAKER_ROOF_ROOMS') == 256 > define('MAPMAKER_ROOMS_IDS_REAL')
+    # per-room C arrays (roof, openview, camera diagnostics) cover the per-room tables (stage 9)
+    per_room = int(r['rooms-reloc-t1-0x702e20']['new_size'], 16) // 4
+    assert c_define('src/interface/pc_mapmaker_roof.inc', 'MAPMAKER_ROOF_ROOMS') == per_room == 0x200 > define('MAPMAKER_ROOMS_IDS_REAL')
+    assert c_define('src/interface/pc_mapmaker_camera.inc', 'MAPMAKER_CAMERA_ROOMS') == per_room - 1
+    for t in ('rooms-reloc-t2-0x703140', 'rooms-reloc-t3-0x703460', 'rooms-reloc-t6-0x708138', 'rooms-reloc-t7-0x708458'):
+        assert int(r[t]['new_size'], 16) == 4 * per_room, t
+    assert int(r['rooms-reloc-t4-0x7038f8']['new_size'], 16) == 12 * per_room
+    ops = [p for p in table() if p['kind'] == 'operand']
+    assert all(int(op_at(ops, a)['value'], 16) == per_room for a in ('0x0008A796', '0x0008A7A2', '0x0008A7B0', '0x00088D71'))
     # the view shadow and stride (stage 7) as the openview, camera and sky music areas read them
     rects, stride = define('MAPMAKER_ROOMS_VIEW_RECTS'), define('MAPMAKER_ROOMS_VIEW_STRIDE')
     assert c_define('src/interface/pc_mapmaker_openview.inc', 'OPENVIEW_RECT') == rects
@@ -291,19 +300,79 @@ def test_other_areas_use_the_moved_tables():
     assert c_define('src/interface/pc_mapmaker_skymusic.inc', 'SMX_PLAYER') == stride
 
 
+# The rooms sub-range for the 511 layout (stage 9; ids 0..0x20C, real rooms 1..0x1FF):
+# block -> (base, reserved bytes, relocations in it). A table may use less than its block
+# while the id space is smaller; the model table and the query buffers are C-defined.
+ROOMS_BLOCKS = {
+    't1': (0x008C0000, 0x800, ['rooms-reloc-t1-0x702e20']),
+    't3': (0x008C0800, 0x800, ['rooms-reloc-t3-0x703460']),       # sky mask reads it here
+    't2': (0x008C1000, 0x800, ['rooms-reloc-t2-0x703140']),
+    't4': (0x008C1800, 0x1800, ['rooms-reloc-t4-0x7038f8']),
+    'bucket staging row': (0x008C3000, 0x1000, ['rooms-reloc-t5-0x7042b8']),
+    't6': (0x008C4000, 0x800, ['rooms-reloc-t6-0x708138']),
+    't7': (0x008C4800, 0x800, ['rooms-reloc-t7-0x708458']),
+    'p2': (0x008C5000, 0x840, ['rooms-reloc-p2-0x7b5840']),
+    'p3': (0x008C5840, 0x840, ['rooms-reloc-p3-0x7b5ba0']),
+    'p5': (0x008C6080, 0x840, ['rooms-reloc-p5-0x7b6260']),
+    'p1': (0x008C7000, 0x840, ['rooms-reloc-p1-0x7b54e0', 'rooms-reloc-p1-global']),   # probe, objects
+    'p4': (0x008C7CC0, 0x840, ['rooms-reloc-p4-0x7b5f00', 'rooms-reloc-p4-global']),   # probe
+    'drawn flag': (0x008C8500, 0x840, ['rooms-reloc-f-0x7b5180']),
+    'model table': (0x008CA000, 0xB08 * 2, []),                   # six other areas read it here
+    'light round robin': (0x008CB700, 0x100, ['rooms-reloc-lb-0x73d910']),
+    'query': (0x008CB800, 0x1000, []),
+    'front-end view': (0x008CD000, 0x3000, ['rooms-reloc-v-0x749890']),
+    'light heads': (0x008D0000, 3 * 0x20C * 4, ['rooms-reloc-l1-head', 'rooms-reloc-l1-rest']),
+    'light colour': (0x008D18A0, 0x20C * 12 + 4, ['rooms-reloc-l2-0x7ac880']),
+}
+
+
 def rooms_regions():
-    """Every block of the rooms sub-range: relocated tables, model table, query buffers."""
-    regions = [(int(r['new'], 16), int(r['new'], 16) + int(r['new_size'], 16), r['id'])
-               for r in table() if r['kind'] == 'relocate']
-    model = define('MAPMAKER_ROOMS_MODEL_TABLE')
-    query = define('MAPMAKER_ROOMS_QUERY_BUFFER')
-    regions += [(model, model + 0xA08 * 2, 'model table'),
-                (query, query + define('MAPMAKER_ROOMS_QUERY_BYTES') * define('MAPMAKER_ROOMS_QUERY_LEVELS'), 'query')]
-    return sorted(regions)
+    """Every reserved block of the rooms sub-range, sorted: (lo, hi, name)."""
+    return sorted((base, base + size, name) for name, (base, size, _) in ROOMS_BLOCKS.items())
+
+
+def blocks_problems(patches):
+    """[] when every relocation, the model table and the query buffers sit in their blocks."""
+    out = []
+    relocs = {p['id']: p for p in patches if p['kind'] == 'relocate'}
+    placed = set()
+    for name, (base, size, ids) in ROOMS_BLOCKS.items():
+        for rid in ids:
+            p = relocs.get(rid)
+            lo = int(p['new'], 16) if p else -1
+            if not p or not (base <= lo and lo + int(p['new_size'], 16) <= base + size):
+                out.append(f'{rid} outside {name}')
+            placed.add(rid)
+    if set(relocs) - placed:
+        out.append(f'relocations without a block: {sorted(set(relocs) - placed)}')
+    model, query = ROOMS_BLOCKS['model table'], ROOMS_BLOCKS['query']
+    if define('MAPMAKER_ROOMS_MODEL_TABLE') != model[0]:
+        out.append('model table')
+    if (define('MAPMAKER_ROOMS_QUERY_BUFFER') != query[0] or
+            define('MAPMAKER_ROOMS_QUERY_BYTES') * define('MAPMAKER_ROOMS_QUERY_LEVELS') > query[1]):
+        out.append('query buffers')
+    return out
+
+
+def test_rooms_blocks():
+    assert not blocks_problems(table())
+
+
+BLOCK_MUTATIONS = {
+    'heads-in-colour': lambda: _mutate('rooms-reloc-l1-head', new='0x008D1890'),
+    'p2-over-p3': lambda: _mutate('rooms-reloc-p2-0x7b5840', new='0x008C5500'),
+    't4-stock-size-moved': lambda: _mutate('rooms-reloc-t4-0x7038f8', new='0x008C2000'),
+    'drawn-flag-old-place': lambda: _mutate('rooms-reloc-f-0x7b5180', new='0x008CC800'),
+}
+
+
+@pytest.mark.parametrize('mutation', sorted(BLOCK_MUTATIONS))
+def test_rooms_blocks_mutations_fail(mutation):
+    assert blocks_problems(BLOCK_MUTATIONS[mutation]()), mutation
 
 
 def test_extension_map_rooms_sub_range():
-    """No other user of 0x008C0000..0x008E0000 in tracked code: the gaps the 255 layout uses are free."""
+    """No other user of 0x008C0000..0x008E0000 in tracked code: the gaps between the rooms blocks are free."""
     import re
     regions = rooms_regions()
     for (a0, a1, n0), (b0, b1, n1) in zip(regions, regions[1:]):
@@ -334,7 +403,7 @@ def test_extension_map_rooms_sub_range():
     assert 12 * GLOBAL <= int(colour['new_size'], 16)          # last entry: +4+12*0x10B-4 .. +12*0x10C
     gaps = [(a1, b0) for (a0, a1, _), (b0, b1, _) in zip(regions, regions[1:]) if b0 > a1]
     assert regions[0][0] == 0x008C0000 and regions[-1][1] <= 0x008D4000
-    assert sum(b - a for a, b in gaps) < 0x2000, [(hex(a), hex(b)) for a, b in gaps]
+    assert sum(b - a for a, b in gaps) < 0x3000, [(hex(a), hex(b)) for a, b in gaps]
 
 
 def test_header_extension_range():
