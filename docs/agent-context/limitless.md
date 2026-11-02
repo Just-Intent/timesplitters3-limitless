@@ -478,8 +478,7 @@ Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained (no hang report).
-Ported bosses in their own areas (parallel sessions, merged 2026-11-01; not
-played): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
+Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, mapmaker-crowe.md), `tank`
 (`pc_mapmaker_tank.inc`: guard robot id 0x12 placeholder -> castle tank prop
 0x281 from prop6.pak, mapmaker-tank.md). Wrapper lists: each doc. ORDER puts them
@@ -488,16 +487,17 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 `rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8. Tank adds WRAP
 `sub_0015E7C0` -> `pc_mapmaker_tank_request` (models requested at level init).
 After mapmaker.22: tank courtyard test/target search bounded (freeze); walker
-intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
-More boss areas (merged 2026-11-01, not played): `khallos` (id 0x33 chair prop 0x376),
-`worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`; wrapper
-lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
+intro skips mission 13's SPC1/SPC2 trigger in `_fx`.
+More boss areas (2026-11-01): `khallos` (id 0x33 chair prop 0x376),
+`worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`; wrappers
+in each doc. Sky area adds `pc_mapmaker_skymusic.inc` (extra
 skies, sandstorm, music; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
 for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll
 list (5 new sets WRAPs; sets_pick outside realbosses_pick; mapmaker-sets.md).
 Multi-boss merge (.26): 28 WRAPs (walker/skeleton/robot/crowe/tank/mothership/khallos statics
 swaps, worm anim register, sky weather); sub_000DAC30 chain: actors, realbosses,
-tank, khallos (log only). See each boss doc.
+tank, khallos (.27+: makes 0x33 as Khallos, who rides; WRAP sub_0014CC80 ->
+khallos_hud in bosses_hud; bosses `bos_bar_proxy`: bar = chair). See docs.
 .27: sets_spawn_masks (sub_00240C50) gives slots 11-20 slot 1's spawn mask;
 worm block at AI start (emitter pool); late walker/skeleton instances.
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe

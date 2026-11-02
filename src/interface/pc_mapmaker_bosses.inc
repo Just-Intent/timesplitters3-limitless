@@ -581,6 +581,11 @@ static void bos_scale(uint32_t a,uint32_t ent,uint32_t rec,unsigned factor)
     bos_play.scaled[k].record=rec;
     bos_play.scaled[k].max_bits=WORD_AT(ent+BOS_ENT_MAX);
 }
+/* A Boss AI whose health lives in another entity (pc_mapmaker_khallos.inc:
+ * a seated Khallos rides his chair, a prop with its own health): that entity
+ * for scaling, range, death and the bar; 0 = the AI's own. Set by that area. */
+#define BOS_BAR_PROXY 1
+static uint32_t (*bos_bar_proxy)(uint32_t entity);
 /* Scales every live Story AI with a factor and returns the living Boss AIs
  * within range of the current player, nearest first (at most max). */
 static unsigned bos_nearest(uint32_t player,uint32_t *ents,uint32_t *index,unsigned max)
@@ -593,9 +598,10 @@ static unsigned bos_nearest(uint32_t player,uint32_t *ents,uint32_t *index,unsig
     if(count>BOS_LIST_MAX) count=BOS_LIST_MAX;
     if(max>BOS_BARS_MAX) max=BOS_BARS_MAX;
     for(i=humans<count?humans:count;i<count;i++) {
-        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec);
+        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec),p;
         float dx,dy,dz,d;
         if(s>=BOS_LEVEL_SLOTS) continue;
+        if(bos_bar_proxy && (p=bos_bar_proxy(ent))!=0 && MAPMAKER_PTR_OK(p,BOS_ENT_SIZE)) ent=p;   /* the bar's entity */
         bos_scale(a,ent,rec,bos_factor(s));
         if(!bos_play.level[s] || bos_play.sub[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;   /* Sub-boss: meter only */
         dx=bos_getf(ent+BOS_ENT_POS)-px;dy=bos_getf(ent+BOS_ENT_POS+4u)-py;dz=bos_getf(ent+BOS_ENT_POS+8u)-pz;
