@@ -43,3 +43,15 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
   Matrix 4.2 MB at 1024; load time of N x N route searches unmeasured.
 - Tests: `mapmaker_limits.c` (1024 allowed, 1025 refused, 767 for 511
   pieces), mutations `groups-*`.
+
+## Engine objects (2026-11-02)
+
+- `pc_mapmaker_objects.inc`: `MAPMAKER_OBJECTS_POOL` and the slot-8/slot-0
+  list caps 1000 -> 1023 (handle serial 1..0x3FFFFF, so slots 0..1022 never
+  form -1); `objects.json` list sizes 0xFFC, slot-0 clear 1023 dwords.
+- `pc_mapmaker_limits.inc`: `MAPMAKER_LIMIT_OBJECTS` 1023,
+  `MAPMAKER_OBJECTS_RESERVE` 64; placed + held pieces + items + 64 must fit
+  (`MAPMAKER_CAP_OBJECTS`, meter share). Compile check ties it to the pool.
+- Tests: `mapmaker_limits.c` (511 pieces + 448 items fit, 449 refused, held
+  pieces count, 255 pieces keep 500 items), `mapmaker_objects.c` (1023
+  pools and lists), mutations `objects-*`, `pool-round3`; `check-tables.py`.

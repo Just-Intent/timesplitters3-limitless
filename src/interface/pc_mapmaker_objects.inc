@@ -28,9 +28,10 @@
  *   written as the original does.
  * - pc_mapmaker_objects_pool / _twin_pool (sub_000A5C00, sub_0008DBF0): while
  *   a MapMaker map is edited or played (scene 102/100, TSFP_MAPMAKER_POOLS not
- *   0) the engine object pool and its twin hold 1000 objects instead of 550.
- *   Object handles keep the slot in their top 10 bits (handle >> 22), so 1024
- *   is the ceiling; 1000 keeps every handle away from -1. Other scenes run the
+ *   0) the engine object pool and its twin hold 1023 objects instead of 550.
+ *   Object handles keep the slot in their top 10 bits (handle >> 22) and a
+ *   serial 1..0x3FFFFF ([0x0072F5E0], 0x000A69B9..0x000A69D3), so 1024 is the
+ *   ceiling and only slot 1023 could make -1; 1023 slots never do. Other scenes run the
  *   original (550, or 20 in scene 101), so story levels keep their memory use.
  * - pc_mapmaker_objects_teleporters (sub_0009CD00, scene 100): the original
  *   gathers teleporter pads into two 10-slot stack arrays without a bound
@@ -61,9 +62,9 @@
 #define MAPMAKER_OBJECTS_LIST9 0x008A0000u    /* obj-list9-relocate */
 #define MAPMAKER_OBJECTS_LIST9_CAP 128u
 #define MAPMAKER_OBJECTS_LIST8 0x008AC000u    /* obj-list8-relocate */
-#define MAPMAKER_OBJECTS_LIST8_CAP 1000u      /* = the object pool: the guard never drops */
+#define MAPMAKER_OBJECTS_LIST8_CAP 1023u      /* = the object pool: the guard never drops */
 #define MAPMAKER_OBJECTS_LIST0 0x008AD000u    /* obj-list0-relocate */
-#define MAPMAKER_OBJECTS_LIST0_CAP 1000u      /* = the object pool: the guard never drops */
+#define MAPMAKER_OBJECTS_LIST0_CAP 1023u      /* = the object pool: the guard never drops */
 
 /* Every guard that turns an object away counts it and logs the first few,
  * so a missing object in play is never silent (probe flag 64 prints the counts). */
@@ -75,7 +76,11 @@ static void mapmaker_objects_dropped(unsigned *n,const char *what,uint32_t obj)
 #define MAPMAKER_OBJECTS_SPARE_GUNS 0x008A9000u   /* 8 x 0x1E0 */
 #define MAPMAKER_OBJECTS_SPARE_OWNERS 0x008AA000u /* 8 x 0x130 */
 #define MAPMAKER_OBJECTS_SPARES 8u
-#define MAPMAKER_OBJECTS_POOL 1000u           /* < 1024: slot = handle >> 22 */
+#define MAPMAKER_OBJECTS_POOL 1023u           /* slots 0..1022: slot = handle >> 22, never -1 */
+/* The editor's object limit (pc_mapmaker_limits.inc) is this pool. */
+typedef char mapmaker_objects_pool_limit[(MAPMAKER_OBJECTS_POOL<1024u && MAPMAKER_LIMIT_OBJECTS==MAPMAKER_OBJECTS_POOL &&
+                                          MAPMAKER_OBJECTS_LIST8_CAP==MAPMAKER_OBJECTS_POOL &&
+                                          MAPMAKER_OBJECTS_LIST0_CAP==MAPMAKER_OBJECTS_POOL)?1:-1];
 #define MAPMAKER_OBJECTS_BUCKET_BYTES 0xA680u /* obj-bucket-bytes */
 #define MAPMAKER_OBJECTS_TAGS 0x008A4400u     /* obj-tag-entries-relocate */
 #define MAPMAKER_OBJECTS_TAGS_CAP 1000u

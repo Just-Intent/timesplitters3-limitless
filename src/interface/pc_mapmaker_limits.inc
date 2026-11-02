@@ -97,6 +97,13 @@
 #define MAPMAKER_LIMIT_PIECES 255u    /* = MAPMAKER_ROOMS_MAX */
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
+/* Engine objects (2026-11-02): in play each piece (room) and about each item
+ * takes one slot of the engine object pool (pc_mapmaker_objects.inc, 1023
+ * slots, taken without a bound check; 462 used at 236 pieces + 200 items),
+ * characters up to 64 more. The editor refuses placement past the pool, so
+ * 511 pieces leave 448 items; 255 pieces keep the 500 items. */
+#define MAPMAKER_LIMIT_OBJECTS 1023u  /* = MAPMAKER_OBJECTS_POOL */
+#define MAPMAKER_OBJECTS_RESERVE 64u  /* characters in MapMaker story play */
 /* Regular pads: the pool fits the handle range and every pool id stays at or
  * below the raised id threshold 0x2328. */
 typedef char mapmaker_limits_pad_ids[(MAPMAKER_POOL_PADS<=0x1F40u && 0x3E9u+MAPMAKER_POOL_PADS-1u<=0x2328u &&
@@ -249,7 +256,13 @@ static uint32_t mapmaker_link_cost(const MapMakerTotals *t)
 }
 /* Which limits placed + held content passes (0: placement allowed). */
 enum { MAPMAKER_CAP_PADS=1u, MAPMAKER_CAP_COVER=2u, MAPMAKER_CAP_LINKS=4u, MAPMAKER_CAP_PIECES=8u,
-       MAPMAKER_CAP_MEMORY=16u, MAPMAKER_CAP_GROUPS=32u, MAPMAKER_CAP_SUB=64u };
+       MAPMAKER_CAP_MEMORY=16u, MAPMAKER_CAP_GROUPS=32u, MAPMAKER_CAP_SUB=64u, MAPMAKER_CAP_OBJECTS=128u };
+/* Engine objects the content takes in play: one per piece and per item, plus
+ * the character reserve. */
+static uint32_t mapmaker_objects_needed(uint32_t pieces,uint32_t sub)
+{
+    return pieces+sub+MAPMAKER_OBJECTS_RESERVE;
+}
 static unsigned mapmaker_limits_over(const MapMakerTotals *p,const MapMakerTotals *h,uint32_t memory,
                                      int32_t groups,uint32_t sub)
 {
@@ -261,6 +274,7 @@ static unsigned mapmaker_limits_over(const MapMakerTotals *p,const MapMakerTotal
     if(memory>MAPMAKER_LIMIT_MEMORY) over|=MAPMAKER_CAP_MEMORY;
     if(groups>MAPMAKER_LIMIT_GROUPS) over|=MAPMAKER_CAP_GROUPS;
     if(sub>MAPMAKER_LIMIT_SUB) over|=MAPMAKER_CAP_SUB;
+    if(mapmaker_objects_needed(p->pieces+h->pieces,sub)>MAPMAKER_LIMIT_OBJECTS) over|=MAPMAKER_CAP_OBJECTS;
     return over;
 }
 static float mapmaker_fraction_max(const float *f,unsigned n)
@@ -275,7 +289,7 @@ void pc_display_mapmaker_limits(void (*original)(void))
     uint32_t editor,placed_head,held_head,flags,placed_mem,total_mem,extra;
     int32_t groups,held_id;
     MapMakerTotals p,h;
-    float f[7];
+    float f[8];
     int refuse;
     original();
     mapmaker_limits_read();
@@ -297,7 +311,8 @@ void pc_display_mapmaker_limits(void (*original)(void))
     f[2]=(float)mapmaker_link_cost(&p)/MAPMAKER_LIMIT_LINKS;f[3]=(float)groups/MAPMAKER_LIMIT_GROUPS;
     f[4]=(float)p.pieces/MAPMAKER_LIMIT_PIECES;f[5]=(float)(p.sub+extra)/MAPMAKER_LIMIT_SUB;
     f[6]=(float)placed_mem/MAPMAKER_LIMIT_MEMORY;
-    FLOAT_AT(editor+0x270)=mapmaker_fraction_max(f,7);
+    f[7]=(float)mapmaker_objects_needed(p.pieces,p.sub+extra)/MAPMAKER_LIMIT_OBJECTS;
+    FLOAT_AT(editor+0x270)=mapmaker_fraction_max(f,8);
     /* Held piece preview. */
     f[0]=(float)h.cost[0]/MAPMAKER_LIMIT_PADS;f[1]=(float)h.cost[1]/MAPMAKER_LIMIT_COVER;
     f[2]=(float)mapmaker_link_cost(&h)/MAPMAKER_LIMIT_LINKS;f[3]=(float)h.pieces/MAPMAKER_LIMIT_PIECES;
