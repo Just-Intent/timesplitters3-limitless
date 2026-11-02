@@ -104,6 +104,9 @@ static uint32_t inner(void (*fn)(void (*)(void)),void (*orig)(void),uint32_t sp0
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
 #include "pc_mapmaker_worm.inc"
+/* sub_001CDD60: 1 + whether worm 1 was still set up or a worm's globals live when it ran */
+static unsigned restart_saw;
+static void fake_restart(void) { originals++;restart_saw=1u+(unsigned)wrm_inst[1].ready+(unsigned)(wrm_cur!=-1);g_esp+=4u; }
 
 /* the stock init sub_001D2350 (the parts the area relies on) */
 static void fake_init(void)
@@ -364,6 +367,37 @@ static void multi(void)
     CHECK(WORD_AT(0x0075B4B4u)==0x00777000u && WORD_AT(0x0078FAE0u)==0x888u && wrm_cur==-1);
     CALL(pc_mapmaker_worm_gone,fake,0x000A70A7u,ENT(4),0,0,1);   /* the fifth (a bot): stock */
     CALL(pc_mapmaker_worm_gone,fake,0x000A70A7u,ENT(3),0,0,1);   /* gone already: stock */
+    /* the pause menu's restart (sub_001CDD60, no level hook): the same pool
+     * entries and spawn records start again; each worm is set up again on its
+     * own block (no new allocation), the dead ones too */
+    {
+        unsigned a0=nalloc,i0=ninit;
+        wrm_enter(2);                                            /* a worm's globals live at the restart */
+        restart_saw=0;
+        CALL(pc_mapmaker_worm_restart,fake_restart,0x0003D4E6u,0,0,0,1);
+        CHECK(restart_saw==1u);                                  /* forgotten before the original */
+        CHECK(wrm_n==4u && wrm_cur==-1 && wrm_i==&wrm_none && WORD_AT(0x0075B4B4u)==0x00777000u && WORD_AT(0x0078FAE0u)==0x888u);
+        for(k=0;k<4u;k++) CHECK(wrm_inst[k].again && !wrm_inst[k].ready && !wrm_inst[k].head && wrm_inst[k].state==WST+k*0x2000u &&
+                                wrm_inst[k].record==REC(k) && wrm_inst[k].scratch==wrm_scratch && !wrm.ticks);
+        CHECK(wrm_find(ENT(1))<0);                               /* not before its AI start */
+        CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(1),0,0,1);   /* its tick before the AI start: stock */
+        for(k=0;k<4u;k++) CALL(pc_mapmaker_worm_ai_start,fake,0x0015F981u,A(k),0,0,1);
+        CHECK(wrm_n==4u && nalloc==a0 && ninit==i0+4u);         /* the same blocks, the stock init again */
+        for(k=0;k<4u;k++) CHECK(!wrm_inst[k].again && wrm_inst[k].state==WST+k*0x2000u && wrm_inst[k].win[0]==WST+k*0x2000u &&
+                                wrm_inst[k].record==REC(k) && WORD_AT(WST+k*0x2000u+0x450u+0x24u)==4u);
+        CHECK(WORD_AT(WST+0x2000u+0x24u)==1u && WORD_AT(WST+3u*0x2000u+0x24u)==1u);   /* worms 1 and 3 are back */
+        for(k=0;k<4u;k++) {
+            CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(k),0,0,0);
+            CHECK(wrm_inst[k].ready && wrm_inst[k].head==ENT(k) && seen_block==WST+k*0x2000u && wrm_inst[k].win[4]==ENT(k));
+        }
+        CHECK(WORD_AT(0x0075B4B4u)==0x00777000u && WORD_AT(0x0078FAE0u)==0x888u && wrm_cur==-1);
+        CALL(pc_mapmaker_worm_ai_start,fake,0x0015F981u,A(1),0,0,1);   /* started again in the same run: kept */
+        CHECK(nalloc==a0 && ninit==i0+4u && wrm_inst[1].ready);
+        set_env("TSFP_MAPMAKER_LIMITS",NULL);
+        CALL(pc_mapmaker_worm_restart,fake,0x0003D4E6u,0,0,0,1);    /* off: the original only */
+        CHECK(wrm_inst[1].ready && !wrm_inst[1].again);
+        set_env("TSFP_MAPMAKER_LIMITS","1");
+    }
     /* the next level: no worm */
     container(0x11,without_ids,3);
     level();

@@ -6,6 +6,30 @@ decode, US XBE data and game-pak checks of every site below). Wired in
 v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
 No guest-code table entry of its own, no new save bytes.
 
+## Restart from the pause menu (fixed after v0.4.0-mapmaker.31)
+
+Same cause as Khallos' chairs ([mapmaker-khallos.md](mapmaker-khallos.md),
+.31). **Proven in the decode**: "START restart" (`[0x006B7AA8]` set) makes
+`sub_0003D440` run the teardown `sub_001CDAF0` and `sub_001CDD60`
+(0x0003D4E1, its only caller), never `sub_001CDB80` with the pak mount
+`sub_00062790` (where this area forgot its tanks) and the story level init
+`sub_0015E7C0`. The restarted placeholders come back in the same pool
+entries with the same spawn records, so `ai_start` found "started again: it
+is already this tank" (same record and id) and every one stayed a guard
+robot. The tank props went with the teardown (its object reset `sub_0006EE00`).
+
+Fix: new `WRAP sub_001CDD60 -> pc_mapmaker_tank_restart`. Before the
+original, the tanks, the diagnostics records and the log budgets are
+forgotten as at a new level; a tank's statics that were swapped in go back
+to the outside values first; the level's model request is kept (nothing is
+mounted or requested again, and the models stay loaded). It logs `level
+restart: the tanks of the last run forgotten (tanks, requested)`.
+Fixture: the four tanks' placeholders started again without the restart stay
+bots; after it the same entries and records become tanks again, once each.
+Mutations `restart-*`; decode `test_restart_skips_mount_and_level_init`.
+Playtest: restart a map with 2-4 tanks from the pause menu; each tank is
+there again (hidden placeholder, bar names), none of them a guard robot.
+
 ## v0.4.0-mapmaker.28: the third tank stayed a bot; bars read "Castle Tank" (fixed after .28)
 
 Report: three tanks placed, "only two tanks spawned, the third was a
@@ -445,6 +469,7 @@ unchanged when the switch is off or outside scene 100.
 |---|---|---|
 | `WRAP sub_00062790 -> pc_mapmaker_tank_mount` | level pak mounts | new |
 | `WRAP sub_0015E7C0 -> pc_mapmaker_tank_request` | story level init (no args) | **new after v0.4.0-mapmaker.21**; works after the original, so any order with other wrappers |
+| `WRAP sub_001CDD60 -> pc_mapmaker_tank_restart` | level restart (no args), only from 0x0003D4E1 | **new after .31**; **shared** with `pc_mapmaker_khallos_restart` and the mothership/worm/realbosses/bosses restarts; order free (works before the original, on its own state only) |
 | `WRAP sub_0015B830 -> pc_mapmaker_tank_ai_start` | AI start (cdecl pool entry) | **shared** with `pc_mapmaker_realbosses_ai_start`; order free (each acts only on its own ids; the tank's runs its work after the original) |
 | `WRAP sub_00255550 -> pc_mapmaker_tank_update` | tank frame (cdecl object) | new |
 | `WRAP sub_00253140 -> pc_mapmaker_tank_wake` | fight start test (no args, eax) | new |

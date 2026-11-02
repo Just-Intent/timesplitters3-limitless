@@ -77,7 +77,14 @@ forward from its spawn point). 2-5 walk and attacks (projectiles through
 - Soft restart: `sub_0015E4F0` (from the scene loop's restart path
   `sub_001CDD60`, which runs after the level was initialised) tail-jumps to
   `sub_0025F6A0`, which resets the robot state with `sub_00292550` only in
-  scene 14.
+  scene 14. Restart audit after .31 (the bosses' restart bug,
+  [Khallos](mapmaker-khallos.md)): this area is **not affected**. Its level
+  hook `sub_0025F720` does not run on "START restart", but `sub_0025F6A0`
+  does (`sub_001CDD60` 0x001CDD74 -> `sub_0015E4F0` -> 0x0015E7B1), so
+  `pc_mapmaker_robot_reset` resets every block, its statics and `removed`;
+  the restarted robot keeps its instance by record and gets its class again
+  at its AI start (fixture: "the same one again (restart)" and the soft
+  restart case). Its other per-level counters only bound log lines.
 - No overhead meter: the robot never calls `sub_0012C800`, so it gets no
   +0x268 record and `sub_0014D1F0` draws no meter on it.
 

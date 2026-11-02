@@ -481,7 +481,7 @@ aim and logs throws. Freeze after a throw: unexplained (no hang report).
 Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, mapmaker-crowe.md), `tank`
 (`pc_mapmaker_tank.inc`: guard robot id 0x12 placeholder -> castle tank prop
-0x281 from prop6.pak, mapmaker-tank.md). Wrapper lists: each doc. ORDER puts them
+0x281 from prop6.pak, mapmaker-tank.md). Wrappers, restart: each doc. ORDER puts them
 after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 `rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8. Tank WRAPs

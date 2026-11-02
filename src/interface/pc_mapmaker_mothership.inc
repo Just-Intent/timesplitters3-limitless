@@ -92,6 +92,12 @@
  *  - ai_start "started again": a ship whose placeholder is still this
  *    entity, or made from this spawn record and id (a removed placeholder's
  *    entity is reused); every refusal logs (msh_refuse, 16 per level).
+ *  - restart (sub_001CDD60, "START restart": the teardown sub_001CDAF0 and
+ *    this, never the pak mount): before the original, the ships of the run
+ *    before are forgotten as at a new level; the model request and the
+ *    once-per-level texture registration are kept (the restart loads
+ *    nothing). The restarted placeholders (same pool entries and spawn
+ *    records) were otherwise "started again" and stayed bots.
  *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax,
  * g_xbox_mem_offset, xbox_HeapAlloc and pc_mapmaker_limits.inc
@@ -195,7 +201,7 @@ struct msh_one {
     unsigned shifts;
     uint32_t st[MSH_WORDS];
 };
-/* This level's ships (cleared by every level's pak mount). */
+/* This level's ships (cleared by every level's pak mount and restart). */
 static struct {
     struct msh_one s[MSH_MAX];
     unsigned n;                          /* ships created */
@@ -442,6 +448,25 @@ void pc_mapmaker_mothership_mount(void (*original)(void))
     }
     if((int32_t)guest_call(sub_000622D0,3,msh.pak,0u,1u)<0) msh_log("l_64_ch.pak did not mount; the mothership placeholder stays a bot",mounted,(uint32_t)has);
     else msh_log(has<0?"mounted l_64_ch.pak (map container unreadable)":"mounted l_64_ch.pak for the mothership",mounted+1u,0);
+}
+
+/* WRAP sub_001CDD60 (the level restart, no args; only at 0x0003D4E1, after
+ * the teardown, never with the pak mount): before the original, no ship
+ * exists yet. The statics outside any ship come back if a ship's were in;
+ * the level's model request and texture registration are kept. */
+static void msh_restart_reset(void)
+{
+    int requested=msh_lv.requested,textured=msh_lv.textured;
+    unsigned had=msh_lv.n;
+    if(msh_lv.act) msh_load(msh_lv.rest);
+    memset(&msh_lv,0,sizeof msh_lv);                       /* forget the last run's ships */
+    msh_lv.requested=requested;msh_lv.textured=textured;
+    if(had) msh_log("level restart: the ships of the last run forgotten (ships, requested)",had,(uint32_t)requested);
+}
+void pc_mapmaker_mothership_restart(void (*original)(void))
+{
+    if(msh_on()) msh_restart_reset();
+    original();
 }
 
 /* WRAP sub_0015E7C0 (story level init, no args): request the two models. */

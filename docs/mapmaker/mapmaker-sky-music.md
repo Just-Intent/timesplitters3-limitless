@@ -150,6 +150,12 @@ was not looked up.
 `sub_00063390` (load pass: reads every requested file); `0x0003D645`
 `sub_001CDE30` -> `sub_0011B430` -> `sub_0011B310` (weather start). A restart
 runs `sub_001CDD60`, which calls `sub_0011B310` directly (`0x001CDDB0`).
+Restart audit after .31 (the bosses' restart bug, [Khallos](mapmaker-khallos.md)):
+this area needs no restart hook. The mount (`sub_00062790`) and map start
+(`sub_0023F390`) do not run on a restart, but what they decided stays true:
+the paks stay mounted, the sandstorm flag and fog row 7 stay in the level
+entry (the restart applies the row again, `sub_0011D240`), and the weather
+start / list hooks run again on the restart path.
 
 ## Design (`TSFP_MAPMAKER_LIMITS=1`)
 

@@ -9,6 +9,21 @@ played**: the wrappers, the picker row and the stubs are the integrator's
 `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_MOTHERSHIP=0` keeps the placeholder
 a normal bot. No guest-code table, no new save bytes.
 
+## Restart from the pause menu (fixed after v0.4.0-mapmaker.31)
+
+The tank's and Khallos' restart bug, here too (**proven** by the same
+decode: "START restart" runs `sub_001CDAF0` + `sub_001CDD60`, never
+`sub_001CDB80` with this area's mount `sub_00062790`). The restarted
+placeholders (same pool entries and spawn records) matched the last run's
+ships ("started again") and stayed bots. New `WRAP sub_001CDD60 ->
+pc_mapmaker_mothership_restart`: before the original, the ships and the
+refusal budget are forgotten, a ship's statics in place go back to the
+outside values, and the model request and the once-per-level texture
+registration (`msh_lv.textured`) are kept: the restart reads no model, so
+registering again would only repeat it. Fixture case, `restart-*`
+mutations. Playtest: restart a map with 1-4 motherships; each hovers and
+fires again, none is a bot.
+
 ## Fixed after v0.4.0-mapmaker.28: reused placeholders and the bar name
 
 Not played with several ships; found with the tank's .28 report
@@ -176,6 +191,7 @@ map floor`.
 |---|---|---|
 | `WRAP sub_00062790 -> pc_mapmaker_mothership_mount` | level pak mounts (no args) | **shared** with `pc_mapmaker_tank_mount`; order free (each mounts its own pak after the original) |
 | `WRAP sub_0015E7C0 -> pc_mapmaker_mothership_request` | story level init (no args) | **shared** with `pc_mapmaker_tank_request`; order free (both work after the original) |
+| `WRAP sub_001CDD60 -> pc_mapmaker_mothership_restart` | level restart (no args), only from 0x0003D4E1 | **new after .31**; **shared** with the khallos/tank/worm/realbosses/bosses restarts; order free (before the original, own state only) |
 | `WRAP sub_0015B830 -> pc_mapmaker_mothership_ai_start` | AI start (cdecl pool entry) | **shared** with realbosses, robot, crowe, tank; order free (acts only on id 0x75, after the original) |
 | `WRAP sub_00217050 -> pc_mapmaker_mothership_update` | ship frame (cdecl object; called through the slot-3 pointer) | new. The native-high-refresh numeric policy (`src/gameplay/pc_native_numeric.h`) patches instructions inside this function, not its entry, so the two don't conflict |
 | `WRAP sub_00215B50 -> pc_mapmaker_mothership_slot10` | ship callback slot 10 (cdecl object) | **new for several ships** |

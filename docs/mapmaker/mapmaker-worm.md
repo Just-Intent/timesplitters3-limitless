@@ -16,6 +16,30 @@ The research's lead was wrong: `sub_001D9730` (prop init index 24) is the
 mansion's generic prop init (models 0x183..0x1CD), not the worm. The worm is
 not an AI class at all; the mansion level runs it.
 
+## Restart from the pause menu (fixed after v0.4.0-mapmaker.31)
+
+**Proven in the decode** (`test_restart_skips_the_level_hook`): "START
+restart" runs `sub_001CDAF0` + `sub_001CDD60`, which never reaches the story
+level init `sub_0025F720` where this area forgets the last level. The
+restarted head comes back with the same spawn record, so `ai_start` found
+its old worm ("the same record again") and its tick ran on the last fight's
+block: `ready` set (no new spawn point or route), the old bound head, and a
+worm killed before stayed gone (state 4). Not seen in a playtest yet.
+
+Fix: new `WRAP sub_001CDD60 -> pc_mapmaker_worm_restart`. Before the
+original, the live globals go back to the outside values and each worm keeps
+only its block, scratch, effect type and record, marked `again`; its tick is
+stock until its AI start, which zeroes the same block and runs the stock init
+`sub_001D2350` on it again (worms 1-4 parked), as at the level's start. No
+new allocation: the block is level memory (`sub_001D1E80` ->
+`sub_0003E0B0(0x20, 0x1590, 1)`), the restart allocates nothing and the
+effect list survives (`sub_003796A0` only redraws it), and the init itself
+allocates nothing. The last fight's emitter of worm 0 is not released
+(suspected small leak; releasing it could hit a pool the teardown already
+reset). Fixture: four worms, two dead, restart: each set up again on its own
+block, bound and ticking. `restart-*` mutations. Playtest: restart a map with
+1-4 worms (kill one first); each is buried at its spawn again and surfaces.
+
 ## The worm (CONFIRMED)
 
 - Character id 0x2C (character table 0x0053A3CC: voice set 0x005397C8, model
@@ -336,6 +360,7 @@ includer's guest helpers; its statics are prefixed `wrm`/`WRM_`).
 ```
 WRAP sub_001C8540 -> pc_mapmaker_worm_anims      (layer with realbosses/crowe/... anims; either order)
 WRAP sub_0025F720 -> pc_mapmaker_worm_level      (layer with realbosses/crowe/... level; either order)
+WRAP sub_001CDD60 -> pc_mapmaker_worm_restart    (after .31; layer with khallos/tank/... restart; either order, before the original)
 WRAP sub_0015B830 -> pc_mapmaker_worm_ai_start   (layer with realbosses/crowe/... ai_start; either order)
 WRAP sub_000D8E30 -> pc_mapmaker_worm_tick       (new; HOT: every character every frame, tests wrm_lv.record first)
 WRAP sub_0015BA10 -> pc_mapmaker_worm_tag        (new; return-address test first)
