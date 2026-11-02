@@ -94,7 +94,7 @@ MUTATIONS = {
     'wake-x-only': ('        if(dx*dx+dz*dz<=KHL_WAKE*KHL_WAKE) return 1;', '        if(dx*dx<=KHL_WAKE*KHL_WAKE) return 1;'),
     'wake-first-player-only': ('    for(k=0;k<n && MAPMAKER_PTR_OK(base,KHL_PLAYER_STRIDE*4u);k++) {\n        ent=', '    for(k=0;k<n && k<1u && MAPMAKER_PTR_OK(base,KHL_PLAYER_STRIDE*4u);k++) {\n        ent='),
     'wake-line-not-forced': ('    WORD_AT(KHL_LINE)=KHL_FLT_MAX;\n    khl_setf(KHL_GAP,px-tx);', '    khl_setf(KHL_GAP,px-tx);'),
-    'line-not-restored': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;\n    khl_rider_health', '    WORD_AT(KHL_GAP)=gap;\n    khl_rider_health'),
+    'line-not-restored': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health', '    WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health'),
     'line-wait-not-restored': ('        original();\n        WORD_AT(KHL_LINE)=line;\n        khl_rider_health(k,obj);\n        return;', '        original();\n        khl_rider_health(k,obj);\n        return;'),
     'frame-none': ('    khl_shift_in(obj);\n    khl_lv.inside=1;', '    khl_lv.inside=1;'),
     'frame-not-back': ('    khl_lv.inside=0;\n    khl_shift_out(obj);', '    khl_lv.inside=0;'),
@@ -104,7 +104,7 @@ MUTATIONS = {
     'frame-z-unclamped': ('    khl_lv.d[2]=khl_clamp(khl_getf(p+KHL_P_POS+8u),khl_ch[k].spawn[2]-KHL_ROAM,khl_ch[k].spawn[2]+KHL_ROAM);', '    khl_lv.d[2]=khl_getf(p+KHL_P_POS+8u);'),
     'gap-unclamped': ('    tx=khl_clamp(px-khl_getf(KHL_GAP),khl_ch[k].spawn[0]-KHL_ROAM,khl_ch[k].spawn[0]+KHL_ROAM);', '    tx=px-khl_getf(KHL_GAP);'),
     'gap-stock': ('    khl_setf(KHL_GAP,px-tx);\n', ''),
-    'gap-not-restored': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;\n    khl_rider_health', '    WORD_AT(KHL_LINE)=line;\n    khl_rider_health'),
+    'gap-not-restored': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health', '    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health'),
     'roam-small': ('#define KHL_ROAM 12.0f', '#define KHL_ROAM 8.0f'),
     'clamp-swapped': ('static float khl_clamp(float v,float lo,float hi) { return v<lo?lo:v>hi?hi:v; }', 'static float khl_clamp(float v,float lo,float hi) { return v<lo?hi:v>hi?lo:v; }'),
     'steer-first-always': ('       khl_getf(base+KHL_P_LINE)>khl_getf(base+KHL_PLAYER_STRIDE+KHL_P_LINE)) return base+KHL_PLAYER_STRIDE;', '       0) return base+KHL_PLAYER_STRIDE;'),
@@ -133,7 +133,7 @@ MUTATIONS = {
     'shot-any-caller': ('|| WORD_AT(g_esp)!=KHL_RET_SHOT) { original();return; }', ') { original();return; }'),
     'sound-wrong-offset': ('#define KHL_SOUND_POS 0x1Cu', '#define KHL_SOUND_POS 0x18u'),
     'sound-unshifted': ('    khl_world_call(original,MAPMAKER_PTR_OK(rec,KHL_SOUND_POS+12u)?rec+KHL_SOUND_POS:0u);', '    (void)rec;original();'),
-    'engine-unshifted': ('    if(!khl_lv.inside || !MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=KHL_RET_ENGINE) { original();return; }\n    khl_world_call(original,WORD_AT(g_esp+8u));', '    original();'),
+    'engine-unshifted': ('    khl_world_call(original,WORD_AT(g_esp+8u));\n    khl_ch[khl_lv.cur].engine++;', '    original();\n    khl_ch[khl_lv.cur].engine++;'),
     'engine-any-caller': ('|| WORD_AT(g_esp)!=KHL_RET_ENGINE) { original();return; }', ') { original();return; }'),
     'damage-stock': ('    khl_setf(r+KHL_REC_DAMAGE,h);                          /* the stock code leaves him at exactly 0 */\n', ''),
     'damage-not-restored': ('    WORD_AT(r+KHL_REC_DAMAGE)=bits;\n', ''),
@@ -236,7 +236,7 @@ MUTATIONS = {
     'rider-revived': ('    if(cur>0.0f) khl_setf(ent+KHL_ENT_HEALTH,max);', '    if(1) khl_setf(ent+KHL_ENT_HEALTH,max);'),
     'rider-kill-no-down': ('        if(left<0.0f) khl_down(k,obj);\n', ''),
     'rider-health-waiting-never': ('        WORD_AT(KHL_LINE)=line;\n        khl_rider_health(k,obj);\n        return;', '        WORD_AT(KHL_LINE)=line;\n        return;'),
-    'rider-health-active-never': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;\n    khl_rider_health(k,obj);\n', '    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;\n'),
+    'rider-health-active-never': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health(k,obj);\n', '    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n'),
     'hud-kept': ('    WORD_AT(player+KHL_FOCUS)=0;\n    original();\n    WORD_AT(player+KHL_FOCUS)=focus;', '    original();\n    WORD_AT(player+KHL_FOCUS)=focus;'),
     'hud-not-back': ('    WORD_AT(player+KHL_FOCUS)=0;\n    original();\n    WORD_AT(player+KHL_FOCUS)=focus;', '    WORD_AT(player+KHL_FOCUS)=0;\n    original();'),
     'hud-unseated': ('(k=khl_chair(focus=WORD_AT(player+KHL_FOCUS)))<0 || !khl_seated((unsigned)k)) { original();return; }', '(k=khl_chair(focus=WORD_AT(player+KHL_FOCUS)))<0) { original();return; }'),
@@ -245,6 +245,34 @@ MUTATIONS = {
     'proxy-not-set': ('    bos_bar_proxy=khl_bar_entity;', '    (void)khl_bar_entity;'),
     'proxy-removed-chair': ('    return k>=0 && !khl_ch[k].removed?khl_ch[k].obj:0u;', '    return k>=0?khl_ch[k].obj:0u;'),
     'proxy-any-entity': ('    int k=khl_ridden(ent);\n    return k>=0', '    int k=khl_lv.n?0:-1;(void)ent;\n    return k>=0'),
+    # v0.4.0-mapmaker.28: orientation, the seat, the sounds
+    'yaw-clamped': ('    khl_setf(KHL_SPAN,KHL_SPAN_FREE);', '    (void)KHL_SPAN_FREE;'),
+    'yaw-not-restored': ('WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;', 'WORD_AT(KHL_GAP)=gap;(void)span;'),
+    'seat-never': ('    khl_seat(k,obj);\n', ''),
+    'seat-chair-0': ('    uint32_t a=khl_ch[k].rider,ent=khl_ch[k].rider_ent,i;\n    float c,want[3];', '    uint32_t a=khl_ch[0].rider,ent=khl_ch[0].rider_ent,i;\n    float c,want[3];'),
+    'seat-unrotated': ('+c*khl_getf(obj+KHL_ENT_ROT+0x10u+i*4u)', '+(i==1u?c:0.0f)'),
+    'seat-wrong-row': ('+c*khl_getf(obj+KHL_ENT_ROT+0x10u+i*4u)', '+c*khl_getf(obj+KHL_ENT_ROT+0x20u+i*4u)'),
+    'seat-no-angles': ('    WORD_AT(ent+KHL_ENT_YAW)=WORD_AT(ent+KHL_ENT_YAW2)=WORD_AT(obj+KHL_ENT_YAW);\n', ''),
+    'seat-no-tilt': ('    WORD_AT(ent+KHL_ENT_PITCH)=WORD_AT(obj+KHL_ENT_PITCH);WORD_AT(ent+KHL_ENT_ROLL)=WORD_AT(obj+KHL_ENT_ROLL);\n', ''),
+    'seat-dead-rider': (' || !(khl_getf(ent+KHL_ENT_HEALTH)>0.0f)) return;\n    if(!khl_sane(c=', ') return;\n    if(!khl_sane(c='),
+    'seat-stock-only': ('    if(!khl_sane(c=khl_getf(KHL_SEAT))) c=KHL_SEAT_STOCK;', '    c=KHL_SEAT_STOCK;'),
+    'seat-no-fallback': ('    if(!khl_sane(c=khl_getf(KHL_SEAT))) c=KHL_SEAT_STOCK;', '    c=khl_getf(KHL_SEAT);if(c!=c) return;'),
+    'seat-offset-unkept': ('khl_ch[k].off[i]=khl_getf(ent+KHL_ENT_POS+i*4u)-want[i];', ''),
+    'seat-class-kept': ('        WORD_AT(a+KHL_AI_CLASS_HI)=0;WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;WORD_AT(a+KHL_AI_NEXT)=0;\n    }\n}', '    }\n}'),
+    'rider-state-kept': ('        WORD_AT(a+KHL_AI_NEXT)=0;                          /* states 2+', '        (void)0;                          /* states 2+'),
+    'rider-state-sitting': ('((int32_t)next>1 ||', '((int32_t)next>0 ||'),
+    'rider-state-seated': ('WORD_AT(a+KHL_AI_STATE)>1u))) {', 'WORD_AT(a+KHL_AI_STATE)>0u))) {'),
+    'rider-uncounted': ('    khl_ch[k].calls++;\n', ''),
+    'sound-load-never': ('    g_eax=KHL_SND_LOAD;\n', ''),
+    'sound-load-any-id': ('(id!=KHL_SND_GUN && id!=KHL_SND_JET) || ', ''),
+    'sound-load-gun-only': ('(id!=KHL_SND_GUN && id!=KHL_SND_JET) || ', '(id!=KHL_SND_GUN) || '),
+    'sound-load-overrides': ('    if(g_eax || !khl_lv.sounds', '    if(!khl_lv.sounds'),
+    'sound-load-any-map': ('    if(!khl_play() || khl.optout || (has=khl_map_has(KHL_ID))==0) return;\n    khl_lv.sounds=1;', '    khl_lv.sounds=1;\n    if(!khl_play() || khl.optout || (has=khl_map_has(KHL_ID))==0) return;'),
+    'sound-load-any-scene': (' || WORD_AT(KHL_SCENE)!=100u || !khl_on()) return;\n    g_eax=KHL_SND_LOAD;', ' || !khl_on()) return;\n    g_eax=KHL_SND_LOAD;'),
+    'sound-load-when-off': (' || WORD_AT(KHL_SCENE)!=100u || !khl_on()) return;\n    g_eax=KHL_SND_LOAD;', ' || WORD_AT(KHL_SCENE)!=100u) return;\n    g_eax=KHL_SND_LOAD;'),
+    'shots-all-failed': ('    if((int32_t)g_eax<0) khl_ch[khl_lv.cur].shot_fail++;', '    khl_ch[khl_lv.cur].shot_fail++;'),
+    'engine-all-playing': ('(int32_t)WORD_AT(handle)<0) khl_ch[khl_lv.cur].engine_off++;', '(int32_t)WORD_AT(handle)<-1) khl_ch[khl_lv.cur].engine_off++;'),
+    'status-every-frame': ('(++khl_ch[k].frames!=1u && khl_ch[k].frames%KHL_STATUS_EVERY)) return;', '(++khl_ch[k].frames!=1u && 0)) return;'),
 }
 
 
@@ -659,3 +687,62 @@ def test_emitter_owner_slots():
     assert ('imm', 0x0078F054) in a[0x001EEB26].ops and target(a[0x001EEB33]) == 0x00378530
     assert ('imm', 0x0078DF50) in a[0x001EEB7A].ops and target(a[0x001EEB7F]) == 0x00378530
     assert target(a[0x00378591]) == 0x00111AE0
+
+
+def test_yaw_clamp_and_seat():
+    """.28 "didn't orient toward me": the yaw target is the player's bearing,
+    clamped to 90 +- [0x005000B8] (30, read by the update alone); the wrap
+    handles any target. "Floated in front": the seat is live position + -1.2 x
+    the chair's up row (+0x284), only in handler states 0 and 1."""
+    rd = xbe_reader()
+    a = by_address()
+    assert refs(0x005000B8) == {UPDATE} and mem(a[0x001EEEDE])[0][4] == 0x005000B8 and f32(rd, 0x005000B8) == 30.0
+    assert mem(a[0x001EEEAB])[0][4] == 0xB4 and mem(a[0x001EEEC9])[0][4] == 0xBC and a[0x001EEEED].mnemonic == 'fpatan'
+    assert mem(a[0x001EEF41])[0][4] == 0x00478638 and f32(rd, 0x00478638) == pytest.approx(57.29578, rel=1e-5)
+    assert a[0x001EEF36].mnemonic == 'addss' and a[0x001EEF3A].mnemonic == 'subss'          # hi 90 + 30, lo 90 - 30
+    assert f32(rd, 0x00475C8C) == -180.0 and f32(rd, 0x00475C88) == 360.0 and f32(rd, 0x00475CB4) == pytest.approx(1 / 360)
+    assert mem(a[0x001EF014])[0][4] == 0x70 and mem(a[0x001EF023])[0][4] == 0x00475C8C   # yaw - target, wrapped
+    # the seat: (0, [0x0049E4BC], 0) through the chair's +0x274, added to the live position
+    assert mem(a[0x00263308])[0][4] == 0x0049E4BC and f32(rd, 0x0049E4BC) == pytest.approx(-1.2)
+    assert mem(a[0x00263355])[0][4] == 0x1C and target(a[0x0026335B]) == 0x00152090        # y of the local vector
+    assert [mem(a[x])[0][4] for x in (0x001520F5, 0x001520A7, 0x001520B0)] == [0x10, 0x14, 0x18]   # y picks row 1
+    assert [mem(a[x])[0][4] for x in (0x002633D1, 0x002633DE, 0x002633E6, 0x002633F0, 0x00263412)] == [0x70, 0xC4, 0x70, 0xC0, 0xC8]
+    # handler states: 0 (sit down, then 1) and 1 (seated); anything else does nothing
+    assert target(a[0x002632EE]) == 0x00263597 and a[0x002632F4].mnemonic == 'dec' and target(a[0x002632F5]) == 0x002636F1
+    assert mem(a[0x002636BA])[0][4] == 0x9D0 and 'ebx' in a[0x002636BA].text
+
+
+def test_chair_sounds():
+    """.28 "didn't really have much audio": the chair plays 0x393 and loops
+    0x394 (handle at chair +0x22C); sub_00045820 needs the sound loaded
+    (sub_00027F80), and sub_00045670 loads a flag-4 sound only in the level of
+    its top byte. It is called only by the level's sound load, after the pak
+    mounts."""
+    rd = xbe_reader()
+    a = by_address()
+    assert ('imm', 0x393) in a[0x001EF79B].ops and ('imm', 0x394) in a[0x001EF809].ops and ('imm', 0x22C) in a[0x001EF818].ops
+    assert target(a[0x00045838]) == 0x00027F80 and mem(a[0x00027F8E])[0][4] == 0xC and mem(a[0x00027F84])[0][4] == 0x004CA9B4
+    assert mem(a[0x00045671])[0][4] == 0x0079094C and ('imm', 4) in a[0x000456B1].ops and ('imm', 0x18) in a[0x000456B8].ops
+    assert ('imm', 4) in a[0x000456CA].ops                                               # "load it"
+    assert calls_to(0x00045670) == {0x0002787A, 0x000278AC} and a[0x000278B4].mnemonic == 'test'
+    assert a[0x000454F0].mnemonic == 'jmp' and target(a[0x000454F0]) == 0x00027700 and calls_to(0x000454F0) == {0x0003D5A8}
+    assert target(a[0x0003D590]) == 0x001CDB80 and target(a[0x001CDB85]) == 0x00062790 and calls_to(0x00062790) == {0x001CDB85}
+    assert ('imm', 0x004761F8) in a[0x00027743].ops and rd(0x004761F8, 22) == b'host0:sound/sounddata\0'
+    if not (GAME / 'sounds_e.pak').exists():
+        pytest.skip('game paks not available locally')
+    pos, n = _index(GAME / 'sounds_e.pak')[_crc('sound/sounddata')]
+    with open(GAME / 'sounds_e.pak', 'rb') as f:
+        f.seek(pos)
+        d = f.read(n)
+    p = 2
+    for _ in range(d[0] | d[1] << 8):                                                    # bank names
+        p += 1 + d[p]
+    sounds = []
+    for _ in range(0x1BD8C // 0x14):                                                     # name, bank, word, flags, word
+        L = d[p]
+        sounds.append((d[p + 1:p + 1 + L].decode('latin1'), struct.unpack_from('<I', d, p + 1 + L + 4)[0]))
+        p += L + 11
+    assert p == len(d)
+    assert sounds[0x393] == ('SFX_11_KHALLOS_GUN', 0x0B00000C) and sounds[0x394] == ('SFX_11_JETPACK_NEW', 0x0B00041C)
+    text = INC.read_text(encoding='utf-8')
+    assert '#define KHL_SND_GUN 0x393u' in text and '#define KHL_SND_JET 0x394u' in text and '#define KHL_SPAN 0x005000B8u' in text
