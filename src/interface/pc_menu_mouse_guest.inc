@@ -693,8 +693,8 @@ void pc_mapmaker_rooms_light_colour(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_light_link(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_light_create(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_buckets(void (*original)(void)) { original(); }
-void pc_mapmaker_rooms_bucket_draw(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_view_lists(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_bucket_draw(void (*original)(void)) { original(); }
 void pc_mapmaker_actors_spawn_gate(void (*original)(void)) { original(); }
 void pc_mapmaker_actors_slot(void (*original)(void)) { original(); }
 void pc_mapmaker_actors_pool(void (*original)(void)) { original(); }

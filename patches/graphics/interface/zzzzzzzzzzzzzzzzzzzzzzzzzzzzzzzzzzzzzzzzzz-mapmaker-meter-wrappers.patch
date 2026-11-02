@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3512 @@
+@@ -1037,6 +1037,3556 @@
      sub_002FA720_gen();
  #endif
  }
@@ -669,6 +669,50 @@
 +    else sub_00114290_gen();
 +#else
 +    sub_00114290_gen();
++#endif
++}
++
++extern void sub_00086C40_gen(void);
++void sub_00086C40(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_buckets")) pc_mapmaker_rooms_buckets(sub_00086C40_gen);
++    else sub_00086C40_gen();
++#else
++    sub_00086C40_gen();
++#endif
++}
++
++extern void sub_000897D0_gen(void);
++void sub_000897D0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_view_lists")) pc_mapmaker_rooms_view_lists(sub_000897D0_gen);
++    else sub_000897D0_gen();
++#else
++    sub_000897D0_gen();
++#endif
++}
++
++extern void sub_00086480_gen(void);
++void sub_00086480(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_bucket_draw")) pc_mapmaker_rooms_bucket_draw(sub_00086480_gen);
++    else sub_00086480_gen();
++#else
++    sub_00086480_gen();
++#endif
++}
++
++extern void sub_000865E0_gen(void);
++void sub_000865E0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_bucket_draw")) pc_mapmaker_rooms_bucket_draw(sub_000865E0_gen);
++    else sub_000865E0_gen();
++#else
++    sub_000865E0_gen();
 +#endif
 +}
 +
