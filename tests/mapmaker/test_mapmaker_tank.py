@@ -78,6 +78,18 @@ MUTATIONS = {
     'centre-wrong': ('#define TNK_CX (-12.05f)', '#define TNK_CX (-9.0f)'),
     'centre-z-wrong': ('#define TNK_CZ 1.5f', '#define TNK_CZ (-3.2f)'),
     'offset-sign': ('t->d[0]=pos[0]-TNK_CX;', 't->d[0]=TNK_CX-pos[0];'),
+    # shown from its creation (the init hides it until its fight starts)
+    'hidden-until-wake': ('    WORD_AT(obj+TNK_OBJ_FLAGS)=fl|TNK_SHOWN;                       /* stands there before its fight starts */\n', ''),
+    'shown-replaces-flags': ('WORD_AT(obj+TNK_OBJ_FLAGS)=fl|TNK_SHOWN;', 'WORD_AT(obj+TNK_OBJ_FLAGS)=TNK_SHOWN;'),
+    'shown-wrong-field': ('#define TNK_OBJ_FLAGS 0x28u', '#define TNK_OBJ_FLAGS 0x2Cu'),
+    'shown-wrong-bit': ('#define TNK_SHOWN 1u', '#define TNK_SHOWN 0x10u'),
+    # first update, first draw and the sleeping wake test: logged once per tank
+    'update-log-every-frame': ('    if(!TK.updates) {\n        TK.updates=1;\n', '    if(!TK.updates) {\n'),
+    'draw-log-every-frame': ('                tnk_lv.t[k].drawn=1;\n', ''),
+    'draw-any-object': ('            if(tnk_lv.t[k].obj!=prop) continue;\n', ''),
+    'draw-no-original': ('            break;\n        }\n    original();\n}', '            break;\n        }\n}'),
+    'draw-first-tank-only': ('        for(k=0;k<tnk_lv.n && k<TNK_MAX;k++) {\n            if(tnk_lv.t[k].obj!=prop)', '        for(k=0;k<1u;k++) {\n            if(tnk_lv.t[k].obj!=prop)'),
+    'wait-log-every-call': ('        TK.waited=1;\n', ''),
     # placeholder removal
     'remove-never': ('        guest_call(sub_0015DDA0,1,ent);\n', ''),
     'remove-every-frame': ('    a=TK.place;ent=TK.place_ent;TK.place=0;', '    a=TK.place;ent=TK.place_ent;'),
@@ -554,6 +566,32 @@ def test_bar_text_sites():
     assert ('imm', 0x1635) in a[0x0014CD79].ops and target(a[0x0014CD7E]) == 0x0003D7B0 and ends(a, 0x0014CD7E) == 0x0014CD83
     # the update sets the story focus to the tank when the fight starts
     assert mem(a[0x002555AA])[0][4] == 0xFF4
+
+
+def test_hidden_until_the_fight():
+    """The init clears prop +0x28 bit 0; only the fight start sets it; the death
+    clears it again as the wreck replaces the tank. sub_000A2740 takes the prop
+    at [esp+4] (read at [esp+8] after its push)."""
+    a = by_address()
+    # sub_002560C0: eax = [esi+0x28]; and ~1; or 0x10; store
+    assert mem(a[0x0025611A])[0][4] == 0x28 and a[0x00256120].mnemonic == 'and' and ('imm', 0xFFFFFFFE) in a[0x00256120].ops
+    assert ('imm', 0x10) in a[0x00256123].ops and mem(a[0x00256126])[0][4] == 0x28
+    # sub_00255550: esi = 1, state 0 calls the wake test; on 1: [edi+0x28] |= esi, state 1
+    assert ('imm', 1) in a[0x00255574].ops and target(a[0x0025557B]) == 0x00253140
+    assert a[0x00255588].mnemonic == 'or' and mem(a[0x00255588])[0][4] == 0x28 and 'esi' in a[0x00255588].text
+    assert mem(a[0x00255596])[0][4] == 0x0078B594
+    # the wake test is the only way out of state 0 (its 0 result leaves the update)
+    assert a[0x00255582].mnemonic == 'je' and target(a[0x00255582]) == 0x00255BD5
+    # sub_00255C20 (the death): bit 0 cleared on the parked tank
+    assert mem(a[0x00255E32])[0][4] == 0x28 and ('imm', 0xFBFFFFFE) in a[0x00255E44].ops and mem(a[0x00255E4F])[0][4] == 0x28
+    # no other tank code sets bit 0 of +0x28 (slot 2 sub_00253D60 sets 0x200000 only)
+    tank = [i for i in decoded() if 0x00251700 <= i.function < 0x00256400 and i.mnemonic == 'or'
+            and any(op[0] == 'mem' and op[4] == 0x28 for op in i.ops)]
+    assert [i.address for i in tank] == [0x00253DCE, 0x00255588]
+    assert ('imm', 0x200000) in a[0x00253DCE].ops
+    # the prop draw: prop at [esp+8] after push esi; the room prop pass is one of its callers
+    assert a[0x000A2740].mnemonic == 'push' and mem(a[0x000A2741])[0][4] == 8
+    assert calls_to(0x000A2740) == {0x0008699F, 0x000869AF, 0x000869E2, 0x000A2B37, 0x00344484}
 
 
 def test_resource_map_relocated():
