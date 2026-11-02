@@ -118,12 +118,14 @@ image constants that only it reads, so it can be moved.
 | `sub_001C8540` -> `pc_mapmaker_crowe_anims` | after the original: when the map's custom set (index 0x11, slots 1-20, as realbosses reads it) holds 0x46 (or the container is unreadable) and lv14.pak is not mounted, mount it with `sub_0005A130` when >= 2 of the 30 mount slots are free |
 | `sub_0025F720` -> `pc_mapmaker_crowe_level` | after the original: forget the last level; when the set holds 0x46, clear `[0x0075F5E8]`, call the stock `sub_0028D6D0` (0x2E04 bytes of level heap plus the effect blocks), then `sub_002A62C0` for the particle block (a block another boss allocated this level stays if this one fails; otherwise the new one replaces it, which leaks 32 KB of level heap and keeps every boss working: they read the global). A failed allocation logs and keeps the bot AI |
 | `sub_0015B830` -> `pc_mapmaker_crowe_ai_start` | character 0x46 or model 0x5E8: class 0/0x40000 when lv14.pak is mounted and this level's state exists; up to 4 per map, each with its own blocks ([Several split Crowes](#several-split-crowes); the fifth and later keep the bot AI); notes the Story AI's Boss flag (chunk +0x29) for the HUD |
-| `sub_0028FE30` -> `pc_mapmaker_crowe_fight` | for this boss in scene 100: **relocate** on its first frame (state 0): the start cell (the 310.0 column's cell, a type-0 platform first, nearest the outer centre in z, whose centre the stock lookup maps back to it; with no such cell, the type-0 cell nearest the outer centre) is centred on the spawn x/z, every cell, the outer and the used edge rectangles (+0/+4/+8/+0xC/+0x10/+0x14) move by the same (dx, dz), sizes and types unchanged; dy = spawn height - 86. **Intro**: state 1 becomes 2 (+0x9D4 1, +0x20 2, +0x9D0 2, +0x9D8 0). **Floor**: during the original only, the image constants 86.0 (0x0049F3C4), 86.205, 88.25, 88.4 get + dy, 310.49 and 310.0 + dx, 80.95 + dz, and the stock bits are written back after (a constant that is not stock is left alone). **Start**: after that first state-0 frame, if the boss is not on the spawn x/z or +0x1198/+0x119C are not the start cell (only possible when no cell holds 310.0), both are set; the boss starts exactly at its Story AI spawn point. **End**: in state 0x12 the original still runs (shifted constants), with +0x2E00 = 0 for the call so no new smoke is emitted; the sparks, hazards and particles play out, and once no particle is live (`[0x0078B0CC]` after the call) or after 300 calls the boss is removed with `sub_0015DDA0` (focus cleared), once |
+| `sub_0028FE30` -> `pc_mapmaker_crowe_fight` | for this boss in scene 100: **relocate** on its first frame (state 0): the start cell (the 310.0 column's cell, a type-0 platform first, nearest the outer centre in z, whose centre the stock lookup maps back to it; with no such cell, the type-0 cell nearest the outer centre) is centred on the spawn x/z, every cell, the outer and the used edge rectangles (+0/+4/+8/+0xC/+0x10/+0x14) move by the same (dx, dz), sizes and types unchanged; dy = spawn height - 86. **Intro**: state 1 becomes 2 (+0x9D4 1, +0x20 2, +0x9D0 2, +0x9D8 0). **Floor**: during the original only, the image constants 86.0 (0x0049F3C4), 86.205, 88.25, 88.4 get + dy, 310.49 and 310.0 + dx, 80.95 + dz, and the stock bits are written back after (a constant that is not stock is left alone). **Start**: after that first state-0 frame, if the boss is not on the spawn x/z or +0x1198/+0x119C are not the start cell (only possible when no cell holds 310.0), both are set; the boss starts exactly at its Story AI spawn point. **End**: in state 0x12 the original still runs (shifted constants), with +0x2E00 = 0 for the call so no new smoke is emitted; the sparks, hazards and particles play out, and once no particle is live (`[0x0078B0CC]` after the call) or after 300 calls the boss is removed with `sub_0015DDA0` (focus cleared), once. **Eggs**: each fight call counts its kept eggs down. **Walk**: 240 calls in state 9 (a walk that stopped short of its target) put the boss on its target cell's centre (+0x1CEC/+0x1CF0). **Trace**: each AI state change (40 per boss and level) and every 600 calls (12) log one line |
 | `sub_0028DD50` -> `pc_mapmaker_crowe_near` | return 0x00290BE7 while shifted: 86.0 restored inside (a distance there), shifted again after |
 | `sub_002A85C0` -> `pc_mapmaker_crowe_sparks` | return 0x00290C02 while shifted: the pushed floor 86.4 + dy, the caller's slot restored |
 | `sub_0028E770` -> `pc_mapmaker_crowe_part` | return 0x0028ECF1, scene 100: only the stock explosion `sub_000EFBD0(0x20, 0x17, state+0x2BFC+part*0x5C, 0, 0, 0, 0, 1)` for parts 0..2, no prop; the original is not run |
 | `sub_002275F0` -> `pc_mapmaker_crowe_event` | return 0x002923A8: level marker 0 is the map's own logic marker: dropped |
-| `sub_002AB1B0` -> `pc_mapmaker_crowe_eggs` | return 0x00291E84 (its only call, 0x00291E7F), inside this boss's fight in scene 100: the egg drop is skipped (cdecl `ret`; the fight pops its six arguments) - see [Eggs](#eggs-the-v040-mapmaker28-crash) |
+| `sub_002AB1B0` -> `pc_mapmaker_crowe_eggs` | return 0x00291E84 (its only call, 0x00291E7F), inside this boss's fight in scene 100: the egg drop is skipped (cdecl `ret`; the fight pops its six arguments) - see [Eggs](#eggs-the-v040-mapmaker28-crash); the egg's hazard slot (argument 1) keeps its cell (arguments 5, 6) for 120 fight calls, unless that slot's egg is still out - see [No walk](#no-walk-the-v040-mapmaker31-playtest) |
+| `sub_001CDD60` -> `pc_mapmaker_crowe_restart` | the pause menu's level restart (no level init): before the original, when this level had Crowes, forget them as a new level does (outside statics back, `[0x0075F5E8]` 0) and let the AI start give every restarted Crowe new blocks, the first one included - see [Restart](#restart-from-the-pause-menu) |
+| `sub_002A9D00` -> `pc_mapmaker_crowe_cells` | return 0x002901BF or 0x00290E67 (the fight's cell lookups), argument 1 = this boss's state + 4: after the original (which clears every cell's +0x24 and blocks the eggs in flight), each kept egg blocks its cell and the cells above, below, left and right of it (+0x24 = 1), as a live egg does |
 | `sub_00126560` -> `pc_mapmaker_crowe_fx` | return 0x001CEE8C: after the original, `sub_0028D710` with this level's state, until the boss is removed (then nothing it draws can stay frozen) |
 | `sub_0014CC80` -> `pc_mapmaker_crowe_hud` | focus on this boss: cleared for the stock bar, restored after (Boss Off = no health; Boss bar = the bosses area's; Sub-boss = the meter) |
 | `sub_0013A400` -> `pc_mapmaker_crowe_meter` | return 0x0014D264, this boss's record: the overhead meter hidden unless its Story AI chose the Sub-boss bar |
@@ -136,7 +138,11 @@ not appear), `no intro
 cutscene; the fight starts`, `split Crowe effects drawn`, `part destroyed:
 explosion only`, `level marker dropped`, `split Crowe defeated: its effects
 play out`, `split Crowe defeated: removed (frames, live particles)`,
-`overhead health meter hidden`, `split Crowe egg drop skipped`.
+`overhead health meter hidden`, `split Crowe egg drop skipped`; per boss
+`split Crowe N fight state A -> B: cell r,c, player cell r,c, target r,c at
+(x, z), direction d, beam b, at (x, z), eggs skipped n (m blocking)`, the
+same with `still: state` every 600 calls, and `walk stopped short; put on
+its target`. The budget of the other lines (24) is per level.
 
 ## Risks (INFERRED, need a playtest)
 
@@ -171,6 +177,10 @@ play out`, `split Crowe defeated: removed (frames, live particles)`,
   that call that reads them except `sub_0028DD50`, handled.
 - **Respawn**: a second spawn of the same Story AI in one level keeps the
   first relocation (and stock state 0 then snaps it to that grid).
+- **Fixed after the v0.4.0-mapmaker.31 playtest** (four of each): the
+  Crowes fired but never walked; the skipped egg no longer blocked the cell
+  it was dropped on, so the walk picked that cell again and again. See
+  [No walk](#no-walk-the-v040-mapmaker31-playtest).
 - **Fixed after the v0.4.0-mapmaker.28 playtest** (four split Crowes and
   four Crow walkers): the game crashed once the fights started. The Crowe's
   falling eggs could not be made in MapMaker and their landing corrupted the
@@ -317,6 +327,74 @@ stock game or an older fork build shows an empty name for the slot and plays
 id 0x46 with the MapMaker bot class (`sub_000D6D00` covers 0x16..0xA3 only,
 like the others) on its own rig. Mission 10 holds the same id.
 
+## No walk (the v0.4.0-mapmaker.31 playtest)
+
+User report: four Crow walkers and four split Crowes; "the split crows
+attacked but didn't move. After moving them around, one of the split crows
+moved, but the others still didn't." No crash. A single Crowe walked in
+earlier builds, before the egg skip. Log `m31.err`: each Crowe's arena moved
+under its spawn (start cell 2,4), the intro skipped, then one `egg drop
+skipped` per Crowe right after the fight began, and nothing else (the 24-line
+log budget was spent in the first level, so no later line).
+
+**Cause** (CONFIRMED from the decode, test `test_egg_steers_the_walk`; the
+playtest is consistent, no state was logged):
+- State 4 decides; state 5 (0x00291560) calls `sub_002A9E60(grid, player
+  cell, boss cell, target x/z, target cell, &[0x0078B1E4], 0)`. With the
+  last argument 0 it takes the first cell, in a fixed order around the
+  player's cell, that is in line with the boss, not next to it, not a gap
+  (+0x20 = 1) and not blocked (+0x24 = 1). No walk there (-1) goes to state
+  10 (0x00291D91), which drops an egg on that target cell (0x00291E7F) and
+  goes back to state 4 (0x00291EB1) either way.
+- `sub_002A9D00`, the fight's cell lookups at the start of every call
+  (0x002901BA), clears every +0x24 and then blocks each egg in flight
+  (hazard +0xF8 set): its cell (+0xEC row, +0xF0 col) and the cells above,
+  below, left and right (0x002A9D88..0x002A9DE5). The egg itself never
+  touches the fight's state (no `[0x0075F5E8]` in `sub_002AB1B0`/
+  `sub_002AA6A0`/`sub_002AA2E0`).
+- So in stock the egg's cells are what makes the next state 5 pick another
+  cell. With the egg skipped (.30) nothing was blocked: the same cell, -1,
+  state 10, state 4, again for as long as the player stood in the same cell.
+  Moving changed the order's first cell; that is the one that walked.
+- Rejected: the shared statics (the walk reads only the boss's state block;
+  `[0x0078B1E4]` is written before it is read in one call, 0x00291AF6/
+  0x00291B1E then 0x00291B61); the per-boss arena offsets (the grid and the
+  targets are the relocated cells; `sub_002A9330`..`sub_002AA1F5` read no
+  arena constant); the walkers (nothing of theirs is read); nav/pad data
+  (the walk uses only the grid); the room ids (not read).
+
+**Fix**: the skipped egg keeps its hazard slot and its cell for 120 fight
+calls (INFERRED: about the egg's fall and landing; not measured);
+`pc_mapmaker_crowe_cells` blocks those cells after each lookup as a live egg
+would, so state 5 picks the next cell. A slot whose egg is still out drops
+nothing, as stock (0x002AB1DA). Each boss keeps its own eggs.
+
+**Also** (INFERRED, not seen): state 9 (0x00291B8B) waits, after the walk
+animation, until the boss's centre has passed its target
+(0x00291C1A..0x00291D8C); a walk stopped short, e.g. by another boss in the
+way, would wait for ever. After 240 calls in state 9 the boss is put on its
+target cell's centre. Per-boss trace lines show each state change, the
+cells, the target, the direction, the beam (+0x2DDC: state 4 waits while a
+turret beam is on the player) and the eggs.
+
+## Restart from the pause menu
+
+Found by the Khallos work: the pause menu's restart (`sub_0003D440`, flag
+`[0x006B7AA8]`) calls `sub_001CDAF0` and then `sub_001CDD60`, never
+`sub_001CDB80`, so `sub_0025F720` (only called from `sub_0015E7C0` at
+0x0015E818, which only `sub_001CDB80` calls) and the level hook do not run
+(CONFIRMED, test `test_restart_runs_no_level_init`). `sub_001CDD60` sets up
+level memory again first (`sub_0003E740`, INFERRED). Stock resets the scene
+14 Crowe in place (`sub_0025F6A0` -> `sub_0028D0C0`). Before: the restarted
+Crowes came back with the same records and kept their old blocks (state,
+particles: level memory), already relocated, with the last fight's cells,
+target and statics; the `m31.err` restarts show AI starts with no new level
+line and no `state allocated`. Now `pc_mapmaker_crowe_restart` forgets them
+before the original and each restarted Crowe gets new blocks at its AI start
+and relocates again (log `level restart: split Crowe blocks forgotten`).
+Other areas with per-level blocks (realbosses walkers/skeletons, robot,
+tank) are not handled here.
+
 ## Wrappers for the integrator
 
 New area `crowe` (add it where the areas are listed, e.g. the
@@ -342,6 +420,8 @@ WRAP sub_00292430 -> pc_mapmaker_crowe_message     (new; the boss's message hand
 WRAP sub_0028DA10 -> pc_mapmaker_crowe_think       (new; entity slot 2 callback)
 WRAP sub_0028F730 -> pc_mapmaker_crowe_hit         (new; entity hit callback +0x19C)
 WRAP sub_002AB1B0 -> pc_mapmaker_crowe_eggs        (new after v0.4.0-mapmaker.28; return-address test first)
+WRAP sub_002A9D00 -> pc_mapmaker_crowe_cells       (new after v0.4.0-mapmaker.31; return-address test first, 2 calls per Crowe frame)
+WRAP sub_001CDD60 -> pc_mapmaker_crowe_restart     (new after v0.4.0-mapmaker.31; layer with khallos_restart, either order; before the original)
 ```
 
 Each layer: `if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_<x>"))
@@ -359,7 +439,8 @@ Guest calls (`extern void ...(void)`, called with `guest_call`):
 `sub_002A62C0`, `sub_0028D710`, `sub_000EFBD0`; the others are already there.
 Off-build no-op hooks (`{ original(); }`) in `pc_menu_mouse_guest.inc` and
 prototypes in `pc_display_menu.h` for the functions above (with
-`pc_mapmaker_crowe_eggs`; it makes no guest call, so no new stub). Owning
+`pc_mapmaker_crowe_eggs`, `_cells` and `_restart`; they make no guest call,
+so no new stub). Owning
 agent-context guide: add the area like realbosses (not edited here, per the
 brief).
 
@@ -389,7 +470,11 @@ needs none of it):
 3. Watch: it appears exactly where its Story AI was placed (not a few
    tiles off), then walks between platforms around its spawn, turns 90 degrees,
    fires. No eggs fall (`egg drop skipped`: their model is not in
-   MapMaker). Shoot its turrets: each explodes (`part destroyed`), no debris.
+   MapMaker), and it still walks on after one, also while the player
+   stands still and with Crow walkers in the map: `split Crowe N fight
+   state 5 -> 9` (walk) lines follow `5 -> 10` (egg) lines within a few
+   seconds; `still: state` lines every 10 s show where each one waits.
+   Shoot its turrets: each explodes (`part destroyed`), no debris.
 4. Kill it: death animation, then after about 3 s the smoke stops and the
    remaining smoke, sparks and explosions finish within about a second, then
    it disappears with them (`level marker dropped`, `effects play out`,

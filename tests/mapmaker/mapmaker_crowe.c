@@ -160,7 +160,12 @@ static void fake_start(uint32_t ent)
 static uint32_t live_particles, seen_parts_on, seen_state_ptr, seen_parts_ptr;
 static CrwPrev prev_k;
 #define FXW(fx,a) (*(uint32_t *)((uint8_t *)&(fx)+((a)-0x0078B080u)))   /* a static in an instance's saved copy */
-static unsigned w_removed;
+static unsigned w_removed, restart_seen_n;
+static uint32_t restart_seen_state;
+static void fake_restart(void)   /* sub_001CDD60: the level heap set up again */
+{
+    originals++;restart_seen_n=crw_n;restart_seen_state=WORD_AT(0x0075F5E8u);alloc_idx=0;g_esp+=4u;
+}
 static void fake_fight(void)
 {
     unsigned k;
@@ -188,6 +193,31 @@ static uint32_t call(void (*fn)(void (*)(void)),void (*orig)(void),uint32_t ret,
     return g_eax;
 }
 #define CALL(fn,orig,ret,a1,a2,a3,n) call(fn,orig,ret,a1,a2,a3,n,__LINE__)
+/* the egg drop's six arguments: hazard, cell, two positions, row, col */
+static void egg_call(uint32_t hazard,uint32_t row,uint32_t col,uint32_t ret,int expect_orig,int line)
+{
+    WORD_AT(ESP0+0x10u)=ESP1;WORD_AT(ESP0+0x14u)=row;WORD_AT(ESP0+0x18u)=col;
+    call(pc_mapmaker_crowe_eggs,fake,ret,hazard,CST+0x970u,ESP1,expect_orig,line);
+    if(WORD_AT(ESP0+0x14u)!=row || WORD_AT(ESP0+0x18u)!=col) { fprintf(stderr,"%s:%d: egg arguments changed\n",__FILE__,line);failures++; }
+}
+#define EGG(h,r,c,ret,n) egg_call(h,r,c,ret,n,__LINE__)
+/* stock sub_002A9D00: the cell lookups clear every cell's +0x24 (no egg of
+ * its own is ever out: they are skipped) */
+static void fake_cells(void)
+{
+    uint32_t st=WORD_AT(g_esp+4u)-4u;
+    unsigned k;
+    originals++;
+    for(k=0;k<35u;k++) WORD_AT(st+0x970u+k*0x28u+0x24u)=0;
+    g_esp+=4u;
+}
+static unsigned blocked_cells(uint32_t st)
+{
+    unsigned k,n=0;
+    for(k=0;k<35u;k++) n+=WORD_AT(st+0x970u+k*0x28u+0x24u)!=0;
+    return n;
+}
+#define BLOCKED(st,r,c) WORD_AT((st)+0x970u+((r)*7u+(c))*0x28u+0x24u)
 static void set_env(const char *name,const char *value)
 {
 #ifdef _WIN32
@@ -375,11 +405,38 @@ static void multi(void)
     CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==0);
     WORD_AT(0x0079094Cu)=100u;
+    /* a restart from the pause menu (sub_001CDD60, no level init): the blocks
+     * are level heap, set up again; every Crowe comes back with its record and
+     * gets new blocks at its AI start, the first one too, and relocates again */
+    WORD_AT(0x0075F5E8u)=0x00740000u;nalloc=0;
+    CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);
+    CHECK(restart_seen_n==0 && restart_seen_state==0 && !crw_n && !crw_inst[0].record && !crw_inst[3].state && !mapmaker_fx_holder);
+    CHECK(WORD_AT(0x0078B090u)==0x00777000u && WORD_AT(0x0078B0D0u)==0x00778000u);   /* the outside statics */
+    for(k=0;k<4u;k++) { actor(k,0x46,0x5E8,k);CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(k),0,0,1); }
+    CHECK(crw_n==4u && nalloc==4u && crw_inst[0].state==CST && crw_inst[3].state==CST+0x9000u && WORD_AT(REC(0)+4u)==0x40000u);
+    CHECK(!crw_inst[1].removed && !crw_inst[0].relocated && WORD_AT(0x0075F5E8u)==0);
+    for(k=0;k<4u;k++) { SETF(ENT(k)+0x64u,20.0f+40.0f*k);SETF(ENT(k)+0x68u,4.0f);SETF(ENT(k)+0x6Cu,-20.0f); }
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(1),0,0,1);
+    CHECK(crw_inst[1].relocated && seen_state_ptr==CST+0x3000u && near_eq(F(CST+0x3000u+0x970u+18u*0x28u+0x10u),60.0f));
+    nalloc=0;
+    CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);    /* restarted again */
+    CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
+    CHECK(crw_n==1u && nalloc==1u && crw_inst[0].record==REC(2));
+    CHECK(crw.restarted);
+    level();                                                               /* a new level forgets the restart */
+    CHECK(!crw.restarted);
+    WORD_AT(0x0079094Cu)=14u;                                              /* mission 10's own restart: stock */
+    CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);
+    CHECK(!crw_n && !crw.restarted);
+    CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);    /* no Crowe: nothing */
+    CHECK(!crw.restarted);
+    WORD_AT(0x0079094Cu)=100u;
     /* the next level: no boss, the outside values live; a stale state pointer cleared */
     WORD_AT(0x0075F5E8u)=0x00740000u;
     level();
     CHECK(WORD_AT(0x0075F5E8u)==0);
     CHECK(crw_cur==-1 && crw_n==1u && !crw_inst[1].state);
+    CHECK(crw.logged<4u);                                    /* a log budget per level */
     for(k=0;k<6u;k++) actor(k,0x0C,0x200,k);
     WORD_AT(PLAYER+0xFF4u)=0;
 }
@@ -568,6 +625,66 @@ int main(void)
     CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==2 && draw_state[1]==CST && draw_parts[1]==PRT && WORD_AT(0x0075F5E8u)==0x00740000u);
     WORD_AT(0x0075F5E8u)=0;ndraw=1;
+
+    /* ---- the skipped egg still blocks its cells (v0.4.0-mapmaker.31: state 5
+     * took the same cell every time and the boss never walked) -------------- */
+    prev_k=crw_enter(0);
+    memset(crw_inst[0].egg_left,0,sizeof crw_inst[0].egg_left);
+    k=crw_inst[0].eggs;
+    EGG(CST+0x11A0u+2u*0x168u,2u,6u,0x00291E84u,0);
+    CHECK(crw_inst[0].egg_left[2]==120u && crw_inst[0].egg_row[2]==2u && crw_inst[0].egg_col[2]==6u);
+    EGG(CST+0x11A0u+2u*0x168u,0u,0u,0x00291E84u,0);                     /* that slot's egg still out: no new one */
+    CHECK(crw_inst[0].egg_left[2]==120u && crw_inst[0].egg_row[2]==2u && crw_inst[0].egg_col[2]==6u);
+    EGG(CST+0x11A0u+3u*0x168u+4u,1u,1u,0x00291E84u,0);                  /* not a hazard */
+    EGG(CST+0x11A0u+3u*0x168u,5u,1u,0x00291E84u,0);                     /* no such row */
+    EGG(CST+0x11A0u+3u*0x168u,1u,7u,0x00291E84u,0);                     /* no such column */
+    EGG(CST+0x11A0u+8u*0x168u,1u,1u,0x00291E84u,0);                     /* past the eight */
+    CHECK(!crw_inst[0].egg_left[3] && !crw_inst[0].egg_left[0] && crw_inst[0].eggs==k+6u);
+    EGG(CST+0x11A0u+4u*0x168u,0u,0u,0x00291E84u,0);                     /* a corner */
+    CHECK(crw_inst[0].egg_left[4]==120u);
+    EGG(CST+0x11A0u+5u*0x168u,1u,1u,0x00291E89u,1);                     /* not the drop: stock, nothing kept */
+    CHECK(!crw_inst[0].egg_left[5]);
+    /* the lookups clear the blocks; the boss's skipped eggs block theirs again: the cell, above, below, left, right */
+    for(k=0;k<35u;k++) WORD_AT(CST+0x970u+k*0x28u+0x24u)=7u;
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+4u,0,0,1);
+    CHECK(blocked_cells(CST)==7u && BLOCKED(CST,2u,6u)==1u && BLOCKED(CST,1u,6u)==1u && BLOCKED(CST,3u,6u)==1u && BLOCKED(CST,2u,5u)==1u);
+    CHECK(BLOCKED(CST,0u,0u)==1u && BLOCKED(CST,1u,0u)==1u && BLOCKED(CST,0u,1u)==1u && !BLOCKED(CST,1u,5u) && !BLOCKED(CST,3u,5u));
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x00290E67u,CST+4u,0,0,1);  /* state 0's lookup */
+    CHECK(blocked_cells(CST)==7u);
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901C4u,CST+4u,0,0,1);  /* another caller: stock */
+    CHECK(blocked_cells(CST)==0);
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+0x3004u,0,0,1);   /* another boss's state */
+    CHECK(blocked_cells(CST)==0 && blocked_cells(CST+0x3000u)==0);
+    crw_leave(prev_k);
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+4u,0,0,1);  /* outside the boss's code: stock */
+    CHECK(blocked_cells(CST)==0);
+    /* the eggs' time runs out with the boss's own fight calls */
+    WORD_AT(A(0)+0x20u)=4u;
+    for(k=0;k<119u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(crw_inst[0].egg_left[2]==1u && crw_inst[0].egg_left[4]==1u);
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(!crw_inst[0].egg_left[2] && !crw_inst[0].egg_left[4]);
+    prev_k=crw_enter(0);
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+4u,0,0,1);
+    CHECK(blocked_cells(CST)==0);
+    crw_leave(prev_k);
+
+    /* ---- a walk stopped short (another boss in the way) ends on its target - */
+    WORD_AT(A(0)+0x20u)=9u;SETF(CST+0x1CECu,13.0f);SETF(CST+0x1CF0u,-14.0f);
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
+    for(k=0;k<239u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f));
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(near_eq(F(ENT(0)+0x64u),13.0f) && near_eq(F(ENT(0)+0x6Cu),-14.0f) && near_eq(F(ENT(0)+0x68u),4.0f) && !crw_inst[0].air);
+    /* each walk waits from its own start */
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x6Cu,-20.0f);
+    for(k=0;k<239u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    WORD_AT(A(0)+0x20u)=4u;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    WORD_AT(A(0)+0x20u)=9u;
+    for(k=0;k<239u;k++) CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(near_eq(F(ENT(0)+0x64u),10.0f) && near_eq(F(ENT(0)+0x6Cu),-20.0f));
+    WORD_AT(A(0)+0x20u)=4u;
 
     /* ---- bar and meter ---------------------------------------------------- */
     WORD_AT(PLAYER+0xFF4u)=ENT(0);

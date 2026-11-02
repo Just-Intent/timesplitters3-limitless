@@ -92,7 +92,11 @@
  * live is crw_lv. Docs: "Several split Crowes".
  *
  * Eggs: the falling eggs need prop 0x4BD, whose model only l_14_st.pak has;
- * the drop is skipped (eggs, below; the v0.4.0-mapmaker.28 crash).
+ * the drop is skipped (eggs, below; the v0.4.0-mapmaker.28 crash), but the
+ * cells it would block are still blocked for a while (cells), or the walk
+ * picks the same cell again and the boss never walks (.31). A walk stopped
+ * short ends on its target after CRW_AIR_MAX calls. Each boss logs its
+ * fight states (crw_trace).
  *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax, g_xbox_mem_offset,
  * pc_mapmaker_area_enabled and pc_mapmaker_limits.inc. Hot hooks (hud, meter,
@@ -168,6 +172,22 @@
 #define CRW_RET_PART 0x0028ECF1u        /* sub_0028E9E0: call sub_0028E770 at 0x0028ECEC */
 #define CRW_RET_EVENT 0x002923A8u       /* sub_0028FE30: call sub_002275F0(0) at 0x002923A3 */
 #define CRW_RET_EGG 0x00291E84u         /* sub_0028FE30: call sub_002AB1B0 (egg drop) at 0x00291E7F */
+#define CRW_RET_CELLS 0x002901BFu       /* sub_0028FE30: call sub_002A9D00 (cell lookups) at 0x002901BA, every call */
+#define CRW_RET_CELLS0 0x00290E67u      /* ... and at 0x00290E62 in state 0 */
+#define CRW_BLOCKED 0x24u               /* cell: 1 = an egg on it or next to it (sub_002A9D00, every call) */
+#define CRW_HAZARD 0x11A0u              /* eight eggs of 0x168 (+0xEC row, +0xF0 col, +0xF8 phase: 0 = none) */
+#define CRW_HAZARD_SIZE 0x168u
+#define CRW_EGGS 8u
+#define CRW_EGG_CALLS 120u              /* fight calls a skipped egg keeps its cells blocked (INFERRED: its fall and landing) */
+#define CRW_TARGET 0x1CECu              /* move target: +0x1CEC/+0x1CF0 x/z (cell centre), +0x1CF4/+0x1CF8 row/col */
+#define CRW_PCELL 0x1190u               /* the player's cell (row, col) */
+#define CRW_DIR 0x1D24u                 /* the move's direction 0..3 (-1: no walk) */
+#define CRW_BEAM 0x2DDCu                /* 1 while a turret beam is on the player: state 4 waits */
+#define CRW_JUMP 9u                     /* AI state: the walk (0x80E), done when the boss passes the target */
+#define CRW_AIR_MAX 240u                /* fight calls in state 9 before an unfinished walk is landed */
+#define CRW_TRACE_MAX 40u               /* fight state changes logged per boss and level */
+#define CRW_BEAT 600u                   /* fight calls between two status lines */
+#define CRW_BEATS 12u
 #define CRW_RET_FX 0x001CEE8Cu          /* sub_001CEBC0: call sub_00126560 at 0x001CEE87 */
 #define CRW_RET_METER 0x0014D264u       /* sub_0014D1F0: call sub_0013A400 at 0x0014D25F */
 #define CRW_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -191,7 +211,7 @@ extern void sub_000EFBD0(void),sub_0015DDA0(void);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
-    int read, optout;
+    int read, optout, restarted;   /* restarted: this level's Crowes get new blocks at their AI start */
     unsigned logged, meters, extras, events, parts, fx, eggs;
 } crw;
 /* The globals one split Crowe's code uses (CONFIRMED, every [abs] operand of
@@ -214,6 +234,9 @@ struct crw_boss_s {
     uint32_t row, col;                  /* the start cell */
     float dx, dy, dz, sx, sz;           /* grid offset, spawn point */
     uint32_t saved[CRW_NCONST];
+    uint32_t egg_row[CRW_EGGS], egg_col[CRW_EGGS];
+    unsigned egg_left[CRW_EGGS];        /* fight calls a skipped egg still blocks its cells */
+    unsigned eggs, air, calls, trace, beats;   /* skipped eggs, calls in state 9, fight calls, log lines */
     MapmakerFx fx;                      /* its statics while another's (or nobody's) are live */
 };
 static struct crw_boss_s crw_inst[CRW_MAX], crw_none;
@@ -309,6 +332,8 @@ static void crw_reset(void)
     memset(crw_inst,0,sizeof crw_inst);
     memset(&crw_none,0,sizeof crw_none);
     crw_n=0;crw_cur=-1;crw_i=&crw_none;
+    crw.logged=0;                                      /* a log budget per level (v0.4.0-mapmaker.31: spent in the first) */
+    crw.restarted=0;
 }
 /* Boss k's blocks: the stock scene 14 allocation (sub_0028D6D0: effect
  * blocks, state, its init; sub_002A62C0: particles), captured into its copy;
@@ -401,6 +426,27 @@ static uint8_t crw_boss_flag(uint32_t index)
     return 0;
 }
 
+/* WRAP sub_001CDD60 (the level restart: the pause menu's restart,
+ * sub_0003D440 with [0x006B7AA8], calls sub_001CDAF0 and then this, never
+ * sub_001CDB80, so neither sub_0025F720 nor the level hook runs; level
+ * memory is set up again in here, INFERRED from sub_0003E740 at 0x001CDD62). Stock resets the
+ * scene 14 Crowe's state in place (sub_0025F6A0 -> sub_0028D0C0); the
+ * MapMaker Crowes' blocks are level heap too. Before the original: forget
+ * them (as a new level does, outside values back, [0x0075F5E8] 0); the
+ * restarted Crowes come back through the AI start with the same records and
+ * get new blocks there, the first one included. */
+void pc_mapmaker_crowe_restart(void (*original)(void))
+{
+    unsigned had=crw_n;
+    if(had || crw.restarted) {
+        crw_reset();
+        WORD_AT(CRW_STATE)=0;
+        crw.restarted=crw_play() && !crw.optout;
+        crw_log("level restart: split Crowe blocks forgotten; new ones at the AI start (bosses, again)",had,(uint32_t)crw.restarted);
+    }
+    original();
+}
+
 /* WRAP sub_0015B830 (cdecl AI pool entry; story mode copies record +0/+4 to
  * AI +0x10/+0x14 at 0x0015B9A3): up to CRW_MAX split Crowes per map get class
  * 0/0x40000, each with its own blocks (the first allocated at level init, the
@@ -418,7 +464,7 @@ void pc_mapmaker_crowe_ai_start(void (*original)(void))
     if(k==crw_n) for(k=0;k<crw_n && crw_inst[k].record;k++) {}   /* a slot allocated but unused */
     if(crw.optout) crw_log("TSFP_MAPMAKER_REAL_BOSS=0: split Crowe with bot behaviour",a,0);
     else if(!crw_pak_mounted()) crw_log("lv14.pak not mounted: split Crowe with bot behaviour",a,0);
-    else if(!crw_n) crw_log("no split Crowe state this level: bot behaviour",a,WORD_AT(CRW_STATE));
+    else if(!crw_n && !crw.restarted) crw_log("no split Crowe state this level: bot behaviour",a,WORD_AT(CRW_STATE));
     else if(k==crw_n && crw_n>=CRW_MAX) {
         if(crw.extras++<4u) crw_log("more than 4 split Crowes in the map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
     } else if(k==crw_n && !crw_alloc(k)) {
@@ -552,10 +598,46 @@ static void crw_shift(int on)
     }
 }
 
+/* One line of the live boss's fight: AI state (from -> to), its cell, the
+ * player's, the move target (cell, centre), direction, beam, eggs. */
+static void crw_trace(const char *what,uint32_t ent,uint32_t from,uint32_t to)
+{
+    uint32_t st=crw_lv.state;
+    unsigned k,held=0;
+    for(k=0;k<CRW_EGGS;k++) held+=crw_lv.egg_left[k]!=0;
+    fprintf(stderr,"[mapmaker] crowe: split Crowe %d %s %u -> %u: cell %d,%d, player cell %d,%d, target %d,%d at (%.2f, %.2f), "
+            "direction %d, beam %u, at (%.2f, %.2f), eggs skipped %u (%u blocking)\n",
+            (int)(crw_i-crw_inst),what,(unsigned)from,(unsigned)to,(int)WORD_AT(st+CRW_START_ROW),(int)WORD_AT(st+CRW_START_COL),
+            (int)WORD_AT(st+CRW_PCELL),(int)WORD_AT(st+CRW_PCELL+4u),(int)WORD_AT(st+CRW_TARGET+8u),(int)WORD_AT(st+CRW_TARGET+0xCu),
+            (double)crw_getf(st+CRW_TARGET),(double)crw_getf(st+CRW_TARGET+4u),(int)WORD_AT(st+CRW_DIR),(unsigned)WORD_AT(st+CRW_BEAM),
+            (double)crw_getf(ent+CRW_ENT_X),(double)crw_getf(ent+CRW_ENT_X+8u),crw_lv.eggs,held);
+    fflush(stderr);
+}
+/* As stock sub_002A9D00 does for an egg in flight (0x002A9D88..0x002A9DE5):
+ * its cell, the cells above and below it and left and right of it. */
+static void crw_block(uint32_t st,uint32_t r,uint32_t c)
+{
+    uint32_t i;
+    for(i=r?r-1u:0u;i<=r+1u && i<CRW_ROWS;i++) WORD_AT(st+CRW_GRID+(i*CRW_COLS+c)*CRW_CELL+CRW_BLOCKED)=1u;
+    for(i=c?c-1u:0u;i<=c+1u && i<CRW_COLS;i++) WORD_AT(st+CRW_GRID+(r*CRW_COLS+i)*CRW_CELL+CRW_BLOCKED)=1u;
+}
+/* State 9 waits, after the walk animation, until the boss's centre passes
+ * its target (0x00291C1A..0x00291D8C); a walk stopped short (another boss in
+ * the way) would wait for ever. The boss is put on its target cell's centre. */
+static void crw_land(uint32_t ent)
+{
+    uint32_t st=crw_lv.state;
+    float x=crw_getf(st+CRW_TARGET),z=crw_getf(st+CRW_TARGET+4u);
+    crw_lv.air=0;
+    if(!crw_sane(x) || !crw_sane(z)) return;
+    crw_setf(ent+CRW_ENT_X,x);crw_setf(ent+CRW_ENT_X+8u,z);
+    if(crw_lv.trace<CRW_TRACE_MAX) { crw_lv.trace++;crw_trace("walk stopped short; put on its target: state",ent,CRW_JUMP,CRW_JUMP); }
+}
 /* The fight call for the boss whose globals are live. */
 static void crw_fight(uint32_t ent,void (*original)(void))
 {
-    uint32_t a,player;
+    uint32_t a,player,from,to;
+    unsigned k;
     int placing;
     a=WORD_AT(ent+CRW_ENT_AI);
     if(WORD_AT(a+CRW_AI_STATE)==0x12u) {                  /* defeated: stock waits for the level script */
@@ -585,10 +667,17 @@ static void crw_fight(uint32_t ent,void (*original)(void))
         WORD_AT(a+0x9D4u)=1u;WORD_AT(a+CRW_AI_STATE)=2u;WORD_AT(a+0x9D0u)=2u;crw_setf(a+0x9D8u,0.0f);
         crw_log("split Crowe: no intro cutscene; the fight starts",a,0);
     }
+    from=WORD_AT(a+CRW_AI_STATE);
     crw_shift(1);
     original();
     crw_shift(0);
     if(placing) crw_place(ent);
+    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_lv.egg_left[k]--;
+    to=WORD_AT(a+CRW_AI_STATE);
+    if(to==CRW_JUMP) { if(++crw_lv.air>=CRW_AIR_MAX) crw_land(ent); }
+    else crw_lv.air=0;
+    if(to!=from && crw_lv.trace<CRW_TRACE_MAX) { crw_lv.trace++;crw_trace("fight state",ent,from,to); }
+    if(!(++crw_lv.calls%CRW_BEAT) && crw_lv.beats<CRW_BEATS) { crw_lv.beats++;crw_trace("still: state",ent,to,to); }
 }
 /* WRAP sub_0028FE30 (cdecl entity; class 0x40000, per AI frame): with this
  * boss's globals live. */
@@ -690,13 +779,44 @@ void pc_mapmaker_crowe_event(void (*original)(void))
  * (RECOMP_ICALL_SAFE restores the esp from before its two arguments). Four
  * skips left the per-character update 0x20 off and crashed it
  * (v0.4.0-mapmaker.28, crash-20261102-024139391). For a boss in scene 100
- * the drop is skipped: no egg, no null prop, nothing to land. */
+ * the drop is skipped: no egg, no null prop, nothing to land.
+ *
+ * But the egg also steers the walk (v0.4.0-mapmaker.31: the Crowes fired and
+ * never walked). State 5 asks sub_002A9E60 for a cell near the player in
+ * line with the boss, taking the first one in a fixed order that is not a
+ * gap (+0x20 = 1) or blocked (+0x24 = 1); -1 (no walk there) goes to state
+ * 10, which drops the egg on that cell and returns to state 4. While the egg
+ * is in flight, sub_002A9D00 blocks its cell and the four next to it on
+ * every call, so the next state 5 picks another cell. With no egg the same
+ * cell came back every time: 4, 5, 10, 4, ... and no walk until the player
+ * moved. The skipped egg keeps its hazard slot (arguments 1, row 5, col 6)
+ * for CRW_EGG_CALLS fight calls; cells blocks its cells like a live egg. */
 void pc_mapmaker_crowe_eggs(void (*original)(void))
 {
+    uint32_t off,row,col,slot;
     if(!crw_lv.record || !MAPMAKER_STACK_OK(0x1C) || WORD_AT(g_esp)!=CRW_RET_EGG || WORD_AT(CRW_SCENE)!=100u || !crw_on()) { original();return; }
+    off=WORD_AT(g_esp+4u)-(crw_lv.state+CRW_HAZARD);row=WORD_AT(g_esp+0x14u);col=WORD_AT(g_esp+0x18u);
+    slot=off/CRW_HAZARD_SIZE;
+    /* stock: a slot whose egg is still out drops nothing (0x002AB1DA) */
+    if(!(off%CRW_HAZARD_SIZE) && slot<CRW_EGGS && !crw_lv.egg_left[slot] && row<CRW_ROWS && col<CRW_COLS) {
+        crw_lv.egg_row[slot]=row;crw_lv.egg_col[slot]=col;crw_lv.egg_left[slot]=CRW_EGG_CALLS;
+    }
+    crw_lv.eggs++;
     if(crw.eggs++<4u) crw_log("split Crowe egg drop skipped (prop 0x4BD is only in l_14_st.pak; null props would be released on landing)",
                                WORD_AT(g_esp+4u),crw.eggs);
     MAPMAKER_GUEST_RET();
+}
+/* WRAP sub_002A9D00 (cdecl state+4, player x/z, boss x/z; the fight's cell
+ * lookups, which also clear every cell's +0x24 and block the cells of the
+ * eggs in flight): the live boss's skipped eggs block theirs too. */
+void pc_mapmaker_crowe_cells(void (*original)(void))
+{
+    uint32_t st=crw_lv.state;
+    unsigned k;
+    if(!crw_lv.record || !st || !MAPMAKER_STACK_OK(8) || (WORD_AT(g_esp)!=CRW_RET_CELLS && WORD_AT(g_esp)!=CRW_RET_CELLS0) ||
+       WORD_AT(g_esp+4u)!=st+4u) { original();return; }
+    original();
+    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_block(st,crw_lv.egg_row[k],crw_lv.egg_col[k]);
 }
 
 /* WRAP sub_00126560 (frame step before the scene-81 draw; the Crowe's own

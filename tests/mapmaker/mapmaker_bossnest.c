@@ -241,6 +241,59 @@ static void fake_crowe_fight(void)
     g_esp+=4u;
 }
 
+/* ---- four Crowes and two walkers through their fights (v0.4.0-mapmaker.31:
+ * the Crowes fired and never walked) ------------------------------------------ */
+static const uint32_t crowe_actor[4]={CROWE_A,CROWE_B,4u,5u};
+static unsigned walks[4], drops[4];
+#define BLOCKED(st,r,c) WORD_AT((st)+0x970u+((r)*7u+(c))*0x28u+0x24u)
+/* stock sub_002A9D00: the cell lookups clear every block (no egg of its own is ever out) */
+static void fake_cells(void)
+{
+    uint32_t st=WORD_AT(g_esp+4u)-4u;
+    unsigned k;
+    originals++;
+    for(k=0;k<35u;k++) WORD_AT(st+0x970u+k*0x28u+0x24u)=0;
+    g_esp+=4u;
+}
+/* state 10's drop (0x00291E7F) with its six arguments, then the next hazard slot (0x00291E89..0x00291EA7) */
+static void call_egg(uint32_t st,uint32_t row,uint32_t col,int line)
+{
+    uint32_t sp=g_esp,frame=STACK-(uint32_t)depth*0x1000u;
+    depth++;
+    g_esp=frame;WORD_AT(frame)=0x00291E84u;WORD_AT(frame+4u)=st+0x11A0u+WORD_AT(st+0x1CE0u)*0x168u;
+    WORD_AT(frame+8u)=st+0x970u+(row*7u+col)*0x28u;WORD_AT(frame+12u)=frame+0x40u;WORD_AT(frame+16u)=frame+0x50u;
+    WORD_AT(frame+20u)=row;WORD_AT(frame+24u)=col;
+    pc_mapmaker_crowe_eggs(fake_egg_spawn);
+    if(g_esp!=frame+4u || WORD_AT(frame+20u)!=row) { fprintf(stderr,"%s:%d: egg drop esp %+d\n",__FILE__,line,(int)(g_esp-frame));failures++; }
+    depth--;
+    g_esp=sp;
+    WORD_AT(st+0x1CE0u)=(WORD_AT(st+0x1CE0u)+1u)%8u;
+}
+/* stock sub_0028FE30 reduced to the walk: the cell lookups first (0x002901BA);
+ * state 4 decides to walk (5); state 5 takes the first cell of the boss's row
+ * 2 in a fixed order (columns 0, 1, 2, 6: in line, not next to column 4) that
+ * is not blocked. Column 0 cannot be walked to (-1): state 10 drops an egg on
+ * it and goes back to 4. Another walks (9), then lands (4). */
+static void fake_walk_fight(void)
+{
+    static const uint32_t order[]={0u,1u,2u,6u};
+    uint32_t ent=WORD_AT(g_esp+4u),a=WORD_AT(ent+0x7Cu),st=WORD_AT(0x0075F5E8u),s=WORD_AT(a+0x20u),k,i;
+    originals++;
+    for(i=0;i<3u && crowe_actor[i]!=(ent-ENTS)/0x400u;i++) {}
+    CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,st+4u);
+    if(s==4u) WORD_AT(a+0x20u)=5u;
+    else if(s==5u) {
+        for(k=0;k<4u && BLOCKED(st,2u,order[k])==1u;k++) {}
+        if(k==4u) WORD_AT(a+0x20u)=4u;                                      /* -2: nothing free */
+        else {
+            WORD_AT(st+0x1CF4u)=2u;WORD_AT(st+0x1CF8u)=order[k];
+            if(!order[k]) { drops[i]++;call_egg(st,2u,0u,__LINE__);WORD_AT(a+0x20u)=4u; }
+            else WORD_AT(a+0x20u)=9u;
+        }
+    } else if(s==9u) { walks[i]++;WORD_AT(a+0x20u)=4u; }
+    g_esp+=4u;
+}
+
 int main(void)
 {
     unsigned k;
@@ -305,6 +358,38 @@ int main(void)
     all_back(__LINE__);
     CALL(pc_mapmaker_crowe_eggs,fake_egg_spawn,0x00291E84u,CST(0)+0x11A0u);   /* outside a Crowe's fight: stock */
     CHECK(nspawn==2u && crw.eggs==1u);
+
+    /* four Crowes and both walkers fight, interleaved: each Crowe's skipped
+     * egg blocks its own cell for a while, so its next walk takes another
+     * cell; when the egg's time is up it tries the first cell again */
+    actor(4,0x46,0x5E8,4);actor(5,0x46,0x5E8,5);
+    for(k=4;k<6u;k++) {
+        CALL(pc_mapmaker_realbosses_ai_start,fake,0x0015F981u,A(k));
+        CALL(pc_mapmaker_crowe_ai_start,fake,0x0015F981u,A(k));
+    }
+    CHECK(crw_n==4u && crw_inst[2].state==CST(2) && crw_inst[3].state==CST(3) && WORD_AT(REC(5)+4u)==0x40000u);
+    all_back(__LINE__);
+    for(k=0;k<4u;k++) {
+        memset(crw_inst[k].egg_left,0,sizeof crw_inst[k].egg_left);
+        WORD_AT(A(crowe_actor[k])+0x20u)=4u;WORD_AT(CST(k)+0x1CE0u)=0;
+    }
+    {
+        unsigned t,blocked_seen=0;
+        for(t=0;t<300u;t++)
+            for(k=0;k<4u;k++) {
+                CALL(pc_mapmaker_crowe_fight,fake_walk_fight,0x0027DE3Eu,ENT(crowe_actor[k]));
+                CALL(pc_mapmaker_realbosses_walk_fight,fake_look,0x0027DE5Fu,ENT(k&1u?WALKER_2:WALKER_1));
+                if(t==10u && BLOCKED(CST(k),2u,0u)==1u && BLOCKED(CST(k),2u,1u)==1u && BLOCKED(CST(k),1u,0u)==1u &&
+                   !BLOCKED(CST(k),2u,2u)) blocked_seen++;   /* its own grid, as the last lookup left it */
+            }
+        CHECK(blocked_seen==4u);
+    }
+    all_back(__LINE__);
+    for(k=0;k<4u;k++) {
+        CHECK(walks[k]>=90u && drops[k]>=2u && drops[k]<=3u);              /* it walks; the egg comes back after its time */
+        CHECK(crw_inst[k].eggs>=drops[k] && WORD_AT(CST(k)+0x1CF8u)==2u);
+    }
+    for(k=0;k<6u;k++) WORD_AT(A(k)+0x20u)=4u;
 
     /* the next level forgets both areas' bosses; the outside values stay live */
     container();HALF_AT(CONT+8u+8u+0x18u+4u)=0x0Cu;HALF_AT(CONT+8u+8u+0x18u+8u)=0x0Cu;   /* neither boss */
