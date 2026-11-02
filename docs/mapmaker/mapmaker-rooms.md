@@ -243,7 +243,8 @@ synced). Mixed builds are already unsupported for raised maps.
   ids. More rooms need word ids: reimplement `sub_00086C40`, `sub_00086480`,
   `sub_000865E0`, `sub_000897D0` (draw buckets) and the light functions
   `sub_001121E0`, `sub_001123C0`, `sub_001124D0`, `sub_00112EA0`, `sub_00114030`,
-  `sub_00114290`, `sub_00356490` (rooms.md §5c). The table and shadow layout
+  `sub_00114290` (rooms.md §5c; its `sub_00356490` is not a light, see "Byte-width
+  room ids"). The table and shadow layout
   here already reserve 256 entries per room table.
 
 ## Tile caps audit (2026-11-01): what bounds placement
@@ -277,7 +278,7 @@ So after the link raise only the room id width stops placement. Above 241
   `sub_00114030`, so ids above 255 would alias a low room, and room 256 would
   be 0, which `sub_001123C0` skips when unlinking (dangling list head). Needs
   a side table by light index (pool `[0x0073D950]`, `[0x004E62DC]` records,
-  plus `[0x0073D960]`) and wrappers of the 10 sites in 6 functions.
+  plus `[0x0073D960]`) and wrappers of the 9 sites in 5 functions.
 - View shadow: one displacement per array, views 0xFFC apart, so the
   12-byte rects hold at most 341 ids (about 327 real rooms); beyond that the
   stride (38 sites, 2 divisions) or the ~27 accessors must change.
@@ -320,9 +321,10 @@ half of it would only add risk. Static analysis only.
   table needs the light index, which `sub_001123C0` only gets as a pointer
   (pools `[0x0073D950]` stride 0xB8 and `[0x0073D960]` stride 0xC0). That
   means reimplementing or wrapping `sub_001121E0`, `sub_001123C0`,
-  `sub_001124D0`, `sub_00112EA0`, `sub_00114030`, `sub_00114290` (which
-  reads `+0x99` at `0x00114829`/`0x00114851` in its body) and
-  `sub_00356490`.
+  `sub_001124D0`, `sub_00112EA0`, `sub_00114030` and `sub_00114290` (which
+  reads `+0x99` at `0x00114829`/`0x00114851` in its body). Corrected by the
+  classification below: `sub_00356490` stores a System Link settings byte, not
+  a light room, and `sub_00112EA0` only indexes the heads (row width).
 - View shadow: the flags at `+0x6C00` (256 B) run into the list at
   `+0x6D00` past id 255, so flags and list need a second shadow region (a
   0x11FF0 allocation, front-end view relocated again).
@@ -340,7 +342,123 @@ a decoder classification test, like `test_every_room_constant_is_classified`;
 (2) the light side table and the bucket writers, gated on scene 100 and on
 ids above 0xF1 so stock ids keep the original code paths; (3) the
 renumbering and relocations; (4) a story-level playtest pass before raising
-`MAPMAKER_LIMIT_PIECES`.
+`MAPMAKER_LIMIT_PIECES`. Step (1) is done below; the stage list there
+replaces this order.
+
+## Byte-width room ids: classification (2026-11-01, stage 1, static only)
+
+Test: `tests/mapmaker/test_mapmaker_rooms_bytes_classified.py` (lifter decode
+of all game code, skips without the private XBE). Nothing was changed in the
+runtime; nothing was run in the game.
+
+| Check | Sites | Rooms among them |
+| --- | --- | --- |
+| Byte accesses at `+0x34..+0x3B`, `+0xB0..+0xB3`, `+0xF0..+0xF3`, `+0x99`, `+0x2A0..+0x2A7` (no index, base not `esp`) | 130 in 77 functions | 9: `light+0x99` |
+| Special-id stores (`0xD5`/`0xCE`) into `+0x34/+0x38/+0xF0/+0x48/+0x2A0/+0x2A4` | all dword | (fields are dwords) |
+| 8-bit instructions with an immediate 0xC8..0xD6 | 15 | 0 (masks, fill bytes, data) |
+| Bucket tables `0x7042B8`/`0x702A40`, counts `0x702DB0`/`0x702D60` | users only in `sub_00086C40`, `sub_000897D0`, `sub_00086480`, `sub_000865E0` | 4 byte writers, 4 byte readers |
+| Byte room flow (seeded at the bucket/light byte loads, through registers, stack slots, call arguments) | 3 byte stores, 1 word store, 1 byte compare | all listed below |
+
+The 121 non-room byte sites, by record: System Link session/player records
+(`[0x774028]`, `0x774180+n*0x30C`; 30), MapMaker editor records (28), flag
+bits tested with masks (25), C++/library objects past `0x3B0000` (15), the
+`sub_00040FA0` record (+0x34 = word*16, 5), room records `+0xB2` flag bits
+(3, indexed by room, hold none), colour bytes (3), static tables
+`0x7A18A0`/`0x74FE7C`/`0x4FA128` (5), `+0xB0` flags of `sub_00236070` (4),
+the level number word `+0x3A` (2) and the System Link settings copy
+`0x78AD58+0x99` (`0x003564F9`, written from `[0x541CD8]`; earlier lists had it
+as a light, it is not). So the open `+0x34`/`+0x38`/`+0xF0` accesses are all
+other records; prop, particle, effect and view rooms are dwords everywhere.
+
+Every byte that holds a room:
+
+| Storage | Writers | Readers | Values it can hold |
+| --- | --- | --- | --- |
+| Bucket rows `0x7042B8[80][200]` (now `0x008C1800` [80][256]) | `0x00086CF6`, `0x00086D80` (copy), `0x000898A3` | `0x000864F4`, `0x00086644`, `0x000898F0` (movzx) | real rooms only: loop counter `edx = 1..[0x7B975C]` |
+| Sorted rows `0x702A40[80][10]` | `0x00086CD4` | `0x00086D77` (mov) | same loop counter |
+| Counts `0x702DB0`/`0x702D60` [80] | `inc cl` stores | movzx | rooms per bucket, at most R |
+| `light+0x99` | `0x001122DE`/`0x001124B9` (0), `0x0011408E`, `0x00114390` | `0x001123D5`, `0x0011241C`, `0x001124FC`, `0x00114829`, `0x00114851` | the prop's `+0x34`, or `[0x0073D95C]` (= R, from `[0x7B975C]` at `0x001121F5`) when the prop is in the global room or several rooms; a held prop keeps its player id (INFERRED: no substitution) |
+
+No reader sign-extends (all movzx or a plain byte copy), so 0xFF is a valid
+room in every byte. The global room is never bucketed (drawn by `push 0xD5`
+at `0x00086DDF`). The flow reaches only these tables (with element size,
+stock entries): `0x7B54E0`/`0x7B5F00` dword[0xD6] (relocated, 256),
+`0x73C350` light heads [3][0xD5], `0x73D910` round robin (room/16, 14),
+`0x7AC880` light colour float[0xD5][3], and `0x7B5180` dword[0xD6]; plus
+view rects (`+0x3BC..`) and room records (`+0xB2`). No stock table of 256
+entries is indexed by a room: every room table is sized 200, 0xD5 or 0xD6.
+
+Found by the flow, not by the earlier constant scan: **`0x7B5180`, a per-id
+"drawn" flag dword[0xD6] written only by `sub_000A79B0` (`0x000A79C8`,
+`[room*4+0x7B5180] = 1`, room from the bucket byte or the global id), never
+relocated** (`objects.json` keeps that operand). With the 241 layout, ids
+0xD6..0xFE write past it: id 0xD6 into `[0x7B54D8]` (a list count that is only
+reset and incremented), 0xD7 into the unreferenced `0x7B54DC`, the rest into
+the stock `0x7B54E0..` tables that `rooms.json` moved away. INFERRED benign
+today (nothing reads those words as data); it is moved first (stage 2).
+
+### Special ids per scene?
+
+No. The special ids are immediates in 155 operand entries of `rooms.json`
+over 85 functions, the same code for story levels and scene 100. A
+scene-dependent value would need a memory operand at each site (longer
+instructions, not a table patch) or wrapping those 85 functions. They stay one
+global layout, as in the 241 change, which already runs story levels with
+moved ids. The audit shows why moving them above 255 is safe for code that
+stores rooms: no special id is stored, compared or loaded as a byte, except a
+held prop's light (above).
+
+### Safe targets
+
+- **255 real rooms, special ids 0x100..0x10C, byte buckets kept** (+14
+  pieces). Buckets hold only real rooms and counts at most R, so
+  `sub_00086C40`/`sub_000897D0` stay as they are. Needed: the light room
+  (held ids) widened, `0x7B5180` relocated, the renumbering and table sizes
+  for an id space of 0x10D, and the view shadow re-packed in place (rects
+  0x10D*12 + flags 0x110 + list 0x21A = 0xFC6 < 0xFFC, so the stride and the
+  0xBFF0 allocation stay).
+- No target above 241 avoids moving the special ids: ids 0xF2..0xFE are taken.
+- **Above 255** needs word buckets (both writers reimplemented, readers
+  `movzx byte` -> `movzx word`, same length) and, past 341 ids, a second view
+  shadow region.
+
+### Stages (each with its sites and test)
+
+1. Done: this classification. Any new byte site, bucket user, flow table or
+   room immediate fails `test_mapmaker_rooms_bytes_classified.py` or
+   `test_every_room_constant_is_classified`.
+2. Room flag table: relocate `0x7B5180` (operand `0x000A79C8`, 0x358 B) to a
+   256+ entry block, drop the `keep` in `objects.json`. Test: `check-tables.py`,
+   and turn `test_room_flag_table_7b5180_is_not_relocated` into a relocated check.
+3. Light room side table (scene 100 only, ids > 0xFF): a word per light,
+   indexed `(light - [0x0073D950])/0xB8` and `(light - [0x0073D960])/0xC0`,
+   written next to `0x0011408E`/`0x00114390`, read at `0x001123D5`,
+   `0x0011241C`, `0x001124FC`, `0x00114829`, `0x00114851`, cleared next to
+   `0x001122DE`/`0x001124B9`: wrappers of `sub_001121E0`, `sub_001123C0`,
+   `sub_001124D0`, `sub_00114030`, `sub_00114290`. Head rows (`imul 0xD5` at
+   `0x001123EA`, `0x00112415`, `0x00112EBD`, `0x0011403C`) widen with the id
+   space. Test: a fixture like `mapmaker_rooms.c` plus the flow test's
+   byte-store set.
+4. Renumber 0xF2..0xFE -> 0x100..0x10C and `cmp 0xF1` -> 0xFF in the 155 + 21
+   `rooms.json` entries (all imm32/imm16/disp32 forms; the generator must
+   keep lengths); id-space counts 0xFF -> 0x10D (`mov ecx`, loop ends,
+   `[0x7B977C]` alloc 0x110 and its clear); per-id tables at `0x008C7000`
+   step 0x400 need 0x10D entries (re-space or move; objects and probe
+   hard-code them); light heads/colour [0x10D]; view shadow re-pack
+   (displacements of the 67 shadow sites and `sub_000CC920`'s flags); model
+   table `0x008CA000` to at least 0xA07 entries (it meets `0x008CB400`).
+   Test: the rooms tests with new values, `check-tables.py`.
+5. Story-level playtest (list in "What to test in play"), then
+   `MAPMAKER_LIMIT_PIECES` 241 -> 255.
+6. Only for more than 255: word buckets (`sub_00086C40`, `sub_000897D0`
+   reimplemented; `0x000864F4`, `0x00086644`, `0x000898F0` widened; the copy
+   `0x00086D77`/`0x00086D80`), then the second shadow region past 341 ids.
+
+Risks: the flow is linear per function (no path merging) and seeded at the
+known byte loads, so a room reaching a byte through a dword struct field and
+back is covered by the field scan only at the listed displacements; held-prop
+lights are INFERRED from the substitution code, not observed; the
+`0x7B54D8` overwrite is static reasoning.
 
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
@@ -374,6 +492,9 @@ private XBE is not present.
   XBE completeness check of every room constant.
 - `tests/mapmaker/test_mapmaker_limits.py`: 241 placed allowed, +1 held refused; two
   new mutations.
+- `tests/mapmaker/test_mapmaker_rooms_bytes_classified.py` (7 checks, 2026-11-01):
+  byte-width room-id classification; 5 hand mutations (seed, field site,
+  immediate, bucket writer, flow table removed) each fail it.
 
 ## What to test in play
 

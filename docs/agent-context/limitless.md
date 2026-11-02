@@ -897,7 +897,7 @@ Site inventories must come from the lifter's decoder, not from
 `private/pipeline/disasm/asm/text.asm`: the listing elides the byte column of
 long instructions, which once hid a room id and crashed a story level.
 `tests/mapmaker/mapmaker_decoded.py` decodes all game code once per process with
-`tools.recomp.disasm`; `tests/test_mapmaker_{pads,container,editor,objects,actors}_classified.py`
+`tools.recomp.disasm`; `tests/test_mapmaker_{pads,container,editor,objects,actors,rooms_bytes}_classified.py`
 (and `test_every_room_constant_is_classified` in the rooms test) require every
 candidate constant/displacement of their area to be patched or listed with a
 reason. They skip without the private XBE, so CI only imports them.
