@@ -829,3 +829,14 @@ nodes.
 Known limits: clouds are not shown in the editor; a cloud map re-saved with
 the switch off loses the flag; the checkbox caption is English only and has no
 help text.
+
+## Fall death after the .27 playtest
+
+In v0.4.0-mapmaker.27 a player who walked off an unbounded tile dropped to y
+-2.5 outside every room, and the game then put them back on the last floor
+height before the 8-query rule could fire. The fall check now also kills at the
+first room query that finds no room while the character is more than
+`MAPMAKER_ROOF_DROP` (1.5) under the lowest floor. The mansion worm (model
+0x5EA) is skipped: it starts and burrows under the floor, and .27 killed it at
+its spawn (y -4.5), which left its burst on screen.
+

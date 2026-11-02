@@ -780,6 +780,27 @@ int main(void)
         CHECK(nkilled==6);
         for(k=0;k<6;k++) tick();
         CHECK(nkilled==7 && killed[6]==ent_of(20) && FLOAT_AT(ent_of(20)+0x68)==0.0f);
+        /* dropping outside every room: dead at the first query that finds no room */
+        FLOAT_AT(ent_of(20)+0x1CC)=100.0f;mapmaker_roof_play.noroom[64]=0;
+        rooms_answer=1;for(k=0;k<12;k++) tick();
+        FLOAT_AT(ent_of(20)+0x68)=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-2.0f;rooms_answer=0;
+        for(k=0;k<6;k++) tick();
+        CHECK(nkilled==8 && killed[7]==ent_of(20));
+        /* just under the floor (a slope, a step down): only the 8-query rule */
+        FLOAT_AT(ent_of(20)+0x1CC)=100.0f;FLOAT_AT(ent_of(20)+0x68)=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-1.0f;
+        rooms_answer=1;for(k=0;k<12;k++) tick();rooms_answer=0;
+        for(k=0;k<12;k++) tick();
+        CHECK(nkilled==8);
+        for(k=0;k<48;k++) tick();
+        CHECK(nkilled==9);
+        /* the mansion worm is never killed under the floor */
+        FLOAT_AT(ent_of(20)+0x1CC)=100.0f;FLOAT_AT(ent_of(20)+0x68)=-30.0f;
+        *(uint16_t *)((uintptr_t)(ent_of(20)+0x94u)+g_xbox_mem_offset)=0x5EAu;
+        for(k=0;k<120;k++) tick();
+        CHECK(nkilled==9);
+        *(uint16_t *)((uintptr_t)(ent_of(20)+0x94u)+g_xbox_mem_offset)=0;
+        FLOAT_AT(ent_of(20)+0x68)=0.0f;rooms_answer=1;mapmaker_roof_play.noroom[64]=0;
+        nkilled=7;
         /* no query memory: the room rule is off */
         {
             uint32_t q=mapmaker_roof_play.query;
