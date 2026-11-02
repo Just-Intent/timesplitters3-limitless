@@ -132,6 +132,15 @@
  *    chair position): inside the moved update only, the frame is put back to
  *    world for the call and the position argument moved by +d, then all is
  *    restored bit for bit.
+ *  - v0.4.0-mapmaker.28 ("didn't orient toward me", "floated in front of
+ *    their chairs", "not much audio"): the active update runs with the yaw
+ *    clamp half-width 0x005000B8 (30: yaw 90 +- 30, facing +x like the train)
+ *    set to 360, so the chair turns to the player at any bearing; after it,
+ *    the living rider is put on the seat (live position + [0x0049E4BC] x the
+ *    chair's up row +0x284, its angles) and an AI class or handler state he
+ *    cannot sit in is put back; sound_load (sub_00045670) loads the chair's
+ *    level-11 gun 0x393 and engine loop 0x394 in a map holding it. Status
+ *    lines per chair: yaw, player offset, seat offset, rider calls, sounds.
  *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax,
  * g_xbox_mem_offset, xbox_HeapAlloc and pc_mapmaker_limits.inc
@@ -213,6 +222,20 @@
 #define KHL_SMOKE 0x0078DF50u            /* three emitters the death stops */
 #define KHL_LINE 0x00500088u             /* -535.0: start line (update only) */
 #define KHL_GAP 0x00500094u              /* 11.0: x target = player x - gap (update only) */
+#define KHL_SPAN 0x005000B8u             /* 30.0: yaw clamped to 90 +- this (update only, 0x001EEEDE) */
+#define KHL_SPAN_FREE 360.0f             /* no clamp: atan2 yaws are within 90 +- 270 */
+#define KHL_SEAT 0x0049E4BCu             /* -1.2: the rider's seat, along the chair's up row (sub_00263260) */
+#define KHL_SEAT_STOCK (-1.2f)
+#define KHL_ENT_ROT 0x274u               /* rotation cached by sub_000A14B0 in the update; row 1 (+0x10) up */
+#define KHL_ENT_PITCH 0xC0u              /* angles the handler copies: +0x70 (also to +0xC4), +0xC0, +0xC8 */
+#define KHL_ENT_YAW2 0xC4u
+#define KHL_ENT_ROLL 0xC8u
+#define KHL_AI_STATE 0x20u               /* sub_00263260 knows states 0 (sit down) and 1 (seated) only */
+#define KHL_SND_GUN 0x393u               /* SFX_11_KHALLOS_GUN, sounddata flags 0x0B00000C: level 11 only */
+#define KHL_SND_JET 0x394u               /* SFX_11_JETPACK_NEW, 0x0B00041C: level 11 only (engine loop) */
+#define KHL_SND_LOAD 4u                  /* sub_00045670's "load it this level" */
+#define KHL_STATUS 6u                    /* status lines per chair */
+#define KHL_STATUS_EVERY 300u            /* frames between them */
 #define KHL_FLT_MAX 0x7F7FFFFFu
 #define KHL_FLT_LOW 0xFF7FFFFFu          /* -FLT_MAX */
 #define KHL_TRAIN_Y 7.5f                 /* the train start height (0x0047D014) */
@@ -272,13 +295,15 @@ static struct {
     float spawn[3];
     int removed, own;                      /* own: the placeholder itself rides */
     unsigned dying, hits;
+    float off[3];                          /* the rider's distance from his seat before it was put back */
+    unsigned frames, status, calls, fixes, shots, shot_fail, engine, engine_off;
 } khl_ch[KHL_MAX];
 static struct {
     uint32_t cand[KHL_CANDS], cand_ent[KHL_CANDS], cand_rec[KHL_CANDS];
     float cand_x[KHL_CANDS], cand_z[KHL_CANDS];
     int cand_bound[KHL_CANDS];
-    unsigned ncand, n, extras, events, seen, creates, np, bars;
-    int requested, inside, cur;
+    unsigned ncand, n, extras, events, seen, creates, np, bars, sounds_logged;
+    int requested, inside, cur, sounds;    /* sounds: load the chair's level-11 sounds this level */
     float d[3];                            /* the moved frame of the update running now */
     uint32_t pworld[4][2], pmoved[4][2];   /* players' +0xB8/+0xBC: world and moved bits */
     uint32_t self[4];                      /* live y/z and object y/z (moved) while unshifted */
@@ -573,6 +598,7 @@ void pc_mapmaker_khallos_mount(void (*original)(void))
     }
     if(khl.slots) memset((void *)((uintptr_t)khl.slots+g_xbox_mem_offset),0,KHL_MAX*KHL_OWNERS*4u);
     if(!khl_play() || khl.optout || (has=khl_map_has(KHL_ID))==0) return;
+    khl_lv.sounds=1;                                       /* sub_000454F0 loads the level's sounds after this */
     if(khl_mounted(KHL_PAK)) return;
     if((mounted=WORD_AT(KHL_MOUNTS))+KHL_MOUNT_KEEP>KHL_MOUNT_MAX) {
         khl_log("pak mount table full; the chair placeholder stays a bot",mounted,KHL_MOUNT_MAX);
@@ -810,10 +836,50 @@ static void khl_remove(unsigned k,uint32_t obj)
     khl_drop_rider(k);
 }
 
+/* Chair k (its globals in, after its active update): its living rider is put
+ * on the seat as sub_00263260 puts him (live position + seat x the chair's up
+ * row, the chair's angles), whether or not his handler ran this frame
+ * (v0.4.0-mapmaker.28: "two of them kind of floated in front of their
+ * chairs"). How far off he was is kept for the log; an AI class or state the
+ * handler cannot sit in is put back. */
+static void khl_seat(unsigned k,uint32_t obj)
+{
+    uint32_t a=khl_ch[k].rider,ent=khl_ch[k].rider_ent,i;
+    float c,want[3];
+    if(khl_ch[k].removed || !khl_seated(k) || WORD_AT(KHL_OBJ)!=obj || !MAPMAKER_PTR_OK(obj,KHL_ENT_ROT+0x30u) ||
+       !MAPMAKER_PTR_OK(ent,0x200u) || !(khl_getf(ent+KHL_ENT_HEALTH)>0.0f)) return;
+    if(!khl_sane(c=khl_getf(KHL_SEAT))) c=KHL_SEAT_STOCK;
+    for(i=0;i<3u;i++) if(!khl_sane(want[i]=khl_getf(KHL_POS+i*4u)+c*khl_getf(obj+KHL_ENT_ROT+0x10u+i*4u))) return;
+    for(i=0;i<3u;i++) { khl_ch[k].off[i]=khl_getf(ent+KHL_ENT_POS+i*4u)-want[i];khl_setf(ent+KHL_ENT_POS+i*4u,want[i]); }
+    WORD_AT(ent+KHL_ENT_YAW)=WORD_AT(ent+KHL_ENT_YAW2)=WORD_AT(obj+KHL_ENT_YAW);
+    WORD_AT(ent+KHL_ENT_PITCH)=WORD_AT(obj+KHL_ENT_PITCH);WORD_AT(ent+KHL_ENT_ROLL)=WORD_AT(obj+KHL_ENT_ROLL);
+    if(WORD_AT(a+KHL_AI_CLASS_HI) || WORD_AT(a+KHL_AI_CLASS)!=KHL_RIDER_CLASS) {
+        if(khl_ch[k].fixes++<4u) fprintf(stderr,"[mapmaker] khallos: chair %u: rider's AI class %X/%X put back to 0/8\n",k,
+                                        (unsigned)WORD_AT(a+KHL_AI_CLASS_HI),(unsigned)WORD_AT(a+KHL_AI_CLASS));
+        WORD_AT(a+KHL_AI_CLASS_HI)=0;WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;WORD_AT(a+KHL_AI_NEXT)=0;
+    }
+}
+/* Chair k's status line (its globals in, world frame): yaw, the player it
+ * turns to, the rider's seat offset, his handler calls and the sounds. */
+static void khl_status(unsigned k,uint32_t obj,uint32_t p)
+{
+    uint32_t a=khl_ch[k].rider;
+    if(khl_ch[k].status>=KHL_STATUS || (++khl_ch[k].frames!=1u && khl_ch[k].frames%KHL_STATUS_EVERY)) return;
+    khl_ch[k].status++;
+    fprintf(stderr,"[mapmaker] khallos: chair %u frame %u: yaw %.0f, player at dx %.1f dz %.1f; seat offset (%.2f, %.2f, %.2f), "
+            "rider calls %u state %d class %X/%X; sounds: gun %u (%u failed), engine %u (%u not playing)\n",k,khl_ch[k].frames,
+            (double)khl_getf(obj+KHL_ENT_YAW),p?(double)(khl_getf(p+KHL_P_POS)-khl_getf(KHL_POS)):0.0,
+            p?(double)(khl_getf(p+KHL_P_POS+8u)-khl_getf(KHL_POS+8u)):0.0,
+            (double)khl_ch[k].off[0],(double)khl_ch[k].off[1],(double)khl_ch[k].off[2],khl_ch[k].calls,
+            khl_seated(k)?(int)WORD_AT(a+KHL_AI_STATE):-1,khl_seated(k)?(unsigned)WORD_AT(a+KHL_AI_CLASS_HI):0u,
+            khl_seated(k)?(unsigned)WORD_AT(a+KHL_AI_CLASS):0u,khl_ch[k].shots,khl_ch[k].shot_fail,khl_ch[k].engine,khl_ch[k].engine_off);
+    fflush(stderr);
+}
+
 /* Chair k's frame, its globals in. */
 static void khl_frame(void (*original)(void),unsigned k,uint32_t obj)
 {
-    uint32_t p,line,gap,a,ent;
+    uint32_t p,line,gap,span,a,ent;
     float px,tx;
     if(khl_ch[k].place && !khl_ch[k].own) {                /* first frame: the placeholder leaves */
         a=khl_ch[k].place;ent=khl_ch[k].place_ent;khl_ch[k].place=0;
@@ -840,13 +906,17 @@ static void khl_frame(void (*original)(void),unsigned k,uint32_t obj)
     khl_lv.d[2]=khl_clamp(khl_getf(p+KHL_P_POS+8u),khl_ch[k].spawn[2]-KHL_ROAM,khl_ch[k].spawn[2]+KHL_ROAM);
     WORD_AT(KHL_LINE)=KHL_FLT_MAX;
     khl_setf(KHL_GAP,px-tx);
+    span=WORD_AT(KHL_SPAN);                               /* the train's yaw 90 +- 30 (facing +x) lifted: */
+    khl_setf(KHL_SPAN,KHL_SPAN_FREE);                     /* the chair turns to the player wherever he is */
     khl_shift_in(obj);
     khl_lv.inside=1;
     original();
     khl_lv.inside=0;
     khl_shift_out(obj);
-    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;
+    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;
     khl_rider_health(k,obj);
+    khl_seat(k,obj);
+    khl_status(k,obj,p);
     if(!(khl_getf(obj+KHL_ENT_HEALTH)<0.0f)) return;
     if(++khl_ch[k].dying>=KHL_GONE_FRAMES || khl_getf(KHL_POS+4u)>khl_ch[k].spawn[1]+KHL_GONE_UP) khl_remove(k,obj);
 }
@@ -905,8 +975,17 @@ void pc_mapmaker_khallos_damage(void (*original)(void))
  * globals of the chair he rides. */
 void pc_mapmaker_khallos_rider(void (*original)(void))
 {
+    uint32_t a,next;
     int k;
     if(!khl_lv.n || !MAPMAKER_STACK_OK(8) || (k=khl_ridden(WORD_AT(g_esp+4u)))<0) { original();return; }
+    khl_ch[k].calls++;
+    a=khl_ch[k].rider;
+    next=khl_seated((unsigned)k)?WORD_AT(a+KHL_AI_NEXT):0xFFFFFFFFu;
+    if(khl_seated((unsigned)k) && ((int32_t)next>1 || ((int32_t)next<0 && WORD_AT(a+KHL_AI_STATE)>1u))) {
+        if(khl_ch[k].fixes++<4u) fprintf(stderr,"[mapmaker] khallos: chair %u: rider state %d (next %d) is none of the seat's: sits down again\n",
+                                        (unsigned)k,(int)WORD_AT(a+KHL_AI_STATE),(int)next);
+        WORD_AT(a+KHL_AI_NEXT)=0;                          /* states 2+ do nothing in the handler: he would hang in the air */
+    }
     khl_swapped(original,(unsigned)k);
 }
 /* WRAP sub_00263150 (cdecl entity; the slot-2 callback the seated Khallos'
@@ -978,9 +1057,29 @@ void pc_mapmaker_khallos_sound(void (*original)(void))
     if(!khl_lv.inside || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=KHL_RET_SOUND) { original();return; }
     rec=WORD_AT(g_esp+4u);
     khl_world_call(original,MAPMAKER_PTR_OK(rec,KHL_SOUND_POS+12u)?rec+KHL_SOUND_POS:0u);
+    khl_ch[khl_lv.cur].shots++;                            /* -1: the sound is not loaded (sub_00027F80) */
+    if((int32_t)g_eax<0) khl_ch[khl_lv.cur].shot_fail++;
 }
 void pc_mapmaker_khallos_engine(void (*original)(void))
 {
+    uint32_t handle;
     if(!khl_lv.inside || !MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=KHL_RET_ENGINE) { original();return; }
+    handle=WORD_AT(g_esp+4u);                              /* chair +0x22C: this chair's own loop */
     khl_world_call(original,WORD_AT(g_esp+8u));
+    khl_ch[khl_lv.cur].engine++;
+    if(!MAPMAKER_PTR_OK(handle,4u) || (int32_t)WORD_AT(handle)<0) khl_ch[khl_lv.cur].engine_off++;
+}
+
+/* WRAP sub_00045670 (cdecl sound id -> nonzero when this level loads it; called
+ * only by sub_00027700, the level's sound load, after the pak mounts). The
+ * chair's gun and engine loop are level-11 sounds (sounddata flag 4, level
+ * byte 11), never loaded in scene 100: v0.4.0-mapmaker.28 "didn't really have
+ * much audio". Loaded when the map's set holds the chair. */
+void pc_mapmaker_khallos_sound_load(void (*original)(void))
+{
+    uint32_t id=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0xFFFFFFFFu;
+    original();
+    if(g_eax || !khl_lv.sounds || (id!=KHL_SND_GUN && id!=KHL_SND_JET) || WORD_AT(KHL_SCENE)!=100u || !khl_on()) return;
+    g_eax=KHL_SND_LOAD;
+    if(khl_lv.sounds_logged++<2u) khl_log("the chair's level-11 sound is loaded in this map (sound, load)",id,KHL_SND_LOAD);
 }
