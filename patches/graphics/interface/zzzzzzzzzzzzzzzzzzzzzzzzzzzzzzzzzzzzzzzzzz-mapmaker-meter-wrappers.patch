@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3556 @@
+@@ -1037,6 +1037,3606 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2503,6 +2503,77 @@
 +#endif
 +}
 +
++extern void sub_001CDD60_gen(void);
++static void sub_001CDD60_layer0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_restart")) pc_mapmaker_realbosses_restart(sub_001CDD60_gen);
++    else sub_001CDD60_gen();
++#else
++    sub_001CDD60_gen();
++#endif
++}
++
++static void sub_001CDD60_layer1(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_restart")) pc_mapmaker_crowe_restart(sub_001CDD60_layer0);
++    else sub_001CDD60_layer0();
++#else
++    sub_001CDD60_layer0();
++#endif
++}
++
++static void sub_001CDD60_layer2(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_restart")) pc_mapmaker_tank_restart(sub_001CDD60_layer1);
++    else sub_001CDD60_layer1();
++#else
++    sub_001CDD60_layer1();
++#endif
++}
++
++static void sub_001CDD60_layer3(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_restart")) pc_mapmaker_khallos_restart(sub_001CDD60_layer2);
++    else sub_001CDD60_layer2();
++#else
++    sub_001CDD60_layer2();
++#endif
++}
++
++static void sub_001CDD60_layer4(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_restart")) pc_mapmaker_worm_restart(sub_001CDD60_layer3);
++    else sub_001CDD60_layer3();
++#else
++    sub_001CDD60_layer3();
++#endif
++}
++
++static void sub_001CDD60_layer5(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_restart")) pc_mapmaker_mothership_restart(sub_001CDD60_layer4);
++    else sub_001CDD60_layer4();
++#else
++    sub_001CDD60_layer4();
++#endif
++}
++
++void sub_001CDD60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_restart")) pc_mapmaker_bosses_restart(sub_001CDD60_layer5);
++    else sub_001CDD60_layer5();
++#else
++    sub_001CDD60_layer5();
++#endif
++}
++
 +extern void sub_0009CC40_gen(void);
 +void sub_0009CC40(void)
 +{
@@ -2687,27 +2758,6 @@
 +    else sub_002A9D00_gen();
 +#else
 +    sub_002A9D00_gen();
-+#endif
-+}
-+
-+extern void sub_001CDD60_gen(void);
-+static void sub_001CDD60_layer0(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_restart")) pc_mapmaker_crowe_restart(sub_001CDD60_gen);
-+    else sub_001CDD60_gen();
-+#else
-+    sub_001CDD60_gen();
-+#endif
-+}
-+
-+void sub_001CDD60(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_restart")) pc_mapmaker_khallos_restart(sub_001CDD60_layer0);
-+    else sub_001CDD60_layer0();
-+#else
-+    sub_001CDD60_layer0();
 +#endif
 +}
 +
