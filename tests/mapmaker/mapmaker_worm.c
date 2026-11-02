@@ -65,6 +65,9 @@ static int failures, originals;
 static unsigned alloc_idx;
 static uint32_t seen_block, draw_block[8];
 static int prev_k;
+static int model_wake;                  /* fake_update: the stock wake test and a burst */
+static uint32_t wake_room[4];
+static unsigned wake_updates[4];
 static int pak_mounted, trophy_mounted, skeleton_mounted, mount_ok=1, alloc_ok=1, scratch_ok=1, bind=1, die;
 static unsigned nmount, nalloc, ninit, nupdate, ndraw, nrelease, neffect, npadcalls;
 static uint32_t mount_arg, scratch_size, effect_args[2], init_objects, init_route_done, refuse=0xFFFFFFFFu;
@@ -152,6 +155,17 @@ static void fake_update(void)
             SETF(ent+0x68u,F(ent+0x68u)-5.0f);
             WORD_AT(0x0078FAE0u)=ent;
         }
+    }
+    if(model_wake && WORD_AT(0x0078FAE0u)) {   /* the wake test sub_001D5D70 (shifted region), then a burst */
+        uint32_t i,b=(LIVE-WST)/0x2000u;
+        int in=0;
+        for(i=0;i<WORD_AT(0x00790950u);i++) {
+            uint32_t pl=WORD_AT(0x007B0C48u)+i*0x1584u;
+            float px=F(pl+0xA8u),pz=F(pl+0xB0u);
+            if(px>=F(0x0049DE3Cu) && px<=F(0x0049DE40u) && pz>=F(0x0049DE34u) && pz<=F(0x0049DE38u)) in=1;
+        }
+        if(b<4u) { wake_updates[b]++;wake_room[b]=seen_room; }   /* the room the attack rays start from */
+        if(WORD_AT(LIVE+0x24u)==1u && in) WORD_AT(LIVE+0x24u)=9u;
     }
     if(die && WORD_AT(0x0078FAE0u)) { WORD_AT(LIVE+0x24u)=4u;WORD_AT(0x0078FAE0u)=0; }   /* state 4: head removed */
 }
@@ -356,6 +370,78 @@ static void multi(void)
     CHECK(wrm_cur==-1 && !wrm_n && !wrm_inst[1].state);
     WORD_AT(0x0075B4B4u)=0;WORD_AT(0x0078FAE0u)=0;
     container(0x11,with_ids,3);
+}
+
+/* six pads around each of three spawns (10 + 30k, 4, -20) */
+static void pads3(void)
+{
+    static const float off[6][2]={{4,0},{-4,0},{0,5},{0,-5},{3,3},{-3,-6}};
+    unsigned k,j;
+    WORD_AT(0x00715F2Cu)=PADS;WORD_AT(0x007B6664u)=18u;
+    for(k=0;k<3u;k++) for(j=0;j<6u;j++) {
+        uint32_t p=PADS+(k*6u+j)*0x20u;
+        WORD_AT(p)=0x3E9u+k*6u+j;WORD_AT(p+4u)=1u;
+        SETF(p+0xCu,10.0f+30.0f*k+off[j][0]);SETF(p+0x10u,4.0f);SETF(p+0x14u,-20.0f+off[j][1]);
+    }
+}
+static void tick3(void) { unsigned k;for(k=0;k<3u;k++) CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(k),0,0,0); }
+#define ST3(k) WORD_AT(WST+(uint32_t)(k)*0x2000u+0x24u)
+/* the .28 playtest map: three worms side by side, the player outside every
+ * wake region, then walking into worm 1's and worm 2's. Each binds, updates,
+ * wakes, surfaces, attacks from its own room and is drawn on its own; the
+ * log lines name the worm and the level (test_mapmaker_worm.py reads them). */
+static void multi3(void)
+{
+    unsigned k,d;
+    fprintf(stderr,"--- multi3\n");fflush(stderr);
+    wrm.levels=0;
+    container(0x11,with_ids,3);
+    pads3();
+    level();
+    for(k=0;k<3u;k++) { actor(k,0x2C,0x5EA,10.0f+30.0f*k,4.0f,-20.0f);WORD_AT(ENT(k)+0x34u)=4u+k;WORD_AT(ENT(k)+0x38u)=4u+k; }
+    for(k=0;k<3u;k++) CALL(pc_mapmaker_worm_ai_start,fake,0x0015F981u,A(k),0,0,1);
+    CHECK(wrm_n==3u);
+    player(40.0f,4.0f,30.0f,8u,0);                           /* 50 north of every spawn */
+    model_wake=1;memset(wake_updates,0,sizeof wake_updates);memset(wake_room,0,sizeof wake_room);
+    tick3();                                                 /* each head's first frame: its own bind */
+    for(k=0;k<3u;k++) {
+        CHECK(wrm_inst[k].ready && wrm_inst[k].head==ENT(k) && wrm_inst[k].win[4]==ENT(k) && wake_updates[k]==1u);
+        CHECK(WORD_AT(ENT(k)+0x34u)==4u+k && near_eq(F(ENT(k)+0x68u),-1.0f) && ST3(k)==1u);
+    }
+    CHECK(WORD_AT(0x0078FAE0u)==0 && WORD_AT(0x0075B4B4u)==0 && wrm_cur==-1);
+    tick3();tick3();                                         /* buried: nobody in a wake region */
+    for(k=0;k<3u;k++) CHECK(ST3(k)==1u && wrm_inst[k].last_state==1u && wake_updates[k]==3u);
+    d=ndraw;
+    CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(ndraw==d+3u);
+    for(k=0;k<3u && d+k<8u;k++) CHECK(draw_block[d+k]==WST+k*0x2000u);
+    for(k=0;k<3u;k++) CHECK(!wrm_inst[k].surfaced && near_eq(F(ENT(k)+0x68u),-1.0f));
+    /* into worm 1's region only: worm 1 surfaces and attacks from the player's room */
+    player(42.0f,4.0f,-12.0f,9u,0);
+    tick3();
+    CHECK(ST3(1)==9u && ST3(0)==1u && ST3(2)==1u);
+    CHECK(WORD_AT(ENT(1)+0x34u)==9u && WORD_AT(ENT(0)+0x34u)==4u && WORD_AT(ENT(2)+0x34u)==6u);
+    tick3();
+    CHECK(wake_room[1]==9u && wake_room[0]==4u && wake_room[2]==6u);
+    CHECK(wrm_inst[1].last_state==9u && wrm_inst[1].states==2u && wrm_inst[0].states==1u && wrm_inst[2].states==1u);
+    CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(wrm_inst[1].surfaced && near_eq(F(ENT(1)+0x64u),40.0f) && near_eq(F(ENT(1)+0x68u),4.0f));
+    CHECK(!wrm_inst[0].surfaced && !wrm_inst[2].surfaced && near_eq(F(ENT(0)+0x68u),-1.0f) && near_eq(F(ENT(2)+0x68u),-1.0f));
+    /* on into worm 2's: worm 2 too, worm 1 out with no one near (its spawn room), worm 0 buried */
+    player(72.0f,4.0f,-12.0f,11u,0);
+    tick3();tick3();
+    CHECK(ST3(2)==9u && ST3(1)==9u && ST3(0)==1u);
+    CHECK(WORD_AT(ENT(2)+0x34u)==11u && WORD_AT(ENT(1)+0x34u)==5u && WORD_AT(ENT(0)+0x34u)==4u && wake_room[2]==11u);
+    CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
+    CHECK(wrm_inst[2].surfaced && near_eq(F(ENT(2)+0x64u),70.0f) && near_eq(F(ENT(1)+0x64u),40.0f) && !wrm_inst[0].surfaced);
+    /* a hit on worm 2's head: worm 2 only */
+    WORD_AT(SCR+0x200u)=ENT(2);
+    CALL(pc_mapmaker_worm_hit,fake_hit,0x000BA3E0u,SCR+0x200u,0,0,1);
+    CHECK(ST3(2)==0xDu && ST3(1)==9u && ST3(0)==1u);
+    CHECK(WORD_AT(0x0075B4B4u)==0 && WORD_AT(0x0078FAE0u)==0 && wrm_cur==-1);
+    fprintf(stderr,"--- multi3 end\n");fflush(stderr);
+    model_wake=0;
+    pads(12);
 }
 
 int main(void)
@@ -619,6 +705,7 @@ int main(void)
 
     /* ---- several mansion worms ------------------------------------------ */
     multi();
+    multi3();
 
     /* ---- route: a refused pad, few pads, the head's own pad, none --------- */
     refuse=5;
