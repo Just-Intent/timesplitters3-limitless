@@ -6,7 +6,8 @@
  * 0x100, id space 0xD6 -> 0x10D; in every scene), raises every "real room"
  * test from 200 to 255 (ids 1..0xFF), moves the static per-room and per-id
  * tables into 0x008C0000..0x008D4000 and the view struct's per-room arrays
- * into a shadow at view+0x6000 (see docs/mapmaker/mapmaker-rooms.md). This
+ * into a shadow at view+0x1000 inside a view stride grown from 0xFFC to
+ * 0x3000 (see docs/mapmaker/mapmaker-rooms.md). This
  * file is the C half:
  *
  *   WRAP sub_00087310 -> pc_mapmaker_rooms_query
@@ -363,7 +364,7 @@ void pc_mapmaker_rooms_light_create(void (*original)(void))
 
 /* ---- word draw buckets (stage 6 of rooms past 255) ---------------------
  * The view's rooms are drawn by portal-walk depth: room r of the current
- * view has its depth dword at shadow rect +0 (view +0x6000 + 12*r; -1 = not
+ * view has its depth dword at shadow rect +0 (view +0x1000 + 12*r; -1 = not
  * reached). Stock sub_00086C40 (every scene, once per view drawn) put each
  * room id as a BYTE in row [depth] of 0x7042B8 (now 0x008C1800, rows of 256)
  * with a byte count per row at 0x702DB0; rooms whose record +0xB2 has bit 8
@@ -379,17 +380,18 @@ void pc_mapmaker_rooms_light_create(void (*original)(void))
  * copies the depth's list there, at most 255 per call, sets that depth's
  * count byte and runs the reader once per 255 rooms (only a depth of more
  * than 255 rooms takes more than one call). sub_000897D0 (per-view sorted
- * room list, view shadow +0x6DB0, count word +0xE08) builds the same list
+ * room list, view shadow +0x2AB0, count word +0xE08) builds the same list
  * from the same depths without byte tables. With at most 255 rooms per depth
  * (every level of up to 255 rooms) the rooms, order and calls are the stock
  * ones. Deviations: a depth >= 80 (stock wrote past its 80 rows and counts)
  * is skipped, and the list never grows past its shadow capacity. */
-#define MAPMAKER_ROOMS_VIEW_CURRENT 0x007B0CC0u  /* -> the view being drawn (0xFFC struct) */
+#define MAPMAKER_ROOMS_VIEW_CURRENT 0x007B0CC0u  /* -> the view being drawn (0xFFC struct + shadow) */
 #define MAPMAKER_ROOMS_VIEW_ARRAY 0x007B0CE4u    /* -> view 0 */
 #define MAPMAKER_ROOMS_VIEW_COUNT 0x007B0CE0u
-#define MAPMAKER_ROOMS_VIEW_STRIDE 0xFFCu
-#define MAPMAKER_ROOMS_VIEW_RECTS 0x6000u        /* shadow: room r at +0x6000+12*r (int32 depth, int16 x0,y0,x1,y1) */
-#define MAPMAKER_ROOMS_VIEW_LIST 0x6DB0u         /* shadow: sorted room list (words), count word +0xE08 */
+#define MAPMAKER_ROOMS_VIEW_STRIDE 0x3000u       /* rooms.json: stock 0xFFC (struct) -> 0x3000 (struct, shadow) */
+#define MAPMAKER_ROOMS_VIEW_RECTS 0x1000u        /* shadow: room r at +0x1000+12*r (int32 depth, int16 x0,y0,x1,y1) */
+#define MAPMAKER_ROOMS_VIEW_FLAGS 0x28A0u        /* shadow: visible flag byte per id (0x210) */
+#define MAPMAKER_ROOMS_VIEW_LIST 0x2AB0u         /* shadow: sorted room list (words), count word +0xE08 */
 #define MAPMAKER_ROOMS_VIEW_LIST_WORDS 0x10Du
 #define MAPMAKER_ROOMS_VIEW_LIST_CAP 0x10Cu      /* rooms.json 0x000899CA: cmp ax,cap before a neighbour */
 #define MAPMAKER_ROOMS_ID_GLOBAL 0x10Cu          /* rooms.json: global room id */

@@ -735,6 +735,51 @@ byte-table code, 1500 rooms with 700 in one depth, 300 random room lists
 against stock `sub_000897D0`, 290-room list; 27 C mutations; the reader
 patches decoded with the lifter's decoder; 6 table mutations).
 
+## Stage 7: view stride 0xFFC -> 0x3000 (2026-11-02, static only)
+
+Target 511 (0x5000 for 1023 was not taken: the pads, links and memory caps
+stop real maps near 500 pieces, and 1023 needs the rooms sub-range repacked
+around the model table). Every view in the six-view array `[0x7B0CE4]` is
+now 0x3000 apart: the 0xFFC struct, then its per-room shadow inside the
+stride. Layout per view (sized for the 511 id space 0x20D):
+
+| field | stock | 255 layout | now |
+| --- | --- | --- | --- |
+| rects 12 B per id (depth, x0, y0, x1, y1) | +0x3BC | +0x6000 | +0x1000 (to +0x289C) |
+| visible flag byte per id | +0xD2C | +0x6CA0 | +0x28A0 (0x210) |
+| sorted room list (words) | +0xE0C | +0x6DB0 | +0x2AB0 (to +0x2ECA) |
+| stride / array | 0xFFC / 0x5FF0 | 0xFFC / 0xBFF0 | 0x3000 / 0x12008 (clear 0x4802 dwords) |
+| front-end static view `0x008CD000` | 0xFFC | 0x7000 | 0x3000 |
+
+`rooms.json` (63 new operand entries, plus the 67 shadow displacements and
+the allocation/clear re-valued): the 35 `add/imul r, 0xFFC` steps (the plan's
+34 plus `0x0009FFA6`, shared by `sub_0009FF10`/`sub_0009FF30`);
+`sub_000C61D0`'s unrolled per-view init (`add ecx, k*0xFFC` x4 and 20 fields
+`[ecx + k*0xFFC + 0x214/0x21C/0x2A0/0x2A4]`, view index k = 1..5, which the
+plan's list missed); the two `(view - views) / 0xFFC` divisions
+(`0x000CC92C`/`0x000CC936` in `sub_000CC920`, `0x000D2D33`/`0x000D2D3C` in
+`sub_000D2D20`): magic `0x80200803` -> `0xAAAAAAAB` and `sar edx, 0xB` ->
+`0xD` (2^45/0x3000 rounded up, exact for every signed 32-bit difference).
+Not view strides (reviewed, in `NOT_VIEW_STRIDE`): `0x00188F70`/`0x001B773E`
+(player array `[0x7B0C48]`, stride 0x1584, field +0xFFC), `0x001B45B6`
+(string copy into another record), the 0x1FF8/0x17FC/0x3FF buffer sizes and
+masks. C: `MAPMAKER_ROOMS_VIEW_STRIDE`/`_RECTS`/`_FLAGS`/`_LIST`,
+`OPENVIEW_RECT` (openview), `MAPMAKER_CAMERA_VIEW_RECTS` (camera
+diagnostics), `SMX_PLAYER` (sky music sand grains walk the views by stride).
+
+Tests (`test_mapmaker_rooms.py`): `test_view_stride_table` (+10 mutations:
+a step missing or stock, an init multiple/field stock or missing, magic or
+shift stock, a division missing, the allocation/clear short; the division is
+evaluated for every multiple of the stride, off-by-one values and the 32-bit
+extremes), `test_every_view_stride_is_classified` (decode: every k*0xFFC,
+0x5FF0, 0x17FC, 0x3FF, the magic, and every displacement past 0xFFC in a
+function that reads the view array base or count is patched or reviewed),
+the shadow checks of `id_space_problems`, the other areas' defines in
+`test_other_areas_use_the_moved_tables`; the bucket, camera and openview
+fixtures use the defines. Story risk: every scene allocates the view array
+(72 KB instead of 48 KB, `sub_0003DFA0(.., 1)`); splitscreen, camera screens
+and the front end use the new layout.
+
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
 Cause: `sub_000BB850` (explosion/area effect over the rooms touching a box)

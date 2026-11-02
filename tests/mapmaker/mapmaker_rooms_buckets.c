@@ -45,7 +45,7 @@ static void log_to(event *e,unsigned *n,char kind,uint32_t a,uint32_t b,uint32_t
 #define STACK 0x00100000u
 #define VIEWPORT 0x00300000u
 #define RET 0x001CED27u
-#define RECT(view,r) ((view)+0x6000u+12u*(r))
+#define RECT(view,r) ((view)+MAPMAKER_ROOMS_VIEW_RECTS+12u*(r))
 
 void sub_00157440(void) {}
 void sub_0003DFA0(void) {}
@@ -85,7 +85,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 static uint32_t reader_esp_bad;
 static void reader(int which)
 {
-    uint32_t b=g_eax,count=*u8(0x00702DB0u+b),row=0x008C1800u+b*0u,i;
+    uint32_t b=g_eax,count=*u8(0x00702DB0u+b),row=MAPMAKER_ROOMS_BUCKET_ROW+b*0u,i;
     GOT('C',(uint32_t)which,b,0,0);
     for(i=0;i<count;i++) GOT('R',(uint32_t)which,b,u16(row+2u*i),0);
     if(WORD_AT(g_esp)!=0x0008683Eu) reader_esp_bad++;
@@ -155,7 +155,7 @@ static void stock_buckets(uint32_t view)
     }
     if(d28>=0x50) d28=0x4F;
     WANT('A',WORD_AT(vp),WORD_AT(vp+0x14u),WORD_AT(vp+4u),WORD_AT(vp+0x18u));
-    WANT('G',0x10Cu,0,0,0);
+    WANT('G',MAPMAKER_ROOMS_ID_GLOBAL,0,0,0);
     WANT('P',0,0,0,0);
     stock_draw(ebx,d28,counts,rows);
     WANT('Q',0,0,0,0);
@@ -202,7 +202,7 @@ static void run_buckets(uint32_t view)
 static void test_buckets_match_stock(void)
 {
     int round,bad=0;
-    uint32_t view=VIEWS+2u*0xFFCu;
+    uint32_t view=VIEWS+2u*MAPMAKER_ROOMS_VIEW_STRIDE;
     WORD_AT(0x00708788u)=RECORDS;
     WORD_AT(0x007E71C8u)=VIEWPORT;
     for(round=0;round<400 && !bad;round++) {
@@ -284,18 +284,18 @@ static void test_reader_outside(void)
 }
 
 /* ---- stock sub_000897D0 with byte rows (text.asm 0x000897D0..0x00089A1C) ---- */
-static uint16_t want_list[6][0x200],want_e08[6],want_e0a[6];
+static uint16_t want_list[6][MAPMAKER_ROOMS_VIEW_LIST_WORDS],want_e08[6],want_e0a[6];
 static void stock_view_lists(void)
 {
     static uint8_t counts[256],rows[256][256];
     uint32_t v,views=WORD_AT(0x007B0CE0u);
     for(v=0;v<views;v++) {
-        uint32_t view=WORD_AT(0x007B0CE4u)+v*0xFFCu,rooms=WORD_AT(0x007B975Cu),r,i;
+        uint32_t view=WORD_AT(0x007B0CE4u)+v*MAPMAKER_ROOMS_VIEW_STRIDE,rooms=WORD_AT(0x007B975Cu),r,i;
         int32_t d28,b;
         uint16_t e08=0;
         if(!(*u8(view+0x21Cu)&0x20u)) { want_e08[v]=u16(view+0xE08u);want_e0a[v]=u16(view+0xE0Au);
-                                         memcpy(want_list[v],u8(view+0x6DB0u),0x400);continue; }
-        memcpy(want_list[v],u8(view+0x6DB0u),0x400);
+                                         memcpy(want_list[v],u8(view+MAPMAKER_ROOMS_VIEW_LIST),sizeof want_list[v]);continue; }
+        memcpy(want_list[v],u8(view+MAPMAKER_ROOMS_VIEW_LIST),sizeof want_list[v]);
         d28=(int32_t)WORD_AT(view+0xD28u);
         if(d28>=0x50) d28=0x4F;
         for(b=0;b<=d28;b++) counts[b]=0;
@@ -312,14 +312,14 @@ static void stock_view_lists(void)
                 want_list[v][e08++]=(uint16_t)room;
             }
         want_e0a[v]=e08;
-        if(WORD_AT(view+0x2A0u)!=0x10Cu) {
+        if(WORD_AT(view+0x2A0u)!=MAPMAKER_ROOMS_ID_GLOBAL) {
             WANT('N',WORD_AT(view+0x2A0u),0x1E,0,0);
             for(i=0;i<neighbour_n;i++) {
                 uint32_t j;
                 int found=0;
                 for(j=0;j<e08;j++) if((uint32_t)(int32_t)(int16_t)want_list[v][j]==neighbours[i]) found=1;
                 if(found) continue;
-                if((int16_t)e08<0x10C) want_list[v][e08++]=(uint16_t)neighbours[i];
+                if((int16_t)e08<(int16_t)MAPMAKER_ROOMS_VIEW_LIST_CAP) want_list[v][e08++]=(uint16_t)neighbours[i];
             }
         }
         want_e08[v]=e08;
@@ -345,13 +345,13 @@ static void test_view_lists_match_stock(void)
         WORD_AT(0x007B975Cu)=rooms;
         WORD_AT(0x004E8CF0u)=300u+rnd(340);
         neighbour_n=rnd(12);
-        for(v=0;v<neighbour_n;v++) neighbours[v]=rnd(4)?rnd(rooms+2u):(uint32_t)(0x101u+rnd(11));
+        for(v=0;v<neighbour_n;v++) neighbours[v]=rnd(4)?rnd(rooms+2u):(uint32_t)(MAPMAKER_ROOMS_IDS_REAL+2u+rnd(11));
         for(v=0;v<views;v++) {
-            uint32_t view=VIEWS+v*0xFFCu;
+            uint32_t view=VIEWS+v*MAPMAKER_ROOMS_VIEW_STRIDE;
             setup_view(view,rooms,(int32_t)rnd(0x58),5,0x50);
             *u8(view+0x21Cu)=rnd(4)?0x20u:0u;
-            WORD_AT(view+0x2A0u)=rnd(5)?rnd(rooms+1u):0x10Cu;
-            memset(u8(view+0x6DB0u),0xEE,0x21A);
+            WORD_AT(view+0x2A0u)=rnd(5)?rnd(rooms+1u):MAPMAKER_ROOMS_ID_GLOBAL;
+            memset(u8(view+MAPMAKER_ROOMS_VIEW_LIST),0xEE,2u*MAPMAKER_ROOMS_VIEW_LIST_WORDS);
             set16(view+0xE08u,0x55);set16(view+0xE0Au,0x66);
         }
         got_n=want_n=0;
@@ -359,9 +359,9 @@ static void test_view_lists_match_stock(void)
         run_view_lists();
         if(!same_events("view list calls")) bad=1;
         for(v=0;v<views;v++) {
-            uint32_t view=VIEWS+v*0xFFCu;
+            uint32_t view=VIEWS+v*MAPMAKER_ROOMS_VIEW_STRIDE;
             if(u16(view+0xE08u)!=want_e08[v] || u16(view+0xE0Au)!=want_e0a[v] ||
-               memcmp(u8(view+0x6DB0u),want_list[v],2u*want_e08[v])) {
+               memcmp(u8(view+MAPMAKER_ROOMS_VIEW_LIST),want_list[v],2u*want_e08[v])) {
                 fprintf(stderr,"view list: round %d view %u: count %u/%u want %u/%u\n",round,v,
                         u16(view+0xE08u),u16(view+0xE0Au),want_e08[v],want_e0a[v]);
                 bad=1;
@@ -372,25 +372,27 @@ static void test_view_lists_match_stock(void)
     CHECK(!bad);
 }
 /* Past 255: rooms above 0xFF are listed with their full id; the list stops at its
- * shadow capacity. (The 255 shadow holds rects for ids up to 298 before the list.) */
+ * shadow capacity: 20 rooms more than the list holds, all with rects below the list. */
 static void test_view_lists_wide(void)
 {
+    const uint32_t many=MAPMAKER_ROOMS_VIEW_LIST_WORDS+20u;
     uint32_t view=VIEWS,r,i,high=0,ok=1;
+    CHECK(MAPMAKER_ROOMS_VIEW_RECTS+12u*(many+1u)<=MAPMAKER_ROOMS_VIEW_LIST);
     WORD_AT(0x007B0CE0u)=1;
-    WORD_AT(0x007B975Cu)=290;
+    WORD_AT(0x007B975Cu)=many;
     WORD_AT(0x004E8CF0u)=640;
     *u8(view+0x21Cu)=0x20;
     WORD_AT(view+0xD28u)=3;
     WORD_AT(view+0x2A0u)=5;
     neighbour_n=2;neighbours[0]=0x150;neighbours[1]=0x20;
-    for(r=1;r<=290;r++) {
+    for(r=1;r<=many;r++) {
         WORD_AT(RECT(view,r))=r<150?3u:2u;
         set16(RECT(view,r)+4u,10);set16(RECT(view,r)+8u,20);
     }
     run_view_lists();
-    CHECK(u16(view+0xE08u)==0x10Du && u16(view+0xE0Au)==0x10Du);   /* full: no neighbour added */
+    CHECK(u16(view+0xE08u)==MAPMAKER_ROOMS_VIEW_LIST_WORDS && u16(view+0xE0Au)==MAPMAKER_ROOMS_VIEW_LIST_WORDS);   /* full: no neighbour added */
     for(i=0;i<u16(view+0xE08u);i++) {
-        uint16_t room=u16(view+0x6DB0u+2u*i);
+        uint16_t room=u16(view+MAPMAKER_ROOMS_VIEW_LIST+2u*i);
         if(room>0xFFu) high++;
         if(room!=i+1u) ok=0;                                        /* depth 3 (1..149), then depth 2 */
     }
@@ -398,7 +400,7 @@ static void test_view_lists_wide(void)
     /* a short list takes the neighbour above 0xFF */
     WORD_AT(0x007B975Cu)=100;
     run_view_lists();
-    CHECK(u16(view+0xE08u)==101u && u16(view+0x6DB0u+200u)==0x150u);
+    CHECK(u16(view+0xE08u)==101u && u16(view+MAPMAKER_ROOMS_VIEW_LIST+200u)==0x150u);
 }
 
 int main(void)

@@ -37,7 +37,7 @@ static int failures;
 
 #define SCENE 0x0079094Cu
 #define VIEW 0x00100000u
-#define RECTS (VIEW+0x6000u)
+#define RECTS (VIEW+OPENVIEW_RECT)
 #define RECORDS 0x00200000u
 #define LISTS 0x00210000u
 #define PORTALS 0x00220000u
