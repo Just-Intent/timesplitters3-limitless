@@ -51,7 +51,7 @@ MUTATIONS = {
     'class-after-original': ('        WORD_AT(rec)=0;WORD_AT(rec+4u)=CRW_CLASS;\n',
                              '        original();WORD_AT(rec)=0;WORD_AT(rec+4u)=CRW_CLASS;g_esp-=4u;\n'),
     'class-without-pak': ('    else if(!crw_pak_mounted()) crw_log("lv14', '    else if(0) crw_log("lv14'),
-    'class-without-state': ('    else if(!crw_n) crw_log(', '    else if(0) crw_log('),
+    'class-without-state': ('    else if(!crw_n && !crw.restarted) crw_log(', '    else if(0) crw_log('),
     'class-two': ('    else if(k==crw_n && crw_n>=CRW_MAX) {', '    else if(k==crw_n && crw_n>=1u) {'),
     'class-ignores-optout': ('    if(crw.optout) crw_log("TSFP_MAPMAKER_REAL_BOSS=0', '    if(0) crw_log("TSFP_MAPMAKER_REAL_BOSS=0'),
     'class-any-character': ('    if(CRW_H(a+CRW_ACTOR_CHAR)!=CRW_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && CRW_H(ent+CRW_ENT_MODEL)==CRW_MODEL)) { original();return; }\n', ''),
@@ -115,6 +115,39 @@ MUTATIONS = {
     'egg-ret-wrong': ('#define CRW_RET_EGG 0x00291E84u', '#define CRW_RET_EGG 0x00291E7Fu'),
     'egg-any-scene': (' || WORD_AT(g_esp)!=CRW_RET_EGG || WORD_AT(CRW_SCENE)!=100u', ' || WORD_AT(g_esp)!=CRW_RET_EGG'),
     'egg-outside-boss': ('    if(!crw_lv.record || !MAPMAKER_STACK_OK(0x1C)', '    if(!MAPMAKER_STACK_OK(0x1C)'),
+    # v0.4.0-mapmaker.31: with no egg to block its cell, state 5 took the same cell for ever
+    'egg-no-block': ('    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_block(st,crw_lv.egg_row[k],crw_lv.egg_col[k]);\n', ''),
+    'egg-never-kept': ('crw_lv.egg_left[slot]=CRW_EGG_CALLS;', 'crw_lv.egg_left[slot]=0;'),
+    'egg-busy-replaced': (' && !crw_lv.egg_left[slot] && row<CRW_ROWS', ' && row<CRW_ROWS'),
+    'egg-any-offset': ('    if(!(off%CRW_HAZARD_SIZE) && slot<CRW_EGGS', '    if(slot<CRW_EGGS'),
+    'egg-any-row': (' && row<CRW_ROWS && col<CRW_COLS) {', ' && col<CRW_COLS) {'),
+    'egg-any-col': (' && row<CRW_ROWS && col<CRW_COLS) {', ' && row<CRW_ROWS) {'),
+    'egg-row-col-swapped': ('row=WORD_AT(g_esp+0x14u);col=WORD_AT(g_esp+0x18u);', 'row=WORD_AT(g_esp+0x18u);col=WORD_AT(g_esp+0x14u);'),
+    'egg-never-expires': ('    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_lv.egg_left[k]--;\n', ''),
+    'egg-life-short': ('#define CRW_EGG_CALLS 120u', '#define CRW_EGG_CALLS 1u'),
+    'block-no-column': ('    for(i=r?r-1u:0u;i<=r+1u && i<CRW_ROWS;i++) WORD_AT(', '    for(i=r;i<=r && i<CRW_ROWS;i++) WORD_AT('),
+    'block-no-row': ('    for(i=c?c-1u:0u;i<=c+1u && i<CRW_COLS;i++) WORD_AT(', '    for(i=c;i<=c && i<CRW_COLS;i++) WORD_AT('),
+    'block-square': ('*CRW_CELL+CRW_BLOCKED)=1u;\n    for(i=c?c-1u:0u;', '*CRW_CELL+CRW_BLOCKED)=1u;\n    if(r+1u<CRW_ROWS && c+1u<CRW_COLS) WORD_AT(st+CRW_GRID+((r+1u)*CRW_COLS+c+1u)*CRW_CELL+CRW_BLOCKED)=1u;\n    for(i=c?c-1u:0u;'),
+    'cells-any-caller': ('(WORD_AT(g_esp)!=CRW_RET_CELLS && WORD_AT(g_esp)!=CRW_RET_CELLS0) ||\n       ', ''),
+    'cells-no-state0': (' && WORD_AT(g_esp)!=CRW_RET_CELLS0) ||', ') ||'),
+    'cells-other-state': (' ||\n       WORD_AT(g_esp+4u)!=st+4u) { original();return; }', ') { original();return; }'),
+    'cells-before-lookup': ('    original();\n    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_block(',
+                            '    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_block(st,crw_lv.egg_row[k],crw_lv.egg_col[k]);\n    original();\n    if(0) crw_block('),
+    # a walk stopped short would wait in state 9 for ever
+    'land-never': ('    if(to==CRW_JUMP) { if(++crw_lv.air>=CRW_AIR_MAX) crw_land(ent); }', '    if(to==CRW_JUMP) { ++crw_lv.air; }'),
+    'land-at-once': ('#define CRW_AIR_MAX 240u', '#define CRW_AIR_MAX 2u'),
+    'land-wait-kept': ('    else crw_lv.air=0;\n', ''),
+    'land-only-x': ('    crw_setf(ent+CRW_ENT_X,x);crw_setf(ent+CRW_ENT_X+8u,z);\n', '    crw_setf(ent+CRW_ENT_X,x);\n'),
+    'land-other-state': ('    if(to==CRW_JUMP) {', '    if(to==CRW_JUMP+1u) {'),
+    # a pause-menu restart runs no level init: the blocks (level heap) were kept, the Crowes stayed on them
+    'restart-none': ('    if(had || crw.restarted) {\n        crw_reset();', '    if(0) {\n        crw_reset();'),
+    'restart-no-original': ('        crw_log("level restart: split Crowe blocks forgotten; new ones at the AI start (bosses, again)",had,(uint32_t)crw.restarted);\n    }\n    original();\n',
+                               '        crw_log("level restart: split Crowe blocks forgotten; new ones at the AI start (bosses, again)",had,(uint32_t)crw.restarted);\n    }\n'),
+    'restart-no-new-blocks': ('        crw.restarted=crw_play() && !crw.optout;\n', '        crw.restarted=0;\n'),
+    'restart-any-scene': ('        crw.restarted=crw_play() && !crw.optout;\n', '        crw.restarted=!crw.optout;\n'),
+    'restart-state-kept': ('        crw_reset();\n        WORD_AT(CRW_STATE)=0;\n', '        crw_reset();\n'),
+    'restart-flag-kept': ('    crw.restarted=0;\n', ''),
+    'log-budget-kept': ('    crw.logged=0;                                      /* a log budget per level', '    (void)0;                                      /* a log budget per level'),
     'message-unswapped': ('    crw_entry(WORD_AT(g_esp+4u),original);\n}\n/* WRAP sub_0028DA10', '    original();\n}\n/* WRAP sub_0028DA10'),
     'think-unswapped': ('    crw_entry(WORD_AT(g_esp+4u),original);\n}\n/* WRAP sub_0028F730', '    original();\n}\n/* WRAP sub_0028F730'),
     'hit-unswapped': ('    crw_entry(WORD_AT(info),original);', '    original();'),
@@ -443,6 +476,45 @@ def test_egg_drop_site():
     # sub_000A9070 -> sub_0009E330(obj, 1, 0): class bit of obj+0x20 indexes a callback table, called indirectly
     assert target(a[0x000A907A]) == 0x0009E330 and mem(a[0x0009E334])[0][4] == 0x20
     assert mem(a[0x0009E35A])[0][4] == 0x0072F2E0 and a[0x0009E36B].mnemonic == 'call'
+
+
+def test_egg_steers_the_walk():
+    """v0.4.0-mapmaker.31: the egg's blocked cells are what makes state 5 pick another cell."""
+    a = by_address()
+    rd = xbe_reader()
+    table = struct.unpack('<18I', rd(0x002923DC, 72))                 # the fight's state switch (0x00290D98)
+    assert a[0x00290D98].mnemonic == 'jmp' and mem(a[0x00290D98])[0][4] == 0x002923DC
+    assert (table[4], table[5], table[9], table[10]) == (0x002913CE, 0x00291560, 0x00291B8B, 0x00291D91)
+    # state 5: sub_002A9E60(grid, player cell, boss cell, target x/z, target cell, &[0x0078B1E4], 0); -1 -> state 10
+    assert ('imm', 0) in a[0x00291565].ops and ('imm', 0x0078B1E4) in a[0x00291567].ops
+    assert target(a[0x0029158E]) == 0x002A9E60 and a[0x002915AD].mnemonic == 'cmp'
+    assert ('imm', 0xA) in a[0x002915B2].ops
+    # its scan (arg 7 = 0) takes the first cell that is not a gap (+0x20 = 1) or blocked (+0x24 = 1)
+    assert mem(a[0x002A9F78])[0][4] == 0x20 and mem(a[0x002A9F7E])[0][4] == 0x24
+    # state 10: the egg on the target cell, then state 4 whether or not it was dropped
+    assert target(a[0x00291E7F]) == 0x002AB1B0 and ('imm', 4) in a[0x00291EB1].ops
+    assert [mem(a[x])[0][4] for x in (0x00291E3D, 0x00291E43)] == [0x1CF8, 0x1CF4]   # pushed as arguments 6, 5
+    # the egg keeps its cell (+0xEC row, +0xF0 col); a slot still out drops nothing (+0xF8)
+    assert mem(a[0x002AB4E8])[0][4] == 0xEC and mem(a[0x002AB4F6])[0][4] == 0xF0
+    assert mem(a[0x002AB1CC])[0][4] == 0xF8 and a[0x002AB1DA].mnemonic == 'jne'
+    # sub_002A9D00(state+4, ..): clears every +0x24, then blocks each egg in flight's cell and its four neighbours
+    assert calls_to(0x002A9D00) == {0x002901BA, 0x00290E62}
+    assert ends(a, 0x002901BA) == 0x002901BF and ends(a, 0x00290E62) == 0x00290E67
+    assert mem(a[0x002A9D3F])[0][4] == 0x990 and a[0x002A9D55].mnemonic == 'mov'
+    assert mem(a[0x002A9D64])[0][4] == 0x1288 and mem(a[0x002A9D74])[0][4] == 0xC   # +0x11A0 +0xEC, +0xF8
+    assert ('imm', 0x168) in a[0x002A9DF7].ops
+    assert all(mem(a[x])[0][4] == 0x990 for x in (0x002A9D88, 0x002A9DB1, 0x002A9DE5))
+    # state 9 waits for the walk animation, then until the boss has passed its target
+    assert target(a[0x00291C0A]) == 0x00059DD0 and a[0x00291C49].mnemonic == 'jbe'
+
+
+def test_restart_runs_no_level_init():
+    """A pause-menu restart (sub_001CDD60) sets up the level heap again but never runs sub_0025F720."""
+    a = by_address()
+    assert calls_to(0x0025F720) == {0x0015E818}                       # only from sub_0015E7C0 (the full load)
+    assert target(a[0x001CDC20]) == 0x0015E7C0                        # sub_001CDB80, not the restart
+    assert all(i.function != 0x001CDD60 or target(i) != 0x0015E7C0 for i in decoded() if i.call)
+    assert target(a[0x001CDD62]) == 0x0003E740                        # the restart's level heap
 
 
 GAME = ROOT / 'private/game/pak'

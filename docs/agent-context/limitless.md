@@ -489,6 +489,7 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 (log); shown (+0x28 bit 0) at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Boss areas, skies, open air, set slots: [boss notes](limitless-bosses.md).
+.31 Crowe no-walk: skipped eggs still block cells (WRAP sub_002A9D00).
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
 anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 (30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear

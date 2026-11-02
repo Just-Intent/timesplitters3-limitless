@@ -25,6 +25,14 @@ MUTATIONS = {
     'egg-drop-kept': (CROWE, 'crw.eggs);\n    MAPMAKER_GUEST_RET();', 'crw.eggs);\n    original();'),
     'egg-no-ret': (CROWE, 'crw.eggs);\n    MAPMAKER_GUEST_RET();', 'crw.eggs);'),
     'egg-any-caller': (CROWE, 'WORD_AT(g_esp)!=CRW_RET_EGG || ', ''),
+    # v0.4.0-mapmaker.31: the skipped egg blocked nothing, state 5 took the same cell for ever
+    'egg-no-block': (CROWE, '    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_block(st,crw_lv.egg_row[k],crw_lv.egg_col[k]);\n', ''),
+    'egg-never-kept': (CROWE, 'crw_lv.egg_left[slot]=CRW_EGG_CALLS;', 'crw_lv.egg_left[slot]=0;'),
+    'egg-never-expires': (CROWE, '    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_lv.egg_left[k]--;\n', ''),
+    'egg-other-boss-grid': (CROWE, '    uint32_t st=crw_lv.state;\n    unsigned k;\n    if(!crw_lv.record || !st',
+                            '    uint32_t st=crw_inst[0].state;\n    unsigned k;\n    if(!crw_lv.record || !st'),
+    'egg-other-boss-slot': (CROWE, 'crw_lv.egg_row[slot]=row;crw_lv.egg_col[slot]=col;crw_lv.egg_left[slot]=CRW_EGG_CALLS;',
+                            'crw_inst[0].egg_row[slot]=row;crw_inst[0].egg_col[slot]=col;crw_inst[0].egg_left[slot]=CRW_EGG_CALLS;'),
     # the overlapping statics: "the same instance again" skipped the swap
     'crowe-same-skips-swap': (CROWE, '    p.fx=mapmaker_fx_enter(k<0?0:&crw_inst[k].fx);\n    if(p.k!=k) {',
                               '    p.fx=mapmaker_fx_holder;\n    if(p.k==k) return p;\n    p.fx=mapmaker_fx_enter(k<0?0:&crw_inst[k].fx);\n    {'),
