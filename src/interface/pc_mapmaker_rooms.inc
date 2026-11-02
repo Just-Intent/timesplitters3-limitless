@@ -1,11 +1,13 @@
 /* US 45410066 MapMaker rooms: 200 -> 241 visibility rooms (one per piece).
  *
  * The guest-code table config/guest-code-patches/rooms.json renumbers the
- * room special ids (players 0xCA..0xCE -> 0xF3..0xF7, views 0xCF..0xD4 ->
- * 0xF8..0xFD, global 0xD5 -> 0xFE, id space 0xD6 -> 0xFF), raises every
- * "real room" test from 200 to 241, moves the static per-room tables into
- * 0x008C0000..0x008CFFFF and the view struct's per-room arrays into a shadow
- * at view+0x6000 (see docs/mapmaker/mapmaker-rooms.md). This file is the C half:
+ * room special ids above the byte range (players 0xCA..0xCE -> 0x101..0x105,
+ * views 0xCF..0xD4 -> 0x106..0x10B, global 0xD5 -> 0x10C, spare 0xC9 ->
+ * 0x100, id space 0xD6 -> 0x10D; in every scene), raises every "real room"
+ * test from 200 to 255 (ids 1..0xFF), moves the static per-room and per-id
+ * tables into 0x008C0000..0x008D4000 and the view struct's per-room arrays
+ * into a shadow at view+0x6000 (see docs/mapmaker/mapmaker-rooms.md). The
+ * editor's piece limit is still 241 (MAPMAKER_ROOMS_MAX). This file is the C half:
  *
  *   WRAP sub_00087310 -> pc_mapmaker_rooms_query
  *   WRAP sub_0008A780 -> pc_mapmaker_rooms_compile
@@ -66,9 +68,10 @@
 #include <string.h>
 
 #define MAPMAKER_ROOMS_MAX 241u
+#define MAPMAKER_ROOMS_IDS_REAL 0xFFu           /* rooms.json: real rooms 1..0xFF, special ids 0x100.. */
 #define MAPMAKER_ROOMS_STOCK 200u
 #define MAPMAKER_ROOMS_PORTALS 0x3FFFu          /* flag bytes at esp+0x1280, 0x4000 B */
-#define MAPMAKER_ROOMS_MODEL_TABLE 0x008CA000u   /* relocated 0x0078B860, 0xA00 words */
+#define MAPMAKER_ROOMS_MODEL_TABLE 0x008CA000u   /* relocated 0x0078B860, 0xA08 words */
 #define MAPMAKER_ROOMS_MODEL_FIRST 0x908u        /* model of room 1 */
 #define MAPMAKER_ROOMS_QUERY_BUFFER 0x008CB800u
 #define MAPMAKER_ROOMS_QUERY_BYTES 0x800u
@@ -200,8 +203,8 @@ void pc_mapmaker_rooms_props(void (*original)(void))
 #define MAPMAKER_ROOMS_LIGHT_ONE 0x0073D960u    /* -> the one 0xC0 record (type-1 source) */
 #define MAPMAKER_ROOMS_LIGHT_STRIDE 0xB8u
 #define MAPMAKER_ROOMS_LIGHT_SLOTS 512u
-#define MAPMAKER_ROOMS_LIGHT_HEADS 0x008C8400u  /* light heads [3][row] (relocated 0x0073C350) */
-#define MAPMAKER_ROOMS_LIGHT_ROW 0xFEu          /* head row width = the global room id */
+#define MAPMAKER_ROOMS_LIGHT_HEADS 0x008C8540u  /* light heads [3][row] (relocated 0x0073C350) */
+#define MAPMAKER_ROOMS_LIGHT_ROW 0x10Cu         /* head row width = the global room id */
 #define MAPMAKER_ROOMS_LIGHT_GROUPS 0x008CB440u /* round robin per room/16 (relocated 0x0073D910) */
 #define MAPMAKER_ROOMS_LIGHT_GROUP_COUNT 32u    /* its entries (ids up to 0x1FF) */
 #define MAPMAKER_ROOMS_LIGHT_PER 0x0073D954u    /* records per room group */

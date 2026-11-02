@@ -94,6 +94,18 @@ def define(name):
     raise AssertionError(name)
 
 
+ID_SPACE = 0x10D                      # room ids 0..0x10C: real 1..0xFF, spare 0x100, players, views, global
+GLOBAL = 0x10C
+
+
+def by_id(patches):
+    return {p['id']: p for p in patches}
+
+
+def op_at(ops, address):
+    return next(p for p in ops if p['address'] == address)
+
+
 def test_table_shape():
     patches = table()
     ids = [p['id'] for p in patches]
@@ -101,17 +113,22 @@ def test_table_shape():
     ops = [p for p in patches if p['kind'] == 'operand']
     relocs = [p for p in patches if p['kind'] == 'relocate']
     assert not [p for p in patches if p['kind'] not in ('operand', 'relocate')]
-    # special ids move by 0x29 to the top of the byte range, nothing else in between
+    # special ids move by 0x37 to 0x100..0x10C (above every byte), nothing else in between
     specials = [p for p in ops if 'room special id' in p['reason']]
     for p in specials:
         old, new = p['reason'].split('room special id ')[1].split(' (')[0].split(' -> ')
-        assert int(new, 16) - int(old, 16) == 0x29 and int(p['value'], 16) == int(new, 16), p
+        assert int(new, 16) - int(old, 16) == 0x37 and int(p['value'], 16) == int(new, 16), p
     by_value = lambda v: [p for p in specials if int(p['value'], 16) == v]
-    assert len(by_value(0xFE)) == 98          # global room (+ light row width, list cap)
-    assert len(by_value(0xF3)) == 19 and len(by_value(0xF7)) == 11 and len(by_value(0xF8)) == 3
-    assert len(by_value(0xFF)) == 12          # id-space counts
-    real = [p for p in ops if 'last real room 200 -> 241' in p['reason']]
-    assert len(real) == 21 and all(int(p['value'], 16) == define('MAPMAKER_ROOMS_MAX') for p in real)
+    assert len(by_value(GLOBAL)) == 98        # global room (+ light row width, list cap)
+    assert len(by_value(0x101)) == 19 and len(by_value(0x105)) == 11 and len(by_value(0x106)) == 3
+    assert len(by_value(ID_SPACE)) == 12      # id-space counts
+    assert len(specials) == 98 + 19 + 11 + 3 + 12
+    players = [p for p in ops if p['reason'].endswith('player index = room - first player id')]
+    assert len(players) == 9 and {int(p['value'], 16) for p in players} == {(-0x101) & 0xFFFFFFFF}
+    real = [p for p in ops if 'last real room 200 -> 255' in p['reason']]
+    assert len(real) == 21 and all(int(p['value'], 16) == define('MAPMAKER_ROOMS_IDS_REAL') == 0xFF for p in real)
+    assert define('MAPMAKER_ROOMS_MAX') <= define('MAPMAKER_ROOMS_IDS_REAL') < 0x100
+    assert not [p for p in ops if '241' in p['reason'] or ' -> 0xFE' in p['reason'] or ' -> 0xF3' in p['reason']]
     # every new table lies in this area's sub-range, without overlap
     spans = sorted((int(r['new'], 16), int(r['new'], 16) + int(r['new_size'], 16), r['id']) for r in relocs)
     for lo, hi, rid in spans:
@@ -119,22 +136,196 @@ def test_table_shape():
     for (a0, a1, n0), (b0, b1, n1) in zip(spans, spans[1:]):
         assert a1 <= b0, (n0, n1)
     # the model table (moved by operand entries) and the query buffers fit around them
-    model = define('MAPMAKER_ROOMS_MODEL_TABLE')
+    model, model_end = define('MAPMAKER_ROOMS_MODEL_TABLE'), define('MAPMAKER_ROOMS_MODEL_TABLE') + 0xA08 * 2
     model_ops = [p for p in ops if 'm-0x78b860' in p['reason']]
-    assert model_ops and all(model <= int(p['value'], 16) < model + 0x1400 for p in model_ops)
+    assert model_ops and all(model <= int(p['value'], 16) < model_end for p in model_ops)
     query = define('MAPMAKER_ROOMS_QUERY_BUFFER')
     query_end = query + define('MAPMAKER_ROOMS_QUERY_BYTES') * define('MAPMAKER_ROOMS_QUERY_LEVELS')
-    for lo, hi, rid in spans + [(model, model + 0x1400, 'model')]:
+    for lo, hi, rid in spans:
+        assert hi <= model or lo >= model_end, rid
+    for lo, hi, rid in spans + [(model, model_end, 'model')]:
         assert hi <= query or lo >= query_end, rid
     assert SUB_RANGE[0] <= query and query_end <= SUB_RANGE[1]
     # the view array grows by the shadow at +0x6000 and is cleared in full
-    alloc = next(p for p in ops if p['address'] == '0x000C61D3')
-    clear = next(p for p in ops if p['address'] == '0x000C61E7')
+    alloc = op_at(ops, '0x000C61D3')
+    clear = op_at(ops, '0x000C61E7')
     assert int(alloc['value'], 16) == 0x6000 + 6 * 0xFFC + 8 == 4 * int(clear['value'], 16)
     # portal flags: frame and buffer grown together, and the C limit leaves the flag for portal 0
-    frame = next(p for p in ops if p['address'] == '0x0008A786')
-    flags = next(p for p in ops if p['address'] == '0x0008ADF0')
+    frame = op_at(ops, '0x0008A786')
+    flags = op_at(ops, '0x0008ADF0')
     assert int(frame['value'], 16) - 0x1270 == 4 * int(flags['value'], 16) == define('MAPMAKER_ROOMS_PORTALS') + 1
+
+
+def id_space_problems(patches):
+    """Stage 4: every table and count indexed by a room id covers ids 0..0x10C (0x10D); [] when right."""
+    out = []
+
+    def need(cond, why):
+        if not cond:
+            out.append(why)
+    ops = [p for p in patches if p['kind'] == 'operand']
+    r = by_id(patches)
+    v = lambda a: int(op_at(ops, a)['value'], 16)
+    # per-id prop tables (step 0x440): p1/p4 plus the directly named global entry 0x10C
+    for t, glob in (('rooms-reloc-p1-0x7b54e0', 'rooms-reloc-p1-global'), ('rooms-reloc-p4-0x7b5f00', 'rooms-reloc-p4-global')):
+        base, size = int(r[t]['new'], 16), int(r[t]['new_size'], 16)
+        need(size == GLOBAL * 4 and int(r[glob]['new'], 16) == base + GLOBAL * 4 and int(r[glob]['new_size'], 16) == 8, t)
+    for t in ('rooms-reloc-p2-0x7b5840', 'rooms-reloc-p3-0x7b5ba0', 'rooms-reloc-p5-0x7b6260'):
+        need(int(r[t]['new_size'], 16) >= ID_SPACE * 4, t)
+    bases = [int(r[t]['new'], 16) for t in ('rooms-reloc-p1-0x7b54e0', 'rooms-reloc-p2-0x7b5840', 'rooms-reloc-p3-0x7b5ba0',
+                                            'rooms-reloc-p4-0x7b5f00', 'rooms-reloc-p5-0x7b6260')]
+    need(all(b - a >= ID_SPACE * 4 for a, b in zip(bases, bases[1:])), 'per-id table step')
+    need(v('0x0009E4E6') == ID_SPACE * 4 and v('0x000A1ED5') == GLOBAL * 4, 'per-id loop ends')
+    # per-id flag bytes [0x7B977C]: allocation, clear (dwords + a stosw) and the special displacements
+    need(v('0x0008A6FD') == v('0x0008BA63') == 0x110 and ID_SPACE <= 4 * v('0x00089734') + 2 <= 0x110, 'id flag bytes')
+    need((v('0x00089746'), v('0x00089756'), v('0x00089776')) == (GLOBAL, 0x101, 0x106), 'id flag displacements')
+    # per-id drawn flag (stage 2)
+    need(int(r['rooms-reloc-f-0x7b5180']['new_size'], 16) >= ID_SPACE * 4, 'drawn flag table')
+    # light heads [3][0x10C]: base, the clear loop (count, stride, start at row 0's last entry, end)
+    heads, row = define('MAPMAKER_ROOMS_LIGHT_HEADS'), define('MAPMAKER_ROOMS_LIGHT_ROW')
+    head, rest = r['rooms-reloc-l1-head'], r['rooms-reloc-l1-rest']
+    need(row == GLOBAL and int(head['new'], 16) == heads, 'light head base / row')
+    need(int(rest['new'], 16) == heads + int(head['new_size'], 16), 'light head pieces')
+    need(int(rest['new'], 16) + int(rest['new_size'], 16) == heads + 3 * row * 4, 'light head size')
+    start = int(rest['new'], 16) + (0x0073C6A0 - int(rest['old'], 16))
+    need(start == heads + (row - 1) * 4 and v('0x00112272') == row, 'light head clear start / count')
+    need(v('0x0011227F') == row * 4 and v('0x00112285') == start + 3 * row * 4, 'light head clear stride / end')
+    # room light colour float[0x10C][3] (its fill loop runs from +4 while below the end)
+    need(int(r['rooms-reloc-l2-0x7ac880']['new_size'], 16) == GLOBAL * 12 + 4, 'light colour')
+    # light round robin room/16 covers the highest special id
+    need(int(r['rooms-reloc-lb-0x73d910']['new_size'], 16) // 4 > GLOBAL // 16, 'round robin')
+    # view shadow per view (0xFFC apart): rects 0x10D x 12, flags 0x110, list 0x10D words
+    flag_ops = [p for p in ops if 'view per-room visible flag' in p['reason']]
+    special_flags = [p for p in ops if 'view flag of special id' in p['reason']]
+    list_ops = [p for p in ops if 'view sorted room list' in p['reason']]
+    rect_ops = [p for p in ops if 'view per-room rect field' in p['reason'] or 'view rect' in p['reason']]
+    flags_at = min(int(p['value'], 16) for p in flag_ops)
+    list_at = v('0x000899A8')
+    need({int(p['value'], 16) for p in rect_ops} <= set(range(0x6000, 0x600D)) | {0x1801}, 'rects at +0x6000')
+    need(0x6000 + ID_SPACE * 12 <= flags_at and flags_at + 0x110 <= list_at, 'shadow flags')
+    need(list_at + ID_SPACE * 2 <= 0x6000 + 0xFFC, 'shadow list below the next view')
+    need(all(int(p['value'], 16) == list_at for p in list_ops if p['address'] not in ('0x00160A90', '0x0025F2E7')), 'list sites')
+    need(v('0x00160A90') == list_at - 0xE08 and v('0x0025F2E7') == list_at - 0xE0A, 'list from its counts')
+    for p in flag_ops:                     # real rooms keep their offset from the flags' base (fixed rooms 0x25..0x36)
+        need(int(p['value'], 16) - flags_at in (0, 0x25, 0x35, 0x36), p['address'])
+    for p in special_flags:                # mov [esi+0xD2C+stock id] -> flags + new id
+        stock = int(p['reason'].split('special id ')[1].split()[0], 16)
+        need(int(p['value'], 16) == flags_at + stock + 0x37, p['address'])
+    need(len(special_flags) == 12 and v('0x000899CA') == GLOBAL, 'special flags / list cap')
+    need(5 * 0xFFC + list_at + ID_SPACE * 2 <= v('0x000C61D3'), 'view array allocation')
+    need(list_at + ID_SPACE * 2 <= int(r['rooms-reloc-v-0x749890']['new_size'], 16), 'front-end static view')
+    # model table: room models 0x908..0x907+255 (0xA06), 0x18-byte per-model array, bounds
+    need(v('0x002427C3') * 2 == 0xA08 > 0x907 + define('MAPMAKER_ROOMS_IDS_REAL'), 'model table clear')
+    need(all(v(a) == 0xA08 for a in ('0x000A5E4E', '0x001B59B8', '0x001B5C09', '0x001B618E')), 'model bounds')
+    need(v('0x0008392D') == 0xA08 * 0x18 and v('0x00083947') * 4 == v('0x0008392D'), 'per-model array')
+    need(define('MAPMAKER_ROOMS_MODEL_TABLE') + 0xA08 * 2 <= int(r['rooms-reloc-lb-0x73d910']['new'], 16), 'model table end')
+    return out
+
+
+def _mutate(entry_id, **fields):
+    return [dict(p, **fields) if p['id'] == entry_id or p.get('address') == entry_id else p for p in table()]
+
+
+ID_SPACE_MUTATIONS = {
+    'p2-256-entries': lambda: _mutate('rooms-reloc-p2-0x7b5840', new_size='0x400'),
+    'p1-global-stale': lambda: _mutate('rooms-reloc-p1-global', new='0x008C73F8'),
+    'p-step-0x400': lambda: _mutate('rooms-reloc-p3-0x7b5ba0', new='0x008C7800'),
+    'loop-end-0xFF': lambda: _mutate('0x0009E4E6', value='0x3FC'),
+    'id-flags-clear-short': lambda: _mutate('0x00089734', value='0x40'),
+    'id-flag-global-stale': lambda: _mutate('0x00089746', value='0xFE'),
+    'drawn-flag-small': lambda: _mutate('rooms-reloc-f-0x7b5180', new_size='0x400'),
+    'light-head-start': lambda: _mutate('rooms-reloc-l1-head', new_size='0xD0'),
+    'light-head-stride': lambda: _mutate('0x0011227F', value='0x3F8'),
+    'light-head-end': lambda: _mutate('0x00112285', value='0x8C93DC'),
+    'light-colour-small': lambda: _mutate('rooms-reloc-l2-0x7ac880', new_size='0xBEC'),
+    'round-robin-16': lambda: _mutate('rooms-reloc-lb-0x73d910', new_size='0x40'),
+    'shadow-flags-stock': lambda: _mutate('0x000F7F54', value='0x6C00'),
+    'shadow-special-flag': lambda: _mutate('0x000CC9FB', value='0x6CFE'),
+    'shadow-list-stock': lambda: _mutate('0x00116F4B', value='0x6D00'),
+    'shadow-list-count': lambda: _mutate('0x00160A90', value='0x5EF8'),
+    'list-cap': lambda: _mutate('0x000899CA', value='0xFE'),
+    'model-bound': lambda: _mutate('0x001B5C09', value='0xA00'),
+    'model-array': lambda: _mutate('0x0008392D', value='0xF000'),
+}
+
+
+def test_id_space_tables():
+    assert not id_space_problems(table())
+
+
+@pytest.mark.parametrize('mutation', sorted(ID_SPACE_MUTATIONS))
+def test_id_space_mutations_fail(mutation):
+    assert id_space_problems(ID_SPACE_MUTATIONS[mutation]()), mutation
+
+
+def c_define(path, name):
+    for line in (ROOT / path).read_text(encoding='utf-8').splitlines():
+        if line.startswith(f'#define {name} '):
+            return int(line.split()[2].rstrip('u'), 0)
+    raise AssertionError(name)
+
+
+def test_other_areas_use_the_moved_tables():
+    """The objects pool clear and the probe read the per-id tables where rooms.json puts them."""
+    r = by_id(table())
+    new = lambda t: int(r[t]['new'], 16)
+    objects = (ROOT / 'src/interface/pc_mapmaker_objects.inc').read_text(encoding='utf-8')
+    for t in ('rooms-reloc-p1-0x7b54e0', 'rooms-reloc-p2-0x7b5840', 'rooms-reloc-p5-0x7b6260'):
+        assert f'    mapmaker_objects_clear(0x{new(t):08X}u,0x{ID_SPACE:X}u*4u);' in objects, t
+    assert objects.count('mapmaker_objects_clear(0x008C') == 3
+    probe = 'src/interface/pc_mapmaker_probe.inc'
+    assert c_define(probe, 'MAPMAKER_PROBE_ROOM_COUNTS') == new('rooms-reloc-p1-0x7b54e0')
+    assert c_define(probe, 'MAPMAKER_PROBE_ROOM_LISTS') == new('rooms-reloc-p4-0x7b5f00')
+    assert c_define(probe, 'MAPMAKER_PROBE_ROOM_IDS') == ID_SPACE and c_define(probe, 'MAPMAKER_PROBE_MODEL_ROOMS_END') == 0xA08
+    assert c_define('src/interface/pc_mapmaker_skymask.inc', 'MAPMAKER_SKYMASK_TABLE') == new('rooms-reloc-t3-0x703460')
+    assert c_define('src/interface/pc_mapmaker_roof.inc', 'MAPMAKER_ROOF_ROOMS') == 256 > define('MAPMAKER_ROOMS_IDS_REAL')
+    assert '#define OPENVIEW_RECT 0x6000u' in (ROOT / 'src/interface/pc_mapmaker_openview.inc').read_text(encoding='utf-8')
+
+
+def rooms_regions():
+    """Every block of the rooms sub-range: relocated tables, model table, query buffers."""
+    regions = [(int(r['new'], 16), int(r['new'], 16) + int(r['new_size'], 16), r['id'])
+               for r in table() if r['kind'] == 'relocate']
+    model = define('MAPMAKER_ROOMS_MODEL_TABLE')
+    query = define('MAPMAKER_ROOMS_QUERY_BUFFER')
+    regions += [(model, model + 0xA08 * 2, 'model table'),
+                (query, query + define('MAPMAKER_ROOMS_QUERY_BYTES') * define('MAPMAKER_ROOMS_QUERY_LEVELS'), 'query')]
+    return sorted(regions)
+
+
+def test_extension_map_rooms_sub_range():
+    """No other user of 0x008C0000..0x008E0000 in tracked code: the gaps the 255 layout uses are free."""
+    import re
+    regions = rooms_regions()
+    for (a0, a1, n0), (b0, b1, n1) in zip(regions, regions[1:]):
+        assert a1 <= b0, (n0, n1)
+    inside = lambda x: any(lo <= x < hi for lo, hi, _ in regions)
+    # constants of other areas (C sources and their guest-code tables) never point into the rooms blocks' gaps
+    found = []
+    for path in sorted((ROOT / 'src').rglob('*')):
+        if path.suffix not in ('.c', '.h', '.inc') or path.name == 'pc_mapmaker_rooms.inc':
+            continue
+        for m in re.finditer(r'0x00(8[CDcd][0-9A-Fa-f]{4})', path.read_text(encoding='utf-8', errors='replace')):
+            found.append((int(m.group(1), 16), path.name))
+    for path in sorted((ROOT / 'config/guest-code-patches').glob('*.json')):
+        if path.name in ('rooms.json', '00-header.json'):
+            continue
+        for e in json.loads(path.read_text(encoding='utf-8'))['patches']:
+            for key in ('value', 'new'):
+                if isinstance(e.get(key), str):
+                    found.append((int(e[key], 16), path.name))
+    stray = [(hex(x), n) for x, n in found if 0x008C0000 <= x < 0x008E0000 and not inside(x)]
+    assert not stray, stray
+    # the rooms area's own operand values into the sub-range are inside its blocks (the head clear end is a bound)
+    for p in table():
+        if p['kind'] == 'operand' and 0x008C0000 <= int(p['value'], 16) < 0x008E0000:
+            assert inside(int(p['value'], 16)) or p['address'] == '0x00112285', p
+    # the colour fill writes entries 0..0x10B from +4: inside the table it is declared with
+    colour = by_id(table())['rooms-reloc-l2-0x7ac880']
+    assert 12 * GLOBAL <= int(colour['new_size'], 16)          # last entry: +4+12*0x10B-4 .. +12*0x10C
+    gaps = [(a1, b0) for (a0, a1, _), (b0, b1, _) in zip(regions, regions[1:]) if b0 > a1]
+    assert regions[0][0] == 0x008C0000 and regions[-1][1] == 0x008D4000
+    assert sum(b - a for a, b in gaps) < 0x2000, [(hex(a), hex(b)) for a, b in gaps]
 
 
 def test_header_extension_range():

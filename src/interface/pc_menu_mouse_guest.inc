@@ -102,13 +102,14 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook)
     }
     for(p=off;off[0] && (p=strstr(p,area))!=NULL;p+=n)
         if(p[-1]==',' && p[n]==',') { enabled=0;break; }
-    /* The container, actors and story code patches assume their hooks (buffer
-     * sizes, the AI cap in code is 63 and only the hook keeps 30, the Story
-     * character gate byte is 0 = choose freely until a hook sets it, the grid
-     * settings block is empty until its hook writes it), so those areas cannot
-     * be switched off; the request is ignored and said so once. */
+    /* The container, actors, story, grid and rooms code patches assume their
+     * hooks (buffer sizes, the AI cap in code is 63 and only the hook keeps 30,
+     * the Story character gate byte is 0 = choose freely until a hook sets it,
+     * the grid settings block is empty until its hook writes it, light rooms
+     * past 0xFF live in the rooms hooks' side table in every scene), so those
+     * areas cannot be switched off; the request is ignored and said so once. */
     if(!enabled) {
-        static const char *const fixed[]={"container","actors","story","grid"};
+        static const char *const fixed[]={"container","actors","story","grid","rooms"};
         static int warned[sizeof fixed/sizeof fixed[0]];
         for(unsigned i=0;i<sizeof fixed/sizeof fixed[0];i++) if(!strcmp(area,fixed[i])) {
             if(!warned[i]) { warned[i]=1;fprintf(stderr,"[mapmaker-area] %s cannot be switched off; ignored\n",area);fflush(stderr); }
