@@ -1,8 +1,10 @@
 # MapMaker Khallos in the flying chair (story mission 4 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_khallos.inc` (area
-`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 188
+`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 225
 mutations, plus decode, US XBE data and game-pak checks of every site below).
+Since the .27 playtest the placeholder itself is the seated Khallos and each
+chair gets its own named Boss bar ([Playtest .27](#playtest-v040-mapmaker27-seated-khallos-and-bars)).
 Wired in v0.4.0-mapmaker.25 (picker row 156); **up to four chairs per map**
 since then ([Several chairs](#several-chairs)), with three new wrappers and
 more logging ([Not appearing in .25](#not-appearing-in-v040-mapmaker25)). No guest-code table,
@@ -180,20 +182,22 @@ A map places the chair with a **Story AI whose character is id 0x33** (the
 fifth copy of the story-only cutscene soldier `chrs/soldiermodel_talk`, model
 0x619 in `chr.pak`; ids 0x2F..0x33 and 0x4B share it; no Arcade row; no other
 port uses it; CONFIRMED). Change `KHL_ID` (one define) if the integrator
-prefers another id. Optional rider: a **Khallos Story AI (id 2, the Arcade
-Khallos, model 0x582 `chrs/trainkhallos`, the train's model)** placed within
-5 m (x/z) of the chair's Story AI. The nearest one becomes the rider (class 8)
-when lv11.pak is mounted (the map's set holds both 0x33 and 2); every other
-Khallos is untouched.
+prefers another id. Since .27 that Story AI is itself made with Khallos'
+models (model 0x582 `chrs/trainkhallos`, the train's) and rides the chair; its
+name and Boss setting give the chair's bar. Fallback (it could not be made
+as Khallos): a **Khallos Story AI (id 2)** placed within 5 m (x/z) becomes
+the rider (class 8) when lv11.pak is mounted; every other Khallos is
+untouched.
 
 - Save format: **unchanged** (stock custom-set members, stock Story AI chunks).
 - Stock or older builds: a soldier bot and a Khallos bot.
 - With `TSFP_MAPMAKER_KHALLOS=0`, when the pak or model cannot be loaded, the
   train's other variant runs, or for a fifth placeholder: a soldier bot (logged).
-- The Story AI's own settings (health, Boss flag, logic) do not apply to the
-  chair: it is a prop with its own health (60) and damage rules, and its defeat
-  is not seen by MapMaker logic. The rider is removed with the chair (whether
-  that counts as an AI death for MapMaker logic is unknown).
+- The Story AI's Boss flag, name and Boss/health multipliers apply to the
+  chair's bar and health (60 x factor) since .27; its own health setting and
+  logic do not: the chair keeps its damage rules and its defeat is not seen
+  by MapMaker logic. The rider is removed with the chair (whether that counts
+  as an AI death for MapMaker logic is unknown).
 
 Editor: this area adds **no picker row** (the picker hooks are
 `pc_mapmaker_realbosses.inc`'s). Suggested `rbs_extra` row:
@@ -250,7 +254,11 @@ level's chair.
 | `WRAP sub_000468A0 -> pc_mapmaker_khallos_engine` | looping sound (cdecl), hot | new; inside the update at 0x001EF824 |
 | `WRAP sub_00263260 -> pc_mapmaker_khallos_rider` | seated Khallos' handler (cdecl entity) | **new (several chairs)**; only for this level's riders |
 | `WRAP sub_00263150 -> pc_mapmaker_khallos_rider_pose` | his pose callback (cdecl entity) | **new (several chairs)**; reached through a stored pointer, so the lifted function is wrapped |
-| `WRAP sub_000DAC30 -> pc_mapmaker_khallos_create` | character maker (cdecl id, .., pool slot) | **new (log only)**; **shared** with `pc_mapmaker_realbosses_create`, order free |
+| `WRAP sub_000DAC30 -> pc_mapmaker_khallos_create` | character maker (cdecl id, .., pool slot) | **shared** with `pc_mapmaker_realbosses_create`, order free; since .27 also makes the placeholder with Khallos' models (character table swap around the original) |
+| `WRAP sub_0014CC80 -> pc_mapmaker_khallos_hud` | story boss bar (ebx = HUD block) | **new (.27)**; chain **inside** `pc_mapmaker_bosses_hud`, like `pc_mapmaker_robot_hud` / `pc_mapmaker_realbosses_hud` (order among those free) |
+
+`pc_mapmaker_bosses.inc` gains `bos_bar_proxy` (no wrapper; this area sets
+it at its mount hook when both are built in).
 
 The five world-call wrappers test one flag first (set only while the chair's
 update runs in the moved frame), so they cost one load elsewhere. Host code
@@ -301,22 +309,70 @@ guide entry for this area.
    floor: in story play a flying chair hovers there (log: `mounted prop3.pak`,
    `requested the chair model`, `Khallos' chair created`, `spawn (...)`,
    `chair placeholder AI removed`).
-2. Also add Khallos (id 2) to the set and place him within 5 m of it: he sits
-   in the chair (log `mounted lv11.pak`, `Khallos rides the chair`).
+2. Khallos sits in the chair (log `mounted lv11.pak`, `chair placeholder made
+   with Khallos' models`, `chair placeholder model (0x582, 0x582)`, `the
+   placeholder is Khallos and rides his own chair`); no other Story AI needed.
 3. Walk within 30 m: the fight starts (log `fight started`, `chair level
    event dropped`); the chair rises, stays about 11 m from you, faces you and
-   fires; the bottom bar reads "Khallos".
+   fires; with Boss on, the bottom bar reads the Story AI's name (log `stock
+   chair bar hidden`). Shooting Khallos himself hurts the chair (log `its
+   rider was hit, the chair takes it`).
 4. Shoot it: hits spin it; map logic markers are unaffected.
 5. Bring it to 0: it shoots upward and vanishes, with its rider (log `chair
    shot down`, `flew off and was removed`, `rider removed with the chair`).
 6. Two to four placeholders: each becomes a chair flying around its own
-   spawn (log `chair N spawn (...)`); shooting one down removes only that one
-   (and its rider). A fifth stays a soldier; `TSFP_MAPMAKER_KHALLOS=0` gives
+   spawn (log `chair N spawn (...)`), each with Khallos and its own bar (up to
+   four in range, nearest first); hits log `chair N hit`; shooting one down
+   removes only that one (and its rider). A fifth stays a soldier; `TSFP_MAPMAKER_KHALLOS=0` gives
    a soldier; story mission 4 still plays stock.
 7. If no chair appears: the log should now say whether the placeholder
    character was made (`chair placeholder character made` / `NOT made`) and
    whether its AI started (`chair placeholder AI starts`). Neither line means
    the map never spawned that Story AI.
+
+## Playtest v0.4.0-mapmaker.27: seated Khallos and bars
+
+User: "Single khallos works, but khallos is not actually visible. It's just
+his chair floating with the appropriate animations. Still takes damage." and
+"3 khallos' didn't seem to take damage, and only 1 boss health bar appeared.
+Also, health read khallos instead of the story AI name." Log `logs/m27.err`
+(main checkout) lines 13330-16510.
+
+| report | cause | fix |
+|---|---|---|
+| no Khallos on the chair | **proven** (log): no `mounted lv11.pak`, no Khallos character or AI start, no `rides the chair` line. The rider had to be a separate Khallos Story AI (id 2) in the set and within 5 m; the map had only the chair's Story AI, which was removed on the first frame | the placeholder is made **with Khallos' models** and rides its own chair (below); lv11.pak is mounted whenever the set holds 0x33 |
+| one bar, labelled "Khallos" | **proven** (decode): the only bar was the stock one (`sub_0014CC80` draws the focus `[[0x007B0C7C]+0xFF4]`, set by the update to the chair that woke last, label text 0xFF1 = this area's "Khallos"); the bosses area draws Story AI bars, and the placeholder AI was gone | **hud** hides the stock bar of a ridden chair; the bosses area draws the rider's Boss bar with his Story AI name and **the chair's health** (`bos_bar_proxy`) |
+| several chairs took no damage | **suspected**, not reproduced: the damage route is per chair (record +0 picks the chair, fixture-tested since .26) and the decode shows no other chair test; with one bar on the last-woken chair (chair 0 in the log, woken after 1 and 2), hits on the others never showed | per-chair bars (above); new log lines `chair N hit (active, damage): health a -> b` (first 4 per chair) and for hits through the rider |
+
+The seated Khallos, step by step:
+
+- **request**: when the set lacks Khallos (id 2), his models (character
+  table `0x0053A3CC` + 2x0x30: +4 = 0x582 `chrs/trainkhallos`, in `chr.pak`,
+  +8 when not -1) are requested with `sub_000A5E40`, as the set preload
+  `sub_000D7780` does for members.
+- **create** (`sub_000DAC30`, already wrapped): for id 0x33, when lv11.pak is
+  mounted, a chair can be made (prop3.pak, row, init, model read), fewer than
+  four chairs exist and both his models are read, id 0x33's +4/+8 are set to
+  Khallos' for that call and put back after (`sub_000DAC30` reads the model at
+  0x000DAC59 and +8 at 0x000DB084, nothing else; decode-checked). Otherwise
+  the soldier model, as before.
+- **ai_start**: a placeholder whose entity model word (+0x94) is Khallos' gets
+  class 8 (+0x10 = 0, +0x14 = 8, +0x9D0 = 0) and rides its own chair; it is
+  not removed. A Khallos Story AI placed nearby then stays a bot. A soldier-
+  model placeholder still takes a nearby Khallos as before, or is removed.
+- **update**: each frame, after the original, the rider's health is put back
+  to its maximum; what he lost goes to the chair while it fights (a kill this
+  way is the same "shot down" as a hit on the chair). A one-hit kill of the
+  rider (health <= 0) is forwarded and not revived.
+- **hud** (`sub_0014CC80`, chained inside `pc_mapmaker_bosses_hud`): a focus
+  on a chair whose rider is still its AI is cleared for the stock call and put
+  back. The bosses area then draws one bar per Boss-flagged rider in range:
+  `bos_bar_proxy` (set by this area at each level's mount) makes the chair the
+  bar's entity for health, Boss/health multipliers, range and death; the
+  label is the Story AI's saved name. Boss Off: no health shown, as for the
+  other ported bosses. Sub-boss bar: the overhead meter shows the rider's own
+  (always full) health (not handled).
+- **text**: "Khallos" stays for a chair without a rider (fallback).
 
 ## Not appearing in .25/.26: set slot 13 (fixed in .27)
 

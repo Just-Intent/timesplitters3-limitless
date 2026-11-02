@@ -101,6 +101,8 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 #include "pc_mapmaker_limits.inc"
 #include "pc_mapmaker_bosses.inc"
 
+static uint32_t proxy_from, proxy_to;
+static uint32_t test_proxy(uint32_t ent) { return ent==proxy_from?proxy_to:0u; }
 static int failures, esp_errors;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
 static void hook1(void (*fn)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t arg,int line)
@@ -598,6 +600,22 @@ int main(void)
     setf(ENT(2)+0x64u,12.0f);
     CHECK(hud_frame(HUD0) && bar.edi==ENT(1) && nlog==2 && blog[1].edi==ENT(2));
     setf(ENT(2)+0x64u,5.0f);
+
+    /* a Boss AI whose bar is another entity (pc_mapmaker_khallos.inc: the chair he rides) */
+    make_actor(5,0,30.0f,1.0f);list_set(6);                         /* "Big Robot" x4, himself out of range */
+    setf(ENT(40)+0x64u,8.0f);setf(ENT(40)+0x1D8u,60.0f);setf(ENT(40)+0x1CCu,30.0f);
+    proxy_from=ENT(5);proxy_to=ENT(40);bos_bar_proxy=test_proxy;
+    CHECK(hud_frame(HUD0) && nlog==3 && blog[0].edi==ENT(2) && blog[1].edi==ENT(40) && blog[2].edi==ENT(1));
+    CHECK(!strcmp(blog[1].label,"Big Robot"));                      /* his name */
+    CHECK(FLOAT_AT(ENT(40)+0x1D8u)==240.0f && FLOAT_AT(ENT(40)+0x1CCu)==120.0f && FLOAT_AT(ENT(5)+0x1D8u)==1.0f);   /* the chair x4 */
+    CHECK(hud_frame(HUD0) && FLOAT_AT(ENT(40)+0x1D8u)==240.0f);     /* once */
+    setf(ENT(40)+0x1CCu,-1.0f);                                     /* the chair is down: no bar */
+    CHECK(hud_frame(HUD0) && nlog==2 && blog[1].edi==ENT(1));
+    setf(ENT(40)+0x1CCu,10.0f);setf(ENT(40)+0x64u,50.0f);           /* range from the chair */
+    CHECK(hud_frame(HUD0) && nlog==2);
+    proxy_to=0;setf(ENT(5)+0x64u,8.0f);                             /* none: his own */
+    CHECK(hud_frame(HUD0) && nlog==3 && blog[1].edi==ENT(5));
+    bos_bar_proxy=0;list_set(5);
 
     /* a stock bar keeps the bottom slot: ours above it */
     stock_bar=1;

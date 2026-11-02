@@ -134,6 +134,8 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 }
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
+#define BOS_BAR_PROXY 1                                    /* pc_mapmaker_bosses.inc's hook, as in the build */
+static uint32_t (*bos_bar_proxy)(uint32_t entity);
 #include "pc_mapmaker_khallos.inc"
 /* chair k's own copy of the chair statics / emitters (in guest memory only during its code) */
 #define CW(k,a) (khl_ch[k].block[((a)-0x0078F000u)/4u])
@@ -144,6 +146,20 @@ static unsigned inner_events, nworld;
 static void fake(void) { originals++;g_eax=orig_eax;g_esp+=4u; }
 static void fake_ai(void) { originals++;g_esp+=4u; }
 static void fake_event(void) { inner_events++;g_esp+=4u; }
+/* sub_000DAC30: the character id's models as it reads them (+4, +8), the entity's model word */
+#define CHARS 0x0053A3CCu
+static uint32_t made_model, made_lod, made_33;
+static void fake_create(void)
+{
+    uint32_t id=WORD_AT(g_esp+4u);
+    originals++;
+    made_model=WORD_AT(CHARS+id*0x30u+4u);made_lod=WORD_AT(CHARS+id*0x30u+8u);made_33=WORD_AT(CHARS+0x33u*0x30u+4u);
+    HALF_AT(ENT(0)+0x94u)=(uint16_t)made_model;g_eax=ENT(0);
+    g_esp+=4u;
+}
+/* sub_0014CC80: the focus the stock bar saw */
+static uint32_t hud_focus;
+static void fake_hud(void) { originals++;hud_focus=WORD_AT(PLAYER+0xFF4u);g_esp+=4u; }
 
 /* A call from inside a fake original into a hook: ret and args pushed below esp. */
 static void inner(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,int line)
@@ -331,6 +347,24 @@ static void level(int rider_first,int line)
     if(nspawn!=s+1u) { fprintf(stderr,"%s:%d: chair not spawned\n",__FILE__,line);failures++; }
 }
 #define UPDATE(n) CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR,0,0,n)
+/* a new level whose set holds the chair only; the placeholder made (as Khallos when it can be) and started */
+static const uint16_t chair_set[]={0x0C,0x33};
+static void own_level(int line)
+{
+    play_scene();
+    container(0x11,chair_set,2,NULL,0);
+    resources(1,0x001F4E00u);
+    HALF_AT(0x008CA000u+0x582u*2u)=4;                             /* Khallos' row */
+    pak_mounted=0;anim_mounted=0;WORD_AT(0x006D7880u)=10u;WORD_AT(0x006D7C4Cu)=0;
+    WORD_AT(CHARS+2u*0x30u+4u)=0x582u;WORD_AT(CHARS+2u*0x30u+8u)=0xFFFFFFFFu;
+    WORD_AT(CHARS+0x33u*0x30u+4u)=0x619u;WORD_AT(CHARS+0x33u*0x30u+8u)=0x61Au;
+    call(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1,line);
+    call(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1,line);
+    call(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1,line);
+    actor(0,0x33,40.0f,2.0f,30.0f,1.5f);HALF_AT(ENT(0)+0x94u)=0;
+    call(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,1u,1,line);
+    call(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1,line);
+}
 
 int main(void)
 {
@@ -430,14 +464,11 @@ int main(void)
     CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
     CHECK(nmount==6 && !khl_ch[0].obj && !khl_lv.n);                              /* a new level forgets the chair */
 
-    /* ---- anims: lv11.pak only with the chair and Khallos in the set ---------- */
-    container(0x11,chair_only,2,NULL,0);
+    /* ---- anims: lv11.pak with the chair in the set (its placeholder rides it) ---- */
+    container(0x11,rider_only,2,NULL,0);                          /* Khallos alone: no chair */
     CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nanim==0);
-    container(0x11,rider_only,2,NULL,0);
-    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
-    CHECK(nanim==0);
-    container(0x11,chair_only,2,rider_only+1,1);                  /* Khallos in slot 11 */
+    container(0x11,neither,2,extra,2);                            /* the chair in slot 12 */
     WORD_AT(0x006D7880u)=57u;
     CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nanim==0);
@@ -451,14 +482,18 @@ int main(void)
     CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);    /* already mounted */
     CHECK(nanim==2);
     anim_mounted=0;
-    WORD_AT(CONT)=0;                                              /* unreadable */
+    container(0x11,chair_only,2,NULL,0);                          /* the chair without Khallos */
     CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
     CHECK(nanim==3 && anim_mounted);
+    anim_mounted=0;
+    WORD_AT(CONT)=0;                                              /* unreadable */
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CHECK(nanim==4 && anim_mounted);
     anim_mounted=0;
     container(0x11,with_both,3,NULL,0);
     WORD_AT(0x0079094Cu)=102u;                                    /* the editor */
     CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
-    CHECK(nanim==3);
+    CHECK(nanim==4);
     play_scene();
 
     /* ---- request ------------------------------------------------------------ */
@@ -885,6 +920,138 @@ int main(void)
     CHECK(!khl_lv.n && khl.slots && !WORD_AT(khl.slots) && !WORD_AT(khl.slots+8u) && !WORD_AT(khl.slots+12u));
     UPDATE(1);
     CHECK(nremove==n && seen_line==-535.0f);
+
+    /* ---- the placeholder made as Khallos rides his own chair (.27: "not actually visible") ---- */
+    req_reads=1;
+    bos_bar_proxy=0;
+    n=nrequest;
+    own_level(__LINE__);
+    CHECK(bos_bar_proxy==khl_bar_entity && anim_mounted);
+    CHECK(nrequest==n+2u && requested==0x582u);                          /* the chair, then his model (no +8) */
+    CHECK(made_model==0x582u && made_lod==0xFFFFFFFFu);                  /* made with Khallos' models ... */
+    CHECK(WORD_AT(CHARS+0x33u*0x30u+4u)==0x619u && WORD_AT(CHARS+0x33u*0x30u+8u)==0x61Au);   /* ... for that call only */
+    CHECK(khl_lv.n==1u && khl_ch[0].own && khl_ch[0].rider==A(0) && khl_ch[0].rider_ent==ENT(0) && khl_ch[0].rider_rec==REC(0));
+    CHECK(WORD_AT(A(0)+0x10u)==0 && WORD_AT(A(0)+0x14u)==8u && WORD_AT(A(0)+0x9D0u)==0);
+    actor(1,0x02,41.0f,2.0f,31.0f,0.0f);                                 /* a Khallos next to it: a bot */
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(1),0,0,1);
+    CHECK(khl_ch[0].rider==A(0) && WORD_AT(A(1)+0x14u)==0x11000000u);
+    CHECK(khl_bar_entity(ENT(0))==CHAIR && !khl_bar_entity(ENT(1)) && !khl_bar_entity(CHAIR));   /* his bar shows the chair */
+    khl_ch[0].removed=1;CHECK(!khl_bar_entity(ENT(0)));khl_ch[0].removed=0;
+    constants();
+    players(100.0f,100.0f,1.0f,100.0f,100.0f,1.0f);                       /* far */
+    n=nremove;
+    UPDATE(1);UPDATE(1);
+    CHECK(nremove==n);                                                   /* he stays */
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(rider_saw==CHAIR);
+    /* hits on him go to the chair while it fights; his health is put back */
+    FLOAT_AT(ENT(0)+0x1D8u)=20.0f;FLOAT_AT(ENT(0)+0x1CCu)=15.0f;FLOAT_AT(CHAIR+0x1CCu)=60.0f;
+    UPDATE(1);                                                           /* waiting: nothing taken */
+    CHECK(FLOAT_AT(ENT(0)+0x1CCu)==20.0f && FLOAT_AT(CHAIR+0x1CCu)==60.0f);
+    players(45.0f,33.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    UPDATE(1);                                                           /* wakes */
+    CHECK(CW(0,0x0078F04Cu)==1u);
+    FLOAT_AT(ENT(0)+0x1CCu)=15.0f;
+    UPDATE(1);
+    CHECK(FLOAT_AT(CHAIR+0x1CCu)==55.0f && FLOAT_AT(ENT(0)+0x1CCu)==20.0f && khl_ch[0].hits==1u);
+    UPDATE(1);
+    CHECK(FLOAT_AT(CHAIR+0x1CCu)==55.0f);                                /* unhurt: nothing */
+    FLOAT_AT(CHAIR+0x1CCu)=3.0f;FLOAT_AT(ENT(0)+0x1CCu)=16.0f;nstop=0;WORD_AT(PLAYER+0xFF4u)=CHAIR;
+    UPDATE(1);                                                           /* shot down through him */
+    CHECK(FLOAT_AT(CHAIR+0x1CCu)==-1.0f && nstop==3u && WORD_AT(PLAYER+0xFF4u)==0 && FLOAT_AT(ENT(0)+0x1CCu)==20.0f);
+    FLOAT_AT(ENT(0)+0x1CCu)=10.0f;
+    UPDATE(1);                                                           /* dead: nothing more taken */
+    CHECK(FLOAT_AT(CHAIR+0x1CCu)==-1.0f && nstop==3u && FLOAT_AT(ENT(0)+0x1CCu)==20.0f);
+    /* killed by one hit: his whole health goes to the chair, he is not revived */
+    own_level(__LINE__);
+    players(45.0f,33.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    UPDATE(1);
+    FLOAT_AT(ENT(0)+0x1D8u)=20.0f;FLOAT_AT(ENT(0)+0x1CCu)=-5.0f;FLOAT_AT(CHAIR+0x1CCu)=60.0f;
+    UPDATE(1);
+    CHECK(FLOAT_AT(CHAIR+0x1CCu)==40.0f && FLOAT_AT(ENT(0)+0x1CCu)==-5.0f);
+    /* the stock bar: hidden for a seated chair, the focus put back */
+    own_level(__LINE__);
+    WORD_AT(PLAYER+0xFF4u)=CHAIR;hud_focus=1u;
+    CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+    CHECK(hud_focus==0 && WORD_AT(PLAYER+0xFF4u)==CHAIR);
+    WORD_AT(PLAYER+0xFF4u)=ENT(5);
+    CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+    CHECK(hud_focus==ENT(5));
+    WORD_AT(PLAYER+0xFF4u)=CHAIR;
+    WORD_AT(A(0)+0xBF0u)=REC(9);                                         /* his entry reused: not seated */
+    CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+    CHECK(hud_focus==CHAIR);
+    WORD_AT(A(0)+0xBF0u)=REC(0);
+    WORD_AT(0x0079094Cu)=102u;
+    CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+    CHECK(hud_focus==CHAIR);
+    play_scene();
+    /* not made as Khallos: no lv11.pak, his model unread, no chair possible, a fifth chair, another id, opted out */
+    own_level(__LINE__);
+    anim_mounted=0;made_model=0;
+    CALL(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,2u,1);
+    CHECK(made_model==0x619u);
+    anim_mounted=1;req_state[4]=0;
+    CALL(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,2u,1);
+    CHECK(made_model==0x619u);
+    req_state[4]=2;WORD_AT(CHARS+2u*0x30u+8u)=0x583u;                    /* a second model, unread */
+    CALL(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,2u,1);
+    CHECK(made_model==0x619u);
+    WORD_AT(CHARS+2u*0x30u+8u)=0xFFFFFFFFu;
+    pak_mounted=0;
+    CALL(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,2u,1);
+    CHECK(made_model==0x619u);
+    pak_mounted=1;
+    khl_lv.n=KHL_MAX;
+    CALL(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,2u,1);
+    CHECK(made_model==0x619u);
+    khl_lv.n=1u;
+    WORD_AT(CHARS+0x34u*0x30u+4u)=0x620u;
+    CALL(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x34u,0,2u,1);
+    CHECK(made_model==0x620u && made_33==0x619u);                        /* another id: nothing swapped */
+    set_env("TSFP_MAPMAKER_KHALLOS","0");
+    CALL(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,2u,1);
+    CHECK(made_model==0x619u);
+    set_env("TSFP_MAPMAKER_KHALLOS",NULL);
+    CALL(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,2u,1);
+    CHECK(made_model==0x582u);                                           /* all there again */
+    /* his second model is requested and swapped too */
+    WORD_AT(CHARS+2u*0x30u+8u)=0x583u;HALF_AT(0x008CA000u+0x583u*2u)=5;
+    n=nrequest;
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==n+3u && requested==0x583u);
+    CALL(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,2u,1);
+    CHECK(made_model==0x582u && made_lod==0x583u && WORD_AT(CHARS+0x33u*0x30u+8u)==0x61Au);
+    WORD_AT(CHARS+2u*0x30u+8u)=0xFFFFFFFFu;
+    /* made as Khallos but lv11.pak gone by its AI start: no rider, removed as before */
+    actor(2,0x33,-20.0f,2.0f,-20.0f,0.0f);HALF_AT(ENT(2)+0x94u)=0x582u;
+    anim_mounted=0;
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
+    CHECK(khl_lv.n==2u && !khl_ch[1].own && !khl_ch[1].rider && WORD_AT(A(2)+0x14u)==0x11000000u);
+    anim_mounted=1;
+    /* a soldier-model placeholder: no own rider, removed on its first frame */
+    play_scene();
+    container(0x11,chair_only,2,NULL,0);
+    resources(1,0x001F4E00u);pak_mounted=0;anim_mounted=0;
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CALL(pc_mapmaker_khallos_anims,fake,0x0005C506u,0,0,0,1);
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    actor(0,0x33,40.0f,2.0f,30.0f,1.5f);HALF_AT(ENT(0)+0x94u)=0x619u;
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
+    CHECK(khl_lv.n==1u && !khl_ch[0].own && !khl_ch[0].rider);
+    players(100.0f,100.0f,1.0f,100.0f,100.0f,1.0f);
+    n=nremove;
+    UPDATE(1);
+    CHECK(nremove==n+1u);
+    /* Khallos in the set: the preload asks for his models, not this area */
+    play_scene();
+    container(0x11,with_both,3,NULL,0);
+    resources(1,0x001F4E00u);pak_mounted=1;
+    n=nrequest;
+    CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(nrequest==n+1u && requested==0x376u);
 
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
     printf("mapmaker khallos ok\n");
