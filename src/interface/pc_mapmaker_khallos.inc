@@ -149,12 +149,19 @@
  *    seated rider whose anim is not khallosidle gets it played again; restart
  *    (sub_001CDD60, the level restart without a pak mount) forgets the chairs
  *    as a new level does, so the placeholders get new ones.
+ *  - v0.4.0-mapmaker.34 ("none of the khallos' showed boss health", "a
+ *    texture stretched between my view and one of the khallos'"): the hud
+ *    hook no longer hides the focus chair's stock bar; the text hook names it
+ *    after its rider's Story AI (bos_story_name) and a fighting chair takes an
+ *    empty focus. The jet emitter, made by the init at the train start, is
+ *    moved to the chair (sub_0010E730) at creation and on each waiting frame.
+ *    Status lines add the rider's yaw, flags, anim speed and pose calls.
  *
- * Requires the includer's WORD_AT, guest_call, g_esp/g_eax,
+ * Requires the includer's WORD_AT, guest_call, g_esp/g_eax/g_ebx,
  * g_xbox_mem_offset, xbox_HeapAlloc and pc_mapmaker_limits.inc
  * (mapmaker_limits, MAPMAKER_GUEST_RET, MAPMAKER_PTR_OK); uses
- * pc_mapmaker_bosses.inc's bos_bar_proxy when BOS_BAR_PROXY is defined (it is
- * included first). Hot hooks (hud, text,
+ * pc_mapmaker_bosses.inc's bos_bar_proxy when BOS_BAR_PROXY is defined and its
+ * bos_story_name when BOS_BAR_EXTRA is (it is included first). Hot hooks (hud, text,
  * flame, flash, shot, sound, engine) test fixed values or a flag first. */
 #include <stdio.h>
 #include <stdlib.h>
@@ -271,6 +278,10 @@
 #define KHL_SMOKE_N 3u                   /* the death's emitters [0x0078DF50..58] */
 #define KHL_OWNERS 2u                    /* slots the engine knows as emitter owners: the jet, the death's first */
 #define KHL_EMIT_OWNER 0x0u              /* emitter +0: its owner slot, cleared by the engine on free (sub_0010E070) */
+#define KHL_EMIT_POS 0x14u               /* emitter position, written by sub_0010E730 (+0x14..+0x1C) */
+#define KHL_NAME 32u                     /* a Story AI's saved name (pc_mapmaker_bosses.inc BOS_NAME) */
+#define KHL_ENT_FLAGS 0x28u              /* entity flags (the handler clears 0x40020000 in state 1) */
+#define KHL_AI_SPEED 0xB08u              /* AI anim speed: sub_0005F460 plays a character's anims at it */
 #define KHL_LOGS 64u                     /* log lines per level */
 #define KHL_HITS 4u                      /* hit lines per chair */
 #define KHL_CREATES 8u                   /* placeholder/Khallos creation and AI start lines per level */
@@ -293,10 +304,12 @@
 
 extern void sub_00062260(void),sub_000622D0(void),sub_0005A130(void),sub_000A5E40(void),sub_000631C0(void);
 extern void sub_000A6F90(void),sub_0015DDA0(void),sub_000A9070(void),sub_0010E2A0(void),sub_0010EB90(void),sub_0005F460(void);
+extern void sub_0010E730(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
-/* Kept for the session: settings, label and the spawn argument buffer. */
-static struct { int read, optout; uint32_t label, args, slots; unsigned logged; } khl;
+/* Kept for the session: settings, labels (the stock bar's: "Khallos" and one
+ * Story AI name per chair) and the spawn argument buffer. */
+static struct { int read, optout; uint32_t label, names, args, slots; unsigned logged; } khl;
 /* sub_00111AE0 keeps the owner slot's address in a new emitter (+0) and the
  * emitter in the slot; sub_0010E070 (an emitter freed or recycled, at any
  * time) writes 0 through that address. Each chair therefore owns guest slots
@@ -316,6 +329,7 @@ static struct {
     unsigned frames, status, calls, fixes, shots, shot_fail, engine, engine_off;
     unsigned asked, dead, wait, replays, replay_fail;      /* class asked back, death logged, khallosidle tries */
     uint32_t anim;                                         /* the rider's anim when his handler last ran */
+    unsigned poses, jets, barred;                          /* pose callback calls, jet moves while waiting, stock bar logged */
 } khl_ch[KHL_MAX];
 static struct {
     uint32_t cand[KHL_CANDS], cand_ent[KHL_CANDS], cand_rec[KHL_CANDS];
@@ -323,6 +337,7 @@ static struct {
     int cand_bound[KHL_CANDS];
     unsigned ncand, n, extras, events, seen, creates, np, bars, sounds_logged;
     int requested, inside, cur, sounds;    /* sounds: load the chair's level-11 sounds this level */
+    int bar;                               /* chair + 1 whose stock bar is being drawn (its label), else 0 */
     float d[3];                            /* the moved frame of the update running now */
     uint32_t pworld[4][2], pmoved[4][2];   /* players' +0xB8/+0xBC: world and moved bits */
     uint32_t self[4];                      /* live y/z and object y/z (moved) while unshifted */
@@ -418,6 +433,20 @@ static void khl_swapped(void (*original)(void),unsigned k)
     original();
     khl_lv.cur=prev;
     khl_out(k,keep);
+}
+/* Chair k's jet emitter (its globals in) at the chair's live position. The
+ * init makes it at the live position of that moment, the train start
+ * (-576.2, 7.5, 0); only the fighting update moves it (sub_0010E730 at
+ * 0x001EED75), so in a map it stayed there until the fight and then jumped
+ * hundreds of metres (v0.4.0-mapmaker.34: "a texture stretched between my
+ * view and one of the khallos'"). Called after the creation and on every
+ * waiting frame; sub_0010E730 sets emitter +0x14..+0x1C (and its bounds). */
+static void khl_jet_home(unsigned k)
+{
+    uint32_t jet=WORD_AT(KHL_JET);
+    if(!jet || !MAPMAKER_PTR_OK(jet,KHL_EMIT_POS+12u)) return;
+    guest_call(sub_0010E730,2,jet,KHL_POS);
+    khl_ch[k].jets++;
 }
 
 /* The map's own custom set (slots 1-10 in the map-info chunk, 11-20 in the
@@ -618,6 +647,25 @@ static uint32_t khl_bar_entity(uint32_t ent)
     return k>=0 && !khl_ch[k].removed?khl_ch[k].obj:0u;
 }
 #endif
+/* The stock bar's label for chair k: its rider's Story AI name
+ * (pc_mapmaker_bosses.inc bos_story_name), else "Khallos". */
+static uint32_t khl_bar_label(unsigned k)
+{
+#ifdef BOS_BAR_EXTRA
+    const char *name;
+    char text[KHL_NAME];
+    size_t n;
+    if(khl.names && khl_ch[k].rider && MAPMAKER_PTR_OK(khl_ch[k].rider_rec,12u) &&
+       (name=bos_story_name(WORD_AT(khl_ch[k].rider_rec+8u)))!=0) {
+        n=strlen(name);
+        if(n>KHL_NAME-1u) n=KHL_NAME-1u;
+        memset(text,0,sizeof text);memcpy(text,name,n);
+        memcpy((void *)((uintptr_t)(khl.names+k*KHL_NAME)+g_xbox_mem_offset),text,KHL_NAME);
+        return khl.names+k*KHL_NAME;
+    }
+#endif
+    return khl.label;
+}
 
 /* A level starts (its pak mount) or restarts (sub_001CDD60, no mount): no
  * chair exists yet. A restart keeps what the mount decided for the level
@@ -802,11 +850,21 @@ void pc_mapmaker_khallos_ai_start(void (*original)(void))
     }
     khl_setf(KHL_POS,pos[0]);khl_setf(KHL_POS+4u,pos[1]+KHL_LIFT);khl_setf(KHL_POS+8u,pos[2]);
     for(i=0;i<3u;i++) khl_setf(obj+KHL_ENT_POS+i*4u,khl_getf(KHL_POS+i*4u));
+    if((e=WORD_AT(KHL_JET))!=0 && MAPMAKER_PTR_OK(e,KHL_EMIT_POS+12u)) {   /* made at the train start by the init */
+        fprintf(stderr,"[mapmaker] khallos: chair %u jet emitter moved from (%.1f, %.1f, %.1f) to the chair\n",k,
+                (double)khl_getf(e+KHL_EMIT_POS),(double)khl_getf(e+KHL_EMIT_POS+4u),(double)khl_getf(e+KHL_EMIT_POS+8u));
+        fflush(stderr);
+        khl_jet_home(k);
+    }
     khl_out(k,keep);
     khl_ch[k].obj=obj;khl_ch[k].place=a;khl_ch[k].place_ent=ent;khl_ch[k].place_rec=WORD_AT(a+KHL_ACTOR_RECORD);
     for(i=0;i<3u;i++) khl_ch[k].spawn[i]=pos[i];
     khl_lv.n=k+1u;
     khl_string(&khl.label,KHL_LABEL,sizeof KHL_LABEL);     /* off the text hook's path */
+    if(!khl.names) {                                       /* the stock bar's per-chair Story AI names */
+        uint32_t p=xbox_HeapAlloc(KHL_MAX*KHL_NAME,4u);
+        if(p && MAPMAKER_PTR_OK(p,KHL_MAX*KHL_NAME)) khl.names=p;
+    }
     khl_log("Khallos' chair created at the placeholder (placeholder, chair)",a,obj);
     fprintf(stderr,"[mapmaker] khallos: chair %u spawn (%.2f, %.2f, %.2f), anchor rebased to (%.2f, %.2f, %.2f)\n",k,
             (double)pos[0],(double)pos[1],(double)pos[2],(double)pos[0],(double)(pos[1]+KHL_LIFT),(double)pos[2]);
@@ -904,6 +962,16 @@ static void khl_remove(unsigned k,uint32_t obj)
     khl_drop_rider(k);
 }
 
+/* A fighting chair (its globals in) with health left takes the story focus
+ * when nothing holds it: the stock update sets it once, when the chair wakes,
+ * and a chair shot down clears it, so the other chairs' stock bar went with
+ * it. Another holder (the tank, the mothership) is left alone. */
+static void khl_keep_focus(uint32_t obj)
+{
+    uint32_t player=WORD_AT(KHL_PLAYER);
+    if(WORD_AT(KHL_ACTIVE)!=1u || !(khl_getf(obj+KHL_ENT_HEALTH)>0.0f) || !MAPMAKER_PTR_OK(player,KHL_FOCUS+4u) || WORD_AT(player+KHL_FOCUS)) return;
+    WORD_AT(player+KHL_FOCUS)=obj;
+}
 /* Chair k (its globals in, after its active update): its living rider is put
  * on the seat as sub_00263260 puts him (live position + seat x the chair's up
  * row, the chair's angles), whether or not his handler ran this frame
@@ -930,14 +998,16 @@ static void khl_status(unsigned k,uint32_t obj,uint32_t p)
     khl_ch[k].status++;
     fprintf(stderr,"[mapmaker] khallos: chair %u frame %u: yaw %.0f, player at dx %.1f dz %.1f; seat offset (%.2f, %.2f, %.2f), "
             "rider calls %u state %d class %X/%X asked %X/%X (asked back %u), anim 0x%X (khallosidle played again %u, %u failed); "
-            "sounds: gun %u (%u failed), engine %u (%u not playing)\n",k,khl_ch[k].frames,
+            "sounds: gun %u (%u failed), engine %u (%u not playing); rider yaw %.0f flags %X anim speed %.2f, pose calls %u, jet moves %u\n",k,khl_ch[k].frames,
             (double)khl_getf(obj+KHL_ENT_YAW),p?(double)(khl_getf(p+KHL_P_POS)-khl_getf(KHL_POS)):0.0,
             p?(double)(khl_getf(p+KHL_P_POS+8u)-khl_getf(KHL_POS+8u)):0.0,
             (double)khl_ch[k].off[0],(double)khl_ch[k].off[1],(double)khl_ch[k].off[2],khl_ch[k].calls,
             khl_seated(k)?(int)WORD_AT(a+KHL_AI_STATE):-1,khl_seated(k)?(unsigned)WORD_AT(a+KHL_AI_CLASS_HI):0u,
             khl_seated(k)?(unsigned)WORD_AT(a+KHL_AI_CLASS):0u,khl_seated(k)?(unsigned)WORD_AT(a+KHL_AI_ASK_HI):0u,
             khl_seated(k)?(unsigned)WORD_AT(a+KHL_AI_ASK):0u,khl_ch[k].asked,(unsigned)khl_ch[k].anim,khl_ch[k].replays,
-            khl_ch[k].replay_fail,khl_ch[k].shots,khl_ch[k].shot_fail,khl_ch[k].engine,khl_ch[k].engine_off);
+            khl_ch[k].replay_fail,khl_ch[k].shots,khl_ch[k].shot_fail,khl_ch[k].engine,khl_ch[k].engine_off,
+            khl_seated(k)?(double)khl_getf(khl_ch[k].rider_ent+KHL_ENT_YAW):0.0,khl_seated(k)?(unsigned)WORD_AT(khl_ch[k].rider_ent+KHL_ENT_FLAGS):0u,
+            khl_seated(k)?(double)khl_getf(a+KHL_AI_SPEED):0.0,khl_ch[k].poses,khl_ch[k].jets);
     fflush(stderr);
 }
 
@@ -959,6 +1029,7 @@ static void khl_frame(void (*original)(void),unsigned k,uint32_t obj)
         WORD_AT(KHL_LINE)=KHL_FLT_LOW;
         original();
         WORD_AT(KHL_LINE)=line;
+        khl_jet_home(k);                                   /* the stock wait never moves its jet */
         khl_rider_health(k,obj);
         khl_keep_class(k);
         return;
@@ -981,6 +1052,7 @@ static void khl_frame(void (*original)(void),unsigned k,uint32_t obj)
     khl_shift_out(obj);
     WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;
     khl_rider_health(k,obj);
+    khl_keep_focus(obj);
     khl_seat(k,obj);
     khl_keep_class(k);
     khl_status(k,obj,p);
@@ -1087,23 +1159,37 @@ void pc_mapmaker_khallos_rider_pose(void (*original)(void))
 {
     int k;
     if(!khl_lv.n || !MAPMAKER_STACK_OK(8) || (k=khl_ridden(WORD_AT(g_esp+4u)))<0) { original();return; }
+    khl_ch[k].poses++;                                     /* the status line: does the seated pose run */
     khl_swapped(original,(unsigned)k);
 }
 
 /* WRAP sub_0014CC80 (story boss bar; chain INSIDE pc_mapmaker_bosses_hud):
- * a seated chair never gets its stock bar ("Khallos", the focus): the bosses
- * area draws its rider's Boss bar (his name, the chair's health), or none. */
+ * the focus chair keeps its stock bar, as the train and the tank show it,
+ * labelled with its rider's Story AI name (text hook); the bosses area
+ * draws the Boss bars of the other chairs and skips this one (it is the
+ * focus). v0.4.0-mapmaker.34: "none of the khallos' showed boss health": the
+ * stock bar was hidden for every seated chair, so with Boss off (or the
+ * bosses area drawing nothing) no chair had a bar. */
 void pc_mapmaker_khallos_hud(void (*original)(void))
 {
-    uint32_t player,focus;
-    int k;
+    uint32_t player,focus,hud=g_ebx;
+    int k,prev;
     if(!khl_lv.n) { original();return; }                   /* cheap: no chair this level */
     player=WORD_AT(KHL_PLAYER);
-    if(!MAPMAKER_PTR_OK(player,KHL_FOCUS+4u) || (k=khl_chair(focus=WORD_AT(player+KHL_FOCUS)))<0 || !khl_seated((unsigned)k)) { original();return; }
-    if(!khl_lv.bars++) khl_log("stock chair bar hidden: the bosses area shows its rider's (chair, rider)",focus,khl_ch[k].rider);
-    WORD_AT(player+KHL_FOCUS)=0;
+    if(!MAPMAKER_PTR_OK(player,KHL_FOCUS+4u) || (k=khl_chair(focus=WORD_AT(player+KHL_FOCUS)))<0) { original();return; }
+    prev=khl_lv.bar;khl_lv.bar=k+1;                        /* the text hook labels this chair's bar */
     original();
-    WORD_AT(player+KHL_FOCUS)=focus;
+    khl_lv.bar=prev;
+    if(khl_ch[k].barred<2u && MAPMAKER_PTR_OK(hud,12u)) {
+        unsigned shown=WORD_AT(hud+8u)&1u;                 /* sub_0014CC80 sets HUD +8 bit 0 when it drew (0x0014D0D5) */
+        if(khl_ch[k].barred!=shown+1u) {
+            khl_ch[k].barred=shown+1u;
+            fprintf(stderr,"[mapmaker] khallos: chair %u is the story focus: stock bar %s (label %s, rider %s)\n",(unsigned)k,
+                    shown?"drawn":"not drawn",khl_bar_label((unsigned)k)!=khl.label?"his Story AI name":"\"Khallos\"",
+                    khl_seated((unsigned)k)?"seated":"none");
+            fflush(stderr);
+        }
+    }
 }
 
 /* WRAP sub_002274C0 (cdecl event, arg): the chair's four events. */
@@ -1124,7 +1210,7 @@ void pc_mapmaker_khallos_text(void (*original)(void))
     if(!MAPMAKER_STACK_OK(8) || WORD_AT(g_esp+4u)!=KHL_BAR_TEXT || WORD_AT(g_esp)!=KHL_RET_BAR_TEXT || !khl.label || !khl_play()) {
         original();return;
     }
-    g_eax=khl.label;
+    g_eax=khl_lv.bar>0 && khl_lv.bar<=(int)khl_lv.n?khl_bar_label((unsigned)khl_lv.bar-1u):khl.label;
     MAPMAKER_GUEST_RET();
 }
 

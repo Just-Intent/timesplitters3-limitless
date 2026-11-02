@@ -43,3 +43,10 @@ and skips the map start `sub_00240C50` (`[0x006F32EC]`). New WRAP sub_001CDD60
 Khallos' (each its own state; realbosses runs the stock skeleton/walker
 resets after the original). Robot (`sub_0025F6A0` reset), skymusic, roof
 and openview need none; see each area doc's restart section.
+
+.34 Khallos/bars: the focus chair keeps its stock bar (rider's Story AI name,
+khallos text hook); pc_mapmaker_bosses_hud skips a proxied focus and logs
+each bar drawn or skipped once per entity and reason (story AI bosses: bar
+of ..) plus a map-start count. The chair's jet emitter, made at the train
+start, is moved to the chair at creation and each waiting frame
+(sub_0010E730); no new WRAP ([area doc](../mapmaker/mapmaker-khallos.md)).

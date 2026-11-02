@@ -103,6 +103,13 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 
 static uint32_t proxy_from, proxy_to;
 static uint32_t test_proxy(uint32_t ent) { return ent==proxy_from?proxy_to:0u; }
+/* a bar reason logged this level for this entity */
+static int bos_noted(uint32_t ent,unsigned why)
+{
+    unsigned k;
+    for(k=0;k<bos_play.notes;k++) if(bos_play.note[k].ent==ent && bos_play.note[k].why==why) return 1;
+    return 0;
+}
 /* an area's props that replaced removed Boss AIs (pc_mapmaker_tank.inc, _mothership.inc) */
 static uint32_t extra_ent[4], extra_id[4];
 static unsigned extra_n;
@@ -645,6 +652,25 @@ int main(void)
     CHECK(hud_frame(HUD0) && nlog==2 && blog[1].edi==ENT(1));
     setf(ENT(40)+0x1CCu,10.0f);setf(ENT(40)+0x64u,50.0f);           /* range from the chair */
     CHECK(hud_frame(HUD0) && nlog==2);
+    /* .34 ("none of the khallos' showed boss health"): the focus chair keeps the
+     * stock bar, so its rider's Boss bar is not drawn twice; every reason logged */
+    setf(ENT(40)+0x64u,8.0f);
+    CHECK(bos_noted(ENT(40),BOS_BAR_DRAWN) && bos_noted(ENT(40),BOS_BAR_DEAD) && bos_noted(ENT(40),BOS_BAR_FAR));
+    stock_bar=1;WORD_AT(PLAYER+0xFF4u)=ENT(40);
+    CHECK(hud_frame(HUD0) && nlog==2 && blog[0].edi==ENT(2) && blog[1].edi==ENT(1));
+    CHECK(bos_noted(ENT(40),BOS_BAR_STOCK) && FLOAT_AT(ENT(40)+0x1D8u)==240.0f);   /* still its multiplier */
+    WORD_AT(PLAYER+0xFF4u)=ENT(41);                                   /* the stock bar shows another */
+    CHECK(hud_frame(HUD0) && nlog==3 && blog[1].edi==ENT(40));
+    stock_bar=0;WORD_AT(PLAYER+0xFF4u)=ENT(40);                       /* focus without a stock bar: drawn */
+    CHECK(hud_frame(HUD0) && nlog==3 && blog[1].edi==ENT(40));
+    WORD_AT(PLAYER+0xFF4u)=0;
+    {
+        unsigned notes=bos_play.notes;
+        CHECK(hud_frame(HUD0) && bos_play.notes==notes);               /* each reason once */
+        WORD_AT(REC(5)+8u)=R+1u+1u;                                    /* his Story AI without a Boss setting */
+        CHECK(hud_frame(HUD0) && nlog==2 && bos_noted(ENT(40),BOS_BAR_NOT_BOSS));
+        WORD_AT(REC(5)+8u)=R+0u+1u;
+    }
     proxy_to=0;setf(ENT(5)+0x64u,8.0f);                             /* none: his own */
     CHECK(hud_frame(HUD0) && nlog==3 && blog[1].edi==ENT(5));
     bos_bar_proxy=0;list_set(5);
