@@ -278,9 +278,9 @@ See `docs/textures/textures.md` and the runtime tests for usage and failure/boun
 | Area | Start here (tracked root unless noted) | Useful checks/docs |
 | --- | --- | --- |
 | Bindings, input prompts | `src/input/pc_controls.c`, `pc_input.c`, `pc_bindings.inc`, `pc_prompts.c` | `tests/input/pc_controls.c`, `tests/input/pc_prompts.c`, `docs/players/windows-settings.md` |
-| Mouse/menu handling | `src/interface/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_briefing.inc` (briefings: fresh left click off the footer = Confirm; MapMaker lighting right-click: limitless.md) | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
-| Auto-look / camera / cutscene | `src/gameplay/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/gameplay/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py` |
-| Limitless fork (MapMaker, scope wheel; `pc_display_menu.h` / `pc_menu_mouse_guest.inc` carry the MapMaker hook declarations and stubs, e.g. `pc_mapmaker_aitemplates_menu_item`) | [limitless.md](limitless.md) | `tests/mapmaker/`, `tests/input/test_scope_wheel.py` |
+| Mouse/menu handling | `src/interface/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_briefing.inc` (briefings: fresh left click off footer = Confirm; MapMaker lighting right-click: limitless.md) | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
+| Auto-look / camera / cutscene | `src/gameplay/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/gameplay/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py`, `test_camera_widescreen.py` |
+| Limitless fork (MapMaker, scope wheel; `pc_display_menu.h` / `pc_menu_mouse_guest.inc` carry MapMaker hook declarations/stubs, e.g. `pc_mapmaker_aitemplates_menu_item`) | [limitless.md](limitless.md) | `tests/mapmaker/`, `tests/input/test_scope_wheel.py` |
 | Display model and native UI | `src/interface/pc_display.c`, `pc_display_*.inc`, `pc_settings.c`, `src/native/` | `tests/graphics/test_pc_display_modes.py`, `test_debug_settings_model.py` |
 | GPU clear / screen copies / sampling | `src/graphics/pc_clear_rhi.inc`, `src/graphics/`, runtime `src/d3d/` | `tests/graphics/test_rhi_menu_sampling.py`, `tests/rhi/`, `docs/development/shared-platform.md` |
 | Texture loading and formats | `src/textures/texture_pack.c`, `texture_pack_format.h`, `texture_pack_io.h`, `texture_pack_stream.h`, `texture_mode.c` | `tests/textures/test_texture_runtime.py`, `tests/textures/texture_pack_tools.py` |
@@ -523,7 +523,7 @@ Native mode accepts finite positive game-float time at `4E794C`; Original60
 retains its whole-time gate at `4E7944`. Both consume/rebase mouse batches with
 `pc_input_consume_motion`, preventing fresh packets from expiring against a
 previous batch timestamp. Paused/invalid native time consumes without aiming.
-Signed +5C speed (camera sweep) and MapMaker sweep hold: mounted-mouse.md, limitless.md.
+Signed +5C speed, sweep hold, wide viewfinder/static: mounted-mouse.md.
 For #385 field provenance, bounded access and original-code regression coverage,
 see [mounted-gun ownership](mounted-mouse.md). The AI target and instance name
 must not authorize or exclude player mouse aim.

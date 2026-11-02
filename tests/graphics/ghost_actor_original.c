@@ -24,6 +24,7 @@ static void sub_001CDAE0(void){}
 static void sub_00022FF0(void){pending=0;}
 static uint32_t guest_call(void(*f)(void),unsigned n){(void)n;if(f==sub_001CDAE0)return 1;f();return 0;}
 static void host_SetTwoDPlacement(int p,uint32_t tag){(void)p;(void)tag;CHECK(!pending);}
+static int viewfinder_primitive(void (*original)(void)) { (void)original;return 0; } /* camera viewfinder, tested by test_camera_widescreen.py */
 /* PRODUCTION */
 void sub_000A4D70(void){
     MEM32(MEM32(g_esp+8))=projected_x;MEM32(MEM32(g_esp+12))=100;

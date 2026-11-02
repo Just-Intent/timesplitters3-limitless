@@ -107,6 +107,56 @@ static void pc_ui_scope_mask(int32_t rect[4],unsigned side,float ratio)
     if(side==2){rect[2]=640;rect[1]=0;rect[3]=480;}
     if(side==3){rect[0]=0;rect[3]=480;rect[2]=640;}
 }
+/* Mounted-gun/camera viewfinder (US sub_0014BFF0): bars, tint, scanlines,
+ * corner brackets and meter of a frame inset 3% x 15% from the view edges.
+ * Drawn STRETCH on a wide output, each primitive gets the fit the renderer's
+ * edge anchors would give it: a frame span (left third to right third) keeps
+ * each edge on its own side, anything else is fitted (scale k) about the
+ * left edge, centre or right edge of the third it sits in. Thicknesses and
+ * bracket shapes keep 4:3 proportions; the frame meets the window edges.
+ * x[0..1] are one primitive's guest x values on a 640-unit canvas. */
+static void pc_ui_viewfinder_x(int32_t x[2],float k)
+{
+    float lo=(float)(x[0]<x[1]?x[0]:x[1]),hi=(float)(x[0]<x[1]?x[1]:x[0]);
+    int span=lo<=640.f/3.f && hi>=1280.f/3.f;
+    float anchor=640.f*pc_ui_side_anchor(lo,hi,640.f);
+    if(!(k>0.f && k<1.f))return;
+    for(unsigned i=0;i<2;i++) {
+        float v=(float)x[i];
+        if(span)anchor=v<=320.f?0.f:640.f;
+        x[i]=(int32_t)floorf(anchor+(v-anchor)*k+.5f);
+    }
+}
+/* The renderer placement (3 LEFT, 2 CENTRE, 4 RIGHT) for viewfinder text
+ * starting at guest x: the same third rule as its primitives. */
+static int pc_ui_viewfinder_text(float x)
+{
+    return x<640.f/3.f?3:x>1280.f/3.f?4:2;
+}
+/* Remote-view static (US sub_000F8DC0) tiles a texture of w x h over the
+ * view at one texel per guest pixel. STRETCH with a tile w*k guest units wide
+ * keeps that texel density while covering the window. */
+static unsigned pc_ui_noise_tile(unsigned w,float k)
+{
+    unsigned t;
+    if(!w || !(k>0.f && k<1.f))return w;
+    t=(unsigned)(w*k+.5f);
+    return t?t:1u;
+}
+/* Tiles the original loop draws along one axis (x from a while x < b). */
+static uint32_t pc_ui_noise_steps(int32_t a,int32_t b,unsigned step)
+{
+    if(!step || a>=b)return 0;
+    return (uint32_t)(((int64_t)b-a+step-1)/step);
+}
+/* US sub_00153B40: state = state * 0x343FD + 0x269EC3 (64-bit, 0x004E7950),
+ * calls counted at 0x007497C8. Advance it as n original calls would. */
+static void pc_ui_rand_advance(uint32_t *lo,uint32_t *hi,uint32_t *count,uint32_t n)
+{
+    uint64_t s=((uint64_t)*hi<<32)|*lo;
+    for(uint32_t i=0;i<n;i++)s=s*0x343FDull+0x269EC3ull;
+    *lo=(uint32_t)s;*hi=(uint32_t)(s>>32);*count+=n;
+}
 /* Apply the canvas fit around the aim point, not the screen centre. This
  * also preserves rotated quads and keeps the original texture UVs intact. */
 static void pc_ui_aim_shape(float *xy,unsigned points,float ratio)
