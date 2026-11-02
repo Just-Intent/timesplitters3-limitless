@@ -66,3 +66,14 @@ Tests: `test_table_shape`, `test_id_space_tables` (+19 mutations),
 `test_other_areas_use_the_moved_tables`, `test_extension_map_rooms_sub_range`
 in `tests/mapmaker/test_mapmaker_rooms.py`. Story-level playtest list:
 mapmaker-rooms.md "What to test in play" (S1..S7).
+
+## Stage 5: editor limit 255
+
+`MAPMAKER_LIMIT_PIECES` (`pc_mapmaker_limits.inc`) and `MAPMAKER_ROOMS_MAX`
+(`pc_mapmaker_rooms.inc`) are 255, gated as the 241 raise was: the editor
+limit only with `TSFP_MAPMAKER_LIMITS=1`, the compile guard only in scene
+100 and only when room models 0x908..0xA06 all have prop slots (else 200).
+Links (255 x 46 = 11,730 of 12,000), pads, cover, pad groups, portals and
+the 1000-object pool still fit. Past 255: word draw buckets (mapmaker-rooms.md
+stage 6). Tests: `test_mapmaker_rooms.py` fixture at 255 (`cap-241`,
+`cap-raised` mutations), `test_mapmaker_limits.py` (`pieces-241`).

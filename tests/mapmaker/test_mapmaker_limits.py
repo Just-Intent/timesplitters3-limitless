@@ -18,7 +18,7 @@ MUTATIONS = {
     'cover-raised': ('#define MAPMAKER_LIMIT_COVER 9984u', '#define MAPMAKER_LIMIT_COVER 10240u'),
     'cover-pool-stock': ('#define MAPMAKER_POOL_COVER 10496u', '#define MAPMAKER_POOL_COVER 1280u'),
     'link-pool-no-stitch': ('(MAPMAKER_LIMIT_LINKS+16u*MAPMAKER_LIMIT_PIECES+256u)*20u', 'MAPMAKER_LIMIT_LINKS*20u'),
-    # Links 12000: 241 of the heaviest tile (46 links) fit; the pool stays int16.
+    # Links 12000: 255 of the heaviest tile (46 links) fit; the pool stays int16.
     'links-round3': ('#define MAPMAKER_LIMIT_LINKS 12000u', '#define MAPMAKER_LIMIT_LINKS 8800u'),
     'links-below-heaviest': ('#define MAPMAKER_LIMIT_LINKS 12000u', '#define MAPMAKER_LIMIT_LINKS 11000u'),
     'links-past-int16': ('#define MAPMAKER_LIMIT_LINKS 12000u', '#define MAPMAKER_LIMIT_LINKS 30000u'),
@@ -29,8 +29,9 @@ MUTATIONS = {
     'keycards-round2': ('    {0x00524CECu,2u,16u},', '    {0x00524CECu,2u,8u},'),
     'movers-round2': ('    {0x00524E3Cu,20u,160u},', '    {0x00524E3Cu,20u,80u},'),
     'markers-round2': ('    {0x00524EE4u,20u,160u},', '    {0x00524EE4u,20u,80u},'),
-    'pieces-stock': ('#define MAPMAKER_LIMIT_PIECES 241u', '#define MAPMAKER_LIMIT_PIECES 200u'),
-    'pieces-past-rooms': ('#define MAPMAKER_LIMIT_PIECES 241u', '#define MAPMAKER_LIMIT_PIECES 242u'),
+    'pieces-stock': ('#define MAPMAKER_LIMIT_PIECES 255u', '#define MAPMAKER_LIMIT_PIECES 200u'),
+    'pieces-241': ('#define MAPMAKER_LIMIT_PIECES 255u', '#define MAPMAKER_LIMIT_PIECES 241u'),
+    'pieces-past-rooms': ('#define MAPMAKER_LIMIT_PIECES 255u', '#define MAPMAKER_LIMIT_PIECES 256u'),
     'categories-always': ('    if(!mapmaker_limits.limits) return;\n    mapmaker_categories_apply();',
                           '    mapmaker_categories_apply();\n    if(!mapmaker_limits.limits) return;'),
     'categories-overwrite': (' && WORD_AT(a)==mapmaker_categories[i].stock)', ')'),

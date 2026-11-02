@@ -1,3 +1,16 @@
+## MapMaker rooms 241 -> 255 (2026-11-01, not built or played)
+
+Source: branch room-cap-255 from mapmaker-recon f0483586, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. Stage 2 relocates the per-id drawn flag 0x7B5180; stage 3 adds a light room
+side table (5 wrappers); stage 4 renumbers the special room ids to 0x100..0x10C in every scene and
+resizes the per-id, light, view-shadow and model tables; stage 5 raises `MAPMAKER_LIMIT_PIECES` to
+255 behind `TSFP_MAPMAKER_LIMITS=1`. check-tables "table verified" after each stage; rooms, limits,
+objects, probe, openview and the decoder tests pass. Full `tests/mapmaker` run: 2661 passed; the
+failures were WinError 4551 (application control) and two realbosses mutations
+(`skel-stale-pointer`, `late-past-cap`) that fail the same way without these changes. Not run: game
+build, story levels (stages 2-4 are not gated), MapMaker play at 255, Mac. Playtest list:
+docs/mapmaker/mapmaker-rooms.md "What to test in play".
+
 ## MapMaker tile caps audit and link raise (2026-11-01, not built or played)
 
 Source: branch from mapmaker-recon 9cac7579, Windows 11 x64, MSVC fixtures only. With

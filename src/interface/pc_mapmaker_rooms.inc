@@ -1,4 +1,4 @@
-/* US 45410066 MapMaker rooms: 200 -> 241 visibility rooms (one per piece).
+/* US 45410066 MapMaker rooms: 200 -> 255 visibility rooms (one per piece).
  *
  * The guest-code table config/guest-code-patches/rooms.json renumbers the
  * room special ids above the byte range (players 0xCA..0xCE -> 0x101..0x105,
@@ -6,8 +6,8 @@
  * 0x100, id space 0xD6 -> 0x10D; in every scene), raises every "real room"
  * test from 200 to 255 (ids 1..0xFF), moves the static per-room and per-id
  * tables into 0x008C0000..0x008D4000 and the view struct's per-room arrays
- * into a shadow at view+0x6000 (see docs/mapmaker/mapmaker-rooms.md). The
- * editor's piece limit is still 241 (MAPMAKER_ROOMS_MAX). This file is the C half:
+ * into a shadow at view+0x6000 (see docs/mapmaker/mapmaker-rooms.md). This
+ * file is the C half:
  *
  *   WRAP sub_00087310 -> pc_mapmaker_rooms_query
  *   WRAP sub_0008A780 -> pc_mapmaker_rooms_compile
@@ -33,12 +33,12 @@
  * buffer from 2048 to 16384) is dropped: its rooms, portals and 0x2C records
  * are set to 0 before the compiler sums them, and the drop is logged. The
  * editor's piece limit (MAPMAKER_LIMIT_PIECES, opt-in) is the real bound; this
- * is the last line. The limit is 241 only when every room model 0x908..0x9F8
+ * is the last line. The limit is 255 only when every room model 0x908..0xA06
  * has a prop slot, else the stock 200.
  *
  * Room props (sub_00242780): room r is drawn by a prop of model 0x907+r, whose
  * slot must come from the prop table; the MapMaker table defines 0x908..0x9CF
- * (200 rooms). In scene 100 the missing room models 0x9D0..0x9F8 get slots
+ * (200 rooms). In scene 100 the missing room models 0x9D0..0xA06 get slots
  * copied from room 200's (model 0x9CF), in a slot array grown by that many
  * entries (same Level heap; the old array is left to the scene). Story levels
  * are not touched.
@@ -67,7 +67,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAPMAKER_ROOMS_MAX 241u
+#define MAPMAKER_ROOMS_MAX 255u
 #define MAPMAKER_ROOMS_IDS_REAL 0xFFu           /* rooms.json: real rooms 1..0xFF, special ids 0x100.. */
 #define MAPMAKER_ROOMS_STOCK 200u
 #define MAPMAKER_ROOMS_PORTALS 0x3FFFu          /* flag bytes at esp+0x1280, 0x4000 B */
@@ -165,7 +165,7 @@ void pc_mapmaker_rooms_compile(void (*original)(void))
     fputc('\n',stderr);
 }
 
-/* ---- prop slots for room models 0x9D0..0x9F8 ---------------------------- */
+/* ---- prop slots for room models 0x9D0..0xA06 ---------------------------- */
 extern void sub_0003DFA0(void);
 void pc_mapmaker_rooms_props(void (*original)(void))
 {
