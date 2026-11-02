@@ -979,6 +979,8 @@ void pc_mapmaker_tilesets_play_pak(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }
+void pc_display_viewfinder(void (*original)(void)) { original(); }
+void pc_display_view_static(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
