@@ -63,6 +63,9 @@ MUTATIONS = {
     'tag-stock-cap': ('#define MAPMAKER_OBJECTS_TAGS_CAP 1000u', '#define MAPMAKER_OBJECTS_TAGS_CAP 250u'),
     'tag-no-serial': ('        WORD_AT(0x00519750u)++;\n', '\n'),
     'tag-sentinel': (' && tag!=0x3F3F3F3Fu', ''),
+    # The placed-pickup table: the `cmp ah,n` test needs a multiple of 256, above the 500 items.
+    'pickups-stock': ('#define MAPMAKER_OBJECTS_PICKUPS 768u', '#define MAPMAKER_OBJECTS_PICKUPS 120u'),
+    'pickups-below-items': ('#define MAPMAKER_OBJECTS_PICKUPS 768u', '#define MAPMAKER_OBJECTS_PICKUPS 256u'),
 }
 
 
@@ -147,6 +150,14 @@ def test_table_matches_policy():
     per = 0x400 + 0x10 * _define('MAPMAKER_OBJECTS_LIST9_CAP')
     for pid in ('obj-perception-clear', 'obj-perception-stride', 'obj-perception-alloc'):
         assert entries[pid]['new_hex'].endswith(per.to_bytes(4, 'little').hex())
+    # Placed pickups: table bytes, clear dwords and the `cmp ah,n` full test agree (768 = 3 << 8).
+    pickups, record = _define('MAPMAKER_OBJECTS_PICKUPS'), _define('MAPMAKER_OBJECTS_PICKUP_BYTES')
+    assert pickups % 256 == 0 and pickups < 0x8000 and record == 0xD8
+    assert entries['obj-pickups-alloc']['original_hex'] == '68' + (120 * record).to_bytes(4, 'little').hex()
+    assert entries['obj-pickups-alloc']['new_hex'] == '68' + (pickups * record).to_bytes(4, 'little').hex()
+    assert entries['obj-pickups-clear']['new_hex'] == 'b9' + (pickups * record // 4).to_bytes(4, 'little').hex()
+    assert entries['obj-pickups-cap']['original_hex'] == '83f878'
+    assert entries['obj-pickups-cap']['new_hex'] == '80fc%02x' % (pickups >> 8)
     for e in table['patches']:
         if e['kind'] == 'code':
             assert len(e['original_hex']) == len(e['new_hex']) and e['original_hex'] != e['new_hex']
