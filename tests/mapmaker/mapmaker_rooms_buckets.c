@@ -384,7 +384,7 @@ static void test_view_lists_wide(void)
     *u8(view+0x21Cu)=0x20;
     WORD_AT(view+0xD28u)=3;
     WORD_AT(view+0x2A0u)=5;
-    neighbour_n=2;neighbours[0]=0x150;neighbours[1]=0x20;
+    neighbour_n=2;neighbours[0]=many;neighbours[1]=0x20;          /* the last room is past the full list */
     for(r=1;r<=many;r++) {
         WORD_AT(RECT(view,r))=r<150?3u:2u;
         set16(RECT(view,r)+4u,10);set16(RECT(view,r)+8u,20);
@@ -398,7 +398,7 @@ static void test_view_lists_wide(void)
     }
     CHECK(ok && high>0);
     /* a short list takes the neighbour above 0xFF */
-    WORD_AT(0x007B975Cu)=100;
+    WORD_AT(0x007B975Cu)=100;neighbours[0]=0x150;
     run_view_lists();
     CHECK(u16(view+0xE08u)==101u && u16(view+MAPMAKER_ROOMS_VIEW_LIST+200u)==0x150u);
 }

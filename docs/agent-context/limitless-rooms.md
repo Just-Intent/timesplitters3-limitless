@@ -125,3 +125,12 @@ p1/p4 `0x008C7000`/`0x008C7CC0` (probe), model table `0x008CA000`. Objects
 clears p2/p5 at `0x008C5000`/`0x008C6080`; `MAPMAKER_ROOF_ROOMS` 512,
 `MAPMAKER_CAMERA_ROOMS` 511. Map: `ROOMS_BLOCKS` (`test_rooms_blocks`) and
 mapmaker-rooms.md "Stage 9".
+
+## Stage 8: special ids 0x200..0x20C (every scene)
+
+Real rooms 1..0x1FF, spare 0x200, players 0x201..0x205, views 0x206..0x20B,
+global 0x20C, id space 0x20D; the same 155 operand entries, sizes tied to the
+id space follow (loop ends, `[0x7B977C]` 0x210, light row 0x20C, colour,
+per-id tables 0x20D). C: `MAPMAKER_ROOMS_IDS_REAL` 0x1FF, `_ID_GLOBAL` 0x20C,
+probe/objects 0x20D. Sourceless lights in rooms 0x100..0x1FF keep their colour
+untinted. mapmaker-rooms.md "Stage 8".

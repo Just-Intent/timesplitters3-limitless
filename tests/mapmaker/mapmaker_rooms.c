@@ -226,7 +226,7 @@ static void lights(void)
     light_unlink(a);
     CHECK(WORD_AT(lhead(1,5))==b && WORD_AT(b+0x84u)==0 && *u8(a+0x99u)==0);
     /* a room id above 0xFF: its own head entry, never room (id & 0xFF)'s */
-    CHECK(MAPMAKER_ROOMS_LIGHT_GROUP_COUNT>0x10Cu/16u);
+    CHECK(MAPMAKER_ROOMS_LIGHT_GROUP_COUNT>MAPMAKER_ROOMS_ID_GLOBAL/16u);
     {
         c=light_create(0,2,0x101);                         /* group 16: record 16 * per */
         CHECK(c==LPOOL+16u*WORD_AT(MAPMAKER_ROOMS_LIGHT_PER)*0xB8u);

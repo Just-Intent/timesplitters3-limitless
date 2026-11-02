@@ -816,6 +816,35 @@ diagnostics), light side table groups 64; the dev sky-mask switch keeps rooms
 C arrays), `test_extension_map_rooms_sub_range` (blocks), objects/openview/
 skymask fixtures.
 
+## Stage 8: special ids 0x200..0x20C (2026-11-02, static only)
+
+| id | stock | 255 layout | 511 layout |
+| --- | --- | --- | --- |
+| real rooms | 1..0xC8 | 1..0xFF | 1..0x1FF (`cmp 0xC8` x21 -> 0x1FF) |
+| spare (unused) | 0xC9 | 0x100 | 0x200 |
+| held by player p / nobody | 0xCA+p / 0xCE | 0x101+p / 0x105 | 0x201+p / 0x205 (`add -0xCA` x9 -> -0x201) |
+| room of view v | 0xCF+v | 0x106+v | 0x206+v |
+| global / unplaced | 0xD5 | 0x10C | 0x20C |
+| id space | 0xD6 | 0x10D | 0x20D |
+
+Same 155 operand entries as the 255 raise (143 special values, 9 player
+index adds, 12 view special flags at shadow flags + new id), every scene.
+Sizes tied to the id space: per-id loop ends `0x0009E4E6` 0x834 /
+`0x000A1ED5` 0x830; `[0x7B977C]` flag bytes 0x210 (`0x0008A6FD`,
+`0x0008BA63`), clear 0x83 dwords + stosw, displacements 0x20C/0x201/0x206;
+per-id tables p1/p4 0x830 + global entry (`0x008C7830`, `0x008C84F0`),
+p2/p3/p5 0x840; drawn flag 0x840; light heads row 0x20C (head piece 0x508,
+rest `0x008D0508`/0x1388, clear stride 0x830, end `0x008D20BC`); light
+colour 0x1894; view list cap `cmp ax, 0x20C`. C: `MAPMAKER_ROOMS_IDS_REAL`
+0x1FF, `_ID_GLOBAL`/`_LIGHT_ROW`/`_VIEW_LIST_CAP` 0x20C, `_VIEW_LIST_WORDS`
+0x20D, probe `MAPMAKER_PROBE_ROOM_IDS` 0x20D, objects clears 0x20D dwords.
+Lights: real rooms 0x100..0x1FF now also use the light side table; a light
+without a source prop there keeps its colour untinted (`sub_001124D0`'s
+byte path; with a source prop scene 100 reads the prop's dword room).
+Tests: `test_table_shape` and `id_space_problems` parameterised by
+`ID_SPACE`/`GLOBAL`/`SHIFT` (the 19 id-space mutations still fail), bucket
+fixture with the defines (list cap mutation re-checked).
+
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
 Cause: `sub_000BB850` (explosion/area effect over the rooms touching a box)
