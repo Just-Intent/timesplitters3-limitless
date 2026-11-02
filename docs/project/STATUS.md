@@ -1,3 +1,13 @@
+## MapMaker placed pickups 120 -> 768 (2026-11-02, not built or played)
+
+Source: branch objects-high from mapmaker-recon 04496239, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. The m36 playtest lost placed health and armour: placed pickups share a
+120-record table (`[0x00732E60]`, full test 0x000C1DC7). `config/guest-code-patches/objects.json`
+`obj-pickups-*` raise table, clear and test to 768 in every scene (+140 KB Level heap, story
+included). Negative handles of slots 512+ ruled out by decode (no signed handle test). Barrels not
+exploding: not explained. check-tables "table verified" (1519 entries). Not run: game build, MapMaker
+play, story levels, Mac. Playtest: docs/agent-context/limitless-caps.md "Placed pickups".
+
 ## MapMaker piece cap 255 -> 511 (2026-11-02, not built or played)
 
 Source: branch cap-511 from mapmaker-recon a9c05312, Windows 11 x64, MSVC fixtures and the

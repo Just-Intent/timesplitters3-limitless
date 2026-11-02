@@ -8,7 +8,8 @@
  * 128 objects); the sub_000A5CE0 object lists relocated into the reserved
  * block (slot 9 at 0x008A0000, 30 -> 128; slot 8 at 0x008A0200, 50 -> 200;
  * slot 0 at 0x008A0600, 112 -> 448); the room bucket buffer doubled; the logic
- * tag links (0x008A2400) and tags (0x008A4400) relocated at 250 -> 1000 each.
+ * tag links (0x008A2400) and tags (0x008A4400) relocated at 250 -> 1000 each;
+ * the placed-pickup records 120 -> 768 (MAPMAKER_OBJECTS_PICKUPS below).
  * Logic tag groups stay at 150 (sub_0023FFA0 and sub_00240360 drop safely when
  * full).
  *
@@ -81,6 +82,18 @@ static void mapmaker_objects_dropped(unsigned *n,const char *what,uint32_t obj)
 typedef char mapmaker_objects_pool_limit[(MAPMAKER_OBJECTS_POOL<1024u && MAPMAKER_LIMIT_OBJECTS==MAPMAKER_OBJECTS_POOL &&
                                           MAPMAKER_OBJECTS_LIST8_CAP==MAPMAKER_OBJECTS_POOL &&
                                           MAPMAKER_OBJECTS_LIST0_CAP==MAPMAKER_OBJECTS_POOL)?1:-1];
+/* Placed pickups (2026-11-02): every placed weapon, ammo, health, armour,
+ * power-up, keycard, flag and special pickup (sub_000C1950 with arg0 bit 0
+ * clear) takes a 0xD8-byte record from [0x00732E60] (count [0x00732E64]);
+ * stock 120, after which the pickup is silently dropped (0x000C1DC7). The
+ * table, its clear and the full test are raised to 768 by objects.json
+ * obj-pickups-* in every scene (the test is `cmp ah,3`, so a multiple of
+ * 256). Every reader loops to the count (test_mapmaker_pickups_classified.py).
+ * The editor's 500-item total stays below it. */
+#define MAPMAKER_OBJECTS_PICKUPS 768u
+#define MAPMAKER_OBJECTS_PICKUP_BYTES 0xD8u
+typedef char mapmaker_objects_pickup_table[(MAPMAKER_OBJECTS_PICKUPS%256u==0u && MAPMAKER_OBJECTS_PICKUPS<0x8000u &&
+                                            MAPMAKER_LIMIT_SUB<MAPMAKER_OBJECTS_PICKUPS)?1:-1];
 #define MAPMAKER_OBJECTS_BUCKET_BYTES 0xA680u /* obj-bucket-bytes */
 #define MAPMAKER_OBJECTS_TAGS 0x008A4400u     /* obj-tag-entries-relocate */
 #define MAPMAKER_OBJECTS_TAGS_CAP 1000u

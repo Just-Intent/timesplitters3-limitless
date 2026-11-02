@@ -56,6 +56,52 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
   pieces count, 255 pieces keep 500 items), `mapmaker_objects.c` (1023
   pools and lists), mutations `objects-*`, `pool-round3`; `check-tables.py`.
 
+## Placed pickups (2026-11-02, v0.4.0-mapmaker.36 playtest)
+
+Symptom: 459 pieces + about 500 items; no placed health or armour, some ammo,
+turrets and barrels loaded. Cause (CONFIRMED in code, not measured in play):
+every placed pickup (`sub_000C2D40` from the loader loop 0x0006D983, then
+`sub_000C1950` with arg0 bit 0 clear: weapons, ammo, health, armour,
+power-ups, keycards, flags, special pickups) takes a 0xD8-byte record from
+`[0x00732E60]` (count `[0x00732E64]`), 120 records (`sub_000BEEE0` push
+0x6540, clear 0x1950 dwords in `sub_000BEE60`). At 120, 0x000C1DC7
+`cmp eax,0x78; jge` frees the new object and returns 0, so later pickups in
+container order vanish silently (and the stock caller then writes through
+the null result into guest 0x28..0x60). Dropped weapons use the separate
+30-entry table at 0x007B0D20 (arg0 bit 0). Turrets and props are not pickups.
+
+- `objects.json` `obj-pickups-alloc` / `-clear` / `-cap`: 768 records in
+  every scene (+140 KB Level heap, also story; static so no wrapper and no
+  scene gating); the test becomes `cmp ah,3` (count >= 768 = 3 << 8), so the
+  size must stay a multiple of 256. `MAPMAKER_OBJECTS_PICKUPS` in
+  `pc_mapmaker_objects.inc` (compile check: above `MAPMAKER_LIMIT_SUB` 500).
+- Every reader loops to the count or uses an index below it (34 sites
+  reviewed); its collect buffers are sized by a
+  counting call (`sub_00232270`). Known latent stock bug, not changed: `sub_0033B290` clamps
+  the count to 10 for its buffer but `sub_003384F0` then writes every match
+  (more than 10 matching pickups of one kind overflow it in that AI command).
+- AI awareness lists stay stock and drop silently past them: weapons 55
+  (`sub_00160820`), health + armour 25 (`sub_00160940`), power-ups 20,
+  flags 20; bots ignore pickups past those.
+- Ruled out (decode, `test_mapmaker_pickups_classified.py`): handles of slots
+  512..1022 are negative as int32, but none of the 167 handle decodes
+  (`shr r,0x16` + `imul r,r,0x2E8`, 8 other shr sites reviewed) is guarded by
+  a signed test of the handle (null is 0, tested with `je`/`jbe`), and the 14
+  signed tests of a loaded dword +0x2C are other structs. So no slot-order
+  change (option a) or sign rewrites (option b) are needed.
+- Not explained: barrels that do not explode. Ruled out: handle signs, the
+  object lists (no `object list full` line in m36.err), the area-effect
+  global room id (rooms.json 0x000BBA05/0x000BBA33 = 0x20C). Open: pool
+  headroom (`sub_000AB590` refuses flag-8 objects when fewer than 5 slots are
+  free; `sub_0009EE00` itself has no bound) and room-bucket state.
+- Tests: `test_mapmaker_pickups_classified.py` (table sites, `cmp ah,3`
+  semantics, handle-sign scan, 2 mutations), `test_mapmaker_objects.py`
+  (table policy, `pickups-*` mutations).
+- Play check: a map with more than 120 pickups (all health and armour placed
+  last) shows them all; probe flag 64 for `[0x007B4FAC]` minus
+  `[0x007B65B8]` (live objects) on a full map; shoot a barrel at once after
+  load and again with bots active.
+
 ## Play memory and the memory estimate (2026-11-02)
 
 - `pc_mapmaker_memory.inc` nav block: 6 MB (`MAPMAKER_NAV_BYTES`) from the
