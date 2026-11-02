@@ -84,11 +84,15 @@
  *    the overhead meter unless the Story AI chose the Sub-boss bar, as the
  *    realbosses area does for the others.
  *
- * Several bosses: up to CRW_MAX split Crowes per map each have their own copy
- * of the 29 globals their code uses (crw_win: the state pointer, the effect
- * and particle systems), swapped in around every entry into their code
- * (fight, message handler, think and hit callbacks, draw) and put back after;
- * the boss whose copy is live is crw_lv. Docs: "Several split Crowes".
+ * Several bosses: up to CRW_MAX split Crowes per map each have their own
+ * state pointer and their own copy of the boss particle/effect statics
+ * (pc_mapmaker_bossfx.inc, one live holder shared with the realbosses area),
+ * swapped in around every entry into their code (fight, message handler,
+ * think and hit callbacks, draw) and put back after; the boss whose copy is
+ * live is crw_lv. Docs: "Several split Crowes".
+ *
+ * Eggs: the falling eggs need prop 0x4BD, whose model only l_14_st.pak has;
+ * the drop is skipped (eggs, below; the v0.4.0-mapmaker.28 crash).
  *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax, g_xbox_mem_offset,
  * pc_mapmaker_area_enabled and pc_mapmaker_limits.inc. Hot hooks (hud, meter,
@@ -163,6 +167,7 @@
 #define CRW_RET_SPARKS 0x00290C02u      /* sub_0028FE30: push 86.4; call sub_002A85C0 at 0x00290BFD */
 #define CRW_RET_PART 0x0028ECF1u        /* sub_0028E9E0: call sub_0028E770 at 0x0028ECEC */
 #define CRW_RET_EVENT 0x002923A8u       /* sub_0028FE30: call sub_002275F0(0) at 0x002923A3 */
+#define CRW_RET_EGG 0x00291E84u         /* sub_0028FE30: call sub_002AB1B0 (egg drop) at 0x00291E7F */
 #define CRW_RET_FX 0x001CEE8Cu          /* sub_001CEBC0: call sub_00126560 at 0x001CEE87 */
 #define CRW_RET_METER 0x0014D264u       /* sub_0014D1F0: call sub_0013A400 at 0x0014D25F */
 #define CRW_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -187,21 +192,18 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
     int read, optout;
-    unsigned logged, meters, extras, events, parts, fx;
+    unsigned logged, meters, extras, events, parts, fx, eggs;
 } crw;
 /* The globals one split Crowe's code uses (CONFIRMED, every [abs] operand of
- * the functions reachable from its entry points, test): the state pointer,
- * the effect blocks (sub_002A8300/8380/85C0/8FC0) and the particle block with
- * its count and emitter templates (sub_002A62C0/62F0/7D60/7F30). Each boss
- * has its own copy; it is swapped in around every entry into Crowe code. */
-static const uint32_t crw_win[]={
-    CRW_STATE,
-    0x0078B080u,0x0078B084u,0x0078B088u,0x0078B08Cu,0x0078B090u,0x0078B094u,0x0078B098u,
-    0x0078B0CCu,0x0078B0D0u,0x0078B0ECu,
-    0x0078B100u,0x0078B104u,0x0078B108u,0x0078B10Cu,0x0078B110u,0x0078B114u,0x0078B118u,0x0078B11Cu,0x0078B120u,
-    0x0078B130u,0x0078B134u,0x0078B138u,0x0078B140u,0x0078B144u,0x0078B148u,0x0078B180u,0x0078B184u,0x0078B188u,
-};
-#define CRW_NWIN (sizeof crw_win/sizeof crw_win[0])
+ * the functions reachable from its entry points, test): the state pointer
+ * [0x0075F5E8] (written only by the allocation sub_0028D6D0) and 28 words of
+ * the boss particle/effect statics 0x0078B080..0x0078B1DB (the effect blocks
+ * of sub_002A8300/8380/85C0/8FC0, the particle block with its count and
+ * emitter templates of sub_002A62C0/62F0/7D60/7F30), which the giant skeleton
+ * and the Crow walker use too. Each boss has its own state and its own copy
+ * of those statics (pc_mapmaker_bossfx.inc, shared with the realbosses area),
+ * swapped in around every entry into Crowe code. */
+#include "pc_mapmaker_bossfx.inc"
 #define CRW_MAX 4u                      /* split Crowes with the story behaviour per map */
 /* One boss of this level: its blocks, spawn record, pool entry, relocation. */
 struct crw_boss_s {
@@ -212,46 +214,42 @@ struct crw_boss_s {
     uint32_t row, col;                  /* the start cell */
     float dx, dy, dz, sx, sz;           /* grid offset, spawn point */
     uint32_t saved[CRW_NCONST];
-    uint32_t win[CRW_NWIN];             /* its globals while another's (or nobody's) are live */
+    MapmakerFx fx;                      /* its statics while another's (or nobody's) are live */
 };
 static struct crw_boss_s crw_inst[CRW_MAX], crw_none;
 static unsigned crw_n;                  /* bosses with their own blocks this level */
-static int crw_cur=-1;                  /* whose globals are live; -1: the outside values */
-static uint32_t crw_out[CRW_NWIN];      /* the outside values (stock, other bosses) while a Crowe's are live */
+static int crw_cur=-1;                  /* whose state pointer is live; -1: the outside value */
+static uint32_t crw_out;                /* [0x0075F5E8] outside the Crowes' code */
 static struct crw_boss_s *crw_i=&crw_none;
 #define crw_lv (*crw_i)                 /* the boss whose code runs now (crw_none outside) */
+typedef struct { int k; MapmakerFx *fx; } CrwPrev;   /* what crw_enter replaced */
 
-static void crw_store(int k)
+static uint8_t *crw_window(void) { return (uint8_t *)((uintptr_t)MAPMAKER_FX+g_xbox_mem_offset); }
+static void crw_set(int k)
 {
-    uint32_t *to=k<0?crw_out:crw_inst[k].win;
-    unsigned j;
-    for(j=0;j<CRW_NWIN;j++) to[j]=WORD_AT(crw_win[j]);
-}
-static void crw_load(int k)
-{
-    const uint32_t *from=k<0?crw_out:crw_inst[k].win;
-    unsigned j;
-    for(j=0;j<CRW_NWIN;j++) WORD_AT(crw_win[j])=from[j];
+    WORD_AT(CRW_STATE)=k<0?crw_out:crw_inst[k].state;
+    crw_cur=k;
     crw_i=k<0?&crw_none:&crw_inst[k];
 }
-/* Make boss k's globals live; returns whose were live, for crw_leave. The same
- * boss again (a nested call) changes nothing; another boss inside (one
- * Crowe's hazard hits another) keeps the first one's current values. */
-static int crw_enter(int k)
+/* Make boss k's state pointer and statics live; returns what was, for
+ * crw_leave. Any nesting: another Crowe inside (one Crowe's hazard hits
+ * another), or this one again inside another boss's code (its hit callback
+ * inside a walker's damage inside its own fight) gets its own latest values. */
+static CrwPrev crw_enter(int k)
 {
-    int prev=crw_cur;
-    if(prev==k) return prev;
-    crw_store(prev);
-    crw_load(k);
-    crw_cur=k;
-    return prev;
+    CrwPrev p;
+    p.k=crw_cur;
+    p.fx=mapmaker_fx_enter(k<0?0:&crw_inst[k].fx);
+    if(p.k!=k) {
+        if(p.k<0) crw_out=WORD_AT(CRW_STATE);
+        crw_set(k);
+    }
+    return p;
 }
-static void crw_leave(int prev)
+static void crw_leave(CrwPrev p)
 {
-    if(crw_cur==prev) return;
-    crw_store(crw_cur);
-    crw_load(prev);
-    crw_cur=prev;
+    mapmaker_fx_leave(p.fx);
+    if(crw_cur!=p.k) crw_set(p.k);
 }
 
 static void crw_log(const char *what,uint32_t a,uint32_t b)
@@ -306,7 +304,8 @@ static int crw_state_ok(void) { return crw_lv.state!=0; }
 /* A new level: no boss, the live globals are the outside values. */
 static void crw_reset(void)
 {
-    if(crw_cur>=0) crw_leave(-1);
+    if(crw_cur>=0) crw_set(-1);
+    mapmaker_fx_forget(crw_inst,sizeof crw_inst);
     memset(crw_inst,0,sizeof crw_inst);
     memset(&crw_none,0,sizeof crw_none);
     crw_n=0;crw_cur=-1;crw_i=&crw_none;
@@ -317,10 +316,10 @@ static void crw_reset(void)
  * back. 1: allocated. */
 static int crw_alloc(unsigned k)
 {
-    uint32_t live[CRW_NWIN],st,parts=0;
-    unsigned j;
+    uint32_t st,parts=0,live_state=WORD_AT(CRW_STATE);
+    MapmakerFx live;
     int ok=1;
-    for(j=0;j<CRW_NWIN;j++) live[j]=WORD_AT(crw_win[j]);
+    memcpy(live.b,crw_window(),MAPMAKER_FX_SIZE);
     WORD_AT(CRW_STATE)=0;
     guest_call(sub_0028D6D0,0);
     st=WORD_AT(CRW_STATE);
@@ -337,10 +336,11 @@ static int crw_alloc(unsigned k)
         }
     }
     if(ok) {
-        for(j=0;j<CRW_NWIN;j++) crw_inst[k].win[j]=WORD_AT(crw_win[j]);
+        memcpy(crw_inst[k].fx.b,crw_window(),MAPMAKER_FX_SIZE);
         crw_inst[k].state=st;
     }
-    for(j=0;j<CRW_NWIN;j++) WORD_AT(crw_win[j])=live[j];
+    memcpy(crw_window(),live.b,MAPMAKER_FX_SIZE);
+    WORD_AT(CRW_STATE)=live_state;
     if(ok) crw_log("split Crowe state allocated (boss, particles)",k,parts);
     return ok;
 }
@@ -595,7 +595,8 @@ static void crw_fight(uint32_t ent,void (*original)(void))
 void pc_mapmaker_crowe_fight(void (*original)(void))
 {
     uint32_t ent;
-    int k,prev;
+    int k;
+    CrwPrev prev;
     if(!crw_n || !MAPMAKER_STACK_OK(8) || (k=crw_boss(ent=WORD_AT(g_esp+4u)))<0) { original();return; }
     prev=crw_enter(k);
     crw_fight(ent,original);
@@ -605,7 +606,8 @@ void pc_mapmaker_crowe_fight(void (*original)(void))
  * original. */
 static void crw_entry(uint32_t ent,void (*original)(void))
 {
-    int k,prev;
+    int k;
+    CrwPrev prev;
     if((k=crw_boss(ent))<0) { original();return; }
     prev=crw_enter(k);
     original();
@@ -677,12 +679,33 @@ void pc_mapmaker_crowe_event(void (*original)(void))
     MAPMAKER_GUEST_RET();
 }
 
+/* WRAP sub_002AB1B0 (cdecl hazard, cell, 4 more; its only call 0x00291E7F in
+ * the fight drops one of the eight falling eggs). Each egg is four props
+ * 0x4BD (farfuture2/splittercrowegg, model only in story/l_14_st.pak, not
+ * mounted in MapMaker): sub_000A6F90 returns 0 for each, the spawn stores the
+ * 0 handles at hazard +0x150..+0x15C and calls on with them, and the landing
+ * (sub_002AA6A0, 0x002AAEA2) releases all four with no null test:
+ * sub_000A9070(0) -> sub_0009E330 reads class 0 at guest 0x20 and calls a
+ * wild pointer, which the runtime skips with the stack 8 bytes too high
+ * (RECOMP_ICALL_SAFE restores the esp from before its two arguments). Four
+ * skips left the per-character update 0x20 off and crashed it
+ * (v0.4.0-mapmaker.28, crash-20261102-024139391). For a boss in scene 100
+ * the drop is skipped: no egg, no null prop, nothing to land. */
+void pc_mapmaker_crowe_eggs(void (*original)(void))
+{
+    if(!crw_lv.record || !MAPMAKER_STACK_OK(0x1C) || WORD_AT(g_esp)!=CRW_RET_EGG || WORD_AT(CRW_SCENE)!=100u || !crw_on()) { original();return; }
+    if(crw.eggs++<4u) crw_log("split Crowe egg drop skipped (prop 0x4BD is only in l_14_st.pak; null props would be released on landing)",
+                               WORD_AT(g_esp+4u),crw.eggs);
+    MAPMAKER_GUEST_RET();
+}
+
 /* WRAP sub_00126560 (frame step before the scene-81 draw; the Crowe's own
  * draw sub_0028D710 runs only in scene 14). */
 void pc_mapmaker_crowe_fx(void (*original)(void))
 {
-    int here=crw_n && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX,prev;
+    int here=crw_n && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX;
     unsigned k;
+    CrwPrev prev;
     original();
     if(!here || WORD_AT(CRW_SCENE)!=100u || !crw_on()) return;
     for(k=0;k<crw_n;k++) {                             /* each boss with its own blocks, until it is removed */
