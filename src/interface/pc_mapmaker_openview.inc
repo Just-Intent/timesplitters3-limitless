@@ -155,6 +155,9 @@ void pc_mapmaker_openview_walk(void (*original)(void))
     unsigned widened=0,added=0;
     int32_t deepest;
     original();
+#ifdef MAPMAKER_CAMERA_VIEW_DIAG
+    mapmaker_camera_view_diag();   /* pc_mapmaker_camera.inc: what this view reaches */
+#endif
     if(!mapmaker_roof_play.open_rooms || WORD_AT(OPENVIEW_SCENE)!=OPENVIEW_PLAY) return;
     mapmaker_limits_read();
     if(!mapmaker_limits.limits) return;

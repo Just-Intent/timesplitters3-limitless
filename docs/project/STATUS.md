@@ -1,3 +1,17 @@
+## MapMaker switch cameras (2026-11-02, not built or played)
+
+Source: branch camera-control from mapmaker-recon 87e134d6, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. v0.4.0-mapmaker.31 report: a switch-held camera keeps sweeping. Cause
+(US code): `sub_00246000` sweeps state 2 without checking the operator; the stock skip bit (data+8
+bit 0) is set on mount only for flag 0x20. New area `camera` wraps `sub_00246000` in scene 100 and
+holds that bit while the reciprocal operator links hold; `pc_mounted.h` now scales by |+5C| (the
+negated sweep speed dropped mouse aim). The 4:3 camera view and the ~10-floor cut from the bottom
+floor are not explained offline; `[PC-DISPLAY] View:` and `[mapmaker] camera:` lines log them
+(docs/mapmaker/mapmaker-camera.md). Tests: test_mapmaker_camera.py (fixture + 7 mutations, decoder),
+test_mounted_mouse.py, test_menu_mouse.py, cutscene-letterbox/decal/camera-feed (production camera
+hook), openview, widescreen, bigdraw, fov: 108 passed, 9 skipped (no XBE in worktree; the camera
+decoder test passed against the main checkout XBE). Not run: full tests/mapmaker, game, live camera, Mac.
+
 ## MapMaker rooms 241 -> 255 (2026-11-01, not built or played)
 
 Source: branch room-cap-255 from mapmaker-recon f0483586, Windows 11 x64, MSVC fixtures and the

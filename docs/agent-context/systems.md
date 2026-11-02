@@ -523,7 +523,7 @@ Native mode accepts finite positive game-float time at `4E794C`; Original60
 retains its whole-time gate at `4E7944`. Both consume/rebase mouse batches with
 `pc_input_consume_motion`, preventing fresh packets from expiring against a
 previous batch timestamp. Paused/invalid native time consumes without aiming.
-The helper still handles only mounted-gun mode `0x80`, not vehicle-seat mode `0x8000`.
+Signed +5C speed (camera sweep) and MapMaker sweep hold: mounted-mouse.md, limitless.md.
 For #385 field provenance, bounded access and original-code regression coverage,
 see [mounted-gun ownership](mounted-mouse.md). The AI target and instance name
 must not authorize or exclude player mouse aim.

@@ -162,3 +162,15 @@ The route no longer rejects an unusable camera FOV (37AA70 has no FOV input;
 it now only scales). PcInput.mech_status names the outcome and both adapters
 log each change once ("[PC-MOUSE] Battle Mech: ..."), so the next playtest
 log identifies a failed link. Live mission behavior remains unverified.
+
+## MapMaker switch cameras (v0.4.0-mapmaker.31 report)
+
+A MapMaker camera (item types 0x35..0x37, switch link 0x18 in `33F0E0`) is
+this mode-0x80 actor; the switch mounts it through `3391D0` -> `B76B0`. Its
+update `246000` sweeps in state 2 (+58/+5C per tick between +34..+38 and
++3C..+40, speed negated at a limit) without checking +D8. Stock skips the
+state machine only on data+8 bit 0, which `3391D0` sets when flag 0x20 is set.
+`pc_mapmaker_camera.inc` sets that bit around `246000` in scene 100 while the
+reciprocal operator links hold, then restores it. With flag 0x1000000 the
+helper scales by |+5C|: the sweep's negated speed no longer drops mouse aim.
+`mounted_mouse.c` covers the negative speed; `test_mapmaker_camera.py` the hold.
