@@ -90,6 +90,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pc_mapmaker_animslots.inc"   /* the anim slot budget run by pc_mapmaker_worm_register */
 
 #ifndef MAPMAKER_STACK_OK
 #define MAPMAKER_STACK_OK(n) (g_esp>=0x00010000u && g_esp<0x04000000u-(uint32_t)(n))
@@ -100,12 +101,6 @@
 #define WRM_ID 0x2Cu                    /* character id */
 #define WRM_MODEL 0x5EAu                /* CHR_MANSION_MANSIONWORM */
 #define WRM_PAK 0x0049D7BCu             /* "pak/stream/lv1/anim/lv1_2.pak" */
-#define WRM_ANIMS 0x0048BEC8u           /* lv1_2.pak names: 30 entries of 0x18 (+0 name, +0x10 id) */
-#define WRM_ANIMS_N 0x1Eu
-#define WRM_ANIM 0x18u
-#define WRM_ANIM_FIRST 21u              /* wrmburst 0x194 .. wrmdeath 0x19B */
-#define WRM_ANIM_COUNT 8u
-#define WRM_ANIM_BARNEY 5u              /* barney_worm 0x149: the burst after state 2 (+0x44C 2) */
 #define WRM_PAK_TROPHY 0x0049D77Cu      /* "pak/stream/lv1/anim/lv1_3.pak": anim ids overlap lv1_2's */
 #define WRM_PAK_SKELETON 0x0049D6FCu    /* "pak/stream/lv1/anim/lv1_6.pak": anim ids overlap lv1_2's */
 #define WRM_MOUNTS 0x006D7880u          /* mounted paks */
@@ -340,14 +335,11 @@ void pc_mapmaker_worm_anims(void (*original)(void))
     uint32_t mounted;
     original();
     if(!wrm_play() || wrm.optout || (has=wrm_set_has())==0 || wrm_pak_mounted()) return;
-    /* lv1_2 names the Jo-Beth anims jblookout (0x193, also in lv1_3, the
-     * giant trophy monster's) and jbgrossend (0x1AE, also in lv1_6, the giant
-     * skeleton's); mission 5 never mounts them together. A name registered
-     * twice is fixed up twice in place (sub_00057F30 turns the anim's offsets
-     * into pointers), and the level load crashed (v0.4.0-mapmaker.24 user
-     * report, sub_00350EC0 from 0x0005C55D). register keeps lv1_2 to the
-     * worm's own names, which no other pak has; without it, the worm stays a
-     * bot next to those bosses. */
+    /* Without register (the anim slot budget) lv1_2's whole 30-name table
+     * registers. With the trophy monster's or skeleton's pak too the 940 anim
+     * slots ran out and the level load crashed (v0.4.0-mapmaker.24; .34 with
+     * lv11.pak: docs/mapmaker/mapmaker-animslots.md), so the worm stays a bot
+     * next to those bosses. */
     if(!pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_register") &&
        ((int32_t)guest_call(sub_00062260,1,WRM_PAK_TROPHY)!=-1 || (int32_t)guest_call(sub_00062260,1,WRM_PAK_SKELETON)!=-1)) {
         wrm_log("lv1_2.pak shares anim ids with the trophy monster's or skeleton's pak: the mansion worm keeps the bot behaviour",
@@ -361,20 +353,16 @@ void pc_mapmaker_worm_anims(void (*original)(void))
 }
 
 /* WRAP sub_0005B980 (cdecl prefix, name table, count: registers a mounted
- * anim pak's names, from sub_001CA2F0 at 0x001CAD75 and sub_001C95F0): in
- * scene 100, lv1_2's table gives only the worm's names, barney_worm and
- * wrmburst..wrmdeath; the rest of the mansion cast (and the two Jo-Beth
- * names other boss paks also register) is left out. */
+ * anim pak's names, from sub_001CA2F0 and sub_001C95F0): the anim slot
+ * budget of pc_mapmaker_animslots.inc (scene 100 only). lv1_2's table gives
+ * only the worm's names, barney_worm and wrmburst..wrmdeath; every boss pak
+ * likewise only its boss's; an id already registered is skipped; nothing
+ * past the 940 slots. Its nested per-entry calls come back here and run the
+ * original. */
 void pc_mapmaker_worm_register(void (*original)(void))
 {
-    uint32_t sp=g_esp,prefix;
-    if(!MAPMAKER_STACK_OK(16) || WORD_AT(g_esp+8u)!=WRM_ANIMS || WORD_AT(g_esp+12u)!=WRM_ANIMS_N || !wrm_play()) { original();return; }
-    prefix=WORD_AT(g_esp+4u);
-    guest_call(sub_0005B980,3,prefix,WRM_ANIMS+WRM_ANIM_BARNEY*WRM_ANIM,1u);
-    WORD_AT(sp+8u)=WRM_ANIMS+WRM_ANIM_FIRST*WRM_ANIM;WORD_AT(sp+12u)=WRM_ANIM_COUNT;
+    if(ans_register()) return;
     original();
-    WORD_AT(sp+8u)=WRM_ANIMS;WORD_AT(sp+12u)=WRM_ANIMS_N;   /* the caller's arguments as pushed */
-    wrm_log("lv1_2.pak: only the mansion worm's anims registered (first, count)",WRM_ANIM_FIRST,WRM_ANIM_COUNT+1u);
 }
 
 /* WRAP sub_0025F720 (story level init): after the original, the worm block
