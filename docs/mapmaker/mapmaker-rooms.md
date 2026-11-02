@@ -845,6 +845,34 @@ Tests: `test_table_shape` and `id_space_problems` parameterised by
 `ID_SPACE`/`GLOBAL`/`SHIFT` (the 19 id-space mutations still fail), bucket
 fixture with the defines (list cap mutation re-checked).
 
+## Stage 10: model table for 511 room models (2026-11-02, static only)
+
+Room r is drawn by a prop of model 0x907 + r, so 511 rooms need models up
+to 0xB06. `rooms.json`: model -> slot table `0x008CA000` 0xB08 words (clear
+`0x002427C3` 0x584 dwords; base unchanged, the 45 operand entries keep
+their values), model bounds `cmp 0x9D0` x4 -> 0xB08, per-model 0x18 B array
+`[0x7087A4]` 0x108C0 bytes (clear 0x4230 dwords; Level heap, +3 KB). C:
+`MAPMAKER_ROOMS_MODEL_ENTRIES` 0xB08 with a compile-time check that every
+real room (0x1FF) and `MAPMAKER_ROOMS_MAX` have an entry; probe
+`MAPMAKER_PROBE_MODEL_ROOMS_END` 0xB08. The prop-slot synthesis
+(`pc_mapmaker_rooms_props`, scene 100) already covers 0x9D0..0x907+MAX, and
+the compile guard keeps 200 unless all of 0x908..0x907+MAX have slots, so
+raising `MAPMAKER_ROOMS_MAX` needs no other room change. The other areas'
+model ids (bosses, characters, khallos, mothership, sky music, tank) are
+all below 0xA00 and only read the table. Tests: `id_space_problems` model
+checks (+3 mutations: bound, clear and array left at the 255 sizes).
+
+## Cap after stages 7-10
+
+The room machinery holds 511 rooms (ids 0x1FF), but `MAPMAKER_ROOMS_MAX`
+and `MAPMAKER_LIMIT_PIECES` stay 255: other caps do not allow 511 yet
+(objects pool 1,000 < 511 rooms + 500 items + 64 characters, no bound check
+on that pool; links 12,000 < 511 x 46; regular pads 4,800 and ids 7,000..8,000
+< 511 x 14; pad groups 600 < ~770). Raise them together once the objects,
+pads and memory work reports: object pool >= 1,100, links >= 23,506, pads
+>= 7,154 with ids past 8,000, pad groups >= 800, and a probe of play memory
+with the arena raised.
+
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
 Cause: `sub_000BB850` (explosion/area effect over the rooms touching a box)
@@ -872,6 +900,12 @@ private XBE is not present.
 
 ## Validation done
 
+- Rooms 511 machinery (stages 7-10, 2026-11-02, static only): `check-tables.py`
+  "table verified" after each stage; `test_mapmaker_rooms.py` (stride table
+  +10, blocks +4, id space +22 mutations, stride decode classification),
+  bucket, camera, openview, roof, skymask, objects, probe, sky music and
+  boss-area fixtures. Not built, not played.
+
 - `check-tables.py` on the folder (00-header, items, rooms): table verified.
 - `tests/mapmaker/test_mapmaker_rooms.py`: fixture + 18 mutations, table shape, and the
   XBE completeness check of every room constant.
@@ -887,6 +921,27 @@ private XBE is not present.
   probe fixtures with the moved tables. Not built, not played.
 
 ## What to test in play
+
+Rooms 511 machinery (stages 7-10, 2026-11-02; every scene, not gated; the
+editor limit is still 255, so MapMaker maps are not larger yet):
+
+- R1. Story missions 1 and 2 for a few minutes each: geometry, doors and
+  portals, props, explosions/grenades (global room 0x20C in the area-effect
+  list), lights and room colours, held/thrown items (player ids 0x201..).
+- R2. Two-player story co-op and four-player Arcade splitscreen (view stride
+  0x3000, unrolled view init, view index divisions): every view draws its
+  rooms, weapon and HUD; the right view gets the right player.
+- R3. A level with security-camera screens and a mounted gun/camera
+  (camera view, widescreen frame, `[mapmaker] camera:` view lines in
+  MapMaker).
+- R4. Front end, pause, level restart and loading a second level (front-end
+  view in one stride, per-id tables, light heads/colour cleared).
+- R5. MapMaker play at 255 pieces with `TSFP_MAPMAKER_LIMITS=1`: `rooms 255 of
+  255`, open-air tiles drawn across (openview), sand grains in Sandstorm sky
+  for two players (sky music walks the views by stride), probe 128 room
+  tables.
+- R6. Any crash at level load points at the view array (72 KB) or the
+  per-model array (68 KB) allocation: note the level.
 
 Rooms 255 (stages 2-4 run in every scene, so story levels come first; no
 `TSFP_MAPMAKER_*` switch is needed for them):

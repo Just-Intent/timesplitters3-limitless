@@ -2635,8 +2635,8 @@
       "address": "0x002427C3",
       "original_hex": "b9e8040000",
       "operand": 1,
-      "value": "0x504",
-      "reason": "mov ecx, 0x4e8: clear the relocated model->slot table (0xA08 words)"
+      "value": "0x584",
+      "reason": "mov ecx, 0x4e8: clear the relocated model->slot table (0xB08 words)"
     },
     {
       "id": "rooms-000a5e4e",
@@ -2645,8 +2645,8 @@
       "address": "0x000A5E4E",
       "original_hex": "81ffd0090000",
       "operand": 1,
-      "value": "0xA08",
-      "reason": "cmp edi, 0x9d0: model id bound 0x9D0 -> 0xA08 (room models 0x908..0xA06)"
+      "value": "0xB08",
+      "reason": "cmp edi, 0x9d0: model id bound 0x9D0 -> 0xB08 (room models 0x908..0xB06)"
     },
     {
       "id": "rooms-001b59b8",
@@ -2655,8 +2655,8 @@
       "address": "0x001B59B8",
       "original_hex": "3dd0090000",
       "operand": 1,
-      "value": "0xA08",
-      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xA08 (room models 0x908..0xA06)"
+      "value": "0xB08",
+      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xB08 (room models 0x908..0xB06)"
     },
     {
       "id": "rooms-001b5c09",
@@ -2665,8 +2665,8 @@
       "address": "0x001B5C09",
       "original_hex": "3dd0090000",
       "operand": 1,
-      "value": "0xA08",
-      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xA08 (room models 0x908..0xA06)"
+      "value": "0xB08",
+      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xB08 (room models 0x908..0xB06)"
     },
     {
       "id": "rooms-001b618e",
@@ -2675,8 +2675,8 @@
       "address": "0x001B618E",
       "original_hex": "3dd0090000",
       "operand": 1,
-      "value": "0xA08",
-      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xA08 (room models 0x908..0xA06)"
+      "value": "0xB08",
+      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xB08 (room models 0x908..0xB06)"
     },
     {
       "id": "rooms-0008392d",
@@ -2685,8 +2685,8 @@
       "address": "0x0008392D",
       "original_hex": "6880eb0000",
       "operand": 0,
-      "value": "0xF0C0",
-      "reason": "push 0xeb80: per-model 0x18 B array [0x7087A4]: 0x9D0 -> 0xA08 models"
+      "value": "0x108C0",
+      "reason": "push 0xeb80: per-model 0x18 B array [0x7087A4]: 0x9D0 -> 0xB08 models"
     },
     {
       "id": "rooms-00083947",
@@ -2695,7 +2695,7 @@
       "address": "0x00083947",
       "original_hex": "b9e03a0000",
       "operand": 1,
-      "value": "0x3C30",
+      "value": "0x4230",
       "reason": "mov ecx, 0x3ae0: clear the per-model array"
     },
     {
@@ -2806,7 +2806,7 @@
       "original_hex": "0fbf044d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0003f36a",
@@ -2816,7 +2816,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006a2ff",
@@ -2826,7 +2826,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006b43b",
@@ -2836,7 +2836,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006b45f",
@@ -2846,7 +2846,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006d1df",
@@ -2856,7 +2856,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006d2ba",
@@ -2866,7 +2866,7 @@
       "original_hex": "0fbf045560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006d47b",
@@ -2876,7 +2876,7 @@
       "original_hex": "0fbf045560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006d68e",
@@ -2886,7 +2886,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006d8c0",
@@ -2896,7 +2896,7 @@
       "original_hex": "0fbf045560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006e7d1",
@@ -2906,7 +2906,7 @@
       "original_hex": "0fbf045560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0006e8e3",
@@ -2916,7 +2916,7 @@
       "original_hex": "0fbf045560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [edx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-00070067",
@@ -2926,7 +2926,7 @@
       "original_hex": "0fbf046d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ebp*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ebp*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-00096475",
@@ -2936,7 +2936,7 @@
       "original_hex": "0fbf045d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ebx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ebx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000964e9",
@@ -2946,7 +2946,7 @@
       "original_hex": "0fbf045d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ebx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ebx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0009656e",
@@ -2956,7 +2956,7 @@
       "original_hex": "0fbf045d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ebx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ebx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-00099221",
@@ -2966,7 +2966,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0009e634",
@@ -2976,7 +2976,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0009e734",
@@ -2986,7 +2986,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0009f49c",
@@ -2996,7 +2996,7 @@
       "original_hex": "0fbf047d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [edi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [edi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0009f51c",
@@ -3006,7 +3006,7 @@
       "original_hex": "0fbf047d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [edi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [edi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000a5e5a",
@@ -3016,7 +3016,7 @@
       "original_hex": "0fbf047d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [edi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [edi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000a688f",
@@ -3026,7 +3026,7 @@
       "original_hex": "668b047d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "mov ax, word ptr [edi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "mov ax, word ptr [edi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000a6ec4",
@@ -3036,7 +3036,7 @@
       "original_hex": "0fbf044d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000a6f56",
@@ -3046,7 +3046,7 @@
       "original_hex": "0fbf044d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000a6f94",
@@ -3056,7 +3056,7 @@
       "original_hex": "0fbf044d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000a6fd4",
@@ -3066,7 +3066,7 @@
       "original_hex": "0fbf044d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000ab5a5",
@@ -3076,7 +3076,7 @@
       "original_hex": "0fbf044d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000d7671",
@@ -3086,7 +3086,7 @@
       "original_hex": "0fbf044d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000d78d5",
@@ -3096,7 +3096,7 @@
       "original_hex": "0fbf044d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-000dac6f",
@@ -3106,7 +3106,7 @@
       "original_hex": "0fbf045d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [ebx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [ebx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-00163f74",
@@ -3116,7 +3116,7 @@
       "original_hex": "0fbf047560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-00163fa4",
@@ -3126,7 +3126,7 @@
       "original_hex": "0fbf047560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-00163fc9",
@@ -3136,7 +3136,7 @@
       "original_hex": "0fbf047560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-002376a1",
@@ -3146,7 +3146,7 @@
       "original_hex": "0fbf0c4d60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx ecx, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx ecx, word ptr [ecx*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-002377d8",
@@ -3156,7 +3156,7 @@
       "original_hex": "66833c5560b87800ff",
       "operand": 0,
       "value": "0x8CA000",
-      "reason": "cmp word ptr [edx*2 + 0x78b860], -1: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "cmp word ptr [edx*2 + 0x78b860], -1: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0023809a",
@@ -3166,7 +3166,7 @@
       "original_hex": "0fbf044560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [eax*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-002427c8",
@@ -3176,7 +3176,7 @@
       "original_hex": "bf60b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "mov edi, 0x78b860: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "mov edi, 0x78b860: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-00242a34",
@@ -3186,7 +3186,7 @@
       "original_hex": "66890c5d60b87800",
       "operand": 0,
       "value": "0x8CA000",
-      "reason": "mov word ptr [ebx*2 + 0x78b860], cx: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "mov word ptr [ebx*2 + 0x78b860], cx: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-002c43f2",
@@ -3196,7 +3196,7 @@
       "original_hex": "0fbf047560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0032cd2f",
@@ -3206,7 +3206,7 @@
       "original_hex": "0fbf047560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0032cd57",
@@ -3216,7 +3216,7 @@
       "original_hex": "0fbf0c7560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx ecx, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx ecx, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0032cd84",
@@ -3226,7 +3226,7 @@
       "original_hex": "0fbf047560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0032cda2",
@@ -3236,7 +3236,7 @@
       "original_hex": "0fbf0c7560b87800",
       "operand": 1,
       "value": "0x8CA000",
-      "reason": "movsx ecx, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx ecx, word ptr [esi*2 + 0x78b860]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-0033de87",
@@ -3246,7 +3246,7 @@
       "original_hex": "0fbf05aec87800",
       "operand": 1,
       "value": "0x8CB04E",
-      "reason": "movsx eax, word ptr [0x78c8ae]: m-0x78b860: model -> slot table 0x9D0 -> 0xA00 words (room models) (moved by operand: overlapping functions)"
+      "reason": "movsx eax, word ptr [0x78c8ae]: m-0x78b860: model -> slot table 0x9D0 -> 0xB08 words (room models) (moved by operand: overlapping functions)"
     },
     {
       "id": "rooms-reloc-t1-0x702e20",

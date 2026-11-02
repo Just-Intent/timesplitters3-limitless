@@ -140,7 +140,8 @@ def test_table_shape():
     for (a0, a1, n0), (b0, b1, n1) in zip(spans, spans[1:]):
         assert a1 <= b0, (n0, n1)
     # the model table (moved by operand entries) and the query buffers fit around them
-    model, model_end = define('MAPMAKER_ROOMS_MODEL_TABLE'), define('MAPMAKER_ROOMS_MODEL_TABLE') + 0xA08 * 2
+    entries = define('MAPMAKER_ROOMS_MODEL_ENTRIES')
+    model, model_end = define('MAPMAKER_ROOMS_MODEL_TABLE'), define('MAPMAKER_ROOMS_MODEL_TABLE') + entries * 2
     model_ops = [p for p in ops if 'm-0x78b860' in p['reason']]
     assert model_ops and all(model <= int(p['value'], 16) < model_end for p in model_ops)
     query = define('MAPMAKER_ROOMS_QUERY_BUFFER')
@@ -222,11 +223,12 @@ def id_space_problems(patches):
     need(len(special_flags) == 12 and v('0x000899CA') == GLOBAL, 'special flags / list cap')
     need(6 * stride + 8 <= v('0x000C61D3'), 'view array allocation')
     need(int(r['rooms-reloc-v-0x749890']['new_size'], 16) >= stride, 'front-end static view: one stride')
-    # model table: room models 0x908..0x907+255 (0xA06), 0x18-byte per-model array, bounds
-    need(v('0x002427C3') * 2 == 0xA08 > 0x907 + define('MAPMAKER_ROOMS_MAX'), 'model table clear')   # stage 10: all real rooms
-    need(all(v(a) == 0xA08 for a in ('0x000A5E4E', '0x001B59B8', '0x001B5C09', '0x001B618E')), 'model bounds')
-    need(v('0x0008392D') == 0xA08 * 0x18 and v('0x00083947') * 4 == v('0x0008392D'), 'per-model array')
-    need(define('MAPMAKER_ROOMS_MODEL_TABLE') + 0xA08 * 2 <= int(r['rooms-reloc-lb-0x73d910']['new'], 16), 'model table end')
+    # model table (stage 10): room models 0x908..0x907+0x1FF for every real room, 0x18-byte per-model array, bounds
+    models = define('MAPMAKER_ROOMS_MODEL_ENTRIES')
+    need(v('0x002427C3') * 4 == models * 2 and models > 0x907 + define('MAPMAKER_ROOMS_IDS_REAL') and models % 2 == 0, 'model table clear')
+    need(all(v(a) == models for a in ('0x000A5E4E', '0x001B59B8', '0x001B5C09', '0x001B618E')), 'model bounds')
+    need(v('0x0008392D') == models * 0x18 and v('0x00083947') * 4 == v('0x0008392D'), 'per-model array')
+    need(define('MAPMAKER_ROOMS_MODEL_TABLE') + models * 2 <= int(r['rooms-reloc-lb-0x73d910']['new'], 16), 'model table end')
     return out
 
 
@@ -254,6 +256,9 @@ ID_SPACE_MUTATIONS = {
     'list-cap': lambda: _mutate('0x000899CA', value='0xFE'),
     'model-bound': lambda: _mutate('0x001B5C09', value='0xA00'),
     'model-array': lambda: _mutate('0x0008392D', value='0xF000'),
+    'model-bound-255': lambda: _mutate('0x000A5E4E', value='0xA08'),
+    'model-clear-255': lambda: _mutate('0x002427C3', value='0x504'),
+    'model-array-255': lambda: _mutate('0x0008392D', value='0xF0C0'),
 }
 
 
@@ -284,7 +289,7 @@ def test_other_areas_use_the_moved_tables():
     probe = 'src/interface/pc_mapmaker_probe.inc'
     assert c_define(probe, 'MAPMAKER_PROBE_ROOM_COUNTS') == new('rooms-reloc-p1-0x7b54e0')
     assert c_define(probe, 'MAPMAKER_PROBE_ROOM_LISTS') == new('rooms-reloc-p4-0x7b5f00')
-    assert c_define(probe, 'MAPMAKER_PROBE_ROOM_IDS') == ID_SPACE and c_define(probe, 'MAPMAKER_PROBE_MODEL_ROOMS_END') == 0xA08
+    assert c_define(probe, 'MAPMAKER_PROBE_ROOM_IDS') == ID_SPACE and c_define(probe, 'MAPMAKER_PROBE_MODEL_ROOMS_END') == define('MAPMAKER_ROOMS_MODEL_ENTRIES')
     assert c_define('src/interface/pc_mapmaker_skymask.inc', 'MAPMAKER_SKYMASK_TABLE') == new('rooms-reloc-t3-0x703460')
     # per-room C arrays (roof, openview, camera diagnostics) cover the per-room tables (stage 9)
     per_room = int(r['rooms-reloc-t1-0x702e20']['new_size'], 16) // 4

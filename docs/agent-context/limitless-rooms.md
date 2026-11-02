@@ -134,3 +134,11 @@ id space follow (loop ends, `[0x7B977C]` 0x210, light row 0x20C, colour,
 per-id tables 0x20D). C: `MAPMAKER_ROOMS_IDS_REAL` 0x1FF, `_ID_GLOBAL` 0x20C,
 probe/objects 0x20D. Sourceless lights in rooms 0x100..0x1FF keep their colour
 untinted. mapmaker-rooms.md "Stage 8".
+
+## Stage 10: model table 0xB08 (every scene)
+
+Model -> slot table `0x008CA000` 0xB08 words, bounds 0xB08, per-model array
+0x108C0; `MAPMAKER_ROOMS_MODEL_ENTRIES` with a compile-time fit check;
+probe 0xB08. Prop slots and the compile guard follow `MAPMAKER_ROOMS_MAX`.
+Cap: still 255 (objects pool, links, pads, pad groups bind first; values
+needed: mapmaker-rooms.md "Cap after stages 7-10").
