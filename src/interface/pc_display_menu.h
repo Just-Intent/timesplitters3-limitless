@@ -366,6 +366,8 @@ void pc_mapmaker_tilesets_play_pak(void (*original)(void));
 void pc_mapmaker_memory_heap_alloc(void (*original)(void));
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void));
 void pc_mapmaker_memory_arena(void (*original)(void));
+void pc_display_viewfinder(void (*original)(void));
+void pc_display_view_static(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));
