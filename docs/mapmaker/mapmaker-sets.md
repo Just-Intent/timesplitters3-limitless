@@ -335,3 +335,16 @@ byte on the weapon/ammo pickup records, fork chunk 0x00C776F6):
    out and start the test (Arcade type): rows 1-10 are the first ten bots,
    slots 11-20 more bots (matchbots area). Front end / in-game pause -> setup
    -> Bots on a MapMaker map: still two pages (matchbots).
+
+## Spawn mode mask for set slots 11-20 (v0.4.0-mapmaker.27)
+
+`pc_mapmaker_sets_spawn_masks` (WRAP `sub_00240C50`, after the original, scene
+100 only): each Story AI spawn record (`[[0x0074C36C]+0x74]`, 0x98 each, count
+`+0x78`) holds at +0xC the game-mode mask of editor item `0x38 + slot`
+(`sub_002F7920`, 0x00242011..0x0024201E) and the slot at +0x16. Items
+0x38..0x41 (slots 1-10) hold 0x700; slots 11-20 read unrelated items 0x42..0x4B
+(slot 13: 0x20, slot 14: 0). Story mode needs bit 0x100/0x200/0x400
+(`sub_0006B100` at 0x0006B1E4), so the spawn walk `sub_00164010` (0x00164071)
+and the AI start (0x0015F96B) skipped any Story AI on slot 13 or 14 without a
+trace. That was why the castle tank and Khallos never appeared in .25/.26.
+Records on slots 11-20 now get slot 1's mask.

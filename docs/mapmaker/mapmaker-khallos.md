@@ -285,3 +285,8 @@ guide entry for this area.
    character was made (`chair placeholder character made` / `NOT made`) and
    whether its AI started (`chair placeholder AI starts`). Neither line means
    the map never spawned that Story AI.
+
+## Not appearing in .25/.26: set slot 13 (fixed in .27)
+
+Khallos' chair sat on set slot 13, whose spawn mode mask never allowed story
+mode; see [Spawn mode mask](mapmaker-sets.md).

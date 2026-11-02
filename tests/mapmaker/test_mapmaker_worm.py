@@ -135,7 +135,6 @@ MUTATIONS = {
     'multi-cap-high': ('#define WRM_MAX 4u', '#define WRM_MAX 5u'),
     'multi-draw-unswapped': ('        prev=wrm_enter((int)k);\n        if(wrm_state_ok()) {', '        prev=wrm_cur;wrm_i=&wrm_inst[k];\n        if(wrm_state_ok()) {'),
     'multi-hit-unswapped': ('    prev=wrm_enter(k);\n    wrm_hit(ent,original);', '    prev=wrm_cur;\n    wrm_hit(ent,original);'),
-    'multi-reuse-slot-lost': ('    if(k==wrm_n) for(k=0;k<wrm_n && wrm_inst[k].record;k++) {}   /* a block allocated but unused */\n', ''),
     'level-not-forgotten': ('    memset(wrm_inst,0,sizeof wrm_inst);               /* a new level', '    (void)0;               /* a new level'),
 }
 

@@ -654,6 +654,7 @@ int main(void)
         set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
         CHECK(seen_class[0]==0 && seen_class[1]==0x20000u && rbs_skel.record==REC(3));   /* before the original */
+        alloc_ok=0;                                    /* a second one, no memory for its own state: a bot */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(4),0,0,1);         /* a second one */
         CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && rbs_skel.record==REC(3) && rbs_skelf.extras==1);
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);         /* same one again */
@@ -661,6 +662,7 @@ int main(void)
         actor(5,0x0C,0x5E9,0);                                               /* by model */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(5),0,0,1);
         CHECK(seen_class[1]==0 && rbs_skelf.extras==2);
+        alloc_ok=1;
         /* princess: the mansion variant */
         k=nprincess;
         FLOAT_AT(ENT(3)+0x68u)=-12.5f;                                       /* spawn height: a lower floor */
@@ -892,8 +894,10 @@ int main(void)
         CHECK(seen_class[0]==0 && seen_class[1]==0x100000u && rbs_walk.record==REC(8) && rbs_walk.actor==A(8));
         for(k=0;k<16u && rbs.real[k].record!=REC(8);k++) {}
         CHECK(k<16u && rbs.real[k].boss==1u);                                    /* Boss flag noted */
+        alloc_ok=0;
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(9),0,0,1);
-        CHECK(seen_class[1]==0 && rbs_walk.record==REC(8));                      /* only one */
+        alloc_ok=1;
+        CHECK(seen_class[1]==0 && rbs_walk.record==REC(8));                      /* no memory for a second */
         /* WELL: a stand-in only for the walker's lookup, only when none is found */
         orig_eax=0;
         well=CALL(pc_mapmaker_realbosses_tag,fake,0x0029B331u,0x57454C4Cu,0,0,1);
@@ -1109,7 +1113,10 @@ int main(void)
         CHECK(WORD_AT(0x0078B1ECu)==SKST && WORD_AT(0x0078B1E8u)==WKST);       /* home: the first of each */
         /* AI start: one instance each, the fourth skeleton and third walker stay bots */
         for(q=10;q<17u;q++) actor(q,q<14u?0x28u:0x64u,q<14u?0x5E9u:0x637u,q);
+        alloc_ok=0;                                    /* no level memory for a late instance */
         for(q=10;q<17u;q++) CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(q),0,0,1);
+        alloc_ok=1;
+        CHECK(rbs_skelf.n==3u && rbs_walkf.n==2u && fx_is(base));
         CHECK(rbs_skels[0].record==REC(10) && rbs_skels[1].record==REC(11) && rbs_skels[2].record==REC(12));
         CHECK(WORD_AT(REC(12)+4u)==0x20000u && WORD_AT(REC(13)+4u)==0 && rbs_skelf.extras>=1u);
         CHECK(rbs_walks[0].record==REC(14) && rbs_walks[1].record==REC(15) && rbs_walks[1].actor==A(15));
@@ -1194,6 +1201,27 @@ int main(void)
         r=nalloc;
         CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
         CHECK(rbs_skelf.n==4u && nalloc-r==4u && rbs_walkf.n==1u && !rbs_skels[3].record);
+        /* the level init counted fewer than were placed (.26: three each, one
+         * counted): each extra gets its own state at its AI start, from the level's
+         * statics, the boss pointers back on the first */
+        container(0x11,both,3,none7,7);
+        sai_slot(0,1u);sai_slot(1,2u);for(q=2;q<7u;q++) sai_slot(q,25u);
+        CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+        CHECK(rbs_skelf.n==1u && rbs_walkf.n==1u);
+        for(q=0;q<0x15Cu;q+=4u) WORD_AT(0x0078B080u+q)=0xE0000000u+q;  /* other statics live now */
+        r=nalloc;q=nwalk_alloc;
+        {
+            unsigned i;
+            for(i=10;i<15u;i++) actor(i,i<13u?0x28u:0x64u,i<13u?0x5E9u:0x637u,i);
+            for(i=10;i<15u;i++) CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(i),0,0,1);
+        }
+        CHECK(rbs_skelf.n==3u && nalloc-r==2u && rbs_walkf.n==2u && nwalk_alloc-q==1u);
+        CHECK(rbs_skels[1].record==REC(11) && rbs_skels[2].record==REC(12) && rbs_walks[1].record==REC(14));
+        CHECK(WORD_AT(REC(12)+4u)==0x20000u && WORD_AT(REC(14)+4u)==0x100000u);
+        CHECK(FXW(rbs_skels[2].fx,0x0078B0E0u)==0xF0000060u);                 /* from the level's statics */
+        CHECK(WORD_AT(0x0078B0E0u)==0xE0000060u);                             /* the live ones put back */
+        CHECK(WORD_AT(0x0078B1ECu)==rbs_skels[0].state && WORD_AT(0x0078B1E8u)==rbs_walks[0].state);
+        for(q=0;q<0x15Cu;q+=4u) WORD_AT(0x0078B080u+q)=0xF0000000u+q;
         {   /* placed through a set slot 11-20 (sets chunk) */
             static const uint16_t x2[]={0x30,0x28};
             container(0x11,both,3,none7,7);container_extra(x2,2);

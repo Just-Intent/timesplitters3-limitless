@@ -307,6 +307,7 @@ void pc_mapmaker_sets_row_draw(void (*original)(void));
 void pc_mapmaker_sets_row_action(void (*original)(void));
 void pc_mapmaker_sets_pane(void (*original)(void));
 void pc_mapmaker_sets_pick(void (*original)(void));
+void pc_mapmaker_sets_spawn_masks(void (*original)(void));
 void pc_mapmaker_matchbots_live(void (*original)(void));
 void pc_mapmaker_matchbots_restart(void (*original)(void));
 void pc_mapmaker_matchbots_match_start(void (*original)(void));

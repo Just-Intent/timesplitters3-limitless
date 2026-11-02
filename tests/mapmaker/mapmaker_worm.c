@@ -290,10 +290,12 @@ static void multi(void)
     unsigned k,d;
     container(0x11,with_ids,3);
     pads(12);
+    nalloc=0;ninit=0;
     level();
+    /* the level load makes no block: its emitter pool is not built yet (.26 crash) */
+    CHECK(nalloc==0 && ninit==0 && !wrm_n && wrm_scratch);
     WORD_AT(0x0075B4B4u)=0x00777000u;WORD_AT(0x0078FAE0u)=0x888u;   /* another value outside */
     for(k=0;k<6u;k++) { actor(k,0x2C,0x5EA,10.0f+30.0f*k,4.0f+k,-20.0f);WORD_AT(A(k)+0x678u)=0; }
-    nalloc=1;
     for(k=0;k<6u;k++) CALL(pc_mapmaker_worm_ai_start,fake,0x0015F981u,A(k),0,0,1);
     CHECK(wrm_n==4u && nalloc==4u);
     for(k=0;k<4u;k++) CHECK(wrm_inst[k].record==REC(k) && wrm_inst[k].state==WST+k*0x2000u && wrm_inst[k].win[0]==WST+k*0x2000u);
@@ -616,8 +618,9 @@ int main(void)
     /* ---- allocation failures ------------------------------------------- */
     alloc_ok=0;w=ninit;
     CHECK(!level_notes() && !wrm_inst[0].state && WORD_AT(0x0075B4B4u)==0 && ninit==w);
-    alloc_ok=1;scratch_ok=0;
+    alloc_ok=1;scratch_ok=0;WORD_AT(0x40u)=0x5A5A5A5Au;
     CHECK(!level_notes() && !wrm_inst[0].state && WORD_AT(0x0075B4B4u)==0 && ninit==w);
+    CHECK(!wrm_scratch && WORD_AT(0x40u)==0x5A5A5A5Au);              /* nothing written through a null block */
     scratch_ok=1;
     /* the next level without the worm forgets this one */
     CHECK(level_notes());
