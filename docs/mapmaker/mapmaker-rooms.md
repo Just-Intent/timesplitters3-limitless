@@ -634,8 +634,7 @@ arena (estimate; to be measured with `TSFP_MAPMAKER_PROBE=32`).
 
 ### Stages (sites)
 
-6. Word draw buckets: reimplement the writers `sub_00086C40` and
-   `sub_000897D0`, widen the readers `sub_00086480`/`sub_000865E0` (first).
+6. Done (this round): word draw buckets, below ("Stage 6").
 7. View stride 0xFFC -> S (0x3000 for 511, 0x5000 for 1023): the 34 `add/imul
    r, 0xFFC` sites found by a scan (`0x0003C524`, `0x0003C576`, `0x0003C711`,
    `0x0003C7ED`, `0x00083847`, `0x00083A37`, `0x00088F82`, `0x000899FC`,
@@ -693,6 +692,48 @@ cap. Stage 6 reimplements `sub_00086C40` and `sub_000897D0` (same results
 below 256 rooms per depth); stage 7 would move every view field above +0xFFC.
 A camera fix that wraps either function, changes the depth cap or adds
 fields to the view must be merged against these hooks.
+
+## Stage 6: word draw buckets (2026-11-02, static only)
+
+`sub_00086C40` (bucket the current view's rooms by portal-walk depth, then
+draw) and `sub_000897D0` (each view's sorted room list) are reimplemented in
+C (`pc_mapmaker_rooms_buckets`, `pc_mapmaker_rooms_view_lists`); the depth
+lists are word lists in C (room ids up to 2047, any number per depth). The
+two readers `sub_00086480`/`sub_000865E0` keep their bodies: rooms.json sets
+their row stride to 0 (`0x000864CB`, `0x00086621`: every depth reads the one
+staging row `0x008C1800`, the relocated row base) and makes the room load a
+word (`0x000864F4`, `0x00086644`: `movzx esi, byte [edx+eax]` ->
+`movzx esi, word [edx+eax*2]`, same length and mnemonic). Their hook
+(`pc_mapmaker_rooms_bucket_draw`) copies the depth's list there and sets its
+count byte (`0x702DB0+depth`), at most 255 per call, and calls the reader
+again with the same return address for the rest. So with up to 255 rooms per
+depth every reader runs once per depth, as stock; the order (normal rooms
+ascending, 10 "sorted" rooms per depth appended as new depths after
+`[view+0xD28]`, readers in `sub_000867F0`'s order) and the calls
+(`sub_0001A010` with the viewport, `sub_000A79B0(0x10C)`, `sub_003442B0`,
+`sub_00086AE0(deepest)`, `sub_00344350`, `[view+0xD28]` restored) are the
+stock ones. Deviations, all where stock wrote out of bounds: depths >= 80
+are skipped (stock wrote past the 80 rows and counts), the room list never
+passes its shadow capacity (0x10D words; stock had no bound on the first
+pass). The old byte rows past the staging row, the sorted rows `0x702A40`
+and their counts `0x702D60` are no longer used (the dead bodies still name
+them). Room ids above 0x10C still need stage 7 (rects) and stage 8.
+
+Wrappers (all four ship together with the rooms.json entries: with the
+table but without the hooks every depth would read one stale row):
+
+```
+WRAP sub_00086C40 -> pc_mapmaker_rooms_buckets      (no args, plain ret; replaces the body)
+WRAP sub_000897D0 -> pc_mapmaker_rooms_view_lists   (no args, plain ret; replaces the body)
+WRAP sub_00086480 -> pc_mapmaker_rooms_bucket_draw  (eax = depth, plain ret; calls the original 1+ times)
+WRAP sub_000865E0 -> pc_mapmaker_rooms_bucket_draw  (same)
+```
+
+Tests: `tests/mapmaker/test_mapmaker_rooms_buckets.py` (fixture
+`mapmaker_rooms_buckets.c`: 400 random views against a model of the stock
+byte-table code, 1500 rooms with 700 in one depth, 300 random room lists
+against stock `sub_000897D0`, 290-room list; 27 C mutations; the reader
+patches decoded with the lifter's decoder; 6 table mutations).
 
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 

@@ -113,7 +113,8 @@ def test_table_shape():
     assert len(ids) == len(set(ids)) and all(i.startswith('rooms-') for i in ids)
     ops = [p for p in patches if p['kind'] == 'operand']
     relocs = [p for p in patches if p['kind'] == 'relocate']
-    assert not [p for p in patches if p['kind'] not in ('operand', 'relocate')]
+    # code entries: only the two stage-6 word loads (test_mapmaker_rooms_buckets.py decodes them)
+    assert sorted(p['address'] for p in patches if p['kind'] not in ('operand', 'relocate')) == ['0x000864F4', '0x00086644']
     # special ids move by 0x37 to 0x100..0x10C (above every byte), nothing else in between
     specials = [p for p in ops if 'room special id' in p['reason']]
     for p in specials:

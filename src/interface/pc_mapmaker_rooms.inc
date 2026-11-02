@@ -19,6 +19,10 @@
  *   WRAP sub_001124D0 -> pc_mapmaker_rooms_light_colour
  *   WRAP sub_00114030 -> pc_mapmaker_rooms_light_link     (room in eax)
  *   WRAP sub_00114290 -> pc_mapmaker_rooms_light_create   (source in eax)
+ *   WRAP sub_00086C40 -> pc_mapmaker_rooms_buckets        (replaces the body)
+ *   WRAP sub_000897D0 -> pc_mapmaker_rooms_view_lists     (replaces the body)
+ *   WRAP sub_00086480 -> pc_mapmaker_rooms_bucket_draw    (depth in eax)
+ *   WRAP sub_000865E0 -> pc_mapmaker_rooms_bucket_draw    (depth in eax)
  *
  * Room query (sub_00087310): the original collects the rooms overlapping a box
  * into a 0x1B0-byte stack frame (about 209 words) with no bound; reimplemented
@@ -355,4 +359,227 @@ void pc_mapmaker_rooms_light_create(void (*original)(void))
             WORD_AT(MAPMAKER_ROOMS_LIGHT_GROUPS+g*4u)=(uint32_t)(((int32_t)WORD_AT(MAPMAKER_ROOMS_LIGHT_GROUPS+g*4u)+1)%per);
     }
     if(!light && picked) mapmaker_rooms_light_set(picked,room);   /* filled, not linked: keep its id */
+}
+
+/* ---- word draw buckets (stage 6 of rooms past 255) ---------------------
+ * The view's rooms are drawn by portal-walk depth: room r of the current
+ * view has its depth dword at shadow rect +0 (view +0x6000 + 12*r; -1 = not
+ * reached). Stock sub_00086C40 (every scene, once per view drawn) put each
+ * room id as a BYTE in row [depth] of 0x7042B8 (now 0x008C1800, rows of 256)
+ * with a byte count per row at 0x702DB0; rooms whose record +0xB2 has bit 8
+ * went into at most 10 per depth at 0x702A40, appended as new depths after
+ * [view+0xD28]. It then drew through sub_00086AE0 -> sub_000867F0, whose two
+ * readers sub_00086480/sub_000865E0 (eax = depth) walk one row. A byte holds
+ * rooms 1..255 and a row 255 rooms.
+ *
+ * Here sub_00086C40 is reimplemented (same order, same calls) with the rows
+ * kept as word lists in C, one context per nesting level. rooms.json makes
+ * both readers read words (movzx word [edx+eax*2]) from one staging row
+ * (row stride 0: every depth reads MAPMAKER_ROOMS_BUCKET_ROW); their hook
+ * copies the depth's list there, at most 255 per call, sets that depth's
+ * count byte and runs the reader once per 255 rooms (only a depth of more
+ * than 255 rooms takes more than one call). sub_000897D0 (per-view sorted
+ * room list, view shadow +0x6DB0, count word +0xE08) builds the same list
+ * from the same depths without byte tables. With at most 255 rooms per depth
+ * (every level of up to 255 rooms) the rooms, order and calls are the stock
+ * ones. Deviations: a depth >= 80 (stock wrote past its 80 rows and counts)
+ * is skipped, and the list never grows past its shadow capacity. */
+#define MAPMAKER_ROOMS_VIEW_CURRENT 0x007B0CC0u  /* -> the view being drawn (0xFFC struct) */
+#define MAPMAKER_ROOMS_VIEW_ARRAY 0x007B0CE4u    /* -> view 0 */
+#define MAPMAKER_ROOMS_VIEW_COUNT 0x007B0CE0u
+#define MAPMAKER_ROOMS_VIEW_STRIDE 0xFFCu
+#define MAPMAKER_ROOMS_VIEW_RECTS 0x6000u        /* shadow: room r at +0x6000+12*r (int32 depth, int16 x0,y0,x1,y1) */
+#define MAPMAKER_ROOMS_VIEW_LIST 0x6DB0u         /* shadow: sorted room list (words), count word +0xE08 */
+#define MAPMAKER_ROOMS_VIEW_LIST_WORDS 0x10Du
+#define MAPMAKER_ROOMS_VIEW_LIST_CAP 0x10Cu      /* rooms.json 0x000899CA: cmp ax,cap before a neighbour */
+#define MAPMAKER_ROOMS_ID_GLOBAL 0x10Cu          /* rooms.json: global room id */
+#define MAPMAKER_ROOMS_DEPTHS 0x50u
+#define MAPMAKER_ROOMS_SORTED 10u                /* stock 0x702A40 rows: 10 per depth */
+#define MAPMAKER_ROOMS_BUCKET_ROW 0x008C1800u    /* staging row (rooms.json: reader stride 0) */
+#define MAPMAKER_ROOMS_BUCKET_COUNTS 0x00702DB0u /* reader count bytes per depth (stock) */
+#define MAPMAKER_ROOMS_BUCKET_SEGMENT 255u
+#define MAPMAKER_ROOMS_BUCKET_ROOMS 2048u        /* room ids the C lists hold (1..2047) */
+#define MAPMAKER_ROOMS_BUCKET_LEVELS 4u
+#define MAPMAKER_ROOMS_RECORDS 0x00708788u       /* -> room records, 0xB4 each, flags +0xB2 */
+
+typedef struct {
+    uint32_t view;
+    uint16_t start[MAPMAKER_ROOMS_DEPTHS],count[MAPMAKER_ROOMS_DEPTHS];
+    uint16_t room[MAPMAKER_ROOMS_BUCKET_ROOMS];
+} mapmaker_rooms_depths;
+static struct {
+    mapmaker_rooms_depths level[MAPMAKER_ROOMS_BUCKET_LEVELS];
+    unsigned depth;
+    int32_t depth_of[MAPMAKER_ROOMS_BUCKET_ROOMS];
+    unsigned long long segmented,clipped,nested;
+} mapmaker_rooms_bk;
+
+static uint32_t mapmaker_rooms_bucket_rooms(void)
+{
+    uint32_t rooms=WORD_AT(0x007B975Cu);
+    if((int32_t)rooms<0) return 0;
+    if(rooms>MAPMAKER_ROOMS_BUCKET_ROOMS-1u) { mapmaker_rooms_bk.clipped++;rooms=MAPMAKER_ROOMS_BUCKET_ROOMS-1u; }
+    return rooms;
+}
+static int32_t mapmaker_rooms_rect_depth(uint32_t view,uint32_t r)
+{
+    return (int32_t)WORD_AT(view+MAPMAKER_ROOMS_VIEW_RECTS+12u*r);
+}
+static int16_t mapmaker_rooms_rect_h(uint32_t view,uint32_t r,uint32_t field)
+{
+    return (int16_t)mapmaker_rooms_u16(view+MAPMAKER_ROOMS_VIEW_RECTS+12u*r+field);
+}
+
+/* sub_00086C40 (no arguments, plain ret): bucket the current view's rooms
+ * by depth, then draw them (the calls of 0x00086DDA..0x00086E04). */
+extern void sub_0001A010(void),sub_000A79B0(void),sub_003442B0(void),sub_00086AE0(void),sub_00344350(void);
+void pc_mapmaker_rooms_buckets(void (*original)(void))
+{
+    uint32_t view=WORD_AT(MAPMAKER_ROOMS_VIEW_CURRENT),rooms=mapmaker_rooms_bucket_rooms();
+    uint32_t records=WORD_AT(MAPMAKER_ROOMS_RECORDS),r,b,n,vp;
+    int32_t deepest=(int32_t)WORD_AT(view+0xD28u),k;
+    uint16_t normal[MAPMAKER_ROOMS_DEPTHS],sorted[MAPMAKER_ROOMS_DEPTHS][MAPMAKER_ROOMS_SORTED];
+    uint8_t sorted_n[MAPMAKER_ROOMS_DEPTHS];
+    uint8_t replaced[MAPMAKER_ROOMS_DEPTHS];       /* depth taken by sorted row k: k+1, else 0 */
+    int any_sorted=0;
+    mapmaker_rooms_depths *c;
+    (void)original;
+    if(mapmaker_rooms_bk.depth>=MAPMAKER_ROOMS_BUCKET_LEVELS) mapmaker_rooms_bk.nested++;
+    c=&mapmaker_rooms_bk.level[mapmaker_rooms_bk.depth<MAPMAKER_ROOMS_BUCKET_LEVELS?mapmaker_rooms_bk.depth:MAPMAKER_ROOMS_BUCKET_LEVELS-1u];
+    memset(normal,0,sizeof normal);memset(sorted_n,0,sizeof sorted_n);memset(replaced,0,sizeof replaced);
+    WORD_AT(0x0070AAD0u)=0;
+    for(r=1;r<=rooms;r++) {
+        int32_t d=mapmaker_rooms_rect_depth(view,r);
+        mapmaker_rooms_bk.depth_of[r]=-1;
+        if(d<0) continue;
+        if(*(uint8_t *)mapmaker_rooms_host(records+r*0xB4u+0xB2u)&8u) {
+            any_sorted=1;                           /* set even when the row is full */
+            if(d<(int32_t)MAPMAKER_ROOMS_DEPTHS && sorted_n[d]<MAPMAKER_ROOMS_SORTED) sorted[d][sorted_n[d]++]=(uint16_t)r;
+            continue;
+        }
+        if(d>=(int32_t)MAPMAKER_ROOMS_DEPTHS) continue;
+        mapmaker_rooms_bk.depth_of[r]=d;normal[d]++;
+    }
+    if(any_sorted)                                   /* each non-empty sorted row becomes depth ++[view+0xD28] */
+        for(k=0;k<=deepest && k<(int32_t)MAPMAKER_ROOMS_DEPTHS;k++) {
+            int32_t e;
+            if(!sorted_n[k]) continue;
+            e=(int32_t)WORD_AT(view+0xD28u)+1;WORD_AT(view+0xD28u)=(uint32_t)e;
+            if(e>=0 && e<(int32_t)MAPMAKER_ROOMS_DEPTHS) replaced[e]=(uint8_t)(k+1);
+        }
+    for(n=0,b=0;b<MAPMAKER_ROOMS_DEPTHS;b++) {
+        c->start[b]=(uint16_t)n;
+        c->count[b]=replaced[b]?sorted_n[replaced[b]-1u]:normal[b];
+        if(replaced[b]) memcpy(&c->room[n],sorted[replaced[b]-1u],c->count[b]*sizeof(uint16_t));
+        n+=c->count[b];
+        normal[b]=0;                                 /* fill position below */
+    }
+    for(r=1;r<=rooms;r++) {
+        int32_t d=mapmaker_rooms_bk.depth_of[r];
+        if(d<0 || replaced[d]) continue;
+        c->room[c->start[d]+normal[d]++]=(uint16_t)r;
+    }
+    c->view=view;
+    if((int32_t)WORD_AT(view+0xD28u)>=(int32_t)MAPMAKER_ROOMS_DEPTHS) WORD_AT(view+0xD28u)=MAPMAKER_ROOMS_DEPTHS-1u;
+    if(!WORD_AT(view+0x214u)) WORD_AT(0x006B7ACCu)=0;
+    vp=WORD_AT(0x007E71C8u);
+    mapmaker_rooms_bk.depth++;
+    guest_call(sub_0001A010,4,WORD_AT(vp),WORD_AT(vp+0x14u),WORD_AT(vp+4u),WORD_AT(vp+0x18u));
+    guest_call(sub_000A79B0,1,MAPMAKER_ROOMS_ID_GLOBAL);
+    guest_call(sub_003442B0,0);
+    guest_call(sub_00086AE0,1,(uint32_t)deepest);   /* -> sub_000867F0 -> the readers */
+    guest_call(sub_00344350,0);
+    mapmaker_rooms_bk.depth--;
+    WORD_AT(WORD_AT(MAPMAKER_ROOMS_VIEW_CURRENT)+0xD28u)=(uint32_t)deepest;
+    MAPMAKER_GUEST_RET();
+}
+
+/* sub_00086480 / sub_000865E0 (eax = depth, plain ret): draw one depth's
+ * rooms from the staging row, 255 per call. */
+void pc_mapmaker_rooms_bucket_draw(void (*original)(void))
+{
+    uint32_t b=g_eax,ret=WORD_AT(g_esp),done=0,n,i;
+    const mapmaker_rooms_depths *c;
+    if(!mapmaker_rooms_bk.depth || b>=MAPMAKER_ROOMS_DEPTHS) {   /* not reached from sub_00086C40 */
+        if(b<MAPMAKER_ROOMS_DEPTHS) *(uint8_t *)mapmaker_rooms_host(MAPMAKER_ROOMS_BUCKET_COUNTS+b)=0;
+        original();
+        return;
+    }
+    c=&mapmaker_rooms_bk.level[(mapmaker_rooms_bk.depth<=MAPMAKER_ROOMS_BUCKET_LEVELS?mapmaker_rooms_bk.depth:MAPMAKER_ROOMS_BUCKET_LEVELS)-1u];
+    n=c->count[b];
+    if(n>MAPMAKER_ROOMS_BUCKET_SEGMENT) mapmaker_rooms_bk.segmented++;
+    do {
+        uint32_t part=n-done>MAPMAKER_ROOMS_BUCKET_SEGMENT?MAPMAKER_ROOMS_BUCKET_SEGMENT:n-done;
+        for(i=0;i<part;i++) mapmaker_rooms_set_u16(MAPMAKER_ROOMS_BUCKET_ROW+2u*i,c->room[c->start[b]+done+i]);
+        *(uint8_t *)mapmaker_rooms_host(MAPMAKER_ROOMS_BUCKET_COUNTS+b)=(uint8_t)part;
+        if(done) { g_esp-=4u;WORD_AT(g_esp)=ret; }  /* the same call again */
+        g_eax=b;
+        original();
+        done+=part;
+    } while(done<n);
+}
+
+/* sub_000897D0 (no arguments, plain ret): for every view with flag 0x20,
+ * the rooms of depths [view+0xD28]..0 whose rectangle is on screen (x1 >= 0,
+ * x0 < [0x004E8CF0], x1 > x0), then the rooms sub_00087720 lists for the
+ * view's room (unless global), each once, below the capacity. The first
+ * call only sets [0x0070877C]. */
+extern void sub_00087720(void);
+void pc_mapmaker_rooms_view_lists(void (*original)(void))
+{
+    static uint16_t first[MAPMAKER_ROOMS_DEPTHS+1u],order[MAPMAKER_ROOMS_BUCKET_ROOMS];
+    uint32_t v;
+    (void)original;
+    if(!WORD_AT(0x0070877Cu)) { WORD_AT(0x0070877Cu)=1;MAPMAKER_GUEST_RET();return; }
+    for(v=0;(int32_t)v<(int32_t)WORD_AT(MAPMAKER_ROOMS_VIEW_COUNT);v++) {
+        uint32_t view=WORD_AT(MAPMAKER_ROOMS_VIEW_ARRAY)+v*MAPMAKER_ROOMS_VIEW_STRIDE,rooms,r,room,n,i,j;
+        uint32_t fill[MAPMAKER_ROOMS_DEPTHS],list=view+MAPMAKER_ROOMS_VIEW_LIST;
+        int32_t deepest,b,right=(int32_t)WORD_AT(0x004E8CF0u);
+        if(!(*(uint8_t *)mapmaker_rooms_host(view+0x21Cu)&0x20u)) continue;
+        mapmaker_rooms_set_u16(view+0xE08u,0);mapmaker_rooms_set_u16(view+0xE0Au,0);
+        if((int32_t)WORD_AT(view+0xD28u)>=(int32_t)MAPMAKER_ROOMS_DEPTHS) WORD_AT(view+0xD28u)=MAPMAKER_ROOMS_DEPTHS-1u;
+        deepest=(int32_t)WORD_AT(view+0xD28u);
+        rooms=mapmaker_rooms_bucket_rooms();
+        memset(first,0,sizeof first);
+        for(r=1;r<=rooms;r++) {                      /* counting sort by depth, rooms ascending */
+            int32_t d=mapmaker_rooms_rect_depth(view,r);
+            if(d>=0 && d<(int32_t)MAPMAKER_ROOMS_DEPTHS) first[d+1]++;
+        }
+        for(b=0;b<(int32_t)MAPMAKER_ROOMS_DEPTHS;b++) { first[b+1]=(uint16_t)(first[b+1]+first[b]);fill[b]=first[b]; }
+        for(r=1;r<=rooms;r++) {
+            int32_t d=mapmaker_rooms_rect_depth(view,r);
+            if(d>=0 && d<(int32_t)MAPMAKER_ROOMS_DEPTHS) order[fill[d]++]=(uint16_t)r;
+        }
+        for(b=deepest;b>=0;b--)
+            for(i=first[b];i<first[b+1];i++) {
+                int16_t x0,x1;
+                uint16_t at;
+                r=order[i];
+                x1=mapmaker_rooms_rect_h(view,r,8u);
+                if(x1<0) continue;
+                x0=mapmaker_rooms_rect_h(view,r,4u);
+                if((int32_t)x0>=right || x1<=x0) continue;
+                at=mapmaker_rooms_u16(view+0xE08u);
+                if(at>=MAPMAKER_ROOMS_VIEW_LIST_WORDS) continue;
+                mapmaker_rooms_set_u16(list+2u*at,(uint16_t)r);
+                mapmaker_rooms_set_u16(view+0xE08u,(uint16_t)(at+1u));
+            }
+        mapmaker_rooms_set_u16(view+0xE0Au,mapmaker_rooms_u16(view+0xE08u));
+        room=WORD_AT(view+0x2A0u);
+        if(room==MAPMAKER_ROOMS_ID_GLOBAL) continue;
+        g_esp-=0x80u;                                 /* the original's 30-dword frame buffer */
+        n=guest_call(sub_00087720,3,room,g_esp,0x1Eu);
+        for(i=0;(int32_t)i<(int32_t)n && i<0x1Eu;i++) {
+            uint32_t near_room=WORD_AT(g_esp+4u*i);
+            int16_t count=(int16_t)mapmaker_rooms_u16(view+0xE08u);
+            int found=0;
+            for(j=0;(int32_t)j<count;j++)
+                if((uint32_t)(int32_t)(int16_t)mapmaker_rooms_u16(list+2u*j)==near_room) { found=1;break; }
+            if(found || count>=(int16_t)MAPMAKER_ROOMS_VIEW_LIST_CAP || count<0) continue;
+            mapmaker_rooms_set_u16(list+2u*(uint32_t)count,(uint16_t)near_room);
+            mapmaker_rooms_set_u16(view+0xE08u,(uint16_t)(count+1));
+        }
+        g_esp+=0x80u;
+    }
+    MAPMAKER_GUEST_RET();
 }
