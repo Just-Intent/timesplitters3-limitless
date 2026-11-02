@@ -62,7 +62,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAPMAKER_LIMIT_PADS 4800u
+/* Regular pads (2026-11-02, was 4800): ids are 0x3E9 + index and the 13
+ * id-threshold compares now read ids up to 0x2328 as regular
+ * (config/guest-code-patches/pads.json pads-idthreshold-*), and regular
+ * handles are the index itself (< 0x1F40), so 8000 regular pads decode in
+ * play. The pool holds all 8000; the editor keeps 320 spare and allows 7680,
+ * 511 pieces of the heaviest tile (14 pads) need 7154. */
+#define MAPMAKER_LIMIT_PADS 7680u
+#define MAPMAKER_POOL_PADS 8000u      /* regular handles 0..0x1F3F, ids 0x3E9..0x2328 */
 /* Cover pads: the runtime pad handles are moved above a 10,240-entry cover
  * handle range (config/guest-code-patches/pads.json, docs/mapmaker/mapmaker-pads.md);
  * the editor keeps 256 spare as stock did (1280 - 1024) for the start-point
@@ -79,6 +86,10 @@
 #define MAPMAKER_LIMIT_PIECES 255u    /* = MAPMAKER_ROOMS_MAX */
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
+/* Regular pads: the pool fits the handle range and every pool id stays at or
+ * below the raised id threshold 0x2328. */
+typedef char mapmaker_limits_pad_ids[(MAPMAKER_POOL_PADS<=0x1F40u && 0x3E9u+MAPMAKER_POOL_PADS-1u<=0x2328u &&
+                                      MAPMAKER_LIMIT_PADS<=MAPMAKER_POOL_PADS)?1:-1];
 
 static struct { int initialized, pools, limits; } mapmaker_limits;
 
@@ -161,12 +172,12 @@ void pc_display_mapmaker_pools(void (*original)(void))
         return;
     }
     save_registers(&r);
-    WORD_AT(0x00715F2Cu)=mapmaker_pool(MAPMAKER_LIMIT_PADS*32u);
+    WORD_AT(0x00715F2Cu)=mapmaker_pool(MAPMAKER_POOL_PADS*32u);
     /* Links: the editor counts template links only; the play-time stitcher
      * adds one per stitch entry (table of 16 per piece) and objects a few. */
     WORD_AT(0x00715F30u)=mapmaker_pool((MAPMAKER_LIMIT_LINKS+16u*MAPMAKER_LIMIT_PIECES+256u)*20u);
     if((WORD_AT(0x007DE454u)>>8&0xFFu)!=10u)                 /* byte [0x007DE455] */
-        WORD_AT(0x00715F3Cu)=mapmaker_pool(MAPMAKER_LIMIT_PADS*44u);
+        WORD_AT(0x00715F3Cu)=mapmaker_pool(MAPMAKER_POOL_PADS*44u);
     WORD_AT(0x00715F34u)=mapmaker_pool(MAPMAKER_POOL_COVER*32u);
     WORD_AT(0x00715F38u)=mapmaker_pool(0x280u);
     WORD_AT(0x007B6664u)=0;WORD_AT(0x007B6660u)=0;WORD_AT(0x007B65C0u)=0;WORD_AT(0x007B6674u)=0;

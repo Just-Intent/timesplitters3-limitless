@@ -187,7 +187,7 @@ table `config/guest-code-patches/<area>.json`, C policy
 the "capacity area stubs" markers in `pc_menu_mouse_guest.inc`. Fixtures that
 compile the whole include chain take link stubs from
 `tests/mapmaker/mapmaker_area_stubs.h`. Areas: `pads` (cover handle range 10,240,
-runtime pad handles 0x4740.., bounded A* pools, group A* pool relocated to
+runtime pad handles 0x4740.., bounded A* pools, pad/link/object/memory caps: [caps](limitless-caps.md), group A* pool relocated to
 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
 `objects`, `editor`, `rooms` (241, then 255 pieces, word draw buckets, plan to 1023: [rooms](limitless-rooms.md)) and `actors` (64 characters / 63 AI
