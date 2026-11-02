@@ -1029,5 +1029,5 @@ Crossplay rotation/lock/recycle: `test_crossplay_peer.py`; Online interpreter:
 
 Markers: test_ui_layout.py; test_patch_updates.py checks 2290/2291 after migration.
 
-Mech input+log: test_mounted_mouse.py [scope](mounted-mouse.md#battle-mech-mouse-425)
+Mech/wide viewfinder: test_mounted_mouse.py, test_camera_widescreen.py; mounted-mouse.md
 MapMaker boss/restart/sand:limitless

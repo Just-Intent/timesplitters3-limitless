@@ -47,6 +47,7 @@ float pc_display_hud_scale(void){return hud_scale;}
 static void ui_place(int value,uint32_t tag){ui_placement=value;ui_tag=tag;placement_changes++;}
 static int footer_hover;
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
+static int viewfinder_label(void (*original)(void)) { (void)original;return 0; } /* pc_display_ui.inc */
 static int menu_mouse_footer_text(void) { return footer_hover; }
 #include "pc_tutorial_ui.inc"
 static float seen;
