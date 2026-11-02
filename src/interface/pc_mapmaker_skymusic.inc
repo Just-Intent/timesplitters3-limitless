@@ -34,6 +34,15 @@
  *    its props and resets the weather list [0x007AC804] to 0x004E63F8 (type
  *    0); the frame code draws it only while the current entry has type 5
  *    (0x0011BC4F, 0x0011BCB5). Scene 2's list 0x00507898 has one type-5 entry.
+ *  - The sandstorm is tied to scene 2's rooms: the four emitters 0x004E62E8
+ *    (0x44 each: rooms +0..+0xC, model +0x10, rate +0x14, wind +0x18, prop
+ *    +0x34) hold rooms {2,3,7} {6,26,27} {5,4} {19}. Only a player whose room
+ *    list matches one (0x0011AD69, 0x0011A66B) spawns sand grains (sub_001186F0:
+ *    on that room's floor zones) and animates/fades in the emitter's prop
+ *    (created at the origin, 0x00118A0C). The grains (60 x 0x24 ring
+ *    [0x007AC874], index [0x007AC878]) age and move in sub_0011ACF0 and are
+ *    drawn by sub_0011B110 (texture 0x303) in each view whose flag
+ *    [0x007AC82C+4v] the haze update (sub_0011A600) set.
  *
  * With TSFP_MAPMAKER_LIMITS=1:
  *  - rows (WRAP sub_00078590, the three bind return addresses, scene 102):
@@ -62,7 +71,12 @@
  *    after) turns the sandstorm on and requests its models; weather_start
  *    (WRAP sub_0011B310, after) and weather_list (WRAP sub_00119AB0, the
  *    level setup's list, which runs after the weather start) keep scene 2's
- *    type-5 entry once the sandstorm buffers exist; music (WRAP sub_00045DE0)
+ *    type-5 entry once the sandstorm buffers exist; weather_frame (WRAP
+ *    sub_0011BBC0) hides scene 2's emitter rooms while the stock frame runs
+ *    (MapMaker rooms are piece numbers: a stray match would fade in scene 2's
+ *    props at the origin) and then blows grains around each outdoor player
+ *    into the stock ring, which the stock code ages, moves and draws;
+ *    music (WRAP sub_00045DE0)
  *    plays the extra track when the map's index is -1.
  * A stock or older build loads such a map with the fallbacks. Requires the
  * includer's WORD_AT, guest_call, g_eax, g_esp, g_xbox_mem_offset,
@@ -111,6 +125,28 @@
 #define SMX_WX_BUF2 0x007AC874u
 #define SMX_WX_DEFAULT 0x004E63F8u
 #define SMX_SAND_LIST 0x00507898u            /* scene 2: one entry, type 5 */
+#define SMX_SAND_EMITTERS 0x004E62E8u        /* 4 x 0x44: rooms +0..+0xC (0 = none) */
+#define SMX_SAND_EMITTER_COUNT 4u
+#define SMX_SAND_ROOM_SLOTS 4u
+#define SMX_SAND_PROP 0x34u                  /* emitter: the prop sub_001189C0 created */
+#define SMX_WX_DRAWN 0x007AC82Cu             /* per view: sub_0011B110 draws when set */
+#define SMX_WX_EXPOSED 0x007AC844u           /* per player float: 1 outdoors (sub_00119B50), decays */
+#define SMX_WX_RING 0x007AC878u              /* next grain of the ring [SMX_WX_BUF2] */
+#define SMX_GRAINS 60u                       /* 0x870 / 0x24 */
+#define SMX_GRAIN 0x24u                      /* pos +0, velocity +0xC, angle +0x18, spin +0x1C, age +0x20 (-1 dead) */
+#define SMX_PLAYERS_N 0x007B0CE0u
+#define SMX_PLAYERS 0x007B0CE4u
+#define SMX_PLAYER 0xFFCu
+#define SMX_PL_FLAGS 0x21Cu                  /* weather runs for sign bit + 0x400 (0x0011A68F) */
+#define SMX_PL_POS 0x27Cu
+#define SMX_PLAYERS_MAX 4u
+#define SMX_STEPS 0x004E7944u                /* frames this update (rate x steps, 0x0011ADC2) */
+#define SMX_TEX_GLOBAL 0x004D2D64u           /* sub_00080F20: handle of global texture id at + id*0x18 */
+#define SMX_TEX_GRAIN 0x303u
+#define SMX_TEX_HAZE 0x328u
+#define SMX_GRAIN_SPREAD 12.0f               /* metres around the player */
+#define SMX_GRAIN_UPWIND 6.0f
+static const float smx_wind[3]={0.53f,0.0f,-0.85f};   /* scene 2 emitter 1 (+0x18) */
 #define SMX_PATH_MAX 32u
 #define SMX_SCAN 0x00080000u
 #define SMX_LEVEL100 0x00518778u             /* level table entry of scene 100 (+0x10 sky) */
@@ -138,7 +174,7 @@ static const struct { const char *label, *pak, *mem; uint32_t list; } smx_weathe
 #define SMX_TEX_STRIDE 0x34u
 #define SMX_TEX_ID 0x1Cu
 #define SMX_TEX_ROWS_MAX 0x2000u
-#define SMX_TEX_LIST_MAX 64u                 /* model file: +0 -> {id, -, -, flags} x n, -1 */
+#define SMX_TEX_LIST_MAX 64u                 /* model file: +0 -> {slot, id, -, flags} x n, -1 */
 #define SMX_TEX_LOGGED 8u
 
 extern void sub_00071800(void),sub_00062260(void),sub_000622D0(void),sub_000A5E40(void),sub_000631C0(void);
@@ -154,6 +190,8 @@ static struct {
     uint32_t tex_total, tex_loaded;          /* last sky probe: textures named, loaded */
     int sand_ready;                          /* this level: the sandstorm pak is mounted */
     int sand_on;                             /* this level: sandstorm flag set by us */
+    uint32_t grains;                         /* this level: grains emitted */
+    uint32_t rng;                            /* host generator: the guest's stays untouched */
     unsigned long long rows, logged;
 } smx;
 
@@ -356,6 +394,7 @@ void pc_mapmaker_skymusic_mount(void (*original)(void))
     original();
     mapmaker_sky.extra_ready=0;mapmaker_sky.extra_prepare=smx_prepare_sky;
     smx.sky_row=0;smx.sand_ready=0;smx.sand_on=0;smx.level_logs=0;smx.frames=0;
+    smx.tex_total=0;smx.tex_loaded=0;smx.grains=0;
     if(pending==100u && smx_on()) smx_log("new MapMaker level (scene now, mounted paks)",smx_scene(),WORD_AT(SMX_MOUNTS));
 }
 
@@ -388,13 +427,17 @@ void pc_mapmaker_skymusic_level(void (*original)(void))
 }
 
 /* 1 when the texture id is in the loaded-texture table (sub_00018B90 looks
- * up and stores ids there; a texture found in no mounted pak never is). */
-static int smx_texture_loaded(uint32_t id)
+ * up and stores ids there, row +0x1C, and writes the row number, or -1, into
+ * the model's entry +0 at 0x00018C91; a texture found in no mounted pak never
+ * is). The entry's row is tried first, then the whole table. */
+static int smx_texture_loaded(uint32_t slot,uint32_t id)
 {
     uint32_t t=WORD_AT(SMX_TEXTURES),rows,end,k;
     if(!MAPMAKER_PTR_OK(t,0x10u) || !(rows=WORD_AT(t))) return 0;
     end=WORD_AT(t+0x0Cu);
     if(end>SMX_TEX_ROWS_MAX) end=SMX_TEX_ROWS_MAX;
+    if(slot<end && MAPMAKER_PTR_OK(rows+slot*SMX_TEX_STRIDE+SMX_TEX_ID,4u) &&
+       WORD_AT(rows+slot*SMX_TEX_STRIDE+SMX_TEX_ID)==id) return 1;
     for(k=0;k<end;k++) {
         uint32_t a=rows+k*SMX_TEX_STRIDE+SMX_TEX_ID;
         if(!MAPMAKER_PTR_OK(a,4u)) return 0;
@@ -402,24 +445,29 @@ static int smx_texture_loaded(uint32_t id)
     }
     return 0;
 }
-/* After the load pass: each texture the sky model's file names (+0: list of
- * 16-byte entries, id first, -1 ends, 0x40000000 skipped as sub_00096330
- * does) and whether it was loaded; the missing ones by id. */
+/* After the load pass: each texture the sky model's file names and whether
+ * it was loaded; the missing ones by id. The file's list (+0: 16-byte entries
+ * {id, id, -, flags}, -1 ends) is the one in memory: the texture pass has
+ * replaced each entry's first word by its loaded-table row (or -1), so the id
+ * is the second word (v0.4.0-mapmaker.28 logged rows 0x692.. as "ids"; the
+ * files' ids are 24-bit, 0x855357 ...). 0x40000000 is skipped as sub_00096330
+ * does. */
 static void smx_sky_textures(uint32_t file,uint32_t rec)
 {
-    uint32_t list,k,id,total=0,loaded=0,named=0;
+    uint32_t list,k,id,slot,total=0,loaded=0,named=0;
     smx.tex_total=smx.tex_loaded=0;
     if(!file || !MAPMAKER_PTR_OK(file,0x10u) || !(list=WORD_AT(file))) {
         smx_log("sky textures not checked: model file not read (record, file)",rec,file);
         return;
     }
     for(k=0;k<SMX_TEX_LIST_MAX && MAPMAKER_PTR_OK(file+list+k*16u,16u);k++) {
-        if((id=WORD_AT(file+list+k*16u))==0xFFFFFFFFu) break;
-        if(id==0x40000000u) continue;
+        slot=WORD_AT(file+list+k*16u);
+        if((id=WORD_AT(file+list+k*16u+4u))==0xFFFFFFFFu) break;
+        if(id==0x40000000u || slot==0x40000000u) continue;
         total++;
-        if(smx_texture_loaded(id)) { loaded++;continue; }
+        if(smx_texture_loaded(slot,id)) { loaded++;continue; }
         if(named++<SMX_TEX_LOGGED && smx.logged++<96u) {
-            fprintf(stderr,"[mapmaker] skymusic: sky texture not loaded: textures/%06x.xbt (record %u; in no mounted pak?)\n",id,rec);
+            fprintf(stderr,"[mapmaker] skymusic: sky texture not loaded: textures/%06x.xbt (row %d, record %u; in no mounted pak?)\n",id,(int)slot,rec);
             fflush(stderr);
         }
     }
@@ -512,23 +560,91 @@ void pc_mapmaker_skymusic_weather_list(void (*original)(void))
     original();
 }
 
+static float smx_rand(void)                  /* [0, 1) */
+{
+    smx.rng=smx.rng*1103515245u+12345u;
+    return (float)((smx.rng>>16)&0x7FFFu)/32768.0f;
+}
+/* Sand grains for a MapMaker map, written into the stock ring as the stock
+ * emitter does (0x0011ADE6..0x0011AED7): position, velocity = wind x 6 with
+ * jitter, 0..1.2 up, a random angle and spin, age 0. One grain per update
+ * step for each player the weather runs for (the stock player test) and who
+ * is outdoors ([0x007AC844+4p] > 0, the stock rain test sub_00119B50), in a
+ * box around the player, upwind so the grains blow past. Returns the count. */
+static uint32_t smx_sand_emit(void)
+{
+    uint32_t ring=WORD_AT(SMX_WX_BUF2),base=WORD_AT(SMX_PLAYERS),n=WORD_AT(SMX_PLAYERS_N),steps=WORD_AT(SMX_STEPS);
+    uint32_t p,i,pl,flags,g,e,made=0;
+    float x,y,z,s;
+    if(!MAPMAKER_PTR_OK(ring,SMX_GRAINS*SMX_GRAIN) || (int32_t)steps<=0) return 0;
+    if(steps>4u) steps=4u;
+    if(n>SMX_PLAYERS_MAX) n=SMX_PLAYERS_MAX;
+    if(!smx.rng) smx.rng=0x5A4D5358u;
+    for(p=0;p<n;p++) {
+        pl=base+p*SMX_PLAYER;
+        if(!MAPMAKER_PTR_OK(pl,SMX_PL_POS+12u)) continue;
+        flags=WORD_AT(pl+SMX_PL_FLAGS);
+        if(!(flags&0x80000000u) || !(flags&0x400u) || !(FLOAT_AT(SMX_WX_EXPOSED+p*4u)>0.0f)) continue;
+        x=FLOAT_AT(pl+SMX_PL_POS);y=FLOAT_AT(pl+SMX_PL_POS+4u);z=FLOAT_AT(pl+SMX_PL_POS+8u);
+        for(i=0;i<steps;i++) {
+            g=WORD_AT(SMX_WX_RING);
+            if(g>=SMX_GRAINS) g=0;
+            e=ring+g*SMX_GRAIN;
+            FLOAT_AT(e)=x-smx_wind[0]*SMX_GRAIN_UPWIND+(smx_rand()*2.0f-1.0f)*SMX_GRAIN_SPREAD;
+            FLOAT_AT(e+4u)=y+smx_rand()*3.0f-1.0f+0.3f;
+            FLOAT_AT(e+8u)=z-smx_wind[2]*SMX_GRAIN_UPWIND+(smx_rand()*2.0f-1.0f)*SMX_GRAIN_SPREAD;
+            s=(smx_rand()+1.0f)*0.5f*6.0f;
+            FLOAT_AT(e+0x0Cu)=smx_wind[0]*s+(smx_rand()-0.5f)*0.25f;
+            FLOAT_AT(e+0x10u)=smx_rand()*1.2f;
+            FLOAT_AT(e+0x14u)=smx_wind[2]*s+(smx_rand()-0.5f)*0.25f;
+            FLOAT_AT(e+0x18u)=(smx_rand()-0.5f)*6.2831853f;
+            FLOAT_AT(e+0x1Cu)=(smx_rand()-0.5f)*1.5707963f;
+            FLOAT_AT(e+0x20u)=0.0f;
+            WORD_AT(SMX_WX_RING)=(g+1u)%SMX_GRAINS;
+            made++;
+        }
+    }
+    smx.grains+=made;
+    return made;
+}
+
 /* WRAP sub_0011BBC0 (weather frame update, no args; called every frame from
  * sub_001CE420 at 0x001CE55F/0x001CE596 with no scene test; it runs the
  * sandstorm (sub_0011ACF0) only while [0x0073D9AC] and the current list
- * entry has type 5, 0x0011BC4F): probe only. On a sandstorm map it logs, on
- * the 1st, 60th and 600th frame of the level, the list, the entry's type,
- * the flag and the buffers. */
+ * entry has type 5, 0x0011BC4F). On a sandstorm map: while the original runs
+ * the emitters' scene-2 rooms read 0 (every slot is tested, 0 skipped), so no
+ * MapMaker piece matches them; they are put back after, unchanged for story
+ * levels. Then, while the entry has type 5, our grains (smx_sand_emit). Logs,
+ * on the 1st, 60th and 600th frame of the level, the list, the entry's type,
+ * the flag, the buffers, and what is drawn: live grains, views flagged for
+ * the draw, player 1's exposure and the grain/haze texture handles. */
 void pc_mapmaker_skymusic_weather_frame(void (*original)(void))
 {
-    uint32_t list,index,type;
+    uint32_t list,index,type,k,alive=0,made=0,rooms[SMX_SAND_EMITTER_COUNT*SMX_SAND_ROOM_SLOTS],ring;
+    if(smx.sand_on!=1 || smx_scene()!=100u || !WORD_AT(SMX_SANDSTORM)) { original();return; }
+    for(k=0;k<SMX_SAND_EMITTER_COUNT*SMX_SAND_ROOM_SLOTS;k++) {
+        uint32_t a=SMX_SAND_EMITTERS+(k/SMX_SAND_ROOM_SLOTS)*0x44u+(k%SMX_SAND_ROOM_SLOTS)*4u;
+        rooms[k]=WORD_AT(a);WORD_AT(a)=0;
+    }
     original();
-    if(smx.sand_on!=1 || smx_scene()!=100u) return;
-    smx.frames++;
-    if(smx.frames!=1u && smx.frames!=60u && smx.frames!=600u) return;
+    for(k=0;k<SMX_SAND_EMITTER_COUNT*SMX_SAND_ROOM_SLOTS;k++)
+        WORD_AT(SMX_SAND_EMITTERS+(k/SMX_SAND_ROOM_SLOTS)*0x44u+(k%SMX_SAND_ROOM_SLOTS)*4u)=rooms[k];
     list=WORD_AT(SMX_WX_LIST);index=WORD_AT(SMX_WX_INDEX);
     type=MAPMAKER_PTR_OK(list+index*0x28u,4u)?WORD_AT(list+index*0x28u):0xFFFFFFFFu;
+    if(type==5u) made=smx_sand_emit();
+    smx.frames++;
+    if(smx.frames!=1u && smx.frames!=60u && smx.frames!=600u) return;
     fprintf(stderr,"[mapmaker] skymusic: weather frame %u: list 0x%08X index %u type %d sandstorm %u buffers 0x%08X 0x%08X (type 5 draws)\n",
             smx.frames,list,index,(int)type,WORD_AT(SMX_SANDSTORM),WORD_AT(SMX_WX_BUF1),WORD_AT(SMX_WX_BUF2));
+    ring=WORD_AT(SMX_WX_BUF2);
+    if(MAPMAKER_PTR_OK(ring,SMX_GRAINS*SMX_GRAIN))
+        for(k=0;k<SMX_GRAINS;k++) if(FLOAT_AT(ring+k*SMX_GRAIN+0x20u)>=0.0f) alive++;
+    fprintf(stderr,"[mapmaker] skymusic: sandstorm drawn: grains alive %u of %u (this frame %u, level %u), views flagged %u %u %u %u, "
+            "player 1 outdoors %.2f, textures 0x303 0x%08X 0x328 0x%08X, scene-2 props 0x%08X 0x%08X 0x%08X 0x%08X (not animated in MapMaker)\n",
+            alive,SMX_GRAINS,made,smx.grains,WORD_AT(SMX_WX_DRAWN),WORD_AT(SMX_WX_DRAWN+4u),WORD_AT(SMX_WX_DRAWN+8u),WORD_AT(SMX_WX_DRAWN+12u),
+            (double)FLOAT_AT(SMX_WX_EXPOSED),WORD_AT(SMX_TEX_GLOBAL+SMX_TEX_GRAIN*0x18u),WORD_AT(SMX_TEX_GLOBAL+SMX_TEX_HAZE*0x18u),
+            WORD_AT(SMX_SAND_EMITTERS+SMX_SAND_PROP),WORD_AT(SMX_SAND_EMITTERS+0x44u+SMX_SAND_PROP),
+            WORD_AT(SMX_SAND_EMITTERS+0x88u+SMX_SAND_PROP),WORD_AT(SMX_SAND_EMITTERS+0xCCu+SMX_SAND_PROP));
     fflush(stderr);
 }
 
