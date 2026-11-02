@@ -478,8 +478,7 @@ Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained (no hang report).
-Ported bosses in their own areas (parallel sessions, merged 2026-11-01; not
-played): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
+Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, mapmaker-crowe.md), `tank`
 (`pc_mapmaker_tank.inc`: guard robot id 0x12 placeholder -> castle tank prop
 0x281 from prop6.pak, mapmaker-tank.md). Wrapper lists: each doc. ORDER puts them
