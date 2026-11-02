@@ -1218,6 +1218,12 @@ int main(void)
         CHECK(rbs_skelf.n==3u && nalloc-r==2u && rbs_walkf.n==2u && nwalk_alloc-q==1u);
         CHECK(rbs_skels[1].record==REC(11) && rbs_skels[2].record==REC(12) && rbs_walks[1].record==REC(14));
         CHECK(WORD_AT(REC(12)+4u)==0x20000u && WORD_AT(REC(14)+4u)==0x100000u);
+        {   /* no fifth: the cap holds for late instances too */
+            unsigned n0=rbs_skelf.n,w0=rbs_walkf.n;
+            rbs_skelf.n=RBS_INST_MAX;rbs_walkf.n=RBS_INST_MAX;r=nalloc;
+            CHECK(!rbs_skel_more() && !rbs_walk_more() && rbs_skelf.n==RBS_INST_MAX && rbs_walkf.n==RBS_INST_MAX && nalloc==r);
+            rbs_skelf.n=n0;rbs_walkf.n=w0;
+        }
         CHECK(FXW(rbs_skels[2].fx,0x0078B0E0u)==0xF0000060u);                 /* from the level's statics */
         CHECK(WORD_AT(0x0078B0E0u)==0xE0000060u);                             /* the live ones put back */
         CHECK(WORD_AT(0x0078B1ECu)==rbs_skels[0].state && WORD_AT(0x0078B1E8u)==rbs_walks[0].state);

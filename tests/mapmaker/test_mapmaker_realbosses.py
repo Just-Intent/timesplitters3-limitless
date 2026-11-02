@@ -233,7 +233,7 @@ MUTATIONS = {
     'multi-shared-base': ('            memcpy(rbs_g(RBS_FX),base,RBS_FX_SIZE);\n            WORD_AT(RBS_SKEL_STATE)=0;', '            WORD_AT(RBS_SKEL_STATE)=0;'),
     'late-walker-none': (' && !(w=rbs_walk_more())) {', ') {'),
     'late-skeleton-none': (' && !(k=rbs_skel_more())) {', ') {'),
-    'late-live-statics': ('    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);\n    WORD_AT(RBS_SKEL_STATE)=0;', '    WORD_AT(RBS_SKEL_STATE)=0;'),
+    'late-live-statics': ('    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);\n    WORD_AT(RBS_SKEL_STATE)=0u;', '    WORD_AT(RBS_SKEL_STATE)=0u;'),
     'late-statics-left': ('    memcpy(rbs_g(RBS_FX),cur,RBS_FX_SIZE);\n    WORD_AT(RBS_SKEL_STATE)=home;', '    WORD_AT(RBS_SKEL_STATE)=home;'),
     'late-home-lost': ('    WORD_AT(RBS_WALK_STATE)=home;\n', ''),
     'late-past-cap': ('    unsigned k=rbs_skelf.n;\n    if(k>=RBS_INST_MAX) return 0;', '    unsigned k=rbs_skelf.n;\n    if(k>=RBS_INST_MAX+1u) return 0;'),
