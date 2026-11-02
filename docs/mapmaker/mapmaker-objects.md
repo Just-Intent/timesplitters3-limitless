@@ -32,6 +32,7 @@ address; **INFERRED** means it was reasoned, not seen.
 | Logic tag links `0x0075D320` | 250 | 1000 at `0x008A2400` | `obj-tag-links-*` | all |
 | Logic tag groups `0x0075CE68` | 150 | 150 (unchanged) | - | - |
 | Cover props (category 33) | 66 | 132 (editor) | `mapmaker_categories[]` | editor |
+| Placed-pickup records `[0x00732E60]` | 120 | 768 | `obj-pickups-*` | all |
 
 Two limits are unchanged:
 
@@ -144,6 +145,19 @@ them untouched.
   `[0x00715FAC]`. `sub_001B5260` sets that pointer to `0x00242BA0`
   (CONFIRMED), and the hook calls that function directly. If any other value
   is found, the hook runs the original (550 slots).
+
+### Placed pickups (2026-11-02)
+
+- **The cause of missing health and armour (v0.4.0-mapmaker.36).** Every
+  placed pickup gets a 0xD8-byte record from a 120-entry Level-heap table
+  (`sub_000BEEE0`, `sub_000BEE60`); `sub_000C1950` frees the new pickup and
+  returns 0 at 120 (0x000C1DC7, CONFIRMED). Raised to 768 in every scene by
+  three same-length rewrites; the full test is `cmp ah,3`. Readers all loop
+  to the count (CONFIRMED, 34 sites). Details and what stays open (barrels):
+  [limitless-caps.md](../agent-context/limitless-caps.md) "Placed pickups".
+- **Object handles of slots 512 and up** are negative as int32 but no
+  handle decode tests the sign (CONFIRMED by the decode scan in
+  `test_mapmaker_pickups_classified.py`).
 
 ### Teleporters
 
