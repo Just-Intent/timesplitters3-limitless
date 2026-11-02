@@ -129,6 +129,14 @@ plays, `[0x00790950]` > 1; INFERRED to fit a half-height viewport), stock
 bar included, for the living Boss AIs within range, nearest first; the
 farther ones wait for a free place.
 
+- Bar entity (after the .27 playtest): `bos_bar_proxy`, null unless an area
+  sets it, may name another entity for a Boss AI. That entity then gives the
+  health the bar shows, the Boss/health multipliers act on it, and range and
+  death use it; the label stays the AI's saved name. Only
+  [Khallos](mapmaker-khallos.md) sets it: a seated Khallos's bar is his chair
+  (a prop with its own health). Fixture: `mapmaker_bosses.c` "a Boss AI whose
+  bar is another entity" (mutations `proxy-ignored`, `proxy-after-scale`).
+
 - Position (CONFIRMED, `sub_00139740`): x is centred between the viewport
   `[[0x007E71C8]+0]`/`+4` and the side margins `[0x007A6140]`/`[0x007A6148]`;
   the box bottom is `[[0x007E71C8]+0x18]` minus the int HUD margin
