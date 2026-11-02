@@ -1,6 +1,7 @@
 #include "pc_mounted.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #define CHECK(c) do {if(!(c)){fprintf(stderr,"FAIL %d: %s\n",__LINE__,#c);return 1;}}while(0)
 #define U(a) (*(uint32_t*)(guest+(a)))
 #define F(a) (*(float*)(guest+(a)))
@@ -27,19 +28,25 @@ int main(void) {
     F(0x6302c)=F(0x63030)=0;F(0x40384)=27.5f;
     MOVE(20,20);CHECK(APPLY()==1 && F(0x63030)==359 && F(0x6302c)==359);
     F(0x40384)=55;
-    U(0x63050)=0;MOVE(10,10);CHECK(APPLY()==0 && !input.dx);U(0x63050)=1;
-    U(0x6309c)=1;MOVE(10,10);CHECK(APPLY()==0);U(0x6309c)=0;
+    CHECK(input.mech_status==PC_MECH_MOVED);
+    U(0x63050)=0;MOVE(10,10);CHECK(APPLY()==0 && !input.dx && input.mech_status==PC_MECH_NO_CONTROL);U(0x63050)=1;
+    U(0x6309c)=1;MOVE(10,10);CHECK(APPLY()==0 && input.mech_status==PC_MECH_OTHER_SLOT);U(0x6309c)=0;
     U(0x10004)=1;MOVE(10,10);CHECK(APPLY()==0);U(0x10004)=0;
-    U(0x60020)=7;MOVE(10,10);CHECK(APPLY()==0);U(0x60020)=8;
-    U(0x61aa0)=0;MOVE(10,10);CHECK(APPLY()==0);U(0x61aa0)=0x63000;
-    U(0x733108)=0;MOVE(10,10);CHECK(APPLY()==0);U(0x733108)=0x50000;
+    U(0x60020)=7;MOVE(10,10);CHECK(APPLY()==0 && input.mech_status==PC_MECH_NOT_CHARACTER);U(0x60020)=8;
+    U(0x61aa0)=0;MOVE(10,10);CHECK(APPLY()==0 && input.mech_status==PC_MECH_NO_DATA);U(0x61aa0)=0x63000;
+    U(0x733108)=0;MOVE(10,10);CHECK(APPLY()==0 && input.mech_status==PC_MECH_NO_CAMERA);U(0x733108)=0x50000;
+    CHECK(!strcmp(pc_mech_status_text(PC_MECH_NO_CONTROL),"player control off (data+50 = 0)"));
     U(0x4e7944)=0;MOVE(10,10);CHECK(APPLY()==0);U(0x4e7944)=1;
     input.focused=0;MOVE(10,10);CHECK(APPLY()==0);input.focused=1;
     input.captured=0;MOVE(10,10);CHECK(APPLY()==0);input.captured=1;
     MOVE(10,10);CHECK(pc_mounted_mouse(&input,1200,.1f,0,0x10000,0x40000,offset,0)==0);
-    F(0x40384)=NAN;MOVE(10,10);CHECK(APPLY()==0);F(0x40384)=55;
-    F(0x63030)=INFINITY;MOVE(10,10);CHECK(APPLY()==0);F(0x63030)=359;
+    /* The original stick route has no FOV input: an unusable camera FOV
+     * (for example the script camera's) still turns the mech, unscaled. */
+    F(0x40384)=NAN;MOVE(10,10);CHECK(APPLY()==1 && F(0x63030)==358 && F(0x6302c)==358);
+    F(0x40384)=500;MOVE(-10,-10);CHECK(APPLY()==1 && F(0x63030)==359 && F(0x6302c)==359);
+    U(0x40384)=0;MOVE(-10,0);CHECK(APPLY()==1 && F(0x63030)<.001f);F(0x40384)=55;
+    F(0x63030)=INFINITY;MOVE(10,10);CHECK(APPLY()==0 && input.mech_status==PC_MECH_BAD_ANGLES);F(0x63030)=359;
     CHECK(F(0x6302c)==359 && !input.dx && !input.dy);
-    U(0x10114)=2;MOVE(10,10);CHECK(APPLY()==-1 && input.dx==10);
+    U(0x10114)=2;MOVE(10,10);CHECK(APPLY()==-1 && input.dx==10 && input.mech_status==PC_MECH_NONE);
     free(guest);puts("PASS: mounted mouse routing, Battle Mech guards and cadence");return 0;
 }

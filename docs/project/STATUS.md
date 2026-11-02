@@ -439,6 +439,19 @@ The local executable SHA-256 is
 `f3f8cefb6218b21a1ce7f76a54dc2c116c87d82d779ad75f30050e2255f4ae5d`.
 No release or main merge is performed.
 
+## Battle Mech mouse follow-up - 2026-11-01
+
+The user reported the Machine Wars mech view still does not turn with the
+mouse. Branch from `mapmaker-recon` `9cac7579` (includes #431). Offline
+US-XBE review found no failing link in the #431 route (see the mounted-mouse
+guide); the cause is unproven. The mech route now ignores an unusable camera
+FOV (scale only) and both adapters log the first outcome per change as
+`[PC-MOUSE] Battle Mech: ...`. Windows: focused mounted/terminal suite 20
+passed including original-XBE fixtures; the region fixture gained inert
+scope-wheel stubs (it no longer compiled after the scope-wheel change).
+`test_menu_mouse.py` fails to link `sub_00096330` on this base, unrelated.
+No game build, launch, live mission or Mac host check was run.
+
 ## Battle Mech mouse aiming (#425) - 2026-10-30
 
 Local branch `425-bug-battle-mech-camera-doesnt-move` starts from main
