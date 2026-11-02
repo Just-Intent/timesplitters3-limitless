@@ -32,6 +32,11 @@ int main(void)
     U(0x31008)=0x1000000;F(0x3105c)=1.6f;
     MOVE(10,10);CHECK(pc_mounted_mouse(&input,1001,.1f,1,0x10000,0x40000,offset,0)==1);
     CHECK(fabsf(F(0x31024)+.8f)<.001f && fabsf(F(0x3101c)-29.2f)<.001f);
+    /* The sweep negates +5C at each limit: a camera taken over mid-sweep
+     * still turns the same way at the same speed (MapMaker camera). */
+    F(0x3101c)=30;F(0x31024)=0;F(0x3105c)=-1.6f;
+    MOVE(10,10);CHECK(pc_mounted_mouse(&input,1002,.1f,1,0x10000,0x40000,offset,0)==1);
+    CHECK(fabsf(F(0x31024)+.8f)<.001f && fabsf(F(0x3101c)-29.2f)<.001f);
     /* Exact authored fixed axes and full-circle guns retain their semantics. */
     U(0x31008)=0;F(0x40384)=55;F(0x31034)=F(0x31038)=15;
     F(0x3103c)=-180;F(0x31040)=180;F(0x31024)=179;

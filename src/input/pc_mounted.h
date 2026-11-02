@@ -204,8 +204,11 @@ static inline int pc_mounted_mouse_in_region(PcInput *input,uint64_t now,float s
     if(!isfinite(fov) || fov<1 || fov>120)return 0;
     scale=sensitivity*(fov<55?fov/55:1);
     if(mode==0x80 && (*(const uint32_t*)(data+8)&0x1000000)) {
-        float speed=*(const float*)(data+0x5c);
-        if(!isfinite(speed) || speed<0)return 0;
+        /* +5C is also the sweep's yaw speed: 246000 negates it at each
+         * limit, so a camera taken over mid-sweep can hold a negative
+         * value. Use its magnitude; the sign is sweep direction only. */
+        float speed=fabsf(*(const float*)(data+0x5c));
+        if(!isfinite(speed))return 0;
         scale*=speed;
     }
     pitch=*(const float*)(data+0x1c);yaw=*(const float*)(data+0x24);
