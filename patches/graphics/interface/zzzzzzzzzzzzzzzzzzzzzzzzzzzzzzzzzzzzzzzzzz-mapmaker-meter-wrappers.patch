@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3381 @@
+@@ -1037,6 +1037,3392 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2533,6 +2533,17 @@
 +    else sub_0028F730_gen();
 +#else
 +    sub_0028F730_gen();
++#endif
++}
++
++extern void sub_002AB1B0_gen(void);
++void sub_002AB1B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_eggs")) pc_mapmaker_crowe_eggs(sub_002AB1B0_gen);
++    else sub_002AB1B0_gen();
++#else
++    sub_002AB1B0_gen();
 +#endif
 +}
 +
