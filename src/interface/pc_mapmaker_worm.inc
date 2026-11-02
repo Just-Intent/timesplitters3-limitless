@@ -174,6 +174,10 @@
 #define WRM_PLAYER 0x1584u
 #define WRM_PLAYER_N 0x00790950u
 #define WRM_PLAYER_MAX 4u
+#define WRM_WAKE_X0 (-79.0f)          /* the stock wake region (sub_001D5D70), before the shift */
+#define WRM_WAKE_X1 (-55.7f)
+#define WRM_WAKE_Z0 (-7.9f)
+#define WRM_WAKE_Z1 40.3f
 #define WRM_REACH 12.0f               /* a player this near the surfaced worm lends it his room */
 #define WRM_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define WRM_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -203,6 +207,7 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 static struct {
     int read, optout;
     unsigned logged, extras, ticks, hits, draws, scripts, surfacings, levels, gones;
+    unsigned serial;                    /* worm levels this session: tells two levels' lines apart */
 } wrm;
 /* The globals one worm block's code keeps between calls (CONFIRMED, every
  * written [abs] operand of the code reachable from its entry points, test):
@@ -424,6 +429,7 @@ void pc_mapmaker_worm_level(void (*original)(void))
     wrm.logged=wrm.extras=wrm.ticks=wrm.hits=wrm.draws=wrm.scripts=wrm.surfacings=wrm.gones=0;
     if(!wrm_play() || wrm.optout || (has=wrm_set_has())==0) return;
     WORD_AT(WRM_STATE)=0;                              /* a stale pointer of an earlier level */
+    wrm.serial++;
     scratch=guest_call(sub_0003DFA0,2,WRM_SCRATCH,1u);
     if(!scratch || !MAPMAKER_PTR_OK(scratch,WRM_SCRATCH)) {
         wrm_log("no level memory for the mansion worm; bot behaviour",0,scratch);
@@ -565,8 +571,12 @@ static void wrm_setup(uint32_t ent)
     WORD_AT(w+WRM_W_PAD)=0xFFFFFFFFu;WORD_AT(w+WRM_W_PAD+4u)=0xFFFFFFFFu;
     WORD_AT(WRM_ENABLE)=1u;
     wrm_lv.ready=1;
-    fprintf(stderr,"[mapmaker] worm: mansion garden moved by (%.2f, %.2f), floor %.2f (mission 5: -2.4), %u route pads\n",
-            (double)wrm_lv.dx,(double)wrm_lv.dz,(double)sy,pads);
+    /* A bound worm stays buried (state 1: only its burrow is drawn) until a
+     * player is in its wake region; the .28 playtest stood outside all three. */
+    fprintf(stderr,"[mapmaker] worm: worm %d (level %u): mansion garden moved by (%.2f, %.2f), floor %.2f (mission 5: -2.4), "
+            "%u route pads; buried until a player is in x %.1f..%.1f, z %.1f..%.1f\n",(int)(wrm_i-wrm_inst),wrm.serial,
+            (double)wrm_lv.dx,(double)wrm_lv.dz,(double)sy,pads,(double)(WRM_WAKE_X0+wrm_lv.dx),(double)(WRM_WAKE_X1+wrm_lv.dx),
+            (double)(WRM_WAKE_Z0+wrm_lv.dz),(double)(WRM_WAKE_Z1+wrm_lv.dz));
     fflush(stderr);
 }
 /* Shift (on) or restore (off) the constants (all for the update, the last
@@ -635,8 +645,8 @@ static void wrm_states(int k,uint32_t ent)
     if(st==wrm_lv.last_state) return;
     if(wrm_lv.states++<48u && wrm.levels<160u) {
         wrm.levels++;
-        fprintf(stderr,"[mapmaker] worm: worm %d state %u -> %u (head anim 0x%X done %u, room %u, height %.2f)\n",k,
-                (unsigned)wrm_lv.last_state,(unsigned)st,ok?(unsigned)WORD_AT(ctrl+0xD4u):0u,ok?(unsigned)WORD_AT(ctrl+0x124u):0u,
+        fprintf(stderr,"[mapmaker] worm: worm %d state %u -> %u (level %u, head anim 0x%X done %u, room %u, height %.2f)\n",k,
+                (unsigned)wrm_lv.last_state,(unsigned)st,wrm.serial,ok?(unsigned)WORD_AT(ctrl+0xD4u):0u,ok?(unsigned)WORD_AT(ctrl+0x124u):0u,
                 (unsigned)WORD_AT(ent+WRM_ENT_ROOM),(double)wrm_getf(ent+WRM_ENT_X+4u));
         fflush(stderr);
     }
@@ -702,7 +712,7 @@ void pc_mapmaker_worm_tag(void (*original)(void))
     tag=WORD_AT(g_esp+4u);
     ent=MAPMAKER_PTR_OK(wrm_lv.actor,WRM_ACTOR)?WORD_AT(wrm_lv.actor):0u;
     g_eax=tag==WRM_TAG && wrm_head(ent)?ent:0u;
-    if(g_eax) wrm_log("mansion worm head bound",ent,tag);
+    if(g_eax) wrm_log("mansion worm head bound (head, worm)",ent,(uint32_t)(wrm_i-wrm_inst));
     MAPMAKER_GUEST_RET();
 }
 
@@ -746,8 +756,8 @@ static void wrm_height(void)
     if(!head || !MAPMAKER_PTR_OK(head,0x200u) || WORD_AT(w+WRM_W_STATE)<WRM_SURFACED) { wrm_lv.surfaced=0;return; }
     if(WORD_AT(w+WRM_W_ROUTE_FROM)==2u) wrm_setf(head+WRM_ENT_X+4u,wrm_getf(head+WRM_ENT_X+4u)+wrm_lv.dy);
     if(!wrm_lv.surfaced && wrm.surfacings++<8u) {
-        fprintf(stderr,"[mapmaker] worm: surfaced, state %u, head height %.2f, spawn floor %.2f, worm height %.2f, room %u%s\n",
-                (unsigned)WORD_AT(w+WRM_W_STATE),(double)wrm_getf(head+WRM_ENT_X+4u),(double)(WRM_GROUND+wrm_lv.dy),
+        fprintf(stderr,"[mapmaker] worm: worm %d surfaced, state %u, head height %.2f, spawn floor %.2f, worm height %.2f, room %u%s\n",
+                (int)(wrm_i-wrm_inst),(unsigned)WORD_AT(w+WRM_W_STATE),(double)wrm_getf(head+WRM_ENT_X+4u),(double)(WRM_GROUND+wrm_lv.dy),
                 (double)wrm_getf(w+4u),(unsigned)WORD_AT(head+WRM_ENT_ROOM),WORD_AT(w+WRM_W_ROUTE_FROM)==2u?" (state-2 burst point)":"");
         fflush(stderr);
     }
