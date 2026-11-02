@@ -67,8 +67,8 @@ static struct {
     unsigned groups, touched_total, open;
     uint16_t group_first[MAPMAKER_ROOF_ROOMS+1u]; /* touched[group_first[g]..group_first[g+1]) */
     uint16_t members[MAPMAKER_ROOF_ROOMS+1u];     /* member count of group g: first entries are its open rooms */
-    uint8_t touched[OPENVIEW_TOUCHED];
-    uint8_t stamp[MAPMAKER_ROOF_ROOMS];
+    uint16_t touched[OPENVIEW_TOUCHED];          /* room ids (words: rooms past 255) */
+    uint16_t stamp[MAPMAKER_ROOF_ROOMS];         /* group mark + 1 per room */
     unsigned build_logs, peak_logs, peak;
     unsigned long long frames, widened, added, overflow;
 } mapmaker_openview;
@@ -106,17 +106,17 @@ static void mapmaker_openview_build(uint32_t n)
         if(!mapmaker_roof_play.open[r-1u] || mapmaker_openview.stamp[r-1u]) continue;
         /* breadth-first over open rooms: the group's members, in order */
         mark=g+1u;
-        mapmaker_openview.stamp[r-1u]=(uint8_t)mark;queue[tail++]=r;
+        mapmaker_openview.stamp[r-1u]=(uint16_t)mark;queue[tail++]=r;
         while(head<tail) {
             uint32_t m=queue[head++];
             k=mapmaker_openview_neighbours(m,n,next);portals+=k;
             for(i=0;i<k;i++)
                 if(mapmaker_roof_play.open[next[i]-1u] && !mapmaker_openview.stamp[next[i]-1u]) {
-                    mapmaker_openview.stamp[next[i]-1u]=(uint8_t)mark;queue[tail++]=next[i];
+                    mapmaker_openview.stamp[next[i]-1u]=(uint16_t)mark;queue[tail++]=next[i];
                 }
         }
         if(at+tail>OPENVIEW_TOUCHED) { mapmaker_openview.overflow++;break; }
-        for(i=0;i<tail;i++) mapmaker_openview.touched[at++]=(uint8_t)queue[i];
+        for(i=0;i<tail;i++) mapmaker_openview.touched[at++]=(uint16_t)queue[i];
         mapmaker_openview.members[g]=(uint16_t)tail;mapmaker_openview.open+=tail;
         /* closed rooms one portal away, listed once per group (stamped with its
          * mark; marks are unique, so a room next to two areas is in both lists) */
@@ -127,7 +127,7 @@ static void mapmaker_openview_build(uint32_t n)
                 uint32_t o=next[j];
                 if(mapmaker_roof_play.open[o-1u] || mapmaker_openview.stamp[o-1u]==mark) continue;
                 if(at>=OPENVIEW_TOUCHED) { mapmaker_openview.overflow++;break; }
-                mapmaker_openview.stamp[o-1u]=(uint8_t)mark;mapmaker_openview.touched[at++]=(uint8_t)o;
+                mapmaker_openview.stamp[o-1u]=(uint16_t)mark;mapmaker_openview.touched[at++]=(uint16_t)o;
             }
         }
         mapmaker_openview.group_first[g]=(uint16_t)first;

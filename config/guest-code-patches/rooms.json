@@ -1937,8 +1937,8 @@
       "address": "0x0008A796",
       "original_hex": "b9c8000000",
       "operand": 1,
-      "value": "0x100",
-      "reason": "mov ecx, 0xc8: clear a relocated per-room table (256 entries)"
+      "value": "0x200",
+      "reason": "mov ecx, 0xc8: clear a relocated per-room table (512 entries)"
     },
     {
       "id": "rooms-0008a7a2",
@@ -1947,8 +1947,8 @@
       "address": "0x0008A7A2",
       "original_hex": "b9c8000000",
       "operand": 1,
-      "value": "0x100",
-      "reason": "mov ecx, 0xc8: clear a relocated per-room table (256 entries)"
+      "value": "0x200",
+      "reason": "mov ecx, 0xc8: clear a relocated per-room table (512 entries)"
     },
     {
       "id": "rooms-0008a7b0",
@@ -1957,8 +1957,8 @@
       "address": "0x0008A7B0",
       "original_hex": "b9c8000000",
       "operand": 1,
-      "value": "0x100",
-      "reason": "mov ecx, 0xc8: clear a relocated per-room table (256 entries)"
+      "value": "0x200",
+      "reason": "mov ecx, 0xc8: clear a relocated per-room table (512 entries)"
     },
     {
       "id": "rooms-00088d71",
@@ -1967,7 +1967,7 @@
       "address": "0x00088D71",
       "original_hex": "68c8000000",
       "operand": 0,
-      "value": "0x100",
+      "value": "0x200",
       "reason": "push 0xc8: capacity of the relocated 0x708458 room list"
     },
     {
@@ -2715,7 +2715,7 @@
       "address": "0x00112285",
       "original_hex": "81fa9cd07300",
       "operand": 1,
-      "value": "0x8C95FC",
+      "value": "0x8D10BC",
       "reason": "cmp edx, 0x73d09c: light head clear loop end (3 rows of 0x10C)"
     },
     {
@@ -3254,29 +3254,29 @@
       "old": "0x00702E20",
       "size": "0x31C",
       "new": "0x008C0000",
-      "new_size": "0x400",
+      "new_size": "0x800",
       "sites": {
         "0x000857F7": "offset",
         "0x00085D77": "offset",
         "0x00085EAB": "offset"
       },
       "data_ok": [],
-      "reason": "float per room (piece +0x60), 200 -> 256"
+      "reason": "float per room (piece +0x60), 200 -> 512"
     },
     {
       "id": "rooms-reloc-t2-0x703140",
       "kind": "relocate",
       "old": "0x00703140",
       "size": "0x31C",
-      "new": "0x008C0400",
-      "new_size": "0x400",
+      "new": "0x008C1000",
+      "new_size": "0x800",
       "sites": {
         "0x000857B2": "offset",
         "0x00085DDC": "offset",
         "0x0008A7A7": "offset"
       },
       "data_ok": [],
-      "reason": "dword per room (piece +0x50), 200 -> 256"
+      "reason": "dword per room (piece +0x50), 200 -> 512"
     },
     {
       "id": "rooms-reloc-t3-0x703460",
@@ -3284,7 +3284,7 @@
       "old": "0x00703460",
       "size": "0x31C",
       "new": "0x008C0800",
-      "new_size": "0x400",
+      "new_size": "0x800",
       "sites": {
         "0x00083974": "offset",
         "0x000857A3": "offset",
@@ -3294,15 +3294,15 @@
         "0x0008A79B": "offset"
       },
       "data_ok": [],
-      "reason": "dword per room (piece +0x44), 200 -> 256; 0x70377C is the 45-entry table at 0x703780 indexed from 1"
+      "reason": "dword per room (piece +0x44), 200 -> 512; 0x70377C is the 45-entry table at 0x703780 indexed from 1"
     },
     {
       "id": "rooms-reloc-t4-0x7038f8",
       "kind": "relocate",
       "old": "0x007038F8",
       "size": "0x960",
-      "new": "0x008C0C00",
-      "new_size": "0xC00",
+      "new": "0x008C1800",
+      "new_size": "0x1800",
       "sites": {
         "0x000857C4": "offset",
         "0x000857D6": "offset",
@@ -3312,15 +3312,15 @@
       "data_ok": [
         "0x004D96F4"
       ],
-      "reason": "float[3] per room (piece +0x54..), 200 -> 256; data 0x4D96F4 points at the tree header after it"
+      "reason": "float[3] per room (piece +0x54..), 200 -> 512; data 0x4D96F4 points at the tree header after it"
     },
     {
       "id": "rooms-reloc-t5-0x7042b8",
       "kind": "relocate",
       "old": "0x007042B8",
       "size": "0xD48",
-      "new": "0x008C1800",
-      "new_size": "0x5000",
+      "new": "0x008C3000",
+      "new_size": "0x1000",
       "sites": {
         "0x000864D1": "offset",
         "0x00086627": "offset",
@@ -3333,30 +3333,30 @@
       "data_ok": [
         "0x004B49D4"
       ],
-      "reason": "draw buckets byte[80][200] -> [80][256]; only the base is referenced (full-range scan), and the declared range stops at 0x705000, an unrelated XGRPH constant (0x003DFCA4); data words are ASCII"
+      "reason": "draw buckets byte[80][200]: since stage 6 only the staging row at the base is read (reader stride 0, <= 255 words); the byte rows of the replaced sub_00086C40/sub_000897D0 bodies are dead. Only the base is referenced (full-range scan), and the declared range stops at 0x705000, an unrelated XGRPH constant (0x003DFCA4); data words are ASCII"
     },
     {
       "id": "rooms-reloc-t6-0x708138",
       "kind": "relocate",
       "old": "0x00708138",
       "size": "0x31C",
-      "new": "0x008C6800",
-      "new_size": "0x400",
+      "new": "0x008C4000",
+      "new_size": "0x800",
       "sites": {
         "0x00085809": "offset",
         "0x00085E2E": "offset",
         "0x0008A7B5": "offset"
       },
       "data_ok": [],
-      "reason": "dword per room (piece +0x64), 200 -> 256"
+      "reason": "dword per room (piece +0x64), 200 -> 512"
     },
     {
       "id": "rooms-reloc-t7-0x708458",
       "kind": "relocate",
       "old": "0x00708458",
       "size": "0x320",
-      "new": "0x008C6C00",
-      "new_size": "0x400",
+      "new": "0x008C4800",
+      "new_size": "0x800",
       "sites": {
         "0x0008625C": "keep",
         "0x00086E94": "keep",
@@ -3372,7 +3372,7 @@
         "0x0008BAA8": "keep"
       },
       "data_ok": [],
-      "reason": "room list for sub_00088CA0, 200 -> 256"
+      "reason": "room list for sub_00088CA0, 200 -> 512"
     },
     {
       "id": "rooms-reloc-p1-0x7b54e0",
@@ -3454,7 +3454,7 @@
       "kind": "relocate",
       "old": "0x007B5840",
       "size": "0x358",
-      "new": "0x008C7440",
+      "new": "0x008C5000",
       "new_size": "0x440",
       "sites": {
         "0x000867F8": "keep",
@@ -3472,7 +3472,7 @@
       "kind": "relocate",
       "old": "0x007B5BA0",
       "size": "0x358",
-      "new": "0x008C7880",
+      "new": "0x008C5840",
       "new_size": "0x440",
       "sites": {
         "0x0009E437": "offset",
@@ -3554,7 +3554,7 @@
       "kind": "relocate",
       "old": "0x007B6260",
       "size": "0x358",
-      "new": "0x008C8100",
+      "new": "0x008C6080",
       "new_size": "0x440",
       "sites": {
         "0x0009EE00": "keep",
@@ -3580,7 +3580,7 @@
       "kind": "relocate",
       "old": "0x0073C350",
       "size": "0x28",
-      "new": "0x008C8540",
+      "new": "0x008D0000",
       "new_size": "0x108",
       "sites": {
         "0x001122F5": "keep",
@@ -3602,7 +3602,7 @@
       "kind": "relocate",
       "old": "0x0073C37C",
       "size": "0x9D0",
-      "new": "0x008C8648",
+      "new": "0x008D0108",
       "new_size": "0xB88",
       "sites": {
         "0x00112213": "keep",
@@ -3621,7 +3621,7 @@
       "kind": "relocate",
       "old": "0x007AC880",
       "size": "0xA00",
-      "new": "0x008C9200",
+      "new": "0x008D18A0",
       "new_size": "0xC94",
       "sites": {
         "0x0008CF27": "offset",
@@ -3651,8 +3651,8 @@
       "kind": "relocate",
       "old": "0x0073D910",
       "size": "0x38",
-      "new": "0x008CB440",
-      "new_size": "0x80",
+      "new": "0x008CB700",
+      "new_size": "0x100",
       "sites": {
         "0x0011225A": "offset",
         "0x001122FD": "keep",
@@ -3673,14 +3673,14 @@
         "0x00115A16": "keep"
       },
       "data_ok": [],
-      "reason": "light round-robin per room/16: 14 -> 32 entries (room ids up to 0x1FF; the special ids 0x100..0x10C use entry 16); after the model table"
+      "reason": "light round-robin per room/16: 14 -> 64 entries (room ids up to 0x3FF; the 511 layout's special ids 0x200..0x20C use entry 32); after the model table"
     },
     {
       "id": "rooms-reloc-f-0x7b5180",
       "kind": "relocate",
       "old": "0x007B5180",
       "size": "0x354",
-      "new": "0x008CC800",
+      "new": "0x008C8500",
       "new_size": "0x440",
       "sites": {
         "0x000A79C8": "offset"
