@@ -86,8 +86,9 @@ immediates, plus negative forms and `lea` displacements); the room ones are:
 | `0x0073D910` light round robin per room/16 | 14 | `0x008CB400` | 16 |
 | `0x00749890` front-end static view (0xFFC) | | `0x008CD000` | 0x7000 (shadow) |
 
-`0x008CB800..0x008CC800`: two 0x800-byte buffers of the room query. Free:
-`0x008CC800..0x008CD000` and `0x008D4000..0x008DFFFF`.
+`0x008CB800..0x008CC800`: two 0x800-byte buffers of the room query.
+`0x008CC800..0x008CCC40`: per-id drawn flag `0x007B5180` (stage 2 of the
+255 raise, below). Free: `0x008CCC40..0x008CD000` and `0x008D4000..0x008DFFFF`.
 
 Notes on how the relocations are declared (each verified by the full scan):
 
@@ -427,9 +428,10 @@ held prop's light (above).
 1. Done: this classification. Any new byte site, bucket user, flow table or
    room immediate fails `test_mapmaker_rooms_bytes_classified.py` or
    `test_every_room_constant_is_classified`.
-2. Room flag table: relocate `0x7B5180` (operand `0x000A79C8`, 0x358 B) to a
-   256+ entry block, drop the `keep` in `objects.json`. Test: `check-tables.py`,
-   and turn `test_room_flag_table_7b5180_is_not_relocated` into a relocated check.
+2. Done (2026-11-01): room flag table `0x7B5180` relocated to `0x008CC800`
+   (0x110 entries; declared 0x354 so the count `0x7B54D8` is outside it), the
+   `keep` dropped from `objects.json` (slot-0 list declared 0x1BC). Test:
+   `check-tables.py`, `test_room_flag_table_7b5180_is_relocated` (+4 mutations).
 3. Light room side table (scene 100 only, ids > 0xFF): a word per light,
    indexed `(light - [0x0073D950])/0xB8` and `(light - [0x0073D960])/0xC0`,
    written next to `0x0011408E`/`0x00114390`, read at `0x001123D5`,
