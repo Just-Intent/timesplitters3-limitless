@@ -34,8 +34,10 @@ void sub_000631C0(void) { g_ecx=9; }
 #define CALLS 64
 static struct { void (*f)(void); int n; uint32_t a[6]; } calls[CALLS];
 static int call_count;
-static char mounted[8][32];
+static char mounted[16][32];
 static int mounted_count, mount_fails;
+static const char *fail_path;                        /* this one pak does not mount */
+static uint32_t request_ret;                         /* what sub_000631C0 returns */
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -54,11 +56,12 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         return 0xFFFFFFFFu;
     }
     if(f==sub_000622D0) {                            /* mount */
-        if(mount_fails || mounted_count>=8) return 0xFFFFFFFFu;
+        if(mount_fails || mounted_count>=16 || (fail_path && !strcmp(fail_path,(const char *)memory+arg[0]))) return 0xFFFFFFFFu;
         strncpy(mounted[mounted_count],(const char *)memory+arg[0],31);
         WORD_AT(0x006D7880u)++;
         return (uint32_t)mounted_count++;
     }
+    if(f==sub_000631C0) return request_ret;
     return 0;
 }
 static uint32_t heap_next=0x00300000u;
@@ -260,30 +263,43 @@ int main(void)
     CHECK(mounted_count==0 && call_count==0 && mapmaker_sky.extra_ready==0 && mapmaker_sky.extra_prepare!=NULL);
     WORD_AT(0x007DE398u)=0;
     WORD_AT(0x0079094Cu)=100u;
-    CHECK(clouds_sky()==35 && mounted_count==1 && !strcmp(mounted[0],"pak/arcade/l_59_ar.pak"));
-    for(i=0;i<(uint32_t)call_count;i++) if(calls[i].f==sub_000622D0) CHECK(calls[i].a[1]==0u && calls[i].a[2]==1u);
+    /* the model's level pak, then the memory pak holding its textures */
+    CHECK(clouds_sky()==35 && mounted_count==2 && !strcmp(mounted[0],"pak/arcade/l_59_ar.pak") &&
+          !strcmp(mounted[1],"pak/arcademem/l_59_arm.pak"));
+    for(k=0,i=0;i<(uint32_t)call_count;i++) if(calls[i].f==sub_000622D0) { CHECK(calls[i].a[1]==0u && calls[i].a[2]==1u);k++; }
+    CHECK(k==2u);
     level();
-    CHECK(seen_sky==35 && H(INFO(C)+0x10)==58 && mounted_count==1);
+    CHECK(seen_sky==35 && H(INFO(C)+0x10)==58 && mounted_count==2);
     for(i=0;i<(uint32_t)call_count;i++) CHECK(calls[i].f!=sub_000622D0);   /* tried once per level */
     mount();level();                                    /* next level: already mounted, still used */
-    CHECK(seen_sky==35 && mounted_count==1);
+    CHECK(seen_sky==35 && mounted_count==2);
 
     memset((char *)memory+C,0,16);mount();             /* map unreadable at the mounts: later is fine */
     make_container(C,F_SKY(2),-1,58,0);unmount_all();
     level();
-    CHECK(seen_sky==35 && mounted_count==1);
+    CHECK(seen_sky==35 && mounted_count==2);
     make_container(C2,F_SKY(10),-1,62,0);               /* the cloud setup saw another map first */
     WORD_AT(0x00784014u)=C2;unmount_all();mount();CHECK(clouds_sky()==47);
     WORD_AT(0x00784014u)=C;level();
-    CHECK(seen_sky==35 && mounted_count==2 && !strcmp(mounted[0],"pak/arcade/l_48_ar.pak") && !strcmp(mounted[1],"pak/arcade/l_59_ar.pak"));
+    CHECK(seen_sky==35 && mounted_count==4 && !strcmp(mounted[0],"pak/arcade/l_48_ar.pak") &&
+          !strcmp(mounted[1],"pak/arcademem/l_48_arm.pak") && !strcmp(mounted[2],"pak/arcade/l_59_ar.pak") &&
+          !strcmp(mounted[3],"pak/arcademem/l_59_arm.pak"));
 
     unmount_all();WORD_AT(0x006D7880u)=57u;mount();level();   /* keep 8 of 64 free */
     CHECK(seen_sky==58 && mounted_count==0 && clouds_sky()==58);
-    WORD_AT(0x006D7880u)=56u;mount();level();
-    CHECK(seen_sky==35 && mounted_count==1);
+    WORD_AT(0x006D7880u)=56u;mount();level();          /* room for the model, not its textures */
+    CHECK(seen_sky==58 && mounted_count==1 && clouds_sky()==58);
+    unmount_all();WORD_AT(0x006D7880u)=55u;mount();level();
+    CHECK(seen_sky==35 && mounted_count==2);
     unmount_all();mount_fails=1;mount();level();
     CHECK(seen_sky==58 && clouds_sky()==58);
     mount_fails=0;
+    unmount_all();fail_path="pak/arcademem/l_59_arm.pak";mount();level();   /* textures pak missing */
+    CHECK(seen_sky==58 && clouds_sky()==58 && mounted_count==1);
+    fail_path=NULL;
+    make_container(C,F_SKY(4),-1,60,0);unmount_all();mount();level();   /* Virtua: stock textures only */
+    CHECK(seen_sky==41 && mounted_count==1 && !strcmp(mounted[0],"pak/arcade/l_38_ar.pak"));
+    make_container(C,F_SKY(2),-1,58,0);
     WORD_AT(0x006D7C4Cu)=1u;mapmaker_sky.extra_ready=1;smx.sky_row=2;mount();  /* skipped: untouched */
     CHECK(mapmaker_sky.extra_ready==1 && smx.sky_row==2u && call_count==0);
     WORD_AT(0x006D7C4Cu)=0;
@@ -304,13 +320,29 @@ int main(void)
     WORD_AT(0x00500000u+0xE04u)=0x00510000u;WORD_AT(0x00510000u+0x94u)=0x700u+35u;
     WORD_AT(0x00700000u+(0x700u+35u)*0x30u+0x10u)=0x00123450u;
     sky_built();CHECK(call_count==1 && calls[0].f==sub_000631C0 && calls[0].a[0]==0x00123450u);
+    CHECK(smx.tex_total==0u);                           /* file not read: nothing to check */
     sky_built();sky_built();CHECK(call_count==0);       /* two lines per level */
+    /* the probe names the textures the load left out: file +0 -> {id,..} x n, -1 */
+    request_ret=0x00520000u;WORD_AT(0x00520000u+0x10u)=0x00530000u;
+    WORD_AT(0x00530000u)=0x0Cu;
+    WORD_AT(0x0053000Cu)=0x28F2CCu;WORD_AT(0x0053001Cu)=0x40000000u;WORD_AT(0x0053002Cu)=0x0CE621u;
+    WORD_AT(0x0053003Cu)=0x876E22u;WORD_AT(0x0053004Cu)=0xFFFFFFFFu;WORD_AT(0x0053005Cu)=0x111111u;
+    WORD_AT(0x004B85C8u)=0x00540000u;WORD_AT(0x00540000u)=0x00541000u;WORD_AT(0x0054000Cu)=3u;
+    WORD_AT(0x00541000u+0u*0x34u+0x1Cu)=0x876E22u;      /* stock texture, loaded earlier */
+    WORD_AT(0x00541000u+2u*0x34u+0x1Cu)=0x28F2CCu;
+    WORD_AT(0x00541000u+3u*0x34u+0x1Cu)=0x0CE621u;      /* past the end: not loaded */
+    mount();level();sky_built();
+    CHECK(smx.tex_total==3u && smx.tex_loaded==2u);
+    WORD_AT(0x0054000Cu)=4u;mount();level();sky_built();
+    CHECK(smx.tex_total==3u && smx.tex_loaded==3u);
+    request_ret=0;
     make_container(C,0,-1,58,0);mount();sky_built();CHECK(call_count==0);
 
     /* ---- play: sandstorm (weather load, weather start, level setup list) ---- */
     make_container(C,F_WX(1),-1,58,0);unmount_all();mount();
     wx_load();
-    CHECK(WORD_AT(0x0073D9ACu)==1u && smx.sand_on==1 && mounted_count==1 && !strcmp(mounted[0],"pak/challenge/l_64_ch.pak"));
+    CHECK(WORD_AT(0x0073D9ACu)==1u && smx.sand_on==1 && mounted_count==2 && !strcmp(mounted[0],"pak/challenge/l_64_ch.pak") &&
+          !strcmp(mounted[1],"pak/challengemem/l_64_chm.pak"));
     for(k=0,i=0;i<(uint32_t)call_count;i++) if(calls[i].f==sub_000A5E40) { CHECK(calls[i].a[0]==0x527u+k);k++; }
     CHECK(k==4u);
     WORD_AT(0x007AC824u)=0x00400000u;WORD_AT(0x007AC874u)=0x00410000u;
@@ -325,7 +357,7 @@ int main(void)
     WORD_AT(0x007AC824u)=0x00400000u;
     make_container(C,F_SKY(6)|F_WX(1),-1,61,0);unmount_all();mount();   /* intro sky + sandstorm: one pak */
     CHECK(clouds_sky()==43);wx_load();level();
-    CHECK(mounted_count==1 && seen_sky==43 && smx.sand_on==1);
+    CHECK(mounted_count==2 && seen_sky==43 && smx.sand_on==1);
     make_container(C,0,-1,58,2);mount();wx_load();      /* rain map: nothing */
     CHECK(WORD_AT(0x0073D9ACu)==0u && call_count==0);
     wx_start();CHECK(WORD_AT(0x007AC804u)==0x004E63F8u);
@@ -334,6 +366,9 @@ int main(void)
     make_container(C,F_WX(1),-1,58,0);unmount_all();mount_fails=1;mount();
     wx_load();CHECK(WORD_AT(0x0073D9ACu)==0u && smx.sand_on==0);   /* no pak: no sandstorm */
     mount_fails=0;
+    unmount_all();fail_path="pak/challengemem/l_64_chm.pak";mount();
+    wx_load();CHECK(WORD_AT(0x0073D9ACu)==0u && smx.sand_on==0 && mounted_count==1);   /* no textures pak */
+    fail_path=NULL;
     unmount_all();mount();setH(0x008CA000u+0x529u*2u,-1);wx_load();
     CHECK(WORD_AT(0x0073D9ACu)==0u && smx.sand_on==0);  /* a model without a row */
     setH(0x008CA000u+0x529u*2u,0x529);
