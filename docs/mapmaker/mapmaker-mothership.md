@@ -9,6 +9,28 @@ played**: the wrappers, the picker row and the stubs are the integrator's
 `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_MOTHERSHIP=0` keeps the placeholder
 a normal bot. No guest-code table, no new save bytes.
 
+## Fixed after v0.4.0-mapmaker.28: reused placeholders and the bar name
+
+Not played with several ships; found with the tank's .28 report
+([mapmaker-tank.md](mapmaker-tank.md#v040-mapmaker28-the-third-tank-stayed-a-bot-bars-read-castle-tank-fixed-after-28)),
+whose code this area shares:
+
+- The AI start's "started again" test matched a ship by its placeholder
+  entity alone, silently. A removed placeholder's pool entry and entity are
+  reused by the next character (proven for the tank in `logs/m28.err`), so a
+  later placeholder would have stayed a bot. Now: started again only when a
+  ship's placeholder is still this entity, or the ship was made from this
+  spawn record (pointer and record id +8). Every refusal is logged with its
+  own budget of 16 per level (`msh_refuse`).
+- The stock bar's label 0x164B was always "Timesplitter Mothership". Now it
+  is the focus ship's Story AI name (a 32-byte guest copy per ship; the
+  stock text when unnamed), via `pc_mapmaker_bosses.inc`'s
+  `bos_story_name`. The bosses area also draws a bar for every other
+  Boss-flagged ship in range (`bos_bar_extra_add`, as the tank), with its
+  name, the ship's health and the Boss/health multipliers; none while the
+  placeholder AI still stands there or once the object is no longer model
+  0x539 (state 5 removes the ship). The focus ship is not drawn twice.
+
 ## Fixed after v0.4.0-mapmaker.25: a grey, untextured ship
 
 Report: the ship appears as a giant grey object and seems to shoot, but its
@@ -64,8 +86,9 @@ object at +0; only our ships' records swap) and the spawn (the init writes
 0x0075C0E4: the result goes to the new ship and the statics are put back).
 One ship's damage inside another's frame nests correctly. Each ship removes
 its own placeholder and falls to its own floor. Every ship sets the players'
-focus while it attacks (stock), so the boss bar follows whichever updated
-last.
+focus while it attacks (stock), so the stock boss bar follows whichever
+updated last; it shows that ship's Story AI name and the other Boss-flagged
+ships get the bosses area's bars (after .28).
 
 Why this boss: the survey ([mapmaker-boss-survey.md](mapmaker-boss-survey.md))
 found it and the catacombs pit-fight skeleton as the only story bosses not yet
@@ -139,7 +162,7 @@ y 50), facing its yaw, already attacking.
 | ai_start (`sub_0015B830`) | after the original, each placeholder up to 4 ships, when both models are ready (resource rows with init 0x0021A710, read requests): create the ship (`sub_000A6F90(0x539, &pos, &rot, 0, 0)`), set state 2 (as `sub_00217030`), firing box = spawn ± 60 m (x/z), dust height = the placeholder's floor, in the ship's own copy of the statics. A fifth placeholder stays a bot (logged) |
 | update (`sub_00217050`) | our ships only, with that ship's statics: first frame removes the placeholder AI (`sub_0015DDA0`, focus cleared if it was on it); in states 3 and 4 the ship's height is moved down by the floor for the call and back, so the fall ends 6.6 m above the map floor |
 | slot 10 (`sub_00215B50`), damage (`sub_002193A0`) | our ships' objects: the original with that ship's statics |
-| text (`sub_0003D7B0`) | id 0x164B at return 0x0014D09F, with a ship this level: "Timesplitter Mothership" |
+| text (`sub_0003D7B0`) | id 0x164B at return 0x0014D09F, with a ship this level: the focus ship's Story AI name, else "Timesplitter Mothership" |
 
 Log lines (`[mapmaker] mothership: ...`; the spawn line names the ship, `mothership N: spawn ...`): `mounted l_64_ch.pak for the
 mothership`, `requested the mothership and wreck models`, `mothership created
@@ -164,7 +187,9 @@ Guest functions called: `sub_00062260`, `sub_000622D0`, `sub_000A5E40`,
 area, so the area stubs exist) and, after v0.4.0-mapmaker.25,
 `sub_00096330` (register a model file's textures: **add it to the area
 stubs**). Host: `xbox_HeapAlloc` (pak path, label,
-32-byte argument buffer; once per session).
+32-byte argument buffer, 4 x 32-byte bar names; once per session). After
+.28 no wrapper changed: the bar names use `pc_mapmaker_bosses.inc`
+(`BOS_BAR_EXTRA`), included before this area.
 
 **Picker row** (in `pc_mapmaker_realbosses.inc`, `rbs_extra`):
 `{158u, 0x75u, 0x52420075u, 0x4Eu, "Mothership"}`. Row 158, id 0x75, text

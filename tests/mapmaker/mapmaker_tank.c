@@ -87,6 +87,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         for(i=0;i<3;i++) { spawn_pos[i]=FLOAT_AT(x[1]+(uint32_t)i*4u);spawn_rot[i]=FLOAT_AT(x[2]+(uint32_t)i*4u); }
         if(!spawn_ok) return 0;
         for(i=0;i<3;i++) FLOAT_AT(spawn_obj+0x64u+(uint32_t)i*4u)=spawn_pos[i];
+        HALF_AT(spawn_obj+0x94u)=(uint16_t)x[0];
         WORD_AT(spawn_obj+0x28u)=(WORD_AT(spawn_obj+0x28u)&~1u)|0x10u;   /* sub_002560C0: hidden until its fight */
         /* sub_00251AA0: zero the block, point it at the XBE tables, reset sounds and some table words */
         memset((void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),0,0x64u);
@@ -112,6 +113,14 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 }
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
+/* pc_mapmaker_bosses.inc's Boss bar hooks, as in the build (included first there) */
+#define BOS_BAR_EXTRA 1
+typedef int (*BosBarExtra)(unsigned k,uint32_t *entity,uint32_t *id);
+static BosBarExtra bar_extra;
+static unsigned bar_adds;
+static void bos_bar_extra_add(BosBarExtra f) { bar_extra=f;bar_adds++; }
+static const char *story_names[8];                 /* record ids 0x100..0x107 */
+static const char *bos_story_name(uint32_t id) { return id>=0x100u && id<0x108u?story_names[id-0x100u]:0; }
 #include "pc_mapmaker_tank.inc"
 
 static int failures;
@@ -743,9 +752,9 @@ int main(void)
     CALL(pc_mapmaker_tank_spawn,fake,0x0027F982u,ENT(6),0,0,1);
     CHECK(tnk_lv.seen[0].told==2u && tnk_lv.logs==n+1u);              /* "reached" once */
     WORD_AT(A(6))=0;                                                  /* no entity: said so */
-    n=tnk_lv.logs;
+    n=tnk_lv.refused;
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(6),0,0,1);
-    CHECK(tnk_lv.logs==n+1u);
+    CHECK(tnk_lv.refused==n+1u);
     WORD_AT(A(6))=ENT(6);
     for(k=0;k<9u;k++) { actor(8u+(k&1u),0x12,0,0,0,0);WORD_AT(ENT(8u+(k&1u))+0x7Cu)=A(10u+k);
                         WORD_AT(A(10u+k))=ENT(8u+(k&1u));HALF_AT(A(10u+k)+0x48u)=0x12u;
@@ -860,6 +869,100 @@ int main(void)
         CALL(pc_mapmaker_tank_slot7,fake_entry,0x00000100u,0x00443000u,0,0,1);
         CHECK(entry_state==0xA0A0A00Du);
         play_scene();
+    }
+
+    /* ---- v0.4.0-mapmaker.28: a removed placeholder's entity and pool entry are
+     * reused by the next placeholder; 3 and 4 tanks, every refusal logged ---- */
+    if(tnk_lv.act) tnk_leave(tnk_lv.act,0);
+    WORD_AT(0x006D7880u)=10u;pak_mounted=0;bar_extra=0;bar_adds=0;
+    tnk_lv.logged=99u;
+    CALL(pc_mapmaker_tank_mount,fake,0x001CDB8Au,0,0,0,1);           /* a new level */
+    CHECK(!tnk_lv.n && bar_adds==1u && bar_extra==tnk_bar_boss);    /* the bosses area's bars */
+    CHECK(tnk_lv.logged==1u);                                         /* general lines: per level */
+    resources(1,1,1,0x002560C0u);READY();
+    {
+        unsigned s=nspawn,r=nremove,refused;
+        uint32_t ent=0,id=0,b1,b3;
+        story_names[1]="Iron Duke";story_names[2]=0;story_names[3]="Third Tank";story_names[4]="Fourth";
+        /* tanks 1 and 2: actors 20/21, records 20/21 (ids 0x101, 0x102) */
+        actor(20,0x12,10.0f,0.5f,10.0f,0.0f);WORD_AT(REC(20)+8u)=0x101u;
+        spawn_obj=0x00450000u;
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);
+        actor(21,0x12,30.0f,0.5f,10.0f,0.0f);WORD_AT(REC(21)+8u)=0x102u;
+        spawn_obj=0x00451000u;
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);
+        CHECK(tnk_lv.n==2u && nspawn==s+2u && tnk_lv.t[0].place_id==0x101u && tnk_lv.t[1].place_id==0x102u);
+        CHECK(bar_extra(0,&ent,&id)==1 && ent==0 && id==0x101u);     /* its AI still stands there: no prop bar */
+        WORD_AT(0x007B0C7Cu)=PLAYER;WORD_AT(PLAYER+0xFF4u)=0;
+        CALL(pc_mapmaker_tank_update,fake,0x00000100u,0x00450000u,0,0,1);   /* tank 1's placeholder leaves */
+        CHECK(nremove==r+1u && remove_arg==ENT(20) && !tnk_lv.t[0].place);
+        CHECK(bar_extra(0,&ent,&id)==1 && ent==0x00450000u && id==0x101u);
+        CHECK(bar_extra(1,&ent,&id)==1 && ent==0 && id==0x102u && bar_extra(2,&ent,&id)==0);
+        /* the same Story AI again (its record and id): no second tank, logged */
+        refused=tnk_lv.refused;
+        actor(22,0x12,10.0f,0.5f,10.0f,0.0f);WORD_AT(A(22)+0xBF0u)=REC(20);
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(22),0,0,1);
+        CHECK(tnk_lv.n==2u && nspawn==s+2u && tnk_lv.refused==refused+1u);
+        /* tank 2's placeholder again (not removed yet): no second tank, logged */
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);
+        CHECK(tnk_lv.n==2u && nspawn==s+2u && tnk_lv.refused==refused+2u);
+        WORD_AT(A(21)+0xBF0u)=0;                                       /* no record: the entity still decides */
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);
+        CHECK(tnk_lv.n==2u && nspawn==s+2u);
+        WORD_AT(A(21)+0xBF0u)=REC(21);refused=tnk_lv.refused-2u;
+        /* the third placeholder gets tank 1's pool entry and entity, its own record (id 0x103) */
+        actor(20,0x12,50.0f,0.5f,10.0f,0.0f);WORD_AT(A(20)+0xBF0u)=REC(23);WORD_AT(REC(23)+8u)=0x103u;
+        n=tnk_lv.logs;
+        CALL(pc_mapmaker_tank_spawn,fake,0x0027F982u,ENT(20),0,0,1);      /* a fresh diagnostics record */
+        CHECK(tnk_lv.seen[0].actor==A(20) && tnk_lv.seen[0].rec==REC(23) && tnk_lv.seen[0].id==0x103u && !tnk_lv.seen[0].started);
+        CHECK(tnk_lv.seen[0].tries==1u && tnk_lv.logs==n+1u);            /* its "waiting" line */
+        spawn_obj=0x00452000u;
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);
+        CHECK(tnk_lv.n==3u && nspawn==s+3u && tnk_lv.t[2].obj==0x00452000u && tnk_lv.t[2].place_ent==ENT(20) && tnk_lv.t[2].place_id==0x103u);
+        CHECK(tnk_lv.seen[0].started && tnk_lv.refused==refused+2u);
+        CHECK(NEAR(tnk_lv.t[2].spawn[0],50.0f) && !tnk_lv.act);
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);  /* started again */
+        CHECK(tnk_lv.n==3u && tnk_lv.refused==refused+3u);
+        CALL(pc_mapmaker_tank_update,fake,0x00000100u,0x00452000u,0,0,1); /* tank 3 removes its own placeholder */
+        CHECK(nremove==r+2u && remove_arg==ENT(20) && !tnk_lv.t[2].place);
+        /* the fourth gets tank 2's pool entry, entity and record (the record rewritten: id 0x104) */
+        CALL(pc_mapmaker_tank_update,fake,0x00000100u,0x00451000u,0,0,1);
+        CHECK(nremove==r+3u && remove_arg==ENT(21));
+        actor(21,0x12,70.0f,0.5f,10.0f,0.0f);WORD_AT(REC(21)+8u)=0x104u;
+        spawn_obj=0x00453000u;
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);
+        CHECK(tnk_lv.n==4u && nspawn==s+4u && tnk_lv.t[3].obj==0x00453000u && tnk_lv.t[3].place_id==0x104u);
+        /* a fifth: at most 4, logged */
+        actor(24,0x12,90.0f,0.5f,10.0f,0.0f);WORD_AT(REC(24)+8u)=0x105u;
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(24),0,0,1);
+        CHECK(tnk_lv.n==4u && nspawn==s+4u && tnk_lv.refused==refused+4u);
+        spawn_obj=TANK;
+        /* the bosses area's bars: each tank (placeholder gone) with its own record id */
+        CHECK(bar_extra(2,&ent,&id)==1 && ent==0x00452000u && id==0x103u);
+        CHECK(bar_extra(3,&ent,&id)==1 && ent==0 && id==0x104u && bar_extra(4,&ent,&id)==0);
+        WORD_AT(0x0079094Cu)=4u;CHECK(bar_extra(0,&ent,&id)==0);play_scene();
+        HALF_AT(0x00452000u+0x94u)=0x298u;                             /* no longer the tank prop: no bar */
+        CHECK(bar_extra(2,&ent,&id)==1 && ent==0);
+        HALF_AT(0x00452000u+0x94u)=0x281u;
+        /* the stock bar's label: the focus tank's Story AI name */
+        WORD_AT(PLAYER+0xFF4u)=0x00450000u;
+        b1=CALL(pc_mapmaker_tank_text,fake,0x0014CD42u,0x165Bu,0,0,0);
+        WORD_AT(PLAYER+0xFF4u)=0x00452000u;
+        b3=CALL(pc_mapmaker_tank_text,fake,0x0014CD42u,0x165Bu,0,0,0);
+        CHECK(b1 && b3 && b1!=b3 && !strcmp((const char *)((uintptr_t)b1+g_xbox_mem_offset),"Iron Duke"));
+        CHECK(!strcmp((const char *)((uintptr_t)b3+g_xbox_mem_offset),"Third Tank"));
+        WORD_AT(PLAYER+0xFF4u)=0x00451000u;                            /* tank 2: its AI is unnamed */
+        CHECK(CALL(pc_mapmaker_tank_text,fake,0x0014CD42u,0x165Bu,0,0,0)==tnk.label);
+        WORD_AT(PLAYER+0xFF4u)=ENT(3);                                 /* not a tank */
+        CHECK(CALL(pc_mapmaker_tank_text,fake,0x0014CD42u,0x165Bu,0,0,0)==tnk.label);
+        story_names[3]="A name that is longer than thirty-one characters";
+        WORD_AT(PLAYER+0xFF4u)=0x00452000u;
+        b3=CALL(pc_mapmaker_tank_text,fake,0x0014CD42u,0x165Bu,0,0,0);
+        CHECK(strlen((const char *)((uintptr_t)b3+g_xbox_mem_offset))==31u && !strcmp((const char *)((uintptr_t)b1+g_xbox_mem_offset),"Iron Duke"));
+        WORD_AT(PLAYER+0xFF4u)=0;
+        /* refusals have their own bounded budget */
+        for(k=0;k<20u;k++) CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(24),0,0,1);
+        CHECK(tnk_lv.refused==TNK_REFUSE_LOGS);
     }
 
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }

@@ -68,7 +68,10 @@
  *   it (sub_00130400). The hook raises the margin by slot x BOS_BAR_STEP x
  *   [0x004E68F8] around each call and puts it back (the HUD frame rewrites
  *   it, 0x0014B084). A stock bar (HUD +8 bit 0 after the original) keeps
- *   slot 0. The smoothing state +0x171C/+0x1724/+0x172C is swapped per boss
+ *   slot 0. Areas that replace a Boss AI with a prop and remove the AI (tank,
+ *   mothership) list their props (bos_bar_extra_add): drawn with the removed
+ *   AI's name, except the focus prop while a stock bar shows it.
+ *   The smoothing state +0x171C/+0x1724/+0x172C is swapped per boss
  *   (BOS_SMOOTH table) and the stock values restored afterwards; each copy's
  *   fade +0x172C is lowered as sub_0014B090 lowers the live one (dt x
  *   [0x00475D10] per HUD block clock +0x2C), else the bar never drains. Coordinates
@@ -508,14 +511,16 @@ static void bos_level_chunk(uint32_t data,unsigned ordinal,void *ctx)
     unsigned level=bos_decode(BOS_B(data+BOS_CHUNK_FLAG)),sub=bos_decode_sub(BOS_B(data+BOS_CHUNK_FLAG)),*n=(unsigned *)ctx;
     unsigned extra=bos_decode_extra(BOS_B(data+BOS_CHUNK_EXTRA),BOS_B(data+BOS_CHUNK_HEALTH));
     (void)ordinal;
+    if(i<BOS_LEVEL_SLOTS) {                      /* every AI's name: bars of AIs replaced by props */
+        memcpy(bos_play.name[i],(const char *)((uintptr_t)(data+BOS_CHUNK_NAME)+g_xbox_mem_offset),BOS_NAME-1u);
+        bos_play.name[i][BOS_NAME-1u]=0;
+    }
     if(!level && !extra) return;
     if(i>=BOS_LEVEL_SLOTS) { bos_log("boss index out of range in play",i,0);return; }
     bos_play.level[i]=(uint8_t)level;
     bos_play.extra[i]=(uint8_t)extra;
     bos_play.sub[i]=(uint8_t)(level && sub);
     if(level && sub) bos_play.subs++;
-    memcpy(bos_play.name[i],(const char *)((uintptr_t)(data+BOS_CHUNK_NAME)+g_xbox_mem_offset),BOS_NAME-1u);
-    bos_play.name[i][BOS_NAME-1u]=0;
     ++*n;
 }
 static float bos_range2(void)
@@ -553,6 +558,19 @@ static uint32_t bos_actor(uint32_t a,uint32_t *entity,uint32_t *record)
     *entity=ent;*record=rec;
     return i;
 }
+/* Story AI index of spawn record id `id` with a boss or health setting, else BOS_LEVEL_SLOTS. */
+static uint32_t bos_slot(uint32_t id)
+{
+    uint32_t i=id-WORD_AT(BOS_SAI_BASE)-1u;
+    return i<BOS_LEVEL_SLOTS && (bos_play.level[i] || bos_play.extra[i])?i:BOS_LEVEL_SLOTS;
+}
+/* The saved name of the Story AI with spawn record id `id` (any AI of this
+ * map, boss or not), or 0 when unnamed or unknown. */
+static const char *bos_story_name(uint32_t id)
+{
+    uint32_t i=id-WORD_AT(BOS_SAI_BASE)-1u;
+    return i<BOS_LEVEL_SLOTS && bos_play.name[i][0]?bos_play.name[i]:0;
+}
 /* Health factor: Boss x1..x8 times stronger health x2..x16. */
 static unsigned bos_factor(uint32_t i) { return bos_multiplier(bos_play.level[i])<<bos_play.extra[i]; }
 static void bos_scale(uint32_t a,uint32_t ent,uint32_t rec,unsigned factor)
@@ -586,30 +604,64 @@ static void bos_scale(uint32_t a,uint32_t ent,uint32_t rec,unsigned factor)
  * for scaling, range, death and the bar; 0 = the AI's own. Set by that area. */
 #define BOS_BAR_PROXY 1
 static uint32_t (*bos_bar_proxy)(uint32_t entity);
+/* A Boss AI an area replaced with a prop and removed (pc_mapmaker_tank.inc,
+ * pc_mapmaker_mothership.inc): the area's k-th prop and the removed AI's
+ * spawn record id (record +8); returns 0 past its last. The prop is the
+ * bar's entity (health, multipliers, range, death); the label is the AI's
+ * saved name. Registered by those areas (bos_bar_extra_add). */
+#define BOS_BAR_EXTRA 1
+#define BOS_EXTRA_AREAS 4u
+#define BOS_EXTRA_MAX 8u                /* props per area */
+#define BOS_FOCUS 0xFF4u                /* player: story focus, the stock bar's entity */
+typedef int (*BosBarExtra)(unsigned k,uint32_t *entity,uint32_t *id);
+static BosBarExtra bos_bar_extra[BOS_EXTRA_AREAS];
+static void bos_bar_extra_add(BosBarExtra f)
+{
+    unsigned k;
+    for(k=0;k<BOS_EXTRA_AREAS;k++) if(bos_bar_extra[k]==f) return;
+    for(k=0;k<BOS_EXTRA_AREAS;k++) if(!bos_bar_extra[k]) { bos_bar_extra[k]=f;return; }
+    bos_log("boss bar area table full",BOS_EXTRA_AREAS,0);
+}
+/* Adds Boss entity ent (Story AI index s) to the n nearest in range; returns the new n. */
+static unsigned bos_near_add(uint32_t ent,uint32_t s,const float *pp,float *dist,uint32_t *ents,uint32_t *index,unsigned max,unsigned n)
+{
+    float dx,dy,dz,d;
+    unsigned k;
+    if(!bos_play.level[s] || bos_play.sub[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) return n;   /* Sub-boss: meter only */
+    dx=bos_getf(ent+BOS_ENT_POS)-pp[0];dy=bos_getf(ent+BOS_ENT_POS+4u)-pp[1];dz=bos_getf(ent+BOS_ENT_POS+8u)-pp[2];
+    d=dx*dx+dy*dy+dz*dz;
+    if(!(d<=bos_play.range2)) return n;
+    for(k=n;k>0 && dist[k-1u]>d;k--) if(k<max) { dist[k]=dist[k-1u];ents[k]=ents[k-1u];index[k]=index[k-1u]; }
+    if(k<max) { dist[k]=d;ents[k]=ent;index[k]=s;if(n<max) n++; }
+    return n;
+}
 /* Scales every live Story AI with a factor and returns the living Boss AIs
- * within range of the current player, nearest first (at most max). */
-static unsigned bos_nearest(uint32_t player,uint32_t *ents,uint32_t *index,unsigned max)
+ * within range of the current player, nearest first (at most max); skip is
+ * a prop the stock bar already shows (0: none). */
+static unsigned bos_nearest(uint32_t player,uint32_t *ents,uint32_t *index,unsigned max,uint32_t skip)
 {
     uint32_t pe=WORD_AT(player+0x14u),count=WORD_AT(BOS_LIST_COUNT),humans=WORD_AT(BOS_HUMANS),i;
-    float px,py,pz,dist[BOS_BARS_MAX];
-    unsigned n=0,k;
+    float pp[3],dist[BOS_BARS_MAX];
+    unsigned n=0,k,f;
     if(!MAPMAKER_PTR_OK(pe,BOS_ENT_SIZE)) return 0;
-    px=bos_getf(pe+BOS_ENT_POS);py=bos_getf(pe+BOS_ENT_POS+4u);pz=bos_getf(pe+BOS_ENT_POS+8u);
+    pp[0]=bos_getf(pe+BOS_ENT_POS);pp[1]=bos_getf(pe+BOS_ENT_POS+4u);pp[2]=bos_getf(pe+BOS_ENT_POS+8u);
     if(count>BOS_LIST_MAX) count=BOS_LIST_MAX;
     if(max>BOS_BARS_MAX) max=BOS_BARS_MAX;
     for(i=humans<count?humans:count;i<count;i++) {
         uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec),p;
-        float dx,dy,dz,d;
         if(s>=BOS_LEVEL_SLOTS) continue;
         if(bos_bar_proxy && (p=bos_bar_proxy(ent))!=0 && MAPMAKER_PTR_OK(p,BOS_ENT_SIZE)) ent=p;   /* the bar's entity */
         bos_scale(a,ent,rec,bos_factor(s));
-        if(!bos_play.level[s] || bos_play.sub[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) continue;   /* Sub-boss: meter only */
-        dx=bos_getf(ent+BOS_ENT_POS)-px;dy=bos_getf(ent+BOS_ENT_POS+4u)-py;dz=bos_getf(ent+BOS_ENT_POS+8u)-pz;
-        d=dx*dx+dy*dy+dz*dz;
-        if(!(d<=bos_play.range2)) continue;
-        for(k=n;k>0 && dist[k-1u]>d;k--) if(k<max) { dist[k]=dist[k-1u];ents[k]=ents[k-1u];index[k]=index[k-1u]; }
-        if(k<max) { dist[k]=d;ents[k]=ent;index[k]=s;if(n<max) n++; }
+        n=bos_near_add(ent,s,pp,dist,ents,index,max,n);
     }
+    for(f=0;f<BOS_EXTRA_AREAS;f++)               /* Boss AIs replaced by props */
+        for(k=0;bos_bar_extra[f] && k<BOS_EXTRA_MAX;k++) {
+            uint32_t ent=0,id=0,s;
+            if(!bos_bar_extra[f](k,&ent,&id)) break;
+            if(!MAPMAKER_PTR_OK(ent,BOS_ENT_SIZE) || (s=bos_slot(id))>=BOS_LEVEL_SLOTS) continue;
+            bos_scale(ent,ent,id,bos_factor(s));
+            if(ent!=skip) n=bos_near_add(ent,s,pp,dist,ents,index,max,n);   /* else the stock bar shows it */
+        }
     return n;
 }
 /* Per-boss copy of the bar's smoothing state (HUD block +0x171C/+0x1724/+0x172C). */
@@ -672,7 +724,7 @@ void pc_mapmaker_bosses_hud(void (*original)(void))
     if(!MAPMAKER_PTR_OK(player,0x1000u) || (p=WORD_AT(player+4u))>3u || hud!=BOS_HUD+p*BOS_HUD_STRIDE) return;
     cap=WORD_AT(BOS_HUMANS)>1u?BOS_BARS_SPLIT:BOS_BARS_MAX;
     slot=(WORD_AT(hud+BOS_HUD_FLAGS)&1u)?1u:0u;  /* a stock bar keeps the bottom slot */
-    n=bos_nearest(player,ents,index,cap-slot);
+    n=bos_nearest(player,ents,index,cap-slot,slot?WORD_AT(player+BOS_FOCUS):0u);
     if(!n || !MAPMAKER_STACK_OK(0x100)) return;
     bos_play.frame++;
     step=bos_step();
