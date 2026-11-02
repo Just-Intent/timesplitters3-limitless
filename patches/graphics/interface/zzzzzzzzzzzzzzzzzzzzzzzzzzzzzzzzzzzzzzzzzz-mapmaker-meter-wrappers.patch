@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3469 @@
+@@ -1037,6 +1037,3480 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2905,6 +2905,17 @@
 +    else sub_00045670_gen();
 +#else
 +    sub_00045670_gen();
++#endif
++}
++
++extern void sub_001CDD60_gen(void);
++void sub_001CDD60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_restart")) pc_mapmaker_khallos_restart(sub_001CDD60_gen);
++    else sub_001CDD60_gen();
++#else
++    sub_001CDD60_gen();
 +#endif
 +}
 +
