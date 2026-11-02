@@ -72,8 +72,12 @@ MUTATIONS = {
     'probe-before-original': ('    uint32_t view=MAPMAKER_PTR_OK(g_esp,8u)?WORD_AT(g_esp+4u):0u,info,rec,model,row,e=0,req=0,data=0,prop;\n    original();\n',
                               '    uint32_t view=MAPMAKER_PTR_OK(g_esp,8u)?WORD_AT(g_esp+4u):0u,info,rec,model,row,e=0,req=0,data=0,prop;\n    original();original();\n'),
     'probe-textures-past-end': ('    end=WORD_AT(t+0x0Cu);', '    end=WORD_AT(t+0x0Cu)+1u;'),
-    'probe-textures-placeholder': ('        if(id==0x40000000u) continue;\n', ''),
-    'probe-textures-unterminated': ('        if((id=WORD_AT(file+list+k*16u))==0xFFFFFFFFu) break;', '        id=WORD_AT(file+list+k*16u);'),
+    'probe-textures-placeholder': ('        if(id==0x40000000u || slot==0x40000000u) continue;\n', ''),
+    'probe-textures-unterminated': ('        if((id=WORD_AT(file+list+k*16u+4u))==0xFFFFFFFFu) break;', '        id=WORD_AT(file+list+k*16u+4u);'),
+    # v0.4.0-mapmaker.28: the entry's first word (the loaded-table row) read as the id
+    'probe-textures-row-as-id': ('        if((id=WORD_AT(file+list+k*16u+4u))==0xFFFFFFFFu) break;', '        if((id=WORD_AT(file+list+k*16u))==0xFFFFFFFFu) break;'),
+    'probe-textures-row-only': ('    for(k=0;k<end;k++) {\n        uint32_t a=rows+k*SMX_TEX_STRIDE+SMX_TEX_ID;', '    for(k=end;k<end;k++) {\n        uint32_t a=rows+k*SMX_TEX_STRIDE+SMX_TEX_ID;'),
+    'probe-count-not-reset': ('    smx.tex_total=0;smx.tex_loaded=0;smx.grains=0;\n', ''),
     'probe-textures-never': ('    if(smx.level_logs==1u) smx_sky_textures(data,rec);', '    (void)smx_sky_textures;'),
     # weather
     'sand-without-pak': ('    if(!smx.sand_ready && !(smx.sand_ready=smx_mount_pair(smx_weather[k-1u].pak,smx_weather[k-1u].mem))) { smx_log("sandstorm pak or its textures pak not mounted; no sandstorm",0,0);return; }\n', ''),
@@ -84,7 +88,26 @@ MUTATIONS = {
     'sand-start-list-kept': ('    WORD_AT(SMX_WX_LIST)=smx_weather[0].list;\n', ''),
     'sand-level-list-reset': ('        WORD_AT(g_esp+8u)=smx_weather[0].list;\n', ''),
     'sand-level-count-zero': ('        WORD_AT(g_esp+4u)=1u;\n', ''),
-    'frame-any-map': ('    if(smx.sand_on!=1 || smx_scene()!=100u) return;\n    smx.frames++;', '    smx.frames++;'),
+    'frame-any-map': ('    if(smx.sand_on!=1 || smx_scene()!=100u || !WORD_AT(SMX_SANDSTORM)) { original();return; }',
+                      '    if(smx_scene()!=100u) { original();return; }'),
+    'frame-flag-ignored': ('    if(smx.sand_on!=1 || smx_scene()!=100u || !WORD_AT(SMX_SANDSTORM)) { original();return; }',
+                           '    if(smx.sand_on!=1 || smx_scene()!=100u) { original();return; }'),
+    # MapMaker sandstorm: scene 2's emitter rooms hidden during the stock frame, our grains after
+    'sand-rooms-kept': ('        rooms[k]=WORD_AT(a);WORD_AT(a)=0;', '        rooms[k]=WORD_AT(a);'),
+    'sand-rooms-lost': ('    for(k=0;k<SMX_SAND_EMITTER_COUNT*SMX_SAND_ROOM_SLOTS;k++)\n        WORD_AT(SMX_SAND_EMITTERS', '    for(k=0;k<0u;k++)\n        WORD_AT(SMX_SAND_EMITTERS'),
+    'sand-rooms-first-only': ('#define SMX_SAND_ROOM_SLOTS 4u', '#define SMX_SAND_ROOM_SLOTS 1u'),
+    'sand-no-grains': ('    if(type==5u) made=smx_sand_emit();', '    (void)smx_sand_emit;'),
+    'sand-grains-any-entry': ('    if(type==5u) made=smx_sand_emit();', '    made=smx_sand_emit();'),
+    'sand-grains-indoors': (' || !(FLOAT_AT(SMX_WX_EXPOSED+p*4u)>0.0f)) continue;', ') continue;'),
+    'sand-grains-any-player': ('        if(!(flags&0x80000000u) || !(flags&0x400u) || ', '        if('),
+    'sand-grains-first-player': ('        if(!MAPMAKER_PTR_OK(pl,SMX_PL_POS+12u)) continue;', '        if(!MAPMAKER_PTR_OK(pl,SMX_PL_POS+12u) || p) continue;'),
+    'sand-grains-past-ring': ('            if(g>=SMX_GRAINS) g=0;\n', ''),
+    'sand-grains-one-slot': ('            WORD_AT(SMX_WX_RING)=(g+1u)%SMX_GRAINS;\n', ''),
+    'sand-grains-unbounded': ('    if(steps>4u) steps=4u;\n', ''),
+    'sand-grains-negative-steps': ('|| (int32_t)steps<=0) return 0;', ') return 0;'),
+    'sand-grains-at-origin': ('        x=FLOAT_AT(pl+SMX_PL_POS);y=FLOAT_AT(pl+SMX_PL_POS+4u);z=FLOAT_AT(pl+SMX_PL_POS+8u);', '        x=0.0f;y=FLOAT_AT(pl+SMX_PL_POS+4u);z=FLOAT_AT(pl+SMX_PL_POS+8u);'),
+    'sand-grains-still': ('            FLOAT_AT(e+0x0Cu)=smx_wind[0]*s+', '            FLOAT_AT(e+0x0Cu)=0.0f*s+'),
+    'sand-grains-dead': ('            FLOAT_AT(e+0x20u)=0.0f;', '            FLOAT_AT(e+0x20u)=-1.0f;'),
     'frame-not-reset': ('smx.level_logs=0;smx.frames=0;', 'smx.level_logs=0;'),
     # music
     'music-any-caller': ('    if(MAPMAKER_PTR_OK(g_esp,4u) && WORD_AT(g_esp)==SMX_RET_MUSIC_PLAY && g_eax==0xFFFFFFFFu &&',
@@ -445,6 +468,58 @@ def test_texture_load_sites():
     insns = decoded()
     texture_pass = {i.address for i in insns if i.call and any(op[0] == 'imm' and op[1] == 0x00063900 for op in i.ops)}
     assert 0x0003D5E5 in texture_pass and 0x0003D5AD < 0x0003D5E5 < 0x0003D645
+
+
+def test_sandstorm_rooms_and_texture_rows():
+    """v0.4.0-mapmaker.28 (sandstorm armed and drawn every frame, nothing seen;
+    sky probe counted 0 loaded): the sandstorm's emitters name scene 2's rooms,
+    which the grain and gust code compare with the player's; grains are drawn
+    with global texture 0x303 in flagged views; the texture pass writes the
+    loaded-table row into the model's entry +0 (XBE)."""
+    read = _xbe()
+    rooms = [_u32(read, 0x004E62E8 + e * 0x44 + s * 4) for e in range(4) for s in range(4)]
+    assert rooms == [2, 3, 7, 0, 6, 26, 27, 0, 5, 4, 0, 0, 19, 0, 0, 0]
+    assert struct.unpack('<3f', read(0x004E62E8 + 0x44 + 0x18, 12)) == pytest.approx((0.53, 0.0, -0.85))
+    text = SMX.read_text(encoding='utf-8')
+    assert 'smx_wind[3]={0.53f,0.0f,-0.85f}' in text and '#define SMX_SAND_EMITTERS 0x004E62E8u' in text
+    # grains: emitter table, player's room list word, compare; gust: player's room +0x2A0
+    assert read(0x0011AD53, 5) == bytes.fromhex('bee8624e00') and read(0x0011AD69, 5) == bytes.fromhex('0fbf3b3bf8')
+    assert read(0x0011A65B, 5) == bytes.fromhex('bae8624e00') and read(0x0011A66B, 6) == bytes.fromhex('3987a0020000')
+    assert read(0x0011ADC2, 7) == bytes.fromhex('0faf1544794e00')                 # rate x [0x004E7944]
+    # the stock player test the weather and our grains use
+    assert read(0x0011A68F, 6) == bytes.fromhex('8b871c020000') and read(0x0011A69D, 3) == bytes.fromhex('f6c404')
+    # emitter props created at the origin from +0x10 into +0x34
+    assert read(0x001189CB, 5) == bytes.fromhex('be1c634e00') and read(0x00118A0C, 1) == b'\xe8'
+    # draw: per-view flag, grain texture 0x303; haze texture 0x328; global texture handles
+    assert read(0x0011B11B, 7) == bytes.fromhex('8b048d2cc87a00') and read(0x0011B194, 5) == bytes.fromhex('6803030000')
+    assert read(0x0011A940, 5) == bytes.fromhex('6828030000')
+    assert read(0x00080F20, 15) == bytes.fromhex('8b4424048d04408b04c5642d4d00c3')
+    # texture pass: sub_000637E0 keeps the entry at +0x10/+0x14, sub_00063900 passes them,
+    # sub_00018B90 writes -1 and then the row through its third argument
+    assert read(0x00063816, 3) == bytes.fromhex('894e10') and read(0x0006383A, 3) == bytes.fromhex('894e14')
+    assert read(0x00063929, 6) == bytes.fromhex('8b46148b4e10')
+    assert read(0x00018BA4, 7) == bytes.fromhex('c74500ffffffff') and read(0x00018C91, 3) == bytes.fromhex('894500')
+    assert read(0x000962CA, 3) == bytes.fromhex('565650')                         # (id, entry, entry)
+
+
+def test_texture_entries_hold_the_id_twice():
+    """The probe reads the id from an entry's second word: in every extra sky and
+    sandstorm model file both words are the id (skipped without game data)."""
+    if not (GAME / 'arcade/l_100.pak').exists():
+        pytest.skip('game paks not available locally')
+    read = _xbe()
+    props = _props(GAME / 'arcade/l_100.pak')
+    rows = [(struct.unpack('<i', read(0x005149A8 + sky * 0x34 + 4, 4))[0], pak) for sky, _, pak, _ in _sky_rows()]
+    rows += [(m, 'pak/challenge/l_64_ch.pak') for m in range(0x527, 0x52B)]
+    for model, pak in rows:
+        data = _entry(GAME / pak[len('pak/'):], _model(props[model]))
+        o = struct.unpack_from('<I', data, 0)[0]
+        while True:
+            first, second = struct.unpack_from('<II', data, o)
+            assert first == second, (props[model], hex(first), hex(second))
+            if first == 0xFFFFFFFF:
+                break
+            o += 16
 
 
 def test_wrappers_documented():
