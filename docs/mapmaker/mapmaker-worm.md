@@ -53,7 +53,7 @@ block, bound and ticking. `restart-*` mutations. Playtest: restart a map with
   0x0048BEC8, 30 names; mounted before registration: `sub_0005C420` calls
   `sub_001C8540` at 0x0005C501, `sub_001CA2F0` at 0x0005C558; also
   `sub_001C95F0`). Two of its names are also in lv1_3/lv1_6 (`jblookout`
-  0x193, `jbgrossend` 0x1AE): see [Shared anim names](#shared-anim-names-crash-after-v040-mapmaker24).
+  0x193, `jbgrossend` 0x1AE, same ids): see [Shared anim names](#shared-anim-names-crash-after-v040-mapmaker24).
 - Health 12.1 (`+0x1CC`/`+0x1D8`, written at binding, 0x001D9B6E).
 
 ## How mission 5 runs it (CONFIRMED)
@@ -206,7 +206,7 @@ Logs (stderr, `[mapmaker] worm:`):
 - `worm k state a -> b (level L, head anim ...)` (each state change)
 - `worm k surfaced, state s, head height h, spawn floor f, worm height w`
   (each surfacing, up to 8)
-- `lv1_2.pak: only the mansion worm's anims registered`
+- `animslots: boss anims registered (kept, left out) from lv1_2 (0x9, 0x15)`
 - `mansion worm: the mansion script trigger dropped`
 - `mansion worm hit (state before, after)`
 - failures: `no pads near the mansion worm's spawn; bot behaviour`,
@@ -313,32 +313,21 @@ giant trophy monster, the giant skeleton and the worm.
 `sub_00350EC0`, called right after the anim name registration `sub_001CA2F0`
 at 0x0005C558.
 
-**Cause** (CONFIRMED, decode and registration tables; test
-`test_lv1_paks_share_anim_ids`, `test_registration_sites_and_fixup`):
-- `sub_0005B980(prefix, table, count)` registers a mounted pak's names one by
-  one through `sub_00057F30(path, id, 0)`. That finds the anim file in the
-  mounted paks, maps the id (`0x007E03C0`) and **fixes the file up in place**:
-  its offsets become pointers (+0x1C, +0x28, +0x2C at 0x0005805F..).
-- lv1_2.pak's table (0x0048BEC8, 30 entries) names two Jo-Beth anims that
-  other boss paks also name: `jblookout` 0x193 (lv1_3.pak, 0x0048C1B0, the
-  trophy monster) and `jbgrossend` 0x1AE (lv1_6.pak, 0x0048C738, the
-  skeleton). With both paks mounted, the same anim is fixed up twice and its
-  pointers become junk (eax 0xFFC00000 in the dump).
-- No other id or name is shared. lv1_3 and lv1_6 share nothing, and the
-  worm's names are unique among lv1_2, lv1_3, lv1_6, lv81 and lv14 (test).
-- Mission 5 never mounts these paks together.
+**Cause, corrected after v0.4.0-mapmaker.34** (CONFIRMED; tests in
+`tests/mapmaker/test_mapmaker_animslots.py`): not a second fixup. `sub_00057F30`
+fixes an anim file up once (flag 4 at header +8, 0x00057FEA). The anim
+**slot table** overflowed: 940 static slots and no bound on the count. lv1_2's
+30 names on top of lv1_3/lv1_6 ran past slot 939. .34 crashed the same way
+with lv11.pak's 33 (ecx 940 in the dump). The two shared Jo-Beth names
+(`jblookout` 0x193 with lv1_3, `jbgrossend` 0x1AE with lv1_6, same ids) are
+real but harmless.
 
-**Fix**: in scene 100, `pc_mapmaker_worm_register` (on `sub_0005B980`)
-replaces lv1_2's whole table with the worm's own entries:
-- `barney_worm` 0x149 (entry 5), registered by a nested call;
-- `wrmburst` 0x194 .. `wrmdeath` 0x19B (entries 21..28), registered by the
-  original with the table and count arguments changed for the call and then
-  restored.
-
-The rest of the mansion cast (and the two shared Jo-Beth names) is not
-registered; MapMaker never uses them. The other bosses' paks keep their stock
-tables and ids. No anim id is remapped: the worm code requests 0x149 and
-0x194..0x19B, and none of these is registered by any other pak.
+**Fix**: [anim slot budget](mapmaker-animslots.md), run by
+`pc_mapmaker_worm_register` (on `sub_0005B980`) in scene 100. lv1_2's table
+registers only the worm's own entries, one nested call each:
+`barney_worm` 0x149 (entry 5) and `wrmburst` 0x194 .. `wrmdeath` 0x19B
+(entries 21..28). Every other boss pak likewise registers only its boss's
+anims. No anim id is remapped.
 
 `barney_worm` is needed: the update plays it on the head in state 9 when
 +0x44C == 2 (0x001DBF46). +0x44C becomes 2 when a worm in state 2 is south
@@ -369,7 +358,7 @@ WRAP sub_00126560 -> pc_mapmaker_worm_fx         (layer with realbosses_fx/crowe
 WRAP sub_001D9370 -> pc_mapmaker_worm_props      (new; return-address test)
 WRAP sub_001D7200 -> pc_mapmaker_worm_extra      (new; return-address test)
 WRAP sub_00234CD0 -> pc_mapmaker_worm_script     (new; return-address test; 5 callers)
-WRAP sub_0005B980 -> pc_mapmaker_worm_register   (new; level load only; table 0x0048BEC8 count 0x1E test first)
+WRAP sub_0005B980 -> pc_mapmaker_worm_register   (level load only; runs the anim slot budget, mapmaker-animslots.md)
 WRAP sub_001D5E20 -> pc_mapmaker_worm_gone       (new, .28; the head's slot 12, only installed on worm heads)
 (several worms: no new wrapper; the same hooks swap each worm's globals)
 ```
@@ -385,8 +374,8 @@ Guest calls (`extern void ...(void)`, called with `guest_call`):
 `sub_0005A130(path)`, `sub_00062260(path)`, `sub_001D1E80()`,
 `sub_0003DFA0(size, 1)`, `sub_00378400(fn, n)`, `sub_001D2350()`,
 `sub_0010E2A0(emitter)`, `sub_001DAAB0()`, `sub_001DA990()`,
-`sub_0009A420(pad)`, `sub_0005B980(prefix, table, count)` (new, by
-`pc_mapmaker_worm_register`; a guest function the build already has).
+`sub_0009A420(pad)`, `sub_0005B980(prefix, table, count)` (by
+`pc_mapmaker_animslots.inc`, one entry per call; a guest function the build already has).
 
 Link stubs to add in `tests/mapmaker/mapmaker_area_stubs.h` (new):
 `sub_001D1E80`, `sub_001D2350`, `sub_001DAAB0`, `sub_001DA990`,

@@ -554,23 +554,23 @@ int main(void)
     register_on=1;
 
     /* ---- register: lv1_2's table gives only the worm's names ------------- */
-    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048BEC8u,0x1Eu,1);
-    CHECK(reg_seen[0]==0x0048BEC8u+21u*0x18u && reg_seen[1]==8u);                  /* wrmburst..wrmdeath */
-    CHECK(nregister==1 && reg_nested[0]==0x0049C690u && reg_nested[1]==0x0048BEC8u+5u*0x18u && reg_nested[2]==1u);  /* barney_worm */
+    /* (pc_mapmaker_animslots.inc; its own fixture covers the other bosses) */
+    memset((void *)((uintptr_t)0x007E03C0u+g_xbox_mem_offset),0xFF,0xC03u*2u);   /* no id registered */
+    WORD_AT(0x006D77F8u)=0x23u;
+    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048BEC8u,0x1Eu,0);
+    CHECK(nregister==9 && reg_nested[0]==0x0049C690u && reg_nested[1]==0x0048BEC8u+28u*0x18u && reg_nested[2]==1u);  /* barney_worm, wrmburst..wrmdeath */
     CHECK(WORD_AT(ESP0+8u)==0x0048BEC8u && WORD_AT(ESP0+12u)==0x1Eu && WORD_AT(ESP0+4u)==0x0049C690u);
-    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048C1B0u,0x10u,1);   /* lv1_3: stock */
-    CHECK(reg_seen[0]==0x0048C1B0u && reg_seen[1]==0x10u && nregister==1);
-    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048C738u,0x1Eu,1);   /* another table, same count: stock */
-    CHECK(reg_seen[0]==0x0048C738u && reg_seen[1]==0x1Eu && nregister==1);
+    CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048C738u,0x1Eu,1);   /* another table that fits: stock */
+    CHECK(reg_seen[0]==0x0048C738u && reg_seen[1]==0x1Eu && nregister==9);
     CALL(pc_mapmaker_worm_register,fake_reg,0x001C9601u,0x0049C690u,0x0048BEC8u,0x1Du,1);   /* another count: stock */
-    CHECK(reg_seen[1]==0x1Du && nregister==1);
+    CHECK(reg_seen[1]==0x1Du && nregister==9);
     WORD_AT(0x0079094Cu)=1u;                                  /* mission 5: the whole table */
     CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048BEC8u,0x1Eu,1);
-    CHECK(reg_seen[0]==0x0048BEC8u && reg_seen[1]==0x1Eu && nregister==1);
+    CHECK(reg_seen[0]==0x0048BEC8u && reg_seen[1]==0x1Eu && nregister==9);
     WORD_AT(0x0079094Cu)=100u;
     set_env("TSFP_MAPMAKER_LIMITS",NULL);                     /* off: stock */
     CALL(pc_mapmaker_worm_register,fake_reg,0x001CAD7Au,0x0049C690u,0x0048BEC8u,0x1Eu,1);
-    CHECK(reg_seen[1]==0x1Eu && nregister==1);
+    CHECK(reg_seen[1]==0x1Eu && nregister==9);
     set_env("TSFP_MAPMAKER_LIMITS","1");
 
     /* ---- AI start: one worm per map ------------------------------------- */
