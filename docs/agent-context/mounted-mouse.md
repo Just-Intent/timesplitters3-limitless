@@ -151,3 +151,14 @@ The registered test_mounted_mouse.py suite includes mech_mouse.c (60/120/180/
 host adapters, and optional original-XBE 37AA70/3797B0 execution. The old-route
 mutation must fail. The original-code fixture proves target survival, direction
 vector updates and controller inputs; it is not a live mission or Mac-input test.
+
+Follow-up (user report: mech view still fixed). Static US-XBE review confirms
+the route: 37A730 is the only 0x8000 setter; D5EB0 always calls the D2B80 hook
+before D5C70 -> 37AA70; 37B720 state 5 keeps +2C/+30 and copies them to
++20/+24 while +50 is set; camera type 0x1F (CCAB0 case CD589) requires a
+type-8 target and aims through 3797B0 from +20/+24. [0x733108] is the script
+camera (C6150 clears it, CC170 aims it). No failing link was proven offline.
+The route no longer rejects an unusable camera FOV (37AA70 has no FOV input;
+it now only scales). PcInput.mech_status names the outcome and both adapters
+log each change once ("[PC-MOUSE] Battle Mech: ..."), so the next playtest
+log identifies a failed link. Live mission behavior remains unverified.

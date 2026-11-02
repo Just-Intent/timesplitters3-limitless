@@ -742,9 +742,17 @@ void pc_controls_apply_mouse(uint32_t player, uint32_t fov_object, ptrdiff_t mem
     pc_reload_guest_context(&input.reload,player,memory_offset,GetTickCount64(),&region);
     terminal = pc_terminal_mouse_in_region(&input, GetTickCount64(), sensitivity, player, memory_offset, pc_native_rate()!=0,&region);
     pc_input_terminal_context(&input, terminal >= 0, input.keys[VK_LBUTTON]);
+    int mech_before = input.mech_status, mech_after;
     if (terminal >= 0 || pc_mounted_mouse_in_region(&input, GetTickCount64(), sensitivity, invert_y,
             player, fov_object, memory_offset, pc_native_rate()!=0,&region) >= 0 || !pc_camera_fields_in_region(player,fov_object,memory_offset,&yaw,&pitch,&fov,&region)) {
+        mech_after = input.mech_status;
         ReleaseSRWLockExclusive(&lock);
+        /* Name the first Battle Mech outcome after each change (bounded). */
+        static unsigned mech_logs;
+        if (mech_after != mech_before && mech_after != PC_MECH_NONE && mech_logs < 16) {
+            mech_logs++;
+            fprintf(stderr, "[PC-MOUSE] Battle Mech: %s\n", pc_mech_status_text(mech_after));
+        }
         return;
     }
     old_yaw = *yaw; old_pitch = *pitch;
