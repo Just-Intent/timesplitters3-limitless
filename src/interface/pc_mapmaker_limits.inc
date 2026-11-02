@@ -88,7 +88,12 @@
 #define MAPMAKER_LINK_STITCH 16u
 #define MAPMAKER_LINK_SLACK 256u
 #define MAPMAKER_LIMIT_LINKS (MAPMAKER_POOL_LINKS-MAPMAKER_LINK_SLACK)  /* template + 16 per piece */
-#define MAPMAKER_LIMIT_GROUPS 600
+/* Pad groups (2026-11-02, was 600): measured 1.5 per piece, so 511 pieces
+ * need about 770. Group ids are int16 (pad+8), the group A* node pool is
+ * bounded (pc_mapmaker_pads.inc, 8192 nodes) and the group table is sized by
+ * count; the N x N distance matrix sub_00275F70 builds is (N+1) x N x 4 B,
+ * 4.2 MB at 1024, and takes N x N route searches at load (unmeasured). */
+#define MAPMAKER_LIMIT_GROUPS 1024
 #define MAPMAKER_LIMIT_PIECES 255u    /* = MAPMAKER_ROOMS_MAX */
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
