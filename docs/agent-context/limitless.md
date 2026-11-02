@@ -488,18 +488,7 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 `sub_0015E7C0` -> `_tank_request` (level-init models), `sub_000A2740` -> `_draw`
 (log); shown (+0x28 bit 0) at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
-More boss areas (2026-11-01): `khallos` (id 0x33 chair prop 0x376; .28 WRAP sub_00045670),
-`worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`; wrapper
-lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
-sky/sand/music, +mem paks, MM sand grains; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
-for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll
-list (mapmaker-sets.md).
-Multi-boss merge (.26): 28 WRAPs (walker/skeleton/robot/crowe/tank/mothership/khallos statics
-swaps, worm anim register, sky weather); sub_000DAC30 chain: actors, realbosses,
-tank, khallos (log only).
-.27: sets_spawn_masks (sub_00240C50): slots 11-20 get slot 1's mask;
-worm block at AI start; late walker/skel; fall drop. .28: Crowe eggs
-off; `pc_mapmaker_bossfx.inc` statics.
+Boss areas, skies, open air, set slots: [boss notes](limitless-bosses.md).
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
 anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 (30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear
