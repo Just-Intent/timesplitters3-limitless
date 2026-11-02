@@ -128,6 +128,14 @@
  *  - bars: the placeholder AI is removed, so the bosses area lists each tank
  *    through bos_bar_extra_add (registered at mount): a Boss-flagged tank's
  *    bar, name and health multipliers, as Khallos' bos_bar_proxy does.
+ *  - restart (sub_001CDD60, "START restart" from the pause menu: sub_0003D440
+ *    runs the teardown sub_001CDAF0 and this instead of sub_001CDB80, so the
+ *    mount above does not run): before the original, the tanks of the run
+ *    before are forgotten as at a new level (their props went with the
+ *    teardown); the model request is kept (nothing is mounted or requested
+ *    again). Without it the restarted placeholders, in the same pool
+ *    entries with the same spawn records, were "started again" and stayed
+ *    guard robots (as Khallos' chairs in v0.4.0-mapmaker.31).
  * Diagnostics (v0.4.0-mapmaker.25: no tank and no line after the model
  * request): the character create sub_000DAC30 (id at [esp+4], pool slot at
  * [esp+12]) logs each castle tank placeholder character and what came back;
@@ -277,7 +285,7 @@ struct tnk_one {
     uint32_t cannon[3];                  /* the cannon aim point last set here */
     uint32_t block[TNK_BLOCK_WORDS], sounds[TNK_SOUNDS_WORDS];
 };
-/* This level's tanks (cleared by every level's pak mount). */
+/* This level's tanks (cleared by every level's pak mount and restart). */
 static struct {
     struct tnk_one t[TNK_MAX];
     unsigned n;                          /* tanks created */
@@ -546,6 +554,26 @@ void pc_mapmaker_tank_mount(void (*original)(void))
     }
     if((int32_t)guest_call(sub_000622D0,3,TNK_PAK,0u,1u)<0) tnk_log("prop6.pak did not mount; the tank placeholder stays a bot",mounted,(uint32_t)has);
     else tnk_log(has<0?"mounted prop6.pak (map container unreadable)":"mounted prop6.pak for the castle tank",mounted+1u,0);
+}
+
+/* WRAP sub_001CDD60 (the level restart, no args; called only at 0x0003D4E1,
+ * after the teardown sub_001CDAF0, never with the pak mount): before the
+ * original, no tank exists yet. The statics outside any tank come back if a
+ * tank's were in, the log budgets start afresh, and the level's model
+ * request is kept. */
+static void tnk_restart_reset(void)
+{
+    int requested=tnk_lv.requested;
+    unsigned had=tnk_lv.n;
+    if(tnk_lv.act) tnk_load(tnk_lv.rest,tnk_lv.rest_sounds);
+    memset(&tnk_lv,0,sizeof tnk_lv);                       /* forget the last run's tanks */
+    tnk_lv.requested=requested;
+    if(had) tnk_log("level restart: the tanks of the last run forgotten (tanks, requested)",had,(uint32_t)requested);
+}
+void pc_mapmaker_tank_restart(void (*original)(void))
+{
+    if(tnk_on()) tnk_restart_reset();
+    original();
 }
 
 /* The diagnostics' record of placeholder actor a with spawn record rec, or

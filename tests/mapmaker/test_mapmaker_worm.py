@@ -62,7 +62,7 @@ MUTATIONS = {
     'ai-extra-wins': ('    else if(k==wrm_n && wrm_n>=WRM_MAX) {', '    else if(0) {'),
     'ai-any-character': ("    if(WRM_H(a+WRM_ACTOR_CHAR)!=WRM_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && WRM_H(ent+WRM_ENT_MODEL)==WRM_MODEL)) { original();return; }\n", ''),
     'ai-class-changed': ('        wrm_inst[k].record=rec;wrm_inst[k].actor=a;', '        wrm_inst[k].record=rec;wrm_inst[k].actor=a;WORD_AT(rec)=0;'),
-    'head-any-entity': ('    for(k=0;k<wrm_n;k++) if(wrm_inst[k].record && wrm_inst[k].record==rec && wrm_inst[k].state) return (int)k;', '    for(k=0;k<wrm_n;k++) if(wrm_inst[k].state) return (int)k;'),
+    'head-any-entity': ('        if(wrm_inst[k].record && wrm_inst[k].record==rec && wrm_inst[k].state && !wrm_inst[k].again) return (int)k;', '        if(wrm_inst[k].state && !wrm_inst[k].again) return (int)k;'),
     'head-any-scene': ('    return k>=0 && WORD_AT(WRM_SCENE)==100u && wrm_on()?k:-1;', '    return k>=0 && wrm_on()?k:-1;'),
     'tick-thinks': ('WRM_W_STATE));\n    wrm_leave(prev);\n    MAPMAKER_GUEST_RET();', 'WRM_W_STATE));\n    wrm_leave(prev);\n    original();'),
     'tick-no-update': ('    guest_call(sub_001DAAB0,0);\n', ''),
@@ -83,7 +83,10 @@ MUTATIONS = {
     'gone-state-kept': ('    WORD_AT(wrm_lv.state+WRM_W_STATE)=WRM_GONE;\n    for(j=0', '    for(j=0'),
     'gone-heads-kept': ('    for(j=0;j<WRM_WORMS;j++) if(WORD_AT(WRM_HEADS+j*4u)==ent) WORD_AT(WRM_HEADS+j*4u)=0;\n', ''),
     'gone-head-kept': ('    wrm_lv.head=0;\n', ''),
-    'level-counters-kept': ('    wrm.logged=wrm.extras=wrm.ticks=wrm.hits=wrm.draws=wrm.scripts=wrm.surfacings=wrm.gones=0;\n', ''),
+    'level-counters-kept': ('     * logged neither its update nor its draw) */\n    wrm.logged=wrm.extras=wrm.ticks=wrm.hits=wrm.draws=wrm.scripts=wrm.surfacings=wrm.gones=0;\n',
+                            '     * logged neither its update nor its draw) */\n'),
+    'restart-counters-kept': ('    wrm_cur=-1;wrm_i=&wrm_none;\n    wrm.logged=wrm.extras=wrm.ticks=wrm.hits=wrm.draws=wrm.scripts=wrm.surfacings=wrm.gones=0;\n',
+                              '    wrm_cur=-1;wrm_i=&wrm_none;\n'),
     'shift-none': ('    wrm_shift(1,0);\n    guest_call(sub_001DAAB0,0);', '    guest_call(sub_001DAAB0,0);'),
     'shift-not-restored': ('    guest_call(sub_001DAAB0,0);\n    wrm_shift(0,0);', '    guest_call(sub_001DAAB0,0);'),
     'shift-ignores-stock-bits': ('            if(wrm_lv.saved[k]!=wrm_consts[k].bits) continue;\n', ''),
@@ -160,6 +163,19 @@ MUTATIONS = {
     'multi3-room-first-worm': ('        wrm_room(ent);\n', '        wrm_room(wrm_inst[0].head?wrm_inst[0].head:ent);\n'),
     'multi3-fx-first-worm': ('    for(k=0;k<wrm_n;k++) {                             /* each map worm', '    for(k=0;k<1u;k++) {                             /* each map worm'),
     'level-not-forgotten':('    memset(wrm_inst,0,sizeof wrm_inst);               /* a new level', '    (void)0;               /* a new level'),
+    # the pause menu's restart (sub_001CDD60: no level hook)
+    'restart-never': ('    if(wrm_on()) wrm_restart_reset();\n', ''),
+    'restart-after-original': ('    if(wrm_on()) wrm_restart_reset();\n    original();', '    original();\n    if(wrm_on()) wrm_restart_reset();'),
+    'restart-when-off': ('    if(wrm_on()) wrm_restart_reset();', '    wrm_restart_reset();'),
+    'restart-not-forgotten': ('        memset(&wrm_inst[k],0,sizeof wrm_inst[k]);        /* the run before', '        (void)0;        /* the run before'),
+    'restart-not-again': ('        wrm_inst[k].again=1;\n', ''),
+    'restart-drops-block': ('wrm_inst[k].state=st;wrm_inst[k].scratch=scratch;', 'wrm_inst[k].state=0;wrm_inst[k].scratch=scratch;'),
+    'restart-drops-record': ('wrm_inst[k].effect=effect;wrm_inst[k].record=rec;', 'wrm_inst[k].effect=effect;'),
+    'restart-globals-left': ('    if(wrm_cur>=0) wrm_leave(-1);\n    for(k=0;k<wrm_n && k<WRM_MAX;k++) {\n        uint32_t st', '    for(k=0;k<wrm_n && k<WRM_MAX;k++) {\n        uint32_t st'),
+    'restart-new-block': ('    if(reuse && MAPMAKER_PTR_OK(reuse,WRM_STATE_SIZE)) { wrm_zero(reuse,WRM_STATE_SIZE);WORD_AT(WRM_STATE)=reuse; }\n    else guest_call',
+                          '    if(0) { wrm_zero(reuse,WRM_STATE_SIZE);WORD_AT(WRM_STATE)=reuse; }\n    else guest_call'),
+    'restart-not-set-up': ('    } else if(k<wrm_n && wrm_inst[k].again && !wrm_alloc(k)) {', '    } else if(0) {'),
+    'restart-ticks-early': ('wrm_inst[k].state && !wrm_inst[k].again) return (int)k;', 'wrm_inst[k].state) return (int)k;'),
 }
 
 
@@ -586,3 +602,21 @@ def test_multi_instance_globals():
     text = INC.read_text(encoding='utf-8')
     assert 'WRM_STATE,0x0075B4B8u,WRM_ENABLE,0x004FDC20u,' in text          # 0x004FDC58: kept 0 during each init
     assert '0x0078FAE0u,0x0078FAE4u,0x0078FAE8u,0x0078FAECu,0x0078FAF0u,' in text
+
+
+def test_restart_skips_the_level_hook():
+    """The pause menu's restart (sub_001CDD60, wrapped:
+    pc_mapmaker_worm_restart) never reaches the story level init sub_0025F720
+    where this area sets up a level; the worm block is level memory
+    (sub_001D1E80: sub_0003E0B0(0x20, 0x1590, 1)) and the stock block init
+    sub_001D2350 allocates nothing, so a restart can set the same block up again."""
+    a = by_address()
+    assert calls_to(0x001CDD60) == {0x0003D4E1} and calls_to(0x0025F720) == {0x0015E818}
+    assert calls_to(0x0015E7C0) == {0x001CDC20} and target(a[0x001CDD74]) == 0x0015E4F0
+    restart = [i for i in decoded() if 0x001CDD60 <= i.address < 0x001CDE27 and (i.call or i.mnemonic == 'jmp')]
+    assert restart and not {target(i) for i in restart} & {0x001CDB80, 0x0015E7C0, 0x0025F720}
+    assert target(a[0x0015E7B1]) == 0x0025F6A0                      # sub_0015E4F0 ends in the soft restart
+    assert ('imm', 0x1590) in a[0x001D1E82].ops and target(a[0x001D1E89]) == 0x0003E0B0
+    assert mem(a[0x001D1E91])[0][4] == 0x0075B4B4
+    init = [i for i in decoded() if 0x001D2350 <= i.address < 0x001D2687 and i.call]
+    assert init and not {target(i) for i in init} & {0x0003DFA0, 0x0003E0B0, 0x001D1E80}

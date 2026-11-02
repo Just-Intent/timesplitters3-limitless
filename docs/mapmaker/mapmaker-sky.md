@@ -423,6 +423,14 @@ player.]"
   No line `play build` at all means the build hook did not run (limits off,
   or the wrapper is missing); no `fall check running` means the tick hook
   did not run in scene 100.
+- Restart from the pause menu (audit after .31, the bosses' restart bug):
+  the play build `sub_0008A780` runs only on a fresh load (`sub_001CDE30`),
+  not on "START restart" (`sub_001CDD60`), so no `play build` line follows a
+  restart. Nothing needs it: the build's rooms, open-room marks, kill heights
+  and the open-view groups (`pc_mapmaker_openview.inc`) describe the map's
+  geometry, which a restart keeps. The fall check's per-character counters
+  carry over but clear on a restarted character's first tick above the floor
+  (`out`) or first query inside a room (`noroom`); a dead one's on its death.
 
 ### Palette entry ("tile category in each set")
 

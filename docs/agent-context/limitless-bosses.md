@@ -27,3 +27,11 @@ Crowe egg skip (WRAP sub_002AB1B0) and the shared boss statics holder
 `sub_0015C700` applies before each think), khallosidle replayed in state 1
 (`sub_0005F460`), and WRAP sub_001CDD60 (level restart, no pak mount)
 resets the chairs ([area doc](../mapmaker/mapmaker-khallos.md)).
+
+Restart audit (after .31): "START restart" runs `sub_001CDAF0` + `sub_001CDD60`,
+never `sub_001CDB80` (pak mount, `sub_0015E7C0`/`sub_0025F720` level init),
+and skips the map start `sub_00240C50` (`[0x006F32EC]`). New WRAP sub_001CDD60
+-> `pc_mapmaker_{tank,mothership,worm,realbosses,bosses}_restart` beside
+Khallos' (each its own state; realbosses runs the stock skeleton/walker
+resets after the original). Robot (`sub_0025F6A0` reset), skymusic, roof
+and openview need none; see each area doc's restart section.

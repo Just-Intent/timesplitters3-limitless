@@ -118,6 +118,9 @@ static uint32_t orig_eax, pre_eax=0xDDDDu;
 static void fake(void) { originals++;g_eax=orig_eax;g_esp+=4u; }
 static int ai_originals;
 static void fake_ai(void) { originals++;ai_originals++;g_esp+=4u; }
+/* sub_001CDD60: notes how many ships the area still knew when it ran (1 + n) */
+static unsigned restart_saw;
+static void fake_restart(void) { originals++;restart_saw=msh_lv.n+1u;g_esp+=4u; }
 /* sub_00217050: records the height and firing box it saw; state 3 falls 1 m, below 6.6 -> 4 */
 static float seen_y, seen_box[5];
 static void fake_update(void)
@@ -576,6 +579,46 @@ int main(void)
         WORD_AT(PLAYER+0xFF4u)=0;
         for(k=0;k<20u;k++) CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(24),0,0,1);
         CHECK(msh_lv.refused==MSH_REFUSE_LOGS);
+    }
+
+    /* ---- the pause menu's restart (sub_001CDD60, no pak mount, no level init):
+     * the placeholders start again in the same pool entries with the same
+     * spawn records and each becomes a ship again ---------------------------- */
+    {
+        static uint32_t live[MSH_WORDS];
+        unsigned s=nspawn,m=nmount,q=nrequest,t=ntex;
+        int requested=msh_lv.requested,textured=msh_lv.textured;
+        CHECK(requested && textured);
+        actor(20,0x75,10.0f,0.5f,10.0f,0.0f);WORD_AT(A(20)+0xBF0u)=REC(20);WORD_AT(REC(20)+8u)=0x101u;
+        actor(21,0x75,70.0f,0.5f,10.0f,0.0f);WORD_AT(REC(21)+8u)=0x104u;
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);   /* the run before still known: no ship */
+        CHECK(msh_lv.n==4u && nspawn==s);
+        msh_save(live);
+        msh_enter(3u);                                                 /* a ship's statics in at the restart */
+        restart_saw=0;
+        CALL(pc_mapmaker_mothership_restart,fake_restart,0x0003D4E6u,0,0,0,1);
+        CHECK(restart_saw==1u);                                        /* forgotten before the original */
+        CHECK(!msh_lv.n && !msh_lv.act && !msh_lv.refused && msh_lv.requested==requested && msh_lv.textured==textured);
+        {
+            uint32_t now[MSH_WORDS];
+            msh_save(now);
+            CHECK(!memcmp(live,now,sizeof live));                      /* the outside statics back */
+        }
+        CHECK(nmount==m && nrequest==q);                               /* nothing mounted or requested again */
+        spawn_obj=0x00450000u;
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);
+        CHECK(msh_lv.n==1u && nspawn==s+1u && msh_lv.s[0].obj==0x00450000u && msh_lv.s[0].place==A(20) &&
+              msh_lv.s[0].place_rec==REC(20) && msh_lv.s[0].place_id==0x101u && ntex==t);   /* textures not registered twice */
+        spawn_obj=0x00451000u;
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);
+        CHECK(msh_lv.n==2u && nspawn==s+2u && msh_lv.s[1].place_rec==REC(21) && msh_lv.s[1].place_id==0x104u);
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);   /* started again in the same run */
+        CHECK(msh_lv.n==2u && nspawn==s+2u);
+        spawn_obj=SHIP;
+        set_env("TSFP_MAPMAKER_LIMITS",NULL);
+        CALL(pc_mapmaker_mothership_restart,fake,0x0003D4E6u,0,0,0,1);   /* off: the original only */
+        CHECK(msh_lv.n==2u);
+        set_env("TSFP_MAPMAKER_LIMITS","1");
     }
 
     if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }

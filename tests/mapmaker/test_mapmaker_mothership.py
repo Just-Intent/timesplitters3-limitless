@@ -130,6 +130,14 @@ MUTATIONS = {
     'tex-creation-flag': ('guest_call(sub_00096330,2,file,1u);', 'guest_call(sub_00096330,2,file,0u);'),
     'tex-request-not-file': ('guest_call(sub_00096330,2,file,1u);', 'guest_call(sub_00096330,2,req,1u);'),
     'tex-not-called': ('    msh_textures();\n', ''),
+    # the pause menu's restart (sub_001CDD60: no pak mount, no level init)
+    'restart-not-reset': ('    memset(&msh_lv,0,sizeof msh_lv);                       /* forget the last run\'s ships */\n', ''),
+    'restart-never': ('    if(msh_on()) msh_restart_reset();\n', ''),
+    'restart-after-original': ('    if(msh_on()) msh_restart_reset();\n    original();', '    original();\n    if(msh_on()) msh_restart_reset();'),
+    'restart-forgets-request': ('    msh_lv.requested=requested;msh_lv.textured=textured;', '    msh_lv.textured=textured;'),
+    'restart-textures-again': ('    msh_lv.requested=requested;msh_lv.textured=textured;', '    msh_lv.requested=requested;'),
+    'restart-statics-left': ('    if(msh_lv.act) msh_load(msh_lv.rest);\n', ''),
+    'restart-when-off': ('    if(msh_on()) msh_restart_reset();', '    msh_restart_reset();'),
 }
 
 
