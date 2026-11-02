@@ -4,11 +4,13 @@
  * Pools (on by default when a MapMaker map is played, scene 100;
  * TSFP_MAPMAKER_POOLS=0 restores the original): sub_0009A140 allocates the
  * AI navigation pools from the Level heap with fixed sizes and nothing checks
- * them when pads are appended. Reimplemented here with twice the regular
- * pads (4800 x 32 B, plus 4800 x 44 B of per-pad AI data) and links
- * (12000 + 16 per piece + 256, x 20 B); the cover pool grows from 1280 to 1536 x 32 B as a guard
- * only, and the 20 runtime pads are unchanged. Same heap, order and zeroing
- * as the original; about 300 KB more of the ~12 MB measured free. On by
+ * them when pads are appended. Reimplemented here with 8000 regular pads
+ * (x 32 B, plus 8000 x 44 B of per-pad AI data), 32,512 links (x 20 B) and
+ * 10,496 cover pads (x 32 B); the 20 runtime pads are unchanged. Same order
+ * and zeroing as the original; the memory comes from the nav block in the
+ * runtime heap when pc_mapmaker_memory.inc provides it (2026-11-02), else
+ * from the Level heap as the original. Current limits: the defines below,
+ * which supersede the values in the next paragraphs. On by
  * default so that a map built with raised editor limits never overflows the
  * stock pools here.
  *
@@ -33,8 +35,8 @@
  * The editor's item node pool is 5300 (config/guest-code-patches/items.json):
  * 500 items, their clipboard copies and up to 81 start points fit twice over.
  * In play items are Level-heap arrays by count (sub_00240590) and about one
- * engine object each (pool 1000, pc_mapmaker_objects.inc; round 3: 500 items
- * + 255 rooms + 64 characters stay below it, measure with probe flag 64).
+ * engine object each (pool 1023, pc_mapmaker_objects.inc; the editor keeps
+ * pieces + items + 64 characters within it, MAPMAKER_LIMIT_OBJECTS).
  *
  * Cover pads stay at the stock 1024: the map adds about 60 more when it loads
  * (measured: 60 on a 142-tile, 50-item map and on a 110-tile, 67-item map, so
@@ -178,9 +180,15 @@ static void mapmaker_limits_read(void)
 
 /* ---- pools ------------------------------------------------------------ */
 extern void sub_0003DFA0(void);
+/* Where the pools come from first: the MapMaker nav block in the runtime heap
+ * (pc_mapmaker_memory.inc registers it once its level-reset hook has run;
+ * 0 = no room or not registered), else the Level heap as the original. */
+#define MAPMAKER_POOL_SOURCE 1
+static uint32_t (*mapmaker_pool_source)(uint32_t bytes);
 static uint32_t mapmaker_pool(uint32_t bytes)
 {
-    uint32_t p=guest_call(sub_0003DFA0,2,bytes,1u); /* Level heap, as the original */
+    uint32_t p=mapmaker_pool_source?mapmaker_pool_source(bytes):0u;
+    if(!p) p=guest_call(sub_0003DFA0,2,bytes,1u); /* Level heap, as the original */
     if(guest_writable(p,bytes)) memset((void *)((uintptr_t)p+g_xbox_mem_offset),0,bytes);
     return p;
 }

@@ -55,3 +55,33 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
 - Tests: `mapmaker_limits.c` (511 pieces + 448 items fit, 449 refused, held
   pieces count, 255 pieces keep 500 items), `mapmaker_objects.c` (1023
   pools and lists), mutations `objects-*`, `pool-round3`; `check-tables.py`.
+
+## Play memory and the memory estimate (2026-11-02)
+
+- `pc_mapmaker_memory.inc` nav block: 6 MB (`MAPMAKER_NAV_BYTES`) from the
+  runtime heap at the first MapMaker map, for CPU-only AI data only: the
+  pools (through `mapmaker_pool_source` in `pc_mapmaker_limits.inc`) and the
+  group matrix (`sub_0003DFA0` from return 0x00275F95, heap 1, scene 100).
+  New wrapper `WRAP sub_0003E650 -> pc_mapmaker_memory_level_reset` empties
+  it with every Level heap reset; without it nothing uses the block.
+  `TSFP_MAPMAKER_NAV=0` turns it off. Never for device-visible data (window).
+- Map-start stderr line (Level heap, arena, Eternal, nav block, host runtime
+  heap and window headroom) and a matrix line with the Level free count.
+- `pc_mapmaker_budget.inc`: explicit scale 2..16; with the limits the
+  default is 8 + arena MB / 2 (16 at `TSFP_MAPMAKER_ARENA_MB=16`).
+  Arena stays off by default (window headroom unmeasured).
+- Container: unchanged (a 511-piece map stays below about 200 KB of 512 KB).
+- Tests: `mapmaker_memory.c` (redirect only for the matrix in scene 100 after
+  a reset, zeroed, Level free untouched, fallbacks, reset, off switch,
+  failed reservation, aligned path; 11 `nav-*` mutations),
+  `mapmaker_limits.c` (pool source and fallback), `mapmaker_budget.c`.
+- Contract: `docs/mapmaker/mapmaker-memory.md` "Round 4".
+
+## What bounds 511 pieces of the heaviest tile now
+
+Pads stop at 548, links at 520, cover at 713, groups at about 680 (1.5 per
+piece), objects at 1023 - 64 - items. With every other cap raised the
+binding limits are the piece count (rooms area), the editor memory estimate
+(about 386 heavy pieces at the default scale 8; 511 need scale 11, i.e. an
+arena raised by at least 6 MB) and, past that, the Level heap itself
+(unmeasured: probe flag 32 and the map-start line).

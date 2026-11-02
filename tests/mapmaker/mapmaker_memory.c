@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x800000/4],g_esp,g_eax;
+static uint32_t memory[0x1000000/4],g_esp,g_eax;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -27,6 +27,15 @@ int xbox_ContiguousFree(uint32_t address)
     if(!live_block || address!=live_block) return 0;
     live_block=0;live_size=0;
     return 1;
+}
+
+/* Runtime heap: one 6 MB block above the fixture's image addresses, or none. */
+static int heap_full;
+static uint32_t heap_allocs,heap_last_size;
+uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment)
+{
+    (void)alignment;heap_allocs++;heap_last_size=bytes;
+    return heap_full?0u:0x00800000u;
 }
 
 #define TSFP_MAPMAKER_MEMORY_TEST
@@ -89,6 +98,28 @@ static void call_aligned(uint32_t ret,uint32_t size,uint32_t heap)
     g_esp=esp;WORD_AT(esp)=ret;WORD_AT(esp+4u)=size;WORD_AT(esp+8u)=16u;WORD_AT(esp+12u)=heap;
     pc_mapmaker_memory_heap_alloc_aligned(fake_alloc_aligned);
     CHECK(g_esp==esp+4u);
+}
+
+/* sub_0003E650 fake: the Level heap reset. */
+static unsigned reset_originals;
+static void fake_reset(void) { reset_originals++; g_esp+=4u; }
+static void call_reset(void)
+{
+    uint32_t esp=0x00700000u;
+    g_esp=esp;WORD_AT(esp)=0x0003D509u;
+    pc_mapmaker_memory_level_reset(fake_reset);
+    CHECK(g_esp==esp+4u);
+}
+/* The matrix request of sub_00275F70 (or another caller): returns eax. */
+static uint32_t call_matrix(uint32_t ret,uint32_t size,uint32_t heap,unsigned *original_ran)
+{
+    uint32_t esp=0x00700000u;
+    unsigned before=originals;
+    g_esp=esp;WORD_AT(esp)=ret;WORD_AT(esp+4u)=size;WORD_AT(esp+8u)=heap;g_eax=0;
+    pc_mapmaker_memory_heap_alloc(fake_alloc_plain);
+    CHECK(g_esp==esp+4u);
+    *original_ran=originals-before;
+    return g_eax;
 }
 
 static unsigned arena_originals;
@@ -158,6 +189,71 @@ int main(int argc,char **argv)
     }
     read_log();
     CHECK(count("heap full")==MAPMAKER_MEMORY_LOG_LINES);
+
+    /* Nav block: nothing before the Level heap reset hook has run. */
+    {
+        unsigned ran;
+        uint32_t p,q,free_before;
+        WORD_AT(MAPMAKER_MEMORY_SCENE)=100;
+        WORD_AT(MAPMAKER_MEMORY_SHARED_FREE)=3000000u;
+        WORD_AT(0x007B666Cu)=1024u;
+        p=call_matrix(MAPMAKER_NAV_MATRIX_RET,1025u*1024u*4u,1u,&ran);
+        CHECK(ran==1 && p==0x00400000u && heap_allocs==0);
+        call_reset();
+        CHECK(reset_originals==1 && mapmaker_nav.resets==1);
+        /* Other scenes, other callers, other heaps: the original. */
+        WORD_AT(MAPMAKER_MEMORY_SCENE)=53;
+        p=call_matrix(MAPMAKER_NAV_MATRIX_RET,4096u,1u,&ran);
+        CHECK(ran==1 && heap_allocs==0);
+        CHECK(mapmaker_nav_alloc(64u)==0 && heap_allocs==0);              /* pools: scene 100 only */
+        WORD_AT(MAPMAKER_MEMORY_SCENE)=100;
+        p=call_matrix(0x0009A1B2u,4096u,1u,&ran);
+        CHECK(ran==1 && heap_allocs==0);
+        p=call_matrix(MAPMAKER_NAV_MATRIX_RET,4096u,0u,&ran);
+        CHECK(ran==1 && heap_allocs==0);
+        /* The matrix at 1024 groups: from the block, zeroed, Level heap untouched. */
+        memset((char *)memory+0x00800000u,0xCD,0x00600000u);
+        WORD_AT(MAPMAKER_MEMORY_SHARED_FREE)=3000000u;free_before=3000000u;
+        p=call_matrix(MAPMAKER_NAV_MATRIX_RET,1025u*1024u*4u,1u,&ran);
+        read_log();
+        CHECK(ran==0 && p==0x00800000u && heap_allocs==1 && heap_last_size==MAPMAKER_NAV_BYTES);
+        CHECK(WORD_AT(p)==0 && WORD_AT(p+1025u*1024u*4u-4u)==0 && WORD_AT(MAPMAKER_MEMORY_SHARED_FREE)==free_before);
+        CHECK(strstr(log_text,"[mapmaker] map start memory: level heap free 3000000")!=NULL && count("map start memory")==1);
+        CHECK(strstr(log_text,"[mapmaker] nav: group matrix of 1024 groups, 4198400 bytes, in the nav block (nav block 4198400 of 6291456 used)")!=NULL);
+        /* The pool source the limits area uses: 16-aligned after it. */
+        q=mapmaker_nav_alloc(100u);
+        CHECK(q==0x00800000u+4198400u && mapmaker_nav.used==4198400u+112u);
+        CHECK(mapmaker_nav_alloc(0x00600000u)==0 && mapmaker_nav.fallbacks==1);   /* too big: Level heap */
+        p=call_matrix(MAPMAKER_NAV_MATRIX_RET,0x00300000u,1u,&ran);                 /* no room: original */
+        read_log();
+        CHECK(ran==1 && p==0x00400000u && strstr(log_text,"in the Level heap")!=NULL);
+        CHECK(count("map start memory")==1);                                        /* once per map */
+        /* The next level resets the block. */
+        call_reset();
+        CHECK(mapmaker_nav.used==0 && mapmaker_nav_alloc(64u)==0x00800000u && heap_allocs==1);
+        read_log();
+        CHECK(count("map start memory")==2);
+        /* Off switch. */
+        set_env("TSFP_MAPMAKER_NAV","0");mapmaker_nav.initialized=0;
+        p=call_matrix(MAPMAKER_NAV_MATRIX_RET,4096u,1u,&ran);
+        CHECK(ran==1 && mapmaker_nav_alloc(64u)==0);
+        set_env("TSFP_MAPMAKER_NAV",NULL);mapmaker_nav.initialized=0;
+        /* The runtime heap cannot give the block: one line, the Level heap from then on. */
+        memset(&mapmaker_nav,0,sizeof mapmaker_nav);heap_full=1;
+        call_reset();
+        p=call_matrix(MAPMAKER_NAV_MATRIX_RET,4096u,1u,&ran);
+        read_log();
+        CHECK(ran==1 && count("the runtime heap cannot give 6291456 bytes")==1);
+        CHECK(mapmaker_nav_alloc(64u)==0 && heap_allocs==2);                         /* tried once */
+        heap_full=0;
+        /* The aligned allocator is never redirected. */
+        memset(&mapmaker_nav,0,sizeof mapmaker_nav);call_reset();
+        {
+            unsigned before=originals;
+            call_aligned(MAPMAKER_NAV_MATRIX_RET,4096u,1u);
+            CHECK(originals==before+1);
+        }
+    }
 
     /* Arena: unset or 0 is stock. */
     WORD_AT(MAPMAKER_ARENA_SIZE)=MAPMAKER_ARENA_STOCK;

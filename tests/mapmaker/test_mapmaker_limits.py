@@ -17,6 +17,8 @@ MUTATIONS = {
     'pools-not-cleared': ('memset((void *)((uintptr_t)p+g_xbox_mem_offset),0,bytes);', '(void)0;'),
     'cover-raised': ('#define MAPMAKER_LIMIT_COVER 9984u', '#define MAPMAKER_LIMIT_COVER 10240u'),
     'cover-pool-stock': ('#define MAPMAKER_POOL_COVER 10496u', '#define MAPMAKER_POOL_COVER 1280u'),
+    'pools-ignore-nav': ('uint32_t p=mapmaker_pool_source?mapmaker_pool_source(bytes):0u;', 'uint32_t p=0u;'),
+    'pools-no-fallback': ('    if(!p) p=guest_call(sub_0003DFA0,2,bytes,1u);', '    if(0) p=guest_call(sub_0003DFA0,2,bytes,1u);'),
     'link-pool-editor-limit': ('mapmaker_pool(MAPMAKER_POOL_LINKS*20u)', 'mapmaker_pool(MAPMAKER_LIMIT_LINKS*20u)'),
     # Links: the pool stays within int16 A* indices; 511 of the heaviest tile (46
     # links + 16 stitch links each) fit the editor limit.

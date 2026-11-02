@@ -11,10 +11,13 @@ BUDGET = ROOT / 'src/interface/pc_mapmaker_budget.inc'
 PATCH = ROOT / 'patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-raise.patch'
 
 MUTATIONS = {
-    'default-on': ("n>=2 && n<=8)?(unsigned)n:1u;", "n>=2 && n<=8)?(unsigned)n:2u;"),
-    'unbounded': ('n>=2 && n<=8)', 'n>=2)'),
+    'default-on': ("n>=2 && n<=MAPMAKER_BUDGET_SCALE_MAX)?(unsigned)n:1u;", "n>=2 && n<=MAPMAKER_BUDGET_SCALE_MAX)?(unsigned)n:2u;"),
+    'unbounded': ('n>=2 && n<=MAPMAKER_BUDGET_SCALE_MAX)', 'n>=2)'),
+    'max-round3': ('#define MAPMAKER_BUDGET_SCALE_MAX 16u', '#define MAPMAKER_BUDGET_SCALE_MAX 8u'),
+    'arena-ignored': ('MAPMAKER_BUDGET_SCALE_LIMITS+mapmaker_budget.arena_mb/2u;', 'MAPMAKER_BUDGET_SCALE_LIMITS;'),
+    'arena-full-mb': ('MAPMAKER_BUDGET_SCALE_LIMITS+mapmaker_budget.arena_mb/2u;', 'MAPMAKER_BUDGET_SCALE_LIMITS+mapmaker_budget.arena_mb;'),
     'round-down': ('(((uint64_t)bytes+n-1)/n)', '(((uint64_t)bytes)/n)'),
-    'limits-no-default': ('            mapmaker_budget.scale=8u;', '            mapmaker_budget.scale=1u;'),
+    'limits-no-default': ('#define MAPMAKER_BUDGET_SCALE_LIMITS 8u', '#define MAPMAKER_BUDGET_SCALE_LIMITS 1u'),
     'limits-override-explicit': ("if((!v || !*v) && l", "if(l"),
     'limits-without-pools': (" && !(p && p[0]=='0' && !p[1]))", ")"),
 }

@@ -45,6 +45,15 @@ static int failures;
 
 static int originals;
 static void fake_pools(void) { originals++; g_esp+=4u; }
+/* Fake nav block: hands out from nav_next, refuses one size. */
+static uint32_t nav_next,nav_refuse;
+static uint32_t fake_nav(uint32_t bytes)
+{
+    uint32_t p=nav_next;
+    if(bytes==nav_refuse) return 0;
+    nav_next+=(bytes+15u)&~15u;
+    return p;
+}
 static void fake_limits(void)
 {
     uint32_t e=WORD_AT(0x007844A8u);
@@ -125,6 +134,19 @@ int main(void)
     set_env("TSFP_MAPMAKER_POOLS","0");
     { uint32_t s_=g_esp; pc_display_mapmaker_pools(fake_pools); CHECK(g_esp==s_+4u); g_esp=s_; }
     CHECK(originals==2 && allocs==0);
+    /* With a pool source (the nav block of pc_mapmaker_memory.inc) the pools come
+     * from it, in the same order, zeroed; a refusal falls back to the Level heap. */
+    set_env("TSFP_MAPMAKER_POOLS",NULL);
+    nav_next=0x00200000u;nav_refuse=32512u*20u;heap_next=0x00500000u;allocs=0;
+    memset((char *)memory+0x00200000u,0xCD,0x00100000u);
+    mapmaker_pool_source=fake_nav;
+    { uint32_t s_=g_esp; pc_display_mapmaker_pools(fake_pools); CHECK(g_esp==s_+4u); g_esp=s_; }
+    CHECK(allocs==1 && alloc_size[0]==32512u*20u);                       /* only the refused links */
+    CHECK(WORD_AT(0x00715F2Cu)==0x00200000u && WORD_AT(0x00715F3Cu)==0x00200000u+8000u*32u &&
+          WORD_AT(0x00715F34u)==0x00200000u+8000u*76u && WORD_AT(0x00715F38u)==0x00200000u+8000u*76u+10496u*32u &&
+          WORD_AT(0x00715F30u)==0x00500000u);
+    CHECK(WORD_AT(0x00200000u)==0 && WORD_AT(0x00200000u+8000u*76u+10496u*32u+0x27Cu)==0);   /* zeroed */
+    mapmaker_pool_source=NULL;allocs=0;
 
     /* ---- editor limits ---- */
     WORD_AT(0x0079094Cu)=102;
