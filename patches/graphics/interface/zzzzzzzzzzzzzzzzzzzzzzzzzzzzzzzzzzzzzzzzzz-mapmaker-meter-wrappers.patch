@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3327 @@
+@@ -1037,6 +1037,3348 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2053,13 +2053,23 @@
 +#endif
 +}
 +
-+void sub_0014CC80(void)
++static void sub_0014CC80_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")) pc_mapmaker_bosses_hud(sub_0014CC80_layer2);
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_hud")) pc_mapmaker_khallos_hud(sub_0014CC80_layer2);
 +    else sub_0014CC80_layer2();
 +#else
 +    sub_0014CC80_layer2();
++#endif
++}
++
++void sub_0014CC80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")) pc_mapmaker_bosses_hud(sub_0014CC80_layer3);
++    else sub_0014CC80_layer3();
++#else
++    sub_0014CC80_layer3();
 +#endif
 +}
 +
@@ -2851,6 +2861,17 @@
 +    else sub_0005B980_gen();
 +#else
 +    sub_0005B980_gen();
++#endif
++}
++
++extern void sub_001D5E20_gen(void);
++void sub_001D5E20(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_gone")) pc_mapmaker_worm_gone(sub_001D5E20_gen);
++    else sub_001D5E20_gen();
++#else
++    sub_001D5E20_gen();
 +#endif
 +}
 +

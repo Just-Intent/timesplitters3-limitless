@@ -870,6 +870,7 @@ void pc_mapmaker_khallos_engine(void (*original)(void)) { original(); }
 void pc_mapmaker_khallos_rider(void (*original)(void)) { original(); }
 void pc_mapmaker_khallos_rider_pose(void (*original)(void)) { original(); }
 void pc_mapmaker_khallos_create(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_hud(void (*original)(void)) { original(); }
 void pc_mapmaker_worm_anims(void (*original)(void)) { original(); }
 void pc_mapmaker_worm_level(void (*original)(void)) { original(); }
 void pc_mapmaker_worm_ai_start(void (*original)(void)) { original(); }
