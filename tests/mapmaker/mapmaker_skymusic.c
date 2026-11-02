@@ -137,7 +137,8 @@ static void load_original(void)                 /* sub_00301A90: editor fields f
     originals++;g_esp+=4u;
 }
 static int seen_sky=-999;
-static void level_original(void) { seen_sky=H(INFO(WORD_AT(0x00784014u))+0x10);originals++;g_esp+=4u; }
+static uint32_t tileset_fog=12u;                 /* the fog row the map start writes (sub_00311870) */
+static void level_original(void) { seen_sky=H(INFO(WORD_AT(0x00784014u))+0x10);WORD_AT(0x00518778u+0x14u)=tileset_fog;originals++;g_esp+=4u; }
 static void weather_start_original(void)        /* sub_0011B310: default list */
 {
     WORD_AT(0x007AC804u)=0x004E63F8u;WORD_AT(0x007AC800u)=1u;WORD_AT(0x007AC808u)=0;
@@ -179,6 +180,16 @@ static uint32_t emitter_rooms(void)
 }
 static void frame_original(void) { rooms_seen=emitter_rooms();originals++;g_esp+=4u; }
 static void wx_frame(void) { hook(pc_mapmaker_skymusic_weather_frame,frame_original,0x001CE564u,0,0,0); }
+/* sub_0011A930 (eax = colour | haze weight, [esp+4] layers): the eax the stock body sees */
+static uint32_t haze(uint32_t ret,uint32_t eax) { hook(pc_mapmaker_skymusic_haze,plain_original,ret,8u,0,eax);return eax_at_original; }
+/* sub_00154FE0(colour, fade): the colour the stock body sees */
+static uint32_t colour_seen;
+static void colour_original(void) { colour_seen=WORD_AT(g_esp+4);originals++;g_esp+=4u; }
+static uint32_t grain_colour(uint32_t ret,uint32_t colour)
+{
+    hook(pc_mapmaker_skymusic_grain_colour,colour_original,ret,colour,0x3F000000u,0);
+    return colour_seen;
+}
 #define RING 0x00410000u
 #define PLAYER 0x00420000u
 static float grain(uint32_t k,uint32_t off) { return FLOAT_AT(RING+k*0x24u+off); }
@@ -396,23 +407,29 @@ int main(void)
     WORD_AT(PLAYER+0xFFCu+0x21Cu)=0x80000400u;FLOAT_AT(PLAYER+0xFFCu+0x27Cu)=-300.0f;
     FLOAT_AT(0x007AC844u)=1.0f;FLOAT_AT(0x007AC848u)=0.0f;   /* player 2 indoors */
     WORD_AT(RING+60u*0x24u)=0xA5A5A5A5u;               /* just past the ring */
-    wx_frame();
+    WORD_AT(0x004E62E8u+0x34u)=0x00430000u;WORD_AT(0x00430004u)=0x00431000u;   /* prop 1 for the probe */
+    FLOAT_AT(0x00430064u)=1.5f;*((uint8_t *)memory+0x004311FAu)=0x7Fu;
+    CHECK(smx.sand_steps==1u);                          /* the level starts one step short of a grain */
+    wx_frame();                                         /* the first step makes one */
     CHECK(grains_alive()==1u && WORD_AT(0x007AC878u)==1u && smx.grains==1u && rooms_seen==0u);
-    CHECK(grain(0,0)>100.0f-6.0f*0.53f-12.01f && grain(0,0)<100.0f-6.0f*0.53f+12.01f);
+    CHECK(grain(0,0)>100.0f-4.0f*0.53f-5.01f && grain(0,0)<100.0f-4.0f*0.53f+5.01f);   /* 10 m box, 4 m upwind */
     CHECK(grain(0,4)>=4.29f && grain(0,4)<=7.31f);
-    CHECK(grain(0,8)>-40.0f+6.0f*0.85f-12.01f && grain(0,8)<-40.0f+6.0f*0.85f+12.01f);
+    CHECK(grain(0,8)>-40.0f+4.0f*0.85f-5.01f && grain(0,8)<-40.0f+4.0f*0.85f+5.01f);
     CHECK(grain(0,0x0C)>0.53f*3.0f-0.13f && grain(0,0x14)<-0.85f*3.0f+0.13f);   /* downwind */
     CHECK(grain(0,0x10)>=0.0f && grain(0,0x10)<=1.2f && grain(0,0x20)==0.0f);
+    wx_frame();CHECK(grains_alive()==1u);               /* one grain per two steps: 30 a second */
+    wx_frame();CHECK(grains_alive()==2u);
     for(i=0;i<200u;i++) wx_frame();                     /* a ring of 60, never past it */
-    CHECK(grains_alive()==60u && WORD_AT(0x007AC878u)==(1u+200u)%60u && WORD_AT(RING+60u*0x24u)==0xA5A5A5A5u);
-    grains_dead();WORD_AT(0x007AC878u)=60u;wx_frame(); /* a bad index starts over */
+    CHECK(grains_alive()==60u && WORD_AT(0x007AC878u)==(2u+100u)%60u && WORD_AT(RING+60u*0x24u)==0xA5A5A5A5u);
+    grains_dead();WORD_AT(0x007AC878u)=60u;smx.sand_steps=1u;wx_frame(); /* a bad index starts over */
     CHECK(grains_alive()==1u && grain(0,0x20)==0.0f && WORD_AT(RING+60u*0x24u)==0xA5A5A5A5u);
-    grains_dead();WORD_AT(0x004E7944u)=3u;wx_frame();CHECK(grains_alive()==3u);    /* per update step */
+    grains_dead();smx.sand_steps=0;WORD_AT(0x004E7944u)=6u;wx_frame();CHECK(grains_alive()==3u);  /* per two update steps */
+    grains_dead();smx.sand_steps=1u;WORD_AT(0x004E7944u)=3u;wx_frame();CHECK(grains_alive()==2u && smx.sand_steps==0u);
     grains_dead();WORD_AT(0x004E7944u)=100u;wx_frame();CHECK(grains_alive()==4u);  /* at most 4 */
     grains_dead();WORD_AT(0x004E7944u)=0xFFFFFFFFu;wx_frame();CHECK(grains_alive()==0u);
-    WORD_AT(0x004E7944u)=1u;
+    WORD_AT(0x004E7944u)=2u;
     grains_dead();FLOAT_AT(0x007AC844u)=0.0f;FLOAT_AT(0x007AC848u)=1.0f;wx_frame();
-    CHECK(grains_alive()==1u && grain(0,0)<-300.0f+12.01f);   /* player 2 now */
+    CHECK(grains_alive()==1u && grain(0,0)<-300.0f+5.01f);   /* player 2 now */
     grains_dead();FLOAT_AT(0x007AC848u)=0.0f;wx_frame();CHECK(grains_alive()==0u);  /* both indoors */
     FLOAT_AT(0x007AC844u)=1.0f;
     grains_dead();WORD_AT(PLAYER+0x21Cu)=0x00000400u;wx_frame();CHECK(grains_alive()==0u);
@@ -420,7 +437,19 @@ int main(void)
     WORD_AT(PLAYER+0x21Cu)=0x80000400u;
     WORD_AT(0x00507898u)=0;grains_dead();wx_frame();CHECK(grains_alive()==0u);  /* not a type-5 entry */
     WORD_AT(0x00507898u)=5u;
-    WORD_AT(0x0073D9ACu)=0;grains_dead();wx_frame();   /* flag cleared: stock frame alone */
+    /* the sandstorm's two draw calls become more opaque; snow, menus and story keep theirs */
+    CHECK(haze(0x0011B143u,0x7F5A1E05u)==0x7F5A1E50u && smx.haze_boosts==1u);
+    CHECK(haze(0x0011B961u,0x60707F05u)==0x60707F05u);  /* snow's call */
+    CHECK(haze(0x0011BBA7u,0x60707F03u)==0x60707F03u);
+    CHECK(grain_colour(0x0011B247u,0x7F643C10u)==0x7F643C60u && smx.grain_boosts==1u);
+    CHECK(grain_colour(0x002D93F0u,0x7F643C10u)==0x7F643C10u);   /* a menu */
+    CHECK(grain_colour(0x0011B247u,0x2F3C503Cu)==0x2F3C503Cu);
+    WORD_AT(0x0079094Cu)=2u;                            /* scene 2's own sandstorm */
+    CHECK(haze(0x0011B143u,0x7F5A1E05u)==0x7F5A1E05u && grain_colour(0x0011B247u,0x7F643C10u)==0x7F643C10u);
+    WORD_AT(0x0079094Cu)=100u;
+    WORD_AT(0x0073D9ACu)=0;
+    CHECK(haze(0x0011B143u,0x7F5A1E05u)==0x7F5A1E05u && grain_colour(0x0011B247u,0x7F643C10u)==0x7F643C10u);
+    grains_dead();wx_frame();                           /* flag cleared: stock frame alone */
     CHECK(grains_alive()==0u && rooms_seen==emitter_rooms());
     WORD_AT(0x0073D9ACu)=1u;
     WORD_AT(0x007AC874u)=0;wx_frame();CHECK(rooms_seen==0u);   /* no ring: nothing written */
@@ -431,10 +460,15 @@ int main(void)
     CHECK(WORD_AT(0x007AC804u)==0x004E63F8u && seen_count==0u);
     WORD_AT(0x007AC824u)=0x00400000u;
     make_container(C,F_SKY(6)|F_WX(1),-1,61,0);unmount_all();mount();   /* intro sky + sandstorm: one pak */
-    CHECK(clouds_sky()==43);wx_load();level();
+    CHECK(clouds_sky()==43);wx_load();
+    level();
     CHECK(mounted_count==2 && seen_sky==43 && smx.sand_on==1);
+    CHECK(WORD_AT(0x00518778u+0x14u)==7u && smx.tileset_fog==12u);   /* scene 2's fog row */
     make_container(C,0,-1,58,2);mount();wx_load();      /* rain map: nothing */
     CHECK(WORD_AT(0x0073D9ACu)==0u && call_count==0);
+    tileset_fog=13u;level();CHECK(WORD_AT(0x00518778u+0x14u)==13u);   /* its own fog */
+    tileset_fog=12u;
+    CHECK(haze(0x0011B143u,0x7F5A1E05u)==0x7F5A1E05u && grain_colour(0x0011B247u,0x7F643C10u)==0x7F643C10u);
     wx_start();CHECK(WORD_AT(0x007AC804u)==0x004E63F8u);
     wx_list(0,0);CHECK(seen_count==0u);
     WORD_AT(0x007B0CE0u)=1u;grains_dead();
