@@ -1,13 +1,17 @@
 # MapMaker Khallos in the flying chair (story mission 4 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_khallos.inc` (area
-`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 252
+`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 271
 mutations, plus decode, US XBE data and game-pak checks of every site below).
 Since the .27 playtest the placeholder itself is the seated Khallos and each
 chair gets its own named Boss bar ([Playtest .27](#playtest-v040-mapmaker27-seated-khallos-and-bars)).
 Since .28 the chair turns to the player at any bearing, the rider is put on
 his seat every flying frame and the chair's gun and engine sounds are loaded
 ([Playtest .28](#playtest-v040-mapmaker28-orientation-seat-and-sound)).
+Since .31 a rider asks for his class 8 too (the engine put chair 0's rider
+back to a bot class every frame), a seated rider gets khallosidle again when
+another anim plays, and a level restart makes new chairs
+([Playtest .31](#playtest-v040-mapmaker31-unseated-riders-and-the-restart)).
 Wired in v0.4.0-mapmaker.25 (picker row 156); **up to four chairs per map**
 since then ([Several chairs](#several-chairs)), with three new wrappers and
 more logging ([Not appearing in .25](#not-appearing-in-v040-mapmaker25)). No guest-code table,
@@ -260,6 +264,7 @@ level's chair.
 | `WRAP sub_000DAC30 -> pc_mapmaker_khallos_create` | character maker (cdecl id, .., pool slot) | **shared** with `pc_mapmaker_realbosses_create`, order free; since .27 also makes the placeholder with Khallos' models (character table swap around the original) |
 | `WRAP sub_00045670 -> pc_mapmaker_khallos_sound_load` | level sound needed? (cdecl sound id -> nonzero) | **new (.28)**; called only by the level's sound load `sub_00027700`, about 5,700 times per level load; acts after the original on 0x393/0x394 only |
 | `WRAP sub_0014CC80 -> pc_mapmaker_khallos_hud` | story boss bar (ebx = HUD block) | **new (.27)**; chain **inside** `pc_mapmaker_bosses_hud`, like `pc_mapmaker_robot_hud` / `pc_mapmaker_realbosses_hud` (order among those free) |
+| `WRAP sub_001CDD60 -> pc_mapmaker_khallos_restart` | level restart (no args), called only at 0x0003D4E1 | **new (.31)**; works before the original; nothing else wraps it |
 
 `pc_mapmaker_bosses.inc` gains `bos_bar_proxy` (no wrapper; this area sets
 it at its mount hook when both are built in).
@@ -274,7 +279,8 @@ Guest functions called: `sub_00062260` (is a pak mounted), `sub_000622D0`
 (mount kept open), `sub_0005A130` (mount an anim pak), `sub_000A5E40` (request
 a model), `sub_000631C0` (find a model's request), `sub_000A6F90` (create the
 chair), `sub_000A9070` (remove an object), `sub_0010E2A0` (free an emitter),
-`sub_0010EB90` (stop an emitter), `sub_0015DDA0` (remove an AI). Host:
+`sub_0010EB90` (stop an emitter), `sub_0015DDA0` (remove an AI), since .31
+`sub_0005F460` (play an anim; already in the area stubs). Host:
 `xbox_HeapAlloc` (label, 32-byte argument buffer, once per session). The area
 stubs (`tests/mapmaker/mapmaker_area_stubs.h`) already have `sub_0005A130`
 and `sub_0010EB90`; they need `sub_000A9070` and `sub_0010E2A0` (and the
@@ -334,7 +340,11 @@ guide entry for this area.
    dz ..; seat offset (..)`, seat offset near 0 after the first line). You
    hear its gun and the jet loop (log `the chair's level-11 sound is loaded`
    twice per level; status `gun n (0 failed), engine n (0 not playing)`).
-8. If no chair appears: the log should now say whether the placeholder
+8. (.31) Every Khallos sits in his chair: status lines show rider calls
+   rising, `state 1 class 0/8 asked 0/8`, `anim 0xBFB`. Restart the map from
+   the pause menu: log `level restart: chair state reset`, then the chairs
+   are made again and Khallos rides each (not on foot).
+9. If no chair appears: the log should now say whether the placeholder
    character was made (`chair placeholder character made` / `NOT made`) and
    whether its AI started (`chair placeholder AI starts`). Neither line means
    the map never spawned that Story AI.
@@ -406,6 +416,39 @@ run; class or state fixes print `rider's AI class .. put back` / `rider state
 
 Risks: the rider's room id (`sub_0009FBE0`, set by the handler) is not
 refreshed by the area's own placement; two more sounds per Khallos map.
+
+## Playtest v0.4.0-mapmaker.31: unseated riders and the restart
+
+User (three chairs): "all khallos AI plus the floating chairs spawning. AI
+turned toward me but didn't put in their chairs; they were kind of floating
+off of them. When restarting the map, the chairs didn't even spawn, and three
+khallos' on the ground just ran toward me." Log `logs/m31.err` (main
+checkout): the map's load is lines 3909-8930; it holds **three** runs (AI
+starts of 0x33 at 6195, 6975, 7136), because a restart logs no new
+`skymusic: new MapMaker level` line. The level at 8931 is another (Crowe) map.
+
+| report | cause | fix |
+|---|---|---|
+| no chairs after a restart, Khallos on foot | **proven** (decode + log). `sub_0003D440` runs "START restart" (`[0x006B7AA8]` set, string 0x0047817C) as the teardown `sub_001CDAF0` plus `sub_001CDD60`, which never calls `sub_001CDB80`, the "from scratch" setup holding the pak mount (`sub_00062790`, the only place this area forgot its chairs). The restart makes and starts the placeholders again in the same pool entries with the same records (6975: `AI start: character 0x33, model 0x582`), so `ai_start` found "this chair placeholder already has its chair" for each and left it a bot; the create hook still made it with Khallos' models. No khallos line after the first run: the 64-line budget was spent by `the rider was killed by one hit`, logged every frame | **restart** (`sub_001CDD60`, new wrapper): before the original, the chairs, riders, counters, emitter owner slots and the log budget are reset as at a new level; the level's sound flag and the chair model request are kept (the restart mounts and loads nothing). The killed rider is logged once per chair. Each level start and restart logs `new level` / `level restart: chair state reset (N chairs and M riders forgotten; ..)` |
+| chair 0's rider: "rider calls 0 state 0" every status line, class `2/0`, later `4000000/0` put back each frame | **proven** (decode): the AI frame calls `sub_0015C700` (0x0015F078) right before the think `sub_0027FE30` (0x0015F07E); it makes the class **asked for** (AI +0xAA8/+0xAAC, written by `sub_00017570` from 221 sites) the class (0x0015C788). The area wrote class 8 at +0x10/+0x14 only, so whatever asked for another class (2, then 0x4000000; which site is not identified, INFERRED a reaction of the bot logic, chair 0 woke first and was hit first) won again on the next think, and the class-8 handler never ran for him; the area's put-back after each flying frame hid it from the status line | **class**: the rider gets class 8 **and** asks for 8 (+0xAA8 = 0, +0xAAC = 8) with state 0; every frame (waiting or flying) a living rider asking for another class is asked back to 8 with state 0, and the engine's own change (`sub_0015C700`, with `sub_00158D40`'s exit flags) seats him. Logged: `rider's AI class .., asked ..: asked back to 0/8` (4 per chair) and `asked .. (asked back n)` in the status line |
+| riders 1 and 2 "floating off" although handler state 1 and seat offset < 0.1 | **suspected**, not proven (no anim was logged): state 0 plays khallosidle with `sub_0005F460(ent, 0xBFB, 0, 1.0)` and moves to state 1 whatever it returns; it returns 0 when the anim's data is not loaded (`[[0x007E3954] + slot*4]`) or `sub_001C8C20` refuses it over the anim playing (current anim at entity +4 -> +0xD4). A placeholder starts as a bot (a running or reaction anim may play) where the train's Khallos starts seated; a standing Khallos at the seat position (feet 1.2 m under the live position) would look like "floating off" the chair. The seat point itself is the train's formula for the same prop | **idle**: after each handler call in state 1, a current anim other than 0xBFB gets khallosidle again the handler's way, at once and then every 30 calls while it differs. Logged: `rider anim X is not khallosidle 0xBFB (slot S, data D): played again (played/refused)` (3 per chair) and `anim .. (khallosidle played again n, f failed)` in the status line |
+
+Kept from earlier builds: the free yaw (facing), the level-11 sounds, the
+named bars. Not changed: the seat formula (the measured offset was below
+0.1 m on every line).
+
+What the next log should show: per chair `chair N frame ..: rider calls`
+rising for **every** chair, `state 1 class 0/8 asked 0/8`, and `anim 0xBFB`.
+If the anim is still another, the `played again` line says whether it was
+refused (`data 0` = khallosidle not loaded; `slot -1` = lv11.pak's names not
+registered) or played and then replaced (repeated tries in the count). After
+a restart: `level restart: chair state reset (3 chairs ..)` followed by three
+`Khallos' chair created` lines.
+
+Risk: asking for class 8 every frame overrides any other class the game asks
+for a living rider (none is wanted while he is seated); a dead rider is left
+to the engine. The restart wrapper assumes the teardown removed the old
+chairs (the user saw none after the restart).
 
 ## Not appearing in .25/.26: set slot 13 (fixed in .27)
 
