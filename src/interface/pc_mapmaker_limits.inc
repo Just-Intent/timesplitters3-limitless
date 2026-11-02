@@ -6,7 +6,7 @@
  * AI navigation pools from the Level heap with fixed sizes and nothing checks
  * them when pads are appended. Reimplemented here with twice the regular
  * pads (4800 x 32 B, plus 4800 x 44 B of per-pad AI data) and links
- * (8800 x 20 B); the cover pool grows from 1280 to 1536 x 32 B as a guard
+ * (12000 + 16 per piece + 256, x 20 B); the cover pool grows from 1280 to 1536 x 32 B as a guard
  * only, and the 20 runtime pads are unchanged. Same heap, order and zeroing
  * as the original; about 300 KB more of the ~12 MB measured free. On by
  * default so that a map built with raised editor limits never overflows the
@@ -25,7 +25,7 @@
  * memory estimate (editor+0x278 > 2,048,000), global pad groups 300 or 50
  * sub-entries, and writes the meter (editor+0x270, placed only) and the held
  * piece preview (editor+0x274) from the same limits. After the original runs,
- * the decision and both values are recomputed with pads 4800, links 8800,
+ * the decision and both values are recomputed with pads 4800, links 12000,
  * pad groups 600, 500 items ("sub-entries"; cover pads stay 1024) and 241
  * pieces (one visibility room each: the engine's 200-room limit is raised to
  * 241 by config/guest-code-patches/rooms.json, see src/interface/pc_mapmaker_rooms.inc);
@@ -69,7 +69,12 @@
  * pads a map adds at load (measured 60). */
 #define MAPMAKER_LIMIT_COVER 9984u    /* 10240 cover handles - 256 */
 #define MAPMAKER_POOL_COVER 10496u    /* 10240 cover handles + 256 guard */
-#define MAPMAKER_LIMIT_LINKS 8800u
+/* Links 12000 (round 4, was 8800): 241 pieces of the heaviest tile (46 links,
+ * tile rows 0..45 of 0x00529400) need 11,086, so links never bind before the
+ * piece limit; the pool (12000 + 16 x 241 + 256 = 16,112) keeps link indices
+ * below the int16 A* limit 32,767 (docs/mapmaker/mapmaker-pads.md). Pads
+ * (14 x 241 = 3,374) and cover (3,374) already fit, so pieces bind first. */
+#define MAPMAKER_LIMIT_LINKS 12000u
 #define MAPMAKER_LIMIT_GROUPS 600
 #define MAPMAKER_LIMIT_PIECES 241u    /* = MAPMAKER_ROOMS_MAX */
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */

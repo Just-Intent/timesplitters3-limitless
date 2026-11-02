@@ -18,6 +18,11 @@ MUTATIONS = {
     'cover-raised': ('#define MAPMAKER_LIMIT_COVER 9984u', '#define MAPMAKER_LIMIT_COVER 10240u'),
     'cover-pool-stock': ('#define MAPMAKER_POOL_COVER 10496u', '#define MAPMAKER_POOL_COVER 1280u'),
     'link-pool-no-stitch': ('(MAPMAKER_LIMIT_LINKS+16u*MAPMAKER_LIMIT_PIECES+256u)*20u', 'MAPMAKER_LIMIT_LINKS*20u'),
+    # Links 12000: 241 of the heaviest tile (46 links) fit; the pool stays int16.
+    'links-round3': ('#define MAPMAKER_LIMIT_LINKS 12000u', '#define MAPMAKER_LIMIT_LINKS 8800u'),
+    'links-below-heaviest': ('#define MAPMAKER_LIMIT_LINKS 12000u', '#define MAPMAKER_LIMIT_LINKS 11000u'),
+    'links-past-int16': ('#define MAPMAKER_LIMIT_LINKS 12000u', '#define MAPMAKER_LIMIT_LINKS 30000u'),
+    'links-held-ignored': ('p.cost[2]+h.cost[2]>MAPMAKER_LIMIT_LINKS', 'p.cost[2]>MAPMAKER_LIMIT_LINKS'),
     'no-held-pieces': ('p.pieces+h.pieces>MAPMAKER_LIMIT_PIECES', 'p.pieces>MAPMAKER_LIMIT_PIECES'),
     'sub-stock-round2': ('#define MAPMAKER_LIMIT_SUB 500u', '#define MAPMAKER_LIMIT_SUB 200u'),
     'sub-past-pool': ('#define MAPMAKER_LIMIT_SUB 500u', '#define MAPMAKER_LIMIT_SUB 501u'),
