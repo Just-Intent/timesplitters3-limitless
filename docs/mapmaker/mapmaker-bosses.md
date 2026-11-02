@@ -136,6 +136,17 @@ farther ones wait for a free place.
   [Khallos](mapmaker-khallos.md) sets it: a seated Khallos's bar is his chair
   (a prop with its own health). Fixture: `mapmaker_bosses.c` "a Boss AI whose
   bar is another entity" (mutations `proxy-ignored`, `proxy-after-scale`).
+- Bars of removed Boss AIs (after the .28 playtest): an area that replaces
+  a Story AI with a prop and removes the AI (the [tank](mapmaker-tank.md),
+  the [mothership](mapmaker-mothership.md)) registers a lister with
+  `bos_bar_extra_add` at its mount: its k-th prop and the removed AI's
+  spawn record id (+8). Each listed prop of a Boss-flagged AI is scaled and
+  drawn like a live Boss AI, with that AI's saved name; entity 0 skips it.
+  A prop the stock bar already shows (HUD +8 bit 0 after the original, the
+  focus `[player]+0xFF4`) is scaled but not drawn again. The level start now
+  keeps every Story AI's saved name, boss or not (`bos_story_name(id)`, used
+  for the stock bars' labels in those areas). Fixture: "Boss AIs replaced by
+  props" (mutations `extra-*`, `names-bosses-only`).
 
 - Position (CONFIRMED, `sub_00139740`): x is centred between the viewport
   `[[0x007E71C8]+0]`/`+4` and the side margins `[0x007A6140]`/`[0x007A6148]`;
