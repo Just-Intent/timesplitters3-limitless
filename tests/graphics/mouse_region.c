@@ -47,6 +47,14 @@ static PcInput input;
 static double sensitivity=.1;
 static int invert_y,rate=144;
 static int pc_native_rate(void){return rate;}
+/* Scope-wheel state is covered by test_scope_wheel.py; keep it inert here. */
+#define PC_ACTION_COUNT 1
+#define PC_BINDING_SLOTS 1
+static int scope_wheel;
+static int pc_settings_bound_keys(int bound[PC_ACTION_COUNT][PC_BINDING_SLOTS]){(void)bound;return 0;}
+static int pc_scope_view(uint32_t player,uint32_t fov,ptrdiff_t offset){(void)player;(void)fov;(void)offset;return 0;}
+static void pc_scope_wheel_bindings(int *wheel,const int (*bound)[PC_BINDING_SLOTS]){(void)wheel;(void)bound;}
+static void pc_scope_wheel_state(int *wheel,int scope,uint64_t now){(void)wheel;(void)scope;(void)now;}
 #ifdef TEST_SDL
 #define camera_input input
 #define mouse_sensitivity sensitivity
@@ -157,11 +165,13 @@ int main(void)
     U(0x50020)=8;U(0x5007c)=0x42000;U(0x42aa0)=0x60000;
     U(0x60050)=1;U(0x6009c)=0;F(0x6002c)=F(0x60030)=0;
     MOVE();APPLY();CHECK(F(0x60030)==359 && F(0x6002c)==359.5f && !input.dx);
-    CHECK(F(0x30100)==-3 && F(0x30104)==old_pitch);
-    short_gun=2;MOVE();APPLY();CHECK(F(0x60030)==359 && !input.dx);short_gun=0;
-    writable=0;MOVE();APPLY();CHECK(F(0x60030)==359 && !input.dx);writable=1;
-    U(0x6009c)=1;MOVE();APPLY();CHECK(F(0x60030)==359 && !input.dx);
-    U(0x30114)=2;
+    CHECK(F(0x30100)==-3 && F(0x30104)==old_pitch && input.mech_status==PC_MECH_MOVED);
+    short_gun=2;MOVE();APPLY();CHECK(F(0x60030)==359 && !input.dx && input.mech_status==PC_MECH_NO_DATA);short_gun=0;
+    writable=0;MOVE();APPLY();CHECK(F(0x60030)==359 && !input.dx && input.mech_status==PC_MECH_READONLY);writable=1;
+    U(0x6009c)=1;MOVE();APPLY();CHECK(F(0x60030)==359 && !input.dx && input.mech_status==PC_MECH_OTHER_SLOT);
+    /* A script camera without a usable FOV still turns the mech unscaled. */
+    U(0x6009c)=0;F(0x10384)=NAN;MOVE();APPLY();CHECK(F(0x60030)==358 && F(0x6002c)==359 && !input.dx);F(0x10384)=55;
+    U(0x30114)=2;APPLY();CHECK(input.mech_status==PC_MECH_NONE);
     /* The interval cache never bridges a region boundary or address overflow. */
     PcGuestRegion region={0};uintptr_t end=(uintptr_t)guest+sizeof guest;
     CHECK(pc_guest_memory_in_span(&region,end-4,4,1));
