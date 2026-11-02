@@ -1031,4 +1031,4 @@ MapMaker caps:limitless-caps
 Markers: test_ui_layout.py; test_patch_updates.py checks 2290/2291 after migration.
 
 Mech input+log: test_mounted_mouse.py [scope](mounted-mouse.md#battle-mech-mouse-425)
-MapMaker boss/animslot/sand/rooms:limitless
+MM boss/anims/sand/rooms:limitless

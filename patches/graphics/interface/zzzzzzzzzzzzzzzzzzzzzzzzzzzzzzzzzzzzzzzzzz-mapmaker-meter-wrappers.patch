@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3628 @@
+@@ -1037,6 +1037,3639 @@
      sub_002FA720_gen();
  #endif
  }
@@ -3602,6 +3602,17 @@
 +    else sub_00023930_gen();
 +#else
 +    sub_00023930_gen();
++#endif
++}
++
++extern void sub_0003E650_gen(void);
++void sub_0003E650(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("memory","pc_mapmaker_memory_level_reset")) pc_mapmaker_memory_level_reset(sub_0003E650_gen);
++    else sub_0003E650_gen();
++#else
++    sub_0003E650_gen();
 +#endif
 +}
 +
