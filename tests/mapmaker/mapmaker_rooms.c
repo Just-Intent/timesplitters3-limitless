@@ -20,6 +20,9 @@ static uint8_t *u8(uint32_t a) { return (uint8_t *)((uintptr_t)a+g_xbox_mem_offs
 
 void sub_00157440(void) {}
 void sub_0003DFA0(void) {}
+/* word draw buckets: tests/mapmaker/mapmaker_rooms_buckets.c */
+void sub_0001A010(void) {} void sub_000A79B0(void) {} void sub_003442B0(void) {}
+void sub_00086AE0(void) {} void sub_00344350(void) {} void sub_00087720(void) {}
 /* Fake tree query: offers fake_hits[] (with repeats) to a model of the
  * callback sub_00087260, which lists a room once (record flag 0x10) as
  * room*2 | in-box bit. */

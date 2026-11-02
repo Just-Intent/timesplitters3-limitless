@@ -77,3 +77,30 @@ Links (255 x 46 = 11,730 of 12,000), pads, cover, pad groups, portals and
 the 1000-object pool still fit. Past 255: word draw buckets (mapmaker-rooms.md
 stage 6). Tests: `test_mapmaker_rooms.py` fixture at 255 (`cap-241`,
 `cap-raised` mutations), `test_mapmaker_limits.py` (`pieces-241`).
+
+## Past 255: plan to 1023 (mapmaker-rooms.md "Rooms 255 -> 1024")
+
+Room machinery reaches 1023 ids (specials 0x400..0x40C) after stages 6-10;
+the view shadow stops at 341 ids until the view stride changes (stage 7).
+Real maps are capped earlier by pads (~500-570 heaviest tiles), links
+(~712, int16 A* indices) and play memory (~550-650 tiles, unmeasured).
+Next safe target: 511 (view stride 0x3000). `MAPMAKER_LIMIT_PIECES` stays
+255 until a target's stages are all done.
+
+## Stage 6: word draw buckets (every scene)
+
+Hooks in `pc_mapmaker_rooms.inc`: `pc_mapmaker_rooms_buckets` replaces
+`sub_00086C40` (depth lists as C word lists, one context per nesting level,
+then the stock calls), `pc_mapmaker_rooms_view_lists` replaces
+`sub_000897D0` (view room list at shadow +0x6DB0, bounded by 0x10D words),
+`pc_mapmaker_rooms_bucket_draw` wraps both readers (`sub_00086480`,
+`sub_000865E0`, eax = depth): copies the depth's rooms into the staging row
+`0x008C1800`, sets the count byte `0x702DB0+depth`, 255 per call, re-pushing
+the return address for each further call. `rooms.json`: reader row stride 0
+(`0x000864CB`, `0x00086621`) and word loads (`code` entries `0x000864F4`,
+`0x00086644`). Stock results for up to 255 rooms per depth; the four
+wrappers and the table must ship together. Tests:
+`tests/mapmaker/test_mapmaker_rooms_buckets.py` (fixture
+`mapmaker_rooms_buckets.c` against models of the stock byte code, 27 C and 6
+table mutations, decode of the word loads). Overlap: the camera view work
+(depth cap 0x4F, view fields) touches the same two functions.

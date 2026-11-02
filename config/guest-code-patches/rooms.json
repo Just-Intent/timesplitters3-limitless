@@ -1977,8 +1977,17 @@
       "address": "0x000864CB",
       "original_hex": "69f6c8000000",
       "operand": 2,
-      "value": "0x100",
-      "reason": "imul esi, esi, 0xc8: draw-bucket row stride 200 -> 256 (relocated 0x7042B8)"
+      "value": "0x0",
+      "reason": "imul esi, esi, 0xc8: draw-bucket row stride 200 -> 0 (stage 6, word buckets: every depth reads the one staging row 0x008C1800 that pc_mapmaker_rooms_bucket_draw fills before each call)"
+    },
+    {
+      "id": "rooms-bucket-word-000864f4",
+      "kind": "code",
+      "function": "0x00086480",
+      "address": "0x000864F4",
+      "original_hex": "0fb63402",
+      "new_hex": "0fb73442",
+      "reason": "movzx esi, byte ptr [edx + eax] -> movzx esi, word ptr [edx + eax*2]: draw-bucket room id byte -> word (stage 6; staging row of words, eax = index in the row)"
     },
     {
       "id": "rooms-00086621",
@@ -1987,8 +1996,17 @@
       "address": "0x00086621",
       "original_hex": "69f6c8000000",
       "operand": 2,
-      "value": "0x100",
-      "reason": "imul esi, esi, 0xc8: draw-bucket row stride 200 -> 256 (relocated 0x7042B8)"
+      "value": "0x0",
+      "reason": "imul esi, esi, 0xc8: draw-bucket row stride 200 -> 0 (stage 6, word buckets: every depth reads the one staging row 0x008C1800 that pc_mapmaker_rooms_bucket_draw fills before each call)"
+    },
+    {
+      "id": "rooms-bucket-word-00086644",
+      "kind": "code",
+      "function": "0x000865E0",
+      "address": "0x00086644",
+      "original_hex": "0fb63402",
+      "new_hex": "0fb73442",
+      "reason": "movzx esi, byte ptr [edx + eax] -> movzx esi, word ptr [edx + eax*2]: draw-bucket room id byte -> word (stage 6; staging row of words, eax = index in the row)"
     },
     {
       "id": "rooms-00086ceb",
