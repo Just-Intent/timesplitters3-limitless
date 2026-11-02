@@ -107,7 +107,7 @@ FLOW_TABLES = {
     0x007B5F00: (4, 0xD6, 'per-id prop list, rooms.json -> 0x008C7C00 (256)'),
     0x007B5180: (4, 0xD6, 'per-id drawn flag, rooms.json -> 0x008CC800 (0x110, check 6)'),
     0x0073C350: (4, 3 * 0xD5, 'light heads [3][0xD5], rooms.json -> 0x008C8400 [3][0xFE]'),
-    0x0073D910: (4, 14, 'light round robin room/16, rooms.json -> 0x008CB400 (16)'),
+    0x0073D910: (4, 14, 'light round robin room/16, rooms.json -> 0x008CB440 (32)'),
     0x007AC880: (12, 0xD5, 'room light colour float[0xD5][3], rooms.json -> 0x008C9000 [0xFE][3]'),
 }
 
@@ -409,3 +409,50 @@ def test_room_flag_table_list0_mutation_fails():
     kept = [dict(e, size='0x1C0', sites=dict(e['sites'], **{'0x000A79C8': 'keep'})) if e['id'] == 'obj-list0-relocate' else e
             for e in objects]
     assert _flag_table_problems(rooms, kept)
+
+
+def _define(name):
+    for line in (ROOT / 'src/interface/pc_mapmaker_rooms.inc').read_text(encoding='utf-8').splitlines():
+        if line.startswith(f'#define {name} '):
+            return int(line.split()[2].rstrip('u'), 0)
+    raise AssertionError(name)
+
+
+def test_light_side_table_matches_the_code():
+    """Stage 3: what pc_mapmaker_rooms.inc's light hooks assume about sub_001121E0..sub_00114290."""
+    funcs, insns = by_function(), unique()
+    calls = defaultdict(set)
+    for i in insns.values():
+        if i.call or i.branch:
+            for op in i.ops:
+                if op[0] == 'imm' and op[1] in (0x001121E0, 0x001123C0, 0x001124D0, 0x00114030, 0x00114290):
+                    calls[op[1]].add(i.address)
+    # sub_00114030 is linked only from sub_00114290 (the pending full id is meant for that call)
+    assert calls[0x00114030] == {0x00114859}
+    assert calls[0x00114290] == {0x00115403, 0x0011588C}
+    assert calls[0x001123C0] == {0x001129A1, 0x001129E0, 0x001142E2, 0x00115593, 0x00115642}
+    assert calls[0x001124D0] == {0x00112D71} and calls[0x001121E0] == {0x00112396, 0x001CDDFB}
+    # the pool clear writes the room byte through +0x80 + 0x19
+    assert insns[0x001122AF].ops[0][4] == 0x19 and insns[0x00112299].ops[1] == ('imm', 0x80)
+    # pool / record / group globals the side table indexes by
+    texts = {a: insns[a].text for a in (0x00112294, 0x00112233, 0x001122BA, 0x001142B8, 0x001142AF)}
+    assert '[0x73d950]' in texts[0x00112294] and '[0x4e62dc]' in texts[0x00112233] and '[0x73d960]' in texts[0x001122BA]
+    assert '[0x73d954]' in texts[0x001142B8] and '0x73d910' in texts[0x001142AF]
+    assert (_define('MAPMAKER_ROOMS_LIGHT_POOL'), _define('MAPMAKER_ROOMS_LIGHT_COUNT'), _define('MAPMAKER_ROOMS_LIGHT_ONE'),
+            _define('MAPMAKER_ROOMS_LIGHT_PER')) == (0x0073D950, 0x004E62DC, 0x0073D960, 0x0073D954)
+    assert insns[0x001122B2].ops[1] == ('imm', _define('MAPMAKER_ROOMS_LIGHT_STRIDE'))
+    # creation: the room argument (esp+0x78 = entry [esp+0x10]) picks group room/16, record rr[g] + g*per
+    assert insns[0x001142A2].ops[1][4] == 0x78 and insns[0x001142AC].text == 'eax, 4'
+    assert insns[0x00114377].ops[1][4] == 0x78 and insns[0x00114390].ops[1] == ('reg', 'dl')
+    # the pool sizes the level code picks (500/200/265/400) fit the side table
+    counts = {i.ops[1][1] for i in insns.values() if 0x00112300 <= i.address < 0x0011233A and i.mnemonic == 'mov'
+              and i.ops[0] == ('reg', 'eax') and i.ops[1][0] == 'imm'}
+    assert counts == {0x1F4, 0xC8, 0x109, 0x190} and max(counts) <= _define('MAPMAKER_ROOMS_LIGHT_SLOTS')
+    # heads, row width and round robin as rooms.json moves them
+    rooms = {e['id']: e for e in _tables()[0]}
+    assert int(rooms['rooms-reloc-l1-head']['new'], 16) == _define('MAPMAKER_ROOMS_LIGHT_HEADS')
+    assert int(rooms['rooms-reloc-lb-0x73d910']['new'], 16) == _define('MAPMAKER_ROOMS_LIGHT_GROUPS')
+    assert int(rooms['rooms-reloc-lb-0x73d910']['new_size'], 16) == 4 * _define('MAPMAKER_ROOMS_LIGHT_GROUP_COUNT')
+    rows = [e for e in rooms.values() if e['kind'] == 'operand' and 'light head row width' in e['reason']]
+    assert sorted(int(e['address'], 16) for e in rows) == [0x001123EA, 0x00112415, 0x00112EBD, 0x0011403C]
+    assert {int(e['value'], 16) for e in rows} == {_define('MAPMAKER_ROOMS_LIGHT_ROW')}

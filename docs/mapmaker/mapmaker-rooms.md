@@ -26,9 +26,22 @@ WRAP sub_0008A780 -> pc_mapmaker_rooms_compile
 WRAP sub_00083F80 -> pc_mapmaker_rooms_piece
 WRAP sub_00085030 -> pc_mapmaker_rooms_piece
 WRAP sub_00242780 -> pc_mapmaker_rooms_props
+WRAP sub_001121E0 -> pc_mapmaker_rooms_light_reset
+WRAP sub_001123C0 -> pc_mapmaker_rooms_light_unlink
+WRAP sub_001124D0 -> pc_mapmaker_rooms_light_colour
+WRAP sub_00114030 -> pc_mapmaker_rooms_light_link
+WRAP sub_00114290 -> pc_mapmaker_rooms_light_create
 ```
 
-All five are cdecl with a plain `ret`. `sub_00242780` is reached by a tail
+The first five are cdecl with a plain `ret`. The light hooks (stage 3 of the
+255 raise) always call their original and change no stack: `sub_001121E0`
+(no arguments; also reached by a tail `jmp` from `0x00112396`),
+`sub_001123C0` (light in `eax`; tail `jmp` from `sub_00112990`),
+`sub_001124D0` (cdecl light, colour; returns `eax`), `sub_00114030` (room in
+`eax`, light at `[esp+4]`), `sub_00114290` (source in `eax`, `ebx`, cdecl
+stack arguments, room the 4th; returns the light in `eax`). None wraps another
+area's hook, so order does not matter; `sub_00114290` calls `sub_001123C0` and
+`sub_00114030` through their wrappers. `sub_00242780` is reached by a tail
 `jmp` from `sub_00242BA0`; the wrapper still runs after the body. The table
 patches the bodies of `sub_0008A780` (portal buffer), so it must stay a
 wrapper calling `sub_0008A780_gen`, not a replacement.
@@ -83,7 +96,7 @@ immediates, plus negative forms and `lea` displacements); the room ones are:
 | `0x0073C350` light heads dword[3][0xD5] | | `0x008C8400` | [3][0xFE] |
 | `0x007AC880` room light colour float[0xD5][3] | | `0x008C9000` | [0xFE][3] |
 | `0x0078B860` model -> slot word[0x9D0] | 0x9D0 | `0x008CA000` | 0xA00 |
-| `0x0073D910` light round robin per room/16 | 14 | `0x008CB400` | 16 |
+| `0x0073D910` light round robin per room/16 | 14 | `0x008CB440` | 32 |
 | `0x00749890` front-end static view (0xFFC) | | `0x008CD000` | 0x7000 (shadow) |
 
 `0x008CB800..0x008CC800`: two 0x800-byte buffers of the room query.
@@ -191,8 +204,24 @@ rest are other structs.
 0xD5 -> 0xFE wide (the stock aliasing of a row's last+1 entry to the next
 row's entry 0 is kept). `sub_00114030`/`sub_00114290` use `room/16` into the
 14-entry `0x0073D910`; rooms 224..241 would have written over the light lists
-at `0x0073D948`/`0x0073D94C`, so it is relocated with 16 entries. Its pool is
-sized from `[0x007B975C]/16` (`sub_001121E0`), already dynamic.
+at `0x0073D948`/`0x0073D94C`, so it is relocated (now 32 entries at
+`0x008CB440`). Its pool is sized from `[0x007B975C]/16` (`sub_001121E0`),
+already dynamic.
+
+Room ids above 0xFF (stage 3, `pc_mapmaker_rooms.inc`): the record has no
+spare byte, so the full id of a light whose room does not fit is kept in a C
+side table, by pool index (`[0x0073D950]`, stride 0xB8, at most 500 records)
+or for the 0xC0 record `[0x0073D960]`, else by address (a group past the
+level's groups indexes records past the pool, as stock does with its special
+ids; 256 such records). `sub_00114290` picks the record with the full room
+argument; the hook keeps the id while it runs so `sub_00114030` (only called
+from `0x00114859`, with the byte) gets it back, and redoes the round-robin
+step of `0x00114829` (which used the byte's group) on the full id's group.
+`sub_001123C0` unlinks the head entry `[row][id]` itself and lets the original
+see room 0; `sub_001124D0` sees room 0 (colour unchanged, the stock result for
+an id above the real rooms). `sub_001121E0` clears the table. Lights in rooms
+0..0xFF take the original paths unchanged, so with the 241 layout the hooks
+only look.
 
 ## Story levels
 
@@ -432,15 +461,11 @@ held prop's light (above).
    (0x110 entries; declared 0x354 so the count `0x7B54D8` is outside it), the
    `keep` dropped from `objects.json` (slot-0 list declared 0x1BC). Test:
    `check-tables.py`, `test_room_flag_table_7b5180_is_relocated` (+4 mutations).
-3. Light room side table (scene 100 only, ids > 0xFF): a word per light,
-   indexed `(light - [0x0073D950])/0xB8` and `(light - [0x0073D960])/0xC0`,
-   written next to `0x0011408E`/`0x00114390`, read at `0x001123D5`,
-   `0x0011241C`, `0x001124FC`, `0x00114829`, `0x00114851`, cleared next to
-   `0x001122DE`/`0x001124B9`: wrappers of `sub_001121E0`, `sub_001123C0`,
-   `sub_001124D0`, `sub_00114030`, `sub_00114290`. Head rows (`imul 0xD5` at
-   `0x001123EA`, `0x00112415`, `0x00112EBD`, `0x0011403C`) widen with the id
-   space. Test: a fixture like `mapmaker_rooms.c` plus the flow test's
-   byte-store set.
+3. Done (2026-11-01): light room side table, every scene (the special ids
+   move in story levels too), five wrappers; see "Lights". The round robin
+   moved to `0x008CB440` with 32 entries. Head rows widen in stage 4. Test:
+   the light part of `mapmaker_rooms.c` (+13 mutations) and
+   `test_light_side_table_matches_the_code`.
 4. Renumber 0xF2..0xFE -> 0x100..0x10C and `cmp 0xF1` -> 0xFF in the 155 + 21
    `rooms.json` entries (all imm32/imm16/disp32 forms; the generator must
    keep lengths); id-space counts 0xFF -> 0x10D (`mov ecx`, loop ends,

@@ -29,3 +29,21 @@ range); `objects.json`'s slot-0 list `0x007B4FC0` is declared 4 bytes short
 past the stock table (into `0x007B54D8` and the moved-away `0x007B54E0`
 tables); now they land in the new table. Test:
 `test_room_flag_table_7b5180_is_relocated` plus four table mutations.
+
+## Stage 3: light room side table
+
+`light+0x99` is the only room byte the stage-1 audit found. The five light
+functions get wrappers in `pc_mapmaker_rooms.inc` (`_light_reset`, `_unlink`,
+`_colour`, `_link`, `_create`; conventions in mapmaker-rooms.md "Wrappers").
+A light whose room is above 0xFF keeps the full id in a C side table (pool
+index, the 0xC0 record, or by address for records past the pool); the bodies
+keep reading the byte, so the hooks fix the three byte uses: the head
+unlink, the colour lookup and the creation's round-robin step / link call.
+Rooms 0..0xFF take the original paths, so with ids below 0x100 nothing
+changes. The round robin `0x0073D910` moved to `0x008CB440` (32 entries).
+Tests: light part of `tests/mapmaker/mapmaker_rooms.c` (models of the guest
+bodies called through the hooks, 13 mutations) and
+`test_light_side_table_matches_the_code` (callers, globals, argument slot,
+pool sizes, rooms.json heads/row/round robin against the C defines).
+Risk: special-id lights in story levels are INFERRED rare (stock would index
+past the light pool for them).
