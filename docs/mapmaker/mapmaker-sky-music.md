@@ -12,7 +12,7 @@ has been built or played**, except the v0.4.0-mapmaker.25 playtest under Play.
 Files: `src/interface/pc_mapmaker_skymusic.inc` (new, area `sky`), the extra-sky
 table and the extra-sky cloud rule in `src/interface/pc_mapmaker_sky.inc`;
 tests `tests/mapmaker/test_mapmaker_skymusic.py` (fixture
-`tests/mapmaker/mapmaker_skymusic.c`, 58 mutations, XBE / decoder / pak and texture-pak
+`tests/mapmaker/mapmaker_skymusic.c`, 77 mutations, XBE / decoder / pak and texture-pak
 checks) and the extended `tests/mapmaker/test_mapmaker_sky.py`.
 
 ## What MapMaker offers (stock)
@@ -191,6 +191,58 @@ dword). System Link peers without this build see the same fallbacks.
 
 ### Play (scene 100)
 
+**Playtest v0.4.0-mapmaker.28** (`logs/m28-sand.err`, ignored): the extra
+skies render; "Sandstorm does not appear to be working". The log has the
+paks mounted, the flag and models, scene 2's type-5 list kept and every
+weather frame on it, so the stock sandstorm code ran. Causes (static, XBE):
+
+- **Sandstorm tied to scene 2's rooms (CONFIRMED).** The four emitters at
+  `0x004E62E8` (0x44 bytes: room ids `+0..+0xC`, 0 = none; model `+0x10`;
+  rate `+0x14`; wind `+0x18..+0x20`; gust `+0x30`; prop `+0x34`) hold rooms
+  {2,3,7}, {6,26,27} (wind 0.53, 0, -0.85), {5,4} (1, 0, 0), {19}
+  (-0.56, 0, 0.83). `sub_0011ACF0` spawns grains only for a room of the
+  player's room list (`+0xE0A` count, `+0xE0C` words) that one of them names
+  (`0x0011AD69`), at a random point of that room's floor zones
+  (`sub_001186F0` -> `sub_00118670`, `sub_00087840(room, 1)`: the level
+  object table `[0x007B9784]`), and only there animates and fades in the
+  emitter's prop (`0x0011AF5E..0x0011AFAB`); `sub_0011A600` matches the
+  player's room `+0x2A0` for the gust (`0x0011A66B`). The props are
+  created at the origin (`sub_001189C0`, `0x00118A0C`), i.e. scene 2's own
+  sand sheets (INFERRED from the names `intro/intro_sandstorm_N`). MapMaker
+  rooms are piece numbers 1..N, so no grain was made (or, in a map with
+  those piece numbers, scene 2's props would fade in at the origin).
+- Checked and not a cause: the draw `sub_0011B110` needs only the view's
+  flag `[0x007AC82C+4v]`, which `sub_0011A600` sets for every player the
+  weather runs for (`+0x21C` sign bit and 0x400, as rain, `0x0011A68F`);
+  grain and haze textures are global ids 0x303 / 0x328 (`sub_00080F20`,
+  handles at `0x004D2D64 + id*0x18`), each used by other effects too; the
+  haze alpha is `[0x007AC844+4p]` (1 outdoors by the rain test
+  `sub_00119B50`, which has a MapMaker branch) times max(0.65, gust). The
+  ring is 60 grains of 0x24 (`[0x007AC874]`, index `[0x007AC878]`): pos,
+  velocity `+0xC`, angle `+0x18`, spin `+0x1C`, age `+0x20` (-1 dead, dies
+  past 3 s).
+- **Fix** (`pc_mapmaker_skymusic_weather_frame`, the existing `sub_0011BBC0`
+  wrapper, sandstorm maps only): the 16 emitter room words read 0 while the
+  stock frame runs and are put back right after (story levels see them
+  unchanged); then, while the entry has type 5, one grain per update step
+  (`[0x004E7944]`, at most 4) for each player the weather runs for who is
+  outdoors, in a 24 m box around the player, 6 m upwind, with the stock
+  emitter's velocity rule (wind x 3..6 m/s + jitter, 0..1.2 m/s up), angle,
+  spin and age 0, into the stock ring; the stock code ages, moves and draws
+  them. Host random numbers: the guest generator `[0x007497CC]` is not
+  advanced. Wind: emitter 1's. Grains show only outdoors, like rain.
+- **Sky texture probe (CONFIRMED wrong).** It read the first word of each
+  16-byte texture entry as the id. In memory the texture pass has replaced
+  that word by the loaded-table row (`sub_00018B90` writes -1, then the row,
+  through its third argument, `0x00018BA4`/`0x00018C91`; `sub_00063900` passes
+  the entry, `sub_000637E0` queued it): .28 logged rows 0x692..0x698, while
+  the files' ids are 24-bit (Spaceport: 0x855357, 0x876E22). The counts 2,
+  4, 6, 7 were each sky's own (Spaceport, Chinese, Sniper, Vietnam), so the
+  "growing list" was row numbers, not a list kept across levels. Fix: id =
+  second word (both words are equal in all 21 files), row = first; loaded
+  when that row holds the id, else the id anywhere in the table; -1 rows no
+  longer end the list; the count is reset at each level.
+
 **Playtest v0.4.0-mapmaker.27:** "Most of the skies are still not rendering
 at all. Some have elements that are rendering in part." Static cause
 (CONFIRMED in the XBE and the pak indexes, not yet played):
@@ -364,7 +416,7 @@ WRAP sub_0011B310 -> pc_mapmaker_skymusic_weather_start  (new in .25; sub_0011B4
 WRAP sub_00045DE0 -> pc_mapmaker_skymusic_music          (new in .25; register argument eax, must see the guest g_eax at entry)
 WRAP sub_00119AB0 -> pc_mapmaker_skymusic_weather_list   (NEW after .25; cdecl count, list; one caller 0x0006E87A; edits its two stack arguments before the original)
 WRAP sub_0011D2C0 -> pc_mapmaker_skymusic_sky_built      (NEW after .25; cdecl view; one caller 0x000CC961; probe after the original)
-WRAP sub_0011BBC0 -> pc_mapmaker_skymusic_weather_frame  (NEW after .25; weather frame update, no args, every frame; callers 0x001CE55F/0x001CE596; probe after the original, one compare when no sandstorm)
+WRAP sub_0011BBC0 -> pc_mapmaker_skymusic_weather_frame  (NEW after .25; weather frame update, no args, every frame; callers 0x001CE55F/0x001CE596; .28 fix: sandstorm maps only, hides the emitter rooms during the original, then adds grains; one compare when no sandstorm)
 ```
 
 All call their original exactly once (no `MAPMAKER_GUEST_RET`). Guest
@@ -398,14 +450,17 @@ order:
 - `music: extra track (row, id)`;
 - `sky built: record R model 0x.. prop 0x.. prop model 0x.. row N loaded L request 0x.. data 0x..`
   (one line per view, two at most); after the first, `sky texture not loaded:
-  textures/xxxxxx.xbt (record R; in no mounted pak?)` for each missing
+  textures/xxxxxx.xbt (row N, record R; in no mounted pak?)` for each missing
   texture (eight at most) and `sky textures loaded (loaded, total) (L, T)`, or
   `sky textures not checked: model file not read (record, file)`;
 - `weather start: sandstorm list set ...`, `level setup: sandstorm list kept (count, list) (1, 5273752)`,
   or `sandstorm buffers missing; not drawn (a, b)`.
 - `map start: extra sky row K resolved to record R model 0x.. (resource row N), map's stock sky S, level sky before B`;
 - `weather frame F: list 0x.. index I type T sandstorm 1 buffers ..` on the
-  1st, 60th and 600th frame of a sandstorm level (type 5 draws).
+  1st, 60th and 600th frame of a sandstorm level (type 5 draws), each
+  followed by `sandstorm drawn: grains alive A of 60 (this frame N, level L),
+  views flagged a b c d, player 1 outdoors X, textures 0x303 H 0x328 H,
+  scene-2 props ...`.
 
 Reading the next log: no `map has extra sky` line = the map's row bits are
 not seen in play; `mounted` but no `map start` line = the map start did not
@@ -414,7 +469,10 @@ run the hook; `map start` with record R but `sky built: record` other than R
 `loaded 0` = the model file was not read from the pak (pak path or contents);
 `sky textures loaded` below the total = a missing textures pak or texture
 (the line before names it); all loaded but no visible sky = drawing (view,
-mask, draw distance), not assets.
+mask, draw distance), not assets. Sandstorm: `grains alive 0` with `player 1
+outdoors 0.00` = the player stood indoors (the rain test); grains alive but
+`views flagged 0` = the stock player test failed; a texture handle of
+0xFFFFFFFF or 0 = the global grain/haze texture is not loaded.
 
 ## What the user tests
 
@@ -424,17 +482,20 @@ mask, draw distance), not assets.
    Horror; the weather list with Sandstorm (log: `rows offered`).
 3. Pick Story: Castle, Cutscene: Prologue, Sandstorm; save; load the map
    again: the three rows still show them. Play: the castle sky (look up in an
-   Open air tile or at the map edge), the cutscene track, sand blowing. Send
+   Open air tile or at the map edge), the cutscene track, sand blowing past
+   outdoors (none inside, like rain; the `sandstorm drawn` lines). Send
    every `skymusic:` line. Try Story: Time to Split with Sandstorm (shared
    paks), Story: Cold Night, Arcade: Temple, Story: Street War (no texture
    in stock paks before), Arcade: Vietnam (was in part), Arcade: Prison (no
-   textures pak: control), split screen 2 players.
+   textures pak: control), split screen 2 players. The `sky textures
+   loaded (L, T)` line now names 24-bit ids and T is that sky's own count.
 4. Quit back to the editor: still the extra choices; play again (second level
    load: `pak already mounted`).
 5. A session without the switch (or an older build): the same map loads and
    plays with the MapMaker twin sky, tileset music and no weather; no crash.
 6. Story smoke test afterwards: scene 2 (sandstorm, intro sky) and one level
-   using a sky from the table look as before.
+   using a sky from the table look as before (the emitter rooms are hidden
+   only during a MapMaker sandstorm frame).
 
 ## Not verified / risks
 

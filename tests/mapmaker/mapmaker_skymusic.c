@@ -170,7 +170,25 @@ static void weather_list_original(void)         /* sub_00119AB0(count, list): 0 
     originals++;g_esp+=4u;
 }
 static void wx_list(uint32_t count,uint32_t list) { hook(pc_mapmaker_skymusic_weather_list,weather_list_original,0x0006E87Fu,count,list,0); }
-static void wx_frame(void) { hook(pc_mapmaker_skymusic_weather_frame,plain_original,0x001CE564u,0,0,0); }
+static uint32_t rooms_seen;                     /* emitter rooms while the stock frame ran */
+static uint32_t emitter_rooms(void)
+{
+    uint32_t k,sum=0;
+    for(k=0;k<16u;k++) sum+=WORD_AT(0x004E62E8u+(k/4u)*0x44u+(k%4u)*4u);
+    return sum;
+}
+static void frame_original(void) { rooms_seen=emitter_rooms();originals++;g_esp+=4u; }
+static void wx_frame(void) { hook(pc_mapmaker_skymusic_weather_frame,frame_original,0x001CE564u,0,0,0); }
+#define RING 0x00410000u
+#define PLAYER 0x00420000u
+static float grain(uint32_t k,uint32_t off) { return FLOAT_AT(RING+k*0x24u+off); }
+static uint32_t grains_alive(void)
+{
+    uint32_t k,n=0;
+    for(k=0;k<60u;k++) if(grain(k,0x20u)>=0.0f) n++;
+    return n;
+}
+static void grains_dead(void) { uint32_t k;for(k=0;k<60u;k++) FLOAT_AT(RING+k*0x24u+0x20u)=-1.0f;WORD_AT(0x007AC878u)=0; }
 static void sky_built(void) { hook(pc_mapmaker_skymusic_sky_built,plain_original,0x000CC966u,0x00500000u,0,0); }
 /* What the cloud setup (pc_mapmaker_sky.inc) sees as the map's sky. */
 static int clouds_sky(void) { return mapmaker_sky_index(INFO(WORD_AT(0x00784014u))); }
@@ -188,6 +206,11 @@ int main(void)
     WORD_AT(0x007844A8u)=ED;WORD_AT(0x00784014u)=C;
     for(k=0;k<68;k++) WORD_AT(0x005149A8u+k*0x34u+4u)=0x700u+k;      /* sky models */
     for(k=0;k<4;k++) WORD_AT(0x004E62F8u+k*0x44u)=0x527u+k;          /* sandstorm models */
+    {   /* scene 2's emitter rooms {2,3,7} {6,26,27} {5,4} {19} */
+        static const uint32_t r[16]={2,3,7,0, 6,26,27,0, 5,4,0,0, 19,0,0,0};
+        for(k=0;k<16u;k++) WORD_AT(0x004E62E8u+(k/4u)*0x44u+(k%4u)*4u)=r[k];
+    }
+    WORD_AT(0x00507898u)=5u;                                           /* scene 2's entry: type 5 */
     WORD_AT(0x00791D4Cu)=0x00700000u;                                  /* resource table */
     for(k=0;k<0xA00u;k++) setH(0x008CA000u+k*2u,(int)k);               /* every model has a row */
     WORD_AT(0x006D7880u)=12u;
@@ -325,16 +348,28 @@ int main(void)
     /* the probe names the textures the load left out: file +0 -> {id,..} x n, -1 */
     request_ret=0x00520000u;WORD_AT(0x00520000u+0x10u)=0x00530000u;
     WORD_AT(0x00530000u)=0x0Cu;
-    WORD_AT(0x0053000Cu)=0x28F2CCu;WORD_AT(0x0053001Cu)=0x40000000u;WORD_AT(0x0053002Cu)=0x0CE621u;
-    WORD_AT(0x0053003Cu)=0x876E22u;WORD_AT(0x0053004Cu)=0xFFFFFFFFu;WORD_AT(0x0053005Cu)=0x111111u;
+    /* in memory each entry's first word is the loaded-table row (or -1), the id the second */
+    WORD_AT(0x0053000Cu)=2u;WORD_AT(0x00530010u)=0x28F2CCu;
+    WORD_AT(0x0053001Cu)=0x40000000u;WORD_AT(0x00530020u)=0x40000000u;
+    WORD_AT(0x0053002Cu)=3u;WORD_AT(0x00530030u)=0x0CE621u;
+    WORD_AT(0x0053003Cu)=0xFFFFFFFFu;WORD_AT(0x00530040u)=0x876E22u;    /* row -1: not the end */
+    WORD_AT(0x0053004Cu)=0xFFFFFFFFu;WORD_AT(0x00530050u)=0xFFFFFFFFu;
+    WORD_AT(0x0053005Cu)=9u;WORD_AT(0x00530060u)=0x111111u;
     WORD_AT(0x004B85C8u)=0x00540000u;WORD_AT(0x00540000u)=0x00541000u;WORD_AT(0x0054000Cu)=3u;
     WORD_AT(0x00541000u+0u*0x34u+0x1Cu)=0x876E22u;      /* stock texture, loaded earlier */
     WORD_AT(0x00541000u+2u*0x34u+0x1Cu)=0x28F2CCu;
     WORD_AT(0x00541000u+3u*0x34u+0x1Cu)=0x0CE621u;      /* past the end: not loaded */
     mount();level();sky_built();
     CHECK(smx.tex_total==3u && smx.tex_loaded==2u);
-    WORD_AT(0x0054000Cu)=4u;mount();level();sky_built();
+    mount();CHECK(smx.tex_total==0u && smx.tex_loaded==0u);   /* a new level forgets the last count */
+    WORD_AT(0x0054000Cu)=4u;level();sky_built();
     CHECK(smx.tex_total==3u && smx.tex_loaded==3u);
+    WORD_AT(0x00541000u+3u*0x34u+0x1Cu)=0x0D0D0Du;WORD_AT(0x00541000u+1u*0x34u+0x1Cu)=0x0CE621u;
+    mount();level();sky_built();                        /* a stale row: found by id elsewhere */
+    CHECK(smx.tex_total==3u && smx.tex_loaded==3u);
+    WORD_AT(0x00541000u+1u*0x34u+0x1Cu)=0;mount();level();sky_built();
+    CHECK(smx.tex_total==3u && smx.tex_loaded==2u);
+    WORD_AT(0x00541000u+3u*0x34u+0x1Cu)=0x0CE621u;
     request_ret=0;
     make_container(C,0,-1,58,0);mount();sky_built();CHECK(call_count==0);
 
@@ -349,8 +384,48 @@ int main(void)
     wx_start();
     CHECK(WORD_AT(0x007AC804u)==0x00507898u && WORD_AT(0x007AC800u)==1u && WORD_AT(0x007AC808u)==0u);
     wx_list(0,0);                                       /* scene 100's empty list after the start */
+    WORD_AT(0x007B0CE0u)=0;                             /* no players yet */
     for(i=0;i<700u;i++) wx_frame();
     CHECK(smx.frames==700u);                            /* probe counts this level's frames */
+    CHECK(rooms_seen==0u && emitter_rooms()==2u+3u+7u+6u+26u+27u+5u+4u+19u);   /* hidden, then back */
+    CHECK(smx.grains==0u);
+    /* grains around each outdoor player the weather runs for */
+    grains_dead();WORD_AT(0x004E7944u)=1u;
+    WORD_AT(0x007B0CE0u)=2u;WORD_AT(0x007B0CE4u)=PLAYER;
+    WORD_AT(PLAYER+0x21Cu)=0x80000400u;FLOAT_AT(PLAYER+0x27Cu)=100.0f;FLOAT_AT(PLAYER+0x280u)=5.0f;FLOAT_AT(PLAYER+0x284u)=-40.0f;
+    WORD_AT(PLAYER+0xFFCu+0x21Cu)=0x80000400u;FLOAT_AT(PLAYER+0xFFCu+0x27Cu)=-300.0f;
+    FLOAT_AT(0x007AC844u)=1.0f;FLOAT_AT(0x007AC848u)=0.0f;   /* player 2 indoors */
+    WORD_AT(RING+60u*0x24u)=0xA5A5A5A5u;               /* just past the ring */
+    wx_frame();
+    CHECK(grains_alive()==1u && WORD_AT(0x007AC878u)==1u && smx.grains==1u && rooms_seen==0u);
+    CHECK(grain(0,0)>100.0f-6.0f*0.53f-12.01f && grain(0,0)<100.0f-6.0f*0.53f+12.01f);
+    CHECK(grain(0,4)>=4.29f && grain(0,4)<=7.31f);
+    CHECK(grain(0,8)>-40.0f+6.0f*0.85f-12.01f && grain(0,8)<-40.0f+6.0f*0.85f+12.01f);
+    CHECK(grain(0,0x0C)>0.53f*3.0f-0.13f && grain(0,0x14)<-0.85f*3.0f+0.13f);   /* downwind */
+    CHECK(grain(0,0x10)>=0.0f && grain(0,0x10)<=1.2f && grain(0,0x20)==0.0f);
+    for(i=0;i<200u;i++) wx_frame();                     /* a ring of 60, never past it */
+    CHECK(grains_alive()==60u && WORD_AT(0x007AC878u)==(1u+200u)%60u && WORD_AT(RING+60u*0x24u)==0xA5A5A5A5u);
+    grains_dead();WORD_AT(0x007AC878u)=60u;wx_frame(); /* a bad index starts over */
+    CHECK(grains_alive()==1u && grain(0,0x20)==0.0f && WORD_AT(RING+60u*0x24u)==0xA5A5A5A5u);
+    grains_dead();WORD_AT(0x004E7944u)=3u;wx_frame();CHECK(grains_alive()==3u);    /* per update step */
+    grains_dead();WORD_AT(0x004E7944u)=100u;wx_frame();CHECK(grains_alive()==4u);  /* at most 4 */
+    grains_dead();WORD_AT(0x004E7944u)=0xFFFFFFFFu;wx_frame();CHECK(grains_alive()==0u);
+    WORD_AT(0x004E7944u)=1u;
+    grains_dead();FLOAT_AT(0x007AC844u)=0.0f;FLOAT_AT(0x007AC848u)=1.0f;wx_frame();
+    CHECK(grains_alive()==1u && grain(0,0)<-300.0f+12.01f);   /* player 2 now */
+    grains_dead();FLOAT_AT(0x007AC848u)=0.0f;wx_frame();CHECK(grains_alive()==0u);  /* both indoors */
+    FLOAT_AT(0x007AC844u)=1.0f;
+    grains_dead();WORD_AT(PLAYER+0x21Cu)=0x00000400u;wx_frame();CHECK(grains_alive()==0u);
+    WORD_AT(PLAYER+0x21Cu)=0x80000000u;wx_frame();CHECK(grains_alive()==0u);   /* the stock player test */
+    WORD_AT(PLAYER+0x21Cu)=0x80000400u;
+    WORD_AT(0x00507898u)=0;grains_dead();wx_frame();CHECK(grains_alive()==0u);  /* not a type-5 entry */
+    WORD_AT(0x00507898u)=5u;
+    WORD_AT(0x0073D9ACu)=0;grains_dead();wx_frame();   /* flag cleared: stock frame alone */
+    CHECK(grains_alive()==0u && rooms_seen==emitter_rooms());
+    WORD_AT(0x0073D9ACu)=1u;
+    WORD_AT(0x007AC874u)=0;wx_frame();CHECK(rooms_seen==0u);   /* no ring: nothing written */
+    WORD_AT(0x007AC874u)=RING;
+    WORD_AT(0x007B0CE0u)=0;
     CHECK(seen_count==1u && seen_list==0x00507898u && WORD_AT(0x007AC804u)==0x00507898u);
     WORD_AT(0x007AC824u)=0;wx_start();wx_list(0,0);     /* buffers missing: default list kept */
     CHECK(WORD_AT(0x007AC804u)==0x004E63F8u && seen_count==0u);
@@ -362,7 +437,9 @@ int main(void)
     CHECK(WORD_AT(0x0073D9ACu)==0u && call_count==0);
     wx_start();CHECK(WORD_AT(0x007AC804u)==0x004E63F8u);
     wx_list(0,0);CHECK(seen_count==0u);
-    wx_frame();CHECK(smx.frames==0u);                   /* rain map: probe idle */
+    WORD_AT(0x007B0CE0u)=1u;grains_dead();
+    wx_frame();CHECK(smx.frames==0u && grains_alive()==0u && rooms_seen==emitter_rooms());   /* rain map: stock frame */
+    WORD_AT(0x007B0CE0u)=0;
     make_container(C,F_WX(1),-1,58,0);unmount_all();mount_fails=1;mount();
     wx_load();CHECK(WORD_AT(0x0073D9ACu)==0u && smx.sand_on==0);   /* no pak: no sandstorm */
     mount_fails=0;
