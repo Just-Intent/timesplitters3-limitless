@@ -152,7 +152,9 @@
  *    shape and counts). Around every entry into its code (the fight, its
  *    slot-2 callback sub_00286430, the fire draw) the instance is swapped in
  *    ([0x0078B1EC] and RBS_FX) and everything is put back after, so another
- *    instance or another area's boss keeps its blocks. Outside, [0x0078B1EC]
+ *    instance or another area's boss keeps its blocks; RBS_FX goes through
+ *    the one holder of pc_mapmaker_bossfx.inc, which the split Crowe shares,
+ *    so any nesting of the two areas is safe. Outside, [0x0078B1EC]
  *    is the first one: its particle-type callback sub_00288BD0 (one shared
  *    entry, sub_00378400) is called with no entity and uses it.
  *  - ai_start: each giant skeleton gets a free instance and record +0/+4 =
@@ -400,28 +402,31 @@ static struct {
  * (at most RBS_INST_MAX each). Each has its own stock state block, its own
  * copy of the particle/effect statics RBS_FX (its particle block pointer
  * [0x0078B0D0], emitter shape and counts, the walker's effect blocks
- * [0x0078B090]/[0x0078B098]) and the spawn record that holds its class. */
+ * [0x0078B090]/[0x0078B098]; pc_mapmaker_bossfx.inc: one live holder, shared
+ * with the split Crowe area) and the spawn record that holds its class. */
+#include "pc_mapmaker_bossfx.inc"
+typedef char rbs_fx_is_the_shared_window[(RBS_FX==MAPMAKER_FX && RBS_FX_SIZE==MAPMAKER_FX_SIZE)?1:-1];
 typedef struct {
     uint32_t state, parts, record;
     unsigned throws, skipped, fire;
     float floor;
     int floor_set;
-    uint8_t fx[RBS_FX_SIZE];
+    MapmakerFx fx;
 } RbsSkel;
 typedef struct {
     uint32_t state, record, actor;
     unsigned wells, drawn, ticks, beats, woken, roars, armed, moves;
     uint32_t last;
-    uint8_t fx[RBS_FX_SIZE];
+    MapmakerFx fx;
 } RbsWalk;
 static RbsSkel rbs_skels[RBS_INST_MAX];
 static RbsWalk rbs_walks[RBS_INST_MAX];
 /* n: instances with a state this level; cur: the one swapped in (0 = none). */
 static struct { unsigned n, extras, events, deaths; RbsSkel *cur; } rbs_skelf;
 static struct { unsigned n, extras, events, seen; RbsWalk *cur; } rbs_walkf;
-/* What a swap replaced: the boss pointer, the statics and the instance that
- * was current (an inner entry of the same instance swaps nothing). */
-typedef struct { uint32_t ptr; void *prev; int swapped; uint8_t fx[RBS_FX_SIZE]; } RbsSave;
+/* What a swap replaced: the boss pointer (an inner entry of the same
+ * instance keeps it), the instance that was current and the statics' holder. */
+typedef struct { uint32_t ptr; void *prev; int swapped; MapmakerFx *fx; } RbsSave;
 
 static void rbs_log(const char *what,uint32_t a,uint32_t b)
 {
@@ -803,44 +808,46 @@ static int rbs_sane(float f) { return f==f && f>-100000.0f && f<100000.0f; }
  * statics are kept in the instance and both are put back exactly as they
  * were, so no other boss (a robot or split Crowe area, another instance) is
  * left looking at this one's blocks. An inner entry of the instance that is
- * already in (a callback during its own fight) swaps nothing. */
-static void rbs_in(uint32_t global,uint32_t state,const uint8_t *fx,RbsSave *s)
+ * already in (a callback during its own fight) keeps the pointer; the statics
+ * always go through the shared holder (mapmaker_fx_enter), so the instance
+ * gets its own back even when another area's boss swapped in between (a
+ * walker's damage inside a split Crowe's hit inside that walker's fight). */
+static void rbs_in(uint32_t global,uint32_t state,MapmakerFx *fx,int same,RbsSave *s)
 {
+    s->fx=mapmaker_fx_enter(fx);
+    s->swapped=0;
+    if(same) return;
     s->ptr=WORD_AT(global);
-    memcpy(s->fx,rbs_g(RBS_FX),RBS_FX_SIZE);
     WORD_AT(global)=state;
-    memcpy(rbs_g(RBS_FX),fx,RBS_FX_SIZE);
     s->swapped=1;
 }
-static void rbs_out(uint32_t global,uint8_t *fx,const RbsSave *s)
+static void rbs_out(uint32_t global,const RbsSave *s)
 {
-    if(!s->swapped) return;
-    memcpy(fx,rbs_g(RBS_FX),RBS_FX_SIZE);
-    WORD_AT(global)=s->ptr;
-    memcpy(rbs_g(RBS_FX),s->fx,RBS_FX_SIZE);
+    if(s->swapped) WORD_AT(global)=s->ptr;
+    mapmaker_fx_leave(s->fx);
 }
 static void rbs_skel_in(RbsSkel *k,RbsSave *s)
 {
-    s->swapped=0;s->prev=rbs_skelf.cur;
-    if(rbs_skelf.cur==k) return;
-    rbs_in(RBS_SKEL_STATE,k->state,k->fx,s);
+    s->prev=rbs_skelf.cur;
+    rbs_in(RBS_SKEL_STATE,k->state,&k->fx,rbs_skelf.cur==k,s);
     rbs_skelf.cur=k;
 }
 static void rbs_skel_out(RbsSkel *k,const RbsSave *s)
 {
-    rbs_out(RBS_SKEL_STATE,k->fx,s);
+    (void)k;
+    rbs_out(RBS_SKEL_STATE,s);
     rbs_skelf.cur=(RbsSkel *)s->prev;
 }
 static void rbs_walk_in(RbsWalk *w,RbsSave *s)
 {
-    s->swapped=0;s->prev=rbs_walkf.cur;
-    if(rbs_walkf.cur==w) return;
-    rbs_in(RBS_WALK_STATE,w->state,w->fx,s);
+    s->prev=rbs_walkf.cur;
+    rbs_in(RBS_WALK_STATE,w->state,&w->fx,rbs_walkf.cur==w,s);
     rbs_walkf.cur=w;
 }
 static void rbs_walk_out(RbsWalk *w,const RbsSave *s)
 {
-    rbs_out(RBS_WALK_STATE,w->fx,s);
+    (void)w;
+    rbs_out(RBS_WALK_STATE,s);
     rbs_walkf.cur=(RbsWalk *)s->prev;
 }
 
@@ -861,6 +868,7 @@ void pc_mapmaker_realbosses_level(void (*original)(void))
     uint32_t st,pt;
     uint8_t base[RBS_FX_SIZE];
     original();
+    mapmaker_fx_forget(rbs_skels,sizeof rbs_skels);mapmaker_fx_forget(rbs_walks,sizeof rbs_walks);
     memset(rbs_skels,0,sizeof rbs_skels);memset(&rbs_skelf,0,sizeof rbs_skelf);   /* a new level: nothing of the last one */
     memset(rbs_walks,0,sizeof rbs_walks);memset(&rbs_walkf,0,sizeof rbs_walkf);
     rbs.logged=0;                                      /* a log budget per level */
@@ -877,7 +885,7 @@ void pc_mapmaker_realbosses_level(void (*original)(void))
             st=WORD_AT(RBS_WALK_STATE);
             if(!st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) { rbs_log("no level memory for a Crow walker; bot behaviour",st,k);break; }
             rbs_walks[k].state=st;
-            memcpy(rbs_walks[k].fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+            memcpy(rbs_walks[k].fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
             rbs_walkf.n=k+1u;
         }
         WORD_AT(RBS_WALK_STATE)=rbs_walkf.n?rbs_walks[0].state:0u;
@@ -896,7 +904,7 @@ void pc_mapmaker_realbosses_level(void (*original)(void))
                 break;
             }
             rbs_skels[k].state=st;rbs_skels[k].parts=pt;
-            memcpy(rbs_skels[k].fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+            memcpy(rbs_skels[k].fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
             rbs_skelf.n=k+1u;
         }
         WORD_AT(RBS_SKEL_STATE)=rbs_skelf.n?rbs_skels[0].state:0u;
@@ -1431,7 +1439,7 @@ static RbsWalk *rbs_walk_more(void)
     if(st && MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) {
         memset(&rbs_walks[k],0,sizeof rbs_walks[k]);
         rbs_walks[k].state=st;
-        memcpy(rbs_walks[k].fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+        memcpy(rbs_walks[k].fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
         rbs_walkf.n=k+1u;
     }
     memcpy(rbs_g(RBS_FX),cur,RBS_FX_SIZE);
@@ -1454,7 +1462,7 @@ static RbsSkel *rbs_skel_more(void)
     if(st && pt && MAPMAKER_PTR_OK(st,RBS_SKEL_STATE_SIZE) && MAPMAKER_PTR_OK(pt,RBS_SKEL_PARTS_SIZE)) {
         memset(&rbs_skels[k],0,sizeof rbs_skels[k]);
         rbs_skels[k].state=st;rbs_skels[k].parts=pt;
-        memcpy(rbs_skels[k].fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+        memcpy(rbs_skels[k].fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
         rbs_skelf.n=k+1u;
     }
     memcpy(rbs_g(RBS_FX),cur,RBS_FX_SIZE);

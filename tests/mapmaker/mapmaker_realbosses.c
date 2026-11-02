@@ -272,7 +272,7 @@ static void sai_slot(unsigned k,uint32_t slot)
         c+=8u+WORD_AT(c+4u);
     }
 }
-#define FXW(fx,a) (*(uint32_t *)((fx)+((a)-0x0078B080u)))   /* a static in an instance's saved copy */
+#define FXW(fx,a) (*(uint32_t *)((uint8_t *)&(fx)+((a)-0x0078B080u)))   /* a static in an instance's saved copy */
 static int fx_is(const uint8_t *base) { return !memcmp((void *)((uintptr_t)0x0078B080u+g_xbox_mem_offset),base,0x15Cu); }
 /* the sets area's chunk for slots 11-20 (0x00C776F5), inserted before the terminator */
 static void container_extra(const uint16_t *ids,unsigned n)
@@ -1156,6 +1156,29 @@ int main(void)
         CHECK(WORD_AT(0x0078B1ECu)==SKST_K(1));
         rbs_skel_out(&rbs_skels[1],&s1);
         CHECK(WORD_AT(0x0078B1ECu)==SKST && fx_is(base) && !rbs_skelf.cur);
+        /* the same instance again inside another area's boss (a split Crowe's
+         * statics live) inside its own code: its own latest values, all back */
+        {
+            static MapmakerFx crowe;
+            MapmakerFx *p;
+            uint32_t count=FXW(rbs_skels[1].fx,0x0078B0CCu);
+            memset(&crowe,0,sizeof crowe);FXW(crowe,0x0078B0D0u)=0x00799000u;
+            rbs_skel_in(&rbs_skels[1],&s1);
+            WORD_AT(0x0078B0CCu)=0x51u;
+            p=mapmaker_fx_enter(&crowe);
+            CHECK(WORD_AT(0x0078B0D0u)==0x00799000u && WORD_AT(0x0078B1ECu)==SKST_K(1) && p==&rbs_skels[1].fx);
+            rbs_skel_in(&rbs_skels[1],&s2);
+            CHECK(!s2.swapped && WORD_AT(0x0078B0D0u)==SKPT_K(1) && WORD_AT(0x0078B0CCu)==0x51u);
+            WORD_AT(0x0078B0CCu)=0x52u;
+            rbs_skel_out(&rbs_skels[1],&s2);
+            CHECK(WORD_AT(0x0078B0D0u)==0x00799000u && rbs_skelf.cur==&rbs_skels[1] && WORD_AT(0x0078B1ECu)==SKST_K(1));
+            WORD_AT(0x0078B0CCu)=0x77u;                                   /* the Crowe's own */
+            mapmaker_fx_leave(p);
+            CHECK(WORD_AT(0x0078B0CCu)==0x52u && WORD_AT(0x0078B0D0u)==SKPT_K(1) && FXW(crowe,0x0078B0CCu)==0x77u);
+            rbs_skel_out(&rbs_skels[1],&s1);
+            CHECK(fx_is(base) && !rbs_skelf.cur && !mapmaker_fx_holder && FXW(rbs_skels[1].fx,0x0078B0CCu)==0x52u);
+            FXW(rbs_skels[1].fx,0x0078B0CCu)=count;
+        }
         /* fire: each burning skeleton draws its own particles */
         WORD_AT(0x007B0CC0u)=PLAYER;WORD_AT(SKST_K(1)+0x3E88u)=1u;WORD_AT(SKST+0x3E88u)=0;WORD_AT(SKST_K(2)+0x3E88u)=0;
         q=nfire;r=nfx;
@@ -1228,6 +1251,15 @@ int main(void)
             sai_slot(0,11u);sai_slot(1,11u);sai_slot(2,10u);
             CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
             CHECK(rbs_skelf.n==2u);
+        }
+        {   /* a new level while a walker's copy is live (a call that never came back): the outside values first */
+            uint8_t out[0x15C];
+            memcpy(out,(void *)((uintptr_t)0x0078B080u+g_xbox_mem_offset),sizeof out);
+            memset(&rbs_walks[0].fx,0xA5,sizeof rbs_walks[0].fx);
+            (void)mapmaker_fx_enter(&rbs_walks[0].fx);
+            CHECK(mapmaker_fx_holder==&rbs_walks[0].fx && !fx_is(out));
+            CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
+            CHECK(!mapmaker_fx_holder && fx_is(out) && FXW(rbs_skels[0].fx,0x0078B0E0u)==FXW(out,0x0078B0E0u));
         }
         alloc_ok=0;
         CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);

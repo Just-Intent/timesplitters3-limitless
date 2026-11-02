@@ -226,6 +226,7 @@ void pc_mapmaker_crowe_meter(void (*original)(void));
 void pc_mapmaker_crowe_think(void (*original)(void));
 void pc_mapmaker_crowe_message(void (*original)(void));
 void pc_mapmaker_crowe_hit(void (*original)(void));
+void pc_mapmaker_crowe_eggs(void (*original)(void));
 void pc_mapmaker_tank_mount(void (*original)(void));
 void pc_mapmaker_tank_ai_start(void (*original)(void));
 void pc_mapmaker_tank_update(void (*original)(void));

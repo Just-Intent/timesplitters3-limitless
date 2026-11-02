@@ -461,7 +461,7 @@ CONFIRMED (decode, `test_several_per_map_entries`):
 | change | what it does |
 |---|---|
 | level | one instance per Story AI placed with the boss (Story AI chunk +0x28 slot whose set member is 0x28 / 0x64; at least 1, at most 4), each made by the stock `sub_00287E00` / `sub_002976F0` from the statics as they were. Each keeps its own copy of the statics, and the statics are put back after. The boss pointers are left on the first instance ("home") |
-| swap | around every entry above (`_princess` for the mansion fight, the new wrappers, the fire and beam draws in `_fx`), the instance's pointer and statics go in. After the call the statics are kept in the instance, and pointer and statics are put back exactly. An inner entry of the instance already in swaps nothing. A robot, split Crowe or other instance never sees this one's blocks |
+| swap | around every entry above (`_princess` for the mansion fight, the new wrappers, the fire and beam draws in `_fx`), the instance's pointer and statics go in. After the call the statics are kept in the instance, and pointer and statics are put back exactly. An inner entry of the instance already in keeps the pointer. The statics always go through the one holder shared with the split Crowe area (see below). A robot, split Crowe or other instance never sees this one's blocks |
 | ai_start | each skeleton / walker takes a free instance (the same one again for a restarting AI). One more than the map prepared keeps the bot class (`no giant skeleton left this level ...`) |
 | walker | heartbeat, fight-state log, wake-up, roar and guns per walker (logs say `Crow walker N`). One WELL stand-in per walker. The end of a walker's death removes that walker |
 | skeleton | floor height, throw and fire per skeleton |
@@ -470,6 +470,26 @@ Not routed (INFERRED, visual only): `sub_00288BD0` always sees the first skeleto
 particles for the other skeletons may be placed from the first one's values. Memory: about 51 KB per
 skeleton and 59 KB per walker of the level heap. The new wrappers are under
 [Integrator notes](#integrator-notes).
+
+**One holder for the statics (after the v0.4.0-mapmaker.28 crash report)**. The split Crowe's
+code uses 28 words of the same window (`docs/mapmaker/mapmaker-crowe.md`, "Several split
+Crowes"). Up to .28 each area copied its part of the window on its own, and an inner entry
+of "the instance already in" swapped nothing. So a walker's damage callback inside a split
+Crowe's hit inside that walker's fight ran on the Crowe's particle and effect blocks (and the
+reverse). Now `pc_mapmaker_bossfx.inc` (included by both areas) keeps one holder: entering an
+instance parks the live window in the current holder's copy (another area's boss, another
+instance, or the outside copy) and loads the instance's; leaving enters the previous holder
+again. Every nesting order sees each instance's latest values and puts everything back. The
+level init and late allocations still start from the outside statics (a level start first
+drops a holder that is one of its own instances). Tests: the fixture's nested foreign-holder
+case and `tests/mapmaker/test_mapmaker_bossnest.py`, which builds both areas in one
+translation unit as the game does.
+
+The crash itself was the split Crowe's egg drop (null props released on landing, each skipped
+wild call leaving esp 8 bytes high): `docs/mapmaker/mapmaker-crowe.md`, "Eggs". The
+realbosses hooks were audited for esp on every path (each runs its original once or does
+one `ret`; `princess` and `message` call the mansion variant directly, which pops the
+caller's return address like the lifted tail jump) and need no change.
 
 ## The Crow walker (story mission 13)
 

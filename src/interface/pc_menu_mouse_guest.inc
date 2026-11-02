@@ -837,6 +837,7 @@ void pc_mapmaker_crowe_meter(void (*original)(void)) { original(); }
 void pc_mapmaker_crowe_think(void (*original)(void)) { original(); }
 void pc_mapmaker_crowe_message(void (*original)(void)) { original(); }
 void pc_mapmaker_crowe_hit(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_eggs(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_mount(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_ai_start(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_update(void (*original)(void)) { original(); }

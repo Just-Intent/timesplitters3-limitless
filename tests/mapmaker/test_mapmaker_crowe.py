@@ -45,7 +45,7 @@ MUTATIONS = {
     'level-keeps': ('    crw_reset();                                       /* a new level', '    (void)0;                                       /* a new level'),
     'level-stale-state': ('    WORD_AT(CRW_STATE)=0;                              /* a stale pointer', '    /* a stale pointer'),
     'level-no-particles': ('    guest_call(sub_002A62C0,0);\n', ''),
-    'level-particles-lost': ('    for(j=0;j<CRW_NWIN;j++) WORD_AT(crw_win[j])=live[j];\n', ''),
+    'level-particles-lost': ('    memcpy(crw_window(),live.b,MAPMAKER_FX_SIZE);\n', ''),
     'level-no-alloc': ('    guest_call(sub_0028D6D0,0);\n', ''),
     'class-value': ('#define CRW_CLASS 0x40000u', '#define CRW_CLASS 0x80000u'),
     'class-after-original': ('        WORD_AT(rec)=0;WORD_AT(rec+4u)=CRW_CLASS;\n',
@@ -93,19 +93,28 @@ MUTATIONS = {
     'sparks-slot-left': ('    WORD_AT(slot)=v;                                   /* the caller', '    (void)v;                                   /* the caller'),
     'intro-kept': ('        WORD_AT(a+0x9D4u)=1u;WORD_AT(a+CRW_AI_STATE)=2u;', '        WORD_AT(a+0x9D4u)=1u;'),
     'intro-next-stale': ('WORD_AT(a+CRW_AI_STATE)=2u;WORD_AT(a+0x9D0u)=2u;', 'WORD_AT(a+CRW_AI_STATE)=2u;'),
-    'multi-no-swap': ('    prev=crw_enter(k);\n    crw_fight(ent,original);', '    prev=crw_cur;crw_i=&crw_inst[k];\n    crw_fight(ent,original);'),
+    'multi-no-swap': ('    prev=crw_enter(k);\n    crw_fight(ent,original);', '    prev.k=crw_cur;prev.fx=mapmaker_fx_holder;crw_i=&crw_inst[k];\n    crw_fight(ent,original);'),
     'multi-not-left': ('    crw_fight(ent,original);\n    crw_leave(prev);', '    crw_fight(ent,original);'),
-    'multi-nested-lost': ('    int prev=crw_cur;\n    if(prev==k) return prev;\n    crw_store(prev);', '    int prev=crw_cur;\n    if(prev==k) return prev;'),
-    'multi-leave-no-store': ('    if(crw_cur==prev) return;\n    crw_store(crw_cur);', '    if(crw_cur==prev) return;'),
-    'multi-window-short': ('0x0078B180u,0x0078B184u,0x0078B188u,\n};', '0x0078B180u,0x0078B184u,\n};'),
-    'multi-no-state-window': ('    CRW_STATE,\n    0x0078B080u,', '    0x0078B080u,'),
-    'multi-alloc-keeps-globals': ('    for(j=0;j<CRW_NWIN;j++) WORD_AT(crw_win[j])=live[j];\n    if(ok) crw_log(', '    if(ok) crw_log('),
-    'multi-alloc-not-captured': ('        for(j=0;j<CRW_NWIN;j++) crw_inst[k].win[j]=WORD_AT(crw_win[j]);\n', ''),
+    # v0.4.0-mapmaker.28: "the same boss again changes nothing" left another area's statics live
+    'multi-same-skips-swap': ('    p.fx=mapmaker_fx_enter(k<0?0:&crw_inst[k].fx);\n    if(p.k!=k) {',
+                              '    p.fx=mapmaker_fx_holder;\n    if(p.k==k) return p;\n    p.fx=mapmaker_fx_enter(k<0?0:&crw_inst[k].fx);\n    {'),
+    'multi-leave-no-fx': ('    mapmaker_fx_leave(p.fx);\n    if(crw_cur!=p.k) crw_set(p.k);', '    if(crw_cur!=p.k) crw_set(p.k);'),
+    'multi-outside-state-lost': ('        if(p.k<0) crw_out=WORD_AT(CRW_STATE);\n', ''),
+    'multi-no-state-swap': ('    WORD_AT(CRW_STATE)=k<0?crw_out:crw_inst[k].state;\n', ''),
+    'multi-alloc-keeps-globals': ('    WORD_AT(CRW_STATE)=live_state;\n    if(ok) crw_log(', '    if(ok) crw_log('),
+    'multi-alloc-not-captured': ('        memcpy(crw_inst[k].fx.b,crw_window(),MAPMAKER_FX_SIZE);\n', ''),
     'multi-no-extra-alloc': ('    } else if(k==crw_n && !crw_alloc(k)) {', '    } else if(k==crw_n) {'),
     'multi-reuse-slot-lost': ('    if(k==crw_n) for(k=0;k<crw_n && crw_inst[k].record;k++) {}   /* a slot allocated but unused */\n', ''),
     'multi-count-kept': ('        if(k==crw_n) crw_n++;\n', ''),
     'multi-cap-high': ('#define CRW_MAX 4u', '#define CRW_MAX 5u'),
-    'multi-draw-unswapped': ('        prev=crw_enter((int)k);\n        guest_call(sub_0028D710,0);', '        prev=crw_cur;\n        guest_call(sub_0028D710,0);'),
+    'multi-draw-unswapped': ('        prev=crw_enter((int)k);\n        guest_call(sub_0028D710,0);', '        prev.k=crw_cur;prev.fx=mapmaker_fx_holder;\n        guest_call(sub_0028D710,0);'),
+    # the egg drop: four null props would be released on landing (v0.4.0-mapmaker.28 crash)
+    'egg-drop-kept': ('crw.eggs);\n    MAPMAKER_GUEST_RET();', 'crw.eggs);\n    original();'),
+    'egg-no-ret': ('crw.eggs);\n    MAPMAKER_GUEST_RET();', 'crw.eggs);'),
+    'egg-any-caller': ('WORD_AT(g_esp)!=CRW_RET_EGG || ', ''),
+    'egg-ret-wrong': ('#define CRW_RET_EGG 0x00291E84u', '#define CRW_RET_EGG 0x00291E7Fu'),
+    'egg-any-scene': (' || WORD_AT(g_esp)!=CRW_RET_EGG || WORD_AT(CRW_SCENE)!=100u', ' || WORD_AT(g_esp)!=CRW_RET_EGG'),
+    'egg-outside-boss': ('    if(!crw_lv.record || !MAPMAKER_STACK_OK(0x1C)', '    if(!MAPMAKER_STACK_OK(0x1C)'),
     'message-unswapped': ('    crw_entry(WORD_AT(g_esp+4u),original);\n}\n/* WRAP sub_0028DA10', '    original();\n}\n/* WRAP sub_0028DA10'),
     'think-unswapped': ('    crw_entry(WORD_AT(g_esp+4u),original);\n}\n/* WRAP sub_0028F730', '    original();\n}\n/* WRAP sub_0028F730'),
     'hit-unswapped': ('    crw_entry(WORD_AT(info),original);', '    original();'),
@@ -133,7 +142,7 @@ MUTATIONS = {
     'event-any-scene': ('WORD_AT(g_esp)!=CRW_RET_EVENT || WORD_AT(CRW_SCENE)!=100u || !crw_on()', 'WORD_AT(g_esp)!=CRW_RET_EVENT || !crw_on()'),
     'event-without-boss': ('    if(!crw_lv.record || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=CRW_RET_EVENT', '    if(!MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=CRW_RET_EVENT'),
     'fx-missing': ('    guest_call(sub_0028D710,0);\n', ''),
-    'fx-any-caller': ('MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX,prev;', 'MAPMAKER_STACK_OK(4),prev;'),
+    'fx-any-caller': ('MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==CRW_RET_FX;', 'MAPMAKER_STACK_OK(4);'),
     'fx-stale': ('    if(!here || WORD_AT(CRW_SCENE)!=100u || !crw_on()) return;\n    for(k=0;k<crw_n;k++) {', '    if(!here) return;\n    for(k=0;k<crw_n;k++) {'),
     'hud-keeps-cleared': ('    original();\n    WORD_AT(player+CRW_FOCUS)=focus;\n', '    original();\n'),
     'hud-any-entity': ('       CRW_H(focus+CRW_ENT_MODEL)!=CRW_MODEL || crw_find(focus)<0 || !crw_play()) { original();return; }', '       CRW_H(focus+CRW_ENT_MODEL)!=CRW_MODEL || !crw_play()) { original();return; }'),
@@ -415,6 +424,27 @@ def test_turret_prop_site():
                for i in readers), [hex(i.address) for i in readers]
 
 
+def test_egg_drop_site():
+    """The egg drop (v0.4.0-mapmaker.28 crash): four props 0x4BD per egg, released on landing with no null test."""
+    a = by_address()
+    assert target(a[0x00291E7F]) == 0x002AB1B0 and ends(a, 0x00291E7F) == 0x00291E84
+    assert calls_to(0x002AB1B0) == {0x00291E7F}
+    assert ('imm', 0x18) in a[0x00291E8F].ops                         # cdecl: the fight pops the six arguments
+    # the spawn: sub_000A6F90(0x4BD, ..) four times, the handle stored at +0x150 + i*4 and used at once
+    assert ('imm', 0x4BD) in a[0x002AB44F].ops and target(a[0x002AB47D]) == 0x000A6F90
+    assert mem(a[0x002AB3DF])[0][4] == 0x150 and a[0x002AB48A].mnemonic == 'mov'   # [edi] = the prop
+    assert target(a[0x002AB48C]) == 0x000A5CE0 and target(a[0x002AB4A0]) == 0x0005F460
+    # the landing: sub_000A9070 on all four (+0x150..+0x15C) with no null test
+    assert mem(a[0x002AAE97])[0][4] == 0x150 and target(a[0x002AAEA5]) == 0x000A9070
+    assert a[0x002AAEA2].mnemonic == 'mov' and a[0x002AAEA4].mnemonic == 'push'
+    assert calls_to(0x002AA6A0) == {0x0028F587}
+    # the death's release tests each handle first (sub_002AA2E0)
+    assert a[0x002AA302].mnemonic == 'test' and a[0x002AA304].mnemonic == 'je' and target(a[0x002AA307]) == 0x000A9070
+    # sub_000A9070 -> sub_0009E330(obj, 1, 0): class bit of obj+0x20 indexes a callback table, called indirectly
+    assert target(a[0x000A907A]) == 0x0009E330 and mem(a[0x0009E334])[0][4] == 0x20
+    assert mem(a[0x0009E35A])[0][4] == 0x0072F2E0 and a[0x0009E36B].mnemonic == 'call'
+
+
 GAME = ROOT / 'private/game/pak'
 if not GAME.exists() and len(ROOT.parents) > 2:
     GAME = ROOT.parents[2] / 'private/game/pak'
@@ -449,10 +479,11 @@ def test_models_in_paks():
     assert crc(path) in _index(GAME / 'chr.pak')
     story = _index(GAME / 'story/l_14_st.pak')
     mounted = [_index(GAME / p) for p in ('chr.pak', 'gun.pak', 'arcade/l_100.pak')]
-    for m in (0x4BE, 0x4BF, 0x4C0):
+    for m in (0x4BD, 0x4BE, 0x4BF, 0x4C0):                            # 0x4BD: the egg
         path = props[m][0]
         assert 'splittercrow' in path and crc(path) in story
         assert not any(crc(path) in i for i in mounted), path
+    assert props[0x4BD][0] == 'farfuture2/splittercrowegg'
 
 
 def test_level_marker_and_reachability():
@@ -548,9 +579,10 @@ def test_multi_instance_globals():
     seen = reach(entries)
     assert users and users <= seen | {0x0029002C}
     window = {v for v, fs in fx.items() if fs & seen}
-    text = INC.read_text(encoding='utf-8')
-    for v in window:
-        assert f'0x{v:08X}u' in text, hex(v)
+    # all inside the shared boss statics the swap copies (pc_mapmaker_bossfx.inc)
+    shared = (ROOT / 'src/interface/pc_mapmaker_bossfx.inc').read_text(encoding='utf-8')
+    assert '#define MAPMAKER_FX 0x0078B080u' in shared and '#define MAPMAKER_FX_SIZE 0x15Cu' in shared
+    assert all(0x0078B080 <= v and v + 4 <= 0x0078B080 + 0x15C for v in window), sorted(map(hex, window))
     assert len(window) == 28                                       # + [0x0075F5E8] = 29 words
     # the entries the swap needs: message handler, think (slot 2) and hit (+0x19C) callbacks
     assert target(a[0x0027D3E9]) == 0x00292430
