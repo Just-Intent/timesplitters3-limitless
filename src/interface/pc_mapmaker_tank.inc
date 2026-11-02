@@ -61,6 +61,12 @@
  *    The castle frame offset d = spawn - TNK_C (the castle arena centre) is
  *    kept per tank; the init's first drive target (-9, y, -3.2) is moved by d.
  *    A placeholder past TNK_MAX keeps its bot behaviour (logged).
+ *    The init hides the tank: prop +0x28 bit 0 is cleared at 0x00256120 and
+ *    set only by the fight start (0x00255588); the death clears it again
+ *    (0x00255E44) as the wreck replaces it. Bit 0 = shown is INFERRED from
+ *    these sites; the first-draw line below confirms it in play.
+ *    v0.4.0-mapmaker.27: one tank 30.7 m from the player never woke, so it
+ *    was never seen. Our tank is shown at once (bit 0 set after the create).
  *  - update (sub_00255550, the tank's per-frame callback, slot 3): on the
  *    first frame, the placeholder AI is removed (sub_0015DDA0, after checking
  *    it is still that AI) so only the tank stands there.
@@ -119,7 +125,9 @@
  * the Story AI spawn sub_0015F8C0 (entity at [esp+4]; it runs the AI start
  * sub_0015B830 only when the placeholder's spawn logic, record +0xC, is true:
  * sub_0006C890 -> sub_0006B100 in scene 100) logs once per placeholder that
- * it is waiting, and when its AI start was reached.
+ * it is waiting, and when its AI start was reached. Per tank, once: its first
+ * update (flags, state), its first prop draw (sub_000A2740, log only) and,
+ * while asleep, the nearest living player's x/z offset.
  * The wake, area, target, state, gun and wreck hooks run inside a tank's
  * entry and act on the tank whose state is in the statics.
  * Not rebased (documented): the update's height tests (player y < -1.0 enters
@@ -179,6 +187,10 @@
 #define TNK_ENT_POS 0x64u                /* x, y (up), z */
 #define TNK_ENT_YAW 0x70u
 #define TNK_ENT_HEALTH 0x1CCu
+/* prop flags: bit 0 shown. The init clears it (0x00256120), the fight start
+ * sets it (0x00255588), the death clears it again (0x00255E44). */
+#define TNK_OBJ_FLAGS 0x28u
+#define TNK_SHOWN 1u
 #define TNK_PLAYER 0x007B0C7Cu
 #define TNK_FOCUS 0xFF4u
 #define TNK_PLAYERS 0x00790950u          /* count */
@@ -246,6 +258,7 @@ struct tnk_one {
     uint32_t obj, place, place_ent, place_rec;
     float d[3], spawn[3];
     unsigned wakes, misses, aims;        /* misses: points outside in this search */
+    unsigned updates, drawn, waited;     /* first update, draw and sleeping wake test logged */
     uint32_t seen_state;                 /* last fight state logged */
     uint32_t cannon[3];                  /* the cannon aim point last set here */
     uint32_t block[TNK_BLOCK_WORDS], sounds[TNK_SOUNDS_WORDS];
@@ -516,7 +529,7 @@ void pc_mapmaker_tank_spawn(void (*original)(void))
 /* WRAP sub_0015B830 (cdecl AI pool entry): the placeholder becomes the tank. */
 void pc_mapmaker_tank_ai_start(void (*original)(void))
 {
-    uint32_t a,ent,e,obj,args,i,tabs,w;
+    uint32_t a,ent,e,obj,args,i,tabs,w,fl;
     float pos[3],yaw,f;
     struct tnk_one *t;
     if(!MAPMAKER_STACK_OK(8) || !tnk_play() || tnk.optout) { original();return; }
@@ -589,12 +602,14 @@ void pc_mapmaker_tank_ai_start(void (*original)(void))
     w=(TNK_GOAL-TNK_BLOCK)/4u;                                     /* the init's first drive target */
     memcpy(&f,&t->block[w],4);f+=t->d[0];memcpy(&t->block[w],&f,4);
     memcpy(&f,&t->block[w+2u],4);f+=t->d[2];memcpy(&t->block[w+2u],&f,4);
+    fl=WORD_AT(obj+TNK_OBJ_FLAGS);
+    WORD_AT(obj+TNK_OBJ_FLAGS)=fl|TNK_SHOWN;                       /* stands there before its fight starts */
     tnk_lv.n++;
     tnk_string(&tnk.label,TNK_LABEL,sizeof TNK_LABEL);              /* off the text hook's path */
     tnk_string(&tnk.timer,TNK_TIMER_LABEL,sizeof TNK_TIMER_LABEL);
     tnk_log("castle tank created at the placeholder",a,obj);
-    fprintf(stderr,"[mapmaker] tank %u: spawn (%.2f, %.2f, %.2f), castle frame offset (%.2f, %.2f, %.2f)\n",tnk_lv.n,
-            (double)pos[0],(double)pos[1],(double)pos[2],(double)t->d[0],(double)t->d[1],(double)t->d[2]);
+    fprintf(stderr,"[mapmaker] tank %u: spawn (%.2f, %.2f, %.2f), castle frame offset (%.2f, %.2f, %.2f), flags 0x%X shown\n",tnk_lv.n,
+            (double)pos[0],(double)pos[1],(double)pos[2],(double)t->d[0],(double)t->d[1],(double)t->d[2],(unsigned)fl);
     fflush(stderr);
 }
 
@@ -605,6 +620,12 @@ void pc_mapmaker_tank_update(void (*original)(void))
     unsigned k,p;
     if(!MAPMAKER_STACK_OK(8) || !(k=tnk_find(WORD_AT(g_esp+4u)))) { original();return; }
     p=tnk_enter(k);
+    if(!TK.updates) {
+        TK.updates=1;
+        fprintf(stderr,"[mapmaker] tank %u: first update (object 0x%X, flags 0x%X, state %u)\n",k,
+                (unsigned)TK.obj,(unsigned)WORD_AT(TK.obj+TNK_OBJ_FLAGS),(unsigned)WORD_AT(TNK_STATE));
+        fflush(stderr);
+    }
     tnk_note_state("fight state at frame start (state, previous)");
     if(!TK.place) { original();tnk_leave(k,p);return; }
     a=TK.place;ent=TK.place_ent;TK.place=0;
@@ -617,6 +638,28 @@ void pc_mapmaker_tank_update(void (*original)(void))
     } else tnk_log("tank placeholder AI already gone",a,ent);
     original();
     tnk_leave(k,p);
+}
+
+/* WRAP sub_000A2740 (cdecl prop, view; a listed prop's draw, from the room
+ * prop pass sub_000A2900 0x000A2B37 and three other sites): log only, each
+ * tank's first draw. Hot (every drawn prop): no tank this level -> original. */
+void pc_mapmaker_tank_draw(void (*original)(void))
+{
+    uint32_t prop;
+    unsigned k;
+    if(tnk_lv.n && MAPMAKER_STACK_OK(8) && (prop=WORD_AT(g_esp+4u))!=0)
+        for(k=0;k<tnk_lv.n && k<TNK_MAX;k++) {
+            if(tnk_lv.t[k].obj!=prop) continue;
+            if(!tnk_lv.t[k].drawn && WORD_AT(TNK_SCENE)==100u) {
+                tnk_lv.t[k].drawn=1;
+                fprintf(stderr,"[mapmaker] tank %u: first draw (object 0x%X, flags 0x%X, at %.2f, %.2f, %.2f)\n",k+1u,(unsigned)prop,
+                        (unsigned)WORD_AT(prop+TNK_OBJ_FLAGS),(double)tnk_getf(prop+TNK_ENT_POS),(double)tnk_getf(prop+TNK_ENT_POS+4u),
+                        (double)tnk_getf(prop+TNK_ENT_POS+8u));
+                fflush(stderr);
+            }
+            break;
+        }
+    original();
 }
 
 /* WRAP sub_00253840 (cdecl tank, arg; slot 7) and WRAP sub_00253D60 (cdecl
@@ -653,7 +696,7 @@ void pc_mapmaker_tank_bar(void (*original)(void))
 void pc_mapmaker_tank_wake(void (*original)(void))
 {
     uint32_t n,base,k,ent;
-    float x,z,dx,dz,h;
+    float x,z,dx,dz,h,d2,best=-1.0f,bx=0.0f,bz=0.0f;
     if(!tnk_lv.act || !MAPMAKER_STACK_OK(4) || WORD_AT(TNK_SCENE)!=100u || !tnk_on()) { original();return; }
     g_eax=0;
     x=tnk_getf(TK.obj+TNK_ENT_POS);z=tnk_getf(TK.obj+TNK_ENT_POS+8u);
@@ -663,7 +706,15 @@ void pc_mapmaker_tank_wake(void (*original)(void))
         ent=WORD_AT(base+k*TNK_PLAYER_STRIDE+TNK_PLAYER_ENT);
         if(!MAPMAKER_PTR_OK(ent,0x200u) || !((h=tnk_getf(ent+TNK_ENT_HEALTH))>0.0f)) continue;
         dx=tnk_getf(ent+TNK_ENT_POS)-x;dz=tnk_getf(ent+TNK_ENT_POS+8u)-z;
+        d2=dx*dx+dz*dz;
+        if(best<0.0f || d2<best) { best=d2;bx=dx;bz=dz; }
         if(dx*dx+dz*dz<=TNK_WAKE*TNK_WAKE) { g_eax=1;break; }
+    }
+    if(!g_eax && !TK.waited) {   /* once per tank: how far the nearest living player is */
+        TK.waited=1;
+        fprintf(stderr,"[mapmaker] tank %u: waiting for a player within %.0f m (x/z); nearest living player at (%+.1f, %+.1f)%s\n",
+                tnk_lv.act,(double)TNK_WAKE,(double)bx,(double)bz,best<0.0f?" (none)":"");
+        fflush(stderr);
     }
     if(g_eax && !TK.wakes++) tnk_log("castle tank fight started: a player came near",tnk_lv.act,TK.obj);
     MAPMAKER_GUEST_RET();
