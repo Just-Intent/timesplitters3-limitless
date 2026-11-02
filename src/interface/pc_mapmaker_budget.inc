@@ -1,6 +1,7 @@
 /* US 45410066 MapMaker level memory budget (opt-in; off unless
- * TSFP_MAPMAKER_MEMORY_SCALE is 2..8, or 8 when TSFP_MAPMAKER_LIMITS=1 and no
- * scale is given).
+ * TSFP_MAPMAKER_MEMORY_SCALE is 2..16, or 8 when TSFP_MAPMAKER_LIMITS=1 and no
+ * scale is given; plus 1 for every 2 MB TSFP_MAPMAKER_ARENA_MB really added,
+ * so 16 with the largest arena).
  *
  * sub_002FA720 refuses placement when the editor's estimate of the level's
  * play-time memory (sub_002FA060 for the placed pieces plus sub_002FA0D0 for
@@ -20,7 +21,12 @@
  * writes guest memory; only the return register of the wrapped functions. */
 #include <stdlib.h>
 
-static struct { int initialized; unsigned scale; } mapmaker_budget;
+/* arena_mb: MB the arena switch really added (pc_mapmaker_memory.inc sets it
+ * through MAPMAKER_BUDGET_ARENA before the editor runs). */
+#define MAPMAKER_BUDGET_ARENA 1
+#define MAPMAKER_BUDGET_SCALE_MAX 16u
+#define MAPMAKER_BUDGET_SCALE_LIMITS 8u
+static struct { int initialized; unsigned scale, arena_mb; } mapmaker_budget;
 
 static unsigned mapmaker_budget_scale(void)
 {
@@ -30,10 +36,15 @@ static unsigned mapmaker_budget_scale(void)
         char *end=NULL;
         unsigned long n=v?strtoul(v,&end,10):1;
         mapmaker_budget.initialized=1;
-        mapmaker_budget.scale=(v && end!=v && !*end && n>=2 && n<=8)?(unsigned)n:1u;
-        /* The raised limits come with the largest budget unless a scale is set. */
-        if((!v || !*v) && l && l[0]=='1' && !l[1] && !(p && p[0]=='0' && !p[1]))
-            mapmaker_budget.scale=8u;
+        mapmaker_budget.scale=(v && end!=v && !*end && n>=2 && n<=MAPMAKER_BUDGET_SCALE_MAX)?(unsigned)n:1u;
+        /* The raised limits come with the largest budget the heap has unless a
+         * scale is set: 8 for the stock arena (measured), one more for every
+         * 2 MB of real Level heap the arena switch added (the estimate is about
+         * 2x the real use, so this keeps that margin). */
+        if((!v || !*v) && l && l[0]=='1' && !l[1] && !(p && p[0]=='0' && !p[1])) {
+            unsigned s=MAPMAKER_BUDGET_SCALE_LIMITS+mapmaker_budget.arena_mb/2u;
+            mapmaker_budget.scale=s<MAPMAKER_BUDGET_SCALE_MAX?s:MAPMAKER_BUDGET_SCALE_MAX;
+        }
     }
     return mapmaker_budget.scale;
 }

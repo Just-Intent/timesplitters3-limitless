@@ -143,11 +143,87 @@ limit are unchanged byte for byte. This build loads both (stock size first,
 then the tiers). System Link only carries stock-size maps, so such a map
 cannot be played over System Link (as with large maps already).
 
+## Round 4 (2026-11-02): nav block, memory budget, map-start line
+
+Static analysis and fixtures only; nothing built or played.
+
+Nav block. The AI navigation data of a MapMaker map is CPU-only and grows
+with the raised caps: regular pads 8000 x 32 B, per-pad AI data 8000 x 44 B,
+links 32,512 x 20 B, cover 10,496 x 32 B, runtime pads 0x280 B (1.59 MB in
+all, was 1.03 MB) and the group distance matrix ((N+1) x N x 4 B, 4.2 MB at
+1024 groups, 1.44 MB at 600). In scene 100 it now comes from one 6 MB block
+of the runtime heap (`xbox_HeapAlloc`, guest RAM), reserved at the first
+MapMaker map and kept for the run, instead of the Level heap:
+
+- `pc_display_mapmaker_pools` takes each pool through `mapmaker_pool_source`
+  (same order, zeroed; Level heap when the block refuses);
+- the heap hook answers `sub_0003DFA0(size, 1)` from return address
+  0x00275F95 (the matrix in `sub_00275F70`, which zeroes it itself) from the
+  block, skipping the original, so the Level heap's free count is untouched;
+  the aligned allocator and every other caller run the original;
+- `pc_mapmaker_memory_level_reset` (WRAP `sub_0003E650`, the Level heap reset,
+  single caller 0x0003D504; the only writer of the Level base besides
+  start-up `sub_0003DF00`/`sub_0003DF70`) empties the block after the
+  original, so its lifetime is exactly the Level heap's. Until that hook has
+  run once nothing is taken from the block (no wrapper, no block).
+- `TSFP_MAPMAKER_NAV=0` keeps everything in the Level heap.
+
+Why the runtime heap and not the window: GPU and APU data must be in the
+contiguous window (physical address = window offset; `pc_mapmaker_container.inc`
+notes a runtime-heap buffer that hung the front end), so only data no device
+reads moves. Pads, links, AI data and the matrix are read by AI code only.
+Why it is free (INFERRED, not measured): guest RAM is 64 MB; the image and
+the extension end at 0x00920000 and the main stack at 0x011A0000, leaving a
+46.4 MB runtime heap (`src/runtime/guest_thread_memory.c`). On the Xbox the
+title's virtual/pool allocations shared 64 MB with the 9 MB image and its
+47.1 MB arena (at most about 8 MB); thread stacks add at most 4 MB; the
+MapMaker host tables are small. So a 6 MB block leaves more than 25 MB. The
+map-start line prints `runtime_heap_free_min` (when the probe include is
+present, always in the game) to confirm it.
+
+Effect: about 1.6 MB of pools plus the matrix (up to 4.2 MB) leave the
+Level heap on every MapMaker map; for the 236-piece test map (about 350
+groups) that is about 1.5 MB more Level headroom at the same content, and at
+511 pieces about 4 MB (pools plus a 770-group matrix). Not done: other
+per-tile Level allocations (geometry, collision, props) stay, since some may
+be device-visible.
+
+Map-start line (stderr, once per map, at the first nav allocation):
+
+    [mapmaker] map start memory: level heap free F, level used U, heap 0 used H, arena A at 0x..., eternal free E; nav block N of 6291456 bytes at 0x... (runtime heap), K fallbacks; host runtime_heap_live L runtime_heap_free_min R contig_free_min C
+    [mapmaker] nav: group matrix of G groups, B bytes, in the nav block (nav block N of 6291456 used); level heap free F
+
+The second line comes when the matrix is built (mode 2/3 maps), late in the
+load, so its `level heap free` shows the headroom after the level's own
+allocations. A failed reservation logs once and the Level heap is used.
+
+Memory budget (`pc_mapmaker_budget.inc`): `TSFP_MAPMAKER_MEMORY_SCALE` now
+accepts 2..16 (was 2..8). With `TSFP_MAPMAKER_LIMITS=1` and no explicit scale
+the default stays 8 for the stock arena and gains one step per 2 MB the arena
+switch really added (`mapmaker_budget.arena_mb`, set by
+`pc_mapmaker_memory_arena` after its trial allocation succeeded), up to 16 at
+`TSFP_MAPMAKER_ARENA_MB=16`. The editor estimate is about 2x the real Level
+use, so this keeps that margin. 511 pieces of the heaviest tile estimate
+21.7 MB plus 40 KB per item type: scale 8 (16.4 MB) stops them at about 386
+pieces, scale 11 (`ARENA_MB=6`) fits them with about 20 item types, scale 16
+(32.8 MB) with every type. The arena itself stays off by default: the
+window's headroom is unmeasured (`contig_free_min`), and on the Xbox the
+non-arena window use was up to about 8 MB, so only a measured value is safe.
+
+Container: no change. 511 pieces (about 40-100 B each with their headers),
+500 items (28 B and up), 511 Story AI (120 B) and logic stay below about
+200 KB, inside the 256 KB tier of the 512 KB container; the undo ring is
+2 x 512 KB. Old saves load as before (stock size first, then the tiers).
+
 ## Wrappers for the integrator
 
     WRAP sub_0003DFA0 -> pc_mapmaker_memory_heap_alloc          (area "memory")
     WRAP sub_0003E0B0 -> pc_mapmaker_memory_heap_alloc_aligned  (area "memory")
     WRAP sub_00023930 -> pc_mapmaker_memory_arena               (area "memory")
+    WRAP sub_0003E650 -> pc_mapmaker_memory_level_reset         (area "memory", 2026-11-02)
+
+`sub_0003E650` takes no arguments, ends in a plain `ret` (0x0003E731), and the
+hook calls the original exactly once before emptying the nav block.
 
 All three call their original exactly once and leave esp to it (plain
 `ret`, CONFIRMED 0x0003E031/0x0003E062/0x0003E07A/0x0003E08C/0x0003E090 for

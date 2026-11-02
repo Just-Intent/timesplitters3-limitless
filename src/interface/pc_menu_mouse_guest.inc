@@ -979,6 +979,7 @@ void pc_mapmaker_tilesets_play_pak(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }
+void pc_mapmaker_memory_level_reset(void (*original)(void)) { original(); }
 void pc_display_viewfinder(void (*original)(void)) { original(); }
 void pc_display_view_static(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
