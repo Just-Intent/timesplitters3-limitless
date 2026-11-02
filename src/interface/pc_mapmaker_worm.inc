@@ -416,8 +416,14 @@ void pc_mapmaker_worm_level(void (*original)(void))
     WORD_AT(scratch+WRM_FAKE_TABLE+WRM_OBJECT*4u)=scratch+WRM_FAKE_OBJECT;
     wrm_scratch=scratch;
     wrm_effect=guest_call(sub_00378400,2,WRM_EFFECT_FN,5u);
-    if(wrm_alloc(0)) wrm_n=1;
-    if(has<0) wrm_log("mansion worm level set up with the map container unreadable",wrm_n,0);
+    /* No block yet: the stock block init (sub_001D2350) takes particle
+     * emitters, and this hook runs in sub_001CDB80, before sub_001CDE30 builds
+     * this level's emitter pool (sub_000FF1B0 -> sub_001121B0). The free list
+     * then still points into the last level's freed memory, which lv1_2's
+     * data overwrote: v0.4.0-mapmaker.26 crashed in sub_0010DF90 from
+     * 0x001D2604 on every level whose set holds the worm. Each worm's block is
+     * made at its AI start, in play. */
+    if(has<0) wrm_log("mansion worm level set up with the map container unreadable",0,0);
 }
 
 /* WRAP sub_0015B830 (cdecl AI pool entry): one mansion worm per map is noted;
@@ -433,10 +439,9 @@ void pc_mapmaker_worm_ai_start(void (*original)(void))
     ent=WORD_AT(a);
     if(WRM_H(a+WRM_ACTOR_CHAR)!=WRM_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && WRM_H(ent+WRM_ENT_MODEL)==WRM_MODEL)) { original();return; }
     for(k=0;k<wrm_n && wrm_inst[k].record!=rec;k++) {}  /* the same record again */
-    if(k==wrm_n) for(k=0;k<wrm_n && wrm_inst[k].record;k++) {}   /* a block allocated but unused */
     if(wrm.optout) wrm_log("TSFP_MAPMAKER_REAL_BOSS=0: mansion worm with bot behaviour",a,0);
     else if(!wrm_pak_mounted()) wrm_log("lv1_2.pak not mounted: mansion worm with bot behaviour",a,0);
-    else if(!wrm_n) wrm_log("no mansion worm state this level: bot behaviour",a,WORD_AT(WRM_STATE));
+    else if(!wrm_scratch) wrm_log("no mansion worm level set-up: bot behaviour",a,WORD_AT(WRM_STATE));
     else if(k==wrm_n && wrm_n>=WRM_MAX) {
         if(wrm.extras++<4u) wrm_log("more than 4 mansion worms in the map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
     } else if(k==wrm_n && !wrm_alloc(k)) {

@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3306 @@
+@@ -1037,6 +1037,3316 @@
      sub_002FA720_gen();
  #endif
  }
@@ -444,13 +444,23 @@
 +#endif
 +}
 +
-+void sub_00240C50(void)
++static void sub_00240C50_layer2(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_level")) pc_mapmaker_bosses_level(sub_00240C50_layer1);
 +    else sub_00240C50_layer1();
 +#else
 +    sub_00240C50_layer1();
++#endif
++}
++
++void sub_00240C50(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sets","pc_mapmaker_sets_spawn_masks")) pc_mapmaker_sets_spawn_masks(sub_00240C50_layer2);
++    else sub_00240C50_layer2();
++#else
++    sub_00240C50_layer2();
 +#endif
 +}
 +

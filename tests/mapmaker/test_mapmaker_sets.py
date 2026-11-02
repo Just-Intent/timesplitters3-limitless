@@ -20,6 +20,12 @@ ROOT = Path(__file__).resolve().parents[2]
 INC = ROOT / 'src/interface/pc_mapmaker_sets.inc'
 
 MUTATIONS = {
+    'mask-not-fixed': ('        WORD_AT(r+0xCu)=mask;\n', ''),
+    'mask-low-slots-too': ('        if(slot<SETS_STOCK || slot>=2u*SETS_STOCK ||', '        if(slot>=2u*SETS_STOCK ||'),
+    'mask-any-scene': ("    if(!sets_on() || WORD_AT(SETS_SCENE)!=100u) return;\n    if(!MAPMAKER_PTR_OK(lvl", "    if(!sets_on()) return;\n    if(!MAPMAKER_PTR_OK(lvl"),
+    'mask-unbounded': ('    if(!n || n>SETS_REC_MAX ||', '    if(!n ||'),
+    'mask-wrong-item': ('#define SETS_MASK_ITEM 0x38u', '#define SETS_MASK_ITEM 0x44u'),
+    'mask-before-original': ('    uint32_t lvl,base,n,i,r,mask,old,fixed=0;\n    original();\n', '    uint32_t lvl,base,n,i,r,mask,old,fixed=0;\n'),
     'always-chunk': ('    if(!high && !sets_extras_used(e)) return;\n', ''),
     'ignores-story-ai': ('SETS_B(data+SETS_SAI_SLOT)>=SETS_STOCK) *(int *)ctx=1;', 'SETS_B(data+SETS_SAI_SLOT)>=SETS_STOCK) (void)ctx;'),
     'used-stale': ('    WORD_AT(info+0x248u)=used;\n', ''),

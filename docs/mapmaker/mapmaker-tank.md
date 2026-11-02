@@ -419,3 +419,8 @@ Also for the integrator: the editor picker row (above), and the
    (log `destroyed`).
 5. Second placeholder in the same map stays a guard robot; `TSFP_MAPMAKER_TANK=0`
    gives a guard robot; story mission 2 still plays stock.
+
+## Not appearing in .25/.26: set slot 14 (fixed in .27)
+
+The tank sat on set slot 14, whose spawn mode mask never allowed story mode;
+see [Spawn mode mask](mapmaker-sets.md). Nothing in the tank area was at fault.

@@ -853,6 +853,7 @@ static void rbs_walk_out(RbsWalk *w,const RbsSave *s)
  * back after, so a robot or split Crowe area keeps its own particle block.
  * The boss pointers are left on the first instance ("home"): code that no
  * entity routes (the skeleton's particle callback sub_00288BD0) uses it. */
+static uint8_t rbs_fx_base[RBS_FX_SIZE];       /* the statics at this level's init: late instances start from them */
 void pc_mapmaker_realbosses_level(void (*original)(void))
 {
     int has;
@@ -866,6 +867,7 @@ void pc_mapmaker_realbosses_level(void (*original)(void))
     if(!rbs_play() || rbs.optout) return;
     rbs_set_report("level init");
     memcpy(base,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_fx_base,base,RBS_FX_SIZE);
     if((has=rbs_map_has(RBS_WALK_ID))!=0) {
         n=rbs_count(RBS_WALK_ID);
         for(k=0;k<n;k++) {
@@ -1409,6 +1411,59 @@ static RbsWalk *rbs_walk_free(uint32_t rec)
     return 0;
 }
 
+/* One more walker or skeleton state at its AI start, when the level init's
+ * count (rbs_count) found fewer than were placed: v0.4.0-mapmaker.26 user
+ * test, three of each placed, "states allocated (.., 0x1)" and the other two
+ * bots. As the level init does it, from the statics as they are outside the
+ * bosses' calls, from the level init's statics; the boss pointers go back to the first instance. The split
+ * Crowe area allocates late the same way (four Crowes played in .26). */
+static RbsWalk *rbs_walk_more(void)
+{
+    uint8_t cur[RBS_FX_SIZE];
+    uint32_t st,home=WORD_AT(RBS_WALK_STATE);
+    unsigned k=rbs_walkf.n;
+    if(k>=RBS_INST_MAX) return 0;
+    memcpy(cur,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);
+    WORD_AT(RBS_WALK_STATE)=0;
+    guest_call(sub_002976F0,0);
+    st=WORD_AT(RBS_WALK_STATE);
+    if(st && MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) {
+        memset(&rbs_walks[k],0,sizeof rbs_walks[k]);
+        rbs_walks[k].state=st;
+        memcpy(rbs_walks[k].fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+        rbs_walkf.n=k+1u;
+    }
+    memcpy(rbs_g(RBS_FX),cur,RBS_FX_SIZE);
+    WORD_AT(RBS_WALK_STATE)=home;
+    rbs_log(rbs_walkf.n>k?"Crow walker not counted at level init: its state allocated at its AI start (state, walker)":
+                          "no level memory for another Crow walker; bot behaviour",st,k);
+    return rbs_walkf.n>k?&rbs_walks[k]:0;
+}
+static RbsSkel *rbs_skel_more(void)
+{
+    uint8_t cur[RBS_FX_SIZE];
+    uint32_t st,pt,home=WORD_AT(RBS_SKEL_STATE),hparts=WORD_AT(RBS_SKEL_PARTS);
+    unsigned k=rbs_skelf.n;
+    if(k>=RBS_INST_MAX) return 0;
+    memcpy(cur,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);
+    WORD_AT(RBS_SKEL_STATE)=0;WORD_AT(RBS_SKEL_PARTS)=0;
+    guest_call(sub_00287E00,0);
+    st=WORD_AT(RBS_SKEL_STATE);pt=WORD_AT(RBS_SKEL_PARTS);
+    if(st && pt && MAPMAKER_PTR_OK(st,RBS_SKEL_STATE_SIZE) && MAPMAKER_PTR_OK(pt,RBS_SKEL_PARTS_SIZE)) {
+        memset(&rbs_skels[k],0,sizeof rbs_skels[k]);
+        rbs_skels[k].state=st;rbs_skels[k].parts=pt;
+        memcpy(rbs_skels[k].fx,rbs_g(RBS_FX),RBS_FX_SIZE);
+        rbs_skelf.n=k+1u;
+    }
+    memcpy(rbs_g(RBS_FX),cur,RBS_FX_SIZE);
+    WORD_AT(RBS_SKEL_STATE)=home;WORD_AT(RBS_SKEL_PARTS)=hparts;
+    rbs_log(rbs_skelf.n>k?"giant skeleton not counted at level init: its state allocated at its AI start (state, skeleton)":
+                          "no level memory for another giant skeleton; bot behaviour",st,k);
+    return rbs_skelf.n>k?&rbs_skels[k]:0;
+}
+
 void pc_mapmaker_realbosses_ai_start(void (*original)(void))
 {
     uint32_t a,ent,rec,id;
@@ -1428,7 +1483,7 @@ void pc_mapmaker_realbosses_ai_start(void (*original)(void))
         else if(!rbs_walk_pak_mounted()) rbs_log("lv81.pak not mounted: Crow walker with bot behaviour",a,0);
         else if(!rbs_walkf.n || !rbs_walk_ours())
             rbs_log("no Crow walker state this level: bot behaviour",a,WORD_AT(RBS_WALK_STATE));
-        else if(!(w=rbs_walk_free(rec))) {
+        else if(!(w=rbs_walk_free(rec)) && !(w=rbs_walk_more())) {
             if(rbs_walkf.extras++<4u) rbs_log("no Crow walker left this level (one per placed walker, at most 4): bot behaviour",a,WORD_AT(rec+8u));
         } else {
             id=WORD_AT(rec+8u);
@@ -1445,7 +1500,7 @@ void pc_mapmaker_realbosses_ai_start(void (*original)(void))
         else if(!rbs_skel_pak_mounted()) rbs_log("lv1_6.pak not mounted: giant skeleton with bot behaviour",a,0);
         else if(!rbs_skelf.n || !rbs_skel_ours())
             rbs_log("no giant skeleton state this level: bot behaviour",a,WORD_AT(RBS_SKEL_STATE));
-        else if(!(k=rbs_skel_free(rec))) {
+        else if(!(k=rbs_skel_free(rec)) && !(k=rbs_skel_more())) {
             if(rbs_skelf.extras++<4u) rbs_log("no giant skeleton left this level (one per placed skeleton, at most 4): bot behaviour",a,WORD_AT(rec+8u));
         } else {
             id=WORD_AT(rec+8u);

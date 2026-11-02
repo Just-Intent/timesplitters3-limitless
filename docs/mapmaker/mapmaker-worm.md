@@ -413,3 +413,17 @@ entries.
    - whether it goes through walls;
    - the logged pad count;
    - the stderr lines.
+
+## Block made at the AI start (v0.4.0-mapmaker.27)
+
+The worm's block (`sub_001D1E80`, then the stock init `sub_001D2350`) is no
+longer made in the level hook. That hook runs inside `sub_001CDB80`, before
+`sub_001CDE30` builds the level's particle emitter pool (`sub_000FF1B0` ->
+`sub_001121B0`, free list rebuilt by `sub_000FEEA0`). The stock init takes
+emitters (`sub_00111AE0` -> `sub_0010DF90`) and found the last level's free
+list in freed memory, which lv1_2's data now overwrites: every level whose set
+holds the worm crashed in .26 (three dumps, `sub_0010DF90+0xB5` from
+`0x001D2604`). The level hook now only makes the shared scratch and effect;
+each worm's block is made at its AI start (`wrm_alloc(k)`), in play, and a
+failed scratch leaves the worm a bot. Confirmed by the user: three split
+Crowes loaded once the worm was out of the set.

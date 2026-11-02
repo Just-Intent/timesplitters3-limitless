@@ -119,6 +119,8 @@ void sub_00071B10(void) {} void sub_00071C50(void) {}
 void sub_000A6F90(void) {} void sub_000EFBD0(void) {} void sub_0028D6D0(void) {} void sub_0028D710(void) {}
 void sub_00292550(void) {} void sub_00292630(void) {} void sub_002A62C0(void) {}
 void sub_000A5E40(void) {} void sub_000631C0(void) {}  /* tank: model request at level init */
+void sub_00096330(void) {}  /* mothership: texture registration */
+void sub_002F7920(void) {}  /* sets: spawn mode mask of an editor item */
 /* khallos, worm (pc_mapmaker_khallos.inc, pc_mapmaker_worm.inc) */
 void sub_0009A420(void) {} void sub_000A9070(void) {} void sub_0010E2A0(void) {} void sub_001D1E80(void) {}
 void sub_001D2350(void) {} void sub_001DA990(void) {} void sub_001DAAB0(void) {} void sub_00378400(void) {} void sub_0005B980(void) {}

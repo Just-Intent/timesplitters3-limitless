@@ -29,6 +29,7 @@ STUB(sub_002C0310,10)
 STUB(sub_00075B70,11) STUB(sub_00071BE0,12) STUB(sub_00079D60,13) STUB(sub_002C1830,14) STUB(sub_00079710,15)
 STUB(sub_000780E0,16) STUB(sub_00078320,17) STUB(sub_000792B0,18) STUB(sub_00078380,19) STUB(sub_000781A0,20)
 STUB(sub_00077140,21) STUB(sub_00077360,22) STUB(sub_00074A00,23) STUB(sub_00074460,24)
+STUB(sub_002F7920,25)
 static struct { void (*f)(void); uint32_t a[7]; } build[96];   /* the pane builder's calls */
 static unsigned nbuild;
 static uint32_t advanced[8][2];                                /* sub_00074460(pane, value, 0) */
@@ -77,6 +78,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     else if(f==sub_00303350) r=fake_slot_name(x[0]);
     else if(f==sub_00071800) { if(noptions<32u) { options[noptions][0]=x[0];options[noptions][1]=x[1]; } noptions++; }
     else if(f==sub_002C0310) fake_refill();
+    else if(f==sub_002F7920) r=x[0]==0x38u?0x700u:x[0]==0x44u?0x20u:0xBADu;   /* item masks (XBE 0x525018) */
     else if(f==sub_000D7780) { if(npreloaded<32u && x[0]==x[1]) preloaded[npreloaded]=x[0]; npreloaded++; }
     return r;
 }
@@ -669,6 +671,39 @@ static void play_tests(void)
     npreloaded=0;CALL(pc_mapmaker_sets_preload,fake_plain,0x0023F47Cu,0u,0u);CHECK(npreloaded==0u);
 }
 
+/* ---- play: Story AIs on set slots 11-20 spawn in story mode ------------ */
+#define LVL 0x00305000u
+#define RECS 0x00306000u
+static void spawn_mask_tests(void)
+{
+    static const uint16_t slot[6]={0,9,10,12,13,19};
+    static const uint32_t mask[6]={0x700u,0x600u,0x701u,0x20u,0u,0xE00077Fu};
+    unsigned k;
+    WORD_AT(0x0074C36Cu)=LVL;WORD_AT(LVL+0x74u)=RECS;WORD_AT(LVL+0x78u)=6u;
+    for(k=0;k<6u;k++) { HALF_AT(RECS+k*0x98u+0x16u)=slot[k];WORD_AT(RECS+k*0x98u+0xCu)=mask[k]; }
+    WORD_AT(0x0079094Cu)=100u;originals=0;
+    CALL(pc_mapmaker_sets_spawn_masks,fake_plain,0x0024245Bu,0u,0u);
+    CHECK(originals==1u);
+    CHECK(WORD_AT(RECS+0xCu)==0x700u && WORD_AT(RECS+0x98u+0xCu)==0x600u);           /* slots 1-10: as they were */
+    for(k=2;k<6u;k++) CHECK(WORD_AT(RECS+k*0x98u+0xCu)==0x700u);                      /* 11-20: slot 1's mask */
+    WORD_AT(RECS+3u*0x98u+0xCu)=0x20u;
+    WORD_AT(0x0079094Cu)=102u;                                     /* the editor: stock */
+    CALL(pc_mapmaker_sets_spawn_masks,fake_plain,0x0024245Bu,0u,0u);
+    CHECK(WORD_AT(RECS+3u*0x98u+0xCu)==0x20u);
+    WORD_AT(0x0079094Cu)=100u;
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);                          /* off: stock */
+    CALL(pc_mapmaker_sets_spawn_masks,fake_plain,0x0024245Bu,0u,0u);
+    CHECK(WORD_AT(RECS+3u*0x98u+0xCu)==0x20u);
+    set_env("TSFP_MAPMAKER_LIMITS","1");
+    WORD_AT(LVL+0x78u)=0x401u;                                     /* an unreadable count: untouched */
+    CALL(pc_mapmaker_sets_spawn_masks,fake_plain,0x0024245Bu,0u,0u);
+    CHECK(WORD_AT(RECS+3u*0x98u+0xCu)==0x20u);
+    WORD_AT(LVL+0x78u)=6u;WORD_AT(0x0074C36Cu)=0;
+    CALL(pc_mapmaker_sets_spawn_masks,fake_plain,0x0024245Bu,0u,0u);
+    CHECK(WORD_AT(RECS+3u*0x98u+0xCu)==0x20u);
+    WORD_AT(0x0079094Cu)=102u;
+}
+
 int main(void)
 {
     g_xbox_mem_offset=(uintptr_t)memory;
@@ -683,6 +718,7 @@ int main(void)
     icon_tests();
     play_tests();
     match_tests();
+    spawn_mask_tests();
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
     printf("mapmaker sets ok\n");
     return 0;

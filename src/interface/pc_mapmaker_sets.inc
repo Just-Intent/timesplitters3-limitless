@@ -115,7 +115,7 @@
 #define SETS_F40 0x42200000u            /* 40.0f, the rows' width argument (0x002C1A97) */
 #define SETS_F45 0x42340000u            /* 45.0f (0x002C19FA) */
 
-extern void sub_00074670(void),sub_00071970(void),sub_00076EF0(void),sub_002BFFD0(void),
+extern void sub_002F7920(void),sub_00074670(void),sub_00071970(void),sub_00076EF0(void),sub_002BFFD0(void),
     sub_0003D7B0(void),sub_00303350(void),sub_00071800(void),sub_000D7780(void),sub_002C0310(void),
     sub_00075B70(void),sub_00071BE0(void),sub_00079D60(void),sub_002C1830(void),sub_00079710(void),
     sub_000780E0(void),sub_00078320(void),sub_000792B0(void),sub_00078380(void),sub_000781A0(void),
@@ -695,5 +695,37 @@ void pc_mapmaker_sets_preload(void (*original)(void))
     for(k=0;k<n;k++) {
         int32_t id=SETS_H(data+4u+4u*k);
         if(id!=-1) guest_call(sub_000D7780,2,(uint32_t)id,(uint32_t)id);
+    }
+}
+
+/* WRAP sub_00240C50 (the level load; Story AI spawn records built): set slots
+ * 11-20 get the spawn mode mask of slots 1-10. Each record's +0xC is the mask
+ * of editor item 0x38+slot (sub_002F7920, 0x00242011..0x0024201E), and +0x16
+ * the slot. Items 0x38..0x41 (slots 1-10) hold 0x700, but 0x42..0x4B are
+ * unrelated items: slot 13's 0x20 and slot 14's 0 have none of story mode's
+ * bits 0x100/0x200/0x400 (sub_0006B100 at 0x0006B1E4), so the spawn walk
+ * sub_00164010 (0x00164071) and the AI start (0x0015F96B) skipped any Story AI
+ * on those slots silently: the castle tank and Khallos "never spawned" in
+ * v0.4.0-mapmaker.25/.26 (set slots 14 and 13). */
+#define SETS_LEVEL 0x0074C36Cu          /* the level; +0x74 spawn records (0x98 each), +0x78 count */
+#define SETS_REC 0x98u
+#define SETS_REC_MAX 0x400u
+#define SETS_MASK_ITEM 0x38u            /* editor item of slot 1 */
+void pc_mapmaker_sets_spawn_masks(void (*original)(void))
+{
+    uint32_t lvl,base,n,i,r,mask,old,fixed=0;
+    original();
+    if(!sets_on() || WORD_AT(SETS_SCENE)!=100u) return;
+    if(!MAPMAKER_PTR_OK(lvl=WORD_AT(SETS_LEVEL),0x80u)) return;
+    base=WORD_AT(lvl+0x74u);n=WORD_AT(lvl+0x78u);
+    if(!n || n>SETS_REC_MAX || !MAPMAKER_PTR_OK(base,n*SETS_REC)) return;
+    mask=guest_call(sub_002F7920,1,SETS_MASK_ITEM);
+    for(i=0;i<n;i++) {
+        uint32_t slot;
+        r=base+i*SETS_REC;
+        slot=(uint16_t)SETS_H(r+0x16u);
+        if(slot<SETS_STOCK || slot>=2u*SETS_STOCK || (old=WORD_AT(r+0xCu))==mask) continue;
+        WORD_AT(r+0xCu)=mask;
+        if(fixed++<4u) sets_log("Story AI on set slot 11-20: spawn mode mask of slots 1-10 (slot, old mask)",(int)slot+1,(int)old);
     }
 }

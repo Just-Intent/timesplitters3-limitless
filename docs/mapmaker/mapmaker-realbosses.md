@@ -683,3 +683,19 @@ stubs). No extension memory.
    removed`, `Crow walker level event dropped`), logic markers unchanged.
    A second Crow walker AI fights as a bot (`only one Crow walker per map`).
    Mission 13 still plays stock.
+
+## Late instances at the AI start (v0.4.0-mapmaker.27)
+
+The level init's count (`rbs_count`) found one skeleton and one walker in the
+.26 test where three of each were placed, so the extras played as bots.
+`rbs_walk_more`/`rbs_skel_more` now allocate one more instance at its AI start
+when none is free (up to `RBS_INST_MAX`), from the statics saved at the level
+init (`rbs_fx_base`), putting the live statics and the home boss pointers back.
+The split Crowe area already allocated late (four Crowes played in .26). Why
+the count misses placed AIs is still open: stock spawn records keep the slot as
+word +0x24 of the Story AI data, while `RBS_SAI_SLOT` reads byte +0x28.
+
+Open: the walker took no damage in any .26 run (health stayed 60). Its damage
+callback `sub_00298BA0` -> `sub_00298570` scores hits by distance to its parts
+(state +0x188.. with +0x19C == 1) and explosion type 0x17; the stage-1 fight
+only takes hits on particular parts.

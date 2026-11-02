@@ -41,7 +41,7 @@ STUB(sub_00076EF0,16) STUB(sub_002BFFD0,17) STUB(sub_000D7780,18) STUB(sub_002C0
 STUB(sub_00075B70,21) STUB(sub_00071BE0,22) STUB(sub_002C1830,23) STUB(sub_00079710,24) STUB(sub_000780E0,25)
 STUB(sub_00078320,26) STUB(sub_000792B0,27) STUB(sub_00078380,28) STUB(sub_000781A0,29) STUB(sub_00077140,30)
 STUB(sub_00077360,31) STUB(sub_00074A00,32) STUB(sub_00074460,33)
-STUB(sub_002976F0,34) STUB(sub_0015DDA0,35) STUB(sub_0029CCB0,36) STUB(sub_00019D70,37) STUB(sub_002A7F30,38) STUB(sub_0005F460,39)  /* realbosses: walker (wake: roar), skeleton fire */
+STUB(sub_002976F0,34) STUB(sub_0015DDA0,35) STUB(sub_0029CCB0,36) STUB(sub_00019D70,37) STUB(sub_002A7F30,38) STUB(sub_0005F460,39) STUB(sub_002F7920,40)  /* realbosses: walker (wake: roar), skeleton fire */
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment)
 {
     static uint32_t next=0x00400000u;
