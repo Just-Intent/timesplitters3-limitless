@@ -104,7 +104,7 @@ int main(void)
     WORD_AT(0x007B6664u)=7;WORD_AT(0x007B666Cu)=9;
     { uint32_t s_=g_esp; pc_display_mapmaker_pools(fake_pools); CHECK(g_esp==s_+4u); g_esp=s_; }
     CHECK(originals==0 && allocs==5);
-    CHECK(alloc_size[0]==4800u*32u && alloc_size[1]==(12000u+16u*241u+256u)*20u && alloc_size[2]==4800u*44u &&
+    CHECK(alloc_size[0]==4800u*32u && alloc_size[1]==(12000u+16u*255u+256u)*20u && alloc_size[2]==4800u*44u &&
           alloc_size[3]==10496u*32u && alloc_size[4]==0x280u);
     CHECK(alloc_heap[0]==1 && alloc_heap[4]==1);
     CHECK(alloc_size[1]/20u<=0x7FFFu);                                  /* int16 A* link indices */
@@ -157,10 +157,10 @@ int main(void)
     WORD_AT(ED+0x25c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u) && (WORD_AT(ED+0x25c)&2u));  /* allowed; other flags kept */
-    /* meter: max(900/4800, 900/9984, 2700/12000, 400/600, 90/241, 0, 112500/2048000) */
+    /* meter: max(900/4800, 900/9984, 2700/12000, 400/600, 90/255, 0, 112500/2048000) */
     CHECK(NEAR(FLOAT_AT(ED+0x270),400.f/600.f));
-    /* held preview: max(2/4800, 9/9984, 20/12000, 1/241, 0, 125/2048000) */
-    CHECK(NEAR(FLOAT_AT(ED+0x274),1.f/241.f));
+    /* held preview: max(2/4800, 9/9984, 20/12000, 1/255, 0, 125/2048000) */
+    CHECK(NEAR(FLOAT_AT(ED+0x274),1.f/255.f));
 
     WORD_AT(0x00762CB8u)=601;                                          /* groups over 600 */
     pc_display_mapmaker_limits(fake_limits);
@@ -201,22 +201,22 @@ int main(void)
     WORD_AT(ED+0x2f34)=(uint32_t)-1;WORD_AT(ED+0x306c)=0;
     WORD_AT(0x0078400Cu)=pieces;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
-    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,241);             /* 241 cost-free placed */
+    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,255);             /* 255 cost-free placed */
     WORD_AT(ED+0x2f7c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEC,1);                 /* + 1 held: refused */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
-    /* The heaviest stock tile (type 14/42: 14 pads, 14 cover, 46 links): 241 of
-     * them fit every other limit, so only the piece limit refuses the 242nd. */
+    /* The heaviest stock tile (type 14/42: 14 pads, 14 cover, 46 links): 255 of
+     * them fit every other limit, so only the piece limit refuses the 256th. */
     WORD_AT(TYPEE)=14;WORD_AT(0x00529400u+14u*0x140u)=14;WORD_AT(0x00529404u+14u*0x140u)=14;
     WORD_AT(0x00529408u+14u*0x140u)=46;WORD_AT(0x00529410u+14u*0x140u)=0;
-    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEE,241);
+    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEE,255);
     WORD_AT(ED+0x2f7c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    CHECK(NEAR(FLOAT_AT(ED+0x270),1.0f));                             /* pieces 241/241 */
+    CHECK(NEAR(FLOAT_AT(ED+0x270),1.0f));                             /* pieces 255/255 */
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEE,1);
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);

@@ -26,15 +26,15 @@
  * sub-entries, and writes the meter (editor+0x270, placed only) and the held
  * piece preview (editor+0x274) from the same limits. After the original runs,
  * the decision and both values are recomputed with pads 4800, links 12000,
- * pad groups 600, 500 items ("sub-entries"; cover pads stay 1024) and 241
+ * pad groups 600, 500 items ("sub-entries"; cover pads stay 1024) and 255
  * pieces (one visibility room each: the engine's 200-room limit is raised to
- * 241 by config/guest-code-patches/rooms.json, see src/interface/pc_mapmaker_rooms.inc);
+ * 255 by config/guest-code-patches/rooms.json, see src/interface/pc_mapmaker_rooms.inc);
  * memory (raised separately by TSFP_MAPMAKER_MEMORY_SCALE) keeps its limit.
  * The editor's item node pool is 5300 (config/guest-code-patches/items.json):
  * 500 items, their clipboard copies and up to 81 start points fit twice over.
  * In play items are Level-heap arrays by count (sub_00240590) and about one
  * engine object each (pool 1000, pc_mapmaker_objects.inc; round 3: 500 items
- * + 241 rooms + 64 characters stay below it, measure with probe flag 64).
+ * + 255 rooms + 64 characters stay below it, measure with probe flag 64).
  *
  * Cover pads stay at the stock 1024: the map adds about 60 more when it loads
  * (measured: 60 on a 142-tile, 50-item map and on a 110-tile, 67-item map, so
@@ -69,14 +69,14 @@
  * pads a map adds at load (measured 60). */
 #define MAPMAKER_LIMIT_COVER 9984u    /* 10240 cover handles - 256 */
 #define MAPMAKER_POOL_COVER 10496u    /* 10240 cover handles + 256 guard */
-/* Links 12000 (round 4, was 8800): 241 pieces of the heaviest tile (46 links,
- * tile rows 0..45 of 0x00529400) need 11,086, so links never bind before the
- * piece limit; the pool (12000 + 16 x 241 + 256 = 16,112) keeps link indices
+/* Links 12000 (round 4, was 8800): 255 pieces of the heaviest tile (46 links,
+ * tile rows 0..45 of 0x00529400) need 11,730, so links never bind before the
+ * piece limit; the pool (12000 + 16 x 255 + 256 = 16,336) keeps link indices
  * below the int16 A* limit 32,767 (docs/mapmaker/mapmaker-pads.md). Pads
- * (14 x 241 = 3,374) and cover (3,374) already fit, so pieces bind first. */
+ * (14 x 255 = 3,570) and cover (3,570) already fit, so pieces bind first. */
 #define MAPMAKER_LIMIT_LINKS 12000u
 #define MAPMAKER_LIMIT_GROUPS 600
-#define MAPMAKER_LIMIT_PIECES 241u    /* = MAPMAKER_ROOMS_MAX */
+#define MAPMAKER_LIMIT_PIECES 255u    /* = MAPMAKER_ROOMS_MAX */
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
 

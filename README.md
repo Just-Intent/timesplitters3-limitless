@@ -30,7 +30,7 @@ LAN play) comes from that project; see [Credits](#credits).
 This fork adds:
 
 - **MapMaker capacity raised many times over** behind one opt-in switch
-  (`TSFP_MAPMAKER_LIMITS=1`): 241 tiles, 200 items, up to 255 Story AI, up to
+  (`TSFP_MAPMAKER_LIMITS=1`): 255 tiles, 200 items, up to 255 Story AI, up to
   64 characters alive in a MapMaker Story map, more movable objects, keycards,
   turrets, teleporters and logic, a 512 KB map file and an 8x memory budget.
 - **New MapMaker features:** sixteen floors on an 80x80 grid, optional
@@ -90,7 +90,7 @@ $env:TSFP_MAPMAKER_STACK_ITEMS = '1'   # optional
 
 | Switch | Default | Effect | Status |
 | --- | --- | --- | --- |
-| `TSFP_MAPMAKER_LIMITS=1` | Off | Raised editor limits: 241 tiles, 200 items, 255 Story AI, x4 keycards, movers and props, more turrets, teleporters, logic and free-standing objects, 512 KB maps and an x8 memory budget. The larger play-time capacity behind them (for example 64 characters alive in a local MapMaker Story map) is always present. Also turns on seven floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, and the Clouds checkbox. | Capacity play-tested on Windows (236 tiles, 200 items, 102+ Story AI, 64 characters; see [STATUS.md](docs/project/STATUS.md)). Story AI duplicates and linked copies: reported working by the maintainer. Grid, Story character and Clouds: fixture-tested, no recorded play test yet. |
+| `TSFP_MAPMAKER_LIMITS=1` | Off | Raised editor limits: 255 tiles, 200 items, 255 Story AI, x4 keycards, movers and props, more turrets, teleporters, logic and free-standing objects, 512 KB maps and an x8 memory budget. The larger play-time capacity behind them (for example 64 characters alive in a local MapMaker Story map) is always present. Also turns on seven floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, and the Clouds checkbox. | Capacity play-tested on Windows (236 tiles, 200 items, 102+ Story AI, 64 characters; see [STATUS.md](docs/project/STATUS.md)). Story AI duplicates and linked copies: reported working by the maintainer. Grid, Story character and Clouds: fixture-tested, no recorded play test yet. |
 | `TSFP_MAPMAKER_OVERLAP=1` | Off | Tiles may be placed over other tiles. Overlapping maps can show visual and pathing artefacts by design. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_STACK_ITEMS=1` | Off | Several pickups or props in one grid cell. Stacked items spawn on the same spot. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_MEMORY_SCALE=2..8` | 8 with `LIMITS`, otherwise off | Divides the editor's play-time memory estimate. | Part of the capacity play test |

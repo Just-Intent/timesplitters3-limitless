@@ -26,9 +26,22 @@ WRAP sub_0008A780 -> pc_mapmaker_rooms_compile
 WRAP sub_00083F80 -> pc_mapmaker_rooms_piece
 WRAP sub_00085030 -> pc_mapmaker_rooms_piece
 WRAP sub_00242780 -> pc_mapmaker_rooms_props
+WRAP sub_001121E0 -> pc_mapmaker_rooms_light_reset
+WRAP sub_001123C0 -> pc_mapmaker_rooms_light_unlink
+WRAP sub_001124D0 -> pc_mapmaker_rooms_light_colour
+WRAP sub_00114030 -> pc_mapmaker_rooms_light_link
+WRAP sub_00114290 -> pc_mapmaker_rooms_light_create
 ```
 
-All five are cdecl with a plain `ret`. `sub_00242780` is reached by a tail
+The first five are cdecl with a plain `ret`. The light hooks (stage 3 of the
+255 raise) always call their original and change no stack: `sub_001121E0`
+(no arguments; also reached by a tail `jmp` from `0x00112396`),
+`sub_001123C0` (light in `eax`; tail `jmp` from `sub_00112990`),
+`sub_001124D0` (cdecl light, colour; returns `eax`), `sub_00114030` (room in
+`eax`, light at `[esp+4]`), `sub_00114290` (source in `eax`, `ebx`, cdecl
+stack arguments, room the 4th; returns the light in `eax`). None wraps another
+area's hook, so order does not matter; `sub_00114290` calls `sub_001123C0` and
+`sub_00114030` through their wrappers. `sub_00242780` is reached by a tail
 `jmp` from `sub_00242BA0`; the wrapper still runs after the body. The table
 patches the bodies of `sub_0008A780` (portal buffer), so it must stay a
 wrapper calling `sub_0008A780_gen`, not a replacement.
@@ -83,11 +96,12 @@ immediates, plus negative forms and `lea` displacements); the room ones are:
 | `0x0073C350` light heads dword[3][0xD5] | | `0x008C8400` | [3][0xFE] |
 | `0x007AC880` room light colour float[0xD5][3] | | `0x008C9000` | [0xFE][3] |
 | `0x0078B860` model -> slot word[0x9D0] | 0x9D0 | `0x008CA000` | 0xA00 |
-| `0x0073D910` light round robin per room/16 | 14 | `0x008CB400` | 16 |
+| `0x0073D910` light round robin per room/16 | 14 | `0x008CB440` | 32 |
 | `0x00749890` front-end static view (0xFFC) | | `0x008CD000` | 0x7000 (shadow) |
 
-`0x008CB800..0x008CC800`: two 0x800-byte buffers of the room query. Free:
-`0x008CC800..0x008CD000` and `0x008D4000..0x008DFFFF`.
+`0x008CB800..0x008CC800`: two 0x800-byte buffers of the room query.
+`0x008CC800..0x008CCC40`: per-id drawn flag `0x007B5180` (stage 2 of the
+255 raise, below). Free: `0x008CCC40..0x008CD000` and `0x008D4000..0x008DFFFF`.
 
 Notes on how the relocations are declared (each verified by the full scan):
 
@@ -190,8 +204,24 @@ rest are other structs.
 0xD5 -> 0xFE wide (the stock aliasing of a row's last+1 entry to the next
 row's entry 0 is kept). `sub_00114030`/`sub_00114290` use `room/16` into the
 14-entry `0x0073D910`; rooms 224..241 would have written over the light lists
-at `0x0073D948`/`0x0073D94C`, so it is relocated with 16 entries. Its pool is
-sized from `[0x007B975C]/16` (`sub_001121E0`), already dynamic.
+at `0x0073D948`/`0x0073D94C`, so it is relocated (now 32 entries at
+`0x008CB440`). Its pool is sized from `[0x007B975C]/16` (`sub_001121E0`),
+already dynamic.
+
+Room ids above 0xFF (stage 3, `pc_mapmaker_rooms.inc`): the record has no
+spare byte, so the full id of a light whose room does not fit is kept in a C
+side table, by pool index (`[0x0073D950]`, stride 0xB8, at most 500 records)
+or for the 0xC0 record `[0x0073D960]`, else by address (a group past the
+level's groups indexes records past the pool, as stock does with its special
+ids; 256 such records). `sub_00114290` picks the record with the full room
+argument; the hook keeps the id while it runs so `sub_00114030` (only called
+from `0x00114859`, with the byte) gets it back, and redoes the round-robin
+step of `0x00114829` (which used the byte's group) on the full id's group.
+`sub_001123C0` unlinks the head entry `[row][id]` itself and lets the original
+see room 0; `sub_001124D0` sees room 0 (colour unchanged, the stock result for
+an id above the real rooms). `sub_001121E0` clears the table. Lights in rooms
+0..0xFF take the original paths unchanged, so with the 241 layout the hooks
+only look.
 
 ## Story levels
 
@@ -427,29 +457,23 @@ held prop's light (above).
 1. Done: this classification. Any new byte site, bucket user, flow table or
    room immediate fails `test_mapmaker_rooms_bytes_classified.py` or
    `test_every_room_constant_is_classified`.
-2. Room flag table: relocate `0x7B5180` (operand `0x000A79C8`, 0x358 B) to a
-   256+ entry block, drop the `keep` in `objects.json`. Test: `check-tables.py`,
-   and turn `test_room_flag_table_7b5180_is_not_relocated` into a relocated check.
-3. Light room side table (scene 100 only, ids > 0xFF): a word per light,
-   indexed `(light - [0x0073D950])/0xB8` and `(light - [0x0073D960])/0xC0`,
-   written next to `0x0011408E`/`0x00114390`, read at `0x001123D5`,
-   `0x0011241C`, `0x001124FC`, `0x00114829`, `0x00114851`, cleared next to
-   `0x001122DE`/`0x001124B9`: wrappers of `sub_001121E0`, `sub_001123C0`,
-   `sub_001124D0`, `sub_00114030`, `sub_00114290`. Head rows (`imul 0xD5` at
-   `0x001123EA`, `0x00112415`, `0x00112EBD`, `0x0011403C`) widen with the id
-   space. Test: a fixture like `mapmaker_rooms.c` plus the flow test's
-   byte-store set.
-4. Renumber 0xF2..0xFE -> 0x100..0x10C and `cmp 0xF1` -> 0xFF in the 155 + 21
-   `rooms.json` entries (all imm32/imm16/disp32 forms; the generator must
-   keep lengths); id-space counts 0xFF -> 0x10D (`mov ecx`, loop ends,
-   `[0x7B977C]` alloc 0x110 and its clear); per-id tables at `0x008C7000`
-   step 0x400 need 0x10D entries (re-space or move; objects and probe
-   hard-code them); light heads/colour [0x10D]; view shadow re-pack
-   (displacements of the 67 shadow sites and `sub_000CC920`'s flags); model
-   table `0x008CA000` to at least 0xA07 entries (it meets `0x008CB400`).
-   Test: the rooms tests with new values, `check-tables.py`.
-5. Story-level playtest (list in "What to test in play"), then
-   `MAPMAKER_LIMIT_PIECES` 241 -> 255.
+2. Done (2026-11-01): room flag table `0x7B5180` relocated to `0x008CC800`
+   (0x110 entries; declared 0x354 so the count `0x7B54D8` is outside it), the
+   `keep` dropped from `objects.json` (slot-0 list declared 0x1BC). Test:
+   `check-tables.py`, `test_room_flag_table_7b5180_is_relocated` (+4 mutations).
+3. Done (2026-11-01): light room side table, every scene (the special ids
+   move in story levels too), five wrappers; see "Lights". The round robin
+   moved to `0x008CB440` with 32 entries. Head rows widen in stage 4. Test:
+   the light part of `mapmaker_rooms.c` (+13 mutations) and
+   `test_light_side_table_matches_the_code`.
+4. Done (2026-11-01): the renumbering and table sizes, see "Rooms 241 ->
+   255" below. Test: `test_table_shape`, `test_id_space_tables` (+19
+   mutations), `test_other_areas_use_the_moved_tables`,
+   `test_extension_map_rooms_sub_range`, `check-tables.py`.
+5. Done (2026-11-01, prepared for the playtest): `MAPMAKER_LIMIT_PIECES` and
+   `MAPMAKER_ROOMS_MAX` 241 -> 255, gated as before (`TSFP_MAPMAKER_LIMITS=1`;
+   the compile guard keeps 200 unless room models 0x908..0xA06 all have prop
+   slots, scene 100 only). Play the story list first (S1..S7).
 6. Only for more than 255: word buckets (`sub_00086C40`, `sub_000897D0`
    reimplemented; `0x000864F4`, `0x00086644`, `0x000898F0` widened; the copy
    `0x00086D77`/`0x00086D80`), then the second shadow region past 341 ids.
@@ -459,6 +483,65 @@ known byte loads, so a room reaching a byte through a dword struct field and
 back is covered by the field scan only at the listed displacements; held-prop
 lights are INFERRED from the substitution code, not observed; the
 `0x7B54D8` overwrite is static reasoning.
+
+## Rooms 241 -> 255 (stages 2-5, 2026-11-01, static only)
+
+Nothing here was built or played by the agent that wrote it. The sections
+above describe the 241 layout; where they differ, this section wins.
+
+Room ids (every scene: the same 155 operand entries run in story levels):
+
+| id | stock | 241 | 255 |
+| --- | --- | --- | --- |
+| real rooms | 1..0xC8 | 1..0xF1 | 1..0xFF (`cmp 0xC8` x21 -> 0xFF) |
+| spare (unused) | 0xC9 | 0xF2 | 0x100 |
+| held by player p / nobody | 0xCA+p / 0xCE | 0xF3+p / 0xF7 | 0x101+p / 0x105 (`add -0xCA` x9 -> -0x101) |
+| room of view v | 0xCF+v | 0xF8+v | 0x106+v |
+| global / unplaced | 0xD5 | 0xFE | 0x10C |
+| id space | 0xD6 | 0xFF | 0x10D |
+
+Every special id is now above every byte, so a byte can only hold a real
+room or 0: the draw buckets (byte rows and counts) stay as they are, and the
+one byte that could hold a special id, `light+0x99`, has the stage-3 side
+table. The checker accepts every new value at its operand width (all
+imm32/imm16/disp32; `cmp ax,0xD5` is the view list cap, 16-bit).
+
+Tables (all in `0x008C0000..0x008D4000`; `test_extension_map_rooms_sub_range`
+proves no other area's constant points into the gaps it uses):
+
+| table | 241 | 255 |
+| --- | --- | --- |
+| per-id prop tables `0x7B54E0`, `0x7B5840`, `0x7B5BA0`, `0x7B5F00`, `0x7B6260` | `0x008C7000` step 0x400, 0xFF | `0x008C7000` step 0x440, 0x10D (global entry 0x10C at +0x430 of the first and fourth) |
+| loop ends `0x0009E4E6` / `0x000A1ED5`, `mov ecx,0xD6` x12 | 0x3FC / 0x3F8, 0xFF | 0x434 / 0x430, 0x10D |
+| per-id flag bytes `[0x7B977C]` | alloc 0x110, clear 0x40 dwords | alloc 0x110, clear 0x43 dwords + stosw (0x10E); +0x10C/+0x101/+0x106 |
+| per-id drawn flag `0x7B5180` (stage 2) | not moved | `0x008CC800`, 0x110 |
+| light heads `0x73C350` [3][row] | `0x008C8400`, row 0xFE | `0x008C8540`, row 0x10C (clear loop: start row 0 entry 0x10B, stride 0x430, end `0x008C95FC`) |
+| room light colour `0x7AC880` float[][3] | `0x008C9000`, 0xFE | `0x008C9200`, 0x10C |
+| light round robin `0x73D910` | `0x008CB400`, 16 | `0x008CB440`, 32 (stage 3) |
+| model -> slot `0x78B860` (operand entries) | `0x008CA000`, 0xA00 | `0x008CA000`, 0xA08 (room models 0x908..0xA06; clear 0x504 dwords; bounds `cmp 0x9D0` x4 -> 0xA08) |
+| per-model 0x18 B array `[0x7087A4]` | 0xF000 | 0xF0C0 (clear 0x3C30 dwords) |
+| view shadow (per view, +0x6000) | rects 256x12, flags +0x6C00, list +0x6D00 | rects 0x10Dx12 (+0x6000..+0x6C9C), flags +0x6CA0 (0x110), list +0x6DB0 (0x10D words, to +0x6FCA < 0x6FFC) |
+
+The view stride (0xFFC), the 0xBFF0 view array, the front-end static view
+(`0x008CD000`, 0x7000) and the rect displacements are unchanged; the open-air
+hook (`pc_mapmaker_openview.inc`, rects at +0x6000 + 12*room, rooms below
+`MAPMAKER_ROOF_ROOMS` = 256) needs no change. Other areas: the objects pool
+clear (`pc_mapmaker_objects.inc`) clears the moved per-id tables at their new
+addresses with 0x10D entries; the probe (`MAPMAKER_PROBE_ROOM_*`) reads them
+there; the bosses/characters/khallos/mothership/sky music/tank areas keep
+reading the model table at `0x008CA000` (their own models are below 0xA00).
+The `rooms` area can no longer be switched off by `TSFP_MAPMAKER_AREA_OFF`
+(the light side table is needed in every scene once ids pass 0xFF).
+
+Free in the rooms sub-range: `0x008C91D0..0x008C9200`, `0x008C9E94..0x008CA000`,
+`0x008CB410..0x008CB440`, `0x008CB4C0..0x008CB800`, `0x008CCC40..0x008CD000`;
+`0x008D4000..0x008DFFFF` (no reference in tracked code); `0x008E0000..` is
+the pads A* group pool and `0x00900000..` actors and later areas.
+
+Stage 5 (`MAPMAKER_LIMIT_PIECES` and `MAPMAKER_ROOMS_MAX` 241 -> 255, gated as
+before by `TSFP_MAPMAKER_LIMITS=1` and the room-model slots of scene 100) is
+the last commit; it changes nothing outside MapMaker play. Story-level risk
+of stages 2-4 (they are not gated): see "What to test in play".
 
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
@@ -495,14 +578,47 @@ private XBE is not present.
 - `tests/mapmaker/test_mapmaker_rooms_bytes_classified.py` (7 checks, 2026-11-01):
   byte-width room-id classification; 5 hand mutations (seed, field site,
   immediate, bucket writer, flow table removed) each fail it.
+- Rooms 255 (2026-11-01, static only): `check-tables.py` "table verified" for
+  the folder after each stage; the rooms fixture with the light side table
+  (13 light mutations), the id-space and extension-map table tests (19
+  mutations), the stage-2 flag table test (5 mutations), the objects and
+  probe fixtures with the moved tables. Not built, not played.
 
 ## What to test in play
+
+Rooms 255 (stages 2-4 run in every scene, so story levels come first; no
+`TSFP_MAPMAKER_*` switch is needed for them):
+
+- S1. Story mission 1: shoot the exploding barrels and throw grenades in
+  several rooms (global room 0x10C in the area-effect room list, the
+  0x000BBA05 crash path), then play on for a few minutes.
+- S2. Two story missions with many dynamic lights (muzzle flashes,
+  explosions, fire): lighting and room light colours look as in the 241
+  build; no flicker or lights left behind when they fade (light heads, colour
+  table, round robin; the side table only acts for ids above 0xFF).
+- S3. Held and thrown things (player ids 0x101..0x104): pick up, carry, drop
+  and throw props and weapons, swap weapons often; the held item draws and
+  lights correctly and stays drawn when dropped.
+- S4. Two-player splitscreen story co-op and four-player Arcade splitscreen
+  (view ids 0x106..0x10B, the view shadow re-pack): every view draws its rooms
+  and its first-person weapon; walk through doors and portals in each view.
+- S5. A mission with security-camera screens or other in-world views: the
+  screens show their rooms.
+- S6. Front-end and pause menus before, between and after levels (the static
+  front-end view at `0x008CD000`), and level restarts / loading a second level
+  (light and per-id table resets).
+- S7. Any crash, missing room geometry, missing props or wrong lighting: note
+  the level and spot; `TSFP_MAPMAKER_PROBE=128` logs room draws in scene 100
+  only, so story issues need the stderr log and the place.
+
+Then MapMaker (stage 5):
 
 1. Story levels (several, including splitscreen with 4 players and a level with
    security-camera screens): rendering, lights, held weapons/items (player
    ids), thrown/held props, particles.
-2. MapMaker with `TSFP_MAPMAKER_LIMITS=1`: a map of 241 pieces; check the log
-   line (rooms = pieces, nothing dropped), draw distance/culling at the far
-   end, lights, doors, items in rooms 201..241, and the front-end menus after
-   leaving the map.
+2. MapMaker with `TSFP_MAPMAKER_LIMITS=1`: a map of 255 pieces (and one of
+   241 built in the previous build); check the log line `rooms 255 of 255`
+   (rooms = pieces, nothing dropped), draw distance/culling at the far end,
+   lights, doors, items in rooms 242..255, open-air tiles near room 255, and
+   the front-end menus after leaving the map.
 3. A map of 200 pieces built in the stock game still loads and plays the same.
