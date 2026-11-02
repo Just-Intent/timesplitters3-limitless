@@ -118,14 +118,14 @@ image constants that only it reads, so it can be moved.
 | `sub_001C8540` -> `pc_mapmaker_crowe_anims` | after the original: when the map's custom set (index 0x11, slots 1-20, as realbosses reads it) holds 0x46 (or the container is unreadable) and lv14.pak is not mounted, mount it with `sub_0005A130` when >= 2 of the 30 mount slots are free |
 | `sub_0025F720` -> `pc_mapmaker_crowe_level` | after the original: forget the last level; when the set holds 0x46, clear `[0x0075F5E8]`, call the stock `sub_0028D6D0` (0x2E04 bytes of level heap plus the effect blocks), then `sub_002A62C0` for the particle block (a block another boss allocated this level stays if this one fails; otherwise the new one replaces it, which leaks 32 KB of level heap and keeps every boss working: they read the global). A failed allocation logs and keeps the bot AI |
 | `sub_0015B830` -> `pc_mapmaker_crowe_ai_start` | character 0x46 or model 0x5E8: class 0/0x40000 when lv14.pak is mounted and this level's state exists; up to 4 per map, each with its own blocks ([Several split Crowes](#several-split-crowes); the fifth and later keep the bot AI); notes the Story AI's Boss flag (chunk +0x29) for the HUD |
-| `sub_0028FE30` -> `pc_mapmaker_crowe_fight` | for this boss in scene 100: **relocate** on its first frame (state 0): the start cell (the 310.0 column's cell, a type-0 platform first, nearest the outer centre in z, whose centre the stock lookup maps back to it; with no such cell, the type-0 cell nearest the outer centre) is centred on the spawn x/z, every cell, the outer and the used edge rectangles (+0/+4/+8/+0xC/+0x10/+0x14) move by the same (dx, dz), sizes and types unchanged; dy = spawn height - 86. **Intro**: state 1 becomes 2 (+0x9D4 1, +0x20 2, +0x9D0 2, +0x9D8 0). **Floor**: during the original only, the image constants 86.0 (0x0049F3C4), 86.205, 88.25, 88.4 get + dy, 310.49 and 310.0 + dx, 80.95 + dz, and the stock bits are written back after (a constant that is not stock is left alone). **Start**: after that first state-0 frame, if the boss is not on the spawn x/z or +0x1198/+0x119C are not the start cell (only possible when no cell holds 310.0), both are set; the boss starts exactly at its Story AI spawn point. **End**: in state 0x12 the original still runs (shifted constants), with +0x2E00 = 0 for the call so no new smoke is emitted; the sparks, hazards and particles play out, and once no particle is live (`[0x0078B0CC]` after the call) or after 300 calls the boss is removed with `sub_0015DDA0` (focus cleared), once. **Eggs**: each fight call counts its kept eggs down. **Walk**: 240 calls in state 9 (a walk that stopped short of its target) put the boss on its target cell's centre (+0x1CEC/+0x1CF0). **Trace**: each AI state change (40 per boss and level) and every 600 calls (12) log one line |
+| `sub_0028FE30` -> `pc_mapmaker_crowe_fight` | for this boss in scene 100: **relocate** on its first frame (state 0): the start cell (the 310.0 column's cell, a type-0 platform first, nearest the outer centre in z, whose centre the stock lookup maps back to it; with no such cell, the type-0 cell nearest the outer centre) is centred on the spawn x/z, every cell, the outer and the used edge rectangles (+0/+4/+8/+0xC/+0x10/+0x14) move by the same (dx, dz), sizes and types unchanged; dy = spawn height - 86; then each cell's centre is asked the room query (cells in no room at the spawn height are *off*, [Walls](#walls-the-v040-mapmaker34-playtest)). **Intro**: state 1 becomes 2 (+0x9D4 1, +0x20 2, +0x9D0 2, +0x9D8 0). **Floor**: during the original only, the image constants 86.0 (0x0049F3C4), 86.205, 88.25, 88.4 get + dy, 310.49 and 310.0 + dx, 80.95 + dz, and the stock bits are written back after (a constant that is not stock is left alone). **Start**: after that first state-0 frame, if the boss is not on the spawn x/z or +0x1198/+0x119C are not the start cell (only possible when no cell holds 310.0), both are set; the boss starts exactly at its Story AI spawn point. **End**: in state 0x12 the original still runs (shifted constants), with +0x2E00 = 0 for the call so no new smoke is emitted; the sparks, hazards and particles play out, and once no particle is live (`[0x0078B0CC]` after the call) or after 300 calls the boss is removed with `sub_0015DDA0` (focus cleared), once. **Eggs**: each fight call counts its kept eggs down. **Walk**: a walk in state 9 that gets no 0.25 nearer its target (+0x1CEC/+0x1CF0) in 90 calls, or lasts 600, ends where the boss stands as stock ends it on arrival, and the cells ahead in its direction stay blocked for 1800 calls (up to .34: put on the target). **Trace**: each AI state change (40 per boss and level) and every 600 calls (12) log one line |
 | `sub_0028DD50` -> `pc_mapmaker_crowe_near` | return 0x00290BE7 while shifted: 86.0 restored inside (a distance there), shifted again after |
 | `sub_002A85C0` -> `pc_mapmaker_crowe_sparks` | return 0x00290C02 while shifted: the pushed floor 86.4 + dy, the caller's slot restored |
 | `sub_0028E770` -> `pc_mapmaker_crowe_part` | return 0x0028ECF1, scene 100: only the stock explosion `sub_000EFBD0(0x20, 0x17, state+0x2BFC+part*0x5C, 0, 0, 0, 0, 1)` for parts 0..2, no prop; the original is not run |
 | `sub_002275F0` -> `pc_mapmaker_crowe_event` | return 0x002923A8: level marker 0 is the map's own logic marker: dropped |
 | `sub_002AB1B0` -> `pc_mapmaker_crowe_eggs` | return 0x00291E84 (its only call, 0x00291E7F), inside this boss's fight in scene 100: the egg drop is skipped (cdecl `ret`; the fight pops its six arguments) - see [Eggs](#eggs-the-v040-mapmaker28-crash); the egg's hazard slot (argument 1) keeps its cell (arguments 5, 6) for 120 fight calls, unless that slot's egg is still out - see [No walk](#no-walk-the-v040-mapmaker31-playtest) |
 | `sub_001CDD60` -> `pc_mapmaker_crowe_restart` | the pause menu's level restart (no level init): before the original, when this level had Crowes, forget them as a new level does (outside statics back, `[0x0075F5E8]` 0) and let the AI start give every restarted Crowe new blocks, the first one included - see [Restart](#restart-from-the-pause-menu) |
-| `sub_002A9D00` -> `pc_mapmaker_crowe_cells` | return 0x002901BF or 0x00290E67 (the fight's cell lookups), argument 1 = this boss's state + 4: after the original (which clears every cell's +0x24 and blocks the eggs in flight), each kept egg blocks its cell and the cells above, below, left and right of it (+0x24 = 1), as a live egg does |
+| `sub_002A9D00` -> `pc_mapmaker_crowe_cells` | return 0x002901BF or 0x00290E67 (the fight's cell lookups), argument 1 = this boss's state + 4: after the original (which clears every cell's +0x24 and blocks the eggs in flight), each kept egg blocks its cell and the cells above, below, left and right of it (+0x24 = 1), as a live egg does; the off cells, the cells beyond an off cell in line with the boss and the cells ahead of a stopped walk are blocked too; a player in no cell (arguments 2, 3) gets the nearest cell in a room as +0x1190/+0x1194 |
 | `sub_00126560` -> `pc_mapmaker_crowe_fx` | return 0x001CEE8C: after the original, `sub_0028D710` with this level's state, until the boss is removed (then nothing it draws can stay frozen) |
 | `sub_0014CC80` -> `pc_mapmaker_crowe_hud` | focus on this boss: cleared for the stock bar, restored after (Boss Off = no health; Boss bar = the bosses area's; Sub-boss = the meter) |
 | `sub_0013A400` -> `pc_mapmaker_crowe_meter` | return 0x0014D264, this boss's record: the overhead meter hidden unless its Story AI chose the Sub-boss bar |
@@ -141,8 +141,12 @@ play out`, `split Crowe defeated: removed (frames, live particles)`,
 `overhead health meter hidden`, `split Crowe egg drop skipped`; per boss
 `split Crowe N fight state A -> B: cell r,c, player cell r,c, target r,c at
 (x, z), direction d, beam b, at (x, z), eggs skipped n (m blocking)`, the
-same with `still: state` every 600 calls, and `walk stopped short; put on
-its target`. The budget of the other lines (24) is per level.
+same with `still: state` every 600 calls, `walk blocked; ended where it
+stands, the cells ahead blocked` / `walk too long; ...`, and `split Crowe N
+arena: n of 35 cells in no room at its height (blocked)`; once per boss
+`player outside a split Crowe's arena: its nearest cell stands in` and
+(should not appear) `start cell is in no room: arena cells not checked`. The
+budget of the other lines (24) is per level.
 
 ## Risks (INFERRED, need a playtest)
 
@@ -150,16 +154,17 @@ its target`. The budget of the other lines (24) is per level.
   The boss starts on its spawn point, but the start platform is in column 4
   of 7, as in mission 10: the lattice reaches about 27 units towards -x and
   17 towards +x of the spawn, and about 20 each way in z (INFERRED from the
-  grid constants). The boss walks its lattice of
-  platforms and bridges straight through whatever the map has there; it has
-  no wall test of its own. Build an open floor (e.g. Open air tiles) around
-  it. MapMaker's world units per tile were not measured.
+  grid constants). Cells over no room at its height are never targets, and
+  a walk a wall stops ends there (since .35, [Walls](#walls-the-v040-mapmaker34-playtest));
+  an open floor around it still gives the best fight. MapMaker's world
+  units per tile were not measured.
 - **Uneven floors**: the fight keeps its spawn height; its sparks and smoke
   use the spawn floor. A map whose floor differs inside the arena shows them
   in the air or under the floor.
-- **Player off the grid**: as in stock, the boss then targets the nearest
-  cell or stops (state 16 sets `[0x00739A90]` = 1 for the rest of the level,
-  a collision flag; cleared at its death).
+- **Player off the grid**: the nearest cell in a room stands in for the
+  player (stock kept the last cell the player was in, or -1 when they never
+  were). State 16 sets `[0x00739A90]` = 1 for the rest of the level (a
+  collision flag; cleared at its death).
 - **Boss multiplier**: health is the sum of the parts, rewritten every frame,
   so the Boss row's x2..x8 does not make it tougher and the bar may read low
   (the bosses area scales +0x1D8). Use x1.
@@ -177,6 +182,10 @@ its target`. The budget of the other lines (24) is per level.
   that call that reads them except `sub_0028DD50`, handled.
 - **Respawn**: a second spawn of the same Story AI in one level keeps the
   first relocation (and stock state 0 then snaps it to that grid).
+- **Fixed after the v0.4.0-mapmaker.34 playtest**: the split Crowes went
+  into walls or vanished after the player walked around. The .32 safety net
+  put a stuck walk on its target, 14-28 units away, in walls or off the
+  map. See [Walls](#walls-the-v040-mapmaker34-playtest).
 - **Fixed after the v0.4.0-mapmaker.31 playtest** (four of each): the
   Crowes fired but never walked; the skipped egg no longer blocked the cell
   it was dropped on, so the walk picked that cell again and again. See
@@ -369,13 +378,85 @@ calls (INFERRED: about the egg's fall and landing; not measured);
 would, so state 5 picks the next cell. A slot whose egg is still out drops
 nothing, as stock (0x002AB1DA). Each boss keeps its own eggs.
 
-**Also** (INFERRED, not seen): state 9 (0x00291B8B) waits, after the walk
-animation, until the boss's centre has passed its target
-(0x00291C1A..0x00291D8C); a walk stopped short, e.g. by another boss in the
-way, would wait for ever. After 240 calls in state 9 the boss is put on its
-target cell's centre. Per-boss trace lines show each state change, the
-cells, the target, the direction, the beam (+0x2DDC: state 4 waits while a
-turret beam is on the player) and the eggs.
+**Also**: state 9 (0x00291B8B) waits, after the walk animation, until the
+boss's centre has passed its target (0x00291C1A..0x00291D8C); a walk stopped
+short would wait for ever. In .32 to .34, after 240 calls in state 9 the
+boss was put on its target cell's centre; that put it into walls (replaced
+in .35, see [Walls](#walls-the-v040-mapmaker34-playtest)). Per-boss trace
+lines show each state change, the cells, the target, the direction, the
+beam (+0x2DDC: state 4 waits while a turret beam is on the player) and the
+eggs.
+
+## Walls (the v0.4.0-mapmaker.34 playtest)
+
+User report: "After walking around my map, the splitter crows disappeared
+and/or glitched into walls." Log `m34.err`: four Crowes, each arena moved
+under its spawn (floor -9.49); 16 lines `walk stopped short; put on its
+target`, targets 14-28 units from the boss (e.g. `target 4,0 at (63.00,
+89.22)` from (65.46, 77.54)); `player cell -1,-1` on every line; the map has
+no open-air tile (`0 bounded, 0 unbounded`); no Crowe died.
+
+**Causes**:
+- CONFIRMED (log, code): the .32 safety net wrote the target cell's centre
+  into the boss's position. The mission 10 lattice (43 x 40 units) knows
+  nothing of the map, so those centres can be inside walls, in another tile
+  behind one, or past the map's edge. After the move the walk animation went
+  on from there (positions past the target in the next lines).
+- CONFIRMED (log, decode): the player was never in any Crowe's grid.
+  `sub_002A9330` writes no cell for a point no cell holds (0x002A93AB), so
+  +0x1190 kept the build's -1, and state 5's picker took its 5 x 5
+  candidates from rows 0-4, columns 0-4 (0x002A9E99..0x002A9EBF) in a fixed
+  order: the boss walked to the same corners whatever the player did, and
+  state 4 never found the player in line (`sub_002A9E10`).
+- INFERRED (not traced in the playtest): why the walks stopped short. The
+  walk is the animation's movement through the game's collision, and state
+  9 ends when a body point passes the target (+0x1D08/+0x1D10); a wall in
+  the way stops the body short (the lines show the boss barely moving, e.g.
+  87.03 -> 86.58 during a state 9 of 240 calls).
+- "Disappeared", NOT the fall check (CONFIRMED): the roof area's kill runs
+  only on a map with an unbounded open-air tile, this map has none, and no
+  `roof: character ... fell off the map` line exists. NOT the eggs
+  (CONFIRMED): the egg logic only sets cells' +0x24 and never moves or
+  removes the boss. The teleport is the likely cause (INFERRED): a boss put
+  outside the map stands in the void or falls, and one put inside another
+  tile keeps its old room (+0x34: the floor probe and the room draw use it),
+  so it can be culled from view or float.
+
+**Fix** (v0.4.0-mapmaker.35):
+- **No teleport**: a walk that gets no 0.25 nearer its target in 90 fight
+  calls (a wall), or lasts 600 calls, ends where the boss stands, as stock
+  ends it on arrival (0x00291C4F..0x00291CA8: `sub_0005F460(entity, 0x810,
+  0, 1.2)`, the state the walk was for (+0x2DE8; 4 if that is not a state),
+  +0x9D0/+0x9D4/+0x9D8, +0x2DF0 = 0). The position stays the one the
+  collision gave it. The cells ahead of the boss in the walk's direction
+  (+0x1D24: 0 row+, 1 column-, 2 row-, 3 column+) stay blocked for 1800 fight
+  calls (about 30 s at 60 Hz, INFERRED), so the next choice goes another way.
+- **The grid follows the map**: after the relocation each cell's centre is
+  passed to the room query `sub_00087310(box, out, 8)` with the body box of
+  the roof area's fall check (x/z +-0.3, y spawn +0.25..+1.5; on the guest
+  stack below esp). A cell in no room at that height (off the map, a void,
+  a floor of another height) is *off*: blocked after every lookup, and so is
+  every cell beyond an off cell in line with the boss (the walk would cross
+  it). The picker (`sub_002A9E60`, +0x24 = 1 skipped) then never picks them;
+  with no free cell it returns -2 and state 4 decides again. When the start
+  cell itself is in no room the query is not trusted and nothing is off
+  (logged). Walls inside a room are not seen by the query (INFERRED: the
+  rooms are the tiles' boxes); the walk-stop rule covers those.
+- **The player outside the grid**: after each lookup, when no cell holds the
+  player's x/z, the nearest cell in a room (any cell when none is) is written
+  as the player's cell. The boss turns and walks towards the player's side
+  as stock does for a player on the grid. Re-centring the arena on the
+  player was rejected: it would carry the boss across the map onto cells
+  nobody checked, away from where the mapper placed it, and the off cells
+  would have to be found again on every move.
+
+Tests: `walls()` and the 4-Crowe part of `multi()` in
+`tests/mapmaker/mapmaker_crowe.c` (cells over no room, a hole with an open
+cell beyond, another floor's room, an untrusted start, the player inside an
+off cell and outside on each side, each boss its own cells and walls), the
+`stop-*`, `wall-*`, `rooms-*`, `shadow-*` and `player-*` mutations, and the
+decode test `test_walk_end_and_cells_for_the_map`. Wrappers: none new (the
+room query and the walk-to-stand anim are guest calls with existing stubs).
 
 ## Restart from the pause menu
 
@@ -434,7 +515,9 @@ too: each hook checks "already mounted" and its own record.
 Guest calls (`extern void ...(void)`, called with `guest_call`):
 `sub_0005A130(path)`, `sub_00062260(path)`, `sub_0028D6D0()`,
 `sub_002A62C0()`, `sub_0028D710()`, `sub_000EFBD0(8 args)`,
-`sub_0015DDA0(entity)`. Link stubs to add in
+`sub_0015DDA0(entity)`, and since .35 `sub_0005F460(entity, anim, 0, speed)`
+and `sub_00087310(box, out, max)` (both already stubbed in
+`tests/mapmaker/mapmaker_area_stubs.h` by realbosses and roof). Link stubs to add in
 `tests/mapmaker/mapmaker_area_stubs.h` (new): `sub_0028D6D0`,
 `sub_002A62C0`, `sub_0028D710`, `sub_000EFBD0`; the others are already there.
 Off-build no-op hooks (`{ original(); }`) in `pc_menu_mouse_guest.inc` and
@@ -489,3 +572,10 @@ needs none of it):
    map, fight all of them for a few minutes (let them shoot each other):
    no crash, no `[ICALL] ... not code` line, each boss keeps its own
    effects.
+8. v0.4.0-mapmaker.34 walls: four Split Crowes in a map with walls and
+   floors of several heights near them; walk around and away from them for a
+   few minutes. They stay visible, never inside a wall or outside the map;
+   `arena: n of 35 cells in no room` once per Crowe, `player outside a split
+   Crowe's arena` when you are away, `walk blocked; ended where it stands`
+   instead of `put on its target`; after one, the next walk goes another way
+   (`5 -> 6` with another direction).
