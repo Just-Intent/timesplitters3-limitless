@@ -180,6 +180,8 @@ static struct {
     float kill_y, out_y;                       /* below kill_y: dead; below out_y for OUT_FRAMES: dead */
     uint32_t hide[MAPMAKER_ROOF_ROOMS];        /* node bits left out of the draw, by room index */
     uint8_t shown[MAPMAKER_ROOF_ROOMS];        /* room's hidden-node count logged in this build */
+    uint8_t open[MAPMAKER_ROOF_ROOMS];         /* open-air room (bounded or unbounded), by room index */
+    unsigned open_rooms, generation;           /* open[] count; play builds seen (pc_mapmaker_openview.inc) */
     uint8_t out[MAPMAKER_ROOF_SLOTS_FALL];     /* ticks below out_y: live-list slots, then human players */
     uint8_t below[MAPMAKER_ROOF_SLOTS_FALL];   /* "below the lowest floor" logged */
     float last_y[MAPMAKER_ROOF_SLOTS_FALL];    /* y at the last once-a-second log */
@@ -629,9 +631,9 @@ static int mapmaker_roof_play_record(uint32_t record,void *ctx)
     if(!k || floor>mapmaker_roof_play.high) mapmaker_roof_play.high=floor;
     if(mode==MAPMAKER_ROOF_OPEN_AIR) mapmaker_roof_play.unbounded++;
     if(k>=MAPMAKER_ROOF_PLAY_PIECES) return 0;
-    mapmaker_roof_play.mode[k]=(uint8_t)(mode==MAPMAKER_ROOF_OPEN_BOUNDED?mode:0u);
+    mapmaker_roof_play.mode[k]=(uint8_t)(mode==MAPMAKER_ROOF_OPEN_BOUNDED || mode==MAPMAKER_ROOF_OPEN_AIR?mode:0u);
     mapmaker_roof_play.mask[k]=WORD_AT(record+8u);
-    if(mapmaker_roof_play.mode[k]) mapmaker_roof_play.bounded++;
+    if(mode==MAPMAKER_ROOF_OPEN_BOUNDED) mapmaker_roof_play.bounded++;
     mapmaker_roof_play.pieces=k+1u;
     return 1;
 }
@@ -647,6 +649,8 @@ void pc_mapmaker_roof_play(void (*original)(void))
     int read=-1;
     memset(mapmaker_roof_play.hide,0,sizeof mapmaker_roof_play.hide);
     memset(mapmaker_roof_play.shown,0,sizeof mapmaker_roof_play.shown);
+    memset(mapmaker_roof_play.open,0,sizeof mapmaker_roof_play.open);
+    mapmaker_roof_play.open_rooms=0;mapmaker_roof_play.generation++;
     memset(mapmaker_roof_play.out,0,sizeof mapmaker_roof_play.out);
     memset(mapmaker_roof_play.below,0,sizeof mapmaker_roof_play.below);
     memset(mapmaker_roof_play.noroom,0,sizeof mapmaker_roof_play.noroom);
@@ -666,7 +670,7 @@ void pc_mapmaker_roof_play(void (*original)(void))
                     mapmaker_roof_play.pieces,c);
     }
     if(mapmaker_roof_play.pieces) {
-        mapmaker_roof_play.building=mapmaker_roof_play.bounded!=0;
+        mapmaker_roof_play.building=mapmaker_roof_play.bounded!=0 || mapmaker_roof_play.unbounded!=0;
         mapmaker_roof_play.kill=mapmaker_roof_play.unbounded!=0;
         mapmaker_roof_play.kill_y=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-MAPMAKER_ROOF_KILL_DEPTH;
         mapmaker_roof_play.out_y=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-MAPMAKER_ROOF_OUT_DEPTH;
@@ -696,7 +700,9 @@ void pc_mapmaker_roof_play(void (*original)(void))
 
 /* WRAP sub_00085710 (store one piece's per-room data, cdecl: the build entry;
  * table[+0x28 + j] = +0x44 for j < +0x14). Only during a build that has
- * bounded pieces. Entry k is record k (0x0008AC70..0x0008ACAB); its +0x44
+ * open-air pieces: their rooms j are marked open (pc_mapmaker_openview.inc
+ * draws across them); bounded ones also hide their side nodes in the draw.
+ * Entry k is record k (0x0008AC70..0x0008ACAB); its +0x44
  * is expected to be the record's +8 (0x0008A91D -> the copy's +0x14 ->
  * +0x44 at 0x00084F98 / 0x000856EB), and a difference is logged. */
 void pc_mapmaker_roof_rooms(void (*original)(void))
@@ -712,14 +718,17 @@ void pc_mapmaker_roof_rooms(void (*original)(void))
     if(WORD_AT(build+0x44u)!=mapmaker_roof_play.mask[k] && mapmaker_roof_play.mismatch++<4u)
         fprintf(stderr,"[mapmaker] roof: room build entry %u mask 0x%08X, its record's +8 0x%08X\n",k,
                 WORD_AT(build+0x44u),mapmaker_roof_play.mask[k]);
-    if(mapmaker_roof_play.mode[k]!=MAPMAKER_ROOF_OPEN_BOUNDED) return;
+    if(mapmaker_roof_play.mode[k]!=MAPMAKER_ROOF_OPEN_BOUNDED && mapmaker_roof_play.mode[k]!=MAPMAKER_ROOF_OPEN_AIR) return;
     base=WORD_AT(build+0x28u);count=WORD_AT(build+0x14u);
     for(j=0;(int32_t)count>0 && j<count;j++) {
         if(base+j>=MAPMAKER_ROOF_ROOMS) { mapmaker_roof_play.beyond++;break; }
+        if(!mapmaker_roof_play.open[base+j]) mapmaker_roof_play.open_rooms++;
+        mapmaker_roof_play.open[base+j]=1;          /* open sides: drawn across (openview) */
+        if(mapmaker_roof_play.mode[k]!=MAPMAKER_ROOF_OPEN_BOUNDED) continue;
         if(!mapmaker_roof_play.hide[base+j]) mapmaker_roof_play.rooms++;
         mapmaker_roof_play.hide[base+j]=MAPMAKER_ROOF_SIDES;
     }
-    if(mapmaker_roof_play.hidden_logs<64u) {
+    if(mapmaker_roof_play.mode[k]==MAPMAKER_ROOF_OPEN_BOUNDED && mapmaker_roof_play.hidden_logs<64u) {
         mapmaker_roof_play.hidden_logs++;
         fprintf(stderr,"[mapmaker] roof: bounded piece %u: rooms %u..%u (mask 0x%08X)\n",k,base+1u,base+count,
                 mapmaker_roof_play.mask[k]);

@@ -790,6 +790,11 @@ What the user tests:
   exact log text (15 mutations); plus the decoder check that `0x000857A3` is the
   only store into the table and that `rooms.json` relocates every reference
   (skipped without the private XBE).
+- `tests/mapmaker/test_mapmaker_openview.py` (fixture `tests/mapmaker/mapmaker_openview.c`):
+  rooms seen across open air (see "Seeing across open air"): open marks for
+  bounded/unbounded only, gates, areas by portal, closed neighbours, union,
+  depth, cap, rebuild per build, bad tables, log text (27 mutations); decoder
+  checks of the walk, its entries and the room list.
 
 ## Sky-tile test session (user, dev switch + probe)
 
@@ -841,3 +846,67 @@ first room query that finds no room while the character is more than
 0x5EA) is skipped: it starts and burrows under the floor, and .27 killed it at
 its spawn (y -4.5), which left its burst on screen.
 
+
+## Seeing across open air (v0.4.0-mapmaker.28)
+
+User report: from an Open air tile, the tiles beyond were drawn only inside a
+sharp-edged box, with the sky around it. Area `openview`,
+`src/interface/pc_mapmaker_openview.inc`, `tests/mapmaker/test_mapmaker_openview.py`
+(fixture `tests/mapmaker/mapmaker_openview.c`, 27 mutations, decoder checks).
+Not built or played.
+
+Cause (CONFIRMED, decode): the per-view portal walk `sub_00089B90` (tail
+jumps at `0x001CE688` from `sub_001CE650`, run per view from the tick at
+`0x0003C56A`, and `0x001CE8E3`) resets every room (`sub_000878A0`: depth -1,
+empty rectangle) and walks from the camera's room with the viewport
+(`sub_00087F80`, `0x00089BD9`). Each portal (room record `[0x00708788]` +
+room*0xB4, `+4` -> {count, ids}; portal `[[0x0070878C]+id*4]` `+0`/`+4` = its
+two rooms) is projected, clipped to the incoming rectangle and merged into
+the neighbour's entry (view `+0x3BC` + 12*room, the `+0x6000` shadow in this
+fork: int32 depth, int16 x0, y0, x1, y1). `sub_000897D0` lists rooms with a
+depth >= 0 and x1 > x0, and every prop of a room is culled and scissored to
+that rectangle (see mapmaker-realbosses.md, "Whole height"). Tiles are joined
+by one-floor portals that the open-air mask does not remove, so a neighbour
+shows only inside the projected shared side, the next one inside the
+intersection of two sides, and a diagonal neighbour or one behind a portal
+off screen not at all.
+
+Fix: `pc_mapmaker_openview_walk`, after the stock walk, in scene 100 with
+`TSFP_MAPMAKER_LIMITS=1` on a map with open-air rooms (the roof's rooms hook
+now marks the rooms of bounded and unbounded pieces open). Once per build the
+open rooms are grouped into areas joined by portals; an area's touched set is
+its rooms plus every room one portal away (a closed tile beside it, so its
+outer walls show). Each frame, for each area with a visible room, the union
+of its visible rooms' rectangles (the whole viewport when the camera stands
+in it, the doorway's rectangle when it is seen from a closed tile) is merged
+into every touched room; a room the walk did not reach gets depth (smallest
+visible depth of the area) + 1, capped at 0x40, and view `+0xD28` is raised
+to it. Depth testing still hides what is behind drawn walls. Unchanged:
+rooms behind a closed tile's doorway, an open area joined to the camera's by
+no portal (an island across a gap), closed tiles away from open air, other
+scenes and story levels. The room id width, the draw buckets (`sub_00086C40`,
+`sub_000897D0`) and the shadow layout are not touched.
+
+Cost: one pass over the area's rooms per view per frame (no guest calls); the
+areas are rebuilt only when the play build, room count or portal count
+changes. The draw cost is the touched rooms of every visible area, each still
+culled by its props' projected boxes. Logs: `[mapmaker] openview: N open-air
+rooms in A areas; T rooms drawn across them at most` per build (32 builds) and
+`W rooms widened across open air (X not reached by the portal walk)` at most 4
+new peaks per build.
+
+    WRAP sub_00089B90 -> pc_mapmaker_openview_walk
+
+cdecl, no arguments, plain `ret`; calls the original exactly once, then
+acts. Reached only by the two tail `jmp`s (new target, no other layer).
+Include after `pc_mapmaker_roof.inc` (it reads `mapmaker_roof_play`); the
+`pc_mapmaker_roof_rooms` change needs no new wrapper. Prototype in
+`pc_display_menu.h`, stub in the non-display branch of
+`pc_menu_mouse_guest.inc` (both added).
+
+Playtest: on a 3x3 field of Open air tiles stand on a corner tile and look
+across: every tile, the diagonal ones too, is drawn whole, nothing boxed; turn
+around fully; repeat with bounded tiles; stand inside a closed tile and look
+out a doorway at the field (only the doorway shows it, as before); put a
+closed building in the field (its outer walls show from every side); 2-4
+player split screen; frame rate on a large all-open map; the log lines above.
