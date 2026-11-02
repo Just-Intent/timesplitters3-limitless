@@ -4,7 +4,7 @@
   "extension": {
     "va": "0x008A0000",
     "size": "0x00080000",
-    "note": "Reserved by titles/futureperfect/src/main.c (TSFP_GUEST_EXTENSION_VA/SIZE). Areas: 0x008A0000 objects, 0x008B0000 logic/tags, 0x008C0000 rooms, 0x008D0000 editor, 0x008E0000-0x0091FFFF spare."
+    "note": "Reserved by titles/futureperfect/src/main.c (TSFP_GUEST_EXTENSION_VA/SIZE). Areas: 0x008A0000 objects, 0x008B0000 logic/tags, 0x008C0000 rooms (to 0x008D3FFF: tables, model table, query buffers, front-end view; map and free gaps in docs/mapmaker/mapmaker-rooms.md, checked by test_extension_map_rooms_sub_range), 0x008D4000-0x008DFFFF no reference in tracked code, 0x008E0000-0x008FFFFF pads group A* pool, 0x00900000 upward actors, story character, grid, sets, matchbots, weaponset, pak table. There is no general spare block: check every table before placing a new one."
   },
   "patches": []
 }

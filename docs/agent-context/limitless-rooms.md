@@ -47,3 +47,22 @@ bodies called through the hooks, 13 mutations) and
 pool sizes, rooms.json heads/row/round robin against the C defines).
 Risk: special-id lights in story levels are INFERRED rare (stock would index
 past the light pool for them).
+
+## Stage 4: special ids 0x100..0x10C (every scene)
+
+`rooms.json` renumbers the special ids by +0xE (stock +0x37): spare 0x100,
+players 0x101..0x105, views 0x106..0x10B, global 0x10C, id space 0x10D; the
+21 real-room compares become `cmp 0xFF`. These entries run in story levels
+too. Resized/moved: per-id prop tables (`0x008C7000` step 0x440), id loop
+ends and `mov ecx` counts, `[0x7B977C]` clear, light heads (`0x008C8540`,
+row 0x10C) and colour (`0x008C9200`), model table (0xA08 words at
+`0x008CA000`) with its bounds and the `[0x7087A4]` per-model array, and the
+view shadow re-packed inside 0xFFC (rects +0x6000 for 0x10D ids, flags
++0x6CA0, list +0x6DB0). Byte draw buckets are untouched (real rooms only).
+`pc_mapmaker_objects.inc` and `pc_mapmaker_probe.inc` follow the moved
+tables; the `rooms` area can no longer be switched off. Free space and the
+extension map: mapmaker-rooms.md "Rooms 241 -> 255" and the 00-header note.
+Tests: `test_table_shape`, `test_id_space_tables` (+19 mutations),
+`test_other_areas_use_the_moved_tables`, `test_extension_map_rooms_sub_range`
+in `tests/mapmaker/test_mapmaker_rooms.py`. Story-level playtest list:
+mapmaker-rooms.md "What to test in play" (S1..S7).

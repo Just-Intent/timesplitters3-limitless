@@ -103,12 +103,12 @@ FLOW = {
 }
 # Tables indexed (or addressed) by a byte room id, by base: (element bytes, stock entries, where they live now).
 FLOW_TABLES = {
-    0x007B54E0: (4, 0xD6, 'per-id prop count, rooms.json -> 0x008C7000 (256)'),
-    0x007B5F00: (4, 0xD6, 'per-id prop list, rooms.json -> 0x008C7C00 (256)'),
+    0x007B54E0: (4, 0xD6, 'per-id prop count, rooms.json -> 0x008C7000 (0x10D)'),
+    0x007B5F00: (4, 0xD6, 'per-id prop list, rooms.json -> 0x008C7CC0 (0x10D)'),
     0x007B5180: (4, 0xD6, 'per-id drawn flag, rooms.json -> 0x008CC800 (0x110, check 6)'),
-    0x0073C350: (4, 3 * 0xD5, 'light heads [3][0xD5], rooms.json -> 0x008C8400 [3][0xFE]'),
+    0x0073C350: (4, 3 * 0xD5, 'light heads [3][0xD5], rooms.json -> 0x008C8540 [3][0x10C]'),
     0x0073D910: (4, 14, 'light round robin room/16, rooms.json -> 0x008CB440 (32)'),
-    0x007AC880: (12, 0xD5, 'room light colour float[0xD5][3], rooms.json -> 0x008C9000 [0xFE][3]'),
+    0x007AC880: (12, 0xD5, 'room light colour float[0xD5][3], rooms.json -> 0x008C9200 [0x10C][3]'),
 }
 
 
@@ -185,7 +185,7 @@ def test_draw_buckets():
     assert loads == BUCKET_READERS
     # readers zero-extend (movzx) or copy the byte unchanged; none sign-extends a room (0xFF stays 255)
     assert {unique()[a].mnemonic for a in BUCKET_READERS} == {'movzx', 'mov'}
-    # the global room is drawn by push 0xD5 (rooms.json: 0xFE), never stored in a bucket
+    # the global room is drawn by push 0xD5 (rooms.json: 0x10C), never stored in a bucket
     assert any(i.address == 0x00086DDF and i.ops == (('imm', 0xD5),) for i in by_function()[0x00086C40])
 
 
