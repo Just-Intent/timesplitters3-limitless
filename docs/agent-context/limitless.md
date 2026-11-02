@@ -190,7 +190,7 @@ compile the whole include chain take link stubs from
 runtime pad handles 0x4740.., bounded A* pools, group A* pool relocated to
 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
-`objects`, `editor`, `rooms` (241 pieces) and `actors` (64 characters / 63 AI
+`objects`, `editor`, `rooms` (241, then 255 pieces: [rooms](limitless-rooms.md)) and `actors` (64 characters / 63 AI
 in a local MapMaker story map instead of 20 alive; live list moved to
 0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
 `actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;
@@ -899,7 +899,7 @@ Site inventories must come from the lifter's decoder, not from
 long instructions, which once hid a room id and crashed a story level.
 `tests/mapmaker/mapmaker_decoded.py` decodes all game code once per process with
 `tools.recomp.disasm`; `tests/test_mapmaker_{pads,container,editor,objects,actors,rooms_bytes}_classified.py`
-(and `test_every_room_constant_is_classified` in the rooms test) require every
+(and the rooms test's constant check) require every
 candidate constant/displacement of their area to be patched or listed with a
 reason. They skip without the private XBE, so CI only imports them.
 

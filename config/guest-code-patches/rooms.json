@@ -7,8 +7,8 @@
       "address": "0x00086A5C",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00086a76",
@@ -17,8 +17,8 @@
       "address": "0x00086A76",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00086a89",
@@ -27,8 +27,8 @@
       "address": "0x00086A89",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00086ab6",
@@ -37,8 +37,8 @@
       "address": "0x00086AB6",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00086ddf",
@@ -47,8 +47,8 @@
       "address": "0x00086DDF",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0008996b",
@@ -57,8 +57,8 @@
       "address": "0x0008996B",
       "original_hex": "3dd5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000899ca",
@@ -67,8 +67,8 @@
       "address": "0x000899CA",
       "original_hex": "663dd500",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp ax, 0xd5: room special id 0xD5 -> 0xFE (view room-list capacity)"
+      "value": "0x10C",
+      "reason": "cmp ax, 0xd5: room special id 0xD5 -> 0x10C (view room-list capacity)"
     },
     {
       "id": "rooms-0008cef7",
@@ -77,8 +77,8 @@
       "address": "0x0008CEF7",
       "original_hex": "81fed5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp esi, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp esi, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000990e4",
@@ -87,8 +87,8 @@
       "address": "0x000990E4",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000bba33",
@@ -97,8 +97,8 @@
       "address": "0x000BBA33",
       "original_hex": "3dd5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000bbc6c",
@@ -107,8 +107,8 @@
       "address": "0x000BBC6C",
       "original_hex": "817e34d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000c3861",
@@ -117,8 +117,8 @@
       "address": "0x000C3861",
       "original_hex": "c74734d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000c3fb7",
@@ -127,8 +127,8 @@
       "address": "0x000C3FB7",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000c44bb",
@@ -137,8 +137,8 @@
       "address": "0x000C44BB",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000d4005",
@@ -147,8 +147,8 @@
       "address": "0x000D4005",
       "original_hex": "bbd5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov ebx, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov ebx, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000d587b",
@@ -157,8 +157,8 @@
       "address": "0x000D587B",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000e79fc",
@@ -167,8 +167,8 @@
       "address": "0x000E79FC",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000e969e",
@@ -177,8 +177,8 @@
       "address": "0x000E969E",
       "original_hex": "3dd5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000e97b6",
@@ -187,8 +187,8 @@
       "address": "0x000E97B6",
       "original_hex": "3dd5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000f15b9",
@@ -197,8 +197,8 @@
       "address": "0x000F15B9",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000f1a22",
@@ -207,8 +207,8 @@
       "address": "0x000F1A22",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000f28ca",
@@ -217,8 +217,8 @@
       "address": "0x000F28CA",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000f2f50",
@@ -227,8 +227,8 @@
       "address": "0x000F2F50",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000f47ed",
@@ -237,8 +237,8 @@
       "address": "0x000F47ED",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00112272",
@@ -247,8 +247,8 @@
       "address": "0x00112272",
       "original_hex": "b9d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov ecx, 0xd5: room special id 0xD5 -> 0xFE (light head row clear count)"
+      "value": "0x10C",
+      "reason": "mov ecx, 0xd5: room special id 0xD5 -> 0x10C (light head row clear count)"
     },
     {
       "id": "rooms-001123ea",
@@ -257,8 +257,8 @@
       "address": "0x001123EA",
       "original_hex": "69d2d5000000",
       "operand": 2,
-      "value": "0xFE",
-      "reason": "imul edx, edx, 0xd5: room special id 0xD5 -> 0xFE (light head row width)"
+      "value": "0x10C",
+      "reason": "imul edx, edx, 0xd5: room special id 0xD5 -> 0x10C (light head row width)"
     },
     {
       "id": "rooms-00112415",
@@ -267,8 +267,8 @@
       "address": "0x00112415",
       "original_hex": "69d2d5000000",
       "operand": 2,
-      "value": "0xFE",
-      "reason": "imul edx, edx, 0xd5: room special id 0xD5 -> 0xFE (light head row width)"
+      "value": "0x10C",
+      "reason": "imul edx, edx, 0xd5: room special id 0xD5 -> 0x10C (light head row width)"
     },
     {
       "id": "rooms-00112ebd",
@@ -277,8 +277,8 @@
       "address": "0x00112EBD",
       "original_hex": "69f6d5000000",
       "operand": 2,
-      "value": "0xFE",
-      "reason": "imul esi, esi, 0xd5: room special id 0xD5 -> 0xFE (light head row width)"
+      "value": "0x10C",
+      "reason": "imul esi, esi, 0xd5: room special id 0xD5 -> 0x10C (light head row width)"
     },
     {
       "id": "rooms-0011403c",
@@ -287,8 +287,8 @@
       "address": "0x0011403C",
       "original_hex": "69d2d5000000",
       "operand": 2,
-      "value": "0xFE",
-      "reason": "imul edx, edx, 0xd5: room special id 0xD5 -> 0xFE (light head row width)"
+      "value": "0x10C",
+      "reason": "imul edx, edx, 0xd5: room special id 0xD5 -> 0x10C (light head row width)"
     },
     {
       "id": "rooms-0011507d",
@@ -297,8 +297,8 @@
       "address": "0x0011507D",
       "original_hex": "3dd5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00115798",
@@ -307,8 +307,8 @@
       "address": "0x00115798",
       "original_hex": "81f9d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp ecx, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp ecx, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00128493",
@@ -317,8 +317,8 @@
       "address": "0x00128493",
       "original_hex": "c74734d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0015f505",
@@ -327,8 +327,8 @@
       "address": "0x0015F505",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0015f511",
@@ -337,8 +337,8 @@
       "address": "0x0015F511",
       "original_hex": "817e34d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0015fd2b",
@@ -347,8 +347,8 @@
       "address": "0x0015FD2B",
       "original_hex": "c74734d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00171b5a",
@@ -357,8 +357,8 @@
       "address": "0x00171B5A",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00171c23",
@@ -367,8 +367,8 @@
       "address": "0x00171C23",
       "original_hex": "3dd5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0018e6e4",
@@ -377,8 +377,8 @@
       "address": "0x0018E6E4",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001b77f0",
@@ -387,8 +387,8 @@
       "address": "0x001B77F0",
       "original_hex": "c7442458d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esp + 0x58], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esp + 0x58], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001d1735",
@@ -397,8 +397,8 @@
       "address": "0x001D1735",
       "original_hex": "bad5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov edx, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov edx, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001e8662",
@@ -407,8 +407,8 @@
       "address": "0x001E8662",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001e90dd",
@@ -417,8 +417,8 @@
       "address": "0x001E90DD",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001e91fa",
@@ -427,8 +427,8 @@
       "address": "0x001E91FA",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001e93a6",
@@ -437,8 +437,8 @@
       "address": "0x001E93A6",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001e944c",
@@ -447,8 +447,8 @@
       "address": "0x001E944C",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001e9980",
@@ -457,8 +457,8 @@
       "address": "0x001E9980",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001eb122",
@@ -467,8 +467,8 @@
       "address": "0x001EB122",
       "original_hex": "b9d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov ecx, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov ecx, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001eb1b9",
@@ -477,8 +477,8 @@
       "address": "0x001EB1B9",
       "original_hex": "b9d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov ecx, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov ecx, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001eb7f0",
@@ -487,8 +487,8 @@
       "address": "0x001EB7F0",
       "original_hex": "c74734d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001ec50d",
@@ -497,8 +497,8 @@
       "address": "0x001EC50D",
       "original_hex": "bbd5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov ebx, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov ebx, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001edab3",
@@ -507,8 +507,8 @@
       "address": "0x001EDAB3",
       "original_hex": "c74034d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [eax + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [eax + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001edf8f",
@@ -517,8 +517,8 @@
       "address": "0x001EDF8F",
       "original_hex": "c7449638d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + edx*4 + 0x38], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + edx*4 + 0x38], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001efdc3",
@@ -527,8 +527,8 @@
       "address": "0x001EFDC3",
       "original_hex": "c74734d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001f511b",
@@ -537,8 +537,8 @@
       "address": "0x001F511B",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001f516d",
@@ -547,8 +547,8 @@
       "address": "0x001F516D",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001f529d",
@@ -557,8 +557,8 @@
       "address": "0x001F529D",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001f531e",
@@ -567,8 +567,8 @@
       "address": "0x001F531E",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001f563c",
@@ -577,8 +577,8 @@
       "address": "0x001F563C",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001f6905",
@@ -587,8 +587,8 @@
       "address": "0x001F6905",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-001f699c",
@@ -597,8 +597,8 @@
       "address": "0x001F699C",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00206b40",
@@ -607,8 +607,8 @@
       "address": "0x00206B40",
       "original_hex": "c74334d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [ebx + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [ebx + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0020a0be",
@@ -617,8 +617,8 @@
       "address": "0x0020A0BE",
       "original_hex": "c74034d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [eax + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [eax + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0020c39d",
@@ -627,8 +627,8 @@
       "address": "0x0020C39D",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0020c73f",
@@ -637,8 +637,8 @@
       "address": "0x0020C73F",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002153a0",
@@ -647,8 +647,8 @@
       "address": "0x002153A0",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00215404",
@@ -657,8 +657,8 @@
       "address": "0x00215404",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0021a832",
@@ -667,8 +667,8 @@
       "address": "0x0021A832",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0021a87d",
@@ -677,8 +677,8 @@
       "address": "0x0021A87D",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0021aac9",
@@ -687,8 +687,8 @@
       "address": "0x0021AAC9",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0021aaf5",
@@ -697,8 +697,8 @@
       "address": "0x0021AAF5",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002203b6",
@@ -707,8 +707,8 @@
       "address": "0x002203B6",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002203dd",
@@ -717,8 +717,8 @@
       "address": "0x002203DD",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0022046c",
@@ -727,8 +727,8 @@
       "address": "0x0022046C",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002204ca",
@@ -737,8 +737,8 @@
       "address": "0x002204CA",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00220abf",
@@ -747,8 +747,8 @@
       "address": "0x00220ABF",
       "original_hex": "c74034d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [eax + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [eax + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00221900",
@@ -757,8 +757,8 @@
       "address": "0x00221900",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002219cb",
@@ -767,8 +767,8 @@
       "address": "0x002219CB",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00222b39",
@@ -777,8 +777,8 @@
       "address": "0x00222B39",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00225f61",
@@ -787,8 +787,8 @@
       "address": "0x00225F61",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002311cc",
@@ -797,8 +797,8 @@
       "address": "0x002311CC",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00235047",
@@ -807,8 +807,8 @@
       "address": "0x00235047",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0023ea42",
@@ -817,8 +817,8 @@
       "address": "0x0023EA42",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0023ecb7",
@@ -827,8 +827,8 @@
       "address": "0x0023ECB7",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0024df18",
@@ -837,8 +837,8 @@
       "address": "0x0024DF18",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0024ea0c",
@@ -847,8 +847,8 @@
       "address": "0x0024EA0C",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0024ea31",
@@ -857,8 +857,8 @@
       "address": "0x0024EA31",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0024ea76",
@@ -867,8 +867,8 @@
       "address": "0x0024EA76",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0024eac4",
@@ -877,8 +877,8 @@
       "address": "0x0024EAC4",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002514af",
@@ -887,8 +887,8 @@
       "address": "0x002514AF",
       "original_hex": "c74634d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002515e2",
@@ -897,8 +897,8 @@
       "address": "0x002515E2",
       "original_hex": "c74734d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-00257f67",
@@ -907,8 +907,8 @@
       "address": "0x00257F67",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002583c5",
@@ -917,8 +917,8 @@
       "address": "0x002583C5",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0025842a",
@@ -927,8 +927,8 @@
       "address": "0x0025842A",
       "original_hex": "68d5000000",
       "operand": 0,
-      "value": "0xFE",
-      "reason": "push 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "push 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002633ba",
@@ -937,8 +937,8 @@
       "address": "0x002633BA",
       "original_hex": "b8d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov eax, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-0027f71d",
@@ -947,8 +947,8 @@
       "address": "0x0027F71D",
       "original_hex": "c74734d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-002b9f4e",
@@ -957,8 +957,8 @@
       "address": "0x002B9F4E",
       "original_hex": "c74734d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [edi + 0x34], 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-003520f3",
@@ -967,8 +967,8 @@
       "address": "0x003520F3",
       "original_hex": "81f9d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "cmp ecx, 0xd5: room special id 0xD5 -> 0xFE (global room)"
+      "value": "0x10C",
+      "reason": "cmp ecx, 0xd5: room special id 0xD5 -> 0x10C (global room)"
     },
     {
       "id": "rooms-000bba05",
@@ -977,8 +977,8 @@
       "address": "0x000BBA05",
       "original_hex": "c7848480010000d5000000",
       "operand": 1,
-      "value": "0xFE",
-      "reason": "mov dword ptr [esp + eax*4 + 0x180], 0xd5: room special id 0xD5 -> 0xFE (global room appended to the room-query list)"
+      "value": "0x10C",
+      "reason": "mov dword ptr [esp + eax*4 + 0x180], 0xd5: room special id 0xD5 -> 0x10C (global room appended to the room-query list)"
     },
     {
       "id": "rooms-0008ce8d",
@@ -987,8 +987,8 @@
       "address": "0x0008CE8D",
       "original_hex": "81feca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "cmp esi, 0xca: room special id 0xCA -> 0xF3 (first player-held id)"
+      "value": "0x101",
+      "reason": "cmp esi, 0xca: room special id 0xCA -> 0x101 (first player-held id)"
     },
     {
       "id": "rooms-0008d053",
@@ -997,8 +997,8 @@
       "address": "0x0008D053",
       "original_hex": "3dca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "cmp eax, 0xca: room special id 0xCA -> 0xF3 (first player-held id)"
+      "value": "0x101",
+      "reason": "cmp eax, 0xca: room special id 0xCA -> 0x101 (first player-held id)"
     },
     {
       "id": "rooms-0008d2d0",
@@ -1007,8 +1007,8 @@
       "address": "0x0008D2D0",
       "original_hex": "3dca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "cmp eax, 0xca: room special id 0xCA -> 0xF3 (first player-held id)"
+      "value": "0x101",
+      "reason": "cmp eax, 0xca: room special id 0xCA -> 0x101 (first player-held id)"
     },
     {
       "id": "rooms-000951a4",
@@ -1017,8 +1017,8 @@
       "address": "0x000951A4",
       "original_hex": "81faca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "cmp edx, 0xca: room special id 0xCA -> 0xF3 (first player-held id)"
+      "value": "0x101",
+      "reason": "cmp edx, 0xca: room special id 0xCA -> 0x101 (first player-held id)"
     },
     {
       "id": "rooms-00095253",
@@ -1027,8 +1027,8 @@
       "address": "0x00095253",
       "original_hex": "3dca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "cmp eax, 0xca: room special id 0xCA -> 0xF3 (first player-held id)"
+      "value": "0x101",
+      "reason": "cmp eax, 0xca: room special id 0xCA -> 0x101 (first player-held id)"
     },
     {
       "id": "rooms-00096dbb",
@@ -1037,8 +1037,8 @@
       "address": "0x00096DBB",
       "original_hex": "81faca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "cmp edx, 0xca: room special id 0xCA -> 0xF3 (first player-held id)"
+      "value": "0x101",
+      "reason": "cmp edx, 0xca: room special id 0xCA -> 0x101 (first player-held id)"
     },
     {
       "id": "rooms-0009fd6b",
@@ -1047,8 +1047,8 @@
       "address": "0x0009FD6B",
       "original_hex": "3dca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "cmp eax, 0xca: room special id 0xCA -> 0xF3 (first player-held id)"
+      "value": "0x101",
+      "reason": "cmp eax, 0xca: room special id 0xCA -> 0x101 (first player-held id)"
     },
     {
       "id": "rooms-00115f14",
@@ -1057,8 +1057,8 @@
       "address": "0x00115F14",
       "original_hex": "3dca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "cmp eax, 0xca: room special id 0xCA -> 0xF3 (first player-held id)"
+      "value": "0x101",
+      "reason": "cmp eax, 0xca: room special id 0xCA -> 0x101 (first player-held id)"
     },
     {
       "id": "rooms-00115fb3",
@@ -1067,8 +1067,8 @@
       "address": "0x00115FB3",
       "original_hex": "3dca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "cmp eax, 0xca: room special id 0xCA -> 0xF3 (first player-held id)"
+      "value": "0x101",
+      "reason": "cmp eax, 0xca: room special id 0xCA -> 0x101 (first player-held id)"
     },
     {
       "id": "rooms-0008ce95",
@@ -1077,8 +1077,8 @@
       "address": "0x0008CE95",
       "original_hex": "81fece000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "cmp esi, 0xce: room special id 0xCE -> 0xF7 (end of player-held ids)"
+      "value": "0x105",
+      "reason": "cmp esi, 0xce: room special id 0xCE -> 0x105 (end of player-held ids)"
     },
     {
       "id": "rooms-0008d060",
@@ -1087,8 +1087,8 @@
       "address": "0x0008D060",
       "original_hex": "3dce000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "cmp eax, 0xce: room special id 0xCE -> 0xF7 (end of player-held ids)"
+      "value": "0x105",
+      "reason": "cmp eax, 0xce: room special id 0xCE -> 0x105 (end of player-held ids)"
     },
     {
       "id": "rooms-0008d2e6",
@@ -1097,8 +1097,8 @@
       "address": "0x0008D2E6",
       "original_hex": "3dce000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "cmp eax, 0xce: room special id 0xCE -> 0xF7 (end of player-held ids)"
+      "value": "0x105",
+      "reason": "cmp eax, 0xce: room special id 0xCE -> 0x105 (end of player-held ids)"
     },
     {
       "id": "rooms-000951ad",
@@ -1107,8 +1107,8 @@
       "address": "0x000951AD",
       "original_hex": "81face000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "cmp edx, 0xce: room special id 0xCE -> 0xF7 (end of player-held ids)"
+      "value": "0x105",
+      "reason": "cmp edx, 0xce: room special id 0xCE -> 0x105 (end of player-held ids)"
     },
     {
       "id": "rooms-0009525e",
@@ -1117,8 +1117,8 @@
       "address": "0x0009525E",
       "original_hex": "3dce000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "cmp eax, 0xce: room special id 0xCE -> 0xF7 (end of player-held ids)"
+      "value": "0x105",
+      "reason": "cmp eax, 0xce: room special id 0xCE -> 0x105 (end of player-held ids)"
     },
     {
       "id": "rooms-00096dc3",
@@ -1127,8 +1127,8 @@
       "address": "0x00096DC3",
       "original_hex": "81face000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "cmp edx, 0xce: room special id 0xCE -> 0xF7 (end of player-held ids)"
+      "value": "0x105",
+      "reason": "cmp edx, 0xce: room special id 0xCE -> 0x105 (end of player-held ids)"
     },
     {
       "id": "rooms-0009fd72",
@@ -1137,8 +1137,8 @@
       "address": "0x0009FD72",
       "original_hex": "3dce000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "cmp eax, 0xce: room special id 0xCE -> 0xF7 (end of player-held ids)"
+      "value": "0x105",
+      "reason": "cmp eax, 0xce: room special id 0xCE -> 0x105 (end of player-held ids)"
     },
     {
       "id": "rooms-00115f1b",
@@ -1147,8 +1147,8 @@
       "address": "0x00115F1B",
       "original_hex": "3dce000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "cmp eax, 0xce: room special id 0xCE -> 0xF7 (end of player-held ids)"
+      "value": "0x105",
+      "reason": "cmp eax, 0xce: room special id 0xCE -> 0x105 (end of player-held ids)"
     },
     {
       "id": "rooms-00115fbe",
@@ -1157,8 +1157,8 @@
       "address": "0x00115FBE",
       "original_hex": "3dce000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "cmp eax, 0xce: room special id 0xCE -> 0xF7 (end of player-held ids)"
+      "value": "0x105",
+      "reason": "cmp eax, 0xce: room special id 0xCE -> 0x105 (end of player-held ids)"
     },
     {
       "id": "rooms-0008d067",
@@ -1167,7 +1167,7 @@
       "address": "0x0008D067",
       "original_hex": "0536ffffff",
       "operand": 1,
-      "value": "0xFFFFFF0D",
+      "value": "0xFFFFFEFF",
       "reason": "add eax, 0xffffff36: player index = room - first player id"
     },
     {
@@ -1177,7 +1177,7 @@
       "address": "0x0008D2F1",
       "original_hex": "0536ffffff",
       "operand": 1,
-      "value": "0xFFFFFF0D",
+      "value": "0xFFFFFEFF",
       "reason": "add eax, 0xffffff36: player index = room - first player id"
     },
     {
@@ -1187,7 +1187,7 @@
       "address": "0x000951B5",
       "original_hex": "81c236ffffff",
       "operand": 1,
-      "value": "0xFFFFFF0D",
+      "value": "0xFFFFFEFF",
       "reason": "add edx, 0xffffff36: player index = room - first player id"
     },
     {
@@ -1197,7 +1197,7 @@
       "address": "0x00095265",
       "original_hex": "0536ffffff",
       "operand": 1,
-      "value": "0xFFFFFF0D",
+      "value": "0xFFFFFEFF",
       "reason": "add eax, 0xffffff36: player index = room - first player id"
     },
     {
@@ -1207,7 +1207,7 @@
       "address": "0x00096DCB",
       "original_hex": "81c236ffffff",
       "operand": 1,
-      "value": "0xFFFFFF0D",
+      "value": "0xFFFFFEFF",
       "reason": "add edx, 0xffffff36: player index = room - first player id"
     },
     {
@@ -1217,7 +1217,7 @@
       "address": "0x0009FD79",
       "original_hex": "0536ffffff",
       "operand": 1,
-      "value": "0xFFFFFF0D",
+      "value": "0xFFFFFEFF",
       "reason": "add eax, 0xffffff36: player index = room - first player id"
     },
     {
@@ -1227,7 +1227,7 @@
       "address": "0x00115F22",
       "original_hex": "0536ffffff",
       "operand": 1,
-      "value": "0xFFFFFF0D",
+      "value": "0xFFFFFEFF",
       "reason": "add eax, 0xffffff36: player index = room - first player id"
     },
     {
@@ -1237,7 +1237,7 @@
       "address": "0x00115FC9",
       "original_hex": "0536ffffff",
       "operand": 1,
-      "value": "0xFFFFFF0D",
+      "value": "0xFFFFFEFF",
       "reason": "add eax, 0xffffff36: player index = room - first player id"
     },
     {
@@ -1247,7 +1247,7 @@
       "address": "0x0008CE9D",
       "original_hex": "8d8636ffffff",
       "operand": 1,
-      "value": "0xFFFFFF0D",
+      "value": "0xFFFFFEFF",
       "reason": "lea eax, [esi - 0xca]: player index = room - first player id"
     },
     {
@@ -1257,8 +1257,8 @@
       "address": "0x001B9202",
       "original_hex": "81c1ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add ecx, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add ecx, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001b9227",
@@ -1267,8 +1267,8 @@
       "address": "0x001B9227",
       "original_hex": "05ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add eax, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add eax, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001b9244",
@@ -1277,8 +1277,8 @@
       "address": "0x001B9244",
       "original_hex": "81c2ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add edx, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add edx, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001b929a",
@@ -1287,8 +1287,8 @@
       "address": "0x001B929A",
       "original_hex": "81c1ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add ecx, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add ecx, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001be1ac",
@@ -1297,8 +1297,8 @@
       "address": "0x001BE1AC",
       "original_hex": "05ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add eax, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add eax, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001be392",
@@ -1307,8 +1307,8 @@
       "address": "0x001BE392",
       "original_hex": "05ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add eax, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add eax, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001c0c94",
@@ -1317,8 +1317,8 @@
       "address": "0x001C0C94",
       "original_hex": "81c1ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add ecx, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add ecx, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001c0d4f",
@@ -1327,8 +1327,8 @@
       "address": "0x001C0D4F",
       "original_hex": "81c1ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add ecx, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add ecx, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001c7d45",
@@ -1337,8 +1337,8 @@
       "address": "0x001C7D45",
       "original_hex": "05ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add eax, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add eax, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001c8179",
@@ -1347,8 +1347,8 @@
       "address": "0x001C8179",
       "original_hex": "81c1ca000000",
       "operand": 1,
-      "value": "0xF3",
-      "reason": "add ecx, 0xca: room special id 0xCA -> 0xF3 (room held by player = 0xCA + player)"
+      "value": "0x101",
+      "reason": "add ecx, 0xca: room special id 0xCA -> 0x101 (room held by player = 0xCA + player)"
     },
     {
       "id": "rooms-001be1b9",
@@ -1357,8 +1357,8 @@
       "address": "0x001BE1B9",
       "original_hex": "c74234ce000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "mov dword ptr [edx + 0x34], 0xce: room special id 0xCE -> 0xF7 (room held by no player)"
+      "value": "0x105",
+      "reason": "mov dword ptr [edx + 0x34], 0xce: room special id 0xCE -> 0x105 (room held by no player)"
     },
     {
       "id": "rooms-001be39f",
@@ -1367,8 +1367,8 @@
       "address": "0x001BE39F",
       "original_hex": "c74234ce000000",
       "operand": 1,
-      "value": "0xF7",
-      "reason": "mov dword ptr [edx + 0x34], 0xce: room special id 0xCE -> 0xF7 (room held by no player)"
+      "value": "0x105",
+      "reason": "mov dword ptr [edx + 0x34], 0xce: room special id 0xCE -> 0x105 (room held by no player)"
     },
     {
       "id": "rooms-00086b30",
@@ -1377,8 +1377,8 @@
       "address": "0x00086B30",
       "original_hex": "81c1cf000000",
       "operand": 1,
-      "value": "0xF8",
-      "reason": "add ecx, 0xcf: room special id 0xCF -> 0xF8 (room of view = 0xCF + view index)"
+      "value": "0x106",
+      "reason": "add ecx, 0xcf: room special id 0xCF -> 0x106 (room of view = 0xCF + view index)"
     },
     {
       "id": "rooms-00086b77",
@@ -1387,8 +1387,8 @@
       "address": "0x00086B77",
       "original_hex": "81c2cf000000",
       "operand": 1,
-      "value": "0xF8",
-      "reason": "add edx, 0xcf: room special id 0xCF -> 0xF8 (room of view = 0xCF + view index)"
+      "value": "0x106",
+      "reason": "add edx, 0xcf: room special id 0xCF -> 0x106 (room of view = 0xCF + view index)"
     },
     {
       "id": "rooms-0011d333",
@@ -1397,8 +1397,8 @@
       "address": "0x0011D333",
       "original_hex": "81c1cf000000",
       "operand": 1,
-      "value": "0xF8",
-      "reason": "add ecx, 0xcf: room special id 0xCF -> 0xF8 (room of view = 0xCF + view index)"
+      "value": "0x106",
+      "reason": "add ecx, 0xcf: room special id 0xCF -> 0x106 (room of view = 0xCF + view index)"
     },
     {
       "id": "rooms-00085cd7",
@@ -1407,8 +1407,8 @@
       "address": "0x00085CD7",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-0009e4f3",
@@ -1417,8 +1417,8 @@
       "address": "0x0009E4F3",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-0009e506",
@@ -1427,8 +1427,8 @@
       "address": "0x0009E506",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-0009e5a1",
@@ -1437,8 +1437,8 @@
       "address": "0x0009E5A1",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-000a1edc",
@@ -1447,8 +1447,8 @@
       "address": "0x000A1EDC",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-000a1eef",
@@ -1457,8 +1457,8 @@
       "address": "0x000A1EEF",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-000a1f81",
@@ -1467,8 +1467,8 @@
       "address": "0x000A1F81",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-000a5af4",
@@ -1477,8 +1477,8 @@
       "address": "0x000A5AF4",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-000a5b00",
@@ -1487,8 +1487,8 @@
       "address": "0x000A5B00",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-000a5c5a",
@@ -1497,8 +1497,8 @@
       "address": "0x000A5C5A",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-000a5c66",
@@ -1507,8 +1507,8 @@
       "address": "0x000A5C66",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-000a5c72",
@@ -1517,8 +1517,8 @@
       "address": "0x000A5C72",
       "original_hex": "b9d6000000",
       "operand": 1,
-      "value": "0xFF",
-      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0xFF (id-space count of the per-room prop tables)"
+      "value": "0x10D",
+      "reason": "mov ecx, 0xd6: room special id 0xD6 -> 0x10D (id-space count of the per-room prop tables)"
     },
     {
       "id": "rooms-0009e4e6",
@@ -1527,8 +1527,8 @@
       "address": "0x0009E4E6",
       "original_hex": "3d58030000",
       "operand": 1,
-      "value": "0x3FC",
-      "reason": "cmp eax, 0x358: loop end over the per-id prop tables (0xD6 -> 0xFF entries)"
+      "value": "0x434",
+      "reason": "cmp eax, 0x358: loop end over the per-id prop tables (0xD6 -> 0x10D entries)"
     },
     {
       "id": "rooms-000a1ed5",
@@ -1537,8 +1537,8 @@
       "address": "0x000A1ED5",
       "original_hex": "3d54030000",
       "operand": 1,
-      "value": "0x3F8",
-      "reason": "cmp eax, 0x354: last entry of the per-id prop tables (0xD5 -> 0xFE)"
+      "value": "0x430",
+      "reason": "cmp eax, 0x354: last entry of the per-id prop tables (0xD5 -> 0x10C)"
     },
     {
       "id": "rooms-0008a6fd",
@@ -1548,7 +1548,7 @@
       "original_hex": "68e0000000",
       "operand": 0,
       "value": "0x110",
-      "reason": "push 0xe0: per-id flag bytes [0x7B977C] (story levels): ids 0..0xFE + clear slack"
+      "reason": "push 0xe0: per-id flag bytes [0x7B977C] (story levels): ids 0..0x10C + clear slack"
     },
     {
       "id": "rooms-0008ba63",
@@ -1567,8 +1567,8 @@
       "address": "0x00089734",
       "original_hex": "b935000000",
       "operand": 1,
-      "value": "0x40",
-      "reason": "mov ecx, 0x35: clear per-id flags: 0x40 dwords + stosw = 0x102 bytes of the 0x110"
+      "value": "0x43",
+      "reason": "mov ecx, 0x35: clear per-id flags: 0x43 dwords + stosw = 0x10E bytes of the 0x110"
     },
     {
       "id": "rooms-00089746",
@@ -1577,7 +1577,7 @@
       "address": "0x00089746",
       "original_hex": "c682d500000001",
       "operand": 0,
-      "value": "0xFE",
+      "value": "0x10C",
       "reason": "mov byte ptr [edx + 0xd5], 1: global id flag"
     },
     {
@@ -1587,7 +1587,7 @@
       "address": "0x00089756",
       "original_hex": "889c01ca000000",
       "operand": 0,
-      "value": "0xF3",
+      "value": "0x101",
       "reason": "mov byte ptr [ecx + eax + 0xca], bl: player id flags"
     },
     {
@@ -1597,7 +1597,7 @@
       "address": "0x00089776",
       "original_hex": "889c02cf000000",
       "operand": 0,
-      "value": "0xF8",
+      "value": "0x106",
       "reason": "mov byte ptr [edx + eax + 0xcf], bl: view id flags"
     },
     {
@@ -1607,7 +1607,7 @@
       "address": "0x000CC9A3",
       "original_hex": "8886f60d0000",
       "operand": 0,
-      "value": "0x6CF3",
+      "value": "0x6DA1",
       "reason": "mov byte ptr [esi + 0xdf6], al: view flag of special id 0xCA -> shadow"
     },
     {
@@ -1617,7 +1617,7 @@
       "address": "0x000CC9A9",
       "original_hex": "888ef70d0000",
       "operand": 0,
-      "value": "0x6CF4",
+      "value": "0x6DA2",
       "reason": "mov byte ptr [esi + 0xdf7], cl: view flag of special id 0xCB -> shadow"
     },
     {
@@ -1627,7 +1627,7 @@
       "address": "0x000CC99D",
       "original_hex": "8896f80d0000",
       "operand": 0,
-      "value": "0x6CF5",
+      "value": "0x6DA3",
       "reason": "mov byte ptr [esi + 0xdf8], dl: view flag of special id 0xCC -> shadow"
     },
     {
@@ -1637,7 +1637,7 @@
       "address": "0x000CC9B9",
       "original_hex": "8896f90d0000",
       "operand": 0,
-      "value": "0x6CF6",
+      "value": "0x6DA4",
       "reason": "mov byte ptr [esi + 0xdf9], dl: view flag of special id 0xCD -> shadow"
     },
     {
@@ -1647,7 +1647,7 @@
       "address": "0x000CC9F5",
       "original_hex": "889efa0d0000",
       "operand": 0,
-      "value": "0x6CF7",
+      "value": "0x6DA5",
       "reason": "mov byte ptr [esi + 0xdfa], bl: view flag of special id 0xCE -> shadow"
     },
     {
@@ -1657,7 +1657,7 @@
       "address": "0x000CC9CB",
       "original_hex": "8886fb0d0000",
       "operand": 0,
-      "value": "0x6CF8",
+      "value": "0x6DA6",
       "reason": "mov byte ptr [esi + 0xdfb], al: view flag of special id 0xCF -> shadow"
     },
     {
@@ -1667,7 +1667,7 @@
       "address": "0x000CC9BF",
       "original_hex": "888efc0d0000",
       "operand": 0,
-      "value": "0x6CF9",
+      "value": "0x6DA7",
       "reason": "mov byte ptr [esi + 0xdfc], cl: view flag of special id 0xD0 -> shadow"
     },
     {
@@ -1677,7 +1677,7 @@
       "address": "0x000CC9E1",
       "original_hex": "8886fd0d0000",
       "operand": 0,
-      "value": "0x6CFA",
+      "value": "0x6DA8",
       "reason": "mov byte ptr [esi + 0xdfd], al: view flag of special id 0xD1 -> shadow"
     },
     {
@@ -1687,7 +1687,7 @@
       "address": "0x000CC9D5",
       "original_hex": "8896fe0d0000",
       "operand": 0,
-      "value": "0x6CFB",
+      "value": "0x6DA9",
       "reason": "mov byte ptr [esi + 0xdfe], dl: view flag of special id 0xD2 -> shadow"
     },
     {
@@ -1697,7 +1697,7 @@
       "address": "0x000CC9E7",
       "original_hex": "888eff0d0000",
       "operand": 0,
-      "value": "0x6CFC",
+      "value": "0x6DAA",
       "reason": "mov byte ptr [esi + 0xdff], cl: view flag of special id 0xD3 -> shadow"
     },
     {
@@ -1707,7 +1707,7 @@
       "address": "0x000CC9ED",
       "original_hex": "8896000e0000",
       "operand": 0,
-      "value": "0x6CFD",
+      "value": "0x6DAB",
       "reason": "mov byte ptr [esi + 0xe00], dl: view flag of special id 0xD4 -> shadow"
     },
     {
@@ -1717,7 +1717,7 @@
       "address": "0x000CC9FB",
       "original_hex": "c686010e000001",
       "operand": 0,
-      "value": "0x6CFE",
+      "value": "0x6DAC",
       "reason": "mov byte ptr [esi + 0xe01], 1: view flag of special id 0xD5 -> shadow"
     },
     {
@@ -1727,8 +1727,8 @@
       "address": "0x000862CF",
       "original_hex": "81f9c8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp ecx, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp ecx, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-000874c3",
@@ -1737,8 +1737,8 @@
       "address": "0x000874C3",
       "original_hex": "81f9c8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp ecx, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp ecx, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-00087643",
@@ -1747,8 +1747,8 @@
       "address": "0x00087643",
       "original_hex": "81f9c8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp ecx, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp ecx, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-00088455",
@@ -1757,8 +1757,8 @@
       "address": "0x00088455",
       "original_hex": "81ffc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp edi, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp edi, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-0009fc2c",
@@ -1767,8 +1767,8 @@
       "address": "0x0009FC2C",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-0009fdf6",
@@ -1777,8 +1777,8 @@
       "address": "0x0009FDF6",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-000a27b4",
@@ -1787,8 +1787,8 @@
       "address": "0x000A27B4",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-000a293d",
@@ -1797,8 +1797,8 @@
       "address": "0x000A293D",
       "original_hex": "81f9c8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp ecx, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp ecx, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-000a2a05",
@@ -1807,8 +1807,8 @@
       "address": "0x000A2A05",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-000c7f2c",
@@ -1817,8 +1817,8 @@
       "address": "0x000C7F2C",
       "original_hex": "81f9c8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp ecx, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp ecx, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-000cad26",
@@ -1827,8 +1827,8 @@
       "address": "0x000CAD26",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-0016ce5d",
@@ -1837,8 +1837,8 @@
       "address": "0x0016CE5D",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-0016d286",
@@ -1847,8 +1847,8 @@
       "address": "0x0016D286",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-0016d697",
@@ -1857,8 +1857,8 @@
       "address": "0x0016D697",
       "original_hex": "81f9c8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp ecx, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp ecx, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-00170567",
@@ -1867,8 +1867,8 @@
       "address": "0x00170567",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-00171b3c",
@@ -1877,8 +1877,8 @@
       "address": "0x00171B3C",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-00171b78",
@@ -1887,8 +1887,8 @@
       "address": "0x00171B78",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-00171c2e",
@@ -1897,8 +1897,8 @@
       "address": "0x00171C2E",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-0017408b",
@@ -1907,8 +1907,8 @@
       "address": "0x0017408B",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-001785ea",
@@ -1917,8 +1917,8 @@
       "address": "0x001785EA",
       "original_hex": "81fec8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp esi, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp esi, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-002497c6",
@@ -1927,8 +1927,8 @@
       "address": "0x002497C6",
       "original_hex": "3dc8000000",
       "operand": 1,
-      "value": "0xF1",
-      "reason": "cmp eax, 0xc8: last real room 200 -> 241"
+      "value": "0xFF",
+      "reason": "cmp eax, 0xc8: last real room 200 -> 255"
     },
     {
       "id": "rooms-0008a796",
@@ -2297,7 +2297,7 @@
       "address": "0x00083A1B",
       "original_hex": "888c282c0d0000",
       "operand": 0,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "mov byte ptr [eax + ebp + 0xd2c], cl: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2307,7 +2307,7 @@
       "address": "0x0009FFAE",
       "original_hex": "0fb684082c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx eax, byte ptr [eax + ecx + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2317,7 +2317,7 @@
       "address": "0x000F7F54",
       "original_hex": "8a94082c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "mov dl, byte ptr [eax + ecx + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2327,7 +2327,7 @@
       "address": "0x0010A98B",
       "original_hex": "0fb684282c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx eax, byte ptr [eax + ebp + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2337,7 +2337,7 @@
       "address": "0x0010AA5B",
       "original_hex": "0fb684102c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx eax, byte ptr [eax + edx + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2347,7 +2347,7 @@
       "address": "0x0010E4AB",
       "original_hex": "0fb684182c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx eax, byte ptr [eax + ebx + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2357,7 +2357,7 @@
       "address": "0x00176B1D",
       "original_hex": "0fb684102c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx eax, byte ptr [eax + edx + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2367,7 +2367,7 @@
       "address": "0x001848FA",
       "original_hex": "0fb684282c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx eax, byte ptr [eax + ebp + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2377,7 +2377,7 @@
       "address": "0x00185BF4",
       "original_hex": "0fb68c31610d0000",
       "operand": 1,
-      "value": "0x6C35",
+      "value": "0x6CD5",
       "reason": "movzx ecx, byte ptr [ecx + esi + 0xd61]: view per-room visible flag 0xD61 -> shadow"
     },
     {
@@ -2387,7 +2387,7 @@
       "address": "0x00185C10",
       "original_hex": "0fb68410620d0000",
       "operand": 1,
-      "value": "0x6C36",
+      "value": "0x6CD6",
       "reason": "movzx eax, byte ptr [eax + edx + 0xd62]: view per-room visible flag 0xD62 -> shadow"
     },
     {
@@ -2397,7 +2397,7 @@
       "address": "0x00185CC6",
       "original_hex": "0fb68408510d0000",
       "operand": 1,
-      "value": "0x6C25",
+      "value": "0x6CC5",
       "reason": "movzx eax, byte ptr [eax + ecx + 0xd51]: view per-room visible flag 0xD51 -> shadow"
     },
     {
@@ -2407,7 +2407,7 @@
       "address": "0x001863E4",
       "original_hex": "80bc162c0d000000",
       "operand": 0,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "cmp byte ptr [esi + edx + 0xd2c], 0: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2417,7 +2417,7 @@
       "address": "0x001FD982",
       "original_hex": "8a94082c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "mov dl, byte ptr [eax + ecx + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2427,7 +2427,7 @@
       "address": "0x00200929",
       "original_hex": "8a8c102c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "mov cl, byte ptr [eax + edx + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2437,7 +2437,7 @@
       "address": "0x00247E3C",
       "original_hex": "0fb684102c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx eax, byte ptr [eax + edx + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2447,7 +2447,7 @@
       "address": "0x00342F9D",
       "original_hex": "0fb684022c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx eax, byte ptr [edx + eax + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2457,7 +2457,7 @@
       "address": "0x0034416B",
       "original_hex": "8a94082c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "mov dl, byte ptr [eax + ecx + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2467,7 +2467,7 @@
       "address": "0x0036B643",
       "original_hex": "0fb68c022c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx ecx, byte ptr [edx + eax + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2477,7 +2477,7 @@
       "address": "0x0036B651",
       "original_hex": "0fb694022c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx edx, byte ptr [edx + eax + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2487,7 +2487,7 @@
       "address": "0x0036B661",
       "original_hex": "0fb694022c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx edx, byte ptr [edx + eax + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2497,7 +2497,7 @@
       "address": "0x0036B671",
       "original_hex": "0fb694022c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx edx, byte ptr [edx + eax + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2507,7 +2507,7 @@
       "address": "0x0036B681",
       "original_hex": "0fb694022c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx edx, byte ptr [edx + eax + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2517,7 +2517,7 @@
       "address": "0x0036B691",
       "original_hex": "0fb694022c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx edx, byte ptr [edx + eax + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2527,7 +2527,7 @@
       "address": "0x0036B6A1",
       "original_hex": "0fb684022c0d0000",
       "operand": 1,
-      "value": "0x6C00",
+      "value": "0x6CA0",
       "reason": "movzx eax, byte ptr [edx + eax + 0xd2c]: view per-room visible flag 0xD2C -> shadow"
     },
     {
@@ -2537,7 +2537,7 @@
       "address": "0x00089925",
       "original_hex": "668984560c0e0000",
       "operand": 0,
-      "value": "0x6D00",
+      "value": "0x6DB0",
       "reason": "mov word ptr [esi + edx*2 + 0xe0c], ax: view sorted room list -> shadow"
     },
     {
@@ -2547,7 +2547,7 @@
       "address": "0x000899A8",
       "original_hex": "8d960c0e0000",
       "operand": 1,
-      "value": "0x6D00",
+      "value": "0x6DB0",
       "reason": "lea edx, [esi + 0xe0c]: view sorted room list -> shadow"
     },
     {
@@ -2557,7 +2557,7 @@
       "address": "0x000899D5",
       "original_hex": "668984560c0e0000",
       "operand": 0,
-      "value": "0x6D00",
+      "value": "0x6DB0",
       "reason": "mov word ptr [esi + edx*2 + 0xe0c], ax: view sorted room list -> shadow"
     },
     {
@@ -2567,7 +2567,7 @@
       "address": "0x00116F4B",
       "original_hex": "8d941b0c0e0000",
       "operand": 1,
-      "value": "0x6D00",
+      "value": "0x6DB0",
       "reason": "lea edx, [ebx + ebx + 0xe0c]: view sorted room list -> shadow"
     },
     {
@@ -2577,7 +2577,7 @@
       "address": "0x0011A1F7",
       "original_hex": "8d870c0e0000",
       "operand": 1,
-      "value": "0x6D00",
+      "value": "0x6DB0",
       "reason": "lea eax, [edi + 0xe0c]: view sorted room list -> shadow"
     },
     {
@@ -2587,7 +2587,7 @@
       "address": "0x0011AD48",
       "original_hex": "8d9c030c0e0000",
       "operand": 1,
-      "value": "0x6D00",
+      "value": "0x6DB0",
       "reason": "lea ebx, [ebx + eax + 0xe0c]: view sorted room list -> shadow"
     },
     {
@@ -2597,7 +2597,7 @@
       "address": "0x00160A90",
       "original_hex": "8d4e04",
       "operand": 1,
-      "value": "0x5EF8",
+      "value": "0x5FA8",
       "reason": "lea ecx, [esi + 4]: view sorted room list from &count (+0xE08) -> shadow"
     },
     {
@@ -2607,7 +2607,7 @@
       "address": "0x0025F2E7",
       "original_hex": "8d5702",
       "operand": 1,
-      "value": "0x5EF6",
+      "value": "0x5FA6",
       "reason": "lea edx, [edi + 2]: view sorted room list from &count (+0xE0A) -> shadow"
     },
     {
@@ -2617,8 +2617,8 @@
       "address": "0x002427C3",
       "original_hex": "b9e8040000",
       "operand": 1,
-      "value": "0x500",
-      "reason": "mov ecx, 0x4e8: clear the relocated model->slot table (0xA00 words)"
+      "value": "0x504",
+      "reason": "mov ecx, 0x4e8: clear the relocated model->slot table (0xA08 words)"
     },
     {
       "id": "rooms-000a5e4e",
@@ -2627,8 +2627,8 @@
       "address": "0x000A5E4E",
       "original_hex": "81ffd0090000",
       "operand": 1,
-      "value": "0xA00",
-      "reason": "cmp edi, 0x9d0: model id bound 0x9D0 -> 0xA00 (room models 0x908..0x9F8)"
+      "value": "0xA08",
+      "reason": "cmp edi, 0x9d0: model id bound 0x9D0 -> 0xA08 (room models 0x908..0xA06)"
     },
     {
       "id": "rooms-001b59b8",
@@ -2637,8 +2637,8 @@
       "address": "0x001B59B8",
       "original_hex": "3dd0090000",
       "operand": 1,
-      "value": "0xA00",
-      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xA00 (room models 0x908..0x9F8)"
+      "value": "0xA08",
+      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xA08 (room models 0x908..0xA06)"
     },
     {
       "id": "rooms-001b5c09",
@@ -2647,8 +2647,8 @@
       "address": "0x001B5C09",
       "original_hex": "3dd0090000",
       "operand": 1,
-      "value": "0xA00",
-      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xA00 (room models 0x908..0x9F8)"
+      "value": "0xA08",
+      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xA08 (room models 0x908..0xA06)"
     },
     {
       "id": "rooms-001b618e",
@@ -2657,8 +2657,8 @@
       "address": "0x001B618E",
       "original_hex": "3dd0090000",
       "operand": 1,
-      "value": "0xA00",
-      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xA00 (room models 0x908..0x9F8)"
+      "value": "0xA08",
+      "reason": "cmp eax, 0x9d0: model id bound 0x9D0 -> 0xA08 (room models 0x908..0xA06)"
     },
     {
       "id": "rooms-0008392d",
@@ -2667,8 +2667,8 @@
       "address": "0x0008392D",
       "original_hex": "6880eb0000",
       "operand": 0,
-      "value": "0xF000",
-      "reason": "push 0xeb80: per-model 0x18 B array [0x7087A4]: 0x9D0 -> 0xA00 models"
+      "value": "0xF0C0",
+      "reason": "push 0xeb80: per-model 0x18 B array [0x7087A4]: 0x9D0 -> 0xA08 models"
     },
     {
       "id": "rooms-00083947",
@@ -2677,7 +2677,7 @@
       "address": "0x00083947",
       "original_hex": "b9e03a0000",
       "operand": 1,
-      "value": "0x3C00",
+      "value": "0x3C30",
       "reason": "mov ecx, 0x3ae0: clear the per-model array"
     },
     {
@@ -2687,8 +2687,8 @@
       "address": "0x0011227F",
       "original_hex": "81c254030000",
       "operand": 1,
-      "value": "0x3F8",
-      "reason": "add edx, 0x354: light head row stride 0xD5 -> 0xFE dwords"
+      "value": "0x430",
+      "reason": "add edx, 0x354: light head row stride 0xD5 -> 0x10C dwords"
     },
     {
       "id": "rooms-00112285",
@@ -2697,8 +2697,8 @@
       "address": "0x00112285",
       "original_hex": "81fa9cd07300",
       "operand": 1,
-      "value": "0x8C93DC",
-      "reason": "cmp edx, 0x73d09c: light head clear loop end (3 rows of 0xFE)"
+      "value": "0x8C95FC",
+      "reason": "cmp edx, 0x73d09c: light head clear loop end (3 rows of 0x10C)"
     },
     {
       "id": "rooms-0008a786",
@@ -3362,7 +3362,7 @@
       "old": "0x007B54E0",
       "size": "0x350",
       "new": "0x008C7000",
-      "new_size": "0x3F8",
+      "new_size": "0x430",
       "sites": {
         "0x00085CDE": "offset",
         "0x0009E430": "offset",
@@ -3413,14 +3413,14 @@
         "0x0034A27A": "offset"
       },
       "data_ok": [],
-      "reason": "prop count per room id, ids 0..0xD4"
+      "reason": "prop count per room id, ids 0..0xD4 (0x10D entries, step 0x440)"
     },
     {
       "id": "rooms-reloc-p1-global",
       "kind": "relocate",
       "old": "0x007B5834",
       "size": "0x4",
-      "new": "0x008C73F8",
+      "new": "0x008C7430",
       "new_size": "0x8",
       "sites": {
         "0x000A4768": "offset",
@@ -3429,15 +3429,15 @@
         "0x000A7F29": "offset"
       },
       "data_ok": [],
-      "reason": "prop count of the global room 0xD5 -> 0xFE"
+      "reason": "prop count of the global room 0xD5 -> 0x10C"
     },
     {
       "id": "rooms-reloc-p2-0x7b5840",
       "kind": "relocate",
       "old": "0x007B5840",
       "size": "0x358",
-      "new": "0x008C7400",
-      "new_size": "0x400",
+      "new": "0x008C7440",
+      "new_size": "0x440",
       "sites": {
         "0x000867F8": "keep",
         "0x0009E4C6": "offset",
@@ -3454,8 +3454,8 @@
       "kind": "relocate",
       "old": "0x007B5BA0",
       "size": "0x358",
-      "new": "0x008C7800",
-      "new_size": "0x400",
+      "new": "0x008C7880",
+      "new_size": "0x440",
       "sites": {
         "0x0009E437": "offset",
         "0x0009E462": "offset",
@@ -3472,8 +3472,8 @@
       "kind": "relocate",
       "old": "0x007B5F00",
       "size": "0x350",
-      "new": "0x008C7C00",
-      "new_size": "0x3F8",
+      "new": "0x008C7CC0",
+      "new_size": "0x430",
       "sites": {
         "0x0009E452": "offset",
         "0x0009E47F": "offset",
@@ -3505,14 +3505,14 @@
         "0x0034A0EB": "offset"
       },
       "data_ok": [],
-      "reason": "prop list pointer per room id, ids 0..0xD4"
+      "reason": "prop list pointer per room id, ids 0..0xD4 (0x10D entries, step 0x440)"
     },
     {
       "id": "rooms-reloc-p4-global",
       "kind": "relocate",
       "old": "0x007B6254",
       "size": "0x4",
-      "new": "0x008C7FF8",
+      "new": "0x008C80F0",
       "new_size": "0x8",
       "sites": {
         "0x000A0E69": "keep",
@@ -3529,15 +3529,15 @@
         "0x000A7EC3": "offset"
       },
       "data_ok": [],
-      "reason": "prop list of the global room 0xD5 -> 0xFE"
+      "reason": "prop list of the global room 0xD5 -> 0x10C"
     },
     {
       "id": "rooms-reloc-p5-0x7b6260",
       "kind": "relocate",
       "old": "0x007B6260",
       "size": "0x358",
-      "new": "0x008C8000",
-      "new_size": "0x400",
+      "new": "0x008C8100",
+      "new_size": "0x440",
       "sites": {
         "0x0009EE00": "keep",
         "0x0009EE59": "keep",
@@ -3562,8 +3562,8 @@
       "kind": "relocate",
       "old": "0x0073C350",
       "size": "0x28",
-      "new": "0x008C8400",
-      "new_size": "0xD0",
+      "new": "0x008C8540",
+      "new_size": "0x108",
       "sites": {
         "0x001122F5": "keep",
         "0x001123F5": "offset",
@@ -3577,15 +3577,15 @@
         "0x00115B24": "offset"
       },
       "data_ok": [],
-      "reason": "light list heads [3][0xD5] -> [3][0xFE] (base)"
+      "reason": "light list heads [3][0xD5] -> [3][0x10C] (base)"
     },
     {
       "id": "rooms-reloc-l1-rest",
       "kind": "relocate",
       "old": "0x0073C37C",
       "size": "0x9D0",
-      "new": "0x008C84D0",
-      "new_size": "0xB18",
+      "new": "0x008C8648",
+      "new_size": "0xB88",
       "sites": {
         "0x00112213": "keep",
         "0x00112267": "offset",
@@ -3596,15 +3596,15 @@
         "0x0011342C": "keep"
       },
       "data_ok": [],
-      "reason": "light list heads: clear loop start 0x73C6A0 -> row 0 entry 0xFD"
+      "reason": "light list heads: clear loop start 0x73C6A0 -> row 0 entry 0x10B"
     },
     {
       "id": "rooms-reloc-l2-0x7ac880",
       "kind": "relocate",
       "old": "0x007AC880",
       "size": "0xA00",
-      "new": "0x008C9000",
-      "new_size": "0xBEC",
+      "new": "0x008C9200",
+      "new_size": "0xC94",
       "sites": {
         "0x0008CF27": "offset",
         "0x0008CF32": "offset",
@@ -3626,15 +3626,15 @@
         "0x001163D8": "offset"
       },
       "data_ok": [],
-      "reason": "room light colour float[0xD5][3] -> [0xFE][3]; loop end"
+      "reason": "room light colour float[0xD5][3] -> [0x10C][3]; loop end"
     },
     {
       "id": "rooms-reloc-lb-0x73d910",
       "kind": "relocate",
       "old": "0x0073D910",
       "size": "0x38",
-      "new": "0x008CB400",
-      "new_size": "0x40",
+      "new": "0x008CB440",
+      "new_size": "0x80",
       "sites": {
         "0x0011225A": "offset",
         "0x001122FD": "keep",
@@ -3655,7 +3655,20 @@
         "0x00115A16": "keep"
       },
       "data_ok": [],
-      "reason": "light round-robin per room/16: 14 -> 16 entries (room 0xFE / 16 = 15)"
+      "reason": "light round-robin per room/16: 14 -> 32 entries (room ids up to 0x1FF; the special ids 0x100..0x10C use entry 16); after the model table"
+    },
+    {
+      "id": "rooms-reloc-f-0x7b5180",
+      "kind": "relocate",
+      "old": "0x007B5180",
+      "size": "0x354",
+      "new": "0x008CC800",
+      "new_size": "0x440",
+      "sites": {
+        "0x000A79C8": "offset"
+      },
+      "data_ok": [],
+      "reason": "per-id drawn flag dword[0xD6] (only reference: sub_000A79B0 [room*4+0x7B5180] = 1) -> 0x110 entries; declared 4 bytes short (0x007B54D8 after entry 0xD5 is a list count)"
     },
     {
       "id": "rooms-reloc-v-0x749890",

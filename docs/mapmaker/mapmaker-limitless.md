@@ -62,7 +62,7 @@ are not in the launcher.
 
 | Limit | Original | Limitless |
 | --- | --- | --- |
-| Tiles (pieces) | 200 | 241 |
+| Tiles (pieces) | 200 | 255 |
 | Items | 50 | 500 |
 | Keycards | 2 per colour | 16 per colour |
 | Pickups (weapons, ammo, health, armour, power-ups) | original per-type maxima | x4 |
@@ -335,7 +335,7 @@ Details: [mapmaker-bugfix.md](mapmaker-bugfix.md).
 - More than 32 characters and more than 30 AI only happen in a MapMaker map
   played locally in Story. Arcade, System Link and campaign levels keep the
   original numbers.
-- Tiles stay capped at 241 even on the 80x80 grid.
+- Tiles stay capped at 255 even on the 80x80 grid.
 - Very large maps can be slow on weaker PCs; lower `TSFP_MAPMAKER_ALIVE` or
   `TSFP_MAPMAKER_MEMORY_SCALE` if needed.
 - Untested: System Link, splitscreen, Mac, story levels after the first, and

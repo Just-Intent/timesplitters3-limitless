@@ -17,8 +17,8 @@ decodes all game code with the lifter's decoder (mapmaker_decoded) and pins:
    reaches exactly the listed byte stores, compares and room-indexed tables;
 5. the light room source: a prop's room or [0x0073D95C] (= room count, set
    from [0x007B975C]), so the light byte holds 0..R or a held/view special id;
-6. the per-room flag dword[0xD6] at 0x007B5180 (one writer, 0x000A79C8) that
-   rooms.json does not relocate.
+6. the per-room flag dword[0xD6] at 0x007B5180 (one writer, 0x000A79C8),
+   relocated by rooms.json (stage 2).
 
 docs/mapmaker/mapmaker-rooms.md ("Byte-width room ids: classification") has
 the table and the stage list built on it. Skips without the private XBE.
@@ -26,6 +26,8 @@ the table and the stage list built on it. Skips without the private XBE.
 from collections import defaultdict
 import json
 from pathlib import Path
+
+import pytest
 
 from mapmaker_decoded import decoded
 
@@ -101,12 +103,12 @@ FLOW = {
 }
 # Tables indexed (or addressed) by a byte room id, by base: (element bytes, stock entries, where they live now).
 FLOW_TABLES = {
-    0x007B54E0: (4, 0xD6, 'per-id prop count, rooms.json -> 0x008C7000 (256)'),
-    0x007B5F00: (4, 0xD6, 'per-id prop list, rooms.json -> 0x008C7C00 (256)'),
-    0x007B5180: (4, 0xD6, 'per-id drawn flag, NOT relocated (check 6)'),
-    0x0073C350: (4, 3 * 0xD5, 'light heads [3][0xD5], rooms.json -> 0x008C8400 [3][0xFE]'),
-    0x0073D910: (4, 14, 'light round robin room/16, rooms.json -> 0x008CB400 (16)'),
-    0x007AC880: (12, 0xD5, 'room light colour float[0xD5][3], rooms.json -> 0x008C9000 [0xFE][3]'),
+    0x007B54E0: (4, 0xD6, 'per-id prop count, rooms.json -> 0x008C7000 (0x10D)'),
+    0x007B5F00: (4, 0xD6, 'per-id prop list, rooms.json -> 0x008C7CC0 (0x10D)'),
+    0x007B5180: (4, 0xD6, 'per-id drawn flag, rooms.json -> 0x008CC800 (0x110, check 6)'),
+    0x0073C350: (4, 3 * 0xD5, 'light heads [3][0xD5], rooms.json -> 0x008C8540 [3][0x10C]'),
+    0x0073D910: (4, 14, 'light round robin room/16, rooms.json -> 0x008CB440 (32)'),
+    0x007AC880: (12, 0xD5, 'room light colour float[0xD5][3], rooms.json -> 0x008C9200 [0x10C][3]'),
 }
 
 
@@ -183,7 +185,7 @@ def test_draw_buckets():
     assert loads == BUCKET_READERS
     # readers zero-extend (movzx) or copy the byte unchanged; none sign-extends a room (0xFF stays 255)
     assert {unique()[a].mnemonic for a in BUCKET_READERS} == {'movzx', 'mov'}
-    # the global room is drawn by push 0xD5 (rooms.json: 0xFE), never stored in a bucket
+    # the global room is drawn by push 0xD5 (rooms.json: 0x10C), never stored in a bucket
     assert any(i.address == 0x00086DDF and i.ops == (('imm', 0xD5),) for i in by_function()[0x00086C40])
 
 
@@ -348,16 +350,109 @@ def test_light_room_source():
     # held / view rooms (0xCA..0xD4 stock) are not substituted: such a light keeps a special id in its byte
 
 
-def test_room_flag_table_7b5180_is_not_relocated():
+def _flag_table_problems(rooms, objects):
+    """Why the stage-2 relocation of the per-id drawn flag table 0x007B5180 is wrong ([] when right)."""
+    flag = [e for e in rooms if e.get('kind') == 'relocate' and int(e['old'], 16) <= 0x007B5180 < int(e['old'], 16) + int(e['size'], 16)]
+    if len(flag) != 1:
+        return ['0x007B5180 is not relocated exactly once']
+    out = []
+    if flag[0]['sites'] != {'0x000A79C8': 'offset'}:
+        out.append('the only reference 0x000A79C8 must be an offset site')
+    old, size, new, new_size = (int(flag[0][k], 16) for k in ('old', 'size', 'new', 'new_size'))
+    # declared 4 bytes short: entry 0xD5 is the old end, so the list count 0x007B54D8 is outside the range
+    if old != 0x007B5180 or size != 0xD5 * 4:
+        out.append('declared range must be entries 0..0xD5 (0x354 bytes)')
+    if new_size < 0x110 * 4:
+        out.append('new table holds fewer than 0x110 ids')
+    if not (0x008C0000 <= new and new + new_size <= 0x008CD000):
+        out.append('new table is outside the rooms tables (0x008C0000..0x008CD000)')
+    list0 = next(e for e in objects if e['id'] == 'obj-list0-relocate')
+    if int(list0['old'], 16) + int(list0['size'], 16) >= 0x007B5180 or '0x000A79C8' in list0['sites']:
+        out.append('objects.json slot-0 list still claims 0x007B5180')
+    return out
+
+
+FLAG_MUTATIONS = {
+    'not-relocated': lambda r, o: [e for e in r if e['id'] != 'rooms-reloc-f-0x7b5180'],
+    'too-small': lambda r, o: [dict(e, new_size='0x3FC') if e['id'] == 'rooms-reloc-f-0x7b5180' else e for e in r],
+    'counter-in-range': lambda r, o: [dict(e, size='0x358') if e['id'] == 'rooms-reloc-f-0x7b5180' else e for e in r],
+    'outside-rooms': lambda r, o: [dict(e, new='0x008D4000') if e['id'] == 'rooms-reloc-f-0x7b5180' else e for e in r],
+}
+
+
+def _tables():
+    load = lambda name: json.loads((ROOT / 'config/guest-code-patches' / name).read_text(encoding='utf-8'))['patches']
+    return load('rooms.json'), load('objects.json')
+
+
+def test_room_flag_table_7b5180_is_relocated():
+    """Stage 2: the per-id drawn flag dword[0xD6] (one reference, 0x000A79C8) moves with room for 0x110 ids."""
     refs = {a for a, i in unique().items() for k, v in i.values() if 0x007B5180 <= v < 0x007B54D8}
     assert refs == {0x000A79C8}                   # mov dword [room*4+0x7B5180], 1 in sub_000A79B0
-    rooms = json.loads((ROOT / 'config/guest-code-patches/rooms.json').read_text(encoding='utf-8'))['patches']
-    assert not any(e.get('kind') == 'relocate' and int(e['old'], 16) <= 0x007B5180 < int(e['old'], 16) + int(e['size'], 16)
-                   for e in rooms)
-    objects = json.loads((ROOT / 'config/guest-code-patches/objects.json').read_text(encoding='utf-8'))['patches']
-    assert any((e.get('sites') or {}).get('0x000A79C8') == 'keep' for e in objects)
-    # entry 0xD6 is [0x007B54D8], a count only incremented/reset (no reader uses it as a bound),
-    # entries 0xD7.. fall into the old 0x007B54E0 tables, which rooms.json moved away
+    rooms, objects = _tables()
+    assert not _flag_table_problems(rooms, objects)
+    # entry 0xD6 of the stock table was [0x007B54D8], a count only incremented/reset (no reader uses it as a
+    # bound); the 241 layout wrote ids 0xD6..0xFE there and into the old 0x007B54E0 tables. Now nothing is.
     counter = {a: i.mnemonic for a, i in unique().items() if any(v == 0x007B54D8 for k, v in i.values())}
     assert counter == {0x0009FBAD: 'inc', 0x000A016E: 'mov', 0x000A0206: 'mov', 0x000A0228: 'mov',
                        0x000A0393: 'mov', 0x000A03B5: 'mov', 0x000A5BAB: 'mov'}
+
+
+@pytest.mark.parametrize('mutation', sorted(FLAG_MUTATIONS))
+def test_room_flag_table_mutations_fail(mutation):
+    rooms, objects = _tables()
+    assert _flag_table_problems(FLAG_MUTATIONS[mutation](rooms, objects), objects), mutation
+
+
+def test_room_flag_table_list0_mutation_fails():
+    rooms, objects = _tables()
+    kept = [dict(e, size='0x1C0', sites=dict(e['sites'], **{'0x000A79C8': 'keep'})) if e['id'] == 'obj-list0-relocate' else e
+            for e in objects]
+    assert _flag_table_problems(rooms, kept)
+
+
+def _define(name):
+    for line in (ROOT / 'src/interface/pc_mapmaker_rooms.inc').read_text(encoding='utf-8').splitlines():
+        if line.startswith(f'#define {name} '):
+            return int(line.split()[2].rstrip('u'), 0)
+    raise AssertionError(name)
+
+
+def test_light_side_table_matches_the_code():
+    """Stage 3: what pc_mapmaker_rooms.inc's light hooks assume about sub_001121E0..sub_00114290."""
+    funcs, insns = by_function(), unique()
+    calls = defaultdict(set)
+    for i in insns.values():
+        if i.call or i.branch:
+            for op in i.ops:
+                if op[0] == 'imm' and op[1] in (0x001121E0, 0x001123C0, 0x001124D0, 0x00114030, 0x00114290):
+                    calls[op[1]].add(i.address)
+    # sub_00114030 is linked only from sub_00114290 (the pending full id is meant for that call)
+    assert calls[0x00114030] == {0x00114859}
+    assert calls[0x00114290] == {0x00115403, 0x0011588C}
+    assert calls[0x001123C0] == {0x001129A1, 0x001129E0, 0x001142E2, 0x00115593, 0x00115642}
+    assert calls[0x001124D0] == {0x00112D71} and calls[0x001121E0] == {0x00112396, 0x001CDDFB}
+    # the pool clear writes the room byte through +0x80 + 0x19
+    assert insns[0x001122AF].ops[0][4] == 0x19 and insns[0x00112299].ops[1] == ('imm', 0x80)
+    # pool / record / group globals the side table indexes by
+    texts = {a: insns[a].text for a in (0x00112294, 0x00112233, 0x001122BA, 0x001142B8, 0x001142AF)}
+    assert '[0x73d950]' in texts[0x00112294] and '[0x4e62dc]' in texts[0x00112233] and '[0x73d960]' in texts[0x001122BA]
+    assert '[0x73d954]' in texts[0x001142B8] and '0x73d910' in texts[0x001142AF]
+    assert (_define('MAPMAKER_ROOMS_LIGHT_POOL'), _define('MAPMAKER_ROOMS_LIGHT_COUNT'), _define('MAPMAKER_ROOMS_LIGHT_ONE'),
+            _define('MAPMAKER_ROOMS_LIGHT_PER')) == (0x0073D950, 0x004E62DC, 0x0073D960, 0x0073D954)
+    assert insns[0x001122B2].ops[1] == ('imm', _define('MAPMAKER_ROOMS_LIGHT_STRIDE'))
+    # creation: the room argument (esp+0x78 = entry [esp+0x10]) picks group room/16, record rr[g] + g*per
+    assert insns[0x001142A2].ops[1][4] == 0x78 and insns[0x001142AC].text == 'eax, 4'
+    assert insns[0x00114377].ops[1][4] == 0x78 and insns[0x00114390].ops[1] == ('reg', 'dl')
+    # the pool sizes the level code picks (500/200/265/400) fit the side table
+    counts = {i.ops[1][1] for i in insns.values() if 0x00112300 <= i.address < 0x0011233A and i.mnemonic == 'mov'
+              and i.ops[0] == ('reg', 'eax') and i.ops[1][0] == 'imm'}
+    assert counts == {0x1F4, 0xC8, 0x109, 0x190} and max(counts) <= _define('MAPMAKER_ROOMS_LIGHT_SLOTS')
+    # heads, row width and round robin as rooms.json moves them
+    rooms = {e['id']: e for e in _tables()[0]}
+    assert int(rooms['rooms-reloc-l1-head']['new'], 16) == _define('MAPMAKER_ROOMS_LIGHT_HEADS')
+    assert int(rooms['rooms-reloc-lb-0x73d910']['new'], 16) == _define('MAPMAKER_ROOMS_LIGHT_GROUPS')
+    assert int(rooms['rooms-reloc-lb-0x73d910']['new_size'], 16) == 4 * _define('MAPMAKER_ROOMS_LIGHT_GROUP_COUNT')
+    rows = [e for e in rooms.values() if e['kind'] == 'operand' and 'light head row width' in e['reason']]
+    assert sorted(int(e['address'], 16) for e in rows) == [0x001123EA, 0x00112415, 0x00112EBD, 0x0011403C]
+    assert {int(e['value'], 16) for e in rows} == {_define('MAPMAKER_ROOMS_LIGHT_ROW')}
