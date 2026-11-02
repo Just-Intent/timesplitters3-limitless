@@ -104,3 +104,41 @@ wrappers and the table must ship together. Tests:
 `mapmaker_rooms_buckets.c` against models of the stock byte code, 27 C and 6
 table mutations, decode of the word loads). Overlap: the camera view work
 (depth cap 0x4F, view fields) touches the same two functions.
+
+## Stage 7: view stride 0x3000 (every scene)
+
+Views `[0x7B0CE4]` are 0x3000 apart (stock 0xFFC); the shadow is inside the
+stride: rects +0x1000 + 12*id, flags +0x28A0, list +0x2AB0 (room for id space
+0x20D). Sites: 35 stride steps, `sub_000C61D0`'s unrolled init (4 multiples,
+20 fields), two magic divisions (`0xAAAAAAAB`, shift 13), allocation 0x12008.
+C readers: `MAPMAKER_ROOMS_VIEW_*`, `OPENVIEW_RECT`, `MAPMAKER_CAMERA_VIEW_RECTS`,
+`SMX_PLAYER` (pinned by `test_other_areas_use_the_moved_tables`). Tests:
+`test_view_stride_table` (+10 mutations), `test_every_view_stride_is_classified`
+(decode). Details: mapmaker-rooms.md "Stage 7".
+
+## Stage 9: sub-range repacked for 511 (before stage 8)
+
+Per-room tables 512 entries, per-id tables room for 0x20D ids, light heads
+`0x008D0000`, colour `0x008D18A0`, round robin `0x008CB700` (64), drawn flag
+`0x008C8500`, staging row `0x008C3000`; fixed: t3 `0x008C0800` (sky mask),
+p1/p4 `0x008C7000`/`0x008C7CC0` (probe), model table `0x008CA000`. Objects
+clears p2/p5 at `0x008C5000`/`0x008C6080`; `MAPMAKER_ROOF_ROOMS` 512,
+`MAPMAKER_CAMERA_ROOMS` 511. Map: `ROOMS_BLOCKS` (`test_rooms_blocks`) and
+mapmaker-rooms.md "Stage 9".
+
+## Stage 8: special ids 0x200..0x20C (every scene)
+
+Real rooms 1..0x1FF, spare 0x200, players 0x201..0x205, views 0x206..0x20B,
+global 0x20C, id space 0x20D; the same 155 operand entries, sizes tied to the
+id space follow (loop ends, `[0x7B977C]` 0x210, light row 0x20C, colour,
+per-id tables 0x20D). C: `MAPMAKER_ROOMS_IDS_REAL` 0x1FF, `_ID_GLOBAL` 0x20C,
+probe/objects 0x20D. Sourceless lights in rooms 0x100..0x1FF keep their colour
+untinted. mapmaker-rooms.md "Stage 8".
+
+## Stage 10: model table 0xB08 (every scene)
+
+Model -> slot table `0x008CA000` 0xB08 words, bounds 0xB08, per-model array
+0x108C0; `MAPMAKER_ROOMS_MODEL_ENTRIES` with a compile-time fit check;
+probe 0xB08. Prop slots and the compile guard follow `MAPMAKER_ROOMS_MAX`.
+Cap: still 255 (objects pool, links, pads, pad groups bind first; values
+needed: mapmaker-rooms.md "Cap after stages 7-10").

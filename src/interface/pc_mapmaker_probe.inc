@@ -508,14 +508,14 @@ static void mapmaker_probe_click(uint32_t menu,float x,float y,uint32_t hit,unsi
  * (sub_00085CC0, 0x00085D6B). Hot path: cheap pointer checks only. */
 #define MAPMAKER_PROBE_ROOM_COUNTS 0x008C7000u
 #define MAPMAKER_PROBE_ROOM_LISTS 0x008C7CC0u
-#define MAPMAKER_PROBE_ROOM_IDS 0x10Du             /* ids 0..0x10C (rooms.json) */
+#define MAPMAKER_PROBE_ROOM_IDS 0x20Du             /* ids 0..0x20C (rooms.json) */
 #define MAPMAKER_PROBE_ROOM_PROPS 64u
 #define MAPMAKER_PROBE_ROOM_WINDOW 5000u
 #define MAPMAKER_PROBE_ROOM_PERIOD 30000u
 #define MAPMAKER_PROBE_ROOM_GAP 2000u
 #define MAPMAKER_PROBE_ROOM_SEEN 1024u
 #define MAPMAKER_PROBE_MODEL_ROOMS 0x908u
-#define MAPMAKER_PROBE_MODEL_ROOMS_END 0xA08u      /* room models 0x908..0xA06 */
+#define MAPMAKER_PROBE_MODEL_ROOMS_END 0xB08u      /* room models 0x908..0xB06 (rooms.json model table) */
 #define MAPMAKER_PROBE_PTR_OK(p,n) ((((uint32_t)(p))>=0x00010000u && ((uint32_t)(p))<0x04000000u-(uint32_t)(n)) || \
                                     (((uint32_t)(p))>=0x80000000u && ((uint32_t)(p))<0x84000000u-(uint32_t)(n)))
 static struct {

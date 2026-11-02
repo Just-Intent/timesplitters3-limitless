@@ -103,7 +103,7 @@ int main(void)
         FLOAT_AT(0x004DCB0Cu)=1800;FLOAT_AT(view+0x384u)=55;
         WORD_AT(view+0x214u)=0;WORD_AT(view+0x2A0u)=1;WORD_AT(view+0xD28u)=2;
         for(r=1;r<=4;r++) {
-            uint32_t e=view+0x6000u+r*12u;
+            uint32_t e=view+MAPMAKER_CAMERA_VIEW_RECTS+r*12u;
             FLOAT_AT(records+r*0xB4u+0x14u)=y[r];FLOAT_AT(records+r*0xB4u+0x20u)=y[r]+5;
             WORD_AT(e)=r<4?r-1:(uint32_t)-1;
             *(int16_t *)((uintptr_t)(e+4u)+g_xbox_mem_offset)=0;
@@ -111,9 +111,9 @@ int main(void)
         }
         mapmaker_camera_view_diag();
         mapmaker_camera_view_diag();          /* unchanged: no second line */
-        WORD_AT(view+0x6000u+4u*12u)=3;*(int16_t *)((uintptr_t)(view+0x6000u+4u*12u+8u)+g_xbox_mem_offset)=640;
+        WORD_AT(view+MAPMAKER_CAMERA_VIEW_RECTS+4u*12u)=3;*(int16_t *)((uintptr_t)(view+MAPMAKER_CAMERA_VIEW_RECTS+4u*12u+8u)+g_xbox_mem_offset)=640;
         mapmaker_camera_view_diag();
-        WORD_AT(SCENE)=1u;WORD_AT(view+0x6000u+3u*12u)=(uint32_t)-1;
+        WORD_AT(SCENE)=1u;WORD_AT(view+MAPMAKER_CAMERA_VIEW_RECTS+3u*12u)=(uint32_t)-1;
         mapmaker_camera_view_diag();          /* other scene: silent */
     }
     puts("phase view");

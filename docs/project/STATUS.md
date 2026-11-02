@@ -27,6 +27,18 @@ test_mounted_mouse.py, test_menu_mouse.py, cutscene-letterbox/decal/camera-feed 
 hook), openview, widescreen, bigdraw, fov: 108 passed, 9 skipped (no XBE in worktree; the camera
 decoder test passed against the main checkout XBE). Not run: full tests/mapmaker, game, live camera, Mac.
 
+## MapMaker rooms machinery for 511 (stages 7-10, 2026-11-02, not built or played)
+
+Source: branch rooms-511 from mapmaker-recon ddb76a38, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. Stage 7 moves the six views to a 0x3000 stride with the per-room shadow
+inside it; stage 9 repacks the rooms tables for 512 rooms / 0x20D ids; stage 8 renumbers the special
+room ids to 0x200..0x20C; stage 10 grows the model table to 0xB08. All run in every scene; the editor
+limit stays 255. check-tables "table verified" after each stage; rooms, buckets, camera, openview,
+roof, skymask, objects, probe, sky music and boss-area tests pass (last run 997 of 1005; the 8 mutation
+failures passed on rerun, transient). Not run: full tests/mapmaker, game
+build, story levels, MapMaker play, Mac. Playtest list: docs/mapmaker/mapmaker-rooms.md "What to test
+in play" (R1..R6).
+
 ## MapMaker rooms 241 -> 255 (2026-11-01, not built or played)
 
 Source: branch room-cap-255 from mapmaker-recon f0483586, Windows 11 x64, MSVC fixtures and the
