@@ -25,7 +25,8 @@ MUTATIONS = {
     'register-slot0-stock': ('cap=MAPMAKER_OBJECTS_LIST0_CAP;', 'cap=112u;'),
     'register-removal-guarded': ('if(flag && (int32_t)WORD_AT(count)', 'if((int32_t)WORD_AT(count)'),
     'register-listed-ignored': (' &&\n       !mapmaker_objects_listed(base,cap,obj)', ''),
-    'pool-stock': ('#define MAPMAKER_OBJECTS_POOL 1000u', '#define MAPMAKER_OBJECTS_POOL 550u'),
+    'pool-stock': ('#define MAPMAKER_OBJECTS_POOL 1023u', '#define MAPMAKER_OBJECTS_POOL 550u'),
+    'pool-round3': ('#define MAPMAKER_OBJECTS_POOL 1023u', '#define MAPMAKER_OBJECTS_POOL 1000u'),
     'pool-story': ('return mapmaker_limits.pools && (mapmaker_objects_scene(100u) || mapmaker_objects_scene(102u));',
                    'return mapmaker_limits.pools;'),
     'pool-play-only': ('(mapmaker_objects_scene(100u) || mapmaker_objects_scene(102u))', 'mapmaker_objects_scene(100u)'),
@@ -53,8 +54,11 @@ MUTATIONS = {
                             '    MAPMAKER_GUEST_RET();\n}\n\n/* ---- logic tags'),
     'tele-any-scene': ('    if(!mapmaker_objects_scene(100u)) { original(); return; }\n    save_registers(&r);\n    mapmaker_limits_read();',
                        '    save_registers(&r);\n    mapmaker_limits_read();'),
-    'tele-stock-pool-assumed': ('links=mapmaker_limits.pools?MAPMAKER_LIMIT_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;',
-                                'links=MAPMAKER_LIMIT_LINKS;'),
+    'tele-stock-pool-assumed': ('links=mapmaker_limits.pools?MAPMAKER_POOL_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;',
+                                'links=MAPMAKER_POOL_LINKS;'),
+    # The editor limit is not the pool: past it the teleporters still get links.
+    'tele-editor-limit-as-pool': ('links=mapmaker_limits.pools?MAPMAKER_POOL_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;',
+                                  'links=mapmaker_limits.pools?MAPMAKER_LIMIT_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;'),
     'tag-not-guarded': ('mapmaker_objects_tags_full()) {', '0) {'),
     'tag-stock-cap': ('#define MAPMAKER_OBJECTS_TAGS_CAP 1000u', '#define MAPMAKER_OBJECTS_TAGS_CAP 250u'),
     'tag-no-serial': ('        WORD_AT(0x00519750u)++;\n', '\n'),
@@ -78,6 +82,8 @@ def build(tmp_path, mutation):
         args = [compiler, '-std=c11', '-O2', '-Wall', '-Wextra', '-D_POSIX_C_SOURCE=200809L',
                 '-I' + str(tmp_path), '-I' + str(ROOT / 'src'), str(source), '-o', str(exe)]
     result = subprocess.run(args, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=60)
+    if mutation != 'fixed' and result.returncode != 0:
+        return None                      # the pool/editor-limit size check refused it at compile time
     assert result.returncode == 0, result.stdout + result.stderr
     return exe
 
@@ -85,6 +91,8 @@ def build(tmp_path, mutation):
 @pytest.mark.parametrize('mutation', ['fixed', *MUTATIONS])
 def test_mapmaker_objects(tmp_path, mutation):
     exe = build(tmp_path, mutation)
+    if exe is None:
+        return
     env = {k: v for k, v in os.environ.items()
            if k not in ('TSFP_MAPMAKER_POOLS', 'TSFP_MAPMAKER_LIMITS', 'TSFP_MAPMAKER_MEMORY_SCALE')}
     result = subprocess.run([str(exe)], env=env, capture_output=True, text=True, timeout=60)

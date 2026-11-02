@@ -38,6 +38,9 @@ MUTATIONS = {
                                       'capacity=MAPMAKER_PADS_COVER_RANGE;'),
     'topup-wraps': ('if(count>capacity || add>capacity-count) {', 'if(add>capacity-count) {'),
     'cover-range-short': ('#define MAPMAKER_PADS_COVER_RANGE 10240u', '#define MAPMAKER_PADS_COVER_RANGE 9984u'),
+    # Regular pad ids past the stock threshold need the pads-idthreshold rewrites (compile-time check).
+    'id-threshold-stock': ('#define MAPMAKER_PADS_ID_THRESHOLD 0x2328u', '#define MAPMAKER_PADS_ID_THRESHOLD 0x1F40u'),
+    'id-threshold-overlaps-cover': ('#define MAPMAKER_PADS_ID_THRESHOLD 0x2328u', '#define MAPMAKER_PADS_ID_THRESHOLD 0x2329u'),
 }
 
 
@@ -92,12 +95,22 @@ EXPECTED_COUNTS = {OLD_RUNTIME: 51, OLD_RUNTIME + RUNTIME_SLOTS: 24, 0x2440: 1,
                    (-OLD_RUNTIME) & 0xFFFFFFFF: 11, (-OLD_RUNTIME * 32 + 4) & 0xFFFFFFFF: 1}
 KEPT = {0x002B0363}            # movsx eax,[pool-0x413D8]: does not depend on the handle
 EXT_START, EXT_END = 0x008E0000, 0x00900000
+# The 13 "pad id above 8000 is a cover id" compares (cmp reg,0x1f40; jle; call
+# sub_0009CCA0; movsx [pad+8]): moved to the last regular id 0x2328.
+ID_THRESHOLD_SITES = {0x0023F300, 0x0023FDCF, 0x002411F6, 0x00241300, 0x002413D2, 0x002416BA, 0x00241853,
+                      0x00241F64, 0x00242035, 0x00242094, 0x00242107, 0x00339448, 0x00339597}
 
 
 def c_define(name):
     m = re.search(rf'#define {name} (\d+)u', PADS.read_text(encoding='utf-8'))
     assert m, name
     return int(m.group(1))
+
+
+def c_hex(name):
+    m = re.search(rf'#define {name} 0x([0-9A-F]+)u', PADS.read_text(encoding='utf-8'))
+    assert m, name
+    return int(m.group(1), 16)
 
 
 def validate(table):
@@ -116,6 +129,16 @@ def validate(table):
         counts[v] = counts.get(v, 0) + 1
     assert counts == EXPECTED_COUNTS
     assert len({e['address'] for e in layout}) == len(layout) == 88
+    # pad id thresholds: exactly the 13 sites, cmp reg,0x1f40 -> cmp reg,0x2328
+    thresholds = [e for e in table['patches'] if e['id'].startswith('pads-idthreshold-')]
+    threshold = c_hex('MAPMAKER_PADS_ID_THRESHOLD')
+    assert threshold == 0x2329 - 1
+    assert {int(e['address'], 16) for e in thresholds} == ID_THRESHOLD_SITES == {
+        int(e['address'], 16) for e in thresholds if e['id'] == f"pads-idthreshold-{int(e['address'], 16):08x}"}
+    for e in thresholds:
+        old, new = bytes.fromhex(e['original_hex']), bytes.fromhex(e['new_hex'])
+        assert old[:-4] in (b'\x3d', b'\x81\xf9', b'\x81\xfd', b'\x81\xfe') and old[-4:] == COVER_BASE.to_bytes(4, 'little')
+        assert new == old[:-4] + threshold.to_bytes(4, 'little'), e['id']
     # the handle range the C bound checks assume
     assert NEW_RUNTIME - COVER_BASE == c_define('MAPMAKER_PADS_COVER_RANGE')
     # group A* pool relocation and the loop bound that makes it possible
@@ -156,6 +179,11 @@ TABLE_MUTATIONS = {
          'original_hex': '0fbf8028ecfbff', 'new_hex': '0fbf8018e8f7ff'}),
     'pool-too-big': lambda t: t['patches'][-1].update(new_size='0x40000'),
     'loop-bound-changes-loop': lambda t: _set_new(t, '0x00098540', '3d20dd7000'),
+    'threshold-missing': lambda t: _drop(t, '0x00242107'),
+    'threshold-into-cover': lambda t: _set_new(t, '0x0023F300', '3d29230000'),
+    'threshold-handle-site': lambda t: t['patches'].insert(0,
+        {'id': 'pads-idthreshold-0009d5fe', 'kind': 'code', 'function': '0x0009D5E0', 'address': '0x0009D5FE',
+         'original_hex': '81f9401f0000', 'new_hex': '81f928230000'}),
 }
 
 
@@ -174,6 +202,34 @@ def _listing():
         if p.is_file():
             return p
     return None
+
+
+def test_id_thresholds_against_listing():
+    """Each threshold site is the id test before the owner lookup: cmp reg,0x1f40;
+    jle within two instructions; then call sub_0009CCA0 and movsx [eax+8]."""
+    listing = _listing()
+    if listing is None:
+        pytest.skip('disassembly listing not available')
+    line = re.compile(r'^\s+0x([0-9A-F]{8})\s+([0-9a-f]+)\s+(\S+)\s*(.*?)\s*$')
+    rows = []
+    with listing.open(encoding='utf-8', errors='replace') as fh:
+        for text in fh:
+            m = line.match(text)
+            if m:
+                rows.append((int(m.group(1), 16), m.group(3), m.group(4)))
+    index = {a: i for i, (a, _, _) in enumerate(rows)}
+    table = json.loads(TABLE.read_text(encoding='utf-8'))
+    for e in table['patches']:
+        if not e['id'].startswith('pads-idthreshold-'):
+            continue
+        i = index[int(e['address'], 16)]
+        assert rows[i][1] == 'cmp' and rows[i][2].endswith('0x1f40'), e['id']
+        after = rows[i + 1:i + 6]
+        mnemonics = [m for _, m, _ in after]
+        assert 'jle' in mnemonics[:3], e['id']
+        j = mnemonics.index('jle')
+        assert any(m == 'call' and '0x9cca0' in o for _, m, o in after[j:]), e['id']
+        assert any(m == 'movsx' and '+ 8]' in o for _, m, o in rows[i + 1:i + 8]), e['id']
 
 
 def test_table_complete_against_listing():

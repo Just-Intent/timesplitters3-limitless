@@ -181,7 +181,7 @@ int main(void)
     /* ---- sub_000A5CE0 list guards ---- */
     {
         static const uint32_t slot[3]={9,8,0},count[3]={0x007B625Cu,0x007B4FA8u,0x007B6258u},
-            base[3]={0x008A0000u,0x008AC000u,0x008AD000u},cap[3]={128,1000,1000};
+            base[3]={0x008A0000u,0x008AC000u,0x008AD000u},cap[3]={128,1023,1023};
         unsigned s;
         const uint32_t obj=0x00530000u;
         WORD_AT(0x007DE318u)=0x55u;
@@ -216,8 +216,8 @@ int main(void)
     WORD_AT(0x00716290u)=0x00540000u;WORD_AT(0x00716294u)=9;WORD_AT(0x0072F5F8u)=9;
     allocs=0;calls[0]=0;originals=0;callback_arg=7;
     HOOK(pc_mapmaker_objects_pool,fake_original);
-    CHECK(originals==0 && allocs==3 && WORD_AT(0x0072F5E4u)==1000u);
-    CHECK(alloc_size[0]==((1000u*0x2E8u+15u)&~15u) && alloc_size[1]==0x190u && alloc_size[2]==0xA680u);
+    CHECK(originals==0 && allocs==3 && WORD_AT(0x0072F5E4u)==1023u);
+    CHECK(alloc_size[0]==((1023u*0x2E8u+15u)&~15u) && alloc_size[1]==0x190u && alloc_size[2]==0xA680u);
     CHECK(alloc_heap[0]==1 && alloc_heap[1]==1 && alloc_heap[2]==1);
     CHECK(WORD_AT(0x0072F5E8u)==0x00900000u && WORD_AT(0x00715FB4u)==WORD_AT(0x0072F5ECu)+0x190u);
     CHECK(WORD_AT(0x008C7000u)==0 && WORD_AT(0x008C5000u+0x20C*4)==0 && WORD_AT(0x008C6080u+4)==0 && WORD_AT(0x008C6080u+0x20C*4)==0);
@@ -247,8 +247,8 @@ int main(void)
     /* twin pool */
     originals=0;allocs=0;WORD_AT(0x007B67D0u)=5;WORD_AT(0x007B6984u)=5;WORD_AT(0x006F73B0u)=0;
     HOOK(pc_mapmaker_objects_twin_pool,fake_original);
-    CHECK(originals==0 && allocs==1 && alloc_size[0]==1000u*0x200u && WORD_AT(0x0070AAD8u)==1000u);
-    CHECK(WORD_AT(WORD_AT(0x0070AADCu))==0 && WORD_AT(WORD_AT(0x0070AADCu)+1000u*0x200u-4u)==0);
+    CHECK(originals==0 && allocs==1 && alloc_size[0]==1023u*0x200u && WORD_AT(0x0070AAD8u)==1023u);
+    CHECK(WORD_AT(WORD_AT(0x0070AADCu))==0 && WORD_AT(WORD_AT(0x0070AADCu)+1023u*0x200u-4u)==0);
     CHECK(WORD_AT(0x007B67D0u)==0 && WORD_AT(0x007B6984u)==0 && WORD_AT(0x004D9700u)==1);
     WORD_AT(0x006F73B0u)=3;
     HOOK(pc_mapmaker_objects_twin_pool,fake_original);
@@ -292,9 +292,12 @@ int main(void)
             CHECK(links[k][0]==want[k][0]+0x100u && links[k][1]==want[k][1]+0x100u);
         CHECK(WORD_AT(0x007B6660u)==111u);
     }
-    WORD_AT(0x007B6660u)=MAPMAKER_LIMIT_LINKS-2u;nlinks=0;            /* link pool nearly full */
+    WORD_AT(0x007B6660u)=MAPMAKER_POOL_LINKS-2u;nlinks=0;             /* link pool nearly full */
     HOOK(pc_mapmaker_objects_teleporters,fake_original);
-    CHECK(nlinks==2 && WORD_AT(0x007B6660u)==MAPMAKER_LIMIT_LINKS);
+    CHECK(nlinks==2 && WORD_AT(0x007B6660u)==MAPMAKER_POOL_LINKS);
+    WORD_AT(0x007B6660u)=MAPMAKER_LIMIT_LINKS+3u;nlinks=0;            /* past the editor limit, pool not full */
+    HOOK(pc_mapmaker_objects_teleporters,fake_original);
+    CHECK(nlinks==11);
     set_env("TSFP_MAPMAKER_POOLS","0");WORD_AT(0x007B6660u)=4399u;nlinks=0; /* stock link pool */
     HOOK(pc_mapmaker_objects_teleporters,fake_original);
     CHECK(nlinks==1);

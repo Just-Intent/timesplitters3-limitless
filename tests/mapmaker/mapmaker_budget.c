@@ -54,7 +54,9 @@ int main(void)
     CHECK(run(4096000u)==1365334u);
     set_scale("8");
     CHECK(run(0xFFFFFFFFu)==0x20000000u);                 /* no overflow */
-    set_scale("9");                                       /* out of range: off */
+    set_scale("16");                                      /* the largest (round 4) */
+    CHECK(run(2048000u)==128000u);
+    set_scale("17");                                      /* out of range: off */
     CHECK(run(2048000u)==2048000u);
     set_scale("2x");
     CHECK(run(2048000u)==2048000u);
@@ -65,8 +67,15 @@ int main(void)
     CHECK(run(2048000u)==256000u);
     set_scale("3");
     CHECK(run(4096000u)==1365334u);
-    set_scale("9");                                       /* invalid explicit: off */
+    set_scale("17");                                      /* invalid explicit: off */
     CHECK(run(2048000u)==2048000u);
+    /* An arena raised by the switch adds one step per 2 MB, up to 16. */
+    set_scale(NULL);mapmaker_budget.arena_mb=6u;
+    CHECK(run(2048000u)==186182u);                        /* scale 11 */
+    set_scale(NULL);mapmaker_budget.arena_mb=16u;
+    CHECK(run(2048000u)==128000u);                        /* scale 16 */
+    set_scale("3");mapmaker_budget.arena_mb=16u;          /* an explicit scale wins */
+    CHECK(run(4096000u)==1365334u);
     set_scale(NULL);set_env("TSFP_MAPMAKER_POOLS","0");   /* limits need the pools */
     CHECK(run(2048000u)==2048000u);
     set_env("TSFP_MAPMAKER_POOLS",NULL);set_env("TSFP_MAPMAKER_LIMITS","0");

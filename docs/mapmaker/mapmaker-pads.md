@@ -13,15 +13,17 @@ in the disassembly at the given address; INFERRED = reasoning, not observed.
 | Runtime pad handles | 0x209E..0x20B1 | 0x4740..0x4753 | same |
 | Scene-100 cover pool | 1280 x 32 B | 10,496 x 32 B (range + 256 guard) | `MAPMAKER_POOL_COVER`, `pc_display_mapmaker_pools` |
 | Editor cover limit (opt-in) | 1024 | 9,984 (range - 256, the stock spare) | `MAPMAKER_LIMIT_COVER` |
-| Link pool (scene 100) | 4400 x 20 B (editor 4400) | 16,336 x 20 B (editor 12,000 + 16 per piece stitch x 255 + 256) | `pc_display_mapmaker_pools` |
+| Link pool (scene 100) | 4400 x 20 B (editor 4400) | 32,512 x 20 B, fixed (int16 A* indices); editor: template links + 16 per piece <= 32,256 (2026-11-02; was 16,336 / 12,000) | `MAPMAKER_POOL_LINKS`, `pc_display_mapmaker_pools` |
 | Group A* node pool | 1000 nodes .bss 0x0070E178, no bound | 8192 nodes at 0x008E0000, bounded | `pads.json` relocation + `pc_mapmaker_pads_group_node` |
 | Pad A* node pool | 1000 nodes .bss 0x00712058, no bound | 1000 nodes, bounded | `pc_mapmaker_pads_pad_node` |
 | Start-point cover top-up | unbounded | refused past the cover capacity (scene 100) | `pc_mapmaker_pads_cover_topup` |
+| Pad id threshold (13 compares) | id > 8000 is cover | id > 9000 (0x2328) is cover | `pads.json` `pads-idthreshold-*` (2026-11-02) |
+| Regular pads (scene 100) | pool 2400, editor 2400 | pool 8000 (the regular handle range), editor 7,680 | `MAPMAKER_POOL_PADS`, `MAPMAKER_LIMIT_PADS` |
 
 Unchanged on purpose: pad ids (regular 0x3E9 + i, cover 0x2329 + i,
 runtime -2), so saved maps and story files read the same; the cover handle
-base 0x1F40; the regular range; the 13 pad-id threshold compares; regular
-pads 4800 and links 12,000 (8800 before 2026-11-01) in the editor; pad groups 600.
+base 0x1F40; the regular handle range (index < 0x1F40). Regular pads were
+4800 in the editor until 2026-11-02 (now 7,680, below).
 
 ## Wrappers for the integrator
 
@@ -142,10 +144,29 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
 
 ## Regular pads, ids and links
 
-- The 13 id-threshold compares (`cmp reg,0x1f40; jle`, pads.md §1.3) treat
-  an id above 8000 as a cover id. Regular ids reach 0x3E9 + 4799 = 5800 with
-  4800 pads, cover ids start at 9001, so they stay correct; they would only
-  misread regular pads past 7000. Unchanged.
+- The 13 id-threshold compares (`cmp reg,0x1f40; jle; call sub_0009CCA0;
+  movsx [pad+8]`: an id above the threshold is a cover id and is replaced by
+  its owner) are in `sub_0023F300` (0x0023F300), `sub_0023FD10` (0x0023FDCF),
+  `sub_00240C50` (0x002411F6, 0x00241300, 0x002413D2, 0x002416BA, 0x00241853,
+  0x00241F64, 0x00242035, 0x00242094, 0x00242107), `sub_00339410`
+  (0x00339448) and `sub_00339560` (0x00339597) (CONFIRMED, each followed by
+  `jle` and the call). With 0x1F40 they misread regular pads 7000..7999 (ids
+  8001..9000) as cover pads, taking `+8` (the group id) as an owner pad id.
+  2026-11-02: `pads-idthreshold-*` rewrites them to 0x2328, the last regular
+  id. Every other cover-id test already uses `>= 0x2329` (`sub_0009CC40`,
+  `sub_0009CCA0`, `sub_0009A330`, `sub_0009CE00`, `sub_0023F9D0`,
+  `sub_00332330`, `sub_0006C1E0`), so the 13 now agree with them. Ids up to
+  8000 decode as before, so story levels (at most 2400 regular, 350 cover) and
+  saved maps are unaffected; no scene gate. The earlier decoder classification
+  called four handle compares (`0x0009D5FE`, `0x0009D622`, `0x0015D51A`,
+  `0x0015E4B5`, all `jl` on handles) id thresholds and two id thresholds
+  (`0x00339448`, `0x00339597`) handle compares; corrected.
+- Regular pads: the scene-100 pool and the per-pad AI data hold 8000 entries
+  (the whole regular handle range, 256 KB + 352 KB), the editor allows 7,680
+  (320 spare). 511 pieces of the heaviest tile need 7,154. Regular ids reach
+  0x3E9 + 7999 = 9000 < 0x2329, cover ids still start at 9001. Not measured:
+  the per-pad AI data writer `sub_0027C4A0` does route searches per regular
+  pad at load, so load time grows with the pad count.
 - Cover ids reach 0x2329 + 10,239 = 19,240 < 32,767 (int16 owner field at
   pad+8 and the `[0x78CCE4]` records) and < 65,535 (uint16 save words).
 - Links: the editor's 12,000 counts template links only (8800 until
@@ -155,9 +176,22 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
   [0x7B6660]` at `0x0009DCEE`), from a table of 16 entries per piece
   (`sub_0009A0F0`, 6-byte entries; INFERRED that the size argument is the
   piece count), and `sub_0009CD00` adds teleporter/door links
-  (`sub_0009A5B0`). The pool is now 12,000 + 16 x 255 + 256 = 16,336 (255 pieces, 2026-11-01).
+  (`sub_0009A5B0`). The pool was 12,000 + 16 x 255 + 256 = 16,336 (255 pieces, 2026-11-01).
   Link indices stay below the int16 limit (32,767) of the A* nodes and
   routes; the fixture checks the pool against it.
+- 2026-11-02: the pool is fixed at 32,512 entries (650 KB, the most below
+  the int16 limit with a margin) and the editor counts what play adds: it
+  refuses placement when template links + 16 x pieces (placed + held) pass
+  32,256, keeping 256 for teleporter and door links. 511 pieces of the
+  heaviest tile need 23,506 + 8,176 = 31,682 (links refuse the 521st);
+  1024 pieces fit with up to 15 template links each. The meter's link share
+  divides the same sum by 32,256. The teleporter pairing
+  (`pc_mapmaker_objects_teleporters`) stops adding links at the pool size
+  (it compared with the editor's 12,000 before, so past 12,000 links a
+  map's teleporters would have had no nav links). Widening the A* indices to
+  32 bits was not attempted: nodes (`+0`..`+6` int16 in 16-byte nodes) and
+  route buffers (int16 arrays of 100/300 in a 0x338-byte struct) are used by
+  13 functions plus every route reader.
 
 ## Pad groups and the A* pools
 
@@ -186,10 +220,15 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
   come from one tile (group ids are offset per tile, `0x0009A8D9`), so its
   nodes are bounded by one tile's links (46 at most) (INFERRED). It stays at 1000 in place, with
   the same guard (`[0x00712044]`, `[0x00715F20]`).
-- Group limit 600 is kept: memory-safe with the guards. Not measured: load
-  time of the N x N distance matrix (`sub_00275F70`, 359,400 route searches
-  at 600 groups vs 89,700 stock; 1.44 MB). Above ~1000 groups that matrix
-  needs a lazy replacement.
+- Group limit 600 -> 1024 (2026-11-02): 511 pieces at the measured 1.5
+  groups per piece need about 770. Memory-safe with the guards: group ids are
+  int16, the group table `[0x7B6770]` is sized by count, the group A* pool is
+  bounded. The N x N distance matrix (`sub_00275F70`, (N+1) x N x 4 B from
+  heap 1 at `0x00275F90`, zeroed by the caller) is 4.2 MB at 1024 groups
+  (1.44 MB at 600); see `docs/mapmaker/mapmaker-memory.md` for where it now
+  lives. Not measured: its load time (N x N route searches, 1.05 M at 1024
+  vs 359,400 at 600 and 89,700 stock). Past 1024 the matrix needs a lazy
+  replacement (wrap `sub_00275F70` and its reader `sub_00275F40`).
 
 ## Open risks
 
