@@ -195,6 +195,7 @@
 #define BOS_SMOOTH 16u
 #define BOS_HUD_CLOCK 0x2Cu             /* float HUD block clock: += dt per sub_0014B090 (0x0014B23E) */
 #define BOS_FADE_RATE 0x00475D10u       /* float 2.0: +0x172C -= dt x this, floor 0 (0x0014B24F..0x0014B276) */
+#define BOS_NOTES 16u                   /* bar reasons logged per level (entity, reason) */
 
 #define BOS_CHARS 0x0053A3CCu           /* per character id, 0x30 bytes */
 #define BOS_RES_SLOT 0x008CA000u        /* int16 per resource id; stock 0x0078B860, moved by the rooms area */
@@ -228,6 +229,8 @@ static struct {
     struct { uint32_t hud, entity, frame, state[3], timed; float clock; } smooth[BOS_SMOOTH];
     uint32_t frame;
     float range2;
+    struct { uint32_t ent; unsigned why; } note[BOS_NOTES];   /* bar reasons logged this level */
+    unsigned notes;
 } bos_play;
 
 static void bos_log(const char *what,unsigned a,unsigned b)
@@ -542,6 +545,9 @@ static void bos_level_read(void)
     bos_walk(WORD_AT(BOS_CONTAINER),BOS_LEVEL_SLOTS,bos_level_chunk,&n);
     bos_play.range2=bos_range2();
     bos_play.active=n!=0;
+    fprintf(stderr,"[mapmaker] story AI bosses: map start: %u Story AIs with a Boss or health setting (%u with the Sub-boss bar)%s\n",
+            n,bos_play.subs,n?"":": no Boss bars this map");
+    fflush(stderr);
 }
 /* sub_00240C50: a MapMaker map starts. */
 void pc_mapmaker_bosses_level(void (*original)(void))
@@ -637,17 +643,37 @@ static void bos_bar_extra_add(BosBarExtra f)
     for(k=0;k<BOS_EXTRA_AREAS;k++) if(!bos_bar_extra[k]) { bos_bar_extra[k]=f;return; }
     bos_log("boss bar area table full",BOS_EXTRA_AREAS,0);
 }
+/* Why a bar candidate is or is not drawn: logged once per entity and reason
+ * per level (v0.4.0-mapmaker.34: no Khallos bar and no line saying why). */
+enum { BOS_BAR_DRAWN, BOS_BAR_REFUSED, BOS_BAR_NOT_BOSS, BOS_BAR_SUB, BOS_BAR_DEAD, BOS_BAR_FAR, BOS_BAR_STOCK, BOS_BAR_FULL };
+static void bos_note(uint32_t ent,uint32_t s,unsigned why)
+{
+    static const char *const text[]={"drawn","refused by the bar draw (sub_00139740)","not shown: the Story AI's Boss setting is Off",
+        "not shown: Sub-boss bar (overhead meter)","not shown: dead","not shown: out of range","not shown: the stock bar shows it",
+        "not shown: more Boss bars than fit"};
+    unsigned k;
+    for(k=0;k<bos_play.notes;k++) if(bos_play.note[k].ent==ent && bos_play.note[k].why==why) return;
+    if(bos_play.notes>=BOS_NOTES) return;
+    bos_play.note[bos_play.notes].ent=ent;bos_play.note[bos_play.notes++].why=why;
+    fprintf(stderr,"[mapmaker] story AI bosses: bar of %s (entity 0x%X): %s\n",
+            s<BOS_LEVEL_SLOTS && bos_play.name[s][0]?bos_play.name[s]:"an unnamed Story AI",(unsigned)ent,text[why]);
+    fflush(stderr);
+}
 /* Adds Boss entity ent (Story AI index s) to the n nearest in range; returns the new n. */
 static unsigned bos_near_add(uint32_t ent,uint32_t s,const float *pp,float *dist,uint32_t *ents,uint32_t *index,unsigned max,unsigned n)
 {
     float dx,dy,dz,d;
     unsigned k;
-    if(!bos_play.level[s] || bos_play.sub[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) return n;   /* Sub-boss: meter only */
+    if(!bos_play.level[s] || bos_play.sub[s] || !(bos_getf(ent+BOS_ENT_HEALTH)>0.0f)) {   /* Sub-boss: meter only */
+        bos_note(ent,s,!bos_play.level[s]?BOS_BAR_NOT_BOSS:bos_play.sub[s]?BOS_BAR_SUB:BOS_BAR_DEAD);
+        return n;
+    }
     dx=bos_getf(ent+BOS_ENT_POS)-pp[0];dy=bos_getf(ent+BOS_ENT_POS+4u)-pp[1];dz=bos_getf(ent+BOS_ENT_POS+8u)-pp[2];
     d=dx*dx+dy*dy+dz*dz;
-    if(!(d<=bos_play.range2)) return n;
+    if(!(d<=bos_play.range2)) { bos_note(ent,s,BOS_BAR_FAR);return n; }
     for(k=n;k>0 && dist[k-1u]>d;k--) if(k<max) { dist[k]=dist[k-1u];ents[k]=ents[k-1u];index[k]=index[k-1u]; }
     if(k<max) { dist[k]=d;ents[k]=ent;index[k]=s;if(n<max) n++; }
+    else bos_note(ent,s,BOS_BAR_FULL);
     return n;
 }
 /* Scales every live Story AI with a factor and returns the living Boss AIs
@@ -664,10 +690,16 @@ static unsigned bos_nearest(uint32_t player,uint32_t *ents,uint32_t *index,unsig
     if(max>BOS_BARS_MAX) max=BOS_BARS_MAX;
     for(i=humans<count?humans:count;i<count;i++) {
         uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec),p;
-        if(s>=BOS_LEVEL_SLOTS) continue;
+        if(s>=BOS_LEVEL_SLOTS) {                 /* no setting; a proxied one (a Khallos rider) logs it */
+            if(bos_bar_proxy && MAPMAKER_PTR_OK(a,BOS_ACTOR_SIZE) && MAPMAKER_PTR_OK(rec=WORD_AT(a+BOS_ACTOR_RECORD),12u) &&
+               bos_slot(WORD_AT(rec+8u))>=BOS_LEVEL_SLOTS && (p=bos_bar_proxy(WORD_AT(a)))!=0)
+                bos_note(p,WORD_AT(rec+8u)-WORD_AT(BOS_SAI_BASE)-1u,BOS_BAR_NOT_BOSS);
+            continue;
+        }
         if(bos_bar_proxy && (p=bos_bar_proxy(ent))!=0 && MAPMAKER_PTR_OK(p,BOS_ENT_SIZE)) ent=p;   /* the bar's entity */
         bos_scale(a,ent,rec,bos_factor(s));
-        n=bos_near_add(ent,s,pp,dist,ents,index,max,n);
+        if(ent!=skip) n=bos_near_add(ent,s,pp,dist,ents,index,max,n);   /* a proxied focus: the stock bar shows it */
+        else bos_note(ent,s,BOS_BAR_STOCK);
     }
     for(f=0;f<BOS_EXTRA_AREAS;f++)               /* Boss AIs replaced by props */
         for(k=0;bos_bar_extra[f] && k<BOS_EXTRA_MAX;k++) {
@@ -676,6 +708,7 @@ static unsigned bos_nearest(uint32_t player,uint32_t *ents,uint32_t *index,unsig
             if(!MAPMAKER_PTR_OK(ent,BOS_ENT_SIZE) || (s=bos_slot(id))>=BOS_LEVEL_SLOTS) continue;
             bos_scale(ent,ent,id,bos_factor(s));
             if(ent!=skip) n=bos_near_add(ent,s,pp,dist,ents,index,max,n);   /* else the stock bar shows it */
+            else bos_note(ent,s,BOS_BAR_STOCK);
         }
     return n;
 }
@@ -762,6 +795,7 @@ void pc_mapmaker_bosses_hud(void (*original)(void))
         restore_registers(&r);
         bos_smooth_io(hud,bos_play.smooth[s].state,0);
         bos_play.smooth[s].frame=bos_play.frame;
+        bos_note(ents[k],index[k],drawn?BOS_BAR_DRAWN:BOS_BAR_REFUSED);
         if(drawn) { any=1;slot++; }
     }
     WORD_AT(BOS_MARGIN)=margin;

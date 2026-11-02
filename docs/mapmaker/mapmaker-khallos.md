@@ -1,7 +1,7 @@
 # MapMaker Khallos in the flying chair (story mission 4 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_khallos.inc` (area
-`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 271
+`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 279
 mutations, plus decode, US XBE data and game-pak checks of every site below).
 Since the .27 playtest the placeholder itself is the seated Khallos and each
 chair gets its own named Boss bar ([Playtest .27](#playtest-v040-mapmaker27-seated-khallos-and-bars)).
@@ -12,6 +12,10 @@ Since .31 a rider asks for his class 8 too (the engine put chair 0's rider
 back to a bot class every frame), a seated rider gets khallosidle again when
 another anim plays, and a level restart makes new chairs
 ([Playtest .31](#playtest-v040-mapmaker31-unseated-riders-and-the-restart)).
+Since .34 the story focus chair keeps its stock bar (named after its rider's
+Story AI), the bosses area logs every bar it draws or skips, and the chair's
+jet emitter starts at the chair instead of the train start
+([Playtest .34](#playtest-v040-mapmaker34-bars-the-stretched-texture-and-the-seat)).
 Wired in v0.4.0-mapmaker.25 (picker row 156); **up to four chairs per map**
 since then ([Several chairs](#several-chairs)), with three new wrappers and
 more logging ([Not appearing in .25](#not-appearing-in-v040-mapmaker25)). No guest-code table,
@@ -263,7 +267,7 @@ level's chair.
 | `WRAP sub_00263150 -> pc_mapmaker_khallos_rider_pose` | his pose callback (cdecl entity) | **new (several chairs)**; reached through a stored pointer, so the lifted function is wrapped |
 | `WRAP sub_000DAC30 -> pc_mapmaker_khallos_create` | character maker (cdecl id, .., pool slot) | **shared** with `pc_mapmaker_realbosses_create`, order free; since .27 also makes the placeholder with Khallos' models (character table swap around the original) |
 | `WRAP sub_00045670 -> pc_mapmaker_khallos_sound_load` | level sound needed? (cdecl sound id -> nonzero) | **new (.28)**; called only by the level's sound load `sub_00027700`, about 5,700 times per level load; acts after the original on 0x393/0x394 only |
-| `WRAP sub_0014CC80 -> pc_mapmaker_khallos_hud` | story boss bar (ebx = HUD block) | **new (.27)**; chain **inside** `pc_mapmaker_bosses_hud`, like `pc_mapmaker_robot_hud` / `pc_mapmaker_realbosses_hud` (order among those free) |
+| `WRAP sub_0014CC80 -> pc_mapmaker_khallos_hud` | story boss bar (ebx = HUD block) | **new (.27)**; chain **inside** `pc_mapmaker_bosses_hud`, like `pc_mapmaker_robot_hud` / `pc_mapmaker_realbosses_hud` (order among those free); since .34 it no longer hides the stock bar, it names it (reads ebx +8 for the log) |
 | `WRAP sub_001CDD60 -> pc_mapmaker_khallos_restart` | level restart (no args), called only at 0x0003D4E1 | **new (.31)**; works before the original; nothing else wraps it |
 
 `pc_mapmaker_bosses.inc` gains `bos_bar_proxy` (no wrapper; this area sets
@@ -280,7 +284,9 @@ Guest functions called: `sub_00062260` (is a pak mounted), `sub_000622D0`
 a model), `sub_000631C0` (find a model's request), `sub_000A6F90` (create the
 chair), `sub_000A9070` (remove an object), `sub_0010E2A0` (free an emitter),
 `sub_0010EB90` (stop an emitter), `sub_0015DDA0` (remove an AI), since .31
-`sub_0005F460` (play an anim; already in the area stubs). Host:
+`sub_0005F460` (play an anim; already in the area stubs), since .34
+`sub_0010E730` (set an emitter's position: the wrapped flame hook, which runs
+the original outside the moved update; stub added to the area stubs). Host:
 `xbox_HeapAlloc` (label, 32-byte argument buffer, once per session). The area
 stubs (`tests/mapmaker/mapmaker_area_stubs.h`) already have `sub_0005A130`
 and `sub_0010EB90`; they need `sub_000A9070` and `sub_0010E2A0` (and the
@@ -324,9 +330,11 @@ guide entry for this area.
    placeholder is Khallos and rides his own chair`); no other Story AI needed.
 3. Walk within 30 m: the fight starts (log `fight started`, `chair level
    event dropped`); the chair rises, stays about 11 m from you, faces you and
-   fires; with Boss on, the bottom bar reads the Story AI's name (log `stock
-   chair bar hidden`). Shooting Khallos himself hurts the chair (log `its
-   rider was hit, the chair takes it`).
+   fires; the bottom bar of the focus chair reads the Story AI's name (log
+   `chair N is the story focus: stock bar drawn (label his Story AI name ..)`),
+   with Boss on the other chairs in range get their own bars (log `story AI
+   bosses: bar of NAME (entity ..): drawn`). Shooting Khallos himself hurts
+   the chair (log `its rider was hit, the chair takes it`).
 4. Shoot it: hits spin it; map logic markers are unaffected.
 5. Bring it to 0: it shoots upward and vanishes, with its rider (log `chair
    shot down`, `flew off and was removed`, `rider removed with the chair`).
@@ -383,7 +391,8 @@ The seated Khallos, step by step:
   to its maximum; what he lost goes to the chair while it fights (a kill this
   way is the same "shot down" as a hit on the chair). A one-hit kill of the
   rider (health <= 0) is forwarded and not revived.
-- **hud** (`sub_0014CC80`, chained inside `pc_mapmaker_bosses_hud`): a focus
+- **hud** (`sub_0014CC80`, chained inside `pc_mapmaker_bosses_hud`; replaced
+  in .34, see below): a focus
   on a chair whose rider is still its AI is cleared for the stock call and put
   back. The bosses area then draws one bar per Boss-flagged rider in range:
   `bos_bar_proxy` (set by this area at each level's mount) makes the chair the
@@ -449,6 +458,36 @@ Risk: asking for class 8 every frame overrides any other class the game asks
 for a living rider (none is wanted while he is seated); a dead rider is left
 to the engine. The restart wrapper assumes the teardown removed the old
 chairs (the user saw none after the restart).
+
+## Playtest v0.4.0-mapmaker.34: bars, the stretched texture and the seat
+
+User (three chairs): "all spawning and attacking. Had a weird glitch with a
+texture stretched between my view and one of the khallos', none of the
+khallos' showed boss health, and they still aren't really seated in their
+chairs." Log `logs/m34.err` (main checkout), level at 19010: every chair's
+status line shows seat offset < 0.1, rider calls rising, `state 1 class 0/8
+asked 0/8`, `anim 0xBFB`, `khallosidle played again 0`; `stock chair bar
+hidden` logged; no `story AI bosses` line at all (that area logged nothing
+in play).
+
+| report | cause | fix |
+|---|---|---|
+| no boss health | **proven** (code): since .27 `pc_mapmaker_khallos_hud` hid the stock bar of every seated chair, leaving the bars to the bosses area, which draws only Story AIs whose **Boss** setting is on (by design, as for every ported boss). A chair whose Story AI had Boss off therefore had no bar at all, where the train (and the tank in a map) shows the stock bar. Whether this map's riders had Boss on is **not known**: the bosses area logged nothing in play (the next log says) | the focus chair keeps its stock bar, labelled with its rider's Story AI name (text hook, `bos_story_name`; "Khallos" when unnamed); the bosses area skips a proxied entity that is the focus while the stock bar shows (as it already did for the tank's props); a fighting chair with health takes the focus when nothing holds it (the stock update sets it once, at wake, and a chair shot down clears it). Boss-flagged chairs other than the focus keep their own bars |
+| no reason in the log | **proven** | bosses area: at each map start `story AI bosses: map start: N Story AIs with a Boss or health setting`; per entity and reason once per level `story AI bosses: bar of NAME (entity E): drawn / refused by the bar draw / not shown: Boss setting Off / Sub-boss bar / dead / out of range / the stock bar shows it / more Boss bars than fit` (16 per level). Khallos: `chair N is the story focus: stock bar drawn/not drawn (label .., rider ..)` (2 per chair) |
+| stretched texture | **proven** that the jet emitter was far off: the init `sub_001EEA30` makes it (`sub_00378530`, owner 0x0078F054) at 0x0078F004, the live position it has just set to the train start (-576.2, 7.5, 0); `sub_0010E730` (emitter +0x14..+0x1C) is called by the update only after the start-line return (0x001EED75), so a waiting chair's jet stayed ~680 m away and jumped to the chair when the fight started. **Suspected**, not proven, that this jump is the stretched texture (the emitter definition's drawing was not decoded). Ruled out: the flash, shot, sound and engine positions are all put back to world in their calls (fixture-tested); the death's three emitters `[0x0078DF50..58]` also stand at train points but never move | the jet is moved to the chair's live position after the creation (with the chair's globals in; logged `chair N jet emitter moved from (..) to the chair`) and on every waiting frame; the fighting update moves it as before. The status line counts `jet moves` |
+| not seated | **not proven**. Ruled out by the decode and the log: the handler `sub_00263260` places him by position only (callees: no attach or parent link; the chair has no seat node it uses), at live position + -1.2 x the chair's up row (our seat offset is measured against that, < 0.1 m), copies the chair's angles (yaw, pitch, roll; the skeleton evaluation wraps the yaw), and plays khallosidle (0xBFB), the **only** Khallos anim in lv11's table (no sit or ride anim; `11_sitsoldier` is a soldier's). lv11.pak holds it as `anim/data/ts3/khallosidle.raw` (100 frames, 19 nodes, compressed); lv11_6/7.pak hold a 41,988-byte uncompressed copy but have no XBE path and are never mounted. So he is placed and animated as on the train. Left: whether the pose callback `sub_00263150` (slot 2, evaluates the skeleton and swings the nodes below a pivot by the sway) runs for him, and whether the anim data is the right file (anim registration, `sub_0005B980`, another agent's work) | diagnostics only: the status line adds `rider yaw Y flags F anim speed S, pose calls P, jet moves J` (P counts the pose callback per chair; 0 means the seated pose never runs; speed is AI +0xB08, which `sub_0005F460` uses for a character) |
+
+Kept: the seat formula, khallosidle replays, the free yaw, the sounds. The
+seat needs lv11 entry 32 (khallosidle) only, which the anim-slot area
+(`pc_mapmaker_animslots.inc`, branch anim-dedupe) keeps; no other lv11 anim.
+
+What the next log should show: `story AI bosses: map start: N ..` (N = 0
+means no Story AI of the map has Boss on); one `chair N is the story focus:
+stock bar drawn` line; for Boss-on chairs `bar of NAME (..): drawn` or a
+reason; three `jet emitter moved` lines; status lines with `pose calls`
+rising with the frames. If the riders still do not look seated with pose
+calls rising and the speed near 1.0, compare with the train: the
+remaining suspect is the anim data khallosidle's slot holds.
 
 ## Not appearing in .25/.26: set slot 13 (fixed in .27)
 
