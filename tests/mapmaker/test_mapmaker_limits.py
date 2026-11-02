@@ -28,6 +28,10 @@ MUTATIONS = {
     'links-held-ignored': ('mapmaker_link_cost(p)+mapmaker_link_cost(h)>MAPMAKER_LIMIT_LINKS',
                            'mapmaker_link_cost(p)>MAPMAKER_LIMIT_LINKS'),
     'no-held-pieces': ('p->pieces+h->pieces>MAPMAKER_LIMIT_PIECES', 'p->pieces>MAPMAKER_LIMIT_PIECES'),
+    # Pad groups 1024: 511 pieces at the measured 1.5 groups each fit.
+    'groups-round3': ('#define MAPMAKER_LIMIT_GROUPS 1024\n', '#define MAPMAKER_LIMIT_GROUPS 600\n'),
+    'groups-unbounded': ('#define MAPMAKER_LIMIT_GROUPS 1024\n', '#define MAPMAKER_LIMIT_GROUPS 2048\n'),
+    'groups-off-by-one': ('if(groups>MAPMAKER_LIMIT_GROUPS)', 'if(groups>=MAPMAKER_LIMIT_GROUPS)'),
     # Regular pads: 7680 in the editor, 8000 in the pool (pad id threshold 0x2328).
     'pads-round3': ('#define MAPMAKER_LIMIT_PADS 7680u', '#define MAPMAKER_LIMIT_PADS 4800u'),
     'pads-pool-stock': ('#define MAPMAKER_POOL_PADS 8000u', '#define MAPMAKER_POOL_PADS 4800u'),

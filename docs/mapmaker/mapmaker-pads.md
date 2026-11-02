@@ -220,10 +220,15 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
   come from one tile (group ids are offset per tile, `0x0009A8D9`), so its
   nodes are bounded by one tile's links (46 at most) (INFERRED). It stays at 1000 in place, with
   the same guard (`[0x00712044]`, `[0x00715F20]`).
-- Group limit 600 is kept: memory-safe with the guards. Not measured: load
-  time of the N x N distance matrix (`sub_00275F70`, 359,400 route searches
-  at 600 groups vs 89,700 stock; 1.44 MB). Above ~1000 groups that matrix
-  needs a lazy replacement.
+- Group limit 600 -> 1024 (2026-11-02): 511 pieces at the measured 1.5
+  groups per piece need about 770. Memory-safe with the guards: group ids are
+  int16, the group table `[0x7B6770]` is sized by count, the group A* pool is
+  bounded. The N x N distance matrix (`sub_00275F70`, (N+1) x N x 4 B from
+  heap 1 at `0x00275F90`, zeroed by the caller) is 4.2 MB at 1024 groups
+  (1.44 MB at 600); see `docs/mapmaker/mapmaker-memory.md` for where it now
+  lives. Not measured: its load time (N x N route searches, 1.05 M at 1024
+  vs 359,400 at 600 and 89,700 stock). Past 1024 the matrix needs a lazy
+  replacement (wrap `sub_00275F70` and its reader `sub_00275F40`).
 
 ## Open risks
 

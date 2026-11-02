@@ -36,3 +36,10 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
   heavy pass every cap but pieces, links stop at 521, pads at 549, 1024 x 15
   links fit), `mapmaker_objects.c` (links past the editor limit);
   mutations in `test_mapmaker_limits.py` / `test_mapmaker_objects.py`.
+
+## Pad groups (2026-11-02)
+
+- `MAPMAKER_LIMIT_GROUPS` 600 -> 1024 (editor global groups `[0x00762CB8]`).
+  Matrix 4.2 MB at 1024; load time of N x N route searches unmeasured.
+- Tests: `mapmaker_limits.c` (1024 allowed, 1025 refused, 767 for 511
+  pieces), mutations `groups-*`.

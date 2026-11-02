@@ -140,7 +140,7 @@ int main(void)
     WORD_AT(0x0078400Cu)=pieces;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     WORD_AT(ED+0x2f34)=(uint32_t)-1;WORD_AT(ED+0x306c)=0;
-    WORD_AT(0x00762CB8u)=400;                                          /* > 300, < 600 */
+    WORD_AT(0x00762CB8u)=700;                                          /* > 600 (round 4), < 1024 */
     /* Placed + held memory as the wrapped originals report it: with the limits
      * on and no TSFP_MAPMAKER_MEMORY_SCALE the budget scale is 8. */
     WORD_AT(ED+0x278)=(90u*10000u+1000u)/8u;
@@ -157,15 +157,18 @@ int main(void)
     WORD_AT(ED+0x25c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u) && (WORD_AT(ED+0x25c)&2u));  /* allowed; other flags kept */
-    /* meter: max(900/7680, 900/9984, 2700/12000, 400/600, 90/255, 0, 112500/2048000) */
-    CHECK(NEAR(FLOAT_AT(ED+0x270),400.f/600.f));
-    /* held preview: max(2/7680, 9/9984, 20/12000, 1/255, 0, 125/2048000) */
+    /* meter: max(900/7680, 900/9984, (2700+1440)/32256, 700/1024, 90/255, 0, 112500/2048000) */
+    CHECK(NEAR(FLOAT_AT(ED+0x270),700.f/1024.f));
+    /* held preview: max(2/7680, 9/9984, (20+16)/32256, 1/255, 0, 125/2048000) */
     CHECK(NEAR(FLOAT_AT(ED+0x274),1.f/255.f));
 
-    WORD_AT(0x00762CB8u)=601;                                          /* groups over 600 */
+    WORD_AT(0x00762CB8u)=1024;                                         /* groups: 1024 allowed */
+    pc_display_mapmaker_limits(fake_limits);
+    CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
+    WORD_AT(0x00762CB8u)=1025;                                         /* over 1024 */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
-    WORD_AT(0x00762CB8u)=400;
+    WORD_AT(0x00762CB8u)=700;
     /* Cover limit 9984: 100 placed pieces of 99 cover (type 4) and held type 2 (9 each). */
     WORD_AT(TYPED)=4;WORD_AT(0x00529404u+4u*0x140u)=99;
     WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPED,100);
@@ -186,7 +189,7 @@ int main(void)
     WORD_AT(ED+0x306c)=400u<<16;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    CHECK(NEAR(FLOAT_AT(ED+0x270),400.f/500.f));                      /* meter: items (above groups 400/600), no cover */
+    CHECK(NEAR(FLOAT_AT(ED+0x270),400.f/500.f));                      /* meter: items (above groups 700/1024), no cover */
     WORD_AT(ED+0x306c)=0;
     /* The item limit itself, with cost-free tiles: 500 allowed, 501 refused. */
     WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,10);
@@ -250,6 +253,8 @@ int main(void)
         CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_PADS));
         heavy.pieces=549;heavy.cost[0]=14u*549u;
         CHECK(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_PADS);
+        /* Pad groups at the measured 1.5 per piece: 767 for 511 pieces. */
+        CHECK(!(mapmaker_limits_over(&none,&none,0,767,0)&MAPMAKER_CAP_GROUPS));
         /* 1024 light pieces (15 links each) fit the link budget. */
         heavy=none;heavy.pieces=1024;heavy.cost[2]=15u*1024u;
         CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_LINKS));
