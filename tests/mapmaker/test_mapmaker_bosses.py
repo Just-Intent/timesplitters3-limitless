@@ -10,6 +10,7 @@ helper sub_00139740 work as the hook assumes.
 """
 import os
 from pathlib import Path
+import re
 import struct
 import subprocess
 import pytest
@@ -159,6 +160,11 @@ MUTATIONS = {
     'meter-negative-player': (' || (int32_t)WORD_AT(player+4u)<0) { original();return; }', ') { original();return; }'),
     'meter-no-restore': ('        restore_registers(&r);\n        bos_play.meters++;\n    }\n    restore_registers(&r);', '        bos_play.meters++;\n    }'),
     'meter-no-count': ('    if(level && sub) bos_play.subs++;\n', ''),
+    # the pause menu's restart (sub_001CDD60): the map start sub_00240C50 is skipped
+    'restart-never': ('    if(bos_on()) bos_level_read();\n    original();', '    original();'),
+    'restart-after-original': ('    if(bos_on()) bos_level_read();\n    original();', '    original();\n    if(bos_on()) bos_level_read();'),
+    'restart-when-off': ('    if(bos_on()) bos_level_read();\n    original();', '    bos_level_read();\n    original();'),
+    'restart-no-reread': ('    memset(&bos_play,0,sizeof bos_play);\n    if(!bos_on()) return;\n    bos_walk', '    memset(&bos_play,0,sizeof bos_play);\n    if(1) return;\n    bos_walk'),
 }
 
 
@@ -430,3 +436,21 @@ def test_character_and_health_sites():
     assert mem(a[0x0015FABA])[0][4] == 0x1CC
     for site, disp in ((0x0027BBE5, 0x68), (0x0027BBEF, 0x6C), (0x0027BBF9, 0x64)):
         assert mem(a[site])[0][4] == disp
+
+
+def test_restart_skips_the_map_start():
+    """sub_0006D7A0 (level start, from sub_0006EC10 and, on the pause menu's
+    restart, sub_0006ED70) calls the MapMaker map start sub_00240C50 only while
+    [0x006F32EC] is 0 and then sets it; only sub_0006C920 (the "from scratch"
+    scene-100 load) clears it, so the restart (sub_001CDD60, wrapped:
+    pc_mapmaker_bosses_restart) never reaches pc_mapmaker_bosses_level."""
+    a = by_address()
+    def target(i):
+        m = re.search(r'0x([0-9a-f]+)', i.text)
+        return int(m.group(1), 16) if m else None
+    starts = {i.address for i in decoded() if i.call and target(i) == 0x00240C50}
+    assert starts == {0x0006D80C} and mem(a[0x0006D802])[0][4] == 0x006F32EC and a[0x0006D809].mnemonic == 'jne'
+    writes = {i.address for i in decoded() if i.mnemonic == 'mov' and i.ops and i.ops[0][0] == 'mem' and i.ops[0][4] == 0x006F32EC}
+    assert writes == {0x0006C958, 0x0006D814}
+    assert a[0x0006C958].function == 0x0006C920 and target(a[0x0003D4E6]) == 0x0006ED70
+    assert target(a[0x0006EDD2]) == 0x0006D7A0 and target(a[0x0003D4E1]) == 0x001CDD60

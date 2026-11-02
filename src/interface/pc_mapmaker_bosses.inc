@@ -533,16 +533,31 @@ static float bos_range2(void)
     }
     return r*r;
 }
-/* sub_00240C50: a MapMaker map starts. */
-void pc_mapmaker_bosses_level(void (*original)(void))
+/* The map's boss settings and names afresh: no bar, smoothing or scaled health yet. */
+static void bos_level_read(void)
 {
     unsigned n=0;
-    original();
     memset(&bos_play,0,sizeof bos_play);
     if(!bos_on()) return;
     bos_walk(WORD_AT(BOS_CONTAINER),BOS_LEVEL_SLOTS,bos_level_chunk,&n);
     bos_play.range2=bos_range2();
     bos_play.active=n!=0;
+}
+/* sub_00240C50: a MapMaker map starts. */
+void pc_mapmaker_bosses_level(void (*original)(void))
+{
+    original();
+    bos_level_read();
+}
+/* WRAP sub_001CDD60 (the level restart, no args; only at 0x0003D4E1): the
+ * map start above is skipped on a restart (sub_0006D7A0 calls sub_00240C50
+ * only while [0x006F32EC] is 0, and only sub_0006C920, the "from scratch"
+ * load, clears it), so the last run's bar smoothing and scaled-health table
+ * stayed. Before the original, the same fresh read. */
+void pc_mapmaker_bosses_restart(void (*original)(void))
+{
+    if(bos_on()) bos_level_read();
+    original();
 }
 
 /* Story AI index of live pool entry a with a boss or health setting, else

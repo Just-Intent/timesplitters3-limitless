@@ -92,6 +92,17 @@ per-level state MapMaker never creates (`sub_0025F720`) and is out of scope.
 - `sub_00240C50` (MapMaker level start, chained): index -> boss level and the
   chunk's saved name (+0x00) from the map container `[0x00784014]`;
   `TSFP_MAPMAKER_BOSS_RANGE` is read here.
+- Restart from the pause menu (after v0.4.0-mapmaker.31, **proven in the
+  decode**, `test_restart_skips_the_map_start`): the restart reaches
+  `sub_0006D7A0` (through `sub_0006ED70`), which calls `sub_00240C50` only
+  while `[0x006F32EC]` is 0 and then sets it; only the "from scratch" load
+  `sub_0006C920` clears it. So the level hook above never ran on a restart
+  and the run before's bar smoothing and scaled-health table stayed (the
+  settings and names were still right, and a recreated boss was scaled again
+  because its stock maximum differs: harmless so far, but stale). New `WRAP
+  sub_001CDD60 -> pc_mapmaker_bosses_restart` reads the map afresh before the
+  original, as the map start does. Bar areas (`bos_bar_extra_add`) and the
+  proxy are per session: unaffected.
 - Health: a character entity's health is the float pair +0x1CC current /
   +0x1D8 maximum (set at creation `sub_000DAC30` 0x000DADEE and at AI start
   `sub_0015F8C0` 0x0015FAB4 from `sub_000B9A90`). Each HUD frame the hook
@@ -306,6 +317,7 @@ WRAP sub_002FEBF0 -> pc_mapmaker_bosses_reset      (chained: sky/roof reset hook
 WRAP sub_003006C0 -> pc_mapmaker_bosses_compile    (chained: OUTSIDE pc_mapmaker_container_compile; order vs aitemplates/sky/roof free)
 WRAP sub_00301A90 -> pc_mapmaker_bosses_load       (chained: OUTSIDE pc_mapmaker_editor_load; order vs aitemplates free)
 WRAP sub_00240C50 -> pc_mapmaker_bosses_level      (chained: OUTSIDE pc_mapmaker_editor_level_load; order vs aitemplates free)
+WRAP sub_001CDD60 -> pc_mapmaker_bosses_restart    (after .31; layer with khallos/tank/... restart, any order; before the original)
 WRAP sub_0014CC80 -> pc_mapmaker_bosses_hud        (new; every HUD frame, ebx = HUD block)
 WRAP sub_00078590 -> pc_mapmaker_bosses_health_rows (new; list binder, acts only for return 0x0031CFD7)
 WRAP sub_0014D1F0 -> pc_mapmaker_bosses_meters     (new; HUD per viewport, scene 100 story; draws before the original)

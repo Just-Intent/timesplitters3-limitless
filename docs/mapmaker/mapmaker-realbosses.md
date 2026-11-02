@@ -8,6 +8,32 @@ in v0.4.0-mapmaker.13 (user: working; its death fix is in .15); the Crow
 walker ([below](#the-crow-walker-story-mission-13)) is not played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
 `TSFP_MAPMAKER_REAL_BOSS=0` keeps the creature on the normal bot AI (stage 1).
 
+## Restart from the pause menu (fixed after v0.4.0-mapmaker.31)
+
+**Proven in the decode** (`test_restart_resets_only_the_mission_bosses`):
+"START restart" runs `sub_001CDAF0` + `sub_001CDD60`, never the level init
+`sub_0025F720` (this area's level hook). Its soft restart `sub_0025F6A0`
+(`sub_0015E4F0` from 0x001CDD74) resets the skeleton's state with
+`sub_00287860` only in scenes 1/0x11 and the walker's with `sub_00297690`
+only in 0x51 (the stock inits end in the same calls). In scene 100 the
+restarted skeletons and walkers found their instances by spawn record (late
+ones too) and fought on with the last run's state and flags: a walker armed
+or roaring before never deployed its guns or roared again; a skeleton kept
+its floor and fight state. The trophy monster has no state block (class
+only, written again at each AI start): not affected.
+
+Fix: new `WRAP sub_001CDD60 -> pc_mapmaker_realbosses_restart`. After the
+original, in scene 100, each skeleton and walker instance gets that stock
+reset with its own state and statics swapped in (`rbs_skel_in`/`rbs_walk_in`,
+the shared `pc_mapmaker_bossfx.inc` holder), and its counters and
+once-per-fight flags are cleared (walker `armed`/`roars`/`woken`..., actor
+until its AI start; skeleton floor, throws). Blocks, records and statics
+copies stay (level memory); the log budget starts afresh. The shared
+holder itself needs nothing: it holds no instance between calls. Fixture
+case (three skeletons, two walkers, one late each), `restart-*` mutations.
+Playtest: restart a map with skeletons and walkers after a fight: each rises
+and fights again, walkers deploy their guns again.
+
 User report (2026-10-31): the trophy monster from story mission 5 is much
 bigger than the Arcade trophy monster and was not selectable. It is a
 separate character (research: `logs/limits/features/real-bosses.md`, main
@@ -604,6 +630,7 @@ WRAP sub_0015B830 -> pc_mapmaker_realbosses_ai_start       (new; AI start)
 WRAP sub_0014CC80 -> pc_mapmaker_realbosses_hud            (already wrapped by bosses: chain INSIDE pc_mapmaker_bosses_hud)
 WRAP sub_0013A400 -> pc_mapmaker_realbosses_meter          (new; overhead meter, per frame per recorded actor)
 WRAP sub_0025F720 -> pc_mapmaker_realbosses_level          (new; story level init, after the original)
+WRAP sub_001CDD60 -> pc_mapmaker_realbosses_restart        (after .31; level restart, after the original; layer with khallos/tank/... restart, any order)
 WRAP sub_0029FE00 -> pc_mapmaker_realbosses_princess       (new; class 0x20000 dispatch, per AI frame)
 WRAP sub_0028D0A0 -> pc_mapmaker_realbosses_message        (new; class 0x20000 messages, incl. its death)
 WRAP sub_002875F0 -> pc_mapmaker_realbosses_risen          (new; per skeleton frame in state 1)

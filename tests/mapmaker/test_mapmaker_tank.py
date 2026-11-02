@@ -250,6 +250,13 @@ MUTATIONS = {
     'text-timer-any-caller': ('id==TNK_TIMER_TEXT && ret==TNK_RET_TIMER_TEXT && tnk.timer', 'id==TNK_TIMER_TEXT && tnk.timer'),
     'text-no-ret': ('    else { original();return; }\n    MAPMAKER_GUEST_RET();\n}', '    else { original();return; }\n}'),
     'text-swapped': ('g_eax=tnk_bar_label();\n    else if', 'g_eax=tnk.timer;\n    else if'),
+    # the pause menu's restart (sub_001CDD60: no pak mount, no level init)
+    'restart-not-reset': ('    memset(&tnk_lv,0,sizeof tnk_lv);                       /* forget the last run\'s tanks */\n', ''),
+    'restart-never': ('    if(tnk_on()) tnk_restart_reset();\n', ''),
+    'restart-after-original': ('    if(tnk_on()) tnk_restart_reset();\n    original();', '    original();\n    if(tnk_on()) tnk_restart_reset();'),
+    'restart-forgets-request': ('    tnk_lv.requested=requested;\n', ''),
+    'restart-statics-left': ('    if(tnk_lv.act) tnk_load(tnk_lv.rest,tnk_lv.rest_sounds);\n', ''),
+    'restart-when-off': ('    if(tnk_on()) tnk_restart_reset();', '    tnk_restart_reset();'),
 }
 
 
@@ -674,6 +681,21 @@ def test_mount_site():
     assert calls_to(0x00062790) == {0x001CDB85}
     # sub_000622D0 answers -1 when the file does not open (sub_000389B0 is a plain ret)
     assert a[0x000389B0].mnemonic == 'ret'
+
+
+def test_restart_skips_mount_and_level_init():
+    """The pause menu's "START restart" ([0x006B7AA8]) runs the teardown
+    sub_001CDAF0 and sub_001CDD60 (wrapped: pc_mapmaker_tank_restart), never
+    sub_001CDB80 with the pak mount sub_00062790 and the story level init
+    sub_0015E7C0 where this area starts a level."""
+    a = by_address()
+    assert mem(a[0x0003D4B1])[0][4] == 0x006B7AA8 and a[0x0003D4BB].mnemonic == 'je'
+    assert target(a[0x0003D4DC]) == 0x001CDAF0 and target(a[0x0003D4E1]) == 0x001CDD60
+    assert calls_to(0x001CDD60) == {0x0003D4E1} and calls_to(0x001CDB80) == {0x0003D590}
+    assert calls_to(0x00062790) == {0x001CDB85} and calls_to(0x0015E7C0) == {0x001CDC20}
+    restart = [i for i in decoded() if 0x001CDD60 <= i.address < 0x001CDE27 and (i.call or i.mnemonic == 'jmp')]
+    assert restart and not {target(i) for i in restart} & {0x001CDB80, 0x00062790, 0x0015E7C0, 0x0025F720}
+    assert target(a[0x001CDD74]) == 0x0015E4F0                     # the story soft restart instead
 
 
 # ---- game data (skipped without the paks) ------------------------------------

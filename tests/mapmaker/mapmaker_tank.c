@@ -183,6 +183,9 @@ static void fake_entry(void)
 }
 static int ai_originals;
 static void fake_ai(void) { originals++;ai_originals++;g_esp+=4u; }
+/* sub_001CDD60: notes how many tanks the area still knew when it ran (1 + n) */
+static unsigned restart_saw;
+static void fake_restart(void) { originals++;restart_saw=tnk_lv.n+1u;g_esp+=4u; }
 
 static uint32_t call(void (*fn)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,int expect_orig,int line)
 {
@@ -963,6 +966,41 @@ int main(void)
         /* refusals have their own bounded budget */
         for(k=0;k<20u;k++) CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(24),0,0,1);
         CHECK(tnk_lv.refused==TNK_REFUSE_LOGS);
+    }
+
+    /* ---- the pause menu's restart (sub_001CDD60, no pak mount, no level init):
+     * the placeholders start again in the same pool entries with the same
+     * spawn records and each becomes a tank again ---------------------------- */
+    {
+        static uint32_t live[TNK_BLOCK_WORDS];
+        unsigned s=nspawn,m=nmount,q=nrequest;
+        int requested=tnk_lv.requested=1;                              /* the level init requested the models */
+        actor(20,0x12,10.0f,0.5f,10.0f,0.0f);WORD_AT(A(20)+0xBF0u)=REC(20);WORD_AT(REC(20)+8u)=0x101u;
+        actor(21,0x12,70.0f,0.5f,10.0f,0.0f);WORD_AT(REC(21)+8u)=0x104u;
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);  /* the run before still known: no tank */
+        CHECK(tnk_lv.n==4u && nspawn==s);
+        memcpy(live,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof live);
+        tnk_enter(2u);                                                  /* a tank's statics in at the restart */
+        restart_saw=0;
+        CALL(pc_mapmaker_tank_restart,fake_restart,0x0003D4E6u,0,0,0,1);
+        CHECK(restart_saw==1u);                                         /* forgotten before the original */
+        CHECK(!tnk_lv.n && !tnk_lv.act && !tnk_lv.nseen && !tnk_lv.refused && !tnk_lv.logs && tnk_lv.requested==requested);
+        CHECK(!memcmp(live,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof live));   /* the outside statics back */
+        CHECK(nmount==m && nrequest==q);                                /* nothing mounted or requested again */
+        spawn_obj=0x00450000u;                                          /* the props come back at the same addresses */
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);
+        CHECK(tnk_lv.n==1u && nspawn==s+1u && tnk_lv.t[0].obj==0x00450000u && tnk_lv.t[0].place==A(20) &&
+              tnk_lv.t[0].place_rec==REC(20) && tnk_lv.t[0].place_id==0x101u && NEAR(tnk_lv.t[0].spawn[0],10.0f));
+        spawn_obj=0x00451000u;
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);
+        CHECK(tnk_lv.n==2u && nspawn==s+2u && tnk_lv.t[1].place_rec==REC(21) && tnk_lv.t[1].place_id==0x104u);
+        CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);  /* started again in the same run: no tank */
+        CHECK(tnk_lv.n==2u && nspawn==s+2u);
+        spawn_obj=TANK;
+        set_env("TSFP_MAPMAKER_LIMITS",NULL);
+        CALL(pc_mapmaker_tank_restart,fake,0x0003D4E6u,0,0,0,1);        /* off: the original only */
+        CHECK(tnk_lv.n==2u);
+        set_env("TSFP_MAPMAKER_LIMITS","1");
     }
 
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }

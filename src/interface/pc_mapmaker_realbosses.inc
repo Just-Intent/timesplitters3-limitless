@@ -160,6 +160,15 @@
  *  - ai_start: each giant skeleton gets a free instance and record +0/+4 =
  *    0/0x20000 when lv1_6.pak is mounted; one more than the map prepared
  *    keeps the MapMaker class (logged, counted).
+ *  - restart (sub_001CDD60, "START restart": the teardown sub_001CDAF0 and
+ *    this, never sub_001CDB80 with the level init above): the stock soft
+ *    restart sub_0025F6A0 resets the skeleton's state (sub_00287860) only in
+ *    scenes 1 and 0x11 and the walker's (sub_00297690) only in 0x51, so in
+ *    scene 100 the restarted bosses found their instances by spawn record and
+ *    fought on with the last run's state. After the original, each skeleton
+ *    and walker instance (late ones too) gets that stock reset with its own
+ *    state and statics swapped in, and its per-fight counters cleared; the
+ *    blocks, records and statics copies are kept (level memory).
  *  - princess (sub_0029FE00(entity)): for that boss in scene 100, the mansion
  *    variant (a direct call: the callee pops the caller's return address,
  *    exactly the lifted tail jump).
@@ -389,6 +398,7 @@
 extern void sub_00079D60(void),sub_00071630(void),sub_00071C70(void),sub_0005A130(void),sub_00062260(void);
 extern void sub_00287E00(void),sub_0029CEF0(void),sub_00286D30(void),sub_00059DB0(void),sub_000EA9C0(void),sub_0010EB90(void);
 extern void sub_002976F0(void),sub_0015DDA0(void),sub_0029CCB0(void),sub_00019D70(void),sub_002A7F30(void),sub_0005F460(void);
+extern void sub_00287860(void),sub_00297690(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
@@ -912,6 +922,44 @@ void pc_mapmaker_realbosses_level(void (*original)(void))
                                 rbs_skels[0].state,rbs_skelf.n);
     }
     memcpy(rbs_g(RBS_FX),base,RBS_FX_SIZE);            /* the statics as they were */
+}
+/* WRAP sub_001CDD60 (the level restart, no args; only at 0x0003D4E1, after
+ * the teardown, never the level init above): after the original, every
+ * skeleton and walker instance of this level gets the stock reset of its
+ * state block (sub_00287860 / sub_00297690, what sub_0025F6A0 runs on a
+ * restart of scenes 1/0x11 and 0x51 only) with its own state and statics
+ * swapped in, and starts its fight afresh (counters and once-per-fight
+ * flags cleared: the walker's guns are deployed again). Blocks, records and
+ * statics copies stay (level memory); the log budget starts afresh. */
+void pc_mapmaker_realbosses_restart(void (*original)(void))
+{
+    unsigned k,skels=0,walks=0;
+    RbsSave s;
+    original();
+    if(!rbs_on()) return;
+    rbs.logged=0;
+    rbs_skelf.extras=rbs_skelf.events=rbs_skelf.deaths=0;
+    rbs_walkf.extras=rbs_walkf.events=rbs_walkf.seen=0;
+    if(WORD_AT(RBS_SCENE)!=100u) return;
+    for(k=0;k<rbs_skelf.n && k<RBS_INST_MAX;k++) {
+        RbsSkel *t=&rbs_skels[k];
+        if(!t->state || !MAPMAKER_PTR_OK(t->state,RBS_SKEL_STATE_SIZE)) continue;
+        rbs_skel_in(t,&s);
+        guest_call(sub_00287860,0);                    /* the stock skeleton reset */
+        rbs_skel_out(t,&s);
+        t->throws=t->skipped=t->fire=0;t->floor=0.0f;t->floor_set=0;
+        skels++;
+    }
+    for(k=0;k<rbs_walkf.n && k<RBS_INST_MAX;k++) {
+        RbsWalk *w=&rbs_walks[k];
+        if(!w->state || !MAPMAKER_PTR_OK(w->state,RBS_WALK_STATE_SIZE)) continue;
+        rbs_walk_in(w,&s);
+        guest_call(sub_00297690,0);                    /* the stock walker reset */
+        rbs_walk_out(w,&s);
+        w->actor=0;w->wells=w->drawn=w->ticks=w->beats=w->woken=w->roars=w->armed=w->moves=0;w->last=0;
+        walks++;
+    }
+    if(skels || walks) rbs_log("level restart: giant skeleton and Crow walker states reset (skeletons, walkers)",skels,walks);
 }
 /* The boss pointer still holds one of this level's instances (home or a
  * swapped one): nothing else has replaced it. */
