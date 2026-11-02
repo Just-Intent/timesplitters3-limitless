@@ -123,6 +123,7 @@ image constants that only it reads, so it can be moved.
 | `sub_002A85C0` -> `pc_mapmaker_crowe_sparks` | return 0x00290C02 while shifted: the pushed floor 86.4 + dy, the caller's slot restored |
 | `sub_0028E770` -> `pc_mapmaker_crowe_part` | return 0x0028ECF1, scene 100: only the stock explosion `sub_000EFBD0(0x20, 0x17, state+0x2BFC+part*0x5C, 0, 0, 0, 0, 1)` for parts 0..2, no prop; the original is not run |
 | `sub_002275F0` -> `pc_mapmaker_crowe_event` | return 0x002923A8: level marker 0 is the map's own logic marker: dropped |
+| `sub_002AB1B0` -> `pc_mapmaker_crowe_eggs` | return 0x00291E84 (its only call, 0x00291E7F), inside this boss's fight in scene 100: the egg drop is skipped (cdecl `ret`; the fight pops its six arguments) - see [Eggs](#eggs-the-v040-mapmaker28-crash) |
 | `sub_00126560` -> `pc_mapmaker_crowe_fx` | return 0x001CEE8C: after the original, `sub_0028D710` with this level's state, until the boss is removed (then nothing it draws can stay frozen) |
 | `sub_0014CC80` -> `pc_mapmaker_crowe_hud` | focus on this boss: cleared for the stock bar, restored after (Boss Off = no health; Boss bar = the bosses area's; Sub-boss = the meter) |
 | `sub_0013A400` -> `pc_mapmaker_crowe_meter` | return 0x0014D264, this boss's record: the overhead meter hidden unless its Story AI chose the Sub-boss bar |
@@ -135,7 +136,7 @@ not appear), `no intro
 cutscene; the fight starts`, `split Crowe effects drawn`, `part destroyed:
 explosion only`, `level marker dropped`, `split Crowe defeated: its effects
 play out`, `split Crowe defeated: removed (frames, live particles)`,
-`overhead health meter hidden`.
+`overhead health meter hidden`, `split Crowe egg drop skipped`.
 
 ## Risks (INFERRED, need a playtest)
 
@@ -147,19 +148,18 @@ play out`, `split Crowe defeated: removed (frames, live particles)`,
   platforms and bridges straight through whatever the map has there; it has
   no wall test of its own. Build an open floor (e.g. Open air tiles) around
   it. MapMaker's world units per tile were not measured.
-- **Uneven floors**: the fight keeps its spawn height; hazards explode at the
-  spawn floor. A map whose floor differs inside the arena shows them in the
-  air or under the floor.
+- **Uneven floors**: the fight keeps its spawn height; its sparks and smoke
+  use the spawn floor. A map whose floor differs inside the arena shows them
+  in the air or under the floor.
 - **Player off the grid**: as in stock, the boss then targets the nearest
   cell or stops (state 16 sets `[0x00739A90]` = 1 for the rest of the level,
   a collision flag; cleared at its death).
 - **Boss multiplier**: health is the sum of the parts, rewritten every frame,
   so the Boss row's x2..x8 does not make it tougher and the bar may read low
   (the bosses area scales +0x1D8). Use x1.
-- **Shared blocks**: each split Crowe now has its own effect and particle
-  blocks, swapped in for its calls, so a Crowe no longer shares them with a
-  Crow walker or the giant skeleton in the same map. The walker and the
-  skeleton still share theirs with each other (their areas).
+- **Shared blocks**: each split Crowe, Crow walker and giant skeleton has
+  its own effect and particle blocks, swapped in for its calls through one
+  shared holder (`pc_mapmaker_bossfx.inc`), so no boss uses another's.
 - **Several Crowes close together**: each arena (about 43 x 40) is laid out
   under its own spawn; arenas that overlap are not a problem for the code
   (each boss walks its own grid), but the bosses walk through each other.
@@ -171,6 +171,10 @@ play out`, `split Crowe defeated: removed (frames, live particles)`,
   that call that reads them except `sub_0028DD50`, handled.
 - **Respawn**: a second spawn of the same Story AI in one level keeps the
   first relocation (and stock state 0 then snaps it to that grid).
+- **Fixed after the v0.4.0-mapmaker.28 playtest** (four split Crowes and
+  four Crow walkers): the game crashed once the fights started. The Crowe's
+  falling eggs could not be made in MapMaker and their landing corrupted the
+  stack. The eggs are now skipped; see [Eggs](#eggs-the-v040-mapmaker28-crash).
 - **Fixed after a later playtest**: when the boss died and was removed, its
   smoke and explosions stayed on screen frozen. The removal stopped the fight
   call that updates them while the draw went on. Now the fight call keeps
@@ -203,7 +207,9 @@ behaviour, not just the first.
   two allocated blocks and their counters.
 - The particle system `0x0078B0CC..0x0078B188` (`sub_002A62C0/62F0/7D60/7F30`):
   the block, the live count and the emitter templates.
-- These 29 words are all; the test checks them against every absolute
+- These 29 words are all (the 28 statics lie inside the boss statics
+  `0x0078B080..0x0078B1DB` that the realbosses area swaps for the walker and
+  the skeleton); the test checks them against every absolute
   operand the code reaches. `[0x0078B1E4]` is only a temporary of one fight
   call (written at 0x00291AF6, read at 0x00291B61). The other boss
   singletons the graph reaches (`[0x0078B1DC]` robot, `[0x0078B1E8]` walker,
@@ -213,19 +219,29 @@ behaviour, not just the first.
   per call by that boss's own offsets).
 
 **What the area does**:
-- Up to 4 bosses (`CRW_MAX`), each with its own copy of the 29 words
-  (`crw_inst[k].win`).
+- Up to 4 bosses (`CRW_MAX`), each with its own state pointer
+  (`crw_inst[k].state`) and its own copy of the whole boss statics window
+  (`crw_inst[k].fx`, a `MapmakerFx` of `pc_mapmaker_bossfx.inc`).
 - Allocation: boss 0 at level init as before, each further one at its AI
   start (the stock `sub_0028D6D0` and `sub_002A62C0`, with the globals as
   they were put back afterwards).
 - `crw_enter(k)` / `crw_leave(prev)` swap the copies around every entry into
   the boss's code: the fight, the message handler, the two callbacks, and
   each boss's draw (the fx hook draws them one by one).
-  - The same boss nested inside its own call changes nothing.
-  - Another boss inside (one Crowe's hazard hits another) keeps the first
-    one's current values.
-  - The values that are live outside every Crowe call (the stock singleton,
-    another boss's blocks) are put back after each call.
+  - The statics go through the one holder shared with the realbosses area
+    (`mapmaker_fx_enter`): it parks the live window in its current holder's
+    copy (a Crowe, a walker, a skeleton, or the outside copy) and loads the
+    new one; leaving enters the previous holder again.
+  - So any nesting is safe: another boss inside (one Crowe's hazard hits
+    another), or this boss again inside another area's boss inside its own
+    call (its hit callback inside a Crow walker's damage inside its fight)
+    gets its own latest values, and each caller gets its own back.
+    Up to v0.4.0-mapmaker.28 each area swapped its part of the window on its
+    own and "the same boss again" changed nothing, so that re-entry ran on
+    the walker's particle and effect blocks (`test_mapmaker_bossnest.py`).
+  - The values that are live outside every boss call (the stock singleton)
+    are put back after each call; the state pointer `[0x0075F5E8]` stays the
+    Crowe area's own (only `sub_0028D6D0` writes it).
 - Everything per boss: relocation, the floor offsets, the death fade and
   removal, the Boss flag (meter), the mission 10 constants' shift.
 - The fifth and later split Crowes keep the bot AI (logged:
@@ -253,6 +269,48 @@ state is a small set of globals reached only through hookable entry points:
 
 
 
+## Eggs (the v0.4.0-mapmaker.28 crash)
+
+User report: four split Crowes and four Crow walkers in one map; the game
+crashed after the fights started (crash-20261102-024139391, exe SHA
+7dd66f38...).
+
+**What happened** (CONFIRMED from the dump, the log and the decode; tests
+`test_egg_drop_site`, `test_models_in_paks`):
+- The crash: `sub_0009A570` got a garbage pad index from the loop at
+  0x0015F0A3 in the per-character update `sub_0015EAE0`. Its esp was 0x20
+  too high: the stack still held the return 0x0015F083 of
+  `sub_0027FE30` at the balanced depth, so that call (the story AI
+  dispatcher, reaching the Crowe fight at 0x0027DE39) returned 0x20 high.
+- The log's last line before the crash: `[ICALL] target 0x8147C368 is not
+  code -- skipped`, callers 0x000A907F <- 0x002AAEAA <- 0x0028F58C (the
+  egg landing loop in `sub_002AA6A0`, called by the Crowe's `sub_0028F440`
+  hazard update).
+- Each egg (8 per boss, state +0x11A0, 0x168 each) is four props 0x4BD
+  (`farfuture2/splittercrowegg`), made by `sub_002AB1B0` (only call
+  0x00291E7F) with `sub_000A6F90`. Its model is only in
+  `story/l_14_st.pak` (14 MB, never mounted in MapMaker), so each
+  `sub_000A6F90` returns 0 (`sub_000A6880` frees the slot when the model
+  instance fails) and the egg keeps four 0 handles at +0x150..+0x15C.
+- On landing (0x002AAEA2..0x002AAEB7) all four are released with
+  `sub_000A9070` and no null test (the death's `sub_002AA2E0` has one).
+  `sub_0009E330(0, 1, 0)` reads class 0 at guest 0x20, indexes 5 entries
+  before its callback table 0x0072F2E0 and calls that word (a heap
+  pointer).
+- The runtime skips a call to a non-code target, but `RECOMP_ICALL_SAFE`
+  restores the esp from before the call's two arguments, and the caller's
+  `add esp, 8` then pops them again: 8 bytes high per skip, 0x20 for one
+  egg. The esp skew went up through the fight and the dispatcher into the
+  per-character update. (A runtime defect for any skipped call with
+  arguments; not changed here.)
+- Not the cause: every Crowe and realbosses hook was audited for esp on
+  each path (each runs its original once or does one `ret`); guest_call
+  saves and restores esp.
+
+**Fix**: `pc_mapmaker_crowe_eggs` skips the egg drop for a boss in scene 100
+(no egg, no null prop, nothing lands). The fight's other attacks (turrets,
+sparks) and its egg counter are unchanged. Mission 10 is untouched.
+
 Unchanged: a stock custom-set member (word id 0x46, sbyte variant -1). No
 Story AI chunk byte of its own (+0x29 is the bosses area's Boss flag). A
 stock game or an older fork build shows an empty name for the slot and plays
@@ -264,7 +322,9 @@ like the others) on its own rig. Mission 10 holds the same id.
 New area `crowe` (add it where the areas are listed, e.g. the
 `pc_mapmaker_area_enabled` table). Include `pc_mapmaker_crowe.inc` after
 `pc_mapmaker_realbosses.inc` (it needs only `pc_mapmaker_limits.inc` and the
-includer's guest helpers; its statics are prefixed `crw`/`CRW_`).
+includer's guest helpers; its statics are prefixed `crw`/`CRW_`). Both
+include `pc_mapmaker_bossfx.inc` (guarded; one holder for the boss statics,
+prefixed `mapmaker_fx`).
 
 ```
 WRAP sub_001C8540 -> pc_mapmaker_crowe_anims       (layer with realbosses_anims; either order)
@@ -281,6 +341,7 @@ WRAP sub_0013A400 -> pc_mapmaker_crowe_meter       (layer with realbosses_meter;
 WRAP sub_00292430 -> pc_mapmaker_crowe_message     (new; the boss's message handler, from sub_0027CEF0)
 WRAP sub_0028DA10 -> pc_mapmaker_crowe_think       (new; entity slot 2 callback)
 WRAP sub_0028F730 -> pc_mapmaker_crowe_hit         (new; entity hit callback +0x19C)
+WRAP sub_002AB1B0 -> pc_mapmaker_crowe_eggs        (new after v0.4.0-mapmaker.28; return-address test first)
 ```
 
 Each layer: `if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_<x>"))
@@ -297,7 +358,8 @@ Guest calls (`extern void ...(void)`, called with `guest_call`):
 `tests/mapmaker/mapmaker_area_stubs.h` (new): `sub_0028D6D0`,
 `sub_002A62C0`, `sub_0028D710`, `sub_000EFBD0`; the others are already there.
 Off-build no-op hooks (`{ original(); }`) in `pc_menu_mouse_guest.inc` and
-prototypes in `pc_display_menu.h` for the eleven functions above. Owning
+prototypes in `pc_display_menu.h` for the functions above (with
+`pc_mapmaker_crowe_eggs`; it makes no guest call, so no new stub). Owning
 agent-context guide: add the area like realbosses (not edited here, per the
 brief).
 
@@ -326,8 +388,8 @@ needs none of it):
    by (...) ... start cell 2,4 at the spawn (x, z)` (row/column may differ), `no intro cutscene; the fight starts`, `effects drawn`.
 3. Watch: it appears exactly where its Story AI was placed (not a few
    tiles off), then walks between platforms around its spawn, turns 90 degrees,
-   fires; falling hazards drop near you and explode on the floor (not in
-   the air). Shoot its turrets: each explodes (`part destroyed`), no debris.
+   fires. No eggs fall (`egg drop skipped`: their model is not in
+   MapMaker). Shoot its turrets: each explodes (`part destroyed`), no debris.
 4. Kill it: death animation, then after about 3 s the smoke stops and the
    remaining smoke, sparks and explosions finish within about a second, then
    it disappears with them (`level marker dropped`, `effects play out`,
@@ -337,4 +399,8 @@ needs none of it):
    Sub-boss bar: the meter. Up to four Split Crowe AIs each fight with their own arena; a fifth fights as a bot (`more than 4
    split Crowes in the map`). Mission 10 still plays stock.
 6. Report: where it walks relative to tile walls, whether it falls through
-   or floats, hazard height, and the stderr lines.
+   or floats, and the stderr lines.
+7. v0.4.0-mapmaker.28 crash: four Split Crowes and four Crow Walkers in one
+   map, fight all of them for a few minutes (let them shoot each other):
+   no crash, no `[ICALL] ... not code` line, each boss keeps its own
+   effects.
