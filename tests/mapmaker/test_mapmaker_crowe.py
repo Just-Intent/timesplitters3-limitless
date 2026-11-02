@@ -133,12 +133,51 @@ MUTATIONS = {
     'cells-other-state': (' ||\n       WORD_AT(g_esp+4u)!=st+4u) { original();return; }', ') { original();return; }'),
     'cells-before-lookup': ('    original();\n    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_block(',
                             '    for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_block(st,crw_lv.egg_row[k],crw_lv.egg_col[k]);\n    original();\n    if(0) crw_block('),
-    # a walk stopped short would wait in state 9 for ever
-    'land-never': ('    if(to==CRW_JUMP) { if(++crw_lv.air>=CRW_AIR_MAX) crw_land(ent); }', '    if(to==CRW_JUMP) { ++crw_lv.air; }'),
-    'land-at-once': ('#define CRW_AIR_MAX 240u', '#define CRW_AIR_MAX 2u'),
-    'land-wait-kept': ('    else crw_lv.air=0;\n', ''),
-    'land-only-x': ('    crw_setf(ent+CRW_ENT_X,x);crw_setf(ent+CRW_ENT_X+8u,z);\n', '    crw_setf(ent+CRW_ENT_X,x);\n'),
-    'land-other-state': ('    if(to==CRW_JUMP) {', '    if(to==CRW_JUMP+1u) {'),
+    # a walk stopped short would wait in state 9 for ever; v0.4.0-mapmaker.34: putting the
+    # boss on its target put it into walls and off the map
+    'stop-teleports': ('    crw_setf(st+CRW_ARRIVED,0.0f);\n',
+                       '    crw_setf(st+CRW_ARRIVED,0.0f);\n    crw_setf(ent+CRW_ENT_X,crw_getf(st+CRW_TARGET));crw_setf(ent+CRW_ENT_X+8u,crw_getf(st+CRW_TARGET+4u));\n'),
+    'stop-never': ('    if(to==CRW_JUMP) crw_walking(ent,a);\n', '    if(to==CRW_JUMP) ++crw_lv.air;\n'),
+    'stop-other-state': ('    if(to==CRW_JUMP) crw_walking(ent,a);', '    if(to==CRW_JUMP+1u) crw_walking(ent,a);'),
+    'stop-wait-kept': ('    else crw_lv.air=crw_lv.stall=0;\n', '    else crw_lv.stall=0;\n'),
+    'stop-no-stall': ('    if(crw_lv.stall>=CRW_STALL_CALLS) crw_stop(', '    if(0) crw_stop('),
+    'stop-no-cap': ('    else if(crw_lv.air>=CRW_AIR_MAX) crw_stop(', '    else if(0) crw_stop('),
+    'stop-cap-short': ('#define CRW_AIR_MAX 600u', '#define CRW_AIR_MAX 240u'),
+    'stop-stall-short': ('#define CRW_STALL_CALLS 90u', '#define CRW_STALL_CALLS 60u'),
+    'stop-progress-any': ('    if(!crw_lv.air++ || !(d>=crw_lv.best-CRW_STALL_STEP)) {', '    if(!crw_lv.air++ || !(d>crw_lv.best)) {'),
+    'stop-best-kept': ('{ crw_lv.best=d;crw_lv.stall=0; }', '{ crw_lv.stall=0; }'),
+    'stop-no-anim': ('    guest_call(sub_0005F460,4,ent,CRW_ANIM_STOP,0u,CRW_ANIM_SPEED);\n', ''),
+    'stop-anim-wrong': ('#define CRW_ANIM_STOP 0x810u', '#define CRW_ANIM_STOP 0x80Eu'),
+    'stop-state-kept': ('WORD_AT(a+CRW_AI_STATE)=next;WORD_AT(a+0x9D0u)=next;', 'WORD_AT(a+0x9D0u)=next;'),
+    'stop-next-stale': ('WORD_AT(a+CRW_AI_STATE)=next;WORD_AT(a+0x9D0u)=next;', 'WORD_AT(a+CRW_AI_STATE)=next;'),
+    'stop-next-unchecked': ('    if(next>=0x12u || next==CRW_JUMP) next=CRW_DECIDE;\n', ''),
+    'stop-again': ('    if(next>=0x12u || next==CRW_JUMP) next=CRW_DECIDE;', '    if(next>=0x12u) next=CRW_DECIDE;'),
+    'stop-arrival-kept': ('    crw_setf(st+CRW_ARRIVED,0.0f);\n', ''),
+    'stop-no-wall': ('            crw_lv.wall_left[(unsigned)i*CRW_COLS+(unsigned)j]=CRW_WALL_CALLS;', '            (void)0;'),
+    'stop-wall-behind': ('    int dr=dir==0u?1:dir==2u?-1:0,dc=', '    int dr=dir==0u?-1:dir==2u?1:0,dc='),
+    'stop-wall-cols-swapped': ('dc=dir==3u?1:dir==1u?-1:0,i,j;', 'dc=dir==1u?1:dir==3u?-1:0,i,j;'),
+    'stop-wall-short': ('#define CRW_WALL_CALLS 1800u', '#define CRW_WALL_CALLS 600u'),
+    'wall-never-expires': ('    for(k=0;k<CRW_CELLS;k++) if(crw_lv.wall_left[k]) crw_lv.wall_left[k]--;\n', ''),
+    'wall-not-blocked': ('if(crw_lv.off[k] || crw_lv.wall_left[k]) WORD_AT(', 'if(crw_lv.off[k]) WORD_AT('),
+    # v0.4.0-mapmaker.34: cells in no room (off the map, another floor) were targets
+    'rooms-none': ('    crw_rooms(st,sy);\n', ''),
+    'rooms-not-blocked': ('if(crw_lv.off[k] || crw_lv.wall_left[k]) WORD_AT(', 'if(crw_lv.wall_left[k]) WORD_AT('),
+    'rooms-floor-height': ('crw_setf(q+4u,y+CRW_BODY_LOW);', 'crw_setf(q+4u,y-CRW_BODY_HIGH);'),
+    'rooms-body-wide': ('#define CRW_BODY_HALF 0.3f', '#define CRW_BODY_HALF 3.0f'),
+    'rooms-untrusted-used': ('    if(crw_lv.off[start]) {\n        memset(crw_lv.off,0,sizeof crw_lv.off);\n', '    if(crw_lv.off[start]) {\n'),
+    'rooms-esp-kept': ('    g_esp=sp;\n    if(crw_lv.off[start]) {', '    if(crw_lv.off[start]) {'),
+    'rooms-in-frame': ('    q=(g_esp-0x40u)&~0xFu;', '    q=(g_esp+0x4u)&~0xFu;'),
+    'shadow-none': ('    if(r<CRW_ROWS && c<CRW_COLS) crw_shadow(st,r,c);\n', ''),
+    'shadow-only-hole': ('            hit|=crw_lv.off[k];\n            if(hit)', '            hit=crw_lv.off[k];\n            if(hit)'),
+    'shadow-one-way': ('{{1,0},{-1,0},{0,1},{0,-1}}', '{{1,0},{-1,0},{0,1},{0,1}}'),
+    # v0.4.0-mapmaker.34: "player cell -1,-1" on every line: an arbitrary walk order
+    'player-none': ('    crw_player(st,px,pz);\n', ''),
+    'player-any-cell': ('if(best==CRW_CELLS || open>bopen || (open==bopen && d<bd))', 'if(best==CRW_CELLS || d<bd)'),
+    'player-overrides-stock': ('!crw_sane(pz) || crw_cell_at(g,px,pz,&r,&c)) return;', '!crw_sane(pz)) return;'),
+    'player-boss-pos': ('    px=crw_getf(g_esp+8u);pz=crw_getf(g_esp+0xCu);', '    px=crw_getf(g_esp+0x10u);pz=crw_getf(g_esp+0x14u);'),
+    'player-row-col-swapped': ('WORD_AT(st+CRW_PCELL)=best/CRW_COLS;WORD_AT(st+CRW_PCELL+4u)=best%CRW_COLS;',
+                               'WORD_AT(st+CRW_PCELL)=best%CRW_COLS;WORD_AT(st+CRW_PCELL+4u)=best/CRW_COLS;'),
+    'player-nan-used': ('    if(!crw_sane(px) || !crw_sane(pz) || crw_cell_at(', '    if(crw_cell_at('),
     # a pause-menu restart runs no level init: the blocks (level heap) were kept, the Crowes stayed on them
     'restart-none': ('    if(had || crw.restarted) {\n        crw_reset();', '    if(0) {\n        crw_reset();'),
     'restart-no-original': ('        crw_log("level restart: split Crowe blocks forgotten; new ones at the AI start (bosses, again)",had,(uint32_t)crw.restarted);\n    }\n    original();\n',
@@ -506,6 +545,43 @@ def test_egg_steers_the_walk():
     assert all(mem(a[x])[0][4] == 0x990 for x in (0x002A9D88, 0x002A9DB1, 0x002A9DE5))
     # state 9 waits for the walk animation, then until the boss has passed its target
     assert target(a[0x00291C0A]) == 0x00059DD0 and a[0x00291C49].mnemonic == 'jbe'
+
+
+def test_walk_end_and_cells_for_the_map():
+    """v0.4.0-mapmaker.34: what crw_stop mirrors and what crw_player/crw_shadow rely on."""
+    a = by_address()
+    # stock arrival (direction 0 shown): sub_0005F460(entity, 0x810, 0, 1.2), state = [+0x2DE8], +0x2DF0 = 0
+    assert ('imm', 0x3F99999A) in a[0x00291C4F].ops and ('imm', 0x810) in a[0x00291C55].ops
+    assert target(a[0x00291C5B]) == 0x0005F460
+    assert mem(a[0x00291C69])[0][4] == 0x2DE8 and mem(a[0x00291C8C])[0][4] == 0x20
+    assert mem(a[0x00291C79])[0][4] == 0x9D4 and mem(a[0x00291C97])[0][4] == 0x9D0
+    assert mem(a[0x00291CA8])[0][4] == 0x2DF0
+    # the arrival tests one axis per direction (+0x1D24: 0 z+, 2 z-, 3 x+, 1 x- of the tracked +0x1D08/+0x1D10)
+    assert mem(a[0x00291C20])[0][4] == 0x1D24 and mem(a[0x00291C3E])[0][4] == 0x1D10
+    assert mem(a[0x00291CEF])[0][4] == 0x1D08
+    # state 5 stores the picker's direction at +0x1D24
+    assert mem(a[0x00291599])[0][4] == 0x1D24
+    # sub_002A9D00(state+4, player x, player z, boss x, boss z): the player's cell into +0x1190 ...
+    assert mem(a[0x002A9D04])[0][4] == 8 and mem(a[0x002A9D00])[0][4] == 0xC
+    assert mem(a[0x002A9D10])[0][4] == 0x118C
+    # ... by sub_002A9330, which writes nothing when no cell holds the point
+    assert a[0x002A93AB].mnemonic == 'cmp' and a[0x002A93AE].mnemonic == 'jne'
+    # the picker's 5 x 5 candidates: rows/columns 0..4 when the player's cell is out of range
+    assert a[0x002A9E99].mnemonic == 'xor' and ('imm', 5) in a[0x002A9E9B].ops
+    # the walk lookup's arguments: the player entity's +0x64/+0x6C
+    assert mem(a[0x002901B1])[0][4] == 0x64 and mem(a[0x002901AD])[0][4] == 0x6C
+
+
+def test_room_query_like_the_fall_check():
+    """The Crowe asks the room query as the roof area's fall check does (same body box)."""
+    crowe = INC.read_text(encoding='utf-8')
+    roof = (ROOT / 'src/interface/pc_mapmaker_roof.inc').read_text(encoding='utf-8')
+    for name, value in (('BODY_HALF', '0.3f'), ('BODY_LOW', '0.25f'), ('BODY_HIGH', '1.5f')):
+        assert re.search(rf'#define CRW_{name} {re.escape(value)}\b', crowe)
+        assert re.search(rf'#define MAPMAKER_ROOF_{name} {re.escape(value)}\b', roof)
+    assert 'guest_call(sub_00087310,3,q,q+0x18u,' in crowe and 'guest_call(sub_00087310,3,q,q+0x18u,' in roof
+    # no teleport left: nothing writes the boss's position from the move target
+    assert not re.search(r'crw_setf\(ent\+CRW_ENT_X[^;]*CRW_TARGET', crowe)
 
 
 def test_restart_runs_no_level_init():
