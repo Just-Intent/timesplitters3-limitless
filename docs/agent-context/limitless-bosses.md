@@ -22,3 +22,8 @@ worm removal (WRAP sub_001D5E20), open-air view (`pc_mapmaker_openview.inc`,
 WRAP sub_00089B90), sandstorm grains outside scene 2 (weather frame hook),
 Crowe egg skip (WRAP sub_002AB1B0) and the shared boss statics holder
 (`pc_mapmaker_bossfx.inc`).
+
+.31 Khallos: riders also ask for class 8 (AI +0xAA8/+0xAAC, which
+`sub_0015C700` applies before each think), khallosidle replayed in state 1
+(`sub_0005F460`), and WRAP sub_001CDD60 (level restart, no pak mount)
+resets the chairs ([area doc](../mapmaker/mapmaker-khallos.md)).

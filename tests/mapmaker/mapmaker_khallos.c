@@ -65,6 +65,11 @@ void sub_0005A130(void) { g_ecx=8; }
 void sub_000A9070(void) { g_ecx=9; }
 void sub_0010E2A0(void) { g_ecx=10; }
 void sub_0010EB90(void) { g_ecx=11; }
+void sub_0005F460(void) { g_ecx=12; }
+/* sub_0005F460(entity, anim, 0, 1.0): plays it (entity +4 -> +0xD4) when idle_ok */
+static unsigned nidle;
+static uint32_t idle_args[4];
+static int idle_ok;
 /* row 3 = the chair: path PATH(3), request REQ(3) whose +0x10 holds the file when read */
 #define PATH(r) (0x00530000u+(uint32_t)(r)*0x40u)
 #define REQ(r) (0x00534000u+(uint32_t)(r)*0x40u)
@@ -120,6 +125,11 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         return 0;
     }
     if(f==sub_0010EB90) { if(nstop<8u) stop_args[nstop]=x[0];nstop++;CHECK(x[1]==0);return 0; }
+    if(f==sub_0005F460) {
+        nidle++;memcpy(idle_args,x,sizeof idle_args);
+        if(idle_ok) WORD_AT(WORD_AT(x[0]+4u)+0xD4u)=x[1];
+        return idle_ok?1u:0;
+    }
     if(f==sub_000A5E40) {
         int16_t r=(int16_t)HALF_AT(0x008CA000u+x[0]*2u);
         requested=x[0];nrequest++;req_after_original=originals;
@@ -160,6 +170,19 @@ static void fake_create(void)
 /* sub_0014CC80: the focus the stock bar saw */
 static uint32_t hud_focus;
 static void fake_hud(void) { originals++;hud_focus=WORD_AT(PLAYER+0xFF4u);g_esp+=4u; }
+static void inner(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,int line);
+/* sub_001CDD60: the level restart makes and starts the placeholder again (restart_spawns) */
+static int restart_spawns;
+static void fake_ai(void);
+static void fake_restart(void)
+{
+    originals++;
+    if(restart_spawns) {
+        inner(pc_mapmaker_khallos_create,fake_create,0x0015DFDAu,0x33u,0,1u,__LINE__);
+        inner(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(0),0,0,__LINE__);
+    }
+    g_esp+=4u;
+}
 
 /* A call from inside a fake original into a hook: ret and args pushed below esp. */
 static void inner(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,int line)
@@ -605,6 +628,7 @@ int main(void)
     /* ---- rider: a Khallos near the chair, with lv11.pak ------------------------ */
     level(1,__LINE__);                                                   /* Khallos started first */
     CHECK(khl_ch[0].rider==A(1) && WORD_AT(A(1)+0x10u)==0 && WORD_AT(A(1)+0x14u)==8u && WORD_AT(A(1)+0x9D0u)==0);
+    CHECK(WORD_AT(A(1)+0xAA8u)==0 && WORD_AT(A(1)+0xAACu)==8u);           /* asked for too */
     level(0,__LINE__);                                                   /* Khallos started after */
     CHECK(khl_ch[0].rider==A(1) && WORD_AT(A(1)+0x14u)==8u);
     actor(3,0x02,40.5f,2.0f,30.5f,0.0f);                                 /* nearer, but a rider exists */
@@ -942,6 +966,7 @@ int main(void)
     CHECK(WORD_AT(CHARS+0x33u*0x30u+4u)==0x619u && WORD_AT(CHARS+0x33u*0x30u+8u)==0x61Au);   /* ... for that call only */
     CHECK(khl_lv.n==1u && khl_ch[0].own && khl_ch[0].rider==A(0) && khl_ch[0].rider_ent==ENT(0) && khl_ch[0].rider_rec==REC(0));
     CHECK(WORD_AT(A(0)+0x10u)==0 && WORD_AT(A(0)+0x14u)==8u && WORD_AT(A(0)+0x9D0u)==0);
+    CHECK(WORD_AT(A(0)+0xAA8u)==0 && WORD_AT(A(0)+0xAACu)==8u);
     actor(1,0x02,41.0f,2.0f,31.0f,0.0f);                                 /* a Khallos next to it: a bot */
     CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(1),0,0,1);
     CHECK(khl_ch[0].rider==A(0) && WORD_AT(A(1)+0x14u)==0x11000000u);
@@ -1097,10 +1122,16 @@ int main(void)
     UPDATE(1);
     CHECK(NEAR(FLOAT_AT(ENT(0)+0x68u),CF(0,LIVE+4u)-2.0f));             /* the game's own value */
     FLOAT_AT(0x0049E4BCu)=-1.2f;
-    /* a class or a state the handler cannot sit in is put back */
+    /* another class asked for is asked back (the engine's sub_0015C700 changes the class) */
     WORD_AT(A(0)+0x10u)=1u;WORD_AT(A(0)+0x14u)=0x11000000u;WORD_AT(A(0)+0x9D0u)=0xFFFFFFFFu;
+    WORD_AT(A(0)+0xAA8u)=1u;WORD_AT(A(0)+0xAACu)=0x11000000u;
     UPDATE(1);
-    CHECK(!WORD_AT(A(0)+0x10u) && WORD_AT(A(0)+0x14u)==8u && WORD_AT(A(0)+0x9D0u)==0);
+    CHECK(!WORD_AT(A(0)+0xAA8u) && WORD_AT(A(0)+0xAACu)==8u && WORD_AT(A(0)+0x9D0u)==0 && khl_ch[0].asked==1u);
+    CHECK(WORD_AT(A(0)+0x10u)==1u && WORD_AT(A(0)+0x14u)==0x11000000u);  /* not written over the engine's change */
+    WORD_AT(A(0)+0x9D0u)=0xFFFFFFFFu;
+    UPDATE(1);                                                           /* asked for 8 already: nothing */
+    CHECK(khl_ch[0].asked==1u && WORD_AT(A(0)+0x9D0u)==0xFFFFFFFFu);
+    WORD_AT(A(0)+0x10u)=0;WORD_AT(A(0)+0x14u)=8u;WORD_AT(A(0)+0x9D0u)=0;
     n=khl_ch[0].calls;
     WORD_AT(A(0)+0x9D0u)=5u;
     CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
@@ -1158,6 +1189,73 @@ int main(void)
     CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
     CHECK(khl_lv.sounds && CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x394u,0,0,1)==4u);
     world_eax=0;
+
+    /* ---- .31: a rider asked for another class while waiting, killed once, khallosidle ---- */
+#define ANIMB 0x00579000u
+#define ANIMT 0x0057A000u
+    own_level(__LINE__);
+    constants();
+    FLOAT_AT(ENT(0)+0x1D8u)=20.0f;FLOAT_AT(ENT(0)+0x1CCu)=20.0f;FLOAT_AT(CHAIR+0x1CCu)=60.0f;
+    pose(CHAIR,0.0f,1.0f,0.0f,0.0f,0.0f,0.0f);
+    players(100.0f,100.0f,1.0f,100.0f,100.0f,1.0f);                       /* far: the chair waits */
+    WORD_AT(A(0)+0xAA8u)=2u;WORD_AT(A(0)+0xAACu)=0;WORD_AT(A(0)+0x9D0u)=0xFFFFFFFFu;   /* asked for 2 */
+    UPDATE(1);
+    CHECK(!WORD_AT(A(0)+0xAA8u) && WORD_AT(A(0)+0xAACu)==8u && WORD_AT(A(0)+0x9D0u)==0 && khl_ch[0].asked==1u);
+    n=khl.logged;
+    FLOAT_AT(ENT(0)+0x1CCu)=-1.0f;WORD_AT(A(0)+0xAA8u)=2u;                 /* killed: left alone, logged once */
+    UPDATE(1);UPDATE(1);UPDATE(1);
+    CHECK(WORD_AT(A(0)+0xAA8u)==2u && khl_ch[0].asked==1u && khl_ch[0].dead==3u && khl.logged==n+1u);
+    FLOAT_AT(ENT(0)+0x1CCu)=20.0f;WORD_AT(A(0)+0xAA8u)=0;
+    /* seated (state 1) with another anim: khallosidle played again the handler's way, every 30 calls */
+    WORD_AT(ENT(0)+4u)=ANIMB;WORD_AT(ANIMB+0xD4u)=0x25u;
+    HALF_AT(0x007E03C0u+0xBFBu*2u)=7u;WORD_AT(0x007E3954u)=ANIMT;WORD_AT(ANIMT+7u*4u)=0x00538800u;
+    WORD_AT(A(0)+0x20u)=1u;WORD_AT(A(0)+0x9D0u)=0xFFFFFFFFu;
+    idle_ok=1;n=nidle;
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(nidle==n+1u && idle_args[0]==ENT(0) && idle_args[1]==0xBFBu && idle_args[2]==0 && idle_args[3]==0x3F800000u);
+    CHECK(WORD_AT(ANIMB+0xD4u)==0xBFBu && khl_ch[0].replays==1u && !khl_ch[0].replay_fail);
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(nidle==n+1u && khl_ch[0].anim==0xBFBu);                         /* playing it: nothing */
+    WORD_AT(ANIMB+0xD4u)=0x30u;idle_ok=0;                                 /* another took over; refused */
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(nidle==n+2u && khl_ch[0].replay_fail==1u && khl_ch[0].anim==0x30u);
+    for(k=0;k<29u;k++) CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(nidle==n+2u);
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(nidle==n+3u);                                                  /* the 30th call tries again */
+    WORD_AT(A(0)+0x20u)=0;khl_ch[0].wait=0;                               /* sitting down: the handler's own */
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(nidle==n+3u);
+    WORD_AT(A(0)+0x20u)=1u;WORD_AT(A(0)+0xBF0u)=REC(9);                   /* not seated (entry reused) */
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(nidle==n+3u);
+    WORD_AT(A(0)+0xBF0u)=REC(0);
+    WORD_AT(ENT(0)+4u)=0;
+
+    /* ---- .31: the level restarts (no pak mount); then a new level: like a first load ---- */
+    own_level(__LINE__);
+    CHECK(khl_lv.n==1u && khl_lv.sounds && khl_lv.requested && khl_ch[0].own);
+    khl_ch[0].hits=3u;khl_ch[0].calls=50u;khl.logged=KHL_LOGS;           /* the old run's state, its log spent */
+    WORD_AT(khl.slots+3u*8u)=0x0BADu;                                    /* an old chair's owner slot */
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);                                 /* off: the original only */
+    restart_spawns=0;
+    CALL(pc_mapmaker_khallos_restart,fake_restart,0x0003D4E6u,0,0,0,1);
+    CHECK(khl_lv.n==1u && khl_ch[0].hits==3u);
+    set_env("TSFP_MAPMAKER_LIMITS","1");
+    actor(0,0x33,40.0f,2.0f,30.0f,1.5f);HALF_AT(ENT(0)+0x94u)=0;         /* made and started again */
+    restart_spawns=1;n=nspawn;r=nmount;
+    CALL(pc_mapmaker_khallos_restart,fake_restart,0x0003D4E6u,0,0,0,3);   /* it, the creation and the AI start */
+    restart_spawns=0;
+    CHECK(nspawn==n+1u && nmount==r && khl_lv.n==1u && khl_ch[0].obj==CHAIR && khl_ch[0].own && khl_ch[0].rider==A(0));
+    CHECK(!khl_ch[0].hits && !khl_ch[0].calls && khl_lv.sounds && khl_lv.requested && khl.logged && khl.logged<KHL_LOGS);
+    CHECK(!WORD_AT(khl.slots+3u*8u) && made_model==0x582u && WORD_AT(A(0)+0x14u)==8u && WORD_AT(A(0)+0xAACu)==8u);
+    players(45.0f,33.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    n=nupdate;
+    UPDATE(1);                                                           /* the new chair flies */
+    CHECK(nupdate==n+1u && CW(0,0x0078F04Cu)==1u);
+    own_level(__LINE__);                                                 /* the next load from scratch */
+    CHECK(khl_lv.n==1u && khl_ch[0].obj==CHAIR && khl_ch[0].own && !khl_ch[0].frames);
 
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
     printf("mapmaker khallos ok\n");

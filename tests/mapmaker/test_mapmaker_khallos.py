@@ -77,8 +77,9 @@ MUTATIONS = {
     'rider-stale-entry': ('        if(khl_lv.cand_bound[c] || !khl_same_ai(khl_lv.cand[c],khl_lv.cand_ent[c],khl_lv.cand_rec[c])) continue;', '        if(khl_lv.cand_bound[c]) continue;'),
     'rider-two': ('    if(!khl_ch[k].obj || khl_ch[k].rider || khl_ch[k].removed) return;', '    if(!khl_ch[k].obj || khl_ch[k].removed) return;'),
     'rider-wrong-class': ('#define KHL_RIDER_CLASS 8u', '#define KHL_RIDER_CLASS 0x80u'),
-    'rider-class-hi-kept': ('    WORD_AT(a+KHL_AI_CLASS_HI)=0;WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;\n    WORD_AT(a+KHL_AI_NEXT)=0;                             /* the handler\'s state 0: sit down */\n    khl_lv.cand_bound', '    WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;\n    WORD_AT(a+KHL_AI_NEXT)=0;\n    khl_lv.cand_bound'),
-    'rider-no-state': ("    WORD_AT(a+KHL_AI_NEXT)=0;                             /* the handler's state 0: sit down */\n    khl_lv.cand_bound", '    khl_lv.cand_bound'),
+    'rider-class-hi-kept': ('    WORD_AT(a+KHL_AI_CLASS_HI)=0;WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;\n    WORD_AT(a+KHL_AI_ASK_HI)', '    WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;\n    WORD_AT(a+KHL_AI_ASK_HI)'),
+    'rider-no-state': ("    WORD_AT(a+KHL_AI_NEXT)=0;                             /* the handler's state 0: sit down */\n}", '}'),
+    'rider-bind-no-class': ('    khl_rider_class(a);\n    khl_lv.cand_bound', '    khl_lv.cand_bound'),
     'rider-not-after-chair': ('            for(k=0;k<khl_lv.n;k++) khl_bind_rider(k);\n', ''),
     'rider-not-at-chair': ('khl_seat_own(k,a,ent);   /* made as Khallos (create) */\n    khl_bind_rider(k);\n}', 'khl_seat_own(k,a,ent);   /* made as Khallos (create) */\n}'),
     'rider-not-removed': ('    khl_unfocus(ent);\n    guest_call(sub_0015DDA0,1,ent);\n    khl_log("rider removed', '    khl_unfocus(ent);\n    khl_log("rider removed'),
@@ -95,7 +96,7 @@ MUTATIONS = {
     'wake-first-player-only': ('    for(k=0;k<n && MAPMAKER_PTR_OK(base,KHL_PLAYER_STRIDE*4u);k++) {\n        ent=', '    for(k=0;k<n && k<1u && MAPMAKER_PTR_OK(base,KHL_PLAYER_STRIDE*4u);k++) {\n        ent='),
     'wake-line-not-forced': ('    WORD_AT(KHL_LINE)=KHL_FLT_MAX;\n    khl_setf(KHL_GAP,px-tx);', '    khl_setf(KHL_GAP,px-tx);'),
     'line-not-restored': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health', '    WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health'),
-    'line-wait-not-restored': ('        original();\n        WORD_AT(KHL_LINE)=line;\n        khl_rider_health(k,obj);\n        return;', '        original();\n        khl_rider_health(k,obj);\n        return;'),
+    'line-wait-not-restored': ('        original();\n        WORD_AT(KHL_LINE)=line;\n        khl_rider_health(k,obj);\n        khl_keep_class(k);\n        return;', '        original();\n        khl_rider_health(k,obj);\n        khl_keep_class(k);\n        return;'),
     'frame-none': ('    khl_shift_in(obj);\n    khl_lv.inside=1;', '    khl_lv.inside=1;'),
     'frame-not-back': ('    khl_lv.inside=0;\n    khl_shift_out(obj);', '    khl_lv.inside=0;'),
     'frame-no-lift': ('    khl_lv.d[1]=khl_ch[k].spawn[1]+KHL_LIFT-KHL_TRAIN_Y;', '    khl_lv.d[1]=khl_ch[k].spawn[1]-KHL_TRAIN_Y;'),
@@ -168,7 +169,7 @@ MUTATIONS = {
     'text-any-mode': ('|| !khl.label || !khl_play()) {', '|| !khl.label || !khl_on()) {'),
     'text-no-ret': ('    g_eax=khl.label;\n    MAPMAKER_GUEST_RET();', '    g_eax=khl.label;'),
     'mine-first-only': ('    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].obj==obj) return (int)k;', '    for(k=0;k<1u && k<khl_lv.n;k++) if(khl_ch[k].obj==obj) return (int)k;'),
-    'mount-keeps-count': ('    memset(&khl_lv,0,sizeof khl_lv);                       /* a new level: forget the last chairs */\n', ''),
+    'mount-keeps-count': ('    memset(&khl_lv,0,sizeof khl_lv);                       /* forget the last chairs */\n', ''),
     'spawn-one-chair': ('    if(khl_lv.n>=KHL_MAX) {', '    if(khl_lv.n>=1u) {'),
     'spawn-unlimited': ('    if(khl_lv.n>=KHL_MAX) {', '    if(khl_lv.n>=KHL_MAX+1u) {'),
     'spawn-same-placeholder-twice': ('    if(k<khl_lv.n) { khl_log("this chair placeholder already has its chair",a,k);return; }\n', ''),
@@ -177,7 +178,7 @@ MUTATIONS = {
     'spawn-failed-not-back': ('        khl_out(k,keep);khl_detach(k);\n        khl_log("the chair was not created', '        khl_detach(k);\n        khl_log("the chair was not created'),
     'variant-not-back': ('        guest_call(sub_000A9070,1,obj);\n        khl_out(k,keep);', '        guest_call(sub_000A9070,1,obj);'),
     'rider-two-chairs': ('        if(khl_lv.cand_bound[c] || !khl_same_ai(khl_lv.cand[c],khl_lv.cand_ent[c],khl_lv.cand_rec[c])) continue;', '        if(!khl_same_ai(khl_lv.cand[c],khl_lv.cand_ent[c],khl_lv.cand_rec[c])) continue;'),
-    'rider-not-swapped': ('    khl_swapped(original,(unsigned)k);\n}\n/* WRAP sub_00263150', '    original();\n}\n/* WRAP sub_00263150'),
+    'rider-not-swapped': ('    khl_swapped(original,(unsigned)k);\n    khl_idle((unsigned)k);\n}\n/* WRAP sub_00263150', '    original();\n    khl_idle((unsigned)k);\n}\n/* WRAP sub_00263150'),
     'rider-any-entity': ('    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].rider && khl_ch[k].rider_ent==ent) return (int)k;', '    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].rider) return (int)k;'),
     'frame-first-chair-spawn': ('    khl_lv.d[1]=khl_ch[k].spawn[1]+KHL_LIFT-KHL_TRAIN_Y;', '    khl_lv.d[1]=khl_ch[0].spawn[1]+KHL_LIFT-KHL_TRAIN_Y;'),
     'gap-first-chair': ('    tx=khl_clamp(px-khl_getf(KHL_GAP),khl_ch[k].spawn[0]-KHL_ROAM,khl_ch[k].spawn[0]+KHL_ROAM);', '    tx=khl_clamp(px-khl_getf(KHL_GAP),khl_ch[0].spawn[0]-KHL_ROAM,khl_ch[0].spawn[0]+KHL_ROAM);'),
@@ -225,7 +226,7 @@ MUTATIONS = {
     'own-never': ('KHL_H(ent+KHL_ENT_MODEL)==m) khl_seat_own(k,a,ent);', 'KHL_H(ent+KHL_ENT_MODEL)==m+1u) khl_seat_own(k,a,ent);'),
     'own-any-model': ('KHL_H(ent+KHL_ENT_MODEL)==m) khl_seat_own(k,a,ent);', 'KHL_H(ent+KHL_ENT_MODEL)!=0xFFFFu) khl_seat_own(k,a,ent);'),
     'own-without-anims': ('    if(!khl_mounted(KHL_ANIM_PAK)) { khl_log("lv11.pak not mounted: the Khallos placeholder', '    if(0) { khl_log("lv11.pak not mounted: the Khallos placeholder'),
-    'own-class-kept': ('    WORD_AT(a+KHL_AI_NEXT)=0;                             /* the handler\'s state 0: sit down */\n    khl_ch[k].rider=a;khl_ch[k].rider_ent=ent;', '    khl_ch[k].rider=a;khl_ch[k].rider_ent=ent;'),
+    'own-class-kept': ('    khl_rider_class(a);\n    khl_ch[k].rider=a;', '    khl_ch[k].rider=a;'),
     'own-removed': ('    if(khl_ch[k].place && !khl_ch[k].own) {', '    if(khl_ch[k].place) {'),
     'own-wrong-record': ('khl_ch[k].rider_rec=khl_ch[k].place_rec;khl_ch[k].own=1;', 'khl_ch[k].rider_rec=0;khl_ch[k].own=1;'),
     'rider-hits-ignored': ('        khl_setf(obj+KHL_ENT_HEALTH,left=h-(max-(cur>0.0f?cur:0.0f)));', '        left=h;'),
@@ -235,7 +236,7 @@ MUTATIONS = {
     'rider-not-topped': ('    if(cur>0.0f) khl_setf(ent+KHL_ENT_HEALTH,max);\n', ''),
     'rider-revived': ('    if(cur>0.0f) khl_setf(ent+KHL_ENT_HEALTH,max);', '    if(1) khl_setf(ent+KHL_ENT_HEALTH,max);'),
     'rider-kill-no-down': ('        if(left<0.0f) khl_down(k,obj);\n', ''),
-    'rider-health-waiting-never': ('        WORD_AT(KHL_LINE)=line;\n        khl_rider_health(k,obj);\n        return;', '        WORD_AT(KHL_LINE)=line;\n        return;'),
+    'rider-health-waiting-never': ('        WORD_AT(KHL_LINE)=line;\n        khl_rider_health(k,obj);\n        khl_keep_class(k);\n        return;', '        WORD_AT(KHL_LINE)=line;\n        khl_keep_class(k);\n        return;'),
     'rider-health-active-never': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health(k,obj);\n', '    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n'),
     'hud-kept': ('    WORD_AT(player+KHL_FOCUS)=0;\n    original();\n    WORD_AT(player+KHL_FOCUS)=focus;', '    original();\n    WORD_AT(player+KHL_FOCUS)=focus;'),
     'hud-not-back': ('    WORD_AT(player+KHL_FOCUS)=0;\n    original();\n    WORD_AT(player+KHL_FOCUS)=focus;', '    WORD_AT(player+KHL_FOCUS)=0;\n    original();'),
@@ -249,7 +250,7 @@ MUTATIONS = {
     'yaw-clamped': ('    khl_setf(KHL_SPAN,KHL_SPAN_FREE);', '    (void)KHL_SPAN_FREE;'),
     'yaw-not-restored': ('WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;', 'WORD_AT(KHL_GAP)=gap;(void)span;'),
     'seat-never': ('    khl_seat(k,obj);\n', ''),
-    'seat-chair-0': ('    uint32_t a=khl_ch[k].rider,ent=khl_ch[k].rider_ent,i;\n    float c,want[3];', '    uint32_t a=khl_ch[0].rider,ent=khl_ch[0].rider_ent,i;\n    float c,want[3];'),
+    'seat-chair-0': ('    uint32_t ent=khl_ch[k].rider_ent,i;\n    float c,want[3];', '    uint32_t ent=khl_ch[0].rider_ent,i;\n    float c,want[3];'),
     'seat-unrotated': ('+c*khl_getf(obj+KHL_ENT_ROT+0x10u+i*4u)', '+(i==1u?c:0.0f)'),
     'seat-wrong-row': ('+c*khl_getf(obj+KHL_ENT_ROT+0x10u+i*4u)', '+c*khl_getf(obj+KHL_ENT_ROT+0x20u+i*4u)'),
     'seat-no-angles': ('    WORD_AT(ent+KHL_ENT_YAW)=WORD_AT(ent+KHL_ENT_YAW2)=WORD_AT(obj+KHL_ENT_YAW);\n', ''),
@@ -258,7 +259,7 @@ MUTATIONS = {
     'seat-stock-only': ('    if(!khl_sane(c=khl_getf(KHL_SEAT))) c=KHL_SEAT_STOCK;', '    c=KHL_SEAT_STOCK;'),
     'seat-no-fallback': ('    if(!khl_sane(c=khl_getf(KHL_SEAT))) c=KHL_SEAT_STOCK;', '    c=khl_getf(KHL_SEAT);if(c!=c) return;'),
     'seat-offset-unkept': ('khl_ch[k].off[i]=khl_getf(ent+KHL_ENT_POS+i*4u)-want[i];', ''),
-    'seat-class-kept': ('        WORD_AT(a+KHL_AI_CLASS_HI)=0;WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;WORD_AT(a+KHL_AI_NEXT)=0;\n    }\n}', '    }\n}'),
+    'seat-class-kept': ('    WORD_AT(a+KHL_AI_ASK_HI)=0;WORD_AT(a+KHL_AI_ASK)=KHL_RIDER_CLASS;WORD_AT(a+KHL_AI_NEXT)=0;\n}', '}'),
     'rider-state-kept': ('        WORD_AT(a+KHL_AI_NEXT)=0;                          /* states 2+', '        (void)0;                          /* states 2+'),
     'rider-state-sitting': ('((int32_t)next>1 ||', '((int32_t)next>0 ||'),
     'rider-state-seated': ('WORD_AT(a+KHL_AI_STATE)>1u))) {', 'WORD_AT(a+KHL_AI_STATE)>0u))) {'),
@@ -273,6 +274,24 @@ MUTATIONS = {
     'shots-all-failed': ('    if((int32_t)g_eax<0) khl_ch[khl_lv.cur].shot_fail++;', '    khl_ch[khl_lv.cur].shot_fail++;'),
     'engine-all-playing': ('(int32_t)WORD_AT(handle)<0) khl_ch[khl_lv.cur].engine_off++;', '(int32_t)WORD_AT(handle)<-1) khl_ch[khl_lv.cur].engine_off++;'),
     'status-every-frame': ('(++khl_ch[k].frames!=1u && khl_ch[k].frames%KHL_STATUS_EVERY)) return;', '(++khl_ch[k].frames!=1u && 0)) return;'),
+    'rider-class-not-asked': ('    WORD_AT(a+KHL_AI_ASK_HI)=0;WORD_AT(a+KHL_AI_ASK)=KHL_RIDER_CLASS;\n    WORD_AT(a+KHL_AI_NEXT)', '    WORD_AT(a+KHL_AI_NEXT)'),
+    'seat-class-written': ('    WORD_AT(a+KHL_AI_ASK_HI)=0;WORD_AT(a+KHL_AI_ASK)=KHL_RIDER_CLASS;WORD_AT(a+KHL_AI_NEXT)=0;\n}', '    WORD_AT(a+KHL_AI_CLASS_HI)=0;WORD_AT(a+KHL_AI_CLASS)=KHL_RIDER_CLASS;WORD_AT(a+KHL_AI_NEXT)=0;\n}'),
+    'seat-class-flying-only': ('        khl_rider_health(k,obj);\n        khl_keep_class(k);\n        return;', '        khl_rider_health(k,obj);\n        return;'),
+    'seat-class-dead-too': ('|| !(khl_getf(khl_ch[k].rider_ent+KHL_ENT_HEALTH)>0.0f)) return;\n    if(!WORD_AT(a+KHL_AI_ASK_HI)', ') return;\n    if(!WORD_AT(a+KHL_AI_ASK_HI)'),
+    'seat-class-always': ('    if(!WORD_AT(a+KHL_AI_ASK_HI) && WORD_AT(a+KHL_AI_ASK)==KHL_RIDER_CLASS) return;\n', ''),
+    'dead-logged-each-frame': ('    else if(!khl_ch[k].dead++) khl_log(', '    else if(++khl_ch[k].dead) khl_log('),
+    'idle-never': ('    r=guest_call(sub_0005F460,4,ent,KHL_IDLE,0u,KHL_ONE);', '    r=0;'),
+    'idle-wrong-anim': ('guest_call(sub_0005F460,4,ent,KHL_IDLE,0u,KHL_ONE)', 'guest_call(sub_0005F460,4,ent,0xBFAu,0u,KHL_ONE)'),
+    'idle-every-call': ('    if(khl_ch[k].wait++%KHL_ANIM_RETRY) return;', '    khl_ch[k].wait++;'),
+    'idle-while-playing': ('    if(khl_ch[k].anim==KHL_IDLE) { khl_ch[k].wait=0;return; }', '    if(0) { khl_ch[k].wait=0;return; }'),
+    'idle-while-sitting-down': ('    if(!khl_seated(k) || WORD_AT(a+KHL_AI_STATE)!=1u || !MAPMAKER_PTR_OK(ent,0x200u)', '    if(!khl_seated(k) || !MAPMAKER_PTR_OK(ent,0x200u)'),
+    'idle-unseated': ('    if(!khl_seated(k) || WORD_AT(a+KHL_AI_STATE)!=1u', '    if(WORD_AT(a+KHL_AI_STATE)!=1u'),
+    'restart-not-reset': ('    if(khl_on()) khl_reset(1);\n', ''),
+    'restart-after-original': ('    if(khl_on()) khl_reset(1);\n    original();', '    original();\n    if(khl_on()) khl_reset(1);'),
+    'restart-when-off': ('    if(khl_on()) khl_reset(1);', '    khl_reset(1);'),
+    'restart-forgets-sounds': ('    if(restart) { khl_lv.sounds=sounds;khl_lv.requested=requested; }\n', ''),
+    'restart-keeps-log': ('    khl.logged=0;                                          /* and log it afresh */\n', ''),
+    'restart-keeps-slots': ('    if(khl.slots) memset((void *)((uintptr_t)khl.slots+g_xbox_mem_offset),0,KHL_MAX*KHL_OWNERS*4u);\n    if(khl_play()) fprintf', '    if(khl_play()) fprintf'),
 }
 
 
@@ -710,6 +729,38 @@ def test_yaw_clamp_and_seat():
     # handler states: 0 (sit down, then 1) and 1 (seated); anything else does nothing
     assert target(a[0x002632EE]) == 0x00263597 and a[0x002632F4].mnemonic == 'dec' and target(a[0x002632F5]) == 0x002636F1
     assert mem(a[0x002636BA])[0][4] == 0x9D0 and 'ebx' in a[0x002636BA].text
+
+
+def test_rider_class_anim_and_restart():
+    """.31: chair 0's rider never reached his handler ("rider calls 0") and the
+    riders looked unseated; a restart made no chairs. sub_0015C700 makes the
+    class asked for (+0xAA8/+0xAAC) the class before every think; state 0
+    plays khallosidle once whatever sub_0005F460 answers (current anim at
+    entity +4 -> +0xD4); the restart is sub_001CDD60, without the pak mount."""
+    rd = xbe_reader()
+    a = by_address()
+    # the asked-for class becomes the class (story: +0x10/+0x14), then the think
+    assert mem(a[0x0015C724])[0][4] == 0xAA8 and mem(a[0x0015C72C])[0][4] == 0xAAC
+    assert mem(a[0x0015C788])[0][4] == 0xAA8 and mem(a[0x0015C78E])[0][4] == 0xAAC
+    assert mem(a[0x0015C794])[0][4] == 0x10 and mem(a[0x0015C797])[0][4] == 0x14
+    assert target(a[0x0015F078]) == 0x0015C700 and target(a[0x0015F07E]) == 0x0027FE30
+    assert target(a[0x0027FE71]) == 0x0027D590                                          # class 8 -> the handler's dispatch
+    assert mem(a[0x000175B8])[0][4] == 0xAA8 and mem(a[0x000175BE])[0][4] == 0xAAC      # sub_00017570: ask for a class
+    # khallosidle: state 0 tests its slot, plays it (entity, 0xBFB, 0, 1.0) and goes on to state 1 regardless
+    assert mem(a[0x002635A4])[0][4] == 0x007E03C0 + 0xBFB * 2 and ('imm', 0x3F800000) in a[0x002635BA].ops
+    assert ('imm', 0xBFB) in a[0x002635C1].ops and target(a[0x002635D9]) == 0x0005F460
+    assert a[0x002635DE].mnemonic == 'movss' and mem(a[0x002636AF])[0][4] == 0x20     # result unused; state 1
+    assert mem(a[0x0005F46D])[0][4] == 0x007E03C0 and mem(a[0x0005F489])[0][4] == 0x007E3954
+    assert target(a[0x0005F4EB]) == 0x001C8C20 and mem(a[0x001C8C5E])[0][4] == 0xD4     # refused over the one playing
+    assert mem(a[0x0005BDA1])[0][4] == 0xD4                                             # sub_0005BC20: the current anim
+    # restart: "START restart" runs the teardown and sub_001CDD60; "from scratch" sub_001CDB80 (the mount)
+    assert rd(0x0047817C, 8) == b'restart\0' and rd(0x0047816C, 13) == b'from scratch\0'
+    assert mem(a[0x0003D460])[0][4] == 0x006B7AA8 and mem(a[0x0003D4B1])[0][4] == 0x006B7AA8
+    assert target(a[0x0003D4DC]) == 0x001CDAF0 and target(a[0x0003D4E1]) == 0x001CDD60
+    assert calls_to(0x001CDD60) == {0x0003D4E1} and calls_to(0x001CDB80) == {0x0003D590}
+    assert target(a[0x001CDD74]) == 0x0015E4F0 and target(a[0x001CDB85]) == 0x00062790
+    text = INC.read_text(encoding='utf-8')
+    assert '#define KHL_AI_ASK_HI 0xAA8u' in text and '#define KHL_IDLE 0xBFBu' in text and '#define KHL_ANIM_DATA 0x007E3954u' in text
 
 
 def test_chair_sounds():
