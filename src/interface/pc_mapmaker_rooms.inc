@@ -12,6 +12,11 @@
  *   WRAP sub_00083F80 -> pc_mapmaker_rooms_piece
  *   WRAP sub_00085030 -> pc_mapmaker_rooms_piece
  *   WRAP sub_00242780 -> pc_mapmaker_rooms_props
+ *   WRAP sub_001121E0 -> pc_mapmaker_rooms_light_reset
+ *   WRAP sub_001123C0 -> pc_mapmaker_rooms_light_unlink   (light in eax)
+ *   WRAP sub_001124D0 -> pc_mapmaker_rooms_light_colour
+ *   WRAP sub_00114030 -> pc_mapmaker_rooms_light_link     (room in eax)
+ *   WRAP sub_00114290 -> pc_mapmaker_rooms_light_create   (source in eax)
  *
  * Room query (sub_00087310): the original collects the rooms overlapping a box
  * into a 0x1B0-byte stack frame (about 209 words) with no bound; reimplemented
@@ -35,6 +40,22 @@
  * copied from room 200's (model 0x9CF), in a slot array grown by that many
  * entries (same Level heap; the old array is left to the scene). Story levels
  * are not touched.
+ *
+ * Light rooms (sub_001121E0, sub_001123C0, sub_001124D0, sub_00114030,
+ * sub_00114290): a light record (pool [0x0073D950], stride 0xB8, count
+ * [0x004E62DC]; plus the one 0xC0 record [0x0073D960]) keeps its room in the
+ * byte +0x99 and has no spare field, so a room id above 0xFF (the special ids
+ * once they sit at 0x100..0x10C, in every scene) is kept here per light, in a
+ * side table. Creation (sub_00114290) gets the full room as its 4th argument
+ * and picks the light's pool group with it, but its round-robin step
+ * (0x00114829) and its link call (0x00114851) re-read the byte: the link hook
+ * gets the full id back and the step is redone on the full id's group. Unlink
+ * (sub_001123C0) and the colour lookup (sub_001124D0) read the byte; for a
+ * light with a full id the head entry is unlinked here and the original sees
+ * room 0, its "no room" path (for the colour the same result a special id
+ * above the real rooms gives stock: the colour unchanged). Lights in rooms
+ * 0..0xFF (every real room, and every light of the 241 layout) take the
+ * original paths unchanged.
  *
  * Requires the includer's WORD_AT, guest_writable, guest_call, g_esp, g_eax
  * and g_xbox_mem_offset. */
@@ -171,4 +192,164 @@ void pc_mapmaker_rooms_props(void (*original)(void))
         n++;
     }
     WORD_AT(0x00791D4Cu)=fresh;WORD_AT(0x0075EAA8u)=n;
+}
+
+/* ---- light rooms past 0xFF -------------------------------------------- */
+#define MAPMAKER_ROOMS_LIGHT_POOL 0x0073D950u   /* -> light records, stride 0xB8 */
+#define MAPMAKER_ROOMS_LIGHT_COUNT 0x004E62DCu  /* records in the pool (500/200/265/400) */
+#define MAPMAKER_ROOMS_LIGHT_ONE 0x0073D960u    /* -> the one 0xC0 record (type-1 source) */
+#define MAPMAKER_ROOMS_LIGHT_STRIDE 0xB8u
+#define MAPMAKER_ROOMS_LIGHT_SLOTS 512u
+#define MAPMAKER_ROOMS_LIGHT_HEADS 0x008C8400u  /* light heads [3][row] (relocated 0x0073C350) */
+#define MAPMAKER_ROOMS_LIGHT_ROW 0xFEu          /* head row width = the global room id */
+#define MAPMAKER_ROOMS_LIGHT_GROUPS 0x008CB440u /* round robin per room/16 (relocated 0x0073D910) */
+#define MAPMAKER_ROOMS_LIGHT_GROUP_COUNT 32u    /* its entries (ids up to 0x1FF) */
+#define MAPMAKER_ROOMS_LIGHT_PER 0x0073D954u    /* records per room group */
+#define MAPMAKER_ROOMS_LIGHT_OTHERS 256u        /* records outside the pool (see below) */
+
+/* A group past the level's groups (room/16 >= [0x0073D958]; stock: every
+ * special id on a level of under ~200 rooms) indexes records past the pool,
+ * as stock does; those records are kept by address in others[]. */
+static struct {
+    uint16_t room[MAPMAKER_ROOMS_LIGHT_SLOTS+1u];   /* full room id when above 0xFF, else 0 */
+    struct { uint32_t light; uint16_t room; } others[MAPMAKER_ROOMS_LIGHT_OTHERS];
+    uint32_t pending;                              /* sub_00114290's full room while it runs */
+    unsigned long long wide, unlinked, full;
+} mapmaker_rooms_light;
+
+static uint8_t *mapmaker_rooms_light_byte(uint32_t light) { return (uint8_t *)mapmaker_rooms_host(light+0x99u); }
+
+/* Side-table index of a pool record (or of the 0xC0 record), else -1. */
+static int mapmaker_rooms_light_slot(uint32_t light)
+{
+    uint32_t pool=WORD_AT(MAPMAKER_ROOMS_LIGHT_POOL),n=WORD_AT(MAPMAKER_ROOMS_LIGHT_COUNT),off;
+    if(!light) return -1;
+    if(light==WORD_AT(MAPMAKER_ROOMS_LIGHT_ONE)) return (int)MAPMAKER_ROOMS_LIGHT_SLOTS;
+    if(!pool || light<pool) return -1;
+    off=light-pool;
+    if(off%MAPMAKER_ROOMS_LIGHT_STRIDE || off/MAPMAKER_ROOMS_LIGHT_STRIDE>=n ||
+       off/MAPMAKER_ROOMS_LIGHT_STRIDE>=MAPMAKER_ROOMS_LIGHT_SLOTS) return -1;
+    return (int)(off/MAPMAKER_ROOMS_LIGHT_STRIDE);
+}
+static uint16_t *mapmaker_rooms_light_entry(uint32_t light,int add)
+{
+    int s=mapmaker_rooms_light_slot(light);
+    unsigned i,spare=MAPMAKER_ROOMS_LIGHT_OTHERS;
+    if(s>=0) return &mapmaker_rooms_light.room[s];
+    if(!light) return NULL;
+    for(i=0;i<MAPMAKER_ROOMS_LIGHT_OTHERS;i++) {
+        if(mapmaker_rooms_light.others[i].light==light) return &mapmaker_rooms_light.others[i].room;
+        if(!mapmaker_rooms_light.others[i].light && spare==MAPMAKER_ROOMS_LIGHT_OTHERS) spare=i;
+    }
+    if(!add) return NULL;
+    if(spare==MAPMAKER_ROOMS_LIGHT_OTHERS) { mapmaker_rooms_light.full++;return NULL; }
+    mapmaker_rooms_light.others[spare].light=light;
+    return &mapmaker_rooms_light.others[spare].room;
+}
+static uint32_t mapmaker_rooms_light_wide(uint32_t light)
+{
+    uint16_t *e=mapmaker_rooms_light_entry(light,0);
+    return e?*e:0u;
+}
+static void mapmaker_rooms_light_set(uint32_t light,uint32_t room)
+{
+    int wide=room>0xFFu && room<0x10000u;
+    uint16_t *e=mapmaker_rooms_light_entry(light,wide);
+    unsigned i;
+    if(!e) return;
+    *e=(uint16_t)(wide?room:0u);
+    if(!wide) for(i=0;i<MAPMAKER_ROOMS_LIGHT_OTHERS;i++)
+        if(e==&mapmaker_rooms_light.others[i].room) mapmaker_rooms_light.others[i].light=0;
+}
+
+/* sub_001121E0 (level light reset, plain ret; also reached by a tail jmp
+ * from the pool allocation): clears every record's room byte and the heads,
+ * so the side table goes with them. */
+void pc_mapmaker_rooms_light_reset(void (*original)(void))
+{
+    original();
+    memset(mapmaker_rooms_light.room,0,sizeof mapmaker_rooms_light.room);
+    memset(mapmaker_rooms_light.others,0,sizeof mapmaker_rooms_light.others);
+    mapmaker_rooms_light.pending=0;
+}
+
+/* sub_001123C0 (eax = light, plain ret; tail-jumped from sub_00112990):
+ * unlinks the light from its room's head list (+0x80 next, +0x84 prev, head
+ * [row +0x92][room], only touched when prev is 0) and from the global list. */
+void pc_mapmaker_rooms_light_unlink(void (*original)(void))
+{
+    uint32_t light=g_eax,room=mapmaker_rooms_light_wide(light);
+    if(room && guest_writable(light,0xB8u)) {
+        uint32_t next=WORD_AT(light+0x80u),prev=WORD_AT(light+0x84u);
+        if(!prev) {                      /* the original's two head cases, with the full id */
+            uint32_t head=MAPMAKER_ROOMS_LIGHT_HEADS+(mapmaker_rooms_u16(light+0x92u)*MAPMAKER_ROOMS_LIGHT_ROW+room)*4u;
+            if(!next) { if(WORD_AT(head)==light) WORD_AT(head)=0; }
+            else if(guest_writable(next,0xB8u)) { WORD_AT(head)=next;WORD_AT(next+0x84u)=0;WORD_AT(light+0x80u)=0; }
+            *mapmaker_rooms_light_byte(light)=0;  /* the original then takes its "no room" path */
+        }
+        mapmaker_rooms_light_set(light,0);
+        mapmaker_rooms_light.unlinked++;
+    }
+    original();
+}
+
+/* sub_001124D0(light, colour) -> colour (cdecl): a light in a real room gets
+ * that room's colour; a room above the real ones returns the colour as is. */
+void pc_mapmaker_rooms_light_colour(void (*original)(void))
+{
+    uint32_t light=WORD_AT(g_esp+4u);
+    uint8_t *byte,keep;
+    if(!mapmaker_rooms_light_wide(light) || !guest_writable(light,0xB8u)) {
+        original();
+        return;
+    }
+    /* scene 100 with a source prop reads the prop's dword room, not the byte */
+    byte=mapmaker_rooms_light_byte(light);keep=*byte;*byte=0;
+    original();
+    *byte=keep;
+}
+
+/* sub_00114030 (eax = room, [esp+4] = light, plain ret): links the light
+ * into the room's head list and steps its group; called only by
+ * sub_00114290 (0x00114859) with the room byte that function just stored. */
+void pc_mapmaker_rooms_light_link(void (*original)(void))
+{
+    uint32_t light=WORD_AT(g_esp+4u);
+    if(mapmaker_rooms_light.pending && (g_eax&0xFFu)==(mapmaker_rooms_light.pending&0xFFu))
+        g_eax=mapmaker_rooms_light.pending;
+    mapmaker_rooms_light_set(light,g_eax);
+    original();
+}
+
+/* sub_00114290 (eax = source record, ebx, stack args, [esp+0x10] = room;
+ * returns the light or 0): takes record rr[g] + g*per of the pool, g =
+ * room/16 (a type-1 source takes the 0xC0 record), fills and links it. */
+void pc_mapmaker_rooms_light_create(void (*original)(void))
+{
+    uint32_t room=WORD_AT(g_esp+0x10u),source=g_eax,outer=mapmaker_rooms_light.pending;
+    uint32_t byte_group,saved,picked=0,light,g=room>>4;
+    if(room<=0xFFu || room>=0x10000u) {          /* a byte holds it: the stock paths */
+        mapmaker_rooms_light.pending=0;
+        original();
+        mapmaker_rooms_light.pending=outer;
+        return;
+    }
+    mapmaker_rooms_light.wide++;
+    if(guest_writable(source,2u) && mapmaker_rooms_u16(source)!=1u && g<MAPMAKER_ROOMS_LIGHT_GROUP_COUNT)
+        picked=WORD_AT(MAPMAKER_ROOMS_LIGHT_POOL)+(WORD_AT(MAPMAKER_ROOMS_LIGHT_GROUPS+g*4u)+
+               g*WORD_AT(MAPMAKER_ROOMS_LIGHT_PER))*MAPMAKER_ROOMS_LIGHT_STRIDE;
+    byte_group=MAPMAKER_ROOMS_LIGHT_GROUPS+((room&0xFFu)>>4)*4u;
+    saved=WORD_AT(byte_group);
+    mapmaker_rooms_light.pending=room;
+    original();
+    mapmaker_rooms_light.pending=outer;
+    light=g_eax;
+    if(light && guest_writable(light,0xB8u) && mapmaker_rooms_u16(light+0x90u)!=1u) {
+        /* the step at 0x00114829 used the byte's group: undo it, step the room's */
+        int32_t per=(int32_t)WORD_AT(MAPMAKER_ROOMS_LIGHT_PER);
+        WORD_AT(byte_group)=saved;
+        if(g<MAPMAKER_ROOMS_LIGHT_GROUP_COUNT && per>0)
+            WORD_AT(MAPMAKER_ROOMS_LIGHT_GROUPS+g*4u)=(uint32_t)(((int32_t)WORD_AT(MAPMAKER_ROOMS_LIGHT_GROUPS+g*4u)+1)%per);
+    }
+    if(!light && picked) mapmaker_rooms_light_set(picked,room);   /* filled, not linked: keep its id */
 }

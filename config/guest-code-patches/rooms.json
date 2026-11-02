@@ -3633,8 +3633,8 @@
       "kind": "relocate",
       "old": "0x0073D910",
       "size": "0x38",
-      "new": "0x008CB400",
-      "new_size": "0x40",
+      "new": "0x008CB440",
+      "new_size": "0x80",
       "sites": {
         "0x0011225A": "offset",
         "0x001122FD": "keep",
@@ -3655,7 +3655,7 @@
         "0x00115A16": "keep"
       },
       "data_ok": [],
-      "reason": "light round-robin per room/16: 14 -> 16 entries (room 0xFE / 16 = 15)"
+      "reason": "light round-robin per room/16: 14 -> 32 entries (room ids up to 0x1FF; the special ids 0x100..0x10C use entry 16); after the model table"
     },
     {
       "id": "rooms-reloc-f-0x7b5180",

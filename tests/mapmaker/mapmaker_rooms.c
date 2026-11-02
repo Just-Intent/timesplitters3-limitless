@@ -104,6 +104,193 @@ static void room_models(uint32_t last_model,uint32_t slots)
     WORD_AT(0x0075EAA8u)=slots;
 }
 
+/* ---- lights: models of the guest bodies (byte room +0x99), called through the hooks ----
+ * Each fake original does what its function's code does with the room (text.asm
+ * sub_001123C0, sub_001124D0, sub_00114030, sub_00114290) and pops the return
+ * address like its ret. Inner calls go through the hooks, as the lifted calls go
+ * through the generated wrappers. */
+#define LPOOL 0x00600000u
+#define LONE 0x00680000u
+#define LSOURCE 0x00690000u
+#define LGLOBAL 0x0073C34Cu            /* global light list head (stock address, not moved) */
+#define LCOUNT 400u
+static int light_ok=1;                 /* sub_001134D0's answer in the create model */
+static uint32_t lhead(uint32_t row,uint32_t room) { return MAPMAKER_ROOMS_LIGHT_HEADS+(row*MAPMAKER_ROOMS_LIGHT_ROW+room)*4u; }
+static uint32_t lgroup(uint32_t g) { return MAPMAKER_ROOMS_LIGHT_GROUPS+g*4u; }
+static void model_unlink(void)
+{
+    uint32_t light=g_eax,next=WORD_AT(light+0x80u),prev=WORD_AT(light+0x84u),room;
+    if(!next && !prev) {
+        room=*u8(light+0x99u);
+        if(room && WORD_AT(lhead(u16(light+0x92u),room))==light) WORD_AT(lhead(u16(light+0x92u),room))=0;
+    } else if(!prev) {
+        room=*u8(light+0x99u);
+        WORD_AT(lhead(u16(light+0x92u),room))=next;WORD_AT(next+0x84u)=0;WORD_AT(light+0x80u)=0;
+    } else if(!next) { WORD_AT(prev+0x80u)=0;WORD_AT(light+0x84u)=0; }
+    else { WORD_AT(next+0x84u)=prev;WORD_AT(prev+0x80u)=next;WORD_AT(light+0x84u)=0;WORD_AT(light+0x80u)=0; }
+    if(WORD_AT(light+0x8Cu)) WORD_AT(WORD_AT(light+0x8Cu)+0x88u)=WORD_AT(light+0x88u);
+    else if(WORD_AT(LGLOBAL)==light) WORD_AT(LGLOBAL)=0;
+    if(WORD_AT(light+0x88u)) WORD_AT(WORD_AT(light+0x88u)+0x8Cu)=WORD_AT(light+0x8Cu);
+    WORD_AT(light+0x8Cu)=0;WORD_AT(light+0x88u)=0;*u8(light+0x99u)=0;
+    g_esp+=4u;
+}
+static void model_colour(void)
+{
+    uint32_t light=WORD_AT(g_esp+4u),room;
+    room=(WORD_AT(0x0079094Cu)==100u && WORD_AT(light+0x9Cu))?WORD_AT(WORD_AT(light+0x9Cu)+0x34u):*u8(light+0x99u);
+    g_eax=((int32_t)room<=0 || room>=WORD_AT(0x007B975Cu)+1u)?WORD_AT(g_esp+8u):0xC0000000u+room;
+    g_esp+=4u;
+}
+static void model_link(void)
+{
+    uint32_t light=WORD_AT(g_esp+4u),room=g_eax,head=lhead(u16(light+0x92u),room),tail;
+    if(!WORD_AT(head)) WORD_AT(head)=light;
+    else {
+        unsigned steps=0;
+        for(tail=WORD_AT(head);WORD_AT(tail+0x80u) && steps<1000u;tail=WORD_AT(tail+0x80u)) steps++;
+        CHECK(steps<1000u);                                  /* a cycle: a list was corrupted */
+        WORD_AT(tail+0x80u)=light;WORD_AT(light+0x84u)=tail;
+    }
+    *u8(light+0x99u)=(uint8_t)room;
+    (void)WORD_AT(lgroup((uint32_t)((int32_t)room/16)));   /* the brightness loop reads rr[room/16] */
+    WORD_AT(light+0x88u)=WORD_AT(LGLOBAL);
+    if(WORD_AT(LGLOBAL)) WORD_AT(WORD_AT(LGLOBAL)+0x8Cu)=light;
+    WORD_AT(LGLOBAL)=light;
+    g_esp+=4u;
+}
+static void model_create(void)
+{
+    uint32_t source=g_eax,room=WORD_AT(g_esp+0x10u),light,g,esp=g_esp;
+    if(u16(source)==1u) light=WORD_AT(MAPMAKER_ROOMS_LIGHT_ONE);
+    else {
+        g=(uint32_t)((int32_t)room/16);
+        light=WORD_AT(MAPMAKER_ROOMS_LIGHT_POOL)+(WORD_AT(lgroup(g))+g*WORD_AT(MAPMAKER_ROOMS_LIGHT_PER))*0xB8u;
+    }
+    g_eax=light;g_esp-=4u;pc_mapmaker_rooms_light_unlink(model_unlink);
+    set16(light+0x90u,u16(source));set16(light+0x92u,u16(source+2u));
+    *u8(light+0x99u)=(uint8_t)room;                       /* 0x00114390: mov [esi+0x99], dl */
+    if(!light_ok) { set16(light+0x96u,0xFFFFu);g_eax=0;g_esp=esp+4u;return; }
+    if(u16(light+0x90u)!=1u) {                            /* 0x00114829: step the byte's group */
+        g=*u8(light+0x99u)>>4;
+        WORD_AT(lgroup(g))=(uint32_t)(((int32_t)WORD_AT(lgroup(g))+1)%(int32_t)WORD_AT(MAPMAKER_ROOMS_LIGHT_PER));
+    }
+    g_eax=*u8(light+0x99u);                               /* 0x00114851: movzx eax, byte [esi+0x99] */
+    g_esp-=8u;WORD_AT(g_esp+4u)=light;pc_mapmaker_rooms_light_link(model_link);g_esp+=4u;
+    g_eax=light;g_esp=esp+4u;
+}
+static uint32_t light_create(uint32_t type,uint32_t row,uint32_t room)
+{
+    set16(LSOURCE,(uint16_t)type);set16(LSOURCE+2u,(uint16_t)row);
+    g_esp=STACK;WORD_AT(STACK+0x10u)=room;g_eax=LSOURCE;
+    pc_mapmaker_rooms_light_create(model_create);
+    CHECK(g_esp==STACK+4u);
+    return g_eax;
+}
+static void light_unlink(uint32_t light)
+{
+    g_esp=STACK;g_eax=light;
+    pc_mapmaker_rooms_light_unlink(model_unlink);
+    CHECK(g_esp==STACK+4u);
+}
+static uint32_t light_colour(uint32_t light)
+{
+    g_esp=STACK;WORD_AT(STACK+4u)=light;WORD_AT(STACK+8u)=0x00ABCDEFu;
+    pc_mapmaker_rooms_light_colour(model_colour);
+    CHECK(g_esp==STACK+4u);
+    return g_eax;
+}
+static void light_reset(void)
+{
+    uint32_t i;
+    memset((char *)memory+LPOOL,0,LCOUNT*0xB8u);memset((char *)memory+LONE,0,0xC0u);
+    memset((char *)memory+MAPMAKER_ROOMS_LIGHT_HEADS,0,3u*MAPMAKER_ROOMS_LIGHT_ROW*4u);
+    for(i=0;i<MAPMAKER_ROOMS_LIGHT_GROUP_COUNT;i++) WORD_AT(lgroup(i))=0;
+    WORD_AT(LGLOBAL)=0;
+    g_esp=STACK;pc_mapmaker_rooms_light_reset(fake_original);
+}
+static void lights(void)
+{
+    uint32_t a,b,c,d,e,f,g;
+    uint8_t before[0x2000];
+    WORD_AT(MAPMAKER_ROOMS_LIGHT_POOL)=LPOOL;WORD_AT(MAPMAKER_ROOMS_LIGHT_COUNT)=LCOUNT;
+    WORD_AT(MAPMAKER_ROOMS_LIGHT_ONE)=LONE;WORD_AT(MAPMAKER_ROOMS_LIGHT_PER)=LCOUNT/MAPMAKER_ROOMS_LIGHT_GROUP_COUNT;
+    WORD_AT(0x007B975Cu)=200;WORD_AT(0x0079094Cu)=53;          /* a story level, 200 rooms */
+    light_reset();
+    /* real rooms: the stock byte paths, nothing in the side table */
+    a=light_create(0,1,5);b=light_create(0,1,5);
+    CHECK(a==LPOOL && b==LPOOL+0xB8u && WORD_AT(lhead(1,5))==a && WORD_AT(a+0x80u)==b && WORD_AT(lgroup(0))==2);
+    CHECK(light_colour(a)==0xC0000005u && mapmaker_rooms_light_wide(a)==0 && mapmaker_rooms_light.wide==0);
+    light_unlink(a);
+    CHECK(WORD_AT(lhead(1,5))==b && WORD_AT(b+0x84u)==0 && *u8(a+0x99u)==0);
+    /* a room id above 0xFF: its own head entry, never room (id & 0xFF)'s */
+    CHECK(MAPMAKER_ROOMS_LIGHT_GROUP_COUNT>0x10Cu/16u);
+    {
+        c=light_create(0,2,0x101);                         /* group 16: record 16 * per */
+        CHECK(c==LPOOL+16u*WORD_AT(MAPMAKER_ROOMS_LIGHT_PER)*0xB8u);
+        CHECK(WORD_AT(lhead(2,0x101))==c && WORD_AT(lhead(2,1))==0 && *u8(c+0x99u)==1);
+        CHECK(mapmaker_rooms_light_wide(c)==0x101 && mapmaker_rooms_light.wide==1);
+        CHECK(WORD_AT(lgroup(16))==1 && WORD_AT(lgroup(0))==2);  /* stepped on the room's group, not the byte's */
+        d=light_create(0,2,0x101);
+        CHECK(d==c+0xB8u && WORD_AT(c+0x80u)==d && WORD_AT(d+0x84u)==c && WORD_AT(lgroup(16))==2);
+        e=light_create(0,2,1);                             /* real room 1 beside it */
+        CHECK(WORD_AT(lhead(2,1))==e && WORD_AT(lhead(2,0x101))==c);
+        /* colour: rooms above the real ones keep the colour, also with the byte 1 */
+        CHECK(light_colour(c)==0x00ABCDEFu && *u8(c+0x99u)==1 && light_colour(e)==0xC0000001u);
+        WORD_AT(0x0079094Cu)=100;WORD_AT(c+0x9Cu)=0x00650000u;WORD_AT(0x00650000u+0x34u)=7;
+        CHECK(light_colour(c)==0xC0000007u);                /* MapMaker: the source prop's room */
+        WORD_AT(0x0079094Cu)=53;WORD_AT(c+0x9Cu)=0;
+        /* unlink the head with a next: the next becomes the head, room 1 untouched */
+        light_unlink(c);
+        CHECK(WORD_AT(lhead(2,0x101))==d && WORD_AT(d+0x84u)==0 && WORD_AT(c+0x80u)==0 && WORD_AT(lhead(2,1))==e);
+        CHECK(mapmaker_rooms_light_wide(c)==0 && *u8(c+0x99u)==0 && mapmaker_rooms_light.unlinked==1);
+        light_unlink(d);                                   /* alone */
+        CHECK(WORD_AT(lhead(2,0x101))==0 && WORD_AT(lhead(2,1))==e && mapmaker_rooms_light_wide(d)==0);
+        /* the type-1 record */
+        f=light_create(1,0,0x105);
+        CHECK(f==LONE && WORD_AT(lhead(0,0x105))==f && mapmaker_rooms_light_wide(f)==0x105 && WORD_AT(lgroup(16))==2);
+        light_unlink(f);
+        CHECK(WORD_AT(lhead(0,0x105))==0 && WORD_AT(lhead(0,5))==0);
+        /* a failed creation (sub_001134D0 = 0) keeps the id for the record's next unlink */
+        light_ok=0;
+        g=light_create(0,1,0x102);
+        CHECK(g==0 && mapmaker_rooms_light_wide(LPOOL+(16u*WORD_AT(MAPMAKER_ROOMS_LIGHT_PER)+2u)*0xB8u)==0x102);
+        light_ok=1;
+        /* slot reuse: creating over a record unlinks its old full-id room */
+        WORD_AT(lgroup(16))=0;
+        c=light_create(0,2,0x101);d=light_create(0,2,0x101);
+        WORD_AT(lgroup(16))=0;
+        e=light_create(0,2,0x101);                         /* reuses c: d becomes the head */
+        CHECK(e==c && WORD_AT(lhead(2,0x101))==d && WORD_AT(d+0x80u)==e && WORD_AT(e+0x84u)==d);
+        /* a group past the pool (stock does the same for its special ids): kept by address */
+        WORD_AT(MAPMAKER_ROOMS_LIGHT_PER)=30;WORD_AT(lgroup(16))=0;
+        f=light_create(0,1,0x103);
+        CHECK(f==LPOOL+480u*0xB8u && mapmaker_rooms_light_slot(f)<0 && mapmaker_rooms_light_wide(f)==0x103);
+        CHECK(WORD_AT(lhead(1,0x103))==f && WORD_AT(lhead(1,3))==0 && light_colour(f)==0x00ABCDEFu);
+        light_unlink(f);
+        CHECK(WORD_AT(lhead(1,0x103))==0 && mapmaker_rooms_light_wide(f)==0 && mapmaker_rooms_light.others[0].light==0);
+        f=light_create(0,1,0x103);
+        CHECK(f==LPOOL+481u*0xB8u && mapmaker_rooms_light.others[0].light==f);
+        WORD_AT(MAPMAKER_ROOMS_LIGHT_PER)=LCOUNT/MAPMAKER_ROOMS_LIGHT_GROUP_COUNT;
+        /* reset clears the side table */
+        light_reset();
+        CHECK(mapmaker_rooms_light_wide(c)==0 && mapmaker_rooms_light_wide(LONE)==0 &&
+              mapmaker_rooms_light_wide(f)==0 && mapmaker_rooms_light.others[0].light==0);
+    }
+    /* not a record: no side entry */
+    CHECK(mapmaker_rooms_light_slot(LPOOL+5u)<0 && mapmaker_rooms_light_slot(LPOOL+LCOUNT*0xB8u)<0 &&
+          mapmaker_rooms_light_slot(0)<0 && mapmaker_rooms_light_slot(LPOOL-0xB8u)<0);
+    /* the stock paths leave exactly what the bodies alone leave */
+    light_reset();
+    a=light_create(0,0,3);b=light_create(0,0,3);light_unlink(a);
+    memcpy(before,(char *)memory+MAPMAKER_ROOMS_LIGHT_HEADS,sizeof before);
+    light_reset();
+    set16(LSOURCE,0);set16(LSOURCE+2u,0);
+    g_esp=STACK;WORD_AT(STACK+0x10u)=3;g_eax=LSOURCE;model_create();
+    g_esp=STACK;WORD_AT(STACK+0x10u)=3;g_eax=LSOURCE;model_create();
+    g_esp=STACK;g_eax=a;model_unlink();
+    CHECK(!memcmp(before,(char *)memory+MAPMAKER_ROOMS_LIGHT_HEADS,sizeof before));
+}
+
 int main(void)
 {
     uint32_t i,r,n,fresh,old;
@@ -208,6 +395,9 @@ int main(void)
     pc_mapmaker_rooms_props(fake_original);
     CHECK(allocs==1 && WORD_AT(0x0075EAA8u)==340 && u16(MAPMAKER_ROOMS_MODEL_TABLE+0x9D0u*2u)==7 &&
           u16(MAPMAKER_ROOMS_MODEL_TABLE+0x9D1u*2u)==300);
+
+    /* ---- light rooms past 0xFF ---- */
+    lights();
 
     if(failures)return 1;
     puts("mapmaker rooms ok");

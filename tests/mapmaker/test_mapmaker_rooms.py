@@ -33,6 +33,22 @@ MUTATIONS = {
     'props-count-not-raised': ('WORD_AT(0x00791D4Cu)=fresh;WORD_AT(0x0075EAA8u)=n;', 'WORD_AT(0x00791D4Cu)=fresh;'),
     'props-replace-defined': ('MAPMAKER_ROOMS_MODEL_TABLE+model*2u)>=0) continue;', 'MAPMAKER_ROOMS_MODEL_TABLE+model*2u)<-1) continue;'),
     'props-wrong-template': ('(first+MAPMAKER_ROOMS_STOCK-1u)*2u', '(first)*2u'),
+    # light rooms past 0xFF (stage 3)
+    'light-link-byte': ('        g_eax=mapmaker_rooms_light.pending;\n', '        ;\n'),
+    'light-unlink-byte-head': ('        if(!prev) {                      /* the original', '        if(0) {                      /* the original'),
+    'light-unlink-keeps-id': ('        mapmaker_rooms_light_set(light,0);\n        mapmaker_rooms_light.unlinked++;',
+                              '        mapmaker_rooms_light.unlinked++;'),
+    'light-colour-byte': ('    if(!mapmaker_rooms_light_wide(light) || !guest_writable(light,0xB8u)) {',
+                          '    if(1) {'),
+    'light-colour-not-restored': ('    original();\n    *byte=keep;\n', '    original();\n'),
+    'light-step-byte-group-kept': ('        WORD_AT(byte_group)=saved;\n', ''),
+    'light-step-room-group-missing': ('            WORD_AT(MAPMAKER_ROOMS_LIGHT_GROUPS+g*4u)=(uint32_t)', '            (void)(uint32_t)'),
+    'light-failed-create-forgets': ('    if(!light && picked) mapmaker_rooms_light_set(picked,room);', ''),
+    'light-reset-keeps-ids': ('    memset(mapmaker_rooms_light.room,0,sizeof mapmaker_rooms_light.room);\n', ''),
+    'light-reset-keeps-others': ('    memset(mapmaker_rooms_light.others,0,sizeof mapmaker_rooms_light.others);\n', ''),
+    'light-pool-only': ('    if(!light) return NULL;\n    for(i=0;', '    return NULL;\n    for(i=0;'),
+    'light-slot-unaligned': ('    if(off%MAPMAKER_ROOMS_LIGHT_STRIDE || off/', '    if(off/'),
+    'light-slot-past-count': ('off/MAPMAKER_ROOMS_LIGHT_STRIDE>=n ||', '0 ||'),
 }
 
 
