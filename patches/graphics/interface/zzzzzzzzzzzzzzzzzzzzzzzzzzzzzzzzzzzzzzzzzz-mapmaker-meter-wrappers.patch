@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3447 @@
+@@ -1037,6 +1037,3469 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1887,6 +1887,28 @@
 +    else sub_00119AB0_gen();
 +#else
 +    sub_00119AB0_gen();
++#endif
++}
++
++extern void sub_0011A930_gen(void);
++void sub_0011A930(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_haze")) pc_mapmaker_skymusic_haze(sub_0011A930_gen);
++    else sub_0011A930_gen();
++#else
++    sub_0011A930_gen();
++#endif
++}
++
++extern void sub_00154FE0_gen(void);
++void sub_00154FE0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_skymusic_grain_colour")) pc_mapmaker_skymusic_grain_colour(sub_00154FE0_gen);
++    else sub_00154FE0_gen();
++#else
++    sub_00154FE0_gen();
 +#endif
 +}
 +
