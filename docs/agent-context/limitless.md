@@ -201,7 +201,7 @@ stack-array AI pickers (`sub_0027BA40` in two passes), a side table at
 from a copy at 0x00901600 (ids >= 32 have no route); `pc_network_bots_revive`
 writes the moved AI table; `TSFP_MAPMAKER_ALIVE=1..64` lowers it; sites and
 risks in `docs/mapmaker/mapmaker-actors.md`), and `grid` (editor only: with
-`TSFP_MAPMAKER_LIMITS=1` floors -2..4 and an 80x80x8 occupancy grid, the five
+`TSFP_MAPMAKER_LIMITS=1` floors -2..13, an 80x80x17 grid ([floors](limitless-floors.md)), the five
 grid functions `sub_00307C20/CC0/CF0/DA0/E60` reimplemented, a placement
 guard above the top level; `TSFP_MAPMAKER_OVERLAP=1` overlapping tiles and
 `TSFP_MAPMAKER_STACK_ITEMS=1` several items per cell (hooks on

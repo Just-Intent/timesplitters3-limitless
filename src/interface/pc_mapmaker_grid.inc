@@ -1,6 +1,6 @@
-/* US 45410066 MapMaker editor: seven floors, an 80 x 80 grid, overlapping
+/* US 45410066 MapMaker editor: sixteen floors, an 80 x 80 grid, overlapping
  * tiles and stacked items (logs/limits/features/floors-grid.md and
- * overlap-items.md; docs/mapmaker/mapmaker-grid.md).
+ * overlap-items.md; docs/mapmaker/mapmaker-grid.md; docs/agent-context/limitless-floors.md).
  *
  * The editor keeps one occupancy grid, [0x00784004]: a Level-heap array of
  * piece pointers, x + 40*(y + 40*(z+2)), 40 x 40 x 6 levels (z -2..3). Five
@@ -10,24 +10,29 @@
  * sub_00307E60(x, y, z floats) reads one cell (0 = empty, also outside).
  *
  * TSFP_MAPMAKER_LIMITS=1 (with the pools on, as mapmaker_limits.limits):
- * - grid 80 x 80 x 8 levels (z -2..5, 200 KB of Level heap): the five
+ * - grid 80 x 80 x 17 levels (z -2..14, 425 KB of Level heap): the five
  *   functions are reimplemented here with per-axis bounds (stock bounds only
  *   the flat index, which would wrap x into the next row);
- * - floors -2..4 can be selected: floor up past 2 is refused by
+ * - floors -2..13 can be selected: floor up past 2 is refused by
  *   sub_00306460 (`cmp ecx,2` at 0x00306E14) with text/sound 0x1576 through
  *   sub_002F79E0 (return 0x00306E99); that refusal is turned into the stock
- *   success (floor +1, "below" = old floor, sound 0x157D) up to floor 4;
+ *   success (floor +1, "below" = old floor, sound 0x157D) up to floor 13;
+ *   the 3D view's own floor up (sub_0032EDA0, `cmp edx,2` at 0x0032EEBC)
+ *   reaches floor 13 too (pc_mapmaker_grid_preview_floor);
  * - placement is refused when any layer of a held piece would be above the
  *   top grid level (sub_002F8DE0 tests only the bottom, so stacked
  *   selections could leave the grid; z >= 4 was the stock "7th floor");
- * - the settings block (pc_mapmaker_grid.h) gives the floor menu 7 bars, the
+ * - the settings block (pc_mapmaker_grid.h) gives the floor menu 16 bars, the
  *   placement bound, view-centre clamp and out-of-grid shading 80.0 and the
  *   widest zoom 100 cells (grid.json redirects the editor's reads there).
  * Without the switch every hook runs its original and the block holds the
  * stock constants. The floor menu's loop count is a stack local
- * (0x0030BF3F, now 7 for both): in stock mode the two extra bars (floors 3
- * and 4, drawn last) are moved off screen after sub_0001ED50 (return
- * 0x0030BFB5) by writing their y slot, which nothing reads after the loop.
+ * ([esp+0x18] of the loop frame, set at 0x0030BF3F, 16 in the image): after
+ * the first bar's sub_0001ED50 (floor -2, return 0x0030BFB5) the hook sets
+ * it to this mode's bar count (5 stock, 16 with the limits); the loop reads
+ * it back at 0x0030C008. Should that slot not hold the table's 16, stock
+ * mode falls back to moving the bars for floors 3+ off screen by writing
+ * their y slot, which nothing reads after the loop.
  *
  * TSFP_MAPMAKER_OVERLAP=1 (editor only, scene 102): the occupancy probe of
  * the placement test (sub_002F8140 called from 0x002F8F8E, return
@@ -83,13 +88,17 @@
 #define MAPMAKER_GRID_STOCK_W 40
 #define MAPMAKER_GRID_STOCK_L 6
 #define MAPMAKER_GRID_WIDE_W 80
-#define MAPMAKER_GRID_WIDE_L 8      /* levels z -2..5: floors -2..4 plus a 2-tall piece on 4 */
-#define MAPMAKER_GRID_TOP_FLOOR 4   /* highest selectable floor with the limits */
+#define MAPMAKER_GRID_WIDE_L 17     /* levels z -2..14: floors -2..13 plus a 2-tall piece on 13 */
+#define MAPMAKER_GRID_TOP_FLOOR 13  /* highest selectable floor with the limits */
+#define MAPMAKER_GRID_STOCK_BARS 5  /* floor menu bars: floors -2..2 */
+#define MAPMAKER_GRID_WIDE_BARS 16  /* floors -2..13; also the loop count in grid.json (test-checked) */
 #define MAPMAKER_GRID_DIM_MAX 64    /* footprint sanity cap per axis */
 #define MAPMAKER_GRID_HIDDEN_Y (-100000.f)
 #define MAPMAKER_GRID_RET_PROBE 0x002F8F93u
 #define MAPMAKER_GRID_RET_FLOOR 0x00306E99u
 #define MAPMAKER_GRID_RET_BAR 0x0030BFB5u
+#define MAPMAKER_GRID_RET_PREVIEW 0x0032F20Fu  /* sub_0032F0E0 after its call of sub_0032EDA0 */
+#define MAPMAKER_GRID_PREVIEW 0x00778D34u      /* the editor's 3D view: +0x98 floor, +0x80 & 0x800 gliding */
 #define MAPMAKER_STACK_RET_COUNT 0x003034ADu
 #define MAPMAKER_STACK_RET_REPLACE 0x00303696u
 #define MAPMAKER_STACK_RET_VALID 0x003070A7u
@@ -99,7 +108,7 @@
 
 static struct {
     int initialized, wide, overlap, stack;
-    unsigned refused, overlaps, stacked, reregistered, stack_valid, stack_sai, stack_newest;
+    unsigned refused, overlaps, stacked, reregistered, stack_valid, stack_sai, stack_newest, preview_up;
     uint32_t allocated;   /* the grid this hook allocated (wide mode) */
 } mapmaker_grid;
 
@@ -111,7 +120,7 @@ static int mapmaker_grid_switch(const char *name)
 static void mapmaker_grid_config(void)
 {
     int w=mapmaker_grid.wide;
-    FLOAT_AT(MAPMAKER_GRID_CFG_FLOORS)=w?7.f:FLOAT_AT(0x004760CCu);
+    FLOAT_AT(MAPMAKER_GRID_CFG_FLOORS)=w?(float)MAPMAKER_GRID_WIDE_BARS:FLOAT_AT(0x004760CCu);
     FLOAT_AT(MAPMAKER_GRID_CFG_EXTENT)=w?(float)MAPMAKER_GRID_WIDE_W:FLOAT_AT(0x004788B8u);
     FLOAT_AT(MAPMAKER_GRID_CFG_ZOOM)=w?100.f:FLOAT_AT(0x004760ACu);
     FLOAT_AT(MAPMAKER_GRID_CFG_ZOOM_INV)=w?.01f:FLOAT_AT(0x00478394u);
@@ -290,7 +299,7 @@ void pc_mapmaker_grid_lookup(void (*original)(void))
 
 /* ---- floors ---------------------------------------------------------- */
 /* sub_002F79E0(text): the floor-up refusal at the stock top floor becomes
- * the stock floor-up, to floor 4. A refusal with the floor above -2 can
+ * the stock floor-up, to floor 13. A refusal with the floor above -2 can
  * only be floor up (floor down refuses at -2). */
 void pc_mapmaker_grid_floor_sound(void (*original)(void))
 {
@@ -310,16 +319,49 @@ void pc_mapmaker_grid_floor_sound(void (*original)(void))
     original();
 }
 /* sub_0001ED50 (sprite select; generic): in the floor menu loop of
- * sub_0030BE60 without the limits, bars for floors 3 and 4 go off screen. */
+ * sub_0030BE60 (ebx = floor, from -2). After the original has popped its
+ * return address the loop frame is g_esp+8 (the arguments of sub_00081C10
+ * and sub_0001ED50 are still pushed): bar y [frame+0x10], remaining count
+ * [frame+0x18]. At floor -2 the count still holds the image's 16; it becomes
+ * this mode's bar count, so the stock menu draws its 5 bars. */
+static int mapmaker_grid_bars(void) { return mapmaker_grid.wide?MAPMAKER_GRID_WIDE_BARS:MAPMAKER_GRID_STOCK_BARS; }
 void pc_mapmaker_grid_floor_bar(void (*original)(void))
 {
     int bar;
     mapmaker_grid_read();  /* early and often: sets the block before any editor code reads it */
-    bar=MAPMAKER_STACK_OK(0x20) && WORD_AT(g_esp)==MAPMAKER_GRID_RET_BAR;
+    bar=MAPMAKER_STACK_OK(0x28) && WORD_AT(g_esp)==MAPMAKER_GRID_RET_BAR;
     original();
-    if(!bar) return;
-    if(!mapmaker_grid.wide && (int32_t)g_ebx>2 && MAPMAKER_STACK_OK(0x20))
+    if(!bar || !MAPMAKER_STACK_OK(0x24)) return;
+    if((int32_t)g_ebx==-2 && WORD_AT(g_esp+0x20u)==(uint32_t)MAPMAKER_GRID_WIDE_BARS)
+        WORD_AT(g_esp+0x20u)=(uint32_t)mapmaker_grid_bars();
+    if(!mapmaker_grid.wide && (int32_t)g_ebx>2)
         FLOAT_AT(g_esp+0x18u)=MAPMAKER_GRID_HIDDEN_Y;
+}
+/* sub_0032EDA0 (3D view floor change; no arguments, called only from
+ * 0x0032F20A): up is refused at floor 2 (`cmp edx,2`, 0x0032EEBC), down at
+ * -2 (0x0032EEEB); either only steps +0x98 by one. With the limits, for a
+ * floor f in 2..12 with no glide running, the original sees floor 1 and the
+ * difference f-1 is added back afterwards: up gives f+1, down f-1, both or
+ * neither f, as at a floor below 2. The glide branch (+0x80 & 0x800) copies
+ * +0x98 to the editor floor (0x0032EE7F) and is left alone. */
+void pc_mapmaker_grid_preview_floor(void (*original)(void))
+{
+    uint32_t view;
+    int32_t f,shift=0;
+    mapmaker_grid_read();
+    view=WORD_AT(MAPMAKER_GRID_PREVIEW);
+    if(mapmaker_grid.wide && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==MAPMAKER_GRID_RET_PREVIEW &&
+       mapmaker_grid_editor() && MAPMAKER_PTR_OK(view,0xA0) && !(WORD_AT(view+0x80u)&0x800u) &&
+       (f=(int32_t)WORD_AT(view+0x98u))>=2 && f<MAPMAKER_GRID_TOP_FLOOR) {
+        shift=f-1;
+        WORD_AT(view+0x98u)=1u;
+    }
+    original();
+    if(!shift) return;
+    f=(int32_t)WORD_AT(view+0x98u)+shift;
+    WORD_AT(view+0x98u)=(uint32_t)f;
+    if(f>shift+1 && mapmaker_grid.preview_up++<3u)
+        fprintf(stderr,"[mapmaker] grid: 3D view floor up to %d\n",(int)f);
 }
 /* sub_002F8DE0: placement test of the held pieces; also refuse any layer
  * above the grid's top level (the stock test bounds only the bottom). */

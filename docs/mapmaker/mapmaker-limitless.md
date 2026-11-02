@@ -44,7 +44,7 @@ are not in the launcher.
 
 | Switch | Default | What it does | Tested |
 | --- | --- | --- | --- |
-| `TSFP_MAPMAKER_LIMITS=1` | Off | The main switch: the raised editor limits below, seven floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, the Clouds checkbox and the open-sky tiles. | See each feature below |
+| `TSFP_MAPMAKER_LIMITS=1` | Off | The main switch: the raised editor limits below, sixteen floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, the Clouds checkbox and the open-sky tiles. | See each feature below |
 | `TSFP_MAPMAKER_OVERLAP=1` | Off | Tiles can be placed over other tiles. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_STACK_ITEMS=1` | Off | Several items can share one grid cell. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_MEMORY_SCALE=2..8` | 8 with `LIMITS` | How far the editor's memory estimate is relaxed. Lower it if large maps run short of memory. | Used in the capacity play test |
@@ -96,12 +96,14 @@ lets you place.
 
 ## New editor features
 
-### Seven floors and an 80x80 grid (`LIMITS`)
+### Sixteen floors and an 80x80 grid (`LIMITS`)
 
-The floor menu has seven floors instead of five, and the grid is 80 x 80 cells
-instead of 40 x 40. Old maps open where they were. Pieces placed beyond the
-original grid still play, but the original editor cannot select them.
-*Checked in game (2026-10-31).*
+The floor menu has sixteen floors (-2 to 13) instead of five, and the grid is
+80 x 80 cells instead of 40 x 40. The 3D view can also move up to the top
+floor. Old maps open where they were and keep their floors. Pieces placed
+beyond the original grid or floors still play, but the original editor cannot
+select them. *Seven floors and the 80x80 grid were checked in game
+(2026-10-31); sixteen floors are not tested in game yet.*
 
 ### Overlapping tiles (`OVERLAP`)
 

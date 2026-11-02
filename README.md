@@ -33,7 +33,7 @@ This fork adds:
   (`TSFP_MAPMAKER_LIMITS=1`): 241 tiles, 200 items, up to 255 Story AI, up to
   64 characters alive in a MapMaker Story map, more movable objects, keycards,
   turrets, teleporters and logic, a 512 KB map file and an 8x memory budget.
-- **New MapMaker features:** seven floors on an 80x80 grid, optional
+- **New MapMaker features:** sixteen floors on an 80x80 grid, optional
   overlapping tiles and stacked items, any unlocked character in MapMaker Story,
   Story AI duplicates and linked copies, and a per-map Clouds option.
 - **PC control fixes:** MapMaker editor mouse controls, click-to-load in the map
