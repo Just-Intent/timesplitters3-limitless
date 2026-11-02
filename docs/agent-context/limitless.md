@@ -167,7 +167,7 @@ policy `src/interface/pc_mapmaker_budget.inc` changes only `g_eax`. Tests:
 `sub_0009A140` is reimplemented in scene 100 with enlarged AI navigation
 pools (`TSFP_MAPMAKER_POOLS=0` = original); with `TSFP_MAPMAKER_LIMITS=1`
 (ignored while pools are off) `sub_002FA720`'s decision, meter and preview
-are recomputed with pads 4800, links 8800, groups 600 and 200 items (cover stays
+are recomputed with pads 4800, links 12000, groups 600 and 200 items (cover stays
 1024; the cover pool is 1536 as a guard), and the category maxima table
 `0x00524BE0` is raised (pickups x4, movers/props x4; turrets and teleporters
 unchanged). The editor's item node
@@ -190,7 +190,7 @@ compile the whole include chain take link stubs from
 runtime pad handles 0x4740.., bounded A* pools, group A* pool relocated to
 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
-`objects`, `editor`, `rooms` (241 pieces) and `actors` (64 characters / 63 AI
+`objects`, `editor`, `rooms` (241 pieces; past 241 blocked, see its doc) and `actors` (64 characters / 63 AI
 in a local MapMaker story map instead of 20 alive; live list moved to
 0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
 `actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;

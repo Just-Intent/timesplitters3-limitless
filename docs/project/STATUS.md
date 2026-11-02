@@ -1,3 +1,15 @@
+## MapMaker tile caps audit and link raise (2026-11-01, not built or played)
+
+Source: branch from mapmaker-recon 9cac7579, Windows 11 x64, MSVC fixtures only. With
+`TSFP_MAPMAKER_LIMITS=1` the editor link limit is 12,000 (was 8800): 241 pieces of the heaviest
+stock tile (46 links) need 11,086, so 8800 refused heavy tiles before the 241-piece limit. Link pool
+16,112 entries, below the int16 A* limit. Pieces = visibility rooms (241, byte room ids) are now
+the only cap on tiles; going past it needs word room ids (docs/mapmaker/mapmaker-rooms.md). Tests:
+`tests/mapmaker/test_mapmaker_limits.py` (fixture + 27 mutations, incl. 241 heaviest tiles allowed and
+4 link mutations), objects, pads, rooms, budget, probe, validate and the decoder checks passed in full,
+plus the unmutated build of every other MapMaker fixture; check-tables "table verified". Not run: game build,
+in-game placement of 191+ heavy tiles, Mac.
+
 ## MapMaker v0.4.0-mapmaker.20: in-game checks (2026-11-01)
 
 Local preview v0.4.0-mapmaker.20 (exe SHA-256 prefix 3b302ef8, source e5cc7189) on the second Windows 11 PC,
