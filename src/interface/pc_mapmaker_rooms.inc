@@ -39,12 +39,12 @@
  * buffer from 2048 to 16384) is dropped: its rooms, portals and 0x2C records
  * are set to 0 before the compiler sums them, and the drop is logged. The
  * editor's piece limit (MAPMAKER_LIMIT_PIECES, opt-in) is the real bound; this
- * is the last line. The limit is 255 only when every room model 0x908..0xA06
+ * is the last line. The limit is MAPMAKER_ROOMS_MAX only when every room model 0x908..0x907+MAX
  * has a prop slot, else the stock 200.
  *
  * Room props (sub_00242780): room r is drawn by a prop of model 0x907+r, whose
  * slot must come from the prop table; the MapMaker table defines 0x908..0x9CF
- * (200 rooms). In scene 100 the missing room models 0x9D0..0xA06 get slots
+ * (200 rooms). In scene 100 the missing room models 0x9D0..0x907+MAX get slots
  * copied from room 200's (model 0x9CF), in a slot array grown by that many
  * entries (same Level heap; the old array is left to the scene). Story levels
  * are not touched.
@@ -79,7 +79,8 @@
 #define MAPMAKER_ROOMS_IDS_REAL 0x1FFu          /* rooms.json: real rooms 1..0x1FF, special ids 0x200.. */
 #define MAPMAKER_ROOMS_STOCK 200u
 #define MAPMAKER_ROOMS_PORTALS 0x3FFFu          /* flag bytes at esp+0x1280, 0x4000 B */
-#define MAPMAKER_ROOMS_MODEL_TABLE 0x008CA000u   /* relocated 0x0078B860, 0xA08 words */
+#define MAPMAKER_ROOMS_MODEL_TABLE 0x008CA000u   /* relocated 0x0078B860, MAPMAKER_ROOMS_MODEL_ENTRIES words */
+#define MAPMAKER_ROOMS_MODEL_ENTRIES 0xB08u      /* rooms.json: models 0..0xB07, room models 0x908..0xB06 (511 rooms) */
 #define MAPMAKER_ROOMS_MODEL_FIRST 0x908u        /* model of room 1 */
 #define MAPMAKER_ROOMS_QUERY_BUFFER 0x008CB800u
 #define MAPMAKER_ROOMS_QUERY_BYTES 0x800u
@@ -173,7 +174,9 @@ void pc_mapmaker_rooms_compile(void (*original)(void))
     fputc('\n',stderr);
 }
 
-/* ---- prop slots for room models 0x9D0..0xA06 ---------------------------- */
+/* ---- prop slots for room models 0x9D0..0x907+MAPMAKER_ROOMS_MAX ---------- */
+typedef char mapmaker_rooms_models_fit[MAPMAKER_ROOMS_MODEL_FIRST-1u+MAPMAKER_ROOMS_IDS_REAL<MAPMAKER_ROOMS_MODEL_ENTRIES &&
+                                       MAPMAKER_ROOMS_MAX<=MAPMAKER_ROOMS_IDS_REAL?1:-1]; /* every real room has a model entry */
 extern void sub_0003DFA0(void);
 void pc_mapmaker_rooms_props(void (*original)(void))
 {

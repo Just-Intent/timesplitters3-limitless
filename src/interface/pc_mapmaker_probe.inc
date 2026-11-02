@@ -515,7 +515,7 @@ static void mapmaker_probe_click(uint32_t menu,float x,float y,uint32_t hit,unsi
 #define MAPMAKER_PROBE_ROOM_GAP 2000u
 #define MAPMAKER_PROBE_ROOM_SEEN 1024u
 #define MAPMAKER_PROBE_MODEL_ROOMS 0x908u
-#define MAPMAKER_PROBE_MODEL_ROOMS_END 0xA08u      /* room models 0x908..0xA06 */
+#define MAPMAKER_PROBE_MODEL_ROOMS_END 0xB08u      /* room models 0x908..0xB06 (rooms.json model table) */
 #define MAPMAKER_PROBE_PTR_OK(p,n) ((((uint32_t)(p))>=0x00010000u && ((uint32_t)(p))<0x04000000u-(uint32_t)(n)) || \
                                     (((uint32_t)(p))>=0x80000000u && ((uint32_t)(p))<0x84000000u-(uint32_t)(n)))
 static struct {
