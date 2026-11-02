@@ -94,9 +94,12 @@
  * Eggs: the falling eggs need prop 0x4BD, whose model only l_14_st.pak has;
  * the drop is skipped (eggs, below; the v0.4.0-mapmaker.28 crash), but the
  * cells it would block are still blocked for a while (cells), or the walk
- * picks the same cell again and the boss never walks (.31). A walk stopped
- * short ends on its target after CRW_AIR_MAX calls. Each boss logs its
- * fight states (crw_trace).
+ * picks the same cell again and the boss never walks (.31). The map: cells
+ * in no room at the boss's height are blocked (crw_rooms), a walk that stops
+ * getting nearer its target ends where the boss stands and blocks the cells
+ * ahead (crw_stop; up to .34 the boss was put on the target, into walls), a
+ * player outside the arena counts as its nearest cell (crw_player). Each
+ * boss logs its fight states (crw_trace). Docs: "Walls (.34)".
  *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax, g_xbox_mem_offset,
  * pc_mapmaker_area_enabled and pc_mapmaker_limits.inc. Hot hooks (hud, meter,
@@ -184,7 +187,19 @@
 #define CRW_DIR 0x1D24u                 /* the move's direction 0..3 (-1: no walk) */
 #define CRW_BEAM 0x2DDCu                /* 1 while a turret beam is on the player: state 4 waits */
 #define CRW_JUMP 9u                     /* AI state: the walk (0x80E), done when the boss passes the target */
-#define CRW_AIR_MAX 240u                /* fight calls in state 9 before an unfinished walk is landed */
+#define CRW_AIR_MAX 600u                /* fight calls in state 9 before an unfinished walk is ended where the boss stands */
+#define CRW_STALL_CALLS 90u             /* ... or fight calls in a row without getting CRW_STALL_STEP nearer its target */
+#define CRW_STALL_STEP 0.25f
+#define CRW_NEXT 0x2DE8u                /* the state the walk goes to on arrival (0x00291C69) */
+#define CRW_ARRIVED 0x2DF0u             /* zeroed on arrival (0x00291CA8) */
+#define CRW_ANIM_STOP 0x810u            /* splitcrowewalktostand: sub_0005F460(entity, 0x810, 0, 1.2) on arrival (0x00291C4F..) */
+#define CRW_ANIM_SPEED 0x3F99999Au
+#define CRW_DECIDE 4u                   /* AI state 4: the next move is chosen */
+#define CRW_WALL_CALLS 1800u            /* fight calls the cells ahead of a stopped walk stay blocked */
+#define CRW_QUERY_OUT 8u                /* room query results kept (only the count is used) */
+#define CRW_BODY_HALF 0.3f              /* the body box of the room query, as the roof area's fall check */
+#define CRW_BODY_LOW 0.25f
+#define CRW_BODY_HIGH 1.5f
 #define CRW_TRACE_MAX 40u               /* fight state changes logged per boss and level */
 #define CRW_BEAT 600u                   /* fight calls between two status lines */
 #define CRW_BEATS 12u
@@ -207,7 +222,7 @@ static const struct { uint32_t addr, bits; int axis; } crw_consts[]={
 #define CRW_NCONST (sizeof crw_consts/sizeof crw_consts[0])
 
 extern void sub_0005A130(void),sub_00062260(void),sub_0028D6D0(void),sub_002A62C0(void),sub_0028D710(void);
-extern void sub_000EFBD0(void),sub_0015DDA0(void);
+extern void sub_000EFBD0(void),sub_0015DDA0(void),sub_0005F460(void),sub_00087310(void);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
@@ -237,6 +252,10 @@ struct crw_boss_s {
     uint32_t egg_row[CRW_EGGS], egg_col[CRW_EGGS];
     unsigned egg_left[CRW_EGGS];        /* fight calls a skipped egg still blocks its cells */
     unsigned eggs, air, calls, trace, beats;   /* skipped eggs, calls in state 9, fight calls, log lines */
+    unsigned stall, clamps;             /* state 9 calls without progress; player cells stood in */
+    float best;                         /* the walk's nearest distance to its target so far */
+    uint8_t off[CRW_CELLS];             /* cell centre in no MapMaker room at the boss's height */
+    unsigned wall_left[CRW_CELLS];      /* fight calls a cell stays blocked behind a stopped walk */
     MapmakerFx fx;                      /* its statics while another's (or nobody's) are live */
 };
 static struct crw_boss_s crw_inst[CRW_MAX], crw_none;
@@ -526,8 +545,44 @@ static uint32_t crw_start_cell(uint32_t g,float oz,uint32_t *row,uint32_t *col)
     *row=br;*col=bc;
     return best;
 }
+/* The mission 10 lattice does not know the map (v0.4.0-mapmaker.34: walks
+ * to cells 14-28 units away in walls or off the map). After the move, each
+ * cell whose centre is in no MapMaker room at the boss's height (the room
+ * query sub_00087310(box, out, max), tree 0x00702E00, as the roof area's fall
+ * check asks it for a body box: x/z +-0.3, y +0.25..+1.5) is off: off the
+ * map, a void, or a floor of another height. cells blocks those (and what
+ * lies beyond them in line with the boss). A start cell in no room means the
+ * query cannot be trusted here: nothing is off. The box sits on the guest
+ * stack below esp; the call's own pushes go below the box. */
+static void crw_rooms(uint32_t st,float y)
+{
+    uint32_t sp=g_esp,q,k,c,start=crw_lv.row*CRW_COLS+crw_lv.col;
+    unsigned n=0;
+    memset(crw_lv.off,0,sizeof crw_lv.off);
+    if(!MAPMAKER_STACK_OK(0x100) || g_esp<0x00010200u || start>=CRW_CELLS) return;
+    q=(g_esp-0x40u)&~0xFu;
+    g_esp=q;
+    for(k=0;k<CRW_CELLS;k++) {
+        float x,z;
+        c=st+CRW_GRID+k*CRW_CELL;
+        x=crw_getf(c+0x10u);z=crw_getf(c+0x14u);
+        crw_setf(q,x-CRW_BODY_HALF);crw_setf(q+4u,y+CRW_BODY_LOW);crw_setf(q+8u,z-CRW_BODY_HALF);
+        crw_setf(q+0xCu,x+CRW_BODY_HALF);crw_setf(q+0x10u,y+CRW_BODY_HIGH);crw_setf(q+0x14u,z+CRW_BODY_HALF);
+        crw_lv.off[k]=guest_call(sub_00087310,3,q,q+0x18u,CRW_QUERY_OUT)==0u;
+    }
+    g_esp=sp;
+    if(crw_lv.off[start]) {
+        memset(crw_lv.off,0,sizeof crw_lv.off);
+        crw_log("split Crowe start cell is in no room: arena cells not checked (cell, state)",start,st);
+        return;
+    }
+    for(k=0;k<CRW_CELLS;k++) n+=crw_lv.off[k];
+    fprintf(stderr,"[mapmaker] crowe: split Crowe %d arena: %u of %u cells in no room at its height (blocked)\n",
+            (int)(crw_i-crw_inst),n,CRW_CELLS);
+    fflush(stderr);
+}
 /* Move the arena grid so the boss's start cell is centred on the spawn point
- * (x/z), note the floor offset. */
+ * (x/z), note the floor offset, then find the cells off the map. */
 static void crw_relocate(uint32_t ent)
 {
     uint32_t st=crw_lv.state,g=st+CRW_GRID,o=st+CRW_OUTER,c,best=0,k,row=0,col=0;
@@ -563,6 +618,7 @@ static void crw_relocate(uint32_t ent)
     fprintf(stderr,"[mapmaker] crowe: arena moved by (%.2f, %.2f), floor %.2f (mission 10: 86), start cell %u,%u at the spawn (%.2f, %.2f)\n",
             (double)crw_lv.dx,(double)crw_lv.dz,(double)sy,(unsigned)row,(unsigned)col,(double)sx,(double)sz);
     fflush(stderr);
+    crw_rooms(st,sy);
 }
 /* After the first state-0 frame: the boss stands at the spawn point on its
  * start cell. Stock already does so when the start cell holds 310.0; anything
@@ -622,16 +678,38 @@ static void crw_block(uint32_t st,uint32_t r,uint32_t c)
     for(i=c?c-1u:0u;i<=c+1u && i<CRW_COLS;i++) WORD_AT(st+CRW_GRID+(r*CRW_COLS+i)*CRW_CELL+CRW_BLOCKED)=1u;
 }
 /* State 9 waits, after the walk animation, until the boss's centre passes
- * its target (0x00291C1A..0x00291D8C); a walk stopped short (another boss in
- * the way) would wait for ever. The boss is put on its target cell's centre. */
-static void crw_land(uint32_t ent)
+ * its target (0x00291C1A..0x00291D8C); a walk stopped short (a MapMaker wall,
+ * another boss) would wait for ever. Up to .34 the boss was then put on its
+ * target cell's centre: inside walls or off the map (v0.4.0-mapmaker.34).
+ * Now the walk ends where the boss stands, as stock ends it on arrival
+ * (0x00291C4F..0x00291CA8: the walk-to-stand anim, the state the walk was
+ * for, +0x2DF0 = 0); the position is the one the game's collision gave it.
+ * The cells ahead of it in the walk's direction (+0x1D24: 0 row+, 1 col-,
+ * 2 row-, 3 col+; sub_002A9E60) stay blocked for CRW_WALL_CALLS, so the next
+ * choice is another way. */
+static void crw_stop(uint32_t ent,uint32_t a,const char *why)
+{
+    uint32_t st=crw_lv.state,next=WORD_AT(st+CRW_NEXT),r=WORD_AT(st+CRW_START_ROW),c=WORD_AT(st+CRW_START_COL),dir=WORD_AT(st+CRW_DIR);
+    int dr=dir==0u?1:dir==2u?-1:0,dc=dir==3u?1:dir==1u?-1:0,i,j;
+    crw_lv.air=crw_lv.stall=0;
+    if(r<CRW_ROWS && c<CRW_COLS && (dr || dc))
+        for(i=(int)r+dr,j=(int)c+dc;i>=0 && i<(int)CRW_ROWS && j>=0 && j<(int)CRW_COLS;i+=dr,j+=dc)
+            crw_lv.wall_left[(unsigned)i*CRW_COLS+(unsigned)j]=CRW_WALL_CALLS;
+    if(next>=0x12u || next==CRW_JUMP) next=CRW_DECIDE;
+    guest_call(sub_0005F460,4,ent,CRW_ANIM_STOP,0u,CRW_ANIM_SPEED);
+    WORD_AT(a+0x9D4u)=CRW_JUMP;WORD_AT(a+CRW_AI_STATE)=next;WORD_AT(a+0x9D0u)=next;crw_setf(a+0x9D8u,0.0f);
+    crw_setf(st+CRW_ARRIVED,0.0f);
+    if(crw_lv.trace<CRW_TRACE_MAX) { crw_lv.trace++;crw_trace(why,ent,CRW_JUMP,next); }
+}
+/* One fight call in state 9: progress is the x+z distance to the target. */
+static void crw_walking(uint32_t ent,uint32_t a)
 {
     uint32_t st=crw_lv.state;
-    float x=crw_getf(st+CRW_TARGET),z=crw_getf(st+CRW_TARGET+4u);
-    crw_lv.air=0;
-    if(!crw_sane(x) || !crw_sane(z)) return;
-    crw_setf(ent+CRW_ENT_X,x);crw_setf(ent+CRW_ENT_X+8u,z);
-    if(crw_lv.trace<CRW_TRACE_MAX) { crw_lv.trace++;crw_trace("walk stopped short; put on its target: state",ent,CRW_JUMP,CRW_JUMP); }
+    float d=fabsf(crw_getf(ent+CRW_ENT_X)-crw_getf(st+CRW_TARGET))+fabsf(crw_getf(ent+CRW_ENT_X+8u)-crw_getf(st+CRW_TARGET+4u));
+    if(!crw_lv.air++ || !(d>=crw_lv.best-CRW_STALL_STEP)) { crw_lv.best=d;crw_lv.stall=0; }
+    else crw_lv.stall++;
+    if(crw_lv.stall>=CRW_STALL_CALLS) crw_stop(ent,a,"walk blocked; ended where it stands, the cells ahead blocked: state");
+    else if(crw_lv.air>=CRW_AIR_MAX) crw_stop(ent,a,"walk too long; ended where it stands, the cells ahead blocked: state");
 }
 /* The fight call for the boss whose globals are live. */
 static void crw_fight(uint32_t ent,void (*original)(void))
@@ -673,10 +751,11 @@ static void crw_fight(uint32_t ent,void (*original)(void))
     crw_shift(0);
     if(placing) crw_place(ent);
     for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_lv.egg_left[k]--;
+    for(k=0;k<CRW_CELLS;k++) if(crw_lv.wall_left[k]) crw_lv.wall_left[k]--;
     to=WORD_AT(a+CRW_AI_STATE);
-    if(to==CRW_JUMP) { if(++crw_lv.air>=CRW_AIR_MAX) crw_land(ent); }
-    else crw_lv.air=0;
     if(to!=from && crw_lv.trace<CRW_TRACE_MAX) { crw_lv.trace++;crw_trace("fight state",ent,from,to); }
+    if(to==CRW_JUMP) crw_walking(ent,a);
+    else crw_lv.air=crw_lv.stall=0;
     if(!(++crw_lv.calls%CRW_BEAT) && crw_lv.beats<CRW_BEATS) { crw_lv.beats++;crw_trace("still: state",ent,to,to); }
 }
 /* WRAP sub_0028FE30 (cdecl entity; class 0x40000, per AI frame): with this
@@ -806,17 +885,63 @@ void pc_mapmaker_crowe_eggs(void (*original)(void))
                                WORD_AT(g_esp+4u),crw.eggs);
     MAPMAKER_GUEST_RET();
 }
+/* Cells in line with the boss (r, c) beyond a cell in no room: the walk
+ * would cross the void (or another floor) to reach them. */
+static void crw_shadow(uint32_t st,uint32_t r,uint32_t c)
+{
+    static const int step[4][2]={{1,0},{-1,0},{0,1},{0,-1}};
+    unsigned d;
+    for(d=0;d<4u;d++) {
+        int i=(int)r+step[d][0],j=(int)c+step[d][1],hit=0;
+        for(;i>=0 && i<(int)CRW_ROWS && j>=0 && j<(int)CRW_COLS;i+=step[d][0],j+=step[d][1]) {
+            unsigned k=(unsigned)i*CRW_COLS+(unsigned)j;
+            hit|=crw_lv.off[k];
+            if(hit) WORD_AT(st+CRW_GRID+k*CRW_CELL+CRW_BLOCKED)=1u;
+        }
+    }
+}
+/* The player outside the arena (v0.4.0-mapmaker.34: "player cell -1,-1" on
+ * every line): sub_002A9330 writes no cell, so +0x1190 keeps the build's -1
+ * (or the last cell the player was in), and state 5 picks among the 5 x 5
+ * cells of rows 0-4, columns 0-4 (0x002A9E99..0x002A9EBF) whatever the
+ * player does. The nearest cell in a room (any cell when none is) stands in
+ * for the player, so the boss still turns and walks towards them. The arena
+ * stays under the spawn: re-centring it on the player would carry the boss
+ * across the map onto cells nobody checked. */
+static void crw_player(uint32_t st,float px,float pz)
+{
+    uint32_t g=st+CRW_GRID,r,c,k,best=CRW_CELLS;
+    float bd=0.0f,d,dx,dz;
+    int open,bopen=0;
+    if(!crw_sane(px) || !crw_sane(pz) || crw_cell_at(g,px,pz,&r,&c)) return;
+    for(k=0;k<CRW_CELLS;k++) {
+        dx=crw_getf(g+k*CRW_CELL+0x10u)-px;dz=crw_getf(g+k*CRW_CELL+0x14u)-pz;d=dx*dx+dz*dz;
+        open=!crw_lv.off[k];
+        if(best==CRW_CELLS || open>bopen || (open==bopen && d<bd)) { best=k;bd=d;bopen=open; }
+    }
+    if(best==CRW_CELLS) return;
+    WORD_AT(st+CRW_PCELL)=best/CRW_COLS;WORD_AT(st+CRW_PCELL+4u)=best%CRW_COLS;
+    if(!crw_lv.clamps++) crw_log("player outside a split Crowe's arena: its nearest cell stands in (boss, cell)",(uint32_t)(crw_i-crw_inst),best);
+}
 /* WRAP sub_002A9D00 (cdecl state+4, player x/z, boss x/z; the fight's cell
  * lookups, which also clear every cell's +0x24 and block the cells of the
- * eggs in flight): the live boss's skipped eggs block theirs too. */
+ * eggs in flight): the live boss's skipped eggs block theirs too, and so do
+ * its cells in no room, those beyond them in line with it and those ahead of
+ * a stopped walk; a player outside the arena gets its nearest cell. */
 void pc_mapmaker_crowe_cells(void (*original)(void))
 {
-    uint32_t st=crw_lv.state;
+    uint32_t st=crw_lv.state,r,c;
     unsigned k;
-    if(!crw_lv.record || !st || !MAPMAKER_STACK_OK(8) || (WORD_AT(g_esp)!=CRW_RET_CELLS && WORD_AT(g_esp)!=CRW_RET_CELLS0) ||
+    float px,pz;
+    if(!crw_lv.record || !st || !MAPMAKER_STACK_OK(0x14) || (WORD_AT(g_esp)!=CRW_RET_CELLS && WORD_AT(g_esp)!=CRW_RET_CELLS0) ||
        WORD_AT(g_esp+4u)!=st+4u) { original();return; }
+    px=crw_getf(g_esp+8u);pz=crw_getf(g_esp+0xCu);
     original();
     for(k=0;k<CRW_EGGS;k++) if(crw_lv.egg_left[k]) crw_block(st,crw_lv.egg_row[k],crw_lv.egg_col[k]);
+    for(k=0;k<CRW_CELLS;k++) if(crw_lv.off[k] || crw_lv.wall_left[k]) WORD_AT(st+CRW_GRID+k*CRW_CELL+CRW_BLOCKED)=1u;
+    r=WORD_AT(st+CRW_START_ROW);c=WORD_AT(st+CRW_START_COL);
+    if(r<CRW_ROWS && c<CRW_COLS) crw_shadow(st,r,c);
+    crw_player(st,px,pz);
 }
 
 /* WRAP sub_00126560 (frame step before the scene-81 draw; the Crowe's own
