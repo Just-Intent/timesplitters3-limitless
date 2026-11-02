@@ -173,12 +173,15 @@ Logs (stderr, `[mapmaker] worm:`):
 - `mounted lv1_2.pak for the mansion worm`
 - `mansion worm state allocated`
 - `mansion worm noted; it binds on its first frame`
-- `mansion garden moved by (dx, dz), floor y (mission 5: -2.4), n route pads`
+- `worm k (level L): mansion garden moved by (dx, dz), floor y (mission 5:
+  -2.4), n route pads; buried until a player is in x a..b, z c..d` (L counts
+  this session's worm levels; .29)
 - `mansion worm runs its story update`
-- `mansion worm head bound`
+- `mansion worm head bound (head, worm)`
 - `mansion worm drawn`
-- `surfaced, state s, head height h, spawn floor f, worm height w` (each
-  surfacing, up to 8)
+- `worm k state a -> b (level L, head anim ...)` (each state change)
+- `worm k surfaced, state s, head height h, spawn floor f, worm height w`
+  (each surfacing, up to 8)
 - `lv1_2.pak: only the mansion worm's anims registered`
 - `mansion worm: the mansion script trigger dropped`
 - `mansion worm hit (state before, after)`
@@ -396,11 +399,12 @@ entries.
    - `mounted lv1_2.pak for the mansion worm`
    - `mansion worm state allocated`
    - `noted; it binds on its first frame`
-   - `mansion garden moved by (...) ... n route pads` (n > 0)
+   - `worm k (level L): mansion garden moved by (...) ... n route pads` (n >
+     0) and the region that wakes it
    - `runs its story update`
    - `head bound`
    - `drawn`
-3. Watch: nothing visible until you walk near; then a dirt trail burrows
+3. Watch: nothing visible until you walk into its wake region (logged); then a dirt trail burrows
    towards you, the worm bursts out (`wrmburst`), attacks and burrows again.
    Its height relative to the floor is the main check.
 4. Shoot it while it is out (`hit` lines with states 9-11 -> 0xD), or use an
@@ -487,3 +491,46 @@ spawn. Expect `head room (spawn room, binding's) (r, 0x18)`, state lines 8
 -> 9 -> 11/14 with `head anim 0x194 done 0`, the burst damaging you, and no
 `fell off the map` for the worm. If 9 never shows or `done 1` follows a
 0x194 play, send the state lines.
+
+## Several worms that never woke (v0.4.0-mapmaker.28 playtest)
+
+**User report**: "Multiple worms failed to spawn in, or weren't visible."
+
+**What the log shows** (CONFIRMED, `logs/m28.err`, the level from line 23361):
+- three worms, three blocks, three binds (heads 0x8181D218, 0x8181E0A0,
+  0x8181EF28), head rooms 4, 5 and 6, and `worm 0/1/2 state 0 -> 1`, each
+  under its own index. No other state line in that level.
+- The later `worm 0` lines (from line 26647) are a separate level with one
+  worm (one allocation, record id 2, the same spot as the first level's worm
+  1). That worm woke, surfaced and attacked. The log had no level number, so
+  the two levels read as one.
+- In the 3-worm level the player stood at the spawn (117, 0.5, 135) for the
+  whole level (every `roof:` sample).
+
+**Cause** (CONFIRMED from the code, the worms' positions and the player's
+log; nothing found in the per-worm swap): state 1 is the stock dormant state.
+The worm stays buried until `sub_001D5D70` finds a player in its wake region,
+x -79..-55.7 and z -7.9..40.3 shifted with the worm. That is x -12.55..+10.75
+and z -24.65..+23.55 around the spawn; y is not checked (+/-FLT_MAX at
+0x00478618/0x00475D5C). The worms were at z 111, x 99/117/135. The player was
+24 units north of worm 1 (z max 134.55) and outside all three regions. A
+buried worm draws only its burrow (`sub_001D2800`, states < 8), and its head
+is 5 under the floor. So nothing showed.
+
+**Change** (.29, diagnostics only): the set-up line names the worm, the worm
+level (`wrm.serial`) and its wake region. The state lines carry the level;
+the bind and surfacing lines carry the worm. The behaviour is unchanged: a
+larger wake region is a design choice for the user.
+
+**Test**: `multi3` in `tests/mapmaker/mapmaker_worm.c`. Three worms side by
+side and a fake update that runs the wake test on the shifted constants. With
+the player outside every region, all three bind and stay buried. In worm 1's
+region only worm 1 surfaces, attacks from the player's room and has its head
+placed by the draw. Then in worm 2's region the same holds for worm 2; worm
+1, out with nobody near, gets its spawn room again. A hit changes worm 2
+only. `test_mapmaker_worm.py` checks the log lines (index, level, region).
+
+**Playtest**: three worms 30+ units apart. Walk into each region in turn,
+using the logged `buried until a player is in ...` bounds. Expect
+`worm k state 1 -> 0` and later `worm k surfaced` for each worm you
+approach, with one level number.
