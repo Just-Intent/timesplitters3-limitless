@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3316 @@
+@@ -1037,6 +1037,3327 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2664,6 +2664,17 @@
 +    else sub_00251800_gen();
 +#else
 +    sub_00251800_gen();
++#endif
++}
++
++extern void sub_000A2740_gen(void);
++void sub_000A2740(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_draw")) pc_mapmaker_tank_draw(sub_000A2740_gen);
++    else sub_000A2740_gen();
++#else
++    sub_000A2740_gen();
 +#endif
 +}
 +

@@ -190,7 +190,7 @@ compile the whole include chain take link stubs from
 runtime pad handles 0x4740.., bounded A* pools, group A* pool relocated to
 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
-`objects`, `editor`, `rooms` (241 pieces; past 241 blocked, see its doc) and `actors` (64 characters / 63 AI
+`objects`, `editor`, `rooms` (241 pieces; see its doc) and `actors` (64 characters / 63 AI
 in a local MapMaker story map instead of 20 alive; live list moved to
 0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
 `actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;
@@ -498,8 +498,8 @@ list (5 new sets WRAPs; sets_pick outside realbosses_pick; mapmaker-sets.md).
 Multi-boss merge (.26): 28 WRAPs (walker/skeleton/robot/crowe/tank/mothership/khallos statics
 swaps, worm anim register, sky weather); sub_000DAC30 chain: actors, realbosses,
 tank, khallos (log only). See each boss doc.
-.27: sets_spawn_masks (sub_00240C50) gives slots 11-20 slot 1's spawn mask;
-worm block at AI start (emitter pool); late walker/skeleton instances; fall drop rule.
+.27: sets_spawn_masks (sub_00240C50): slots 11-20 get slot 1's mask;
+worm block at AI start (emitter pool); late walker/skel instances; fall drop.
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
 anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 (30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear
