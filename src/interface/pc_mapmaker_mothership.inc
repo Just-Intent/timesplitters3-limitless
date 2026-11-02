@@ -86,7 +86,12 @@
  *    the map floor instead of at the intro's absolute 6.6.
  *  - text (sub_0003D7B0): the bar label 0x164B (pushed by the 0x539 case of
  *    sub_0014CC80, call 0x0014D09A, return 0x0014D09F) is a level-local
- *    text id; in scene 100 our label is returned there.
+ *    text id; in scene 100 the focus ship's Story AI name is returned there
+ *    ("Timesplitter Mothership" when unnamed). The bosses area lists each
+ *    ship (bos_bar_extra_add) for Boss-flagged bars, as the tank area does.
+ *  - ai_start "started again": a ship whose placeholder is still this
+ *    entity, or made from this spawn record and id (a removed placeholder's
+ *    entity is reused); every refusal logs (msh_refuse, 16 per level).
  *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax,
  * g_xbox_mem_offset, xbox_HeapAlloc and pc_mapmaker_limits.inc
@@ -160,6 +165,9 @@
 #define MSH_BAR_TEXT 0x164Bu
 #define MSH_RET_BAR_TEXT 0x0014D09Fu     /* sub_0014CC80: call sub_0003D7B0 at 0x0014D09A */
 #define MSH_LABEL "Timesplitter Mothership"
+#define MSH_NAME 32u                     /* a Story AI's saved name (pc_mapmaker_bosses.inc BOS_NAME) */
+#define MSH_OBJ_MODEL 0x94u              /* prop: model word (the stock bar's switch, 0x0014CCD6) */
+#define MSH_REFUSE_LOGS 16u              /* "stays a bot" / "started again" lines per level */
 #define MSH_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define MSH_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -178,10 +186,11 @@ extern void sub_000A5E40(void),sub_000631C0(void),sub_00096330(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
 /* Kept for the session: settings, strings, spawn arguments, stock constants. */
-static struct { int read, optout; uint32_t label, pak, args; unsigned logged; } msh;
-/* One ship: its object and placeholder, floor, and its copy of the statics. */
+static struct { int read, optout; uint32_t label, pak, args, names; unsigned logged; } msh;
+/* One ship: its object and placeholder (place_id: its spawn record's id,
+ * record +8), floor, and its copy of the statics. */
 struct msh_one {
-    uint32_t obj, place, place_ent, place_rec;
+    uint32_t obj, place, place_ent, place_rec, place_id;
     float floor;
     unsigned shifts;
     uint32_t st[MSH_WORDS];
@@ -193,7 +202,7 @@ static struct {
     unsigned act;                        /* 1 + the ship whose statics are in place; 0: none */
     uint32_t rest[MSH_WORDS];            /* the statics outside any ship */
     int requested, textured;
-    unsigned extras;
+    unsigned refused;
 } msh_lv;
 #define MS (msh_lv.s[msh_lv.act-1u])     /* the active ship (only with msh_lv.act) */
 
@@ -201,6 +210,14 @@ static void msh_log(const char *what,uint32_t a,uint32_t b)
 {
     if(msh.logged>=24u) return;
     msh.logged++;
+    fprintf(stderr,"[mapmaker] mothership: %s (0x%X, 0x%X)\n",what,(unsigned)a,(unsigned)b);
+    fflush(stderr);
+}
+/* Why a placeholder made no ship: a budget per level, so every refusal shows. */
+static void msh_refuse(const char *what,uint32_t a,uint32_t b)
+{
+    if(msh_lv.refused>=MSH_REFUSE_LOGS) return;
+    msh_lv.refused++;
     fprintf(stderr,"[mapmaker] mothership: %s (0x%X, 0x%X)\n",what,(unsigned)a,(unsigned)b);
     fflush(stderr);
 }
@@ -370,11 +387,49 @@ static void msh_rebase(struct msh_one *m,float x,float floor,float z)
     memcpy(m->st,v,sizeof v);
 }
 
+#ifdef BOS_BAR_EXTRA
+/* pc_mapmaker_bosses.inc's Boss bars: ship k as the bar of its removed
+ * placeholder AI (record id); entity 0 while that AI still stands there or
+ * once the object is no longer the ship (state 5 removes it). */
+static int msh_bar_boss(unsigned k,uint32_t *entity,uint32_t *id)
+{
+    uint32_t obj;
+    if(k>=msh_lv.n || k>=MSH_MAX || WORD_AT(MSH_SCENE)!=100u) return 0;
+    obj=msh_lv.s[k].obj;
+    *entity=msh_lv.s[k].place || !MAPMAKER_PTR_OK(obj,0x200u) || MSH_H(obj+MSH_OBJ_MODEL)!=MSH_MODEL?0u:obj;
+    *id=msh_lv.s[k].place_id;
+    return 1;
+}
+#endif
+/* The stock bar's label: the focus ship's Story AI name, else "Timesplitter Mothership". */
+static uint32_t msh_bar_label(void)
+{
+#ifdef BOS_BAR_EXTRA
+    uint32_t pl=WORD_AT(MSH_PLAYER),buf;
+    unsigned k;
+    const char *name;
+    size_t n;
+    if(msh.names && MAPMAKER_PTR_OK(pl,MSH_FOCUS+4u) && (k=msh_find(WORD_AT(pl+MSH_FOCUS)))!=0 &&
+       (name=bos_story_name(msh_lv.s[k-1u].place_id))!=0) {
+        buf=msh.names+(k-1u)*MSH_NAME;
+        n=strlen(name);
+        if(n>MSH_NAME-1u) n=MSH_NAME-1u;
+        memcpy((void *)((uintptr_t)buf+g_xbox_mem_offset),name,n);
+        MSH_B(buf+(uint32_t)n)=0;
+        return buf;
+    }
+#endif
+    return msh.label;
+}
+
 /* WRAP sub_00062790 (the level's pak mounts, no args). */
 void pc_mapmaker_mothership_mount(void (*original)(void))
 {
     int has;
     uint32_t mounted;
+#ifdef BOS_BAR_EXTRA
+    bos_bar_extra_add(msh_bar_boss);                       /* the bosses area's bars: a ship shows its AI's */
+#endif
     if(WORD_AT(MSH_MOUNT_SKIP)) { original();return; }    /* the original does nothing */
     original();
     memset(&msh_lv,0,sizeof msh_lv);                       /* a new level: forget the last ships */
@@ -405,35 +460,44 @@ void pc_mapmaker_mothership_request(void (*original)(void))
 /* WRAP sub_0015B830 (cdecl AI pool entry): the placeholder becomes the ship. */
 void pc_mapmaker_mothership_ai_start(void (*original)(void))
 {
-    uint32_t a,ent,e,obj,args,i,m,keep[MSH_WORDS];
+    uint32_t a,ent,e,obj,args,i,m,keep[MSH_WORDS],rec,id;
     float pos[3],yaw;
     struct msh_one *s;
     if(!MAPMAKER_STACK_OK(8) || !msh_play() || msh.optout) { original();return; }
     a=WORD_AT(g_esp+4u);
     original();
-    if(!MAPMAKER_PTR_OK(a,MSH_ACTOR) || MSH_H(a+MSH_ACTOR_CHAR)!=MSH_ID || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) return;
-    for(i=0;i<msh_lv.n;i++) if(msh_lv.s[i].place_ent==ent && msh_lv.s[i].obj) return;   /* started again */
-    if(msh_lv.n>=MSH_MAX) {
-        if(msh_lv.extras++<4u) msh_log("at most 4 motherships per map: this placeholder stays a bot",a,msh_lv.n);
-        return;
+    if(!MAPMAKER_PTR_OK(a,MSH_ACTOR) || MSH_H(a+MSH_ACTOR_CHAR)!=MSH_ID) return;
+    if(!MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) { msh_refuse("mothership placeholder AI started without an entity: stays a bot",a,0);return; }
+    rec=WORD_AT(a+MSH_ACTOR_RECORD);id=MAPMAKER_PTR_OK(rec,12u)?WORD_AT(rec+8u):0u;
+    /* Started again: a ship whose placeholder is still this entity, or one
+     * made from this spawn record. Not the entity alone: a removed
+     * placeholder's entity is reused by the next placeholder (the tank's
+     * v0.4.0-mapmaker.28 third placeholder stayed a bot that way). */
+    for(i=0;i<msh_lv.n && i<MSH_MAX;i++) {
+        s=&msh_lv.s[i];
+        if(s->obj && ((s->place && s->place_ent==ent) || (rec && s->place_rec==rec && s->place_id==id))) {
+            msh_refuse("mothership placeholder started again: it is already this ship (actor, ship)",a,i+1u);
+            return;
+        }
     }
-    if(msh_lv.act) { msh_log("a mothership is running: this placeholder stays a bot",a,msh_lv.act);return; }
-    if(!msh_pak_mounted()) { msh_log("l_64_ch.pak not mounted: the mothership placeholder stays a bot",a,0);return; }
+    if(msh_lv.n>=MSH_MAX) { msh_refuse("at most 4 motherships per map: this placeholder stays a bot",a,msh_lv.n);return; }
+    if(msh_lv.act) { msh_refuse("a mothership is running: this placeholder stays a bot",a,msh_lv.act);return; }
+    if(!msh_pak_mounted()) { msh_refuse("l_64_ch.pak not mounted: the mothership placeholder stays a bot",a,0);return; }
     if(!(e=msh_resource(MSH_MODEL)) || WORD_AT(e+MSH_RES_INIT)!=MSH_INIT || !msh_resource(MSH_WRECK)) {
-        msh_log("mothership models missing from the resource table: the placeholder stays a bot",e,e?WORD_AT(e+MSH_RES_INIT):0);
+        msh_refuse("mothership models missing from the resource table: the placeholder stays a bot",e,e?WORD_AT(e+MSH_RES_INIT):0);
         return;
     }
     if((m=msh_models_unready())!=0) {
-        msh_log(msh_lv.requested?"a mothership model was requested but not read: the placeholder stays a bot":
-                                 "mothership models not requested this level: the placeholder stays a bot",m,0);
+        msh_refuse(msh_lv.requested?"a mothership model was requested but not read: the placeholder stays a bot":
+                                    "mothership models not requested this level: the placeholder stays a bot",m,0);
         return;
     }
-    for(i=0;i<3u;i++) if(!msh_sane(pos[i]=msh_getf(ent+MSH_ENT_POS+i*4u))) { msh_log("placeholder position unusable",a,i);return; }
+    for(i=0;i<3u;i++) if(!msh_sane(pos[i]=msh_getf(ent+MSH_ENT_POS+i*4u))) { msh_refuse("placeholder position unusable: it stays a bot",a,i);return; }
     if(!msh_sane(yaw=msh_getf(ent+MSH_ENT_YAW))) yaw=0.0f;
     msh_textures();
     if(!msh.args) {
         uint32_t p=xbox_HeapAlloc(32u,16u);
-        if(!p || !MAPMAKER_PTR_OK(p,32u)) { msh_log("no memory for the spawn arguments",32u,0);return; }
+        if(!p || !MAPMAKER_PTR_OK(p,32u)) { msh_refuse("no memory for the spawn arguments: the placeholder stays a bot",32u,0);return; }
         msh.args=p;
     }
     args=msh.args;
@@ -444,13 +508,18 @@ void pc_mapmaker_mothership_ai_start(void (*original)(void))
     obj=guest_call(sub_000A6F90,5,MSH_MODEL,args,args+12u,0u,0u);
     if(obj && MAPMAKER_PTR_OK(obj,0x200u)) { memset(s,0,sizeof *s);msh_save(s->st); }
     msh_load(keep);
-    if(!obj || !MAPMAKER_PTR_OK(obj,0x200u)) { msh_log("the mothership was not created: the placeholder stays a bot",a,obj);return; }
+    if(!obj || !MAPMAKER_PTR_OK(obj,0x200u)) { msh_refuse("the mothership was not created: the placeholder stays a bot",a,obj);return; }
     WORD_AT(obj+MSH_STATE)=MSH_ATTACK;                        /* no fly-in: attack where it stands */
-    s->obj=obj;s->place=a;s->place_ent=ent;s->place_rec=WORD_AT(a+MSH_ACTOR_RECORD);
+    s->obj=obj;s->place=a;s->place_ent=ent;s->place_rec=rec;s->place_id=id;
     s->floor=pos[1];
     msh_rebase(s,pos[0],pos[1],pos[2]);
     msh_lv.n++;
     msh_string(&msh.label,MSH_LABEL,sizeof MSH_LABEL);         /* off the text hook's path */
+    if(!msh.names) {                                           /* the bar labels: each ship's Story AI name */
+        uint32_t p=xbox_HeapAlloc(MSH_MAX*MSH_NAME,4u);
+        if(p && MAPMAKER_PTR_OK(p,MSH_MAX*MSH_NAME)) msh.names=p;
+        else msh_log("no memory for the bar names: bars read Timesplitter Mothership",MSH_MAX*MSH_NAME,0);
+    }
     msh_log("mothership created above the placeholder",a,obj);
     fprintf(stderr,"[mapmaker] mothership %u: spawn (%.2f, %.2f, %.2f), floor %.2f, firing box %.0f m around it\n",msh_lv.n,
             (double)pos[0],(double)(pos[1]+MSH_HOVER),(double)pos[2],(double)pos[1],(double)MSH_RANGE);
@@ -506,6 +575,6 @@ void pc_mapmaker_mothership_text(void (*original)(void))
 {
     if(!MAPMAKER_STACK_OK(8) || WORD_AT(g_esp+4u)!=MSH_BAR_TEXT || WORD_AT(g_esp)!=MSH_RET_BAR_TEXT || !msh.label ||
        !msh_lv.n || !msh_play()) { original();return; }
-    g_eax=msh.label;
+    g_eax=msh_bar_label();
     MAPMAKER_GUEST_RET();
 }

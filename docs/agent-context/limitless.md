@@ -489,8 +489,8 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 (log); shown (+0x28 bit 0) at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 More boss areas (merged 2026-11-01, not played): `khallos` (id 0x33 chair prop 0x376),
-`worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`; wrapper
-lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
+`worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`; .28: tank/ships
+reuse, bos_bar_extra_add. Sky area adds `pc_mapmaker_skymusic.inc` (extra
 sky/sand/music, +mem paks; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
 for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll
 list (5 new sets WRAPs; sets_pick outside realbosses_pick; mapmaker-sets.md).
