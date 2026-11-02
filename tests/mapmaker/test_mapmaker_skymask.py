@@ -29,9 +29,9 @@ EXPECTED = '\n'.join([
     'phase rebuild',
     M + 'dev switch TSFP_MAPMAKER_ROOM_MASK_CLEAR=0x09000000 (MapMaker play only)',
     M + 'cleared 0x09000000 on 2 rooms (build 1: 2 rooms in 1 pieces)',
-    M + 'room 255 0xFFFFFFFF -> 0xF6FFFFFF',
-    M + 'room 256 0xFFFFFFFF -> 0xF6FFFFFF',
-    M + '2 rooms past the 256-entry table left unchanged',
+    M + 'room 511 0xFFFFFFFF -> 0xF6FFFFFF',
+    M + 'room 512 0xFFFFFFFF -> 0xF6FFFFFF',
+    M + '2 rooms past the 512-entry table left unchanged',
     'phase bound',
     M + 'dev switch TSFP_MAPMAKER_ROOM_MASK_CLEAR=0x02000000 (MapMaker play only)',
     M + 'room build in scene 102 ignored (play is scene 100)',
@@ -116,7 +116,7 @@ def test_room_mask_table_has_one_writer():
     rooms = json.loads((ROOT / 'config/guest-code-patches/rooms.json').read_text(encoding='utf-8'))
     entries = rooms['patches']
     reloc = next(e for e in entries if e.get('id') == 'rooms-reloc-t3-0x703460')
-    assert int(reloc['new'], 16) == 0x008C0800 and int(reloc['new_size'], 16) >= 256 * 4   # 512 rooms; the switch keeps 0..255
+    assert int(reloc['new'], 16) == 0x008C0800 and int(reloc['new_size'], 16) >= 512 * 4   # 512 rooms; the switch covers them all
     for site in (0x00083974, 0x000857A3, 0x00085DCA, 0x0008A79B):
         assert reloc['sites'][f'0x{site:08X}'] == 'offset'
 
