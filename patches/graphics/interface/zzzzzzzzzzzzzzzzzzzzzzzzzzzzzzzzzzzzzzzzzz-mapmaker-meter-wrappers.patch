@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3480 @@
+@@ -1037,6 +1037,3501 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2624,6 +2624,38 @@
 +#endif
 +}
 +
++extern void sub_002A9D00_gen(void);
++void sub_002A9D00(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_cells")) pc_mapmaker_crowe_cells(sub_002A9D00_gen);
++    else sub_002A9D00_gen();
++#else
++    sub_002A9D00_gen();
++#endif
++}
++
++extern void sub_001CDD60_gen(void);
++static void sub_001CDD60_layer0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_restart")) pc_mapmaker_crowe_restart(sub_001CDD60_gen);
++    else sub_001CDD60_gen();
++#else
++    sub_001CDD60_gen();
++#endif
++}
++
++void sub_001CDD60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_restart")) pc_mapmaker_khallos_restart(sub_001CDD60_layer0);
++    else sub_001CDD60_layer0();
++#else
++    sub_001CDD60_layer0();
++#endif
++}
++
 +extern void sub_00255550_gen(void);
 +void sub_00255550(void)
 +{
@@ -2905,17 +2937,6 @@
 +    else sub_00045670_gen();
 +#else
 +    sub_00045670_gen();
-+#endif
-+}
-+
-+extern void sub_001CDD60_gen(void);
-+void sub_001CDD60(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_restart")) pc_mapmaker_khallos_restart(sub_001CDD60_gen);
-+    else sub_001CDD60_gen();
-+#else
-+    sub_001CDD60_gen();
 +#endif
 +}
 +
