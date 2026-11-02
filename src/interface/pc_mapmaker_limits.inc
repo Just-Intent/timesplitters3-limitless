@@ -4,11 +4,13 @@
  * Pools (on by default when a MapMaker map is played, scene 100;
  * TSFP_MAPMAKER_POOLS=0 restores the original): sub_0009A140 allocates the
  * AI navigation pools from the Level heap with fixed sizes and nothing checks
- * them when pads are appended. Reimplemented here with twice the regular
- * pads (4800 x 32 B, plus 4800 x 44 B of per-pad AI data) and links
- * (12000 + 16 per piece + 256, x 20 B); the cover pool grows from 1280 to 1536 x 32 B as a guard
- * only, and the 20 runtime pads are unchanged. Same heap, order and zeroing
- * as the original; about 300 KB more of the ~12 MB measured free. On by
+ * them when pads are appended. Reimplemented here with 8000 regular pads
+ * (x 32 B, plus 8000 x 44 B of per-pad AI data), 32,512 links (x 20 B) and
+ * 10,496 cover pads (x 32 B); the 20 runtime pads are unchanged. Same order
+ * and zeroing as the original; the memory comes from the nav block in the
+ * runtime heap when pc_mapmaker_memory.inc provides it (2026-11-02), else
+ * from the Level heap as the original. Current limits: the defines below,
+ * which supersede the values in the next paragraphs. On by
  * default so that a map built with raised editor limits never overflows the
  * stock pools here.
  *
@@ -33,8 +35,8 @@
  * The editor's item node pool is 5300 (config/guest-code-patches/items.json):
  * 500 items, their clipboard copies and up to 81 start points fit twice over.
  * In play items are Level-heap arrays by count (sub_00240590) and about one
- * engine object each (pool 1000, pc_mapmaker_objects.inc; round 3: 500 items
- * + 255 rooms + 64 characters stay below it, measure with probe flag 64).
+ * engine object each (pool 1023, pc_mapmaker_objects.inc; the editor keeps
+ * pieces + items + 64 characters within it, MAPMAKER_LIMIT_OBJECTS).
  *
  * Cover pads stay at the stock 1024: the map adds about 60 more when it loads
  * (measured: 60 on a 142-tile, 50-item map and on a 110-tile, 67-item map, so
@@ -62,23 +64,55 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAPMAKER_LIMIT_PADS 4800u
+/* Regular pads (2026-11-02, was 4800): ids are 0x3E9 + index and the 13
+ * id-threshold compares now read ids up to 0x2328 as regular
+ * (config/guest-code-patches/pads.json pads-idthreshold-*), and regular
+ * handles are the index itself (< 0x1F40), so 8000 regular pads decode in
+ * play. The pool holds all 8000; the editor keeps 320 spare and allows 7680,
+ * 511 pieces of the heaviest tile (14 pads) need 7154. */
+#define MAPMAKER_LIMIT_PADS 7680u
+#define MAPMAKER_POOL_PADS 8000u      /* regular handles 0..0x1F3F, ids 0x3E9..0x2328 */
 /* Cover pads: the runtime pad handles are moved above a 10,240-entry cover
  * handle range (config/guest-code-patches/pads.json, docs/mapmaker/mapmaker-pads.md);
  * the editor keeps 256 spare as stock did (1280 - 1024) for the start-point
  * pads a map adds at load (measured 60). */
 #define MAPMAKER_LIMIT_COVER 9984u    /* 10240 cover handles - 256 */
 #define MAPMAKER_POOL_COVER 10496u    /* 10240 cover handles + 256 guard */
-/* Links 12000 (round 4, was 8800): 255 pieces of the heaviest tile (46 links,
- * tile rows 0..45 of 0x00529400) need 11,730, so links never bind before the
- * piece limit; the pool (12000 + 16 x 255 + 256 = 16,336) keeps link indices
- * below the int16 A* limit 32,767 (docs/mapmaker/mapmaker-pads.md). Pads
- * (14 x 255 = 3,570) and cover (3,570) already fit, so pieces bind first. */
-#define MAPMAKER_LIMIT_LINKS 12000u
-#define MAPMAKER_LIMIT_GROUPS 600
+/* Links (2026-11-02; 12000 template links before, pool 16,336): the A*
+ * nodes and routes hold link indices as int16, so the scene-100 pool is fixed
+ * at 32,512 entries (indices < 32,767). Play adds 16 stitch links per piece
+ * (sub_0009DC70, table of 16 per piece from sub_0009A0F0) and teleporter and
+ * door links (sub_0009CD00, the 256 slack), so the editor limits template
+ * links + 16 per piece to 32,256: 511 pieces of the heaviest tile (46 links)
+ * need 23,506 + 8,176 = 31,682, and 1024 pieces fit with up to 15 links each
+ * (docs/mapmaker/mapmaker-pads.md). */
+#define MAPMAKER_POOL_LINKS 32512u
+#define MAPMAKER_LINK_STITCH 16u
+#define MAPMAKER_LINK_SLACK 256u
+#define MAPMAKER_LIMIT_LINKS (MAPMAKER_POOL_LINKS-MAPMAKER_LINK_SLACK)  /* template + 16 per piece */
+/* Pad groups (2026-11-02, was 600): measured 1.5 per piece, so 511 pieces
+ * need about 770. Group ids are int16 (pad+8), the group A* node pool is
+ * bounded (pc_mapmaker_pads.inc, 8192 nodes) and the group table is sized by
+ * count; the N x N distance matrix sub_00275F70 builds is (N+1) x N x 4 B,
+ * 4.2 MB at 1024, and takes N x N route searches at load (unmeasured). */
+#define MAPMAKER_LIMIT_GROUPS 1024
 #define MAPMAKER_LIMIT_PIECES 255u    /* = MAPMAKER_ROOMS_MAX */
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
+/* Engine objects (2026-11-02): in play each piece (room) and about each item
+ * takes one slot of the engine object pool (pc_mapmaker_objects.inc, 1023
+ * slots, taken without a bound check; 462 used at 236 pieces + 200 items),
+ * characters up to 64 more. The editor refuses placement past the pool, so
+ * 511 pieces leave 448 items; 255 pieces keep the 500 items. */
+#define MAPMAKER_LIMIT_OBJECTS 1023u  /* = MAPMAKER_OBJECTS_POOL */
+#define MAPMAKER_OBJECTS_RESERVE 64u  /* characters in MapMaker story play */
+/* Regular pads: the pool fits the handle range and every pool id stays at or
+ * below the raised id threshold 0x2328. */
+typedef char mapmaker_limits_pad_ids[(MAPMAKER_POOL_PADS<=0x1F40u && 0x3E9u+MAPMAKER_POOL_PADS-1u<=0x2328u &&
+                                      MAPMAKER_LIMIT_PADS<=MAPMAKER_POOL_PADS)?1:-1];
+/* Links: every pool index fits the int16 A* indices. */
+typedef char mapmaker_limits_link_pool[(MAPMAKER_POOL_LINKS<=0x7FFFu &&
+                                        MAPMAKER_LIMIT_LINKS+MAPMAKER_LINK_SLACK<=MAPMAKER_POOL_LINKS)?1:-1];
 
 static struct { int initialized, pools, limits; } mapmaker_limits;
 
@@ -146,9 +180,15 @@ static void mapmaker_limits_read(void)
 
 /* ---- pools ------------------------------------------------------------ */
 extern void sub_0003DFA0(void);
+/* Where the pools come from first: the MapMaker nav block in the runtime heap
+ * (pc_mapmaker_memory.inc registers it once its level-reset hook has run;
+ * 0 = no room or not registered), else the Level heap as the original. */
+#define MAPMAKER_POOL_SOURCE 1
+static uint32_t (*mapmaker_pool_source)(uint32_t bytes);
 static uint32_t mapmaker_pool(uint32_t bytes)
 {
-    uint32_t p=guest_call(sub_0003DFA0,2,bytes,1u); /* Level heap, as the original */
+    uint32_t p=mapmaker_pool_source?mapmaker_pool_source(bytes):0u;
+    if(!p) p=guest_call(sub_0003DFA0,2,bytes,1u); /* Level heap, as the original */
     if(guest_writable(p,bytes)) memset((void *)((uintptr_t)p+g_xbox_mem_offset),0,bytes);
     return p;
 }
@@ -161,12 +201,12 @@ void pc_display_mapmaker_pools(void (*original)(void))
         return;
     }
     save_registers(&r);
-    WORD_AT(0x00715F2Cu)=mapmaker_pool(MAPMAKER_LIMIT_PADS*32u);
-    /* Links: the editor counts template links only; the play-time stitcher
-     * adds one per stitch entry (table of 16 per piece) and objects a few. */
-    WORD_AT(0x00715F30u)=mapmaker_pool((MAPMAKER_LIMIT_LINKS+16u*MAPMAKER_LIMIT_PIECES+256u)*20u);
+    WORD_AT(0x00715F2Cu)=mapmaker_pool(MAPMAKER_POOL_PADS*32u);
+    /* Links: template links, one per stitch entry (table of 16 per piece) and
+     * a few for objects, all within the int16 index range. */
+    WORD_AT(0x00715F30u)=mapmaker_pool(MAPMAKER_POOL_LINKS*20u);
     if((WORD_AT(0x007DE454u)>>8&0xFFu)!=10u)                 /* byte [0x007DE455] */
-        WORD_AT(0x00715F3Cu)=mapmaker_pool(MAPMAKER_LIMIT_PADS*44u);
+        WORD_AT(0x00715F3Cu)=mapmaker_pool(MAPMAKER_POOL_PADS*44u);
     WORD_AT(0x00715F34u)=mapmaker_pool(MAPMAKER_POOL_COVER*32u);
     WORD_AT(0x00715F38u)=mapmaker_pool(0x280u);
     WORD_AT(0x007B6664u)=0;WORD_AT(0x007B6660u)=0;WORD_AT(0x007B65C0u)=0;WORD_AT(0x007B6674u)=0;
@@ -217,6 +257,34 @@ static uint32_t mapmaker_placed_memory(uint32_t piece)
     }
     return mapmaker_budget_apply(total);
 }
+/* Links a list costs in play: its template links and the stitch links. */
+static uint32_t mapmaker_link_cost(const MapMakerTotals *t)
+{
+    return t->cost[2]+MAPMAKER_LINK_STITCH*t->pieces;
+}
+/* Which limits placed + held content passes (0: placement allowed). */
+enum { MAPMAKER_CAP_PADS=1u, MAPMAKER_CAP_COVER=2u, MAPMAKER_CAP_LINKS=4u, MAPMAKER_CAP_PIECES=8u,
+       MAPMAKER_CAP_MEMORY=16u, MAPMAKER_CAP_GROUPS=32u, MAPMAKER_CAP_SUB=64u, MAPMAKER_CAP_OBJECTS=128u };
+/* Engine objects the content takes in play: one per piece and per item, plus
+ * the character reserve. */
+static uint32_t mapmaker_objects_needed(uint32_t pieces,uint32_t sub)
+{
+    return pieces+sub+MAPMAKER_OBJECTS_RESERVE;
+}
+static unsigned mapmaker_limits_over(const MapMakerTotals *p,const MapMakerTotals *h,uint32_t memory,
+                                     int32_t groups,uint32_t sub)
+{
+    unsigned over=0;
+    if(p->cost[0]+h->cost[0]>MAPMAKER_LIMIT_PADS) over|=MAPMAKER_CAP_PADS;
+    if(p->cost[1]+h->cost[1]>MAPMAKER_LIMIT_COVER) over|=MAPMAKER_CAP_COVER;
+    if(mapmaker_link_cost(p)+mapmaker_link_cost(h)>MAPMAKER_LIMIT_LINKS) over|=MAPMAKER_CAP_LINKS;
+    if(p->pieces+h->pieces>MAPMAKER_LIMIT_PIECES) over|=MAPMAKER_CAP_PIECES;
+    if(memory>MAPMAKER_LIMIT_MEMORY) over|=MAPMAKER_CAP_MEMORY;
+    if(groups>MAPMAKER_LIMIT_GROUPS) over|=MAPMAKER_CAP_GROUPS;
+    if(sub>MAPMAKER_LIMIT_SUB) over|=MAPMAKER_CAP_SUB;
+    if(mapmaker_objects_needed(p->pieces+h->pieces,sub)>MAPMAKER_LIMIT_OBJECTS) over|=MAPMAKER_CAP_OBJECTS;
+    return over;
+}
 static float mapmaker_fraction_max(const float *f,unsigned n)
 {
     float m=0;
@@ -229,7 +297,7 @@ void pc_display_mapmaker_limits(void (*original)(void))
     uint32_t editor,placed_head,held_head,flags,placed_mem,total_mem,extra;
     int32_t groups,held_id;
     MapMakerTotals p,h;
-    float f[7];
+    float f[8];
     int refuse;
     original();
     mapmaker_limits_read();
@@ -248,21 +316,19 @@ void pc_display_mapmaker_limits(void (*original)(void))
     total_mem=WORD_AT(editor+0x278);              /* written by the original */
     /* Meter (placed only), as the first part of the original. */
     f[0]=(float)p.cost[0]/MAPMAKER_LIMIT_PADS;f[1]=(float)p.cost[1]/MAPMAKER_LIMIT_COVER;
-    f[2]=(float)p.cost[2]/MAPMAKER_LIMIT_LINKS;f[3]=(float)groups/MAPMAKER_LIMIT_GROUPS;
+    f[2]=(float)mapmaker_link_cost(&p)/MAPMAKER_LIMIT_LINKS;f[3]=(float)groups/MAPMAKER_LIMIT_GROUPS;
     f[4]=(float)p.pieces/MAPMAKER_LIMIT_PIECES;f[5]=(float)(p.sub+extra)/MAPMAKER_LIMIT_SUB;
     f[6]=(float)placed_mem/MAPMAKER_LIMIT_MEMORY;
-    FLOAT_AT(editor+0x270)=mapmaker_fraction_max(f,7);
+    f[7]=(float)mapmaker_objects_needed(p.pieces,p.sub+extra)/MAPMAKER_LIMIT_OBJECTS;
+    FLOAT_AT(editor+0x270)=mapmaker_fraction_max(f,8);
     /* Held piece preview. */
     f[0]=(float)h.cost[0]/MAPMAKER_LIMIT_PADS;f[1]=(float)h.cost[1]/MAPMAKER_LIMIT_COVER;
-    f[2]=(float)h.cost[2]/MAPMAKER_LIMIT_LINKS;f[3]=(float)h.pieces/MAPMAKER_LIMIT_PIECES;
+    f[2]=(float)mapmaker_link_cost(&h)/MAPMAKER_LIMIT_LINKS;f[3]=(float)h.pieces/MAPMAKER_LIMIT_PIECES;
     f[4]=(float)(h.sub+(held_id>=0?1u:0u))/MAPMAKER_LIMIT_SUB;
     f[5]=(float)(total_mem>placed_mem?total_mem-placed_mem:0u)/MAPMAKER_LIMIT_MEMORY;
     FLOAT_AT(editor+0x274)=mapmaker_fraction_max(f,6);
     /* Placement decision over placed + held. */
-    refuse=p.cost[0]+h.cost[0]>MAPMAKER_LIMIT_PADS || p.cost[1]+h.cost[1]>MAPMAKER_LIMIT_COVER ||
-        p.cost[2]+h.cost[2]>MAPMAKER_LIMIT_LINKS || p.pieces+h.pieces>MAPMAKER_LIMIT_PIECES ||
-        total_mem>MAPMAKER_LIMIT_MEMORY || groups>MAPMAKER_LIMIT_GROUPS ||
-        p.sub+h.sub+(held_id>9?1u:0u)+extra>MAPMAKER_LIMIT_SUB;
+    refuse=mapmaker_limits_over(&p,&h,total_mem,groups,p.sub+h.sub+(held_id>9?1u:0u)+extra)!=0;
     flags=WORD_AT(editor+0x25c);
     WORD_AT(editor+0x25c)=refuse?(flags|0x400000u):(flags&~0x400000u);
 }

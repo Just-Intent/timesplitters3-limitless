@@ -89,6 +89,132 @@ static void mapmaker_memory_check(uint32_t caller,uint32_t size,uint32_t heap,in
         fflush(stderr);
     }
 }
+/* ---- nav block --------------------------------------------------------- */
+/* The AI navigation data of a MapMaker map is CPU-only (pads, links, per-pad
+ * AI data, cover and runtime pads, the group distance matrix), and at 511
+ * pieces it is several MB of the Level heap. In scene 100 it comes from one
+ * block of the runtime heap (guest RAM below 0x04000000, xbox_HeapAlloc),
+ * reserved at the first MapMaker map and kept for the run:
+ *  - the pools of pc_display_mapmaker_pools (pc_mapmaker_limits.inc, through
+ *    mapmaker_pool_source),
+ *  - the matrix sub_00275F70 asks for at 0x00275F90 (return 0x00275F95,
+ *    (groups + 1) x groups x 4 B, heap 1; the caller zeroes it, so do we).
+ * Nothing else: Level-heap data the GPU or the APU reads must stay in the
+ * contiguous window (guest code may form physical addresses from it; see the
+ * container note in pc_mapmaker_container.inc).
+ * Lifetime: the Level heap is reset only by sub_0003E650 (the one writer of
+ * its base besides start-up, called from 0x0003D504 per level), so
+ * pc_mapmaker_memory_level_reset (WRAP sub_0003E650) empties the block right
+ * after it, and nothing is taken from the block before that hook has run.
+ * When the block is full or cannot be reserved, the Level heap is used as
+ * before. TSFP_MAPMAKER_NAV=0 turns it off.
+ * Free runtime heap: guest RAM is 64 MB; the image and this fork's extension
+ * end at 0x00920000, the main stack at 0x011A0000, so the runtime heap is
+ * 46.4 MB (src/runtime/guest_thread_memory.c). On the Xbox the title's
+ * virtual and pool allocations shared 64 MB with the 9 MB image and its
+ * 47.1 MB arena, so they were at most about 8 MB; thread stacks add at most
+ * 8 x 512 KB. The block (6 MB) therefore leaves more than 25 MB (INFERRED;
+ * the map-start line prints runtime_heap_free_min to confirm). */
+#ifndef MAPMAKER_GUEST_RET
+#define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
+#endif
+#define MAPMAKER_NAV_BYTES 0x00600000u        /* pools 1.59 MB + matrix 4.2 MB at 1024 groups */
+#define MAPMAKER_NAV_MATRIX_RET 0x00275F95u   /* sub_00275F70: call sub_0003DFA0 at 0x00275F90 */
+#define MAPMAKER_NAV_GROUPS 0x007B666Cu       /* group count in play, read by sub_00275F70 */
+#define MAPMAKER_NAV_SCENE 100u
+extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
+static struct {
+    int initialized, off, tried, reported;
+    uint32_t base, size, used, peak, resets, fallbacks;
+} mapmaker_nav;
+static void mapmaker_nav_read(void)
+{
+    const char *v;
+    if(mapmaker_nav.initialized) return;
+    v=getenv("TSFP_MAPMAKER_NAV");
+    mapmaker_nav.initialized=1;
+    mapmaker_nav.off=v && v[0]=='0' && !v[1];
+}
+/* One line per map at its first nav allocation (the start of the AI
+ * navigation load): Level heap, arena, Eternal heap and nav block. */
+static void mapmaker_nav_report(void)
+{
+    uint32_t arena=WORD_AT(0x007E72D4u),low=WORD_AT(0x006B837Cu),end=WORD_AT(0x006B8380u),top=WORD_AT(0x006B8388u);
+    fprintf(stderr,"[mapmaker] map start memory: level heap free %d, level used %u, heap 0 used %u, arena %u at 0x%08X,"
+        " eternal free %d; nav block %u of %u bytes at 0x%08X (runtime heap), %u fallbacks",
+        (int)(int32_t)WORD_AT(MAPMAKER_MEMORY_SHARED_FREE),low-(arena+0x9DC00u),end-top,WORD_AT(0x007E72D8u),arena,
+        (int)(int32_t)WORD_AT(MAPMAKER_MEMORY_ETERNAL_FREE),mapmaker_nav.used,mapmaker_nav.size,mapmaker_nav.base,
+        mapmaker_nav.fallbacks);
+#ifdef MAPMAKER_PROBE_HEAP_TOP
+    {
+        uint32_t usage[PC_USAGE_WORDS],contig_end;
+        memset(usage,0,sizeof usage);
+        pc_capture_allocation_usage(usage);
+        contig_end=MAPMAKER_PROBE_CONTIG_BASE+xbox_ContiguousAllocatedBytes();
+        if(usage[PC_USAGE_PHYS_END_PEAK]>contig_end) contig_end=usage[PC_USAGE_PHYS_END_PEAK];
+        fprintf(stderr,"; host runtime_heap_live %u runtime_heap_free_min %d contig_free_min %d",
+            usage[PC_USAGE_HEAP_LIVE],
+            usage[PC_USAGE_HEAP_END_PEAK]?(int)(MAPMAKER_PROBE_HEAP_TOP-usage[PC_USAGE_HEAP_END_PEAK]):0,
+            (int)(MAPMAKER_PROBE_CONTIG_TOP-contig_end));
+    }
+#endif
+    fputc('\n',stderr);
+    fflush(stderr);
+}
+/* bytes from the block, zeroed and 16-aligned as the Level heap's, or 0. */
+static uint32_t mapmaker_nav_alloc(uint32_t bytes)
+{
+    uint32_t need=(bytes+15u)&~15u,p;
+    mapmaker_nav_read();
+    if(mapmaker_nav.off || !mapmaker_nav.resets || WORD_AT(MAPMAKER_MEMORY_SCENE)!=MAPMAKER_NAV_SCENE || !bytes) return 0;
+    if(!mapmaker_nav.tried) {
+        mapmaker_nav.tried=1;
+        mapmaker_nav.base=xbox_HeapAlloc(MAPMAKER_NAV_BYTES,4096u);
+        mapmaker_nav.size=mapmaker_nav.base?MAPMAKER_NAV_BYTES:0u;
+        if(!mapmaker_nav.base) {
+            fprintf(stderr,"[mapmaker] nav block: the runtime heap cannot give %u bytes; AI navigation data stays in the Level heap\n",
+                MAPMAKER_NAV_BYTES);
+            fflush(stderr);
+        }
+    }
+    if(!mapmaker_nav.reported) { mapmaker_nav.reported=1;mapmaker_nav_report(); }
+    if(!mapmaker_nav.base || need<bytes || need>mapmaker_nav.size-mapmaker_nav.used) {
+        mapmaker_nav.fallbacks++;
+        return 0;
+    }
+    p=mapmaker_nav.base+mapmaker_nav.used;
+    mapmaker_nav.used+=need;
+    if(mapmaker_nav.used>mapmaker_nav.peak) mapmaker_nav.peak=mapmaker_nav.used;
+    memset((void *)((uintptr_t)p+g_xbox_mem_offset),0,need);
+    return p;
+}
+/* WRAP sub_0003E650 (Level heap reset, cdecl, plain ret). */
+void pc_mapmaker_memory_level_reset(void (*original)(void))
+{
+    original();
+    mapmaker_nav.used=0;mapmaker_nav.reported=0;
+    mapmaker_nav.resets++;
+#ifdef MAPMAKER_POOL_SOURCE
+    mapmaker_pool_source=mapmaker_nav_alloc;   /* pc_mapmaker_limits.inc pools */
+#endif
+}
+/* The group distance matrix (sub_00275F70) from the nav block. */
+static int mapmaker_nav_matrix(uint32_t caller,uint32_t size,uint32_t heap)
+{
+    uint32_t p;
+    if(caller!=MAPMAKER_NAV_MATRIX_RET || heap!=1u || WORD_AT(MAPMAKER_MEMORY_SCENE)!=MAPMAKER_NAV_SCENE) return 0;
+    p=mapmaker_nav_alloc(size);
+    fprintf(stderr,"[mapmaker] nav: group matrix of %u groups, %u bytes, in the %s (nav block %u of %u used);"
+        " level heap free %d\n",
+        WORD_AT(MAPMAKER_NAV_GROUPS),size,p?"nav block":"Level heap",mapmaker_nav.used,mapmaker_nav.size,
+        (int)(int32_t)WORD_AT(MAPMAKER_MEMORY_SHARED_FREE));
+    fflush(stderr);
+    if(!p) return 0;
+    g_eax=p;
+    MAPMAKER_GUEST_RET();                      /* the original's ret: the caller pops the arguments */
+    return 1;
+}
+
 static void mapmaker_memory_guard(void (*original)(void),unsigned heap_arg)
 {
     uint32_t caller=0,size=0,heap=0xFFFFFFFFu;
@@ -97,6 +223,7 @@ static void mapmaker_memory_guard(void (*original)(void),unsigned heap_arg)
     if(MAPMAKER_STACK_OK(4u+4u*(heap_arg+1u))) {
         caller=WORD_AT(g_esp);size=WORD_AT(g_esp+4u);heap=WORD_AT(g_esp+4u+4u*heap_arg);
     }
+    if(heap_arg==1u && mapmaker_nav_matrix(caller,size,heap)) return;
     pool=mapmaker_memory_pool(heap);
     if(pool>=0) before=(int32_t)WORD_AT(pool?MAPMAKER_MEMORY_ETERNAL_FREE:MAPMAKER_MEMORY_SHARED_FREE);
     original();
@@ -143,6 +270,9 @@ void pc_mapmaker_memory_arena(void (*original)(void))
         } else {
             xbox_ContiguousFree(trial);
             WORD_AT(MAPMAKER_ARENA_SIZE)=size;raised=size;
+#ifdef MAPMAKER_BUDGET_ARENA
+            mapmaker_budget.arena_mb=mb;mapmaker_budget.initialized=0;  /* editor memory budget follows */
+#endif
             fprintf(stderr,"[mapmaker] arena: TSFP_MAPMAKER_ARENA_MB=%u, %u -> %u bytes (Level heap and heap 0 gain %u MB in every scene)\n",
                 mb,MAPMAKER_ARENA_STOCK,size,mb);
         }

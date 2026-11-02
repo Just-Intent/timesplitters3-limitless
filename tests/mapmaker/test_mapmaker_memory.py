@@ -24,6 +24,19 @@ MUTATIONS = {
     'arena-trial-kept': ('            xbox_ContiguousFree(trial);\n', '            (void)trial;\n'),
     'arena-after-original': ('            WORD_AT(MAPMAKER_ARENA_SIZE)=size;raised=size;', '            raised=size;'),
     'arena-ignores-current': ('        if(stock!=MAPMAKER_ARENA_STOCK) {', '        if(0) {'),
+    # Nav block (AI navigation data of a MapMaker map in the runtime heap).
+    'nav-before-reset': (' || !mapmaker_nav.resets ||', ' ||'),
+    'nav-any-scene': (' || WORD_AT(MAPMAKER_MEMORY_SCENE)!=MAPMAKER_NAV_SCENE || !bytes) return 0;', ' || !bytes) return 0;'),
+    'nav-not-zeroed': ('    memset((void *)((uintptr_t)p+g_xbox_mem_offset),0,need);\n', '\n'),
+    'nav-never-emptied': ('    mapmaker_nav.used=0;mapmaker_nav.reported=0;\n', '    mapmaker_nav.reported=0;\n'),
+    'nav-unbounded': (' || need>mapmaker_nav.size-mapmaker_nav.used) {', ') {'),
+    'nav-matrix-any-caller': ('    if(caller!=MAPMAKER_NAV_MATRIX_RET || heap!=1u ||', '    if(heap!=1u ||'),
+    'nav-matrix-no-ret': ('    MAPMAKER_GUEST_RET();                      /* the original\'s ret', '    (void)0;                      /* the original\'s ret'),
+    'nav-retries-heap': ('    if(!mapmaker_nav.tried) {', '    if(!mapmaker_nav.base) {'),
+    'nav-aligned-redirected': ('    if(heap_arg==1u && mapmaker_nav_matrix(', '    if(mapmaker_nav_matrix('),
+    'nav-report-every-alloc': ('    if(!mapmaker_nav.reported) { mapmaker_nav.reported=1;mapmaker_nav_report(); }',
+                               '    mapmaker_nav_report();'),
+    'nav-no-off-switch': ("    mapmaker_nav.off=v && v[0]=='0' && !v[1];", '    mapmaker_nav.off=0;(void)v;'),
 }
 
 

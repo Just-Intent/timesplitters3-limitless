@@ -29,7 +29,7 @@
  *
  * Requires the includer's WORD_AT, guest_writable, g_esp and, from
  * pc_mapmaker_limits.inc, mapmaker_limits, mapmaker_limits_read,
- * MAPMAKER_LIMIT_COVER and MAPMAKER_POOL_COVER. */
+ * MAPMAKER_LIMIT_COVER, MAPMAKER_POOL_COVER and MAPMAKER_POOL_PADS. */
 #ifndef MAPMAKER_STACK_OK
 /* Hot hooks check the guest stack with this instead of guest_writable,
  * whose VirtualQuery made a 186-piece map's AI setup take 13 minutes. */
@@ -44,6 +44,18 @@
 #define MAPMAKER_PADS_GROUP_NODES 8192u   /* pads.json: 0x20000 B of 16-byte nodes */
 #define MAPMAKER_PADS_PAD_NODES 1000u     /* stock: 0x3E80 B at 0x00712058 */
 #define MAPMAKER_PADS_SPARE 256u          /* stock spare: 1280 - 1024 */
+/* Pad ids: regular 0x3E9 + index, cover 0x2329 + index. The 13 "id above
+ * the threshold is a cover id, take its owner" compares (sub_0023F300,
+ * sub_0023FD10, 9 in sub_00240C50, sub_00339410, sub_00339560) read 0x1F40
+ * in stock, which misreads regular pads 7000..7999; pads.json moves them to
+ * the last regular id, so every regular handle (< 0x1F40) has a regular id. */
+#define MAPMAKER_PADS_ID_THRESHOLD 0x2328u /* pads.json pads-idthreshold-* */
+#define MAPMAKER_PADS_REGULAR_ID 0x3E9u
+#define MAPMAKER_PADS_COVER_ID 0x2329u
+
+typedef char mapmaker_pads_regular_ids[(MAPMAKER_PADS_REGULAR_ID+MAPMAKER_POOL_PADS-1u<=MAPMAKER_PADS_ID_THRESHOLD &&
+                                        MAPMAKER_PADS_ID_THRESHOLD+1u==MAPMAKER_PADS_COVER_ID &&
+                                        MAPMAKER_POOL_PADS<=0x1F40u)?1:-1];
 
 /* The editor limit leaves the stock spare below the handle range, and the
  * pool holds the whole handle range. */
