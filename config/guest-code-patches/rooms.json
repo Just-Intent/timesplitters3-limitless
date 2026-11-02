@@ -3658,6 +3658,19 @@
       "reason": "light round-robin per room/16: 14 -> 16 entries (room 0xFE / 16 = 15)"
     },
     {
+      "id": "rooms-reloc-f-0x7b5180",
+      "kind": "relocate",
+      "old": "0x007B5180",
+      "size": "0x354",
+      "new": "0x008CC800",
+      "new_size": "0x440",
+      "sites": {
+        "0x000A79C8": "offset"
+      },
+      "data_ok": [],
+      "reason": "per-id drawn flag dword[0xD6] (only reference: sub_000A79B0 [room*4+0x7B5180] = 1) -> 0x110 entries; declared 4 bytes short (0x007B54D8 after entry 0xD5 is a list count)"
+    },
+    {
       "id": "rooms-reloc-v-0x749890",
       "kind": "relocate",
       "old": "0x00749890",
