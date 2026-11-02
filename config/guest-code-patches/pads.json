@@ -793,6 +793,123 @@
       "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
     },
     {
+      "id": "pads-idthreshold-0023f300",
+      "kind": "code",
+      "function": "0x0023F300",
+      "address": "0x0023F300",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d28230000",
+      "reason": "cmp eax, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-0023fdcf",
+      "kind": "code",
+      "function": "0x0023FD10",
+      "address": "0x0023FDCF",
+      "original_hex": "81f9401f0000",
+      "new_hex": "81f928230000",
+      "reason": "cmp ecx, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-002411f6",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x002411F6",
+      "original_hex": "81fd401f0000",
+      "new_hex": "81fd28230000",
+      "reason": "cmp ebp, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-00241300",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x00241300",
+      "original_hex": "81fd401f0000",
+      "new_hex": "81fd28230000",
+      "reason": "cmp ebp, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-002413d2",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x002413D2",
+      "original_hex": "81fd401f0000",
+      "new_hex": "81fd28230000",
+      "reason": "cmp ebp, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-002416ba",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x002416BA",
+      "original_hex": "81fd401f0000",
+      "new_hex": "81fd28230000",
+      "reason": "cmp ebp, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-00241853",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x00241853",
+      "original_hex": "81fd401f0000",
+      "new_hex": "81fd28230000",
+      "reason": "cmp ebp, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-00241f64",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x00241F64",
+      "original_hex": "81fe401f0000",
+      "new_hex": "81fe28230000",
+      "reason": "cmp esi, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-00242035",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x00242035",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d28230000",
+      "reason": "cmp eax, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-00242094",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x00242094",
+      "original_hex": "81fe401f0000",
+      "new_hex": "81fe28230000",
+      "reason": "cmp esi, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-00242107",
+      "kind": "code",
+      "function": "0x00240C50",
+      "address": "0x00242107",
+      "original_hex": "81fe401f0000",
+      "new_hex": "81fe28230000",
+      "reason": "cmp esi, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-00339448",
+      "kind": "code",
+      "function": "0x00339410",
+      "address": "0x00339448",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d28230000",
+      "reason": "cmp eax, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
+      "id": "pads-idthreshold-00339597",
+      "kind": "code",
+      "function": "0x00339560",
+      "address": "0x00339597",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d28230000",
+      "reason": "cmp eax, 0x1f40; jle; call sub_0009CCA0; movsx [pad+8]: a pad id above the threshold is a cover id and takes its owner. 8000 -> 9000 (0x2328, the last regular id; cover ids start at 0x2329 as in sub_0009CC40 and sub_0009A330), so regular pads 7000..7999 (ids 8001..9000) stay regular"
+    },
+    {
       "id": "pads-astar-loop-bound",
       "kind": "code",
       "function": "0x000984D0",

@@ -17,11 +17,13 @@ in the disassembly at the given address; INFERRED = reasoning, not observed.
 | Group A* node pool | 1000 nodes .bss 0x0070E178, no bound | 8192 nodes at 0x008E0000, bounded | `pads.json` relocation + `pc_mapmaker_pads_group_node` |
 | Pad A* node pool | 1000 nodes .bss 0x00712058, no bound | 1000 nodes, bounded | `pc_mapmaker_pads_pad_node` |
 | Start-point cover top-up | unbounded | refused past the cover capacity (scene 100) | `pc_mapmaker_pads_cover_topup` |
+| Pad id threshold (13 compares) | id > 8000 is cover | id > 9000 (0x2328) is cover | `pads.json` `pads-idthreshold-*` (2026-11-02) |
+| Regular pads (scene 100) | pool 2400, editor 2400 | pool 8000 (the regular handle range), editor 7,680 | `MAPMAKER_POOL_PADS`, `MAPMAKER_LIMIT_PADS` |
 
 Unchanged on purpose: pad ids (regular 0x3E9 + i, cover 0x2329 + i,
 runtime -2), so saved maps and story files read the same; the cover handle
-base 0x1F40; the regular range; the 13 pad-id threshold compares; regular
-pads 4800 and links 12,000 (8800 before 2026-11-01) in the editor; pad groups 600.
+base 0x1F40; the regular handle range (index < 0x1F40). Regular pads were
+4800 in the editor until 2026-11-02 (now 7,680, below).
 
 ## Wrappers for the integrator
 
@@ -142,10 +144,29 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
 
 ## Regular pads, ids and links
 
-- The 13 id-threshold compares (`cmp reg,0x1f40; jle`, pads.md §1.3) treat
-  an id above 8000 as a cover id. Regular ids reach 0x3E9 + 4799 = 5800 with
-  4800 pads, cover ids start at 9001, so they stay correct; they would only
-  misread regular pads past 7000. Unchanged.
+- The 13 id-threshold compares (`cmp reg,0x1f40; jle; call sub_0009CCA0;
+  movsx [pad+8]`: an id above the threshold is a cover id and is replaced by
+  its owner) are in `sub_0023F300` (0x0023F300), `sub_0023FD10` (0x0023FDCF),
+  `sub_00240C50` (0x002411F6, 0x00241300, 0x002413D2, 0x002416BA, 0x00241853,
+  0x00241F64, 0x00242035, 0x00242094, 0x00242107), `sub_00339410`
+  (0x00339448) and `sub_00339560` (0x00339597) (CONFIRMED, each followed by
+  `jle` and the call). With 0x1F40 they misread regular pads 7000..7999 (ids
+  8001..9000) as cover pads, taking `+8` (the group id) as an owner pad id.
+  2026-11-02: `pads-idthreshold-*` rewrites them to 0x2328, the last regular
+  id. Every other cover-id test already uses `>= 0x2329` (`sub_0009CC40`,
+  `sub_0009CCA0`, `sub_0009A330`, `sub_0009CE00`, `sub_0023F9D0`,
+  `sub_00332330`, `sub_0006C1E0`), so the 13 now agree with them. Ids up to
+  8000 decode as before, so story levels (at most 2400 regular, 350 cover) and
+  saved maps are unaffected; no scene gate. The earlier decoder classification
+  called four handle compares (`0x0009D5FE`, `0x0009D622`, `0x0015D51A`,
+  `0x0015E4B5`, all `jl` on handles) id thresholds and two id thresholds
+  (`0x00339448`, `0x00339597`) handle compares; corrected.
+- Regular pads: the scene-100 pool and the per-pad AI data hold 8000 entries
+  (the whole regular handle range, 256 KB + 352 KB), the editor allows 7,680
+  (320 spare). 511 pieces of the heaviest tile need 7,154. Regular ids reach
+  0x3E9 + 7999 = 9000 < 0x2329, cover ids still start at 9001. Not measured:
+  the per-pad AI data writer `sub_0027C4A0` does route searches per regular
+  pad at load, so load time grows with the pad count.
 - Cover ids reach 0x2329 + 10,239 = 19,240 < 32,767 (int16 owner field at
   pad+8 and the `[0x78CCE4]` records) and < 65,535 (uint16 save words).
 - Links: the editor's 12,000 counts template links only (8800 until

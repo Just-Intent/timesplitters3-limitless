@@ -26,9 +26,10 @@ KEPT = reviewed("""
 002B0363 movsx eax,[eax-0x413D8]: eax was just reloaded from [0x715F38], so it is a fixed stray read before the runtime pool, not runtime[h].owner; rewriting would only move it
 """)
 
-# Cover handle base 0x1F40 and the pad-id threshold 0x1F40: Layout B keeps both
-# (cover = 0x1F40 + index, ids > 8000 are cover ids). These decode/encode cover
-# handles exactly as before.
+# Cover handle base 0x1F40: Layout B keeps it (cover = 0x1F40 + index). These
+# decode/encode cover handles exactly as before. The 13 pad-id threshold compares
+# (cmp id,0x1F40; jle; call sub_0009CCA0) are rewritten to 0x2328 in pads.json
+# (pads-idthreshold-*), so they are table sites, not listed here.
 COVER_BASE = reviewed("""
 0009A40B add eax,0x1F40: cover index -> handle (sub_0009A3C0)
 0009A43D cmp eax,0x1F40: handle >= cover base (sub_0009A420 decoder)
@@ -41,39 +42,26 @@ COVER_BASE = reviewed("""
 0009D26E add eax,-0x1F40: cover handle -> index (nav loader sub_0009CE00)
 0009D37E add eax,-0x1F40: cover handle -> index (sub_0009CE00)
 0009D474 add eax,-0x1F40: cover handle -> index (sub_0009D3B0)
-0009D5FE cmp ecx,0x1F40: pad id threshold (sub_0009D5E0)
-0009D622 cmp edx,0x1F40: pad id threshold (sub_0009D5E0)
+0009D5FE cmp ecx,0x1F40: handle >= cover base (sub_0009D5E0, jl)
+0009D622 cmp edx,0x1F40: handle >= cover base (sub_0009D5E0, jl)
 00159712 cmp eax,0x1F40: handle >= cover base (sub_001596F0)
 0015975B cmp eax,0x1F40: handle >= cover base (sub_001596F0)
 0015976F add eax,-0x1F40: cover handle -> index (sub_001596F0)
-0015D51A cmp edi,0x1F40: pad id threshold (sub_0015D500)
-0015E4B5 cmp edx,0x1F40: pad id threshold (sub_0015E450)
+0015D51A cmp edi,0x1F40: handle >= cover base (sub_0015D500, jl)
+0015E4B5 cmp edx,0x1F40: handle >= cover base (AI +0x684 handle, sub_0015E450)
 00160BD4 cmp eax,0x1F40: handle >= cover base (sub_00160BD0)
 001FCED5 cmp eax,0x1F40: handle >= cover base (sub_001FCE90)
 001FCEE3 add eax,-0x1F40: cover handle -> index (sub_001FCE90)
 002329DF cmp eax,0x1F40: handle >= cover base (sub_00232270)
 002329F3 add eax,-0x1F40: cover handle -> index (sub_00232270)
-0023F300 cmp eax,0x1F40: pad id threshold (sub_0023F300)
-0023FDCF cmp ecx,0x1F40: pad id threshold (teleporter walk sub_0023FD10)
-002411F6 cmp ebp,0x1F40: pad id threshold (map fill sub_00240C50)
-00241300 cmp ebp,0x1F40: pad id threshold (sub_00240C50)
-002413D2 cmp ebp,0x1F40: pad id threshold (sub_00240C50)
-002416BA cmp ebp,0x1F40: pad id threshold (sub_00240C50)
-00241853 cmp ebp,0x1F40: pad id threshold (sub_00240C50)
-00241F64 cmp esi,0x1F40: pad id threshold (sub_00240C50)
-00242035 cmp eax,0x1F40: pad id threshold (sub_00240C50)
-00242094 cmp esi,0x1F40: pad id threshold (sub_00240C50)
-00242107 cmp esi,0x1F40: pad id threshold (sub_00240C50)
 00274411 cmp eax,0x1F40: handle >= cover base (sub_00274400)
 0027446A cmp eax,0x1F40: handle >= cover base (sub_00274450)
 0027C3BB cmp eax,0x1F40: handle >= cover base (sub_0027C3A0)
 002B5A03 cmp eax,0x1F40: handle >= cover base (sub_002B55D0)
 002B5A22 movsx edx,[eax+ecx-0x3E7F8]: folded cover[h-0x1F40] (x32, +8), cover base kept
 002B5A86 movsx eax,[ecx+edx-0x3E7F8]: folded cover[h-0x1F40] (x32, +8), cover base kept
-00339448 cmp eax,0x1F40: handle >= cover base (sub_00339410)
 003394B2 cmp ecx,0x1F40: handle >= cover base (sub_00339480)
 003394C2 add ecx,-0x1F40: cover handle -> index (sub_00339480)
-00339597 cmp eax,0x1F40: handle >= cover base (sub_00339560)
 0033B7DC cmp [esp+edx*4+0x14],0x1F40: handle >= cover base (sub_0033B750)
 0033B80B sub edx,0x1F40: cover handle -> index (sub_0033B750)
 0033B95D cmp eax,0x1F40: handle >= cover base (sub_0033B940)
@@ -116,6 +104,7 @@ def candidate_sites():
 def test_every_pad_handle_constant_is_classified():
     table = patched('pads')
     found = candidate_sites()
+    by_address = {i.address: i for i in decoded() if i.address in found}
     assert not unclassified(found, table, KEPT, COVER_BASE, NOT_HANDLE)
     # the reviewed lists describe real sites and never hide a patched one
     for name, group in (('kept', KEPT), ('cover base', COVER_BASE), ('not a handle', NOT_HANDLE)):
@@ -124,5 +113,6 @@ def test_every_pad_handle_constant_is_classified():
     # every runtime-range constant (not the kept cover base) is rewritten
     moved = {a for a, s in found.items() if a not in KEPT and a not in COVER_BASE and a not in NOT_HANDLE}
     assert moved <= table
-    assert len(moved) == 88
+    thresholds = {a for a in moved if 0x1F40 in [v for k, v in by_address[a].values()]}
+    assert len(thresholds) == 13 and len(moved - thresholds) == 88
     assert 0x002B0456 in moved                     # folded runtime[h - base].flags
