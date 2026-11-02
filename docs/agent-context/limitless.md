@@ -499,7 +499,7 @@ Multi-boss merge (.26): 28 WRAPs (walker/skeleton/robot/crowe/tank/mothership/kh
 swaps, worm anim register, sky weather); sub_000DAC30 chain: actors, realbosses,
 tank, khallos (log only). See each boss doc.
 .27: sets_spawn_masks (sub_00240C50) gives slots 11-20 slot 1's spawn mask;
-worm block at AI start (emitter pool); late walker/skeleton instances.
+worm block at AI start (emitter pool); late walker/skeleton instances; fall drop rule.
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
 anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 (30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear

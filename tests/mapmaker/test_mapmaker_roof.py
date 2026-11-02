@@ -15,6 +15,9 @@ ROOT = Path(__file__).resolve().parents[2]
 ROOF = ROOT / 'src/interface/pc_mapmaker_roof.inc'
 
 MUTATIONS = {
+    'drop-rule-gone': ('            if(y<floor_y-MAPMAKER_ROOF_DROP) { mapmaker_roof_kill(slot,ent,"dropping outside every room");return; }\n', ''),
+    'drop-any-height': ('            if(y<floor_y-MAPMAKER_ROOF_DROP) {', '            if(y<floor_y+1.0f) {'),
+    'worm-killed': ('==MAPMAKER_ROOF_WORM_MODEL) return;\n', '==0xFFFFu) return;\n'),
     'without-limits': ('    return mapmaker_limits.limits && WORD_AT(0x0079094Cu)==102u;',
                        '    return WORD_AT(0x0079094Cu)==102u;'),
     'any-scene': ('    return mapmaker_limits.limits && WORD_AT(0x0079094Cu)==102u;',

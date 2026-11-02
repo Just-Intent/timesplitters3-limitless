@@ -145,6 +145,9 @@
 #define MAPMAKER_ROOF_SECOND 60u                 /* ticks between the fall logs */
 #define MAPMAKER_ROOF_QUERY_EVERY 6u             /* ticks between room queries per character */
 #define MAPMAKER_ROOF_NOROOM_QUERIES 8u          /* in no room this many queries in a row: dead (~0.8 s) */
+#define MAPMAKER_ROOF_DROP 1.5f                  /* outside every room and this far under the lowest floor: dead */
+#define MAPMAKER_ROOF_ENT_MODEL 0x94u            /* entity: model id (halfword) */
+#define MAPMAKER_ROOF_WORM_MODEL 0x5EAu          /* the mansion worm: starts and burrows under the floor */
 #define MAPMAKER_ROOF_BODY_LOW 0.25f             /* body box above the feet (y +0x68 is the feet: */
 #define MAPMAKER_ROOF_BODY_HIGH 1.5f             /* the hazard kill compares it with the floor) */
 #define MAPMAKER_ROOF_BODY_HALF 0.3f
@@ -825,6 +828,9 @@ static void mapmaker_roof_fall_check(unsigned slot,uint32_t ent,int log_now)
     float y=FLOAT_AT(ent+0x68u),health=FLOAT_AT(ent+0x1CCu);
     float floor_y=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT;
     if(!(health>0.0f)) { mapmaker_roof_play.out[slot]=mapmaker_roof_play.noroom[slot]=mapmaker_roof_play.below[slot]=0;return; }
+    /* the mansion worm lives under the floor (v0.4.0-mapmaker.27: killed at its
+     * spawn, y -4.5 outside every room, its burst left on screen) */
+    if(*(uint16_t *)((uintptr_t)(ent+MAPMAKER_ROOF_ENT_MODEL)+g_xbox_mem_offset)==MAPMAKER_ROOF_WORM_MODEL) return;
     if((mapmaker_roof_play.ticks+slot)%MAPMAKER_ROOF_QUERY_EVERY==0u) {
         int rooms=mapmaker_roof_rooms_at(ent);
         if(rooms>=0) mapmaker_roof_play.rooms_seen[slot]=(uint32_t)rooms;
@@ -834,6 +840,9 @@ static void mapmaker_roof_fall_check(unsigned slot,uint32_t ent,int log_now)
                         (double)FLOAT_AT(ent+0x64u),(double)y,(double)FLOAT_AT(ent+0x6Cu));
                 fflush(stderr);
             }
+            /* .27: a player who walked off dropped to y -2.5 outside every room,
+             * then the game put them back on the last floor before 8 queries */
+            if(y<floor_y-MAPMAKER_ROOF_DROP) { mapmaker_roof_kill(slot,ent,"dropping outside every room");return; }
             if(++mapmaker_roof_play.noroom[slot]>=MAPMAKER_ROOF_NOROOM_QUERIES) { mapmaker_roof_kill(slot,ent,"outside every room");return; }
         } else if(rooms>0) mapmaker_roof_play.noroom[slot]=0;
     }
