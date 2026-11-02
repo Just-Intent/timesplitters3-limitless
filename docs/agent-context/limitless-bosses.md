@@ -22,3 +22,8 @@ worm removal (WRAP sub_001D5E20), open-air view (`pc_mapmaker_openview.inc`,
 WRAP sub_00089B90), sandstorm grains outside scene 2 (weather frame hook),
 Crowe egg skip (WRAP sub_002AB1B0) and the shared boss statics holder
 (`pc_mapmaker_bossfx.inc`).
+
+.31 Crowes fired but never walked: the egg's blocked cells steer state 5
+(sub_002A9E60); the skipped egg now keeps them 120 calls (WRAP sub_002A9D00
+-> `_crowe_cells`); a stalled state-9 walk lands after 240; per-Crowe trace. Pause restart
+(sub_001CDD60, no level init): WRAP -> `_crowe_restart` forgets the blocks.
