@@ -104,3 +104,14 @@ wrappers and the table must ship together. Tests:
 `mapmaker_rooms_buckets.c` against models of the stock byte code, 27 C and 6
 table mutations, decode of the word loads). Overlap: the camera view work
 (depth cap 0x4F, view fields) touches the same two functions.
+
+## Stage 7: view stride 0x3000 (every scene)
+
+Views `[0x7B0CE4]` are 0x3000 apart (stock 0xFFC); the shadow is inside the
+stride: rects +0x1000 + 12*id, flags +0x28A0, list +0x2AB0 (room for id space
+0x20D). Sites: 35 stride steps, `sub_000C61D0`'s unrolled init (4 multiples,
+20 fields), two magic divisions (`0xAAAAAAAB`, shift 13), allocation 0x12008.
+C readers: `MAPMAKER_ROOMS_VIEW_*`, `OPENVIEW_RECT`, `MAPMAKER_CAMERA_VIEW_RECTS`,
+`SMX_PLAYER` (pinned by `test_other_areas_use_the_moved_tables`). Tests:
+`test_view_stride_table` (+10 mutations), `test_every_view_stride_is_classified`
+(decode). Details: mapmaker-rooms.md "Stage 7".
