@@ -262,6 +262,7 @@ void pc_mapmaker_khallos_rider(void (*original)(void));
 void pc_mapmaker_khallos_rider_pose(void (*original)(void));
 void pc_mapmaker_khallos_create(void (*original)(void));
 void pc_mapmaker_khallos_hud(void (*original)(void));
+void pc_mapmaker_khallos_sound_load(void (*original)(void));
 void pc_mapmaker_worm_anims(void (*original)(void));
 void pc_mapmaker_worm_level(void (*original)(void));
 void pc_mapmaker_worm_ai_start(void (*original)(void));
