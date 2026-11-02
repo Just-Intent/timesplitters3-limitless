@@ -12,7 +12,7 @@ has been built or played**, except the v0.4.0-mapmaker.25 playtest under Play.
 Files: `src/interface/pc_mapmaker_skymusic.inc` (new, area `sky`), the extra-sky
 table and the extra-sky cloud rule in `src/interface/pc_mapmaker_sky.inc`;
 tests `tests/mapmaker/test_mapmaker_skymusic.py` (fixture
-`tests/mapmaker/mapmaker_skymusic.c`, 38 mutations, XBE / decoder / pak
+`tests/mapmaker/mapmaker_skymusic.c`, 58 mutations, XBE / decoder / pak and texture-pak
 checks) and the extended `tests/mapmaker/test_mapmaker_sky.py`.
 
 ## What MapMaker offers (stock)
@@ -191,6 +191,42 @@ dword). System Link peers without this build see the same fallbacks.
 
 ### Play (scene 100)
 
+**Playtest v0.4.0-mapmaker.27:** "Most of the skies are still not rendering
+at all. Some have elements that are rendering in part." Static cause
+(CONFIRMED in the XBE and the pak indexes, not yet played):
+
+- A sky model's textures are separate files `textures/<id>.xbt` (id = the
+  24-bit word at the start of each 16-byte entry of the list at model file
+  `+[file+0]`). The load pass `sub_00063390` reads the model and, since every
+  sky file's texture block `+0x48` is 0x10 (`0x00063543`, all 27 skies
+  checked), registers its textures at once (`sub_00096220`, `0x0006355D`):
+  nothing is deferred to the prop's creation, so the mothership's fix
+  (`sub_00096330(file, 1)`, f75895d9) does not apply. Each texture is
+  queued (`sub_000637E0`, name `host0:textures/%06x.xbt`) and the texture
+  pass `sub_00063900` (`0x0003D5E5`, before the views at `0x0003D645`) loads
+  it from any mounted pak (`sub_00018B90`: size, data, then the id into the
+  loaded table `[0x004B85C8]`, rows of 0x34, id `+0x1C`). A texture in no
+  mounted pak is skipped (size 0), and its material has no texture.
+- **No level pak holds any sky texture.** They are in the level's memory
+  pak (`arcademem/l_20_arm.pak`, ...), which a story level mounts whole
+  (`sub_00062610(scene, 1)` -> `sub_000622D0(path, 1, 1)`, `0x000628B1`;
+  scene 100 gets `l_100m.pak` there). MapMaker play mounted only the level
+  pak: 14 skies lacked textures, 9 all of them (not drawn) and 5 only some
+  (Train, Time to Split, Vietnam, Spaceport, NF1 also use textures the stock
+  play paks share: "in part"); Virtua, Prison and Sniper lack none. The sandstorm's four models each need one
+  texture of `challengemem/l_64_chm.pak` too (the .25 "flag set, nothing
+  shown").
+- Checked and not a cause: sky records hold one model (`+4`) and no second
+  model or layer (`0x005149A8`, 0x34 bytes, dumped for all 17); the room
+  mask switch (`pc_mapmaker_skymask.inc`) is a dev switch, off by default;
+  no scene-gated sky draw code was found (not searched exhaustively).
+- **Fix:** each row names its textures pak (`mem` in `mapmaker_sky_extras`,
+  0 for the three without), the sandstorm too; `smx_mount_pair` mounts the
+  model's pak, then the textures pak, index-only, and the extra sky or the
+  sandstorm is used only when both are mounted (else the stock choice,
+  logged). The probe lists, once per level, each of the model's textures
+  missing from the loaded table and a loaded/total count.
+
 **Playtest v0.4.0-mapmaker.25 (mapmaker-recon 54129718):** the new music
 played; the extra skies and the sandstorm did not show. Static re-check:
 
@@ -252,14 +288,17 @@ Steps now:
 
 - **mount** (`sub_00062790`, after the original): a new level; nothing is
   mounted here.
-- Mounting (first of the steps below that needs it): for an extra sky its pak
-  (table below), for the sandstorm `pak/challenge/l_64_ch.pak`. Index only,
-  like `chr.pak` (`sub_000622D0(path, 0, 1)`: the file stays open and entries
-  are read on demand), at most two, skipped when already mounted
+- Mounting (first of the steps below that needs it): for an extra sky its
+  model pak and then its textures pak (table below), for the sandstorm
+  `pak/challenge/l_64_ch.pak` and `pak/challengemem/l_64_chm.pak`; used only
+  when both are mounted. Index only, like `chr.pak` (`sub_000622D0(path, 0,
+  1)`: the file stays open and entries are read on demand; textures are read
+  the same way, `sub_00062CA0`/`sub_00062C30`/`sub_00062D20`), at most four
+  (Time to Split + Sandstorm share both), skipped when already mounted
   (`sub_00062260`), tried once per level and row, refused when fewer than 8 of
   the 64 slots (`paktable.json`) would stay free. The stock bulk unmount
   (`sub_00062720`) removes them with the level. The path strings live in one
-  heap block (32 bytes per pak), kept for the session.
+  heap block (32 bytes per pak, room for 36), kept for the session.
 - **cloud setup** (`pc_mapmaker_sky_clouds`, existing hook): with an extra
   sky (its pak mounted now) the level's sky is that record while
   `sub_0011C9F0` runs, so its own cloud layer (record 5) is used; story
@@ -281,33 +320,36 @@ Steps now:
 - **music** (`sub_00045DE0`, return `0x00045FBC`, eax = -1): eax becomes the
   extra track's id.
 
-| sky | pak mounted | fallback |
-|---|---|---|
-| 5 Cold Night | arcade/l_20_ar.pak | 64 |
-| 35 Castle | arcade/l_59_ar.pak | 58 |
-| 39 Train | cutscene/l_33_cs.pak | 63 |
-| 41 Virtua | arcade/l_38_ar.pak | 60 |
-| 42 Prison | arcade/l_29_ar.pak | 67 |
-| 43 Time to Split | challenge/l_64_ch.pak | 61 |
-| 44 Nemo | story/l_81_st.pak | 61 |
-| 45 Venice | arcade/l_46_ar.pak | 59 |
-| 46 Street War | cutscene/l_40_cs.pak | 61 |
-| 47 Vietnam | arcade/l_48_ar.pak | 62 |
-| 48 Temple | arcade/l_49_ar.pak | 62 |
-| 49 Spaceport | arcade/l_15_ar.pak | 60 |
-| 50 Depot | challenge/l_76_ch.pak | 63 |
-| 51 Sniper | arcade/l_53_ar.pak | 64 |
-| 52 NF1 | challenge/l_66_ch.pak | 61 |
-| 56 Chinese | arcade/l_25_ar.pak | 66 |
-| 57 Horror | arcade/l_39_ar.pak | 59 |
+| sky | model pak | textures pak (textures not in stock paks) | fallback |
+|---|---|---|---|
+| 5 Cold Night | arcade/l_20_ar.pak | arcademem/l_20_arm.pak (6 of 6) | 64 |
+| 35 Castle | arcade/l_59_ar.pak | arcademem/l_59_arm.pak (2 of 2) | 58 |
+| 39 Train | cutscene/l_33_cs.pak | cutscenemem/l_33_csm.pak (2 of 3) | 63 |
+| 41 Virtua | arcade/l_38_ar.pak | none (its 1 is in gun.pak's MapMaker twin) | 60 |
+| 42 Prison | arcade/l_29_ar.pak | none (6 of 6 stock) | 67 |
+| 43 Time to Split | challenge/l_64_ch.pak | challengemem/l_64_chm.pak (1 of 5) | 61 |
+| 44 Nemo | story/l_81_st.pak | storymem/l_81_stm.pak (1 of 1) | 61 |
+| 45 Venice | arcade/l_46_ar.pak | arcademem/l_46_arm.pak (6 of 6) | 59 |
+| 46 Street War | cutscene/l_40_cs.pak | cutscenemem/l_40_csm.pak (30 of 30) | 61 |
+| 47 Vietnam | arcade/l_48_ar.pak | arcademem/l_48_arm.pak (1 of 7) | 62 |
+| 48 Temple | arcade/l_49_ar.pak | arcademem/l_49_arm.pak (10 of 10) | 62 |
+| 49 Spaceport | arcade/l_15_ar.pak | arcademem/l_15_arm.pak (1 of 2) | 60 |
+| 50 Depot | challenge/l_76_ch.pak | challengemem/l_76_chm.pak (2 of 2) | 63 |
+| 51 Sniper | arcade/l_53_ar.pak | none (6 of 6 stock) | 64 |
+| 52 NF1 | challenge/l_66_ch.pak | challengemem/l_66_chm.pak (1 of 2) | 61 |
+| 56 Chinese | arcade/l_25_ar.pak | arcademem/l_25_arm.pak (4 of 4) | 66 |
+| 57 Horror | arcade/l_39_ar.pak | arcademem/l_39_arm.pak (4 of 4) | 59 |
+| Sandstorm | challenge/l_64_ch.pak | challengemem/l_64_chm.pak (1 per model) | - |
 
-Pak choice: arcade, then challenge, cutscene, story. Every extra pak shares
-with the stock play paks only byte-identical entries (CONFIRMED,
-`test_pak_assets`), which matters because the pak lookup tries the last pak
-that answered first (`sub_00062B70`, `[0x004D19F4]`/`[0x004D19F8]`), so a
-shared name with different content could otherwise change a stock asset.
-INFERRED: a level pak holds the sky model's textures with it (each level pak
-is self-contained); a cutscene pak has only a few own entries.
+Pak choice: arcade, then challenge, cutscene, story; the textures pak is that
+level's own memory pak. Every extra pak shares with the stock play paks
+(now including `arcademem/l_100m.pak`) only byte-identical entries
+(CONFIRMED, `test_pak_assets`, `test_sky_texture_paks`), which matters
+because the pak lookup tries the last pak that answered first
+(`sub_00062B70`, `[0x004D19F4]`/`[0x004D19F8]`), so a shared name with
+different content could otherwise change a stock asset. The old INFERRED
+"a level pak holds the sky model's textures" was wrong: no level pak holds
+any sky texture (`.27` cause below).
 
 ## Wrappers for the integrator (area `sky`)
 
@@ -345,15 +387,20 @@ order:
   when the level being loaded is scene 100 (S is `[0x0079094C]` at that time);
 - `map has extra sky (row, record) (K, R)`, then `mounted pak (slot): pak/... (N)`,
   `pak already mounted: ...`, `pak mount table too full; not mounted: ...` or
-  `pak did not mount: ...`;
+  `pak did not mount: ...` for the model pak and then the textures pak, and
+  `textures pak not mounted; the model's textures would be missing: pak/...`
+  when only the second failed (the stock sky or no sandstorm is kept);
 - `sandstorm on, models requested (first, count) (1319, 4)` or
-  `sandstorm pak not mounted; no sandstorm` / `sandstorm model has no resource row ...`;
+  `sandstorm pak or its textures pak not mounted; no sandstorm` / `sandstorm model has no resource row ...`;
 - `map start: level sky record, model requested (R, M)` or
   `map start: extra sky pak not mounted; MapMaker sky kept` /
   `map start: extra sky model has no resource row; MapMaker sky kept`;
 - `music: extra track (row, id)`;
 - `sky built: record R model 0x.. prop 0x.. prop model 0x.. row N loaded L request 0x.. data 0x..`
-  (one line per view, two at most);
+  (one line per view, two at most); after the first, `sky texture not loaded:
+  textures/xxxxxx.xbt (record R; in no mounted pak?)` for each missing
+  texture (eight at most) and `sky textures loaded (loaded, total) (L, T)`, or
+  `sky textures not checked: model file not read (record, file)`;
 - `weather start: sandstorm list set ...`, `level setup: sandstorm list kept (count, list) (1, 5273752)`,
   or `sandstorm buffers missing; not drawn (a, b)`.
 - `map start: extra sky row K resolved to record R model 0x.. (resource row N), map's stock sky S, level sky before B`;
@@ -365,7 +412,9 @@ not seen in play; `mounted` but no `map start` line = the map start did not
 run the hook; `map start` with record R but `sky built: record` other than R
 = something rewrote the level sky; `sky built` with `data 0x00000000` and
 `loaded 0` = the model file was not read from the pak (pak path or contents);
-a correct prop model with no visible sky = drawing/textures.
+`sky textures loaded` below the total = a missing textures pak or texture
+(the line before names it); all loaded but no visible sky = drawing (view,
+mask, draw distance), not assets.
 
 ## What the user tests
 
@@ -376,8 +425,10 @@ a correct prop model with no visible sky = drawing/textures.
 3. Pick Story: Castle, Cutscene: Prologue, Sandstorm; save; load the map
    again: the three rows still show them. Play: the castle sky (look up in an
    Open air tile or at the map edge), the cutscene track, sand blowing. Send
-   every `skymusic:` line. Try Story: Time to Split with Sandstorm (one pak),
-   two or three other skies, split screen 2 players.
+   every `skymusic:` line. Try Story: Time to Split with Sandstorm (shared
+   paks), Story: Cold Night, Arcade: Temple, Story: Street War (no texture
+   in stock paks before), Arcade: Vietnam (was in part), Arcade: Prison (no
+   textures pak: control), split screen 2 players.
 4. Quit back to the editor: still the extra choices; play again (second level
    load: `pak already mounted`).
 5. A session without the switch (or an older build): the same map loads and
@@ -387,10 +438,11 @@ a correct prop model with no visible sky = drawing/textures.
 
 ## Not verified / risks
 
-- Played once (.25): music works; the sky and sandstorm fixes above are not
-  played yet. Unknowns: that a sky model draws correctly from an index-only
-  level pak in scene 100 (textures with it, INFERRED; the probe line will
-  tell whether the file was read); the sandstorm's look over MapMaker tiles
+- Played (.25, .27): music works; skies not or partly drawn, the textures
+  pak fix (.27 cause above) is not played yet. Unknowns: that index-only
+  textures load as the whole-mounted memory pak's do in story (same lookup,
+  INFERRED; the texture probe tells); scene-gated sky extras in story level
+  code (none found, not searched exhaustively); the sandstorm's look over MapMaker tiles
   (it follows the camera, INFERRED) and its ambient sound (none is started:
   the type-5 entry's sound fields were not decoded); whether the jingles loop.
 - Mounting moved from the pak-mount step into the load (`sub_001CDB80` /
@@ -398,5 +450,5 @@ a correct prop model with no visible sky = drawing/textures.
   (INFERRED harmless: the tank's pak is mounted at the end of the mount step
   the same way).
 - Mount budget: each extra pak takes one of the 64 slots (index memory only,
-  some KB).
+  some KB); a textures pak holds 187..412 entries.
 - English labels only, no help text.

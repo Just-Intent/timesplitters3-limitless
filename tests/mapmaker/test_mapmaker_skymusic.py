@@ -53,6 +53,10 @@ MUTATIONS = {
     'mount-whole-file': ('guest_call(sub_000622D0,3,path,0u,1u)', 'guest_call(sub_000622D0,3,path,1u,1u)'),
     'mount-no-budget': ('    if((count=WORD_AT(SMX_MOUNTS))+SMX_MOUNT_KEEP>SMX_MOUNT_MAX) {', '    if((count=WORD_AT(SMX_MOUNTS))>SMX_MOUNT_MAX) {'),
     'mount-twice': ('    if((slot=(int32_t)guest_call(sub_00062260,1,path))!=-1) { smx_logs("pak already mounted",pak,(uint32_t)slot);return 1; }\n', ''),
+    'mount-no-textures-pak': ('    if(!mem || smx_mount(mem)) return 1;', '    (void)mem;return 1;'),
+    'mount-textures-optional': ("model's textures would be missing\",mem,0);\n    return 0;", "model's textures would be missing\",mem,0);\n    return 1;"),
+    'mount-textures-other-level': ('"pak/arcademem/l_59_arm.pak"', '"pak/arcademem/l_58_arm.pak"'),
+    'sand-no-textures-pak': ('smx_mount_pair(smx_weather[k-1u].pak,smx_weather[k-1u].mem)', 'smx_mount(smx_weather[k-1u].pak)'),
     'mount-failure-ready': ('    if((slot=(int32_t)guest_call(sub_000622D0,3,path,0u,1u))<0) { smx_logs("pak did not mount",pak,count);return 0; }',
                             '    slot=(int32_t)guest_call(sub_000622D0,3,path,0u,1u);'),
     'prepare-stale-row': ('    if(smx.sky_row!=k) {', '    if(!smx.sky_row) {'),
@@ -67,8 +71,12 @@ MUTATIONS = {
     'probe-every-view': ('       smx.level_logs>=2u) return;', '       0) return;'),
     'probe-before-original': ('    uint32_t view=MAPMAKER_PTR_OK(g_esp,8u)?WORD_AT(g_esp+4u):0u,info,rec,model,row,e=0,req=0,data=0,prop;\n    original();\n',
                               '    uint32_t view=MAPMAKER_PTR_OK(g_esp,8u)?WORD_AT(g_esp+4u):0u,info,rec,model,row,e=0,req=0,data=0,prop;\n    original();original();\n'),
+    'probe-textures-past-end': ('    end=WORD_AT(t+0x0Cu);', '    end=WORD_AT(t+0x0Cu)+1u;'),
+    'probe-textures-placeholder': ('        if(id==0x40000000u) continue;\n', ''),
+    'probe-textures-unterminated': ('        if((id=WORD_AT(file+list+k*16u))==0xFFFFFFFFu) break;', '        id=WORD_AT(file+list+k*16u);'),
+    'probe-textures-never': ('    if(smx.level_logs==1u) smx_sky_textures(data,rec);', '    (void)smx_sky_textures;'),
     # weather
-    'sand-without-pak': ('    if(!smx.sand_ready && !(smx.sand_ready=smx_mount(smx_weather[k-1u].pak))) { smx_log("sandstorm pak not mounted; no sandstorm",0,0);return; }\n', ''),
+    'sand-without-pak': ('    if(!smx.sand_ready && !(smx.sand_ready=smx_mount_pair(smx_weather[k-1u].pak,smx_weather[k-1u].mem))) { smx_log("sandstorm pak or its textures pak not mounted; no sandstorm",0,0);return; }\n', ''),
     'sand-no-models': ('        if(model!=0xFFFFFFFFu) guest_call(sub_000A5E40,1,model);\n', ''),
     'sand-before-original': ('    uint32_t info,k,model;\n    original();\n', '    uint32_t info,k,model;\n'),
     'sand-list-without-buffers': ('    if(!WORD_AT(SMX_WX_BUF1) || !WORD_AT(SMX_WX_BUF2)) { smx_log(', '    if(0) { smx_log('),
@@ -165,8 +173,15 @@ def _c_table(text, name):
 
 def _sky_rows():
     """(sky, fallback, pak, label) rows of mapmaker_sky_extras."""
-    rows = re.findall(r'\{\s*(\d+),(\d+),"([^"]+)","([^"]+)"\}', _c_table(SKY.read_text(encoding='utf-8'), 'mapmaker_sky_extras[]'))
-    return [(int(a), int(b), c, d) for a, b, c, d in rows]
+    return [(s, f, p, label) for s, f, p, _, label in _sky_rows_mem()]
+
+
+def _sky_rows_mem():
+    """(sky, fallback, pak, textures pak or None, label) rows of mapmaker_sky_extras."""
+    rows = re.findall(r'\{\s*(\d+),(\d+),"([^"]+)",(?:"([^"]+)"|0),"([^"]+)"\}',
+                      _c_table(SKY.read_text(encoding='utf-8'), 'mapmaker_sky_extras[]'))
+    assert len(rows) == 17
+    return [(int(a), int(b), c, d or None, e) for a, b, c, d, e in rows]
 
 
 def _music_rows():
@@ -346,6 +361,90 @@ def test_pak_assets():
                         a.seek(pa)
                         b.seek(pb)
                         assert na == nb and a.read(na) == b.read(nb), (rel, name, hex(crc))
+
+
+MEM_DIR = {'arcade': 'arcademem', 'challenge': 'challengemem', 'cutscene': 'cutscenemem', 'story': 'storymem'}
+
+
+def _texture_ids(data):
+    """Texture ids a model file names (+0: 16-byte entries, id first, -1 ends)."""
+    ids, o = [], struct.unpack_from('<I', data, 0)[0]
+    while (tid := struct.unpack_from('<I', data, o)[0]) != 0xFFFFFFFF:
+        if tid != 0x40000000:
+            ids.append(tid)
+        o += 16
+    return ids
+
+
+def _entry(path, crc):
+    pos, n = _index(path)[crc]
+    with open(path, 'rb') as f:
+        f.seek(pos)
+        return f.read(n)
+
+
+def test_texture_paks_named():
+    """Each textures pak is the memory pak of the row's own level; the sandstorm's too."""
+    for _, _, pak, mem, _ in _sky_rows_mem():
+        if mem:
+            d, f = pak[len('pak/'):].split('/')
+            assert mem == f'pak/{MEM_DIR[d]}/{f[:-4]}m.pak' and len(mem) < 32, (pak, mem)
+    assert '{"Sandstorm","pak/challenge/l_64_ch.pak","pak/challengemem/l_64_chm.pak",SMX_SAND_LIST}' in SMX.read_text(encoding='utf-8')
+
+
+def test_sky_texture_paks():
+    """v0.4.0-mapmaker.27 (skies not drawn or only in part): every texture an extra
+    sky or sandstorm model names that no stock play pak holds is in the row's
+    textures pak, and only there among the mounted paks; rows without one need
+    none; a textures pak shares only byte-identical entries with the stock play
+    paks (skipped without game data)."""
+    if not (GAME / 'arcade/l_100.pak').exists():
+        pytest.skip('game paks not available locally')
+    read = _xbe()
+    props = _props(GAME / 'arcade/l_100.pak')
+    stock = {p: _index(GAME / p) for p in STOCK_PLAY + ['arcademem/l_100m.pak']}
+    rows = [(struct.unpack('<i', read(0x005149A8 + sky * 0x34 + 4, 4))[0:1], pak, mem)
+            for sky, _, pak, mem, _ in _sky_rows_mem()]
+    rows.append((tuple(range(0x527, 0x52B)), 'pak/challenge/l_64_ch.pak', 'pak/challengemem/l_64_chm.pak'))
+    for models, pak, mem in rows:
+        level = _index(GAME / pak[len('pak/'):])
+        textures = _index(GAME / mem[len('pak/'):]) if mem else {}
+        need = []
+        for model in models:
+            ids = _texture_ids(_entry(GAME / pak[len('pak/'):], _model(props[model])))
+            assert ids, props[model]
+            need += [i for i in ids if not any(_crc(f'textures/{i:06x}.xbt') in v for v in stock.values())]
+        assert bool(need) == bool(mem), (pak, mem, [hex(i) for i in need])
+        for i in need:
+            crc = _crc(f'textures/{i:06x}.xbt')
+            assert crc in textures and crc not in level, (pak, hex(i))
+        if mem:
+            with open(GAME / mem[len('pak/'):], 'rb') as a:
+                for name, sidx in stock.items():
+                    with open(GAME / name, 'rb') as b:
+                        for crc in set(textures) & set(sidx):
+                            (pa, na), (pb, nb) = textures[crc], sidx[crc]
+                            a.seek(pa)
+                            b.seek(pb)
+                            assert na == nb and a.read(na) == b.read(nb), (mem, name, hex(crc))
+
+
+def test_texture_load_sites():
+    """The texture path the probe and the fix rely on (XBE and decoder)."""
+    read = _xbe()
+    assert _cstr(read, 0x0047D3C8) == 'textures/%06x.xbt' and _cstr(read, 0x00475D90) == 'host0:textures/%06x.xbt'
+    # Load pass: a read model's textures registered at once when its block +0x48 is 0x10.
+    assert read(0x00063543, 5) == bytes.fromhex('83ff107411') and read(0x0006355D, 5) == bytes.fromhex('e8be2c0300')
+    # sub_00018B90: loaded table [0x004B85C8], rows of 0x34 with the id at +0x1C, end at +0xC.
+    assert read(0x00018BAB, 6) == bytes.fromhex('8b0dc8854b00') and read(0x00018BB4, 3) == bytes.fromhex('8b510c')
+    assert read(0x00018BCF, 7) == bytes.fromhex('6bf6348d4c0e1c')
+    assert read(0x00018C83, 4) == bytes.fromhex('895c111c')
+    # Story levels mount their memory pak whole: sub_00062610(scene, 1) -> sub_000622D0(path, 1, 1).
+    assert read(0x0006289B, 4) == bytes.fromhex('6a0157e8') and read(0x000628AC, 10) == bytes.fromhex('6a016a0156e81afaffff')
+    from mapmaker_decoded import decoded
+    insns = decoded()
+    texture_pass = {i.address for i in insns if i.call and any(op[0] == 'imm' and op[1] == 0x00063900 for op in i.ops)}
+    assert 0x0003D5E5 in texture_pass and 0x0003D5AD < 0x0003D5E5 < 0x0003D645
 
 
 def test_wrappers_documented():

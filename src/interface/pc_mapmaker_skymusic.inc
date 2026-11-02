@@ -20,6 +20,14 @@
  *  - Sky records 0..67 (0x005149A8, model at +4); MapMaker play mounts only
  *    its tileset pak, l_100.pak, gun.pak, chr.pak (sub_00062790), so the 17
  *    story/arcade skies whose model is in a level pak cannot be drawn there.
+ *    Their textures (and the sandstorm's) are in no level pak at all: the
+ *    load pass registers a read model's textures (sub_00096220, 0x0006355D;
+ *    sky files' texture block +0x48 is 0x10, so never deferred to creation),
+ *    which queues "textures/%06x.xbt" (sub_000637E0); the texture pass
+ *    (sub_00063900, 0x0003D5E5) loads each from any mounted pak
+ *    (sub_00018B90). 14 skies' and the sandstorm's are only in the level's
+ *    memory pak (arcademem/l_20_arm.pak, ...), which story levels mount whole
+ *    (sub_00062610(scene, 1) -> sub_000622D0(path, 1, 1), 0x000628B1).
  *  - Weather type 5 (sandstorm, story scenes 2/26/64): sub_00119960 sets
  *    [0x0073D9AC] and requests the four intro_sandstorm models (0x004E62F8,
  *    stride 0x44); sub_0011B430 allocates its buffers, sub_0011B310 creates
@@ -42,14 +50,15 @@
  *  - play (scene 100): mount (WRAP sub_00062790) only starts a new level
  *    (there the scene may still be the old one and the map is not read;
  *    v0.4.0-mapmaker.25 mounted there and no extra sky or sandstorm showed).
- *    The sky's / sandstorm's level pak is mounted index-only like chr.pak
- *    (sub_000622D0(path, 0, 1)), at most two, keeping 8 of the 64 mount
+ *    The sky's / sandstorm's level pak and then its textures' memory pak are
+ *    mounted index-only like chr.pak (sub_000622D0(path, 0, 1); both or the
+ *    stock choice is kept), at most four, keeping 8 of the 64 mount
  *    slots free, by the first of: the cloud setup (pc_mapmaker_sky.inc via
  *    mapmaker_sky.extra_prepare), the map start, the weather load. level
  *    (WRAP sub_0023F390) gives the map start the extra sky record in info
  *    +0x10 while it runs (it sets the level sky and requests the model
  *    before the load pass); sky_built (WRAP sub_0011D2C0, probe) logs what
- *    each view's sky prop was built from; weather_load (WRAP sub_00119960,
+ *    each view's sky prop was built from and the textures not loaded; weather_load (WRAP sub_00119960,
  *    after) turns the sandstorm on and requests its models; weather_start
  *    (WRAP sub_0011B310, after) and weather_list (WRAP sub_00119AB0, the
  *    level setup's list, which runs after the weather start) keep scene 2's
@@ -120,10 +129,17 @@ static const struct { uint32_t id; const char *label; } smx_music[]={
     {0xA5u,"Cutscene 19a"},{0xAAu,"Cutscene: Anya's Lab"},
 };
 #define SMX_MUSIC_COUNT ((uint32_t)(sizeof smx_music/sizeof smx_music[0]))
-static const struct { const char *label, *pak; uint32_t list; } smx_weather[]={
-    {"Sandstorm","pak/challenge/l_64_ch.pak",SMX_SAND_LIST},
+static const struct { const char *label, *pak, *mem; uint32_t list; } smx_weather[]={
+    {"Sandstorm","pak/challenge/l_64_ch.pak","pak/challengemem/l_64_chm.pak",SMX_SAND_LIST},
 };
 #define SMX_WEATHER_COUNT ((uint32_t)(sizeof smx_weather/sizeof smx_weather[0]))
+#define SMX_PATHS (2u*(MAPMAKER_SKY_EXTRA_COUNT+SMX_WEATHER_COUNT))   /* level and texture paks */
+#define SMX_TEXTURES 0x004B85C8u             /* loaded textures: +0 rows (0x34, id +0x1C), +0xC end (sub_00018B90) */
+#define SMX_TEX_STRIDE 0x34u
+#define SMX_TEX_ID 0x1Cu
+#define SMX_TEX_ROWS_MAX 0x2000u
+#define SMX_TEX_LIST_MAX 64u                 /* model file: +0 -> {id, -, -, flags} x n, -1 */
+#define SMX_TEX_LOGGED 8u
 
 extern void sub_00071800(void),sub_00062260(void),sub_000622D0(void),sub_000A5E40(void),sub_000631C0(void);
 
@@ -131,10 +147,11 @@ static struct {
     uint32_t labels;                         /* guest: every row label */
     uint32_t music_text[SMX_MUSIC_COUNT], sky_text[MAPMAKER_SKY_EXTRA_COUNT], weather_text[SMX_WEATHER_COUNT];
     uint32_t paths;                          /* guest: pak paths, SMX_PATH_MAX each */
-    const char *path_of[MAPMAKER_SKY_EXTRA_COUNT+SMX_WEATHER_COUNT];
+    const char *path_of[SMX_PATHS];
     uint32_t sky_row;                        /* this level: extra sky row whose pak was tried */
     uint32_t level_logs;                     /* this level: sky probe lines */
     uint32_t frames;                         /* this level: weather frames seen (probe) */
+    uint32_t tex_total, tex_loaded;          /* last sky probe: textures named, loaded */
     int sand_ready;                          /* this level: the sandstorm pak is mounted */
     int sand_on;                             /* this level: sandstorm flag set by us */
     unsigned long long rows, logged;
@@ -263,7 +280,7 @@ static uint32_t smx_play_info(void)
 /* A pak path in guest memory (kept: the mount table may refer to it). */
 static uint32_t smx_path(const char *pak)
 {
-    uint32_t k,n=MAPMAKER_SKY_EXTRA_COUNT+SMX_WEATHER_COUNT;
+    uint32_t k,n=SMX_PATHS;
     if(!smx.paths && !(smx.paths=xbox_HeapAlloc(n*SMX_PATH_MAX,4u))) return 0;
     for(k=0;k<n;k++) {
         if(smx.path_of[k] && !strcmp(smx.path_of[k],pak)) return smx.paths+k*SMX_PATH_MAX;
@@ -291,6 +308,17 @@ static int smx_mount(const char *pak)
     smx_logs("mounted pak (slot)",pak,(uint32_t)slot);
     return 1;
 }
+/* A model's level pak and then its textures' pak (mem 0: none needed); 1
+ * when both are mounted. Without the textures pak the model would be read
+ * but its textures (textures/<id>.xbt) found in no pak: drawn not at all or
+ * only in part (v0.4.0-mapmaker.27), so the caller keeps the stock choice. */
+static int smx_mount_pair(const char *pak,const char *mem)
+{
+    if(!smx_mount(pak)) return 0;
+    if(!mem || smx_mount(mem)) return 1;
+    smx_logs("textures pak not mounted; the model's textures would be missing",mem,0);
+    return 0;
+}
 
 /* 1 when scene 100's resource table has a row for the model (sub_000A5E40
  * requests only those). */
@@ -312,7 +340,7 @@ static uint32_t smx_prepare_sky(uint32_t info)
     if(smx.sky_row!=k) {
         smx.sky_row=k;
         smx_log("map has extra sky (row, record)",k,(uint32_t)mapmaker_sky_extras[k-1u].sky);
-        mapmaker_sky.extra_ready=smx_mount(mapmaker_sky_extras[k-1u].pak);
+        mapmaker_sky.extra_ready=smx_mount_pair(mapmaker_sky_extras[k-1u].pak,mapmaker_sky_extras[k-1u].mem);
     }
     return mapmaker_sky.extra_ready?k:0u;
 }
@@ -359,9 +387,50 @@ void pc_mapmaker_skymusic_level(void (*original)(void))
     smx_log("map start: level sky record after, model requested",WORD_AT(SMX_LEVEL100+0x10u),model);
 }
 
+/* 1 when the texture id is in the loaded-texture table (sub_00018B90 looks
+ * up and stores ids there; a texture found in no mounted pak never is). */
+static int smx_texture_loaded(uint32_t id)
+{
+    uint32_t t=WORD_AT(SMX_TEXTURES),rows,end,k;
+    if(!MAPMAKER_PTR_OK(t,0x10u) || !(rows=WORD_AT(t))) return 0;
+    end=WORD_AT(t+0x0Cu);
+    if(end>SMX_TEX_ROWS_MAX) end=SMX_TEX_ROWS_MAX;
+    for(k=0;k<end;k++) {
+        uint32_t a=rows+k*SMX_TEX_STRIDE+SMX_TEX_ID;
+        if(!MAPMAKER_PTR_OK(a,4u)) return 0;
+        if(WORD_AT(a)==id) return 1;
+    }
+    return 0;
+}
+/* After the load pass: each texture the sky model's file names (+0: list of
+ * 16-byte entries, id first, -1 ends, 0x40000000 skipped as sub_00096330
+ * does) and whether it was loaded; the missing ones by id. */
+static void smx_sky_textures(uint32_t file,uint32_t rec)
+{
+    uint32_t list,k,id,total=0,loaded=0,named=0;
+    smx.tex_total=smx.tex_loaded=0;
+    if(!file || !MAPMAKER_PTR_OK(file,0x10u) || !(list=WORD_AT(file))) {
+        smx_log("sky textures not checked: model file not read (record, file)",rec,file);
+        return;
+    }
+    for(k=0;k<SMX_TEX_LIST_MAX && MAPMAKER_PTR_OK(file+list+k*16u,16u);k++) {
+        if((id=WORD_AT(file+list+k*16u))==0xFFFFFFFFu) break;
+        if(id==0x40000000u) continue;
+        total++;
+        if(smx_texture_loaded(id)) { loaded++;continue; }
+        if(named++<SMX_TEX_LOGGED && smx.logged++<96u) {
+            fprintf(stderr,"[mapmaker] skymusic: sky texture not loaded: textures/%06x.xbt (record %u; in no mounted pak?)\n",id,rec);
+            fflush(stderr);
+        }
+    }
+    smx.tex_total=total;smx.tex_loaded=loaded;
+    smx_log("sky textures loaded (loaded, total)",loaded,total);
+}
+
 /* WRAP sub_0011D2C0 (a view's sky prop; cdecl view): probe only. Logs the
  * record and model the view's sky was built from and whether the model's
- * file was read (resource row +4 loaded, or its request holds data). */
+ * file was read (resource row +4 loaded, or its request holds data), and,
+ * once per level, which of its textures were loaded. */
 void pc_mapmaker_skymusic_sky_built(void (*original)(void))
 {
     uint32_t view=MAPMAKER_PTR_OK(g_esp,8u)?WORD_AT(g_esp+4u):0u,info,rec,model,row,e=0,req=0,data=0,prop;
@@ -383,6 +452,7 @@ void pc_mapmaker_skymusic_sky_built(void (*original)(void))
             rec,model,prop,prop && MAPMAKER_PTR_OK(prop,0x98u)?WORD_AT(prop+0x94u):0u,(int)(int16_t)row,
             e && MAPMAKER_PTR_OK(e,8u)?WORD_AT(e+4u):0u,req,data);
     fflush(stderr);
+    if(smx.level_logs==1u) smx_sky_textures(data,rec);
 }
 
 /* WRAP sub_00119960 (weather load, no args; zeroes the weather flags, then
@@ -394,7 +464,7 @@ void pc_mapmaker_skymusic_weather_load(void (*original)(void))
     original();
     if(!(info=smx_play_info()) ||
        !(k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),SMX_WEATHER_MASK,SMX_WEATHER_SHIFT,SMX_WEATHER_COUNT))) return;
-    if(!smx.sand_ready && !(smx.sand_ready=smx_mount(smx_weather[k-1u].pak))) { smx_log("sandstorm pak not mounted; no sandstorm",0,0);return; }
+    if(!smx.sand_ready && !(smx.sand_ready=smx_mount_pair(smx_weather[k-1u].pak,smx_weather[k-1u].mem))) { smx_log("sandstorm pak or its textures pak not mounted; no sandstorm",0,0);return; }
     for(k=0;k<4u;k++) {
         model=WORD_AT(SMX_SAND_MODELS+k*0x44u);
         if(model!=0xFFFFFFFFu && !smx_model_ok(model)) { smx_log("sandstorm model has no resource row; no sandstorm",model,0);return; }
