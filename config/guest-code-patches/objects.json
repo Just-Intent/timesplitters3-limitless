@@ -302,6 +302,33 @@
       "original_hex": "81fafa000000",
       "new_hex": "81fae8030000",
       "reason": "link slots 250 -> 1000"
+    },
+    {
+      "id": "obj-pickups-alloc",
+      "kind": "code",
+      "function": "0x000BEEE0",
+      "address": "0x000BEEE2",
+      "original_hex": "6840650000",
+      "new_hex": "6800880200",
+      "reason": "placed-pickup records [0x00732E60] 120 -> 768 x 0xD8 B (Level heap, every scene)"
+    },
+    {
+      "id": "obj-pickups-clear",
+      "kind": "code",
+      "function": "0x000BEE60",
+      "address": "0x000BEE69",
+      "original_hex": "b950190000",
+      "new_hex": "b900a20000",
+      "reason": "placed-pickup record clear: 768 x 0xD8 / 4 dwords"
+    },
+    {
+      "id": "obj-pickups-cap",
+      "kind": "code",
+      "function": "0x000C1950",
+      "address": "0x000C1DC7",
+      "original_hex": "83f878",
+      "new_hex": "80fc03",
+      "reason": "cmp eax,0x78 -> cmp ah,3 before the jge: placed-pickup count [0x00732E64] full at 768 (= 3 << 8) instead of 120"
     }
   ]
 }
