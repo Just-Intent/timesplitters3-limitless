@@ -1448,7 +1448,7 @@ static RbsSkel *rbs_skel_more(void)
     if(k>=RBS_INST_MAX) return 0;
     memcpy(cur,rbs_g(RBS_FX),RBS_FX_SIZE);
     memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);
-    WORD_AT(RBS_SKEL_STATE)=0;WORD_AT(RBS_SKEL_PARTS)=0;
+    WORD_AT(RBS_SKEL_STATE)=0u;WORD_AT(RBS_SKEL_PARTS)=0u;
     guest_call(sub_00287E00,0);
     st=WORD_AT(RBS_SKEL_STATE);pt=WORD_AT(RBS_SKEL_PARTS);
     if(st && pt && MAPMAKER_PTR_OK(st,RBS_SKEL_STATE_SIZE) && MAPMAKER_PTR_OK(pt,RBS_SKEL_PARTS_SIZE)) {
