@@ -66,6 +66,10 @@ void sub_000A9070(void) { g_ecx=9; }
 void sub_0010E2A0(void) { g_ecx=10; }
 void sub_0010EB90(void) { g_ecx=11; }
 void sub_0005F460(void) { g_ecx=12; }
+void sub_0010E730(void) { g_ecx=13; }
+/* sub_0010E730(emitter, pos): emitter +0x14..+0x1C = pos */
+static unsigned njet;
+static uint32_t jet_args[2];
 /* sub_0005F460(entity, anim, 0, 1.0): plays it (entity +4 -> +0xD4) when idle_ok */
 static unsigned nidle;
 static uint32_t idle_args[4];
@@ -125,6 +129,11 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         return 0;
     }
     if(f==sub_0010EB90) { if(nstop<8u) stop_args[nstop]=x[0];nstop++;CHECK(x[1]==0);return 0; }
+    if(f==sub_0010E730) {
+        njet++;memcpy(jet_args,x,sizeof jet_args);
+        if(x[0] && x[1]) for(i=0;i<3;i++) FLOAT_AT(x[0]+0x14u+(uint32_t)i*4u)=FLOAT_AT(x[1]+(uint32_t)i*4u);
+        return 0;
+    }
     if(f==sub_0005F460) {
         nidle++;memcpy(idle_args,x,sizeof idle_args);
         if(idle_ok) WORD_AT(WORD_AT(x[0]+4u)+0xD4u)=x[1];
@@ -146,6 +155,9 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 #include "pc_mapmaker_limits.inc"
 #define BOS_BAR_PROXY 1                                    /* pc_mapmaker_bosses.inc's hook, as in the build */
 static uint32_t (*bos_bar_proxy)(uint32_t entity);
+#define BOS_BAR_EXTRA 1                                    /* pc_mapmaker_bosses.inc's saved Story AI names */
+static uint32_t name_id;
+static const char *bos_story_name(uint32_t id) { return id && id==name_id?"Khallos the Great":0; }
 #include "pc_mapmaker_khallos.inc"
 /* chair k's own copy of the chair statics / emitters (in guest memory only during its code) */
 #define CW(k,a) (khl_ch[k].block[((a)-0x0078F000u)/4u])
@@ -167,10 +179,18 @@ static void fake_create(void)
     HALF_AT(ENT(0)+0x94u)=(uint16_t)made_model;g_eax=ENT(0);
     g_esp+=4u;
 }
+static void inner(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,int line);
 /* sub_0014CC80: the focus the stock bar saw */
 static uint32_t hud_focus;
-static void fake_hud(void) { originals++;hud_focus=WORD_AT(PLAYER+0xFF4u);g_esp+=4u; }
-static void inner(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a1,uint32_t a2,uint32_t a3,int line);
+static uint32_t hud_label;
+#define HUDB 0x005B0000u                                    /* ebx: the HUD block, +8 bit 0 = a bar drawn */
+static void fake_hud(void)                                  /* asks for its label like 0x0014CDA1 */
+{
+    originals++;hud_focus=WORD_AT(PLAYER+0xFF4u);
+    hud_label=hud_focus?(inner(pc_mapmaker_khallos_text,fake,0x0014CDA6u,0xFF1u,0,0,__LINE__),g_eax):0u;
+    if(hud_focus) WORD_AT(HUDB+8u)|=1u;
+    g_esp+=4u;
+}
 /* sub_001CDD60: the level restart makes and starts the placeholder again (restart_spawns) */
 static int restart_spawns;
 static void fake_ai(void);
@@ -594,11 +614,16 @@ int main(void)
     CHECK(NEAR(spawn_rot[0],0.0f) && NEAR(spawn_rot[1],1.5f) && NEAR(spawn_rot[2],0.0f));
     CHECK(CF(0,LIVE)==40.0f && CF(0,LIVE+4u)==3.0f && CF(0,LIVE+8u)==30.0f && CW(0,0x0078F000u)==CHAIR && FLOAT_AT(LIVE)!=40.0f);   /* spawn + lift */
     CHECK(FLOAT_AT(CHAIR+0x64u)==40.0f && FLOAT_AT(CHAIR+0x68u)==3.0f && FLOAT_AT(CHAIR+0x6Cu)==30.0f);
+    /* .34 "a texture stretched between my view and one of the khallos'": the init made the jet
+     * at the train start; it is moved to the chair (with the chair's globals in) */
+    CHECK(njet==1u && jet_args[0]==JETE && jet_args[1]==LIVE && khl_ch[0].jets==1u);
+    CHECK(FLOAT_AT(JETE+0x14u)==40.0f && FLOAT_AT(JETE+0x18u)==3.0f && FLOAT_AT(JETE+0x1Cu)==30.0f);
     actor(2,0x33,10.0f,1.0f,-20.0f,0.0f);                                /* a second placeholder: a second chair */
     CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
     CHECK(nspawn==4 && khl_lv.n==2u && khl_ch[0].obj==CHAIR && khl_ch[1].obj==CHAIR+0x1000u && khl_ch[1].place==A(2));
     CHECK(CF(1,LIVE)==10.0f && CF(1,LIVE+4u)==2.0f && CF(1,LIVE+8u)==-20.0f && CW(1,0x0078F000u)==CHAIR+0x1000u);
     CHECK(CF(0,LIVE)==40.0f && CW(0,0x0078F054u)==JETE && CW(1,0x0078F054u)==JETE+0x100u);   /* each its own */
+    CHECK(njet==2u && jet_args[0]==JETE+0x100u && FLOAT_AT(JETE+0x114u)==10.0f && FLOAT_AT(JETE+0x11Cu)==-20.0f);
     CHECK(khl_ch[0].smoke[0]==0x00576000u && khl_ch[1].smoke[0]==0x00576100u);
     CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);   /* the same placeholder again */
     CHECK(nspawn==4 && khl_lv.n==2u);
@@ -886,10 +911,12 @@ int main(void)
     CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(10),0,0,1);   /* not a rider */
     CHECK(rider_saw==0x00123450u && khl_lv.cur==-1);
     WORD_AT(0x0078F060u)=0;
+    n=khl_ch[0].poses;
     CALL(pc_mapmaker_khallos_rider_pose,fake_rider,0x000A5D5Eu,ENT(1),0,0,1);   /* its pose callback too */
     CHECK(rider_saw==CHAIR && rider_live==40.0f && WORD_AT(0x0078F060u)==0 && WORD_AT(0x0078F000u)==0x00123450u);
+    CHECK(khl_ch[0].poses==n+1u);                                        /* counted for the status line */
     CALL(pc_mapmaker_khallos_rider_pose,fake_rider,0x000A5D5Eu,ENT(10),0,0,1);
-    CHECK(rider_saw==0x00123450u && khl_lv.cur==-1);
+    CHECK(rider_saw==0x00123450u && khl_lv.cur==-1 && khl_ch[0].poses==n+1u);
     /* emitter owners: each chair's emitters point at its own guest slot, the stock slot only inside its code */
     CHECK(khl.slots && WORD_AT(JETE)==khl.slots && WORD_AT(khl.slots)==JETE);
     CHECK(WORD_AT(JETE+0x100u)==khl.slots+8u && WORD_AT(khl.slots+8u)==JETE+0x100u && WORD_AT(0x00576100u)==khl.slots+12u);
@@ -981,8 +1008,10 @@ int main(void)
     CHECK(rider_saw==CHAIR);
     /* hits on him go to the chair while it fights; his health is put back */
     FLOAT_AT(ENT(0)+0x1D8u)=20.0f;FLOAT_AT(ENT(0)+0x1CCu)=15.0f;FLOAT_AT(CHAIR+0x1CCu)=60.0f;
+    FLOAT_AT(JETE+0x14u)=-576.2f;n=khl_ch[0].jets;
     UPDATE(1);                                                           /* waiting: nothing taken */
     CHECK(FLOAT_AT(ENT(0)+0x1CCu)==20.0f && FLOAT_AT(CHAIR+0x1CCu)==60.0f);
+    CHECK(FLOAT_AT(JETE+0x14u)==40.0f && FLOAT_AT(JETE+0x1Cu)==30.0f && khl_ch[0].jets==n+1u);   /* the jet waits at the chair */
     players(45.0f,33.0f,1.0f,100.0f,100.0f,1.0f);
     FLOAT_AT(PL(1)+0xA8u)=1000.0f;
     UPDATE(1);                                                           /* wakes */
@@ -1006,23 +1035,59 @@ int main(void)
     FLOAT_AT(ENT(0)+0x1D8u)=20.0f;FLOAT_AT(ENT(0)+0x1CCu)=-5.0f;FLOAT_AT(CHAIR+0x1CCu)=60.0f;
     UPDATE(1);
     CHECK(FLOAT_AT(CHAIR+0x1CCu)==40.0f && FLOAT_AT(ENT(0)+0x1CCu)==-5.0f);
-    /* the stock bar: hidden for a seated chair, the focus put back */
+    /* the stock bar (.34: "none of the khallos' showed boss health"): the focus
+     * chair keeps it, labelled with its rider's Story AI name */
     own_level(__LINE__);
-    WORD_AT(PLAYER+0xFF4u)=CHAIR;hud_focus=1u;
+    g_ebx=HUDB;WORD_AT(HUDB+8u)=0;
+    WORD_AT(PLAYER+0xFF4u)=CHAIR;hud_focus=1u;name_id=0;
     CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,1);
-    CHECK(hud_focus==0 && WORD_AT(PLAYER+0xFF4u)==CHAIR);
+    CHECK(hud_focus==CHAIR && WORD_AT(PLAYER+0xFF4u)==CHAIR && khl_ch[0].barred==2u);
+    CHECK(hud_label==khl.label && !strcmp((const char *)((uintptr_t)hud_label+g_xbox_mem_offset),"Khallos"));   /* unnamed */
+    CHECK(!khl_lv.bar);                                                  /* only while its bar is drawn */
+    WORD_AT(REC(0)+8u)=0x1234u;name_id=0x1234u;                          /* his saved name */
+    CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,1);
+    CHECK(hud_label && hud_label!=khl.label && !strcmp((const char *)((uintptr_t)hud_label+g_xbox_mem_offset),"Khallos the Great"));
+    r=CALL(pc_mapmaker_khallos_text,fake,0x0014CDA6u,0xFF1u,0,0,0);     /* outside the bar: the fallback */
+    CHECK(r==khl.label);
     WORD_AT(PLAYER+0xFF4u)=ENT(5);
     CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,1);
-    CHECK(hud_focus==ENT(5));
+    CHECK(hud_focus==ENT(5) && hud_label==khl.label);                    /* not a chair: the fallback label */
     WORD_AT(PLAYER+0xFF4u)=CHAIR;
-    WORD_AT(A(0)+0xBF0u)=REC(9);                                         /* his entry reused: not seated */
+    WORD_AT(A(0)+0xBF0u)=REC(9);                                         /* his entry reused: still the chair's bar and name */
     CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,1);
-    CHECK(hud_focus==CHAIR);
+    CHECK(hud_focus==CHAIR && hud_label!=khl.label);
     WORD_AT(A(0)+0xBF0u)=REC(0);
     WORD_AT(0x0079094Cu)=102u;
-    CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,1);
-    CHECK(hud_focus==CHAIR);
+    CALL(pc_mapmaker_khallos_hud,fake_hud,0x0014F25Bu,0,0,0,2);           /* the original and its text lookup */
+    CHECK(hud_focus==CHAIR && hud_label==orig_eax);
     play_scene();
+    name_id=0;
+    /* a chair shot down clears the focus; another fighting chair takes it, a holder elsewhere is kept */
+    own_level(__LINE__);
+    constants();
+    players(45.0f,33.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    UPDATE(1);                                                           /* wakes: the stock focus */
+    CHECK(WORD_AT(PLAYER+0xFF4u)==CHAIR);
+    WORD_AT(PLAYER+0xFF4u)=0;
+    UPDATE(1);
+    CHECK(WORD_AT(PLAYER+0xFF4u)==CHAIR);                                /* taken again */
+    WORD_AT(PLAYER+0xFF4u)=ENT(9);
+    UPDATE(1);
+    CHECK(WORD_AT(PLAYER+0xFF4u)==ENT(9));                               /* another holder: left */
+    WORD_AT(PLAYER+0xFF4u)=0;FLOAT_AT(CHAIR+0x1CCu)=-1.0f;
+    UPDATE(1);
+    CHECK(WORD_AT(PLAYER+0xFF4u)==0);                                    /* down: not taken */
+    FLOAT_AT(CHAIR+0x1CCu)=60.0f;
+    {                                                                    /* the rule itself (chair globals in) */
+        uint32_t act=WORD_AT(0x0078F04Cu);
+        WORD_AT(0x0078F04Cu)=1u;
+        WORD_AT(PLAYER+0xFF4u)=ENT(9);khl_keep_focus(CHAIR);CHECK(WORD_AT(PLAYER+0xFF4u)==ENT(9));
+        WORD_AT(PLAYER+0xFF4u)=0;khl_keep_focus(CHAIR);CHECK(WORD_AT(PLAYER+0xFF4u)==CHAIR);
+        WORD_AT(PLAYER+0xFF4u)=0;FLOAT_AT(CHAIR+0x1CCu)=-1.0f;khl_keep_focus(CHAIR);CHECK(WORD_AT(PLAYER+0xFF4u)==0);
+        FLOAT_AT(CHAIR+0x1CCu)=60.0f;WORD_AT(0x0078F04Cu)=0;khl_keep_focus(CHAIR);CHECK(WORD_AT(PLAYER+0xFF4u)==0);   /* waiting */
+        WORD_AT(0x0078F04Cu)=act;
+    }
     /* not made as Khallos: no lv11.pak, his model unread, no chair possible, a fifth chair, another id, opted out */
     own_level(__LINE__);
     anim_mounted=0;made_model=0;

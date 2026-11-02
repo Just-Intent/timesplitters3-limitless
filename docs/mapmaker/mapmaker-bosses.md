@@ -147,6 +147,17 @@ farther ones wait for a free place.
   [Khallos](mapmaker-khallos.md) sets it: a seated Khallos's bar is his chair
   (a prop with its own health). Fixture: `mapmaker_bosses.c` "a Boss AI whose
   bar is another entity" (mutations `proxy-ignored`, `proxy-after-scale`).
+  Since .34 a proxied entity that is the focus while the stock bar shows
+  (Khallos' focus chair keeps its stock bar) is scaled but not drawn again,
+  as for the props below (mutation `proxy-no-skip`).
+- Bar log (after the .34 playtest, which logged nothing about bars): at each
+  map start (and restart) `story AI bosses: map start: N Story AIs with a
+  Boss or health setting (M with the Sub-boss bar)`; then once per entity and
+  reason per level (16 lines) `story AI bosses: bar of NAME (entity E):`
+  `drawn`, `refused by the bar draw`, `not shown: the Story AI's Boss setting
+  is Off` (also for a proxied AI without any setting), `Sub-boss bar`,
+  `dead`, `out of range`, `the stock bar shows it`, `more Boss bars than fit`
+  (mutations `note-*`).
 - Bars of removed Boss AIs (after the .28 playtest): an area that replaces
   a Story AI with a prop and removes the AI (the [tank](mapmaker-tank.md),
   the [mothership](mapmaker-mothership.md)) registers a lister with

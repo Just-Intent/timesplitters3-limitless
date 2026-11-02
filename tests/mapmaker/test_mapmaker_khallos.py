@@ -96,7 +96,7 @@ MUTATIONS = {
     'wake-first-player-only': ('    for(k=0;k<n && MAPMAKER_PTR_OK(base,KHL_PLAYER_STRIDE*4u);k++) {\n        ent=', '    for(k=0;k<n && k<1u && MAPMAKER_PTR_OK(base,KHL_PLAYER_STRIDE*4u);k++) {\n        ent='),
     'wake-line-not-forced': ('    WORD_AT(KHL_LINE)=KHL_FLT_MAX;\n    khl_setf(KHL_GAP,px-tx);', '    khl_setf(KHL_GAP,px-tx);'),
     'line-not-restored': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health', '    WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health'),
-    'line-wait-not-restored': ('        original();\n        WORD_AT(KHL_LINE)=line;\n        khl_rider_health(k,obj);\n        khl_keep_class(k);\n        return;', '        original();\n        khl_rider_health(k,obj);\n        khl_keep_class(k);\n        return;'),
+    'line-wait-not-restored': ('        original();\n        WORD_AT(KHL_LINE)=line;\n        khl_jet_home(k);', '        original();\n        khl_jet_home(k);'),
     'frame-none': ('    khl_shift_in(obj);\n    khl_lv.inside=1;', '    khl_lv.inside=1;'),
     'frame-not-back': ('    khl_lv.inside=0;\n    khl_shift_out(obj);', '    khl_lv.inside=0;'),
     'frame-no-lift': ('    khl_lv.d[1]=khl_ch[k].spawn[1]+KHL_LIFT-KHL_TRAIN_Y;', '    khl_lv.d[1]=khl_ch[k].spawn[1]-KHL_TRAIN_Y;'),
@@ -167,7 +167,7 @@ MUTATIONS = {
     'event-any-scene': ('       WORD_AT(KHL_SCENE)!=100u || !khl_on()) { original();return; }', '       !khl_on()) { original();return; }'),
     'text-any-caller': ('WORD_AT(g_esp+4u)!=KHL_BAR_TEXT || WORD_AT(g_esp)!=KHL_RET_BAR_TEXT ||', 'WORD_AT(g_esp+4u)!=KHL_BAR_TEXT ||'),
     'text-any-mode': ('|| !khl.label || !khl_play()) {', '|| !khl.label || !khl_on()) {'),
-    'text-no-ret': ('    g_eax=khl.label;\n    MAPMAKER_GUEST_RET();', '    g_eax=khl.label;'),
+    'text-no-ret': ('khl_bar_label((unsigned)khl_lv.bar-1u):khl.label;\n    MAPMAKER_GUEST_RET();', 'khl_bar_label((unsigned)khl_lv.bar-1u):khl.label;'),
     'mine-first-only': ('    for(k=0;k<khl_lv.n;k++) if(khl_ch[k].obj==obj) return (int)k;', '    for(k=0;k<1u && k<khl_lv.n;k++) if(khl_ch[k].obj==obj) return (int)k;'),
     'mount-keeps-count': ('    memset(&khl_lv,0,sizeof khl_lv);                       /* forget the last chairs */\n', ''),
     'spawn-one-chair': ('    if(khl_lv.n>=KHL_MAX) {', '    if(khl_lv.n>=1u) {'),
@@ -236,13 +236,22 @@ MUTATIONS = {
     'rider-not-topped': ('    if(cur>0.0f) khl_setf(ent+KHL_ENT_HEALTH,max);\n', ''),
     'rider-revived': ('    if(cur>0.0f) khl_setf(ent+KHL_ENT_HEALTH,max);', '    if(1) khl_setf(ent+KHL_ENT_HEALTH,max);'),
     'rider-kill-no-down': ('        if(left<0.0f) khl_down(k,obj);\n', ''),
-    'rider-health-waiting-never': ('        WORD_AT(KHL_LINE)=line;\n        khl_rider_health(k,obj);\n        khl_keep_class(k);\n        return;', '        WORD_AT(KHL_LINE)=line;\n        khl_keep_class(k);\n        return;'),
+    'rider-health-waiting-never': ('        khl_jet_home(k);                                   /* the stock wait never moves its jet */\n        khl_rider_health(k,obj);\n        khl_keep_class(k);\n        return;', '        khl_jet_home(k);                                   /* the stock wait never moves its jet */\n        khl_keep_class(k);\n        return;'),
     'rider-health-active-never': ('    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n    khl_rider_health(k,obj);\n', '    WORD_AT(KHL_LINE)=line;WORD_AT(KHL_GAP)=gap;WORD_AT(KHL_SPAN)=span;\n'),
-    'hud-kept': ('    WORD_AT(player+KHL_FOCUS)=0;\n    original();\n    WORD_AT(player+KHL_FOCUS)=focus;', '    original();\n    WORD_AT(player+KHL_FOCUS)=focus;'),
-    'hud-not-back': ('    WORD_AT(player+KHL_FOCUS)=0;\n    original();\n    WORD_AT(player+KHL_FOCUS)=focus;', '    WORD_AT(player+KHL_FOCUS)=0;\n    original();'),
-    'hud-unseated': ('(k=khl_chair(focus=WORD_AT(player+KHL_FOCUS)))<0 || !khl_seated((unsigned)k)) { original();return; }', '(k=khl_chair(focus=WORD_AT(player+KHL_FOCUS)))<0) { original();return; }'),
-    'hud-any-focus': ('(k=khl_chair(focus=WORD_AT(player+KHL_FOCUS)))<0 || !khl_seated((unsigned)k)) { original();return; }', '(k=0,focus=WORD_AT(player+KHL_FOCUS))<0 || !khl_seated((unsigned)k)) { original();return; }'),
     'seated-stale': ('static int khl_seated(unsigned k) { return khl_ch[k].rider && khl_same_ai(', 'static int khl_seated(unsigned k) { return khl_ch[k].rider || khl_same_ai('),
+    # v0.4.0-mapmaker.34: the focus chair keeps its stock bar (its rider's name); the jet emitter at the chair
+    'hud-hides-stock': ('khl_lv.bar=k+1;                        /* the text hook labels this chair\'s bar */\n    original();', 'khl_lv.bar=k+1;\n    WORD_AT(player+KHL_FOCUS)=0;original();WORD_AT(player+KHL_FOCUS)=focus;'),
+    'hud-no-label': ('prev=khl_lv.bar;khl_lv.bar=k+1;', 'prev=khl_lv.bar;khl_lv.bar=0;'),
+    'hud-label-kept': ('    original();\n    khl_lv.bar=prev;\n', '    original();\n'),
+    'label-unnamed': ('(name=bos_story_name(WORD_AT(khl_ch[k].rider_rec+8u)))!=0', '(name=0)!=0'),
+    'label-any-chair': ('khl_bar_label((unsigned)khl_lv.bar-1u):khl.label', 'khl.label:khl.label'),
+    'focus-not-kept': ('    khl_keep_focus(obj);\n', ''),
+    'focus-taken-from-other': (' || WORD_AT(player+KHL_FOCUS)) return;', ') return;'),
+    'focus-dead-taken': (' || !(khl_getf(obj+KHL_ENT_HEALTH)>0.0f) || !MAPMAKER_PTR_OK(player,KHL_FOCUS+4u)', ' || !MAPMAKER_PTR_OK(player,KHL_FOCUS+4u)'),
+    'jet-not-moved': ('        khl_jet_home(k);\n    }\n    khl_out(k,keep);', '    }\n    khl_out(k,keep);'),
+    'jet-waiting-not-moved': ('        khl_jet_home(k);                                   /* the stock wait never moves its jet */\n', ''),
+    'jet-wrong-pos': ('guest_call(sub_0010E730,2,jet,KHL_POS);', 'guest_call(sub_0010E730,2,jet,KHL_POS+4u);'),
+    'pose-not-counted': ('    khl_ch[k].poses++;', ''),
     'proxy-not-set': ('    bos_bar_proxy=khl_bar_entity;', '    (void)khl_bar_entity;'),
     'proxy-removed-chair': ('    return k>=0 && !khl_ch[k].removed?khl_ch[k].obj:0u;', '    return k>=0?khl_ch[k].obj:0u;'),
     'proxy-any-entity': ('    int k=khl_ridden(ent);\n    return k>=0', '    int k=khl_lv.n?0:-1;(void)ent;\n    return k>=0'),
@@ -797,3 +806,47 @@ def test_chair_sounds():
     assert sounds[0x393] == ('SFX_11_KHALLOS_GUN', 0x0B00000C) and sounds[0x394] == ('SFX_11_JETPACK_NEW', 0x0B00041C)
     text = INC.read_text(encoding='utf-8')
     assert '#define KHL_SND_GUN 0x393u' in text and '#define KHL_SND_JET 0x394u' in text and '#define KHL_SPAN 0x005000B8u' in text
+
+def test_jet_emitter_starts_at_the_train():
+    """.34 "a texture stretched between my view and one of the khallos'": the
+    init makes the jet emitter (owner slot 0x0078F054) at 0x0078F004, the live
+    position it has just set to the train start; sub_0010E730 writes an
+    emitter's position (+0x14..+0x1C) and the update calls it only after the
+    start-line return, so a waiting chair's jet stayed at the train start."""
+    a = by_address()
+    assert mem(a[0x001EEAA1])[0][4] == 0x0078F004 and mem(a[0x001EEAB1])[0][4] == 0x0078F008   # live = train start ...
+    assert ('imm', 0x0078F004) in a[0x001EEAE9].ops and ('imm', 0x0078F054) in a[0x001EEB26].ops   # ... the jet's position
+    assert target(a[0x001EEB33]) == 0x00378530
+    assert [mem(a[x])[0][4] for x in (0x0010E73F, 0x0010E745, 0x0010E74B)] == [0x14, 0x18, 0x1C]
+    update = {i.address for i in decoded() if i.function == UPDATE}
+    assert calls_to(0x0010E730) & update == {0x001EED75}
+    assert a[0x001EEC57].mnemonic == 'ja' and target(a[0x001EEC57]) == 0x001EF827 and 0x001EEC57 < 0x001EED75
+    text = INC.read_text(encoding='utf-8')
+    assert '#define KHL_EMIT_POS 0x14u' in text and '#define KHL_JET 0x0078F054u' in text
+
+
+def test_rider_pose_sources():
+    """.34 "still aren't really seated": what the train's seated Khallos is. The
+    handler places him by position only (no attach or parent call), plays the
+    only Khallos anim of lv11 (khallosidle; no sit or ride anim exists) and
+    installs the pose callback sub_00263150 (slot 2), which swings the nodes
+    below a pivot by the chair's sway. lv11.pak holds khallosidle as
+    anim/data/ts3/khallosidle.raw; the other copies (lv11_6/7.pak) have no XBE
+    path and are never mounted."""
+    rd = xbe_reader()
+    a = by_address()
+    callees = {target(i) for i in decoded() if i.function == 0x00263260 and i.call}
+    assert callees == {0x0015E120, 0x00152090, 0x0009FBE0, 0x003C8C64, 0x000A5CE0, 0x0015AF30, 0x0005F460}
+    assert ('imm', 0x00263150) in a[0x00263577].ops and ('imm', 2) in a[0x0026357C].ops and target(a[0x0026357F]) == 0x000A5CE0
+    assert target(a[0x002631FC]) == 0x0005CEF0                                         # the pose callback evaluates the skeleton
+    lv11 = anim_table(rd, 0x00484410, 0x21)
+    assert [n for n in lv11 if 'khallos' in n.lower()] == ['khallosidle']
+    assert not [n for n in lv11 if 'sit' in n.lower() and 'soldier' not in n.lower()]   # 11_sitsoldier only
+    assert rd(0x0049C690, 15) == b'anim/data/ts3/\0' and ('imm', 0x0049C690) in a[0x001CA8D3].ops
+    xbe = (_private() / 'game/default.xbe').read_bytes()
+    assert b'lv11/anim/lv11_6.pak' not in xbe and b'lv11/anim/lv11_7.pak' not in xbe
+    if not (GAME / 'stream/lv11/anim/lv11.pak').exists():
+        pytest.skip('game paks not available locally')
+    idx = _index(GAME / 'stream/lv11/anim/lv11.pak')
+    names = sorted(lv11, key=lv11.get)
+    assert list(idx).index(_crc('anim/data/ts3/khallosidle.raw')) == names.index('khallosidle') == 32

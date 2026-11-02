@@ -130,6 +130,7 @@ void sub_00096330(void) {}  /* mothership: texture registration */
 void sub_002F7920(void) {}  /* sets: spawn mode mask of an editor item */
 /* khallos, worm (pc_mapmaker_khallos.inc, pc_mapmaker_worm.inc) */
 void sub_0009A420(void) {} void sub_000A9070(void) {} void sub_0010E2A0(void) {} void sub_001D1E80(void) {}
+void sub_0010E730(void) {}  /* khallos: the jet emitter's position */
 void sub_001D2350(void) {} void sub_001DA990(void) {} void sub_001DAAB0(void) {} void sub_00378400(void) {} void sub_0005B980(void) {}
 /* tilesets (pc_mapmaker_tilesets.inc: pak mount) */
 void sub_000622D0(void) {}
