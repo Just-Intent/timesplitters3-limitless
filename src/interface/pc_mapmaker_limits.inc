@@ -76,12 +76,18 @@
  * pads a map adds at load (measured 60). */
 #define MAPMAKER_LIMIT_COVER 9984u    /* 10240 cover handles - 256 */
 #define MAPMAKER_POOL_COVER 10496u    /* 10240 cover handles + 256 guard */
-/* Links 12000 (round 4, was 8800): 255 pieces of the heaviest tile (46 links,
- * tile rows 0..45 of 0x00529400) need 11,730, so links never bind before the
- * piece limit; the pool (12000 + 16 x 255 + 256 = 16,336) keeps link indices
- * below the int16 A* limit 32,767 (docs/mapmaker/mapmaker-pads.md). Pads
- * (14 x 255 = 3,570) and cover (3,570) already fit, so pieces bind first. */
-#define MAPMAKER_LIMIT_LINKS 12000u
+/* Links (2026-11-02; 12000 template links before, pool 16,336): the A*
+ * nodes and routes hold link indices as int16, so the scene-100 pool is fixed
+ * at 32,512 entries (indices < 32,767). Play adds 16 stitch links per piece
+ * (sub_0009DC70, table of 16 per piece from sub_0009A0F0) and teleporter and
+ * door links (sub_0009CD00, the 256 slack), so the editor limits template
+ * links + 16 per piece to 32,256: 511 pieces of the heaviest tile (46 links)
+ * need 23,506 + 8,176 = 31,682, and 1024 pieces fit with up to 15 links each
+ * (docs/mapmaker/mapmaker-pads.md). */
+#define MAPMAKER_POOL_LINKS 32512u
+#define MAPMAKER_LINK_STITCH 16u
+#define MAPMAKER_LINK_SLACK 256u
+#define MAPMAKER_LIMIT_LINKS (MAPMAKER_POOL_LINKS-MAPMAKER_LINK_SLACK)  /* template + 16 per piece */
 #define MAPMAKER_LIMIT_GROUPS 600
 #define MAPMAKER_LIMIT_PIECES 255u    /* = MAPMAKER_ROOMS_MAX */
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
@@ -90,6 +96,9 @@
  * below the raised id threshold 0x2328. */
 typedef char mapmaker_limits_pad_ids[(MAPMAKER_POOL_PADS<=0x1F40u && 0x3E9u+MAPMAKER_POOL_PADS-1u<=0x2328u &&
                                       MAPMAKER_LIMIT_PADS<=MAPMAKER_POOL_PADS)?1:-1];
+/* Links: every pool index fits the int16 A* indices. */
+typedef char mapmaker_limits_link_pool[(MAPMAKER_POOL_LINKS<=0x7FFFu &&
+                                        MAPMAKER_LIMIT_LINKS+MAPMAKER_LINK_SLACK<=MAPMAKER_POOL_LINKS)?1:-1];
 
 static struct { int initialized, pools, limits; } mapmaker_limits;
 
@@ -173,9 +182,9 @@ void pc_display_mapmaker_pools(void (*original)(void))
     }
     save_registers(&r);
     WORD_AT(0x00715F2Cu)=mapmaker_pool(MAPMAKER_POOL_PADS*32u);
-    /* Links: the editor counts template links only; the play-time stitcher
-     * adds one per stitch entry (table of 16 per piece) and objects a few. */
-    WORD_AT(0x00715F30u)=mapmaker_pool((MAPMAKER_LIMIT_LINKS+16u*MAPMAKER_LIMIT_PIECES+256u)*20u);
+    /* Links: template links, one per stitch entry (table of 16 per piece) and
+     * a few for objects, all within the int16 index range. */
+    WORD_AT(0x00715F30u)=mapmaker_pool(MAPMAKER_POOL_LINKS*20u);
     if((WORD_AT(0x007DE454u)>>8&0xFFu)!=10u)                 /* byte [0x007DE455] */
         WORD_AT(0x00715F3Cu)=mapmaker_pool(MAPMAKER_POOL_PADS*44u);
     WORD_AT(0x00715F34u)=mapmaker_pool(MAPMAKER_POOL_COVER*32u);
@@ -228,6 +237,27 @@ static uint32_t mapmaker_placed_memory(uint32_t piece)
     }
     return mapmaker_budget_apply(total);
 }
+/* Links a list costs in play: its template links and the stitch links. */
+static uint32_t mapmaker_link_cost(const MapMakerTotals *t)
+{
+    return t->cost[2]+MAPMAKER_LINK_STITCH*t->pieces;
+}
+/* Which limits placed + held content passes (0: placement allowed). */
+enum { MAPMAKER_CAP_PADS=1u, MAPMAKER_CAP_COVER=2u, MAPMAKER_CAP_LINKS=4u, MAPMAKER_CAP_PIECES=8u,
+       MAPMAKER_CAP_MEMORY=16u, MAPMAKER_CAP_GROUPS=32u, MAPMAKER_CAP_SUB=64u };
+static unsigned mapmaker_limits_over(const MapMakerTotals *p,const MapMakerTotals *h,uint32_t memory,
+                                     int32_t groups,uint32_t sub)
+{
+    unsigned over=0;
+    if(p->cost[0]+h->cost[0]>MAPMAKER_LIMIT_PADS) over|=MAPMAKER_CAP_PADS;
+    if(p->cost[1]+h->cost[1]>MAPMAKER_LIMIT_COVER) over|=MAPMAKER_CAP_COVER;
+    if(mapmaker_link_cost(p)+mapmaker_link_cost(h)>MAPMAKER_LIMIT_LINKS) over|=MAPMAKER_CAP_LINKS;
+    if(p->pieces+h->pieces>MAPMAKER_LIMIT_PIECES) over|=MAPMAKER_CAP_PIECES;
+    if(memory>MAPMAKER_LIMIT_MEMORY) over|=MAPMAKER_CAP_MEMORY;
+    if(groups>MAPMAKER_LIMIT_GROUPS) over|=MAPMAKER_CAP_GROUPS;
+    if(sub>MAPMAKER_LIMIT_SUB) over|=MAPMAKER_CAP_SUB;
+    return over;
+}
 static float mapmaker_fraction_max(const float *f,unsigned n)
 {
     float m=0;
@@ -259,21 +289,18 @@ void pc_display_mapmaker_limits(void (*original)(void))
     total_mem=WORD_AT(editor+0x278);              /* written by the original */
     /* Meter (placed only), as the first part of the original. */
     f[0]=(float)p.cost[0]/MAPMAKER_LIMIT_PADS;f[1]=(float)p.cost[1]/MAPMAKER_LIMIT_COVER;
-    f[2]=(float)p.cost[2]/MAPMAKER_LIMIT_LINKS;f[3]=(float)groups/MAPMAKER_LIMIT_GROUPS;
+    f[2]=(float)mapmaker_link_cost(&p)/MAPMAKER_LIMIT_LINKS;f[3]=(float)groups/MAPMAKER_LIMIT_GROUPS;
     f[4]=(float)p.pieces/MAPMAKER_LIMIT_PIECES;f[5]=(float)(p.sub+extra)/MAPMAKER_LIMIT_SUB;
     f[6]=(float)placed_mem/MAPMAKER_LIMIT_MEMORY;
     FLOAT_AT(editor+0x270)=mapmaker_fraction_max(f,7);
     /* Held piece preview. */
     f[0]=(float)h.cost[0]/MAPMAKER_LIMIT_PADS;f[1]=(float)h.cost[1]/MAPMAKER_LIMIT_COVER;
-    f[2]=(float)h.cost[2]/MAPMAKER_LIMIT_LINKS;f[3]=(float)h.pieces/MAPMAKER_LIMIT_PIECES;
+    f[2]=(float)mapmaker_link_cost(&h)/MAPMAKER_LIMIT_LINKS;f[3]=(float)h.pieces/MAPMAKER_LIMIT_PIECES;
     f[4]=(float)(h.sub+(held_id>=0?1u:0u))/MAPMAKER_LIMIT_SUB;
     f[5]=(float)(total_mem>placed_mem?total_mem-placed_mem:0u)/MAPMAKER_LIMIT_MEMORY;
     FLOAT_AT(editor+0x274)=mapmaker_fraction_max(f,6);
     /* Placement decision over placed + held. */
-    refuse=p.cost[0]+h.cost[0]>MAPMAKER_LIMIT_PADS || p.cost[1]+h.cost[1]>MAPMAKER_LIMIT_COVER ||
-        p.cost[2]+h.cost[2]>MAPMAKER_LIMIT_LINKS || p.pieces+h.pieces>MAPMAKER_LIMIT_PIECES ||
-        total_mem>MAPMAKER_LIMIT_MEMORY || groups>MAPMAKER_LIMIT_GROUPS ||
-        p.sub+h.sub+(held_id>9?1u:0u)+extra>MAPMAKER_LIMIT_SUB;
+    refuse=mapmaker_limits_over(&p,&h,total_mem,groups,p.sub+h.sub+(held_id>9?1u:0u)+extra)!=0;
     flags=WORD_AT(editor+0x25c);
     WORD_AT(editor+0x25c)=refuse?(flags|0x400000u):(flags&~0x400000u);
 }

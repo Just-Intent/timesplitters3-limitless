@@ -17,13 +17,21 @@ MUTATIONS = {
     'pools-not-cleared': ('memset((void *)((uintptr_t)p+g_xbox_mem_offset),0,bytes);', '(void)0;'),
     'cover-raised': ('#define MAPMAKER_LIMIT_COVER 9984u', '#define MAPMAKER_LIMIT_COVER 10240u'),
     'cover-pool-stock': ('#define MAPMAKER_POOL_COVER 10496u', '#define MAPMAKER_POOL_COVER 1280u'),
-    'link-pool-no-stitch': ('(MAPMAKER_LIMIT_LINKS+16u*MAPMAKER_LIMIT_PIECES+256u)*20u', 'MAPMAKER_LIMIT_LINKS*20u'),
-    # Links 12000: 255 of the heaviest tile (46 links) fit; the pool stays int16.
-    'links-round3': ('#define MAPMAKER_LIMIT_LINKS 12000u', '#define MAPMAKER_LIMIT_LINKS 8800u'),
-    'links-below-heaviest': ('#define MAPMAKER_LIMIT_LINKS 12000u', '#define MAPMAKER_LIMIT_LINKS 11000u'),
-    'links-past-int16': ('#define MAPMAKER_LIMIT_LINKS 12000u', '#define MAPMAKER_LIMIT_LINKS 30000u'),
-    'links-held-ignored': ('p.cost[2]+h.cost[2]>MAPMAKER_LIMIT_LINKS', 'p.cost[2]>MAPMAKER_LIMIT_LINKS'),
-    'no-held-pieces': ('p.pieces+h.pieces>MAPMAKER_LIMIT_PIECES', 'p.pieces>MAPMAKER_LIMIT_PIECES'),
+    'link-pool-editor-limit': ('mapmaker_pool(MAPMAKER_POOL_LINKS*20u)', 'mapmaker_pool(MAPMAKER_LIMIT_LINKS*20u)'),
+    # Links: the pool stays within int16 A* indices; 511 of the heaviest tile (46
+    # links + 16 stitch links each) fit the editor limit.
+    'links-pool-stock-raise': ('#define MAPMAKER_POOL_LINKS 32512u', '#define MAPMAKER_POOL_LINKS 16336u'),
+    'links-past-int16': ('#define MAPMAKER_POOL_LINKS 32512u', '#define MAPMAKER_POOL_LINKS 32768u'),
+    'links-no-stitch': ('    return t->cost[2]+MAPMAKER_LINK_STITCH*t->pieces;', '    return t->cost[2];'),
+    'links-no-slack': ('#define MAPMAKER_LIMIT_LINKS (MAPMAKER_POOL_LINKS-MAPMAKER_LINK_SLACK)',
+                       '#define MAPMAKER_LIMIT_LINKS MAPMAKER_POOL_LINKS'),
+    'links-held-ignored': ('mapmaker_link_cost(p)+mapmaker_link_cost(h)>MAPMAKER_LIMIT_LINKS',
+                           'mapmaker_link_cost(p)>MAPMAKER_LIMIT_LINKS'),
+    'no-held-pieces': ('p->pieces+h->pieces>MAPMAKER_LIMIT_PIECES', 'p->pieces>MAPMAKER_LIMIT_PIECES'),
+    # Regular pads: 7680 in the editor, 8000 in the pool (pad id threshold 0x2328).
+    'pads-round3': ('#define MAPMAKER_LIMIT_PADS 7680u', '#define MAPMAKER_LIMIT_PADS 4800u'),
+    'pads-pool-stock': ('#define MAPMAKER_POOL_PADS 8000u', '#define MAPMAKER_POOL_PADS 4800u'),
+    'pads-past-ids': ('#define MAPMAKER_POOL_PADS 8000u', '#define MAPMAKER_POOL_PADS 8001u'),
     'sub-stock-round2': ('#define MAPMAKER_LIMIT_SUB 500u', '#define MAPMAKER_LIMIT_SUB 200u'),
     'sub-past-pool': ('#define MAPMAKER_LIMIT_SUB 500u', '#define MAPMAKER_LIMIT_SUB 501u'),
     'keycards-round2': ('    {0x00524CECu,2u,16u},', '    {0x00524CECu,2u,8u},'),
@@ -63,6 +71,8 @@ def build(tmp_path, mutation):
         args = [compiler, '-std=c11', '-O2', '-Wall', '-Wextra', '-D_POSIX_C_SOURCE=200809L',
                 '-I' + str(tmp_path), '-I' + str(ROOT / 'src'), str(source), '-o', str(exe)]
     result = subprocess.run(args, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=60)
+    if mutation != 'fixed' and result.returncode != 0:
+        return None                      # a size check refused it at compile time
     assert result.returncode == 0, result.stdout + result.stderr
     return exe
 
@@ -70,6 +80,8 @@ def build(tmp_path, mutation):
 @pytest.mark.parametrize('mutation', ['fixed', *MUTATIONS])
 def test_mapmaker_limits(tmp_path, mutation):
     exe = build(tmp_path, mutation)
+    if exe is None:
+        return
     env = {k: v for k, v in os.environ.items()
            if k not in ('TSFP_MAPMAKER_POOLS', 'TSFP_MAPMAKER_LIMITS', 'TSFP_MAPMAKER_MEMORY_SCALE')}
     result = subprocess.run([str(exe)], env=env, capture_output=True, text=True, timeout=60)

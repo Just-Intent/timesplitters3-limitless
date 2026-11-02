@@ -21,3 +21,18 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
   2 C + 3 table mutations), `test_mapmaker_pads_classified.py` (88 runtime +
   13 threshold rewrites; four mislabelled sites corrected).
 - Contract and evidence: `docs/mapmaker/mapmaker-pads.md`.
+
+## Links (2026-11-02)
+
+- `pc_mapmaker_limits.inc`: `MAPMAKER_POOL_LINKS` 32,512 (scene-100 pool,
+  fixed; int16 A* link indices), `MAPMAKER_LINK_STITCH` 16 per piece,
+  `MAPMAKER_LINK_SLACK` 256, `MAPMAKER_LIMIT_LINKS` = pool - slack.
+  `mapmaker_link_cost` (template + 16 x pieces) feeds the meter, the held
+  preview and `mapmaker_limits_over` (bit mask of the limits passed; the
+  placement decision is `!= 0`).
+- `pc_mapmaker_objects.inc` teleporter links stop at the pool, not the
+  editor limit.
+- Tests: `mapmaker_limits.c` (exact 32,256 boundary with held pieces; 511
+  heavy pass every cap but pieces, links stop at 521, pads at 549, 1024 x 15
+  links fit), `mapmaker_objects.c` (links past the editor limit);
+  mutations in `test_mapmaker_limits.py` / `test_mapmaker_objects.py`.

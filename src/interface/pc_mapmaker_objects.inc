@@ -46,7 +46,7 @@
  * Requires the includer's WORD_AT, guest_writable, guest_call,
  * save_registers/restore_registers, g_esp/g_eax/g_ebx/g_edi,
  * g_xbox_mem_offset and pc_mapmaker_limits.inc (mapmaker_limits,
- * MAPMAKER_LIMIT_LINKS). */
+ * MAPMAKER_POOL_LINKS). */
 #ifndef MAPMAKER_STACK_OK
 /* Hot hooks check the guest stack with this instead of guest_writable,
  * whose VirtualQuery made a 186-piece map's AI setup take 13 minutes. */
@@ -294,7 +294,7 @@ void pc_mapmaker_objects_teleporters(void (*original)(void))
     if(!mapmaker_objects_scene(100u)) { original(); return; }
     save_registers(&r);
     mapmaker_limits_read();
-    links=mapmaker_limits.pools?MAPMAKER_LIMIT_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;
+    links=mapmaker_limits.pools?MAPMAKER_POOL_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;  /* the pool, not the editor limit */
     n=mapmaker_objects_teleporters_read();
     for(i=0;i<n;i++) {
         uint32_t a=guest_call(sub_0009CC40,1,mapmaker_objects_tele_pad[i]);
