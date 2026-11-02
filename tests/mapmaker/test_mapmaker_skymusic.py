@@ -103,12 +103,32 @@ MUTATIONS = {
     'sand-grains-first-player': ('        if(!MAPMAKER_PTR_OK(pl,SMX_PL_POS+12u)) continue;', '        if(!MAPMAKER_PTR_OK(pl,SMX_PL_POS+12u) || p) continue;'),
     'sand-grains-past-ring': ('            if(g>=SMX_GRAINS) g=0;\n', ''),
     'sand-grains-one-slot': ('            WORD_AT(SMX_WX_RING)=(g+1u)%SMX_GRAINS;\n', ''),
-    'sand-grains-unbounded': ('    if(steps>4u) steps=4u;\n', ''),
+    'sand-grains-unbounded': ('    if(steps>4u*SMX_GRAIN_EVERY) steps=4u*SMX_GRAIN_EVERY;\n', ''),
     'sand-grains-negative-steps': ('|| (int32_t)steps<=0) return 0;', ') return 0;'),
     'sand-grains-at-origin': ('        x=FLOAT_AT(pl+SMX_PL_POS);y=FLOAT_AT(pl+SMX_PL_POS+4u);z=FLOAT_AT(pl+SMX_PL_POS+8u);', '        x=0.0f;y=FLOAT_AT(pl+SMX_PL_POS+4u);z=FLOAT_AT(pl+SMX_PL_POS+8u);'),
     'sand-grains-still': ('            FLOAT_AT(e+0x0Cu)=smx_wind[0]*s+', '            FLOAT_AT(e+0x0Cu)=0.0f*s+'),
     'sand-grains-dead': ('            FLOAT_AT(e+0x20u)=0.0f;', '            FLOAT_AT(e+0x20u)=-1.0f;'),
     'frame-not-reset': ('smx.level_logs=0;smx.frames=0;', 'smx.level_logs=0;'),
+    # v0.4.0-mapmaker.31: grains alive but invisible (stock alpha 16/255, haze 2/255, 24 m box, a 1 s life)
+    'sand-grains-every-step': ('#define SMX_GRAIN_EVERY 2u', '#define SMX_GRAIN_EVERY 1u'),
+    'sand-grains-wide': ('#define SMX_GRAIN_SPREAD 5.0f', '#define SMX_GRAIN_SPREAD 12.0f'),
+    'sand-steps-not-reset': ('smx.sand_steps=SMX_GRAIN_EVERY-1u;', 'smx.sand_steps=0;'),
+    'sand-steps-no-carry': ('    steps+=smx.sand_steps%SMX_GRAIN_EVERY;\n', ''),
+    'fog-not-set': ('    WORD_AT(SMX_LEVEL100+SMX_LEVEL_FOG)=SMX_SAND_FOG;\n', ''),
+    'fog-any-map': ('    if(!smx_sand_live()) return;\n    smx.tileset_fog', '    smx.tileset_fog'),
+    'fog-before-original': ('    smx_level_sky(original);\n    smx_sand_fog();', '    smx_sand_fog();\n    smx_level_sky(original);'),
+    'fog-other-row': ('#define SMX_SAND_FOG 7u', '#define SMX_SAND_FOG 12u'),
+    'sand-live-any-scene': ('return smx.sand_on==1 && smx_scene()==100u && WORD_AT(SMX_SANDSTORM); }', 'return smx.sand_on==1 && WORD_AT(SMX_SANDSTORM); }'),
+    'sand-live-no-flag': ('return smx.sand_on==1 && smx_scene()==100u && WORD_AT(SMX_SANDSTORM); }', 'return smx.sand_on==1 && smx_scene()==100u; }'),
+    'haze-any-caller': ('WORD_AT(g_esp)==SMX_RET_HAZE && smx_sand_live()', 'smx_sand_live()'),
+    'haze-any-map': ('WORD_AT(g_esp)==SMX_RET_HAZE && smx_sand_live() &&', 'WORD_AT(g_esp)==SMX_RET_HAZE &&'),
+    'haze-stock': ('        g_eax=(g_eax&0xFFFFFF00u)|SMX_HAZE_ALPHA;\n', ''),
+    'haze-wrong-caller': ('#define SMX_RET_HAZE 0x0011B143u', '#define SMX_RET_HAZE 0x0011B13Eu'),
+    'grain-colour-any-caller': ('WORD_AT(g_esp)==SMX_RET_GRAIN_COLOUR && ', ''),
+    'grain-colour-any-colour': (' && WORD_AT(g_esp+4u)==SMX_GRAIN_COLOUR', ''),
+    'grain-colour-any-map': (' && smx_sand_live()) {\n        WORD_AT(g_esp+4u)', ') {\n        WORD_AT(g_esp+4u)'),
+    'grain-colour-stock': ('        WORD_AT(g_esp+4u)=(SMX_GRAIN_COLOUR&0xFFFFFF00u)|SMX_GRAIN_ALPHA;\n', ''),
+    'grain-colour-wrong-caller': ('#define SMX_RET_GRAIN_COLOUR 0x0011B247u', '#define SMX_RET_GRAIN_COLOUR 0x0011B242u'),
     # music
     'music-any-caller': ('    if(MAPMAKER_PTR_OK(g_esp,4u) && WORD_AT(g_esp)==SMX_RET_MUSIC_PLAY && g_eax==0xFFFFFFFFu &&',
                          '    if(MAPMAKER_PTR_OK(g_esp,4u) && g_eax==0xFFFFFFFFu &&'),
@@ -270,6 +290,47 @@ def test_stock_sky_weather_data():
     assert read(0x00313901, 5) == bytes.fromhex('e88a4cd6ff')            # weather bind -> 0x00313906
     assert read(0x00045FB7, 5) == bytes.fromhex('e824feffff')            # music start -> 0x00045FBC
     assert read(0x0006298E, 5) == bytes.fromhex('6890874700')            # gun.pak index-only mount
+
+
+def _f32(read, va):
+    return struct.unpack('<f', read(va, 4))[0]
+
+
+def test_stock_sandstorm_draw():
+    """v0.4.0-mapmaker.31: what the sandstorm draw makes of a grain and of the
+    haze, and the fog row of the story sandstorm levels (US XBE bytes)."""
+    read = _xbe()
+    # sub_0011B110: haze first (eax = 0x7F5A1E05, 8 layers -> sub_0011A930), return 0x0011B143.
+    assert read(0x0011B137, 12) == bytes.fromhex('6a08b8051e5a7fe8edf7ffff')
+    # Per live grain (age +0x20 >= 0): t = age/3, colour sub_00154FE0(0x7F643C10, fade),
+    # return 0x0011B247; size t + 1.5; sprite sub_0001D5F0 at +0/+4/+8.
+    assert read(0x0011B1B6, 6) == bytes.fromhex('f30f10440b20') and _f32(read, 0x00475CAC) == 0.0
+    assert read(0x0011B1D7, 8) == bytes.fromhex('f30f590dd8cf4700') and abs(_f32(read, 0x0047CFD8) - 1 / 3) < 1e-6
+    assert read(0x0011B23D, 10) == bytes.fromhex('68103c647fe8999d0300')
+    assert read(0x0011B2C7, 8) == bytes.fromhex('f30f5805205d4700') and _f32(read, 0x00475D20) == 1.5
+    assert read(0x0011B2E4, 5) == bytes.fromhex('e80723f0ff')
+    # sub_00154FE0 scales only the low byte (alpha) by the clamped fade.
+    assert read(0x00155002, 11) == bytes.fromhex('8b742408' '8bc6' '25ff000000')
+    assert read(0x00155028, 6) == bytes.fromhex('81e600ffffff')
+    # sub_0011A930: weight = eax low byte; quad alpha = (sum alpha x weight + 1) x 0.125.
+    assert read(0x0011A936, 15) == bytes.fromhex('8be825ff000000' '578bf0' '6828030000')
+    assert read(0x0011AB72, 16) == bytes.fromhex('d9442410d805785c4700d80d505d4700')
+    assert _f32(read, 0x00475D50) == 0.125
+    # Grain life: dead past 3 s (-1); the ring is 60 x 0x24.
+    assert read(0x0011B0E0, 7) == bytes.fromhex('0f2f05185d4700') and _f32(read, 0x00475D18) == 3.0
+    assert read(0x0011B0F9, 6) == bytes.fromhex('81ff70080000')
+    # Level table 0x00515FF8 (0x80, scene +8): scenes 2/26/64 use fog row 7 (+0x14), scene 100's
+    # entry is 0x00518778; the map start writes the tileset's row there (0x0023F40A).
+    level = {_u32(read, 0x00515FF8 + k * 0x80 + 8): 0x00515FF8 + k * 0x80 for k in range(80)}
+    assert level[100] == 0x00518778
+    assert [_u32(read, level[s] + 0x14) for s in (2, 26, 64)] == [7, 7, 7]
+    assert read(0x0023F405, 8) == bytes.fromhex('e866240d00894614')
+    # sub_0006A710: fog row = 0x00515778 + row x 0x3C; row 7: colour 0x2F210F, 25..235.5 m.
+    assert read(0x0006A747, 11) == bytes.fromhex('8b41146bc03c0578575100')
+    fog = 0x00515778 + 7 * 0x3C
+    assert _u32(read, fog + 4) == 0x2F210F00 and (_f32(read, fog + 0x14), _f32(read, fog + 0x18)) == (25.0, 235.5)
+    # The level start applies it: sub_001CDE30 -> sub_0011D3C0 -> (jmp) sub_0011D240.
+    assert read(0x001CDE70, 5) == bytes.fromhex('e84bf5f4ff') and read(0x0011D3DF, 5) == bytes.fromhex('e95cfeffff')
 
 
 def test_decoded_sites():
