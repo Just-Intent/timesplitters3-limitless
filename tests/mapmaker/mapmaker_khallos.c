@@ -175,10 +175,11 @@ static void inner(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,u
 static uint32_t rec_ptr;
 static float rec_pos[3], rec_p[2], rec_obj[2], rec_live[2];
 static int rec_inside;
+static uint32_t world_eax;                                  /* what the sound calls return */
 static void fake_world(void)
 {
     int i;
-    nworld++;
+    nworld++;g_eax=world_eax;
     for(i=0;i<3;i++) rec_pos[i]=rec_ptr?FLOAT_AT(rec_ptr+(uint32_t)i*4u):0.0f;
     for(i=0;i<2;i++) { rec_p[i]=FLOAT_AT(PL(0)+0xB8u+(uint32_t)i*4u);rec_obj[i]=FLOAT_AT((khl_lv.cur>=0?khl_ch[khl_lv.cur].obj:CHAIR)+0x68u+(uint32_t)i*4u);rec_live[i]=FLOAT_AT(LIVE+4u+(uint32_t)i*4u); }
     rec_inside=khl_lv.inside;
@@ -198,7 +199,7 @@ static void call_world(void (*hook)(void (*)(void)),uint32_t ret,uint32_t a1,uin
 }
 /* sub_001EEBD0: the start line, the controller at its target this frame (or
  * climbing 5 m a frame when dead), and the calls out of it. */
-static float seen_line, seen_gap, seen_live[3], seen_obj[3], seen_p[3], after_p[2], after_live[2], after_obj[2];
+static float seen_span, seen_line, seen_gap, seen_live[3], seen_obj[3], seen_p[3], after_p[2], after_live[2], after_obj[2];
 static int seen_inside, fire=1;
 static uint32_t seen_jet, seen_owner, foreign_jet;
 static unsigned nupdate;
@@ -208,7 +209,7 @@ static void fake_update(void)
     uint32_t obj=WORD_AT(g_esp+4u),base=WORD_AT(0x007B0C48u),p=base,i;
     float y;
     originals++;nupdate++;
-    seen_line=FLOAT_AT(LINE);seen_gap=FLOAT_AT(GAP);
+    seen_line=FLOAT_AT(LINE);seen_gap=FLOAT_AT(GAP);seen_span=FLOAT_AT(0x005000B8u);
     if(BYTE_AT(0x007DE455u)==10u && WORD_AT(0x00790950u)>1u && FLOAT_AT(base+0xA8u)>FLOAT_AT(base+0x1584u+0xA8u)) p=base+0x1584u;
     if(!WORD_AT(0x0078F04Cu)) {
         if(FLOAT_AT(p+0xA8u)>FLOAT_AT(LINE)) { g_esp+=4u;return; }
@@ -325,7 +326,16 @@ static void players(float x0,float z0,float h0,float x1,float z1,float h1)
     FLOAT_AT(PL(1)+0xA8u)=x1+1000.0f;FLOAT_AT(PL(1)+0xB4u)=x1;FLOAT_AT(PL(1)+0xB8u)=0.1f;FLOAT_AT(PL(1)+0xBCu)=z1;
 }
 static void play_scene(void) { WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10u; }
-static void constants(void) { FLOAT_AT(LINE)=-535.0f;FLOAT_AT(GAP)=11.0f; }
+static void constants(void) { FLOAT_AT(LINE)=-535.0f;FLOAT_AT(GAP)=11.0f;FLOAT_AT(0x005000B8u)=30.0f;FLOAT_AT(0x0049E4BCu)=-1.2f; }
+/* chair obj's cached rotation (+0x274): identity but for its up row; its angles */
+static void pose(uint32_t obj,float ux,float uy,float uz,float yaw,float pitch,float roll)
+{
+    unsigned i;
+    for(i=0;i<12u;i++) FLOAT_AT(obj+0x274u+i*4u)=0.0f;
+    FLOAT_AT(obj+0x274u)=1.0f;FLOAT_AT(obj+0x29Cu)=1.0f;
+    FLOAT_AT(obj+0x284u)=ux;FLOAT_AT(obj+0x288u)=uy;FLOAT_AT(obj+0x28Cu)=uz;
+    FLOAT_AT(obj+0x70u)=yaw;FLOAT_AT(obj+0xC0u)=pitch;FLOAT_AT(obj+0xC8u)=roll;
+}
 /* a new level: chair placeholder at (40, 2, 30), Khallos 3 m off */
 static const uint16_t with_both[]={0x0C,0x33,0x02};
 static void level(int rider_first,int line)
@@ -1052,6 +1062,102 @@ int main(void)
     n=nrequest;
     CALL(pc_mapmaker_khallos_request,fake,0x001CDC25u,0,0,0,1);
     CHECK(nrequest==n+1u && requested==0x376u);
+
+    /* ---- .28: the chair turns to the player anywhere, the rider sits on his seat, its sounds load ---- */
+    own_level(__LINE__);
+    CHECK(khl_lv.sounds==1);
+    constants();
+    FLOAT_AT(ENT(0)+0x1D8u)=20.0f;FLOAT_AT(ENT(0)+0x1CCu)=20.0f;FLOAT_AT(CHAIR+0x1CCu)=60.0f;
+    pose(CHAIR,0.5f,1.0f,-0.25f,135.0f,4.0f,-6.0f);                     /* tilted */
+    FLOAT_AT(ENT(0)+0x64u)=40.0f;FLOAT_AT(ENT(0)+0x68u)=2.0f;FLOAT_AT(ENT(0)+0x6Cu)=30.0f;   /* left where he stood */
+    players(100.0f,100.0f,1.0f,100.0f,100.0f,1.0f);
+    UPDATE(1);                                                           /* waiting: the handler seats him */
+    CHECK(seen_span==30.0f && FLOAT_AT(ENT(0)+0x64u)==40.0f && !khl_ch[0].status);
+    players(45.0f,33.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    world_eax=0xFFFFFFFFu;WORD_AT(CHAIR+0x22Cu)=0xFFFFFFFFu;            /* sounds not loaded: they fail */
+    UPDATE(1);                                                           /* wakes and flies */
+    CHECK(seen_span==360.0f && FLOAT_AT(0x005000B8u)==30.0f);            /* no yaw clamp inside, put back after */
+    CHECK(NEAR(FLOAT_AT(ENT(0)+0x64u),CF(0,LIVE)-0.6f) && NEAR(FLOAT_AT(ENT(0)+0x68u),CF(0,LIVE+4u)-1.2f) &&
+          NEAR(FLOAT_AT(ENT(0)+0x6Cu),CF(0,LIVE+8u)+0.3f));               /* live position + seat x up row */
+    CHECK(FLOAT_AT(ENT(0)+0x70u)==135.0f && FLOAT_AT(ENT(0)+0xC4u)==135.0f && FLOAT_AT(ENT(0)+0xC0u)==4.0f && FLOAT_AT(ENT(0)+0xC8u)==-6.0f);
+    CHECK(NEAR(khl_ch[0].off[0],40.0f-(CF(0,LIVE)-0.6f)) && NEAR(khl_ch[0].off[2],30.0f-(CF(0,LIVE+8u)+0.3f)));
+    CHECK(khl_ch[0].status==1u && khl_ch[0].frames==1u);
+    CHECK(khl_ch[0].shots==1u && khl_ch[0].shot_fail==1u && khl_ch[0].engine==1u && khl_ch[0].engine_off==1u);
+    world_eax=5u;WORD_AT(CHAIR+0x22Cu)=3u;
+    UPDATE(1);
+    CHECK(khl_ch[0].shots==2u && khl_ch[0].shot_fail==1u && khl_ch[0].engine==2u && khl_ch[0].engine_off==1u);
+    for(k=0;k<KHL_STATUS_EVERY;k++) UPDATE(1);
+    CHECK(khl_ch[0].status==2u);                                         /* a line every 300 frames */
+    memcpy((void *)((uintptr_t)0x0049E4BCu+g_xbox_mem_offset),"\xFF\xFF\xFF\x7F",4);   /* the seat unreadable (NaN): the stock -1.2 */
+    FLOAT_AT(ENT(0)+0x68u)=50.0f;
+    UPDATE(1);
+    CHECK(NEAR(FLOAT_AT(ENT(0)+0x68u),CF(0,LIVE+4u)-1.2f));
+    FLOAT_AT(0x0049E4BCu)=-2.0f;
+    UPDATE(1);
+    CHECK(NEAR(FLOAT_AT(ENT(0)+0x68u),CF(0,LIVE+4u)-2.0f));             /* the game's own value */
+    FLOAT_AT(0x0049E4BCu)=-1.2f;
+    /* a class or a state the handler cannot sit in is put back */
+    WORD_AT(A(0)+0x10u)=1u;WORD_AT(A(0)+0x14u)=0x11000000u;WORD_AT(A(0)+0x9D0u)=0xFFFFFFFFu;
+    UPDATE(1);
+    CHECK(!WORD_AT(A(0)+0x10u) && WORD_AT(A(0)+0x14u)==8u && WORD_AT(A(0)+0x9D0u)==0);
+    n=khl_ch[0].calls;
+    WORD_AT(A(0)+0x9D0u)=5u;
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(WORD_AT(A(0)+0x9D0u)==0 && khl_ch[0].calls==n+1u);
+    WORD_AT(A(0)+0x9D0u)=1u;
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(WORD_AT(A(0)+0x9D0u)==1u);                                     /* sitting down: the handler's own */
+    WORD_AT(A(0)+0x9D0u)=0xFFFFFFFFu;WORD_AT(A(0)+0x20u)=3u;
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(WORD_AT(A(0)+0x9D0u)==0);
+    WORD_AT(A(0)+0x9D0u)=0xFFFFFFFFu;WORD_AT(A(0)+0x20u)=1u;
+    CALL(pc_mapmaker_khallos_rider,fake_rider,0x0027DAA0u,ENT(0),0,0,1);
+    CHECK(WORD_AT(A(0)+0x9D0u)==0xFFFFFFFFu && khl_ch[0].calls==n+4u);  /* seated: untouched */
+    /* a second chair: its rider sits on his own chair, chair 0's stays */
+    actor(2,0x33,-20.0f,2.0f,-20.0f,0.0f);HALF_AT(ENT(2)+0x94u)=0x582u;
+    CALL(pc_mapmaker_khallos_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
+    CHECK(khl_lv.n==2u && khl_ch[1].own && khl_ch[1].rider_ent==ENT(2));
+    FLOAT_AT(ENT(2)+0x1D8u)=20.0f;FLOAT_AT(ENT(2)+0x1CCu)=20.0f;FLOAT_AT(CHAIR+0x1000u+0x1CCu)=60.0f;
+    pose(CHAIR+0x1000u,0.0f,1.0f,0.0f,-40.0f,1.0f,2.0f);
+    dy=FLOAT_AT(ENT(0)+0x64u);dz=FLOAT_AT(ENT(0)+0x6Cu);
+    players(-15.0f,-22.0f,1.0f,100.0f,100.0f,1.0f);
+    FLOAT_AT(PL(1)+0xA8u)=1000.0f;
+    CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR+0x1000u,0,0,1);
+    CHECK(CW(1,0x0078F04Cu)==1u && seen_span==360.0f);
+    CHECK(NEAR(FLOAT_AT(ENT(2)+0x64u),CF(1,LIVE)) && NEAR(FLOAT_AT(ENT(2)+0x68u),CF(1,LIVE+4u)-1.2f) && NEAR(FLOAT_AT(ENT(2)+0x6Cu),CF(1,LIVE+8u)));
+    CHECK(FLOAT_AT(ENT(2)+0x70u)==-40.0f && FLOAT_AT(ENT(2)+0xC8u)==2.0f && khl_ch[1].status==1u && khl_ch[1].shots==1u);
+    CHECK(FLOAT_AT(ENT(0)+0x64u)==dy && FLOAT_AT(ENT(0)+0x6Cu)==dz && FLOAT_AT(ENT(0)+0x70u)==135.0f);
+    /* a dead rider is not moved */
+    FLOAT_AT(ENT(2)+0x1CCu)=-1.0f;FLOAT_AT(ENT(2)+0x64u)=7.0f;
+    CALL(pc_mapmaker_khallos_update,fake_update,0x00000100u,CHAIR+0x1000u,0,0,1);
+    CHECK(FLOAT_AT(ENT(2)+0x64u)==7.0f);
+    /* sub_00045670: the chair's two level-11 sounds load in a map holding it, nothing else changes */
+    orig_eax=0;
+    CHECK(CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x393u,0,0,1)==4u);
+    CHECK(CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x394u,0,0,1)==4u);
+    CHECK(CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x395u,0,0,1)==0);
+    CHECK(CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x43Cu,0,0,1)==0);
+    orig_eax=0x80000004u;
+    CHECK(CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x393u,0,0,1)==0x80000004u);
+    orig_eax=0;
+    WORD_AT(0x0079094Cu)=11u;
+    CHECK(CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x393u,0,0,1)==0);   /* the train: stock */
+    play_scene();
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);
+    CHECK(CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x393u,0,0,1)==0);
+    set_env("TSFP_MAPMAKER_LIMITS","1");
+    container(0x11,neither,2,NULL,0);
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(!khl_lv.sounds && CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x393u,0,0,1)==0);
+    container(0x11,chair_only,2,NULL,0);
+    set_env("TSFP_MAPMAKER_KHALLOS","0");
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(!khl_lv.sounds);
+    set_env("TSFP_MAPMAKER_KHALLOS",NULL);
+    CALL(pc_mapmaker_khallos_mount,fake,0x001CDB8Au,0,0,0,1);
+    CHECK(khl_lv.sounds && CALL(pc_mapmaker_khallos_sound_load,fake,0x0002787Fu,0x394u,0,0,1)==4u);
+    world_eax=0;
 
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
     printf("mapmaker khallos ok\n");

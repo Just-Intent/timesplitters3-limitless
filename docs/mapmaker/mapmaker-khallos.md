@@ -1,10 +1,13 @@
 # MapMaker Khallos in the flying chair (story mission 4 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_khallos.inc` (area
-`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 225
+`khallos`), fixture-tested (`tests/mapmaker/test_mapmaker_khallos.py`: 252
 mutations, plus decode, US XBE data and game-pak checks of every site below).
 Since the .27 playtest the placeholder itself is the seated Khallos and each
 chair gets its own named Boss bar ([Playtest .27](#playtest-v040-mapmaker27-seated-khallos-and-bars)).
+Since .28 the chair turns to the player at any bearing, the rider is put on
+his seat every flying frame and the chair's gun and engine sounds are loaded
+([Playtest .28](#playtest-v040-mapmaker28-orientation-seat-and-sound)).
 Wired in v0.4.0-mapmaker.25 (picker row 156); **up to four chairs per map**
 since then ([Several chairs](#several-chairs)), with three new wrappers and
 more logging ([Not appearing in .25](#not-appearing-in-v040-mapmaker25)). No guest-code table,
@@ -136,7 +139,7 @@ placeholder stays a soldier (logged).
 | height band 7..10 and target height 10 (shared constants 10.0/7.0, inline) | the map's floor height | **update**: frame moved by dy = spawn y + 1.0 - 7.5: start 1 m above the spawn floor, band +0.5..+3.5, hover +3.5 |
 | target z 0 (inline `0 - z`) | a line through the map's origin | **update**: frame moved by dz = the steered player's z clamped to spawn z +- 12 |
 | target x = player x - 11 (`[0x00500094]`, read only by the update) | follows the player anywhere | **update**: the constant is set so the target is "player x - 11" clamped to spawn x +- 12; restored after |
-| yaw 60..120 (shared constants) | | kept: the chair stays on the -x side of the player, as on the train, so it faces the player unless clamped by the box |
+| yaw 60..120: 90 +- `[0x005000B8]` (30, read by the update only) | the player is anywhere around the chair | **update** (since .28): the half-width is set to 360 for the call and restored, so the yaw follows the player's bearing |
 | start position (-576.2, 7.5, 0) | elsewhere | **ai_start**: live position and chair = spawn + (0, 1.0, 0) |
 | events 0x29, 0x12, 0x13, 4 | the map's own logic markers | **event**: dropped |
 | the death's particles/emitter need the train setup; fixed train points | null / garbage, crash risk (INFERRED) | **damage**: the killing hit is cut to the remaining health, so stock leaves health at exactly 0 and skips the train death; then health = the real result, the three emitters stopped (stock `sub_0010EB90`, null safe), focus cleared |
@@ -255,6 +258,7 @@ level's chair.
 | `WRAP sub_00263260 -> pc_mapmaker_khallos_rider` | seated Khallos' handler (cdecl entity) | **new (several chairs)**; only for this level's riders |
 | `WRAP sub_00263150 -> pc_mapmaker_khallos_rider_pose` | his pose callback (cdecl entity) | **new (several chairs)**; reached through a stored pointer, so the lifted function is wrapped |
 | `WRAP sub_000DAC30 -> pc_mapmaker_khallos_create` | character maker (cdecl id, .., pool slot) | **shared** with `pc_mapmaker_realbosses_create`, order free; since .27 also makes the placeholder with Khallos' models (character table swap around the original) |
+| `WRAP sub_00045670 -> pc_mapmaker_khallos_sound_load` | level sound needed? (cdecl sound id -> nonzero) | **new (.28)**; called only by the level's sound load `sub_00027700`, about 5,700 times per level load; acts after the original on 0x393/0x394 only |
 | `WRAP sub_0014CC80 -> pc_mapmaker_khallos_hud` | story boss bar (ebx = HUD block) | **new (.27)**; chain **inside** `pc_mapmaker_bosses_hud`, like `pc_mapmaker_robot_hud` / `pc_mapmaker_realbosses_hud` (order among those free) |
 
 `pc_mapmaker_bosses.inc` gains `bos_bar_proxy` (no wrapper; this area sets
@@ -325,7 +329,12 @@ guide entry for this area.
    four in range, nearest first); hits log `chair N hit`; shooting one down
    removes only that one (and its rider). A fifth stays a soldier; `TSFP_MAPMAKER_KHALLOS=0` gives
    a soldier; story mission 4 still plays stock.
-7. If no chair appears: the log should now say whether the placeholder
+7. (.28) Walk around a flying chair: it turns to face you on every side and
+   Khallos stays in his seat (log `chair N frame F: yaw .., player at dx ..
+   dz ..; seat offset (..)`, seat offset near 0 after the first line). You
+   hear its gun and the jet loop (log `the chair's level-11 sound is loaded`
+   twice per level; status `gun n (0 failed), engine n (0 not playing)`).
+8. If no chair appears: the log should now say whether the placeholder
    character was made (`chair placeholder character made` / `NOT made`) and
    whether its AI started (`chair placeholder AI starts`). Neither line means
    the map never spawned that Story AI.
@@ -373,6 +382,30 @@ The seated Khallos, step by step:
   other ported bosses. Sub-boss bar: the overhead meter shows the rider's own
   (always full) health (not handled).
 - **text**: "Khallos" stays for a chair without a rider (fallback).
+
+## Playtest v0.4.0-mapmaker.28: orientation, seat and sound
+
+User (three chairs): "The khallos' didn't really have much audio, they didn't
+orient toward me even though they fired accurately at me, and two of them kind
+of floated in front of their chairs." Log `logs/m28.err` (main checkout): all
+three seated, hits through the riders, bars; no line covered yaw, seat or
+sound, so the status lines below were added.
+
+| report | cause | fix |
+|---|---|---|
+| no turning to the player | **proven** (decode): the yaw target is the bearing to the player, `atan2(dx, dz)` (0x001EEEED, x 57.3) clamped to 90 +- `[0x005000B8]` (30): the train always has the player on the chair's +x side. Shots aim at the player directly (gun nodes, +0xB4..+0xBC), so they hit. The yaw error is wrapped generically (`-180`, `1/360`, `360`), the tilt controller works in the chair's own axes | the active update runs with `[0x005000B8]` = 360 (read by the update alone), restored after: no clamp |
+| two riders "in front" of their seat | **not proven**. The handler `sub_00263260` (state 1) puts him at live position + `[0x0049E4BC]` (-1.2) x the chair's up row (+0x284, `sub_00152090` row 1), all per chair (swap list checked, entity arg for both the handler and the pose callback `sub_00012E60`/`sub_000A0CA3`). States other than 0 and 1 and an AI class other than 0/8 skip that placement, leaving him where he was while the chair flies on (suspected: an AI state request or class reset by other code; the handler running late or not every frame) | after each flying frame the area puts a living rider on the seat itself (same formula, the chair's angles copied); a class other than 0/8 is put back, a state request of 2+ (or state 2+) becomes 0 ("sit down"); the measured offset is logged |
+| little audio | **proven** (decode + `sound/sounddata` in `sounds_e.pak`): the gun `0x393` SFX_11_KHALLOS_GUN (flags 0x0B00000C) and the engine loop `0x394` SFX_11_JETPACK_NEW (0x0B00041C) carry flag 4 with level byte 11; `sub_00045670` loads such a sound only when the scene is that level, so in scene 100 neither is loaded and `sub_00045820` (via `sub_00027F80`, table `[0x004CA9B4]` +0xC) returns -1. Per chair already: the shot record is a stack local, the loop handle is chair +0x22C | **sound_load** (`sub_00045670`) answers 4 ("load") for 0x393/0x394 in a scene-100 map whose set holds 0x33 (flag set by the mount hook, which runs before `sub_000454F0` in the level setup). Voice: the chair code plays no voice; the train's Cortez/Anya lines come from its level script (events dropped here), Khallos' only own line 0x43C is unused, so none is added |
+
+New log lines, per chair (6 at most, the first flying frame then every 300):
+`chair N frame F: yaw Y, player at dx .. dz ..; seat offset (x, y, z), rider
+calls C state S class H/L; sounds: gun n (f failed), engine n (m not
+playing)`. A large seat offset with few rider calls means the handler did not
+run; class or state fixes print `rider's AI class .. put back` / `rider state
+.. sits down again`.
+
+Risks: the rider's room id (`sub_0009FBE0`, set by the handler) is not
+refreshed by the area's own placement; two more sounds per Khallos map.
 
 ## Not appearing in .25/.26: set slot 13 (fixed in .27)
 
