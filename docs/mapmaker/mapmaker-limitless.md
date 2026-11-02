@@ -74,7 +74,7 @@ are not in the launcher.
 | Bots per MapMaker Arcade match (local play) | 10 (16 characters) | 20 (24 characters) |
 | Logic operations / nodes / records | 30 / 130 / 100 | 120 / 520 / 400 |
 | Free-standing objects | 40 / 30 / 100 | 160 / 120 / 400 |
-| Pads / pad links / pad groups | 2400 / 4400 / 300 | 4800 / 8800 / 600 |
+| Pads / pad links / pad groups | 2400 / 4400 / 300 | 4800 / 12000 / 600 |
 | Map file | 32 KB | 512 KB |
 | Memory budget meter | 1x | 8x |
 

@@ -13,7 +13,7 @@ in the disassembly at the given address; INFERRED = reasoning, not observed.
 | Runtime pad handles | 0x209E..0x20B1 | 0x4740..0x4753 | same |
 | Scene-100 cover pool | 1280 x 32 B | 10,496 x 32 B (range + 256 guard) | `MAPMAKER_POOL_COVER`, `pc_display_mapmaker_pools` |
 | Editor cover limit (opt-in) | 1024 | 9,984 (range - 256, the stock spare) | `MAPMAKER_LIMIT_COVER` |
-| Link pool (scene 100) | 4400 x 20 B (editor 4400) | 12,256 x 20 B (editor 8800 + 16 per piece stitch + 256) | `pc_display_mapmaker_pools` |
+| Link pool (scene 100) | 4400 x 20 B (editor 4400) | 16,112 x 20 B (editor 12,000 + 16 per piece stitch x 241 + 256) | `pc_display_mapmaker_pools` |
 | Group A* node pool | 1000 nodes .bss 0x0070E178, no bound | 8192 nodes at 0x008E0000, bounded | `pads.json` relocation + `pc_mapmaker_pads_group_node` |
 | Pad A* node pool | 1000 nodes .bss 0x00712058, no bound | 1000 nodes, bounded | `pc_mapmaker_pads_pad_node` |
 | Start-point cover top-up | unbounded | refused past the cover capacity (scene 100) | `pc_mapmaker_pads_cover_topup` |
@@ -21,7 +21,7 @@ in the disassembly at the given address; INFERRED = reasoning, not observed.
 Unchanged on purpose: pad ids (regular 0x3E9 + i, cover 0x2329 + i,
 runtime -2), so saved maps and story files read the same; the cover handle
 base 0x1F40; the regular range; the 13 pad-id threshold compares; regular
-pads 4800 and links 8800 in the editor; pad groups 600.
+pads 4800 and links 12,000 (8800 before 2026-11-01) in the editor; pad groups 600.
 
 ## Wrappers for the integrator
 
@@ -148,13 +148,16 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
   misread regular pads past 7000. Unchanged.
 - Cover ids reach 0x2329 + 10,239 = 19,240 < 32,767 (int16 owner field at
   pad+8 and the `[0x78CCE4]` records) and < 65,535 (uint16 save words).
-- Links: the editor's 8800 counts template links only. The stitcher
+- Links: the editor's 12,000 counts template links only (8800 until
+  2026-11-01: 241 pieces of the heaviest tiles, 46 links each, need 11,086,
+  so 8800 refused tiles before the piece limit). The stitcher
   `sub_0009DC70` appends one link per stitch entry with no bound (`inc
   [0x7B6660]` at `0x0009DCEE`), from a table of 16 entries per piece
   (`sub_0009A0F0`, 6-byte entries; INFERRED that the size argument is the
   piece count), and `sub_0009CD00` adds teleporter/door links
-  (`sub_0009A5B0`). The pool is now 8800 + 16 x 200 + 256 = 12,256.
-  Link indices stay far below the int16 limit of the A* nodes and routes.
+  (`sub_0009A5B0`). The pool is now 12,000 + 16 x 241 + 256 = 16,112.
+  Link indices stay below the int16 limit (32,767) of the A* nodes and
+  routes; the fixture checks the pool against it.
 
 ## Pad groups and the A* pools
 
@@ -163,7 +166,7 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
   cheaper, through the free list (`sub_0009B200`, `sub_0009B160`). So the
   live nodes per search are at most the number of inter-group links, and the
   counter `[0x00711FF8]` is reset per search (`0x0009B576`, `0x0009B666`)
-  (CONFIRMED code, INFERRED bound). With 600 groups and up to 12,256 links
+  (CONFIRMED code, INFERRED bound). With 600 groups and up to 16,112 links
   that can pass 1000, which overwrote `0x00711FF8`, the list heads at
   `0x00712040..0x0071204C` and the pad-level pool.
 - Relocation: 0x0070E178 (0x3E80 B) -> 0x008E0000 (0x20000 B, 8192 nodes,
@@ -217,7 +220,7 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
 - `tests/mapmaker/test_mapmaker_pads.py`: fixture (12 C mutations), table invariants
   (6 table mutations), completeness against the listing when available.
 - `tests/mapmaker/test_mapmaker_limits.py`: updated expectations (cover 9,984, pool
-  10,496, link pool 12,256).
+  10,496, link pool 16,112; 241 of the heaviest tile allowed).
 - `logs/limits/check-tables.py` over this folder: "table verified".
 
 ## Decoder classification (2026-10-30)

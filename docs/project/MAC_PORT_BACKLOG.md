@@ -8149,7 +8149,7 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
 - **Status:** Awaiting validation
 - **PC behavior:** When a MapMaker map is played the AI navigation pools are
   enlarged (on by default; `TSFP_MAPMAKER_POOLS=0` = original). With
-  `TSFP_MAPMAKER_LIMITS=1` the editor allows pads 4800, links 8800, pad
+  `TSFP_MAPMAKER_LIMITS=1` the editor allows pads 4800, links 12000, pad
   groups 600 and 200 items, with raised per-category maxima (pickups and
   movers/props x4); turrets, cover pads and pieces unchanged. Probe flag 64 logs pool,
   object and tag counts. The editor item pool (2120) comes from the shared

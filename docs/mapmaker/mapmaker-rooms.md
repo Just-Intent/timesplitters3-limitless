@@ -246,6 +246,45 @@ synced). Mixed builds are already unsupported for raised maps.
   `sub_00114290`, `sub_00356490` (rooms.md §5c). The table and shadow layout
   here already reserve 256 entries per room table.
 
+## Tile caps audit (2026-11-01): what bounds placement
+
+Every cap on tiles with `TSFP_MAPMAKER_LIMITS=1`, against 241 pieces of the
+heaviest stock tile (tile rows 0..45 of `0x00529400` read from the XBE: at
+most 14 pads, 14 cover pads, 46 links, 42,427 B memory estimate):
+
+| Cap | Value | Needed at 241 | Binds? |
+| --- | --- | --- | --- |
+| Pieces = rooms (byte room ids) | 241 | 241 | **yes, first** |
+| Links (editor) | 8800 -> 12,000 | 11,086 | was first for tiles with 37+ links (types 14, 25, 40, 42, 43) |
+| Pads / cover | 4800 / 9984 | 3,374 / 3,374 | no |
+| Memory estimate (x8) | 16.4 MB | 10.2 MB + 40 KB per item type | no |
+| Pad groups | 600 | ~370 measured (1.5 per tile) | no (worst case unmeasured) |
+| Portals | 0x3FFF | ~3,400 (14 per tile measured) | no |
+| Container / undo ring | 512 KB / 1 MB | tens of KB | no |
+| Grid | 80x80 x 7 floors | | no |
+| Per-room tables, view shadow | 256 entries | 255 ids | no |
+
+So after the link raise only the room id width stops placement. Above 241
+(not done; found in this audit, static analysis):
+
+- Draw buckets: byte ids written only by `sub_00086C40` and `sub_000897D0`
+  (C reimplementation needed) and read by `sub_00086480`/`sub_000865E0`
+  (`movzx esi, byte [edx+eax]` -> `movzx esi, word [edx+eax*2]` is the same
+  length); bucket counts can stay bytes if the writer spills a full bucket.
+- Lights: `light+0x99` is the only room byte; the 0xB8-byte light record has
+  no spare field (+0x98..+0x9B bytes, up to +0xB4 used). Creation
+  (`sub_00114290`) stores its room argument as a byte and passes the byte to
+  `sub_00114030`, so ids above 255 would alias a low room, and room 256 would
+  be 0, which `sub_001123C0` skips when unlinking (dangling list head). Needs
+  a side table by light index (pool `[0x0073D950]`, `[0x004E62DC]` records,
+  plus `[0x0073D960]`) and wrappers of the 10 sites in 6 functions.
+- View shadow: one displacement per array, views 0xFFC apart, so the
+  12-byte rects hold at most 341 ids (about 327 real rooms); beyond that the
+  stride (38 sites, 2 divisions) or the ~27 accessors must change.
+- Then the same steps as 200 -> 241 again: special ids, `cmp 0xF1`, table
+  relocations, model table/slots, light tables and the 1000-object pool
+  (500 items + rooms + 64 characters).
+
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
 Cause: `sub_000BB850` (explosion/area effect over the rooms touching a box)

@@ -147,7 +147,7 @@ them untouched.
   pad -> pad nav link. The hook skips it (counted, first three logged as
   `teleporter pair on one pad`) and stops that teleporter's search as stock
   does after a pair, so the next one still pairs onward.
-- **Link-pool guard.** No link is added once the pool is full: 8800 with the
+- **Link-pool guard.** No link is added once the pool is full: 12,000 with the
   stage-A pools, otherwise 4400. `sub_0009A5B0` itself has no bound
   (CONFIRMED).
 - **Gameplay with more than two per colour.** `sub_000C0540` sends a player to

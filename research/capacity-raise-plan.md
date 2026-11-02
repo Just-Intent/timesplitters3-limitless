@@ -79,6 +79,12 @@ overrides at lift time) plus function wrappers.
   arcade stats table sets the 24 limit. Ordinary Arcade and System Link
   stay stock.
 
+- Tile caps audit 2026-11-01 (not built or played;
+  `docs/mapmaker/mapmaker-rooms.md`): editor links 8800 -> 12,000 so 241
+  pieces of the heaviest tile fit; pieces = rooms 241 (byte room ids) is
+  now the only cap on tiles. Past 241: word ids in the draw buckets and
+  lights and a larger view shadow (about 327 rooms before the view stride).
+
 ## Stages (in order)
 
 1. **Item and object quick wins.** Keycards, movers, props and other category
