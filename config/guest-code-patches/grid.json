@@ -7,8 +7,8 @@
       "address": "0x0030BF3F",
       "original_hex": "c744241805000000",
       "operand": 1,
-      "value": "0x7",
-      "reason": "floor menu loop count 5 -> 7 bars (floors -2..4); without TSFP_MAPMAKER_LIMITS the bars for floors 3 and 4 are moved off screen by pc_mapmaker_grid_floor_bar"
+      "value": "0x10",
+      "reason": "floor menu loop count 5 -> 16 bars (floors -2..13); pc_mapmaker_grid_floor_bar sets the count back to 5 at the first bar without TSFP_MAPMAKER_LIMITS (fallback: bars for floors 3+ moved off screen)"
     },
     {
       "id": "grid-floor-panel",

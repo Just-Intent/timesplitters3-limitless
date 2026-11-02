@@ -1,18 +1,19 @@
-# MapMaker grid: seven floors, 80x80, overlapping tiles, stacked items and Story AI
+# MapMaker grid: sixteen floors, 80x80, overlapping tiles, stacked items and Story AI
 
 Editor-only feature area (scene 102). Research and evidence:
 `logs/limits/features/floors-grid.md` and `overlap-items.md` (ignored, main
 checkout). Code: `src/interface/pc_mapmaker_grid.inc`, `src/interface/pc_mapmaker_grid.h`,
 `config/guest-code-patches/grid.json`; fixture `tests/mapmaker/mapmaker_grid.c` +
-`tests/mapmaker/test_mapmaker_grid.py` (70 mutations, table/settings-block checks,
-decoder inventory of the redirected constants). Nothing here was built or run
-in the game.
+`tests/mapmaker/test_mapmaker_grid.py` (mutations, table/settings-block checks,
+decoder inventory of the redirected constants, save round trips). Seven floors
+were checked in game (2026-10-31); the sixteen-floor raise (2026-11-01, why it
+stops at 16: `docs/agent-context/limitless-floors.md`) was not built or run.
 
 ## Switches (environment only)
 
 | switch | effect |
 |---|---|
-| `TSFP_MAPMAKER_LIMITS=1` (pools on) | floors -2..4 (7 bars), grid 80 x 80 x 8 levels (z -2..5), placement refused above level 5, view/pan/shading/placement bounds 80, widest zoom 100 cells |
+| `TSFP_MAPMAKER_LIMITS=1` (pools on) | floors -2..13 (16 bars; the 3D view reaches 13 too), grid 80 x 80 x 17 levels (z -2..14), placement refused above level 14, view/pan/shading/placement bounds 80, widest zoom 100 cells |
 | `TSFP_MAPMAKER_OVERLAP=1` | tile placement ignores occupancy (bounds still apply; layers above the top grid level refused) |
 | `TSFP_MAPMAKER_STACK_ITEMS=1` | several items per cell for weapons, ammo, keycards, teleporters, health, armour, power-ups, special pickups and props (categories 8-13, 14-18, 19-21, 26, 31, 33, 35, 36); Story AI on cells with those items and with other Story AI, and those items on Story AI cells; starts, flags, turrets, movers, markers and unknown categories keep one per cell (nothing joins them) |
 | `LIMITS` or `OVERLAP` | removing a piece writes back the cells of other pieces inside its box (last placed wins) |
@@ -26,18 +27,27 @@ launchers.
 ## How it works
 
 - Grid `[0x00784004]`: index `x + W*(y + W*(z+2))`. Stock W 40, 6 levels,
-  0x9600 bytes. With the limits the hooks allocate W 80, 8 levels (0x32000
-  bytes of Level heap) and bound every axis (stock bounds only the flat index,
-  which would wrap x into the next row).
+  0x9600 bytes. With the limits the hooks allocate W 80, 17 levels (0x6A400
+  bytes = 425 KB of Level heap, editor only; 8 levels took 200 KB) and bound
+  every axis (stock bounds only the flat index, which would wrap x into the
+  next row).
 - Floor up: stock `cmp ecx,2` at 0x00306E14 refuses with text 0x1576 through
-  `sub_002F79E0` (return 0x00306E99). The hook turns that refusal at floors 2
-  and 3 into the stock success (floor +1, below = old floor, text 0x157D).
+  `sub_002F79E0` (return 0x00306E99). The hook turns that refusal at floors
+  2..12 into the stock success (floor +1, below = old floor, text 0x157D).
   Floor down is unchanged (-2).
-- Floor menu `sub_0030BE60`: loop count 5 -> 7 (`grid.json`, unconditional);
-  panel extent read from the settings block (5.0 / 7.0). Without the limits
-  the bars for floors 3 and 4 (drawn last) get y = -100000 in their stack slot
-  after `sub_0001ED50` (return 0x0030BFB5); nothing reads that slot after the
-  loop, so the menu looks and clicks as stock.
+- 3D view (`[0x00778D34]`, floor `+0x98`, camera height floor x 5.0 at
+  0x0032D649): its own floor change `sub_0032EDA0` refuses up at 2
+  (0x0032EEBC) and was not raised for seven floors. `pc_mapmaker_grid_preview_floor`
+  (return 0x0032F20F, limits, scene 102, no glide `+0x80 & 0x800`) runs it
+  with the floor shifted to 1 for floors 2..12 and adds the shift back.
+- Floor menu `sub_0030BE60`: loop count 5 -> 16 (`grid.json`); panel extent
+  read from the settings block (5.0 / 16.0). After the first bar's
+  `sub_0001ED50` (floor -2, return 0x0030BFB5) the hook sets the loop count
+  (`[frame+0x18]` = esp+0x20 after the call) to 5 without the limits, so the
+  stock menu draws its own 5 bars. If that slot does not hold 16 the old
+  fallback applies: bars for floors 3+ get y = -100000 in their stack slot;
+  nothing reads that slot after the loop. The panel grows downward from the
+  stock top by 2.2% of the screen height per bar (16 bars: about 26%..60%).
 - Settings block 0x00903600 (16 bytes, extension range 0x009036xx; 0x00903500 is the story gate; free per the
   feature brief): floors, extent, widest zoom, 1/widest zoom. Stock values are
   copied from the image constants, so stock mode is bit-exact. Written on the
@@ -155,10 +165,15 @@ launchers.
 ## Save and story compatibility
 
 No format change: absolute signed-byte cells, rebuilt into the grid at load.
-Old maps load identically (they sit in 0..39, levels 0..5). A map that fits
+Old maps load identically (they sit in 0..39, levels 0..5; the fixture loads
+a 7-floor map into the 16-floor grid and round-trips a map on floors -2..13
+through the record bytes). The floor byte `+6` is signed (`movsx`), so the
+format itself would allow floors up to 127; 13 is this build's editor limit
+(see `docs/agent-context/limitless-floors.md`). A map that fits
 the stock limits (x/y < 40, floors <= 2 plus 2-tall pieces, one item per
 cell) is a stock map. Pieces at x/y >= 40 or z >= 4 work in play but are
-outside the stock editor's grid (cannot be picked there). Stacked items load
+outside the stock editor's grid (cannot be picked there); in this build with
+the limits off the same is true above level 3. Stacked items load
 in the stock game too (the loader does not dedupe); the stock editor replaces
 the oldest when a new item is placed there. Re-saving an old map that used the
 7th-floor glitch recomputes connections for its high pieces (they now connect).
@@ -176,6 +191,7 @@ WRAP sub_00307E60 -> pc_mapmaker_grid_lookup
 WRAP sub_002F8DE0 -> pc_mapmaker_grid_placement
 WRAP sub_002F79E0 -> pc_mapmaker_grid_floor_sound
 WRAP sub_0001ED50 -> pc_mapmaker_grid_floor_bar
+WRAP sub_0032EDA0 -> pc_mapmaker_grid_preview_floor
 WRAP sub_002F8140 -> pc_mapmaker_overlap_cell
 WRAP sub_00308260 -> pc_mapmaker_stack_find
 WRAP sub_00334770 -> pc_mapmaker_stack_cell
@@ -189,10 +205,11 @@ sites; the hook costs one stack compare when not in the floor menu.
 
 ## Risks
 
-- Floor menu: the 7-bar panel grows downward from the stock top (bars are
-  bottom-up from base + 7 steps); check it does not cover the toolbar.
-- Hidden stock-mode bars are drawn off screen, not skipped (two extra sprite
-  calls per frame).
+- Floor menu: the 16-bar panel grows downward from the stock top (bars are
+  bottom-up from base + 16 steps, to about 60% of the screen height); check
+  it covers nothing on the right-hand side (7 bars were checked in game).
+- Stock mode draws its 5 bars through the loop-count write; the off-screen
+  fallback only runs if that slot is unexpected.
 - 80x80 play: longer sightlines, AI pathing over distance, fog; rooms stay
   capped at 241 pieces.
 - Overlap maps look broken by design; starts/flags/turrets/movers never stack.

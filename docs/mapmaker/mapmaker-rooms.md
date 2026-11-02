@@ -262,7 +262,7 @@ most 14 pads, 14 cover pads, 46 links, 42,427 B memory estimate):
 | Pad groups | 600 | ~370 measured (1.5 per tile) | no (worst case unmeasured) |
 | Portals | 0x3FFF | ~3,400 (14 per tile measured) | no |
 | Container / undo ring | 512 KB / 1 MB | tens of KB | no |
-| Grid | 80x80 x 7 floors | | no |
+| Grid | 80x80 x 16 floors | | no |
 | Per-room tables, view shadow | 256 entries | 255 ids | no |
 
 So after the link raise only the room id width stops placement. Above 241

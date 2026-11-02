@@ -711,6 +711,29 @@ int main(void)
     play();
     CHECK(mapmaker_roof_play.kill && mapmaker_roof_play.low==-1 && mapmaker_roof_play.high==1 && mapmaker_roof_play.kill_y==-25.0f &&
           mapmaker_roof_play.out_y==-10.0f && mapmaker_roof_play.rooms==5u);
+    /* sixteen floors: a piece on floor 13 (record byte +6 = 13, y 65) only
+     * raises the high floor; the kill heights follow the lowest floor */
+    FLOAT_AT(piece(83)+8)=13.0f;
+    WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
+    CHECK(((WORD_AT(record(3)+4)>>16)&0xFFu)==13u);
+    play();
+    CHECK(mapmaker_roof_play.kill && mapmaker_roof_play.low==-1 && mapmaker_roof_play.high==13 &&
+          mapmaker_roof_play.kill_y==-25.0f && mapmaker_roof_play.out_y==-10.0f && mapmaker_roof_play.rooms==5u);
+    make_actor(0,65.0f,100.0f);WORD_AT(0x0074C37Cu)=1u;
+    {
+        int k;
+        ticks=0;
+        for(k=0;k<70;k++) tick();
+        CHECK(nkilled==0 && FLOAT_AT(ent_of(0)+0x1CC)==100.0f);   /* standing on floor 13 */
+    }
+    FLOAT_AT(piece(83)+8)=-2.0f;                            /* now the lowest floor: -2 */
+    WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
+    play();
+    CHECK(mapmaker_roof_play.low==-2 && mapmaker_roof_play.high==0 && mapmaker_roof_play.kill_y==-30.0f);
+    FLOAT_AT(piece(83)+8)=1.0f;
+    WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
+    play();
+    CHECK(mapmaker_roof_play.low==-1 && mapmaker_roof_play.high==1 && mapmaker_roof_play.kill_y==-25.0f);
     make_actor(0,-26.0f,100.0f);make_actor(1,-24.0f,100.0f);make_actor(2,-500.0f,0.0f);make_actor(3,-500.0f,50.0f);
     WORD_AT(ent_of(3)+0x7C)=0;                             /* not a live character entry */
     WORD_AT(0x00900100u+4u*4u)=0;WORD_AT(0x0074C37Cu)=5u;

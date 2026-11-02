@@ -1,4 +1,4 @@
-"""Compile the MapMaker grid policy (src/interface/pc_mapmaker_grid.inc: seven floors,
+"""Compile the MapMaker grid policy (src/interface/pc_mapmaker_grid.inc: sixteen floors,
 80x80 grid, overlapping tiles, stacked items) against fake guest memory, with
 mutation cases, and check config/guest-code-patches/grid.json against the
 settings block the C side writes.
@@ -25,18 +25,36 @@ MUTATIONS = {
     'wide-always': ('mapmaker_grid.wide=mapmaker_limits.limits;', 'mapmaker_grid.wide=1;'),
     'overlap-default-on': ('mapmaker_grid.overlap=mapmaker_grid_switch("TSFP_MAPMAKER_OVERLAP");', 'mapmaker_grid.overlap=1;'),
     'stack-default-on': ('mapmaker_grid.stack=mapmaker_grid_switch("TSFP_MAPMAKER_STACK_ITEMS");', 'mapmaker_grid.stack=1;'),
-    'levels-stock': ('#define MAPMAKER_GRID_WIDE_L 8 ', '#define MAPMAKER_GRID_WIDE_L 6 '),
+    'levels-stock': ('#define MAPMAKER_GRID_WIDE_L 17 ', '#define MAPMAKER_GRID_WIDE_L 6 '),
+    'levels-seven-floors': ('#define MAPMAKER_GRID_WIDE_L 17 ', '#define MAPMAKER_GRID_WIDE_L 8 '),
+    'levels-no-top-room': ('#define MAPMAKER_GRID_WIDE_L 17 ', '#define MAPMAKER_GRID_WIDE_L 16 '),
     'width-stock': ('#define MAPMAKER_GRID_WIDE_W 80', '#define MAPMAKER_GRID_WIDE_W 40'),
     'flat-bound-only': ('if(x<0 || x>=w || y<0 || y>=w ||', 'if(x<0 || y<0 ||'),
-    'top-floor-5': ('#define MAPMAKER_GRID_TOP_FLOOR 4', '#define MAPMAKER_GRID_TOP_FLOOR 5'),
+    'top-floor-4': ('#define MAPMAKER_GRID_TOP_FLOOR 13', '#define MAPMAKER_GRID_TOP_FLOOR 4'),
+    'top-floor-14': ('#define MAPMAKER_GRID_TOP_FLOOR 13', '#define MAPMAKER_GRID_TOP_FLOOR 14'),
+    'bars-seven': ('#define MAPMAKER_GRID_WIDE_BARS 16 ', '#define MAPMAKER_GRID_WIDE_BARS 7 '),
+    'bars-count-off': ('        WORD_AT(g_esp+0x20u)=(uint32_t)mapmaker_grid_bars();\n', ''),
+    'bars-count-any-bar': ("if((int32_t)g_ebx==-2 && WORD_AT(g_esp+0x20u)==", "if(WORD_AT(g_esp+0x20u)=="),
+    'bars-count-unchecked': ("if((int32_t)g_ebx==-2 && WORD_AT(g_esp+0x20u)==(uint32_t)MAPMAKER_GRID_WIDE_BARS)", "if((int32_t)g_ebx==-2)"),
+    'bars-count-slot': ('WORD_AT(g_esp+0x20u)=(uint32_t)mapmaker_grid_bars();', 'WORD_AT(g_esp+0x1Cu)=(uint32_t)mapmaker_grid_bars();'),
+    'bars-stock-sixteen': ('return mapmaker_grid.wide?MAPMAKER_GRID_WIDE_BARS:MAPMAKER_GRID_STOCK_BARS;', 'return MAPMAKER_GRID_WIDE_BARS;'),
+    'bars-fallback-off': ('    if(!mapmaker_grid.wide && (int32_t)g_ebx>2)\n        FLOAT_AT(g_esp+0x18u)=MAPMAKER_GRID_HIDDEN_Y;\n', ''),
+    'preview-off': ('        shift=f-1;\n        WORD_AT(view+0x98u)=1u;\n', ''),
+    'preview-no-restore': ('    WORD_AT(view+0x98u)=(uint32_t)f;\n    if(f>shift+1', '    if(f>shift+1'),
+    'preview-shift-by-one': ('        shift=f-1;\n', '        shift=1;\n'),
+    'preview-past-top': ('(f=(int32_t)WORD_AT(view+0x98u))>=2 && f<MAPMAKER_GRID_TOP_FLOOR) {', '(f=(int32_t)WORD_AT(view+0x98u))>=2 && f<=MAPMAKER_GRID_TOP_FLOOR) {'),
+    'preview-while-gliding': (' && !(WORD_AT(view+0x80u)&0x800u) &&', ' &&'),
+    'preview-any-caller': ('WORD_AT(g_esp)==MAPMAKER_GRID_RET_PREVIEW &&', '1 &&'),
+    'preview-any-scene': ('       mapmaker_grid_editor() && MAPMAKER_PTR_OK(view,0xA0)', '       MAPMAKER_PTR_OK(view,0xA0)'),
+    'preview-stock-mode': ('    if(mapmaker_grid.wide && MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==MAPMAKER_GRID_RET_PREVIEW', '    if(MAPMAKER_STACK_OK(4) && WORD_AT(g_esp)==MAPMAKER_GRID_RET_PREVIEW'),
     'floor-any-caller': ('WORD_AT(g_esp)==MAPMAKER_GRID_RET_FLOOR &&', ''),
     'floor-any-text': ('       WORD_AT(g_esp+4u)==0x1576u) {', '       1) {'),
     'floor-down-too': ('if(f>=2 && f<MAPMAKER_GRID_TOP_FLOOR) {', 'if(f<MAPMAKER_GRID_TOP_FLOOR) {'),
     'floor-no-below': ('                WORD_AT(editor+0x268u)=(uint32_t)f;\n', ''),
     'floor-refusal-sound': ('                WORD_AT(g_esp+4u)=0x157Du;', '                (void)0;'),
     'bar-hidden-wide': ('if(!mapmaker_grid.wide && (int32_t)g_ebx>2', 'if((int32_t)g_ebx>2'),
-    'bar-hides-floor-2': ('(int32_t)g_ebx>2 && MAPMAKER_STACK_OK(0x20)', '(int32_t)g_ebx>1 && MAPMAKER_STACK_OK(0x20)'),
-    'bar-any-caller': ('bar=MAPMAKER_STACK_OK(0x20) && WORD_AT(g_esp)==MAPMAKER_GRID_RET_BAR;', 'bar=MAPMAKER_STACK_OK(0x20);'),
+    'bar-hides-floor-2': ('if(!mapmaker_grid.wide && (int32_t)g_ebx>2)', 'if(!mapmaker_grid.wide && (int32_t)g_ebx>1)'),
+    'bar-any-caller': ('bar=MAPMAKER_STACK_OK(0x28) && WORD_AT(g_esp)==MAPMAKER_GRID_RET_BAR;', 'bar=MAPMAKER_STACK_OK(0x28);'),
     'guard-off-by-one': ('+2>=(int64_t)mapmaker_grid_l()', '+2>(int64_t)mapmaker_grid_l()'),
     'guard-bottom-only': ('(int64_t)z+h-1+2>=', '(int64_t)z+2>='),
     'guard-first-piece': ('            g_eax=0;\n            return;\n        }\n    }', '            g_eax=0;\n        }\n        return;\n    }'),
@@ -55,7 +73,8 @@ MUTATIONS = {
     'alloc-not-cleared': ('if(g && guest_writable(g,bytes)) memset(', 'if(0) memset('),
     'reset-partial': ('memset((void *)((uintptr_t)g+g_xbox_mem_offset),0,mapmaker_grid_bytes());', 'memset((void *)((uintptr_t)g+g_xbox_mem_offset),0,0x9600u);'),
     'config-extent-40': ('w?(float)MAPMAKER_GRID_WIDE_W:', 'w?40.f:'),
-    'config-floors-5': ('w?7.f:FLOAT_AT(0x004760CCu)', 'w?5.f:FLOAT_AT(0x004760CCu)'),
+    'config-floors-5': ('w?(float)MAPMAKER_GRID_WIDE_BARS:FLOAT_AT(0x004760CCu)', 'w?5.f:FLOAT_AT(0x004760CCu)'),
+    'config-floors-7': ('w?(float)MAPMAKER_GRID_WIDE_BARS:FLOAT_AT(0x004760CCu)', 'w?7.f:FLOAT_AT(0x004760CCu)'),
     'config-zoom-inv-stock': ('w?.01f:FLOAT_AT(0x00478394u)', 'w?1.f/60.f:FLOAT_AT(0x00478394u)'),
     'config-stock-literal': ('w?.01f:FLOAT_AT(0x00478394u)', 'w?.01f:1.f/61.f'),
     'probe-any-caller': ('    if(ret!=MAPMAKER_GRID_RET_PROBE || !g_eax) return;', '    if(!g_eax) return;'),
@@ -163,6 +182,37 @@ REDIRECTS = {
 }
 
 
+def grid_define(name):
+    text = GRID.read_text(encoding='utf-8')
+    return int(re.search(r'#define MAPMAKER_GRID_' + name + r' (\d+)', text).group(1))
+
+
+def test_floor_constants_agree():
+    """Floors -2..TOP: the menu has TOP+3 bars (also the image's loop count),
+    the grid TOP+4 levels (a 2-tall piece on the top floor), and the floor
+    byte of a piece record (signed, +6) holds every level."""
+    top = grid_define('TOP_FLOOR')
+    assert top == 13
+    assert grid_define('WIDE_BARS') == top + 3
+    assert grid_define('WIDE_L') == top + 4
+    assert grid_define('STOCK_BARS') == 5 and grid_define('STOCK_L') == 6
+    # grid memory: 80 x 80 x 17 dwords from the editor's Level heap
+    assert grid_define('WIDE_W') ** 2 * grid_define('WIDE_L') * 4 == 435200
+
+
+def test_preview_floor_site():
+    """The 3D view's floor change sub_0032EDA0: up refused at 2, down at -2,
+    both only step +0x98 by one; its one caller returns to 0x0032F20F."""
+    from mapmaker_decoded import decoded
+    insns = {i.address: i for i in decoded() if 0x0032EDA0 <= i.address < 0x0032F220}
+    assert insns[0x0032EEBC].hex == '83fa02'
+    assert insns[0x0032EEEB].hex == '83f8fe'
+    assert insns[0x0032EEC1].hex == '42' and insns[0x0032EEF0].hex == '48'
+    assert insns[0x0032EE79].hex == '8b8898000000'
+    call = insns[0x0032F20A]
+    assert call.hex == 'e891fbffff' and call.address + len(call.hex) // 2 == 0x0032F20F
+
+
 def test_table_matches_settings_block():
     base, fields = config_addresses()
     assert set(fields) == {'FLOORS', 'EXTENT', 'ZOOM', 'ZOOM_INV'}
@@ -174,7 +224,8 @@ def test_table_matches_settings_block():
         a = int(e['address'], 16)
         assert e['kind'] == 'operand'
         if e['id'] == 'grid-floor-bars':
-            assert a == 0x0030BF3F and e['original_hex'] == 'c744241805000000' and int(e['value'], 16) == 7
+            assert a == 0x0030BF3F and e['original_hex'] == 'c744241805000000'
+            assert int(e['value'], 16) == grid_define('WIDE_BARS') == 16
             continue
         func, old, field = REDIRECTS[a]
         assert int(e['function'], 16) == func, e['id']
