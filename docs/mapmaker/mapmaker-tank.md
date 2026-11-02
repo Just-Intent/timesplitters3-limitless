@@ -1,10 +1,39 @@
 # MapMaker castle tank (story mission 2 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_tank.inc` (area `tank`),
-fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 127 mutations, plus
+fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 172 mutations, plus
 decode, US XBE data and game-pak checks of every site below). Wired in
 v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
 No guest-code table entry of its own, no new save bytes.
+
+## v0.4.0-mapmaker.27: created, but never seen (fixed after .27)
+
+Report: one tank placed, "did not spawn". The .27 log (`logs/m27.err`, line
+36382 on) shows the placeholder created, its AI start, `castle tank created`
+at (105, 0.51, 81), its first update (`placeholder AI removed`, logged inside
+`pc_mapmaker_tank_update`), then nothing: the update kept running in state 0,
+where stock asks the wake test every frame and leaves the update when it says
+0 (`je 0x00255BD5` at 0x00255582). The player stood at (118.1, 108.8): 30.7 m
+x/z, just outside `TNK_WAKE` 30 m, and never came nearer. In .22/.23 the
+player started 19 m away and the fight began within a second.
+
+Cause (CONFIRMED by decode, `test_hidden_until_the_fight`): the init
+`sub_002560C0` clears prop `+0x28` bit 0 (0x00256120); only the fight start
+sets it (`or [edi+0x28], esi`, esi = 1, 0x00255588); the death clears it
+again (0x00255E44) as the wreck replaces the tank. That the bit means
+"shown" is INFERRED from those sites (and the same pairing for held weapon
+models at 0x001B9C19/0x001B9C7D): a sleeping tank was invisible, so a tank
+placed more than 30 m from the player's start could not be found. The swap of
+statics, the update and the placeholder removal worked as designed.
+
+Fix: after the create, the AI start hook sets bit 0 (other flags kept), so the
+tank stands at its placeholder from the start; the fight still starts at
+30 m. Diagnostics, once per tank: `first update (object, flags, state)`,
+`first draw (object, flags, at x, y, z)` from a new log-only
+`WRAP sub_000A2740` (the prop draw, called by the room prop pass at
+0x000A2B37), and, while asleep, `waiting for a player within 30 m (x/z);
+nearest living player at (dx, dz)`. The spawn line now ends with the init's
+flags.
 
 ## v0.4.0-mapmaker.25: no tank at all (diagnostics)
 
@@ -363,6 +392,7 @@ unchanged when the switch is off or outside scene 100.
 | `WRAP sub_00253D60 -> pc_mapmaker_tank_slot2` | tank callback slot 2 (cdecl object) | **new for several tanks** |
 | `WRAP sub_00255FD0 -> pc_mapmaker_tank_damage` | tank damage callback (cdecl damage record) | **new for several tanks** |
 | `WRAP sub_00251800 -> pc_mapmaker_tank_bar` | boss bar state-9 timer (no args, returns on the x87 stack) | **new for several tanks**; the hook only swaps memory around the original |
+| `WRAP sub_000A2740 -> pc_mapmaker_tank_draw` | prop draw (cdecl prop, view), hot | **new after v0.4.0-mapmaker.27**; log only, before the original; no tank this level: one compare |
 | `WRAP sub_00255390 -> pc_mapmaker_tank_state` | state entry (eax = tank) | new; must see the guest `g_eax` at entry |
 | `WRAP sub_00255C20 -> pc_mapmaker_tank_wreck` | death (esi = tank) | new |
 | `WRAP sub_002274C0 -> pc_mapmaker_tank_event` | level event (cdecl) | **shared** with `pc_mapmaker_realbosses_event` (and other boss ports); order free: each matches only its own return addresses |
@@ -395,6 +425,8 @@ Also for the integrator: the editor picker row (above), and the
   (`sub_002548F0` drives by its own position; INFERRED it follows the floor
   through stock object physics).
 - Textures of the tank not checked separately from the .xbr.
+- Shown before its fight: shots can damage a sleeping tank (the damage
+  callback has no state-0 test); unplayed.
 - Creating a prop during AI start (`sub_0015B830` from `sub_0015F8C0`)
   instead of during the level's object load (INFERRED safe: the castle and
   MapMaker both create props at level start).
@@ -407,9 +439,11 @@ Also for the integrator: the editor picker row (above), and the
 ## User test steps
 
 1. A map whose custom set holds id 0x12 with one Story AI of it on a
-   ground-floor spot: in story play the tank appears there (log: `mounted
-   prop6.pak`, `requested the tank, turret and wreck models`, `castle tank created`, `spawn (...)`, `placeholder AI
-   removed`).
+   ground-floor spot more than 30 m from the start: in story play the tank
+   stands there, visible from afar (log: `mounted prop6.pak`, `requested the
+   tank, turret and wreck models`, `castle tank created`, `spawn (...) flags
+   0x.. shown`, `placeholder AI removed`, `first update`, `waiting for a
+   player`, `first draw` once it is on screen).
 2. Walk within 30 m: it starts (log `fight started`, then `fight state ...
    (1, 0)`), drives and fires; the bottom bar reads "Castle Tank". The game
    keeps running; if it stops, the last `fight state` line names the state.

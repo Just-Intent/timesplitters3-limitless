@@ -87,6 +87,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         for(i=0;i<3;i++) { spawn_pos[i]=FLOAT_AT(x[1]+(uint32_t)i*4u);spawn_rot[i]=FLOAT_AT(x[2]+(uint32_t)i*4u); }
         if(!spawn_ok) return 0;
         for(i=0;i<3;i++) FLOAT_AT(spawn_obj+0x64u+(uint32_t)i*4u)=spawn_pos[i];
+        WORD_AT(spawn_obj+0x28u)=(WORD_AT(spawn_obj+0x28u)&~1u)|0x10u;   /* sub_002560C0: hidden until its fight */
         /* sub_00251AA0: zero the block, point it at the XBE tables, reset sounds and some table words */
         memset((void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),0,0x64u);
         WORD_AT(0x0078B560u)=0x0051B9C8u;WORD_AT(0x0078B564u)=0x0051B998u;WORD_AT(0x0078B568u)=0x0051B920u;WORD_AT(0x0078B56Cu)=0x0051BB44u;
@@ -433,8 +434,10 @@ int main(void)
     n=originals;
     FLOAT_AT(0x0078B580u)=77.0f;WORD_AT(0x0078B594u)=0x55u;WORD_AT(0x0075F468u)=0x66u;   /* the statics before */
     FLOAT_AT(0x0051B9C8u+0x10u)=88.0f;
+    WORD_AT(TANK+0x28u)=0x00400001u;                                   /* the init hides it (fake) */
     CALL(pc_mapmaker_tank_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);
     CHECK(nspawn==2 && tnk_lv.n==1u && tnk_lv.t[0].obj==TANK && spawn_after_original==(int)n+1);   /* after the AI started */
+    CHECK(WORD_AT(TANK+0x28u)==0x00400011u);                           /* shown before its fight, other flags kept */
     CHECK(FLOAT_AT(0x0078B580u)==77.0f && WORD_AT(0x0078B594u)==0x55u && WORD_AT(0x0075F468u)==0x66u && !tnk_lv.act);   /* restored */
     CHECK(FLOAT_AT(0x0051B9C8u+0x10u)==88.0f && tnk_lv.t[0].block[0]==tnk.tabs+0xA8u && tnk_lv.t[0].sounds[0]==0x5002u);
     CHECK(FLOAT_AT(tnk.tabs+0xA8u+0x10u)==2.0f && tnk_lv.t[0].block[3]==0x0051BB44u);   /* its own tables, as the init left them */
@@ -471,15 +474,23 @@ int main(void)
     /* ---- update: the placeholder leaves on the tank's first frame ----------- */
     WORD_AT(0x007B0C7Cu)=PLAYER;WORD_AT(PLAYER+0xFF4u)=ENT(0);
     CALL(pc_mapmaker_tank_update,fake,0x00000100u,0x00570000u,0,0,1);   /* another object */
-    CHECK(nremove==0);
+    CHECK(nremove==0 && !TK.updates);
     CALL(pc_mapmaker_tank_update,fake,0x00000100u,TANK,0,0,1);
-    CHECK(nremove==1 && remove_arg==ENT(0) && WORD_AT(PLAYER+0xFF4u)==0);
+    CHECK(nremove==1 && remove_arg==ENT(0) && WORD_AT(PLAYER+0xFF4u)==0 && TK.updates==1u);
     CALL(pc_mapmaker_tank_update,fake,0x00000100u,TANK,0,0,1);
-    CHECK(nremove==1);
+    CHECK(nremove==1 && TK.updates==1u);
+
+    /* ---- draw: log only, each tank's first draw ------------------------------- */
+    CALL(pc_mapmaker_tank_draw,fake,0x000A2B3Cu,0x00570000u,0,0,1);    /* another prop */
+    CHECK(!TK.drawn);
+    CALL(pc_mapmaker_tank_draw,fake,0x000A2B3Cu,TANK,0,0,1);
+    CHECK(TK.drawn==1u);
+    CALL(pc_mapmaker_tank_draw,fake,0x000A2B3Cu,TANK,0,0,1);
+    CHECK(TK.drawn==1u && WORD_AT(TANK+0x28u)==0x00400011u);
 
     /* ---- wake ---------------------------------------------------------------- */
     players(100.0f,100.0f,1.0f,40.0f+20.0f,30.0f+20.0f,0.0f);           /* far; near but dead */
-    CHECK(CALL(pc_mapmaker_tank_wake,fake,0x00255580u,0,0,0,0)==0);
+    CHECK(CALL(pc_mapmaker_tank_wake,fake,0x00255580u,0,0,0,0)==0 && TK.waited==1u);   /* logged once */
     players(100.0f,100.0f,1.0f,40.0f+20.0f,30.0f+20.0f,0.5f);           /* 28.3 m, alive */
     CHECK(CALL(pc_mapmaker_tank_wake,fake,0x00255580u,0,0,0,0)==1u);
     players(40.0f+22.0f,30.0f+22.0f,1.0f,100.0f,100.0f,1.0f);           /* 31.1 m */
@@ -771,6 +782,7 @@ int main(void)
             struct tnk_one *t=&tnk_lv.t[k];
             uint32_t tabs=tnk.tabs+k*0x224u;
             CHECK(t->obj==0x00440000u+k*0x1000u && t->place==A(4u+k) && t->place_ent==ENT(4u+k));
+            CHECK(WORD_AT(t->obj+0x28u)==0x11u && !t->drawn);           /* each shown */
             CHECK(t->block[0]==tabs+0xA8u && t->block[1]==tabs+0x78u && t->block[2]==tabs && t->block[3]==0x0051BB44u);
             CHECK(FLOAT_AT(tabs+0xA8u+0x10u)==(float)(s+1u+k) && WORD_AT(tabs+0x68u)==0 && WORD_AT(tabs+4u)==0xC0C0C001u);
             CHECK(t->sounds[0]==0x5000u+s+1u+k);
@@ -779,6 +791,8 @@ int main(void)
             CHECK(NEAR(sx,-9.0f+t->d[0]));                              /* its first drive target */
             t->block[13]=20u+k;                                         /* [0x0078B594] */
         }
+        CALL(pc_mapmaker_tank_draw,fake,0x000A2B3Cu,0x00442000u,0,0,1);   /* tank 3's first draw */
+        CHECK(tnk_lv.t[2].drawn && !tnk_lv.t[0].drawn && !tnk_lv.t[1].drawn && !tnk_lv.t[3].drawn && !tnk_lv.act);
         /* the update: tank 3's statics in, its changes kept, the statics put back */
         entry_set=33u;
         CALL(pc_mapmaker_tank_update,fake_entry,0x00000100u,0x00442000u,0,0,1);

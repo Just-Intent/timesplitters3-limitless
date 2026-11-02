@@ -485,10 +485,10 @@ played): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot
 0x281 from prop6.pak, mapmaker-tank.md). Wrapper lists: each doc. ORDER puts them
 after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
-`rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8. Tank adds WRAP
-`sub_0015E7C0` -> `pc_mapmaker_tank_request` (models requested at level init).
-After mapmaker.22: tank courtyard test/target search bounded (freeze); walker
-intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
+`rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8. Tank WRAPs
+`sub_0015E7C0` -> `_tank_request` (level-init models), `sub_000A2740` -> `_draw`
+(log); shown (+0x28 bit 0) at create. .22: tank yard/target search bounded;
+walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 More boss areas (merged 2026-11-01, not played): `khallos` (id 0x33 chair prop 0x376),
 `worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`; wrapper
 lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
