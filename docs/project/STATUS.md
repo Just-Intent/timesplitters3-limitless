@@ -87,6 +87,15 @@ grid, tiles and pointer stay aligned in widescreen; a left click confirms the st
 arcade/challenge event briefings. Found: the MapMaker custom bot set offers no large characters
 (giant robot etc.), so Boss Story AI with big characters could not be tried yet.
 
+## MapMaker sixteen floors: fixtures only (2026-11-01)
+
+Branch `more-floors` (base ee5560b8), Windows 11 x64, MSVC fixtures: floors -2..13 and an
+80x80x17 editor grid with `TSFP_MAPMAKER_LIMITS=1`, the 3D view's floor up raised to 13,
+the floor menu at 16 bars (5 in stock mode). `tests/mapmaker/test_mapmaker_grid.py` (fixture,
+mutations, decoder checks, old-map load and high-floor round trip) and the roof fixture's
+floor-13 case pass; `check-tables.py` verified the guest-code tables. Not built or run in the
+game: menu layout, high-floor connections, the 3D view and play on floors 5..13 are unchecked.
+
 ## MapMaker features: in-game checks (2026-10-31)
 
 Branch `mapmaker-recon`, compile-only builds run by the user on the second

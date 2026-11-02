@@ -97,6 +97,20 @@ static void orig_lookup(void)
 static uint32_t sound_arg;
 static void orig_sound(void) { sound_arg=WORD_AT(g_esp+4u);orig_calls++;g_esp+=4u; }
 static void orig_bar(void) { orig_calls++;g_esp+=4u; }
+/* sub_0032EDA0: the 3D view's floor change (0x0032EDA0..0x0032EF51). */
+#define PREVIEW 0x00778D34u
+#define PV 0x00190000u
+static int preview_press;   /* 1 up, 2 down, 3 both */
+static void orig_preview(void)
+{
+    uint32_t v=WORD_AT(PREVIEW);
+    int32_t f=(int32_t)WORD_AT(v+0x98u);
+    orig_calls++;g_esp+=4u;
+    if(WORD_AT(v+0x80u)&0x800u) { WORD_AT(0x00100000u+0x264u)=(uint32_t)f;return; }  /* glide ends: editor floor */
+    if((preview_press&1) && f<2) f++;
+    if((preview_press&2) && f>-2) f--;
+    WORD_AT(v+0x98u)=(uint32_t)f;
+}
 static uint32_t placement_result, probe_result, cell_extra_refusal, valid_result;
 static void orig_placement(void) { g_eax=placement_result;orig_calls++;g_esp+=4u; }
 static void orig_probe(void) { g_eax=probe_result;WORD_AT(ED+0x2F80u)=0x77u;orig_calls++;g_esp+=4u; }
@@ -209,22 +223,37 @@ static void test_stock(void)
     WORD_AT(ED+0x264u)=2;WORD_AT(ED+0x268u)=1;
     CALL(pc_mapmaker_grid_floor_sound,orig_sound,0x00306E99u,0x1576u);
     CHECK(orig_calls==1 && sound_arg==0x1576u && WORD_AT(ED+0x264u)==2u && WORD_AT(ED+0x268u)==1u);
-    /* menu: 7 bars drawn by the patched loop, floors 3 and 4 off screen */
-    g_ebx=3;FLOAT_AT(ESP0+4u+0x18u)=123.f;
+    /* menu: the patched loop starts with 16 bars; at floor -2 its count
+     * (loop frame +0x18 = esp after the call +0x20) becomes the stock 5 */
+    g_ebx=(uint32_t)-2;FLOAT_AT(ESP0+4u+0x18u)=123.f;WORD_AT(ESP0+4u+0x20u)=16u;
     CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x0030BFB5u,0);
-    CHECK(orig_calls==1 && FLOAT_AT(g_esp+0x18u)==MAPMAKER_GRID_HIDDEN_Y);
-    g_ebx=4;FLOAT_AT(ESP0+4u+0x18u)=123.f;
+    CHECK(orig_calls==1 && FLOAT_AT(g_esp+0x18u)==123.f && WORD_AT(g_esp+0x20u)==5u);
+    g_ebx=(uint32_t)-1;WORD_AT(ESP0+4u+0x20u)=16u;      /* only at the first bar */
+    CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x0030BFB5u,0);
+    CHECK(WORD_AT(g_esp+0x20u)==16u);
+    g_ebx=(uint32_t)-2;WORD_AT(ESP0+4u+0x20u)=7u;       /* not the table's count: left alone */
+    CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x0030BFB5u,0);
+    CHECK(WORD_AT(g_esp+0x20u)==7u);
+    g_ebx=(uint32_t)-2;WORD_AT(ESP0+4u+0x20u)=16u;      /* another caller of the sprite select */
+    CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x00012345u,0);
+    CHECK(WORD_AT(g_esp+0x20u)==16u);
+    /* fallback: bars for floors 3+ still go off screen */
+    g_ebx=3;FLOAT_AT(ESP0+4u+0x18u)=123.f;WORD_AT(ESP0+4u+0x20u)=12u;
+    CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x0030BFB5u,0);
+    CHECK(orig_calls==1 && FLOAT_AT(g_esp+0x18u)==MAPMAKER_GRID_HIDDEN_Y && WORD_AT(g_esp+0x20u)==12u);
+    g_ebx=13;FLOAT_AT(ESP0+4u+0x18u)=123.f;
     CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x0030BFB5u,0);
     CHECK(FLOAT_AT(g_esp+0x18u)==MAPMAKER_GRID_HIDDEN_Y);
     g_ebx=2;FLOAT_AT(ESP0+4u+0x18u)=123.f;
     CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x0030BFB5u,0);
     CHECK(FLOAT_AT(g_esp+0x18u)==123.f);
-    g_ebx=(uint32_t)-2;FLOAT_AT(ESP0+4u+0x18u)=123.f;
-    CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x0030BFB5u,0);
-    CHECK(FLOAT_AT(g_esp+0x18u)==123.f);
     g_ebx=3;FLOAT_AT(ESP0+4u+0x18u)=123.f;              /* another caller of the sprite select */
     CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x00012345u,0);
     CHECK(orig_calls==1 && FLOAT_AT(g_esp+0x18u)==123.f);
+    /* 3D view: stock floor change untouched */
+    WORD_AT(PREVIEW)=PV;WORD_AT(PV+0x98u)=2;preview_press=1;
+    CALL(pc_mapmaker_grid_preview_floor,orig_preview,0x0032F20Fu,0);
+    CHECK(orig_calls==1 && WORD_AT(PV+0x98u)==2u);
     /* placement: no upper guard in stock mode */
     WORD_AT(ED+0x264u)=2;a=piece(2,0,0,1,1,1,2);WORD_AT(ED+0x2F7Cu)=a;placement_result=1;
     CALL(pc_mapmaker_grid_placement,orig_placement,0x00306EC6u,0);
@@ -239,16 +268,22 @@ static void test_wide(void)
     uint32_t a,b,c,r,q,list[4],g;
     set_env("1",NULL,NULL);reset_world();
     CALL(pc_mapmaker_grid_alloc,orig_alloc,0x00303029u,0);
-    CHECK(orig_calls==0 && allocs==1 && last_alloc==80u*80u*8u*4u && WORD_AT(GRID)==0x00500000u);
+    CHECK(orig_calls==0 && allocs==1 && last_alloc==80u*80u*17u*4u && WORD_AT(GRID)==0x00500000u);
     g=WORD_AT(GRID);
-    CHECK(WORD_AT(g)==0 && WORD_AT(g+80u*80u*8u*4u-4u)==0);   /* cleared */
-    CHECK(FLOAT_AT(MAPMAKER_GRID_CFG_FLOORS)==7.f && FLOAT_AT(MAPMAKER_GRID_CFG_EXTENT)==80.f);
+    CHECK(WORD_AT(g)==0 && WORD_AT(g+80u*80u*17u*4u-4u)==0);   /* cleared */
+    CHECK(FLOAT_AT(MAPMAKER_GRID_CFG_FLOORS)==16.f && FLOAT_AT(MAPMAKER_GRID_CFG_EXTENT)==80.f);
     CHECK(FLOAT_AT(MAPMAKER_GRID_CFG_ZOOM)==100.f && fabsf(FLOAT_AT(MAPMAKER_GRID_CFG_ZOOM_INV)-.01f)<1e-7f);
-    /* far corner, top levels */
-    a=piece(0,78,79,4,2,1,2);
+    /* far corner, top levels: a 2-tall piece on floor 13 fills levels 13 and 14 */
+    a=piece(0,78,79,13,2,1,2);
     CALL(pc_mapmaker_grid_insert,orig_insert,0x00307FAAu,a);
     CHECK(orig_calls==0);
-    CHECK(lookup(78,79,4)==a && lookup(79,79,5)==a && lookup(79,79,6)==0 && lookup(80,79,4)==0 && lookup(79,80,4)==0);
+    CHECK(lookup(78,79,13)==a && lookup(79,79,14)==a && lookup(79,79,15)==0 && lookup(80,79,13)==0 && lookup(79,80,13)==0);
+    CHECK(lookup(79,79,12)==0 && lookup(79,79,4)==0);
+    CALL(pc_mapmaker_grid_remove,orig_remove,0x0030851Au,a);
+    CHECK(lookup(78,79,13)==0 && lookup(79,79,14)==0);
+    a=piece(0,78,79,4,2,1,2);
+    CALL(pc_mapmaker_grid_insert,orig_insert,0x00307FAAu,a);
+    CHECK(lookup(78,79,4)==a && lookup(79,79,5)==a && lookup(79,79,6)==0);
     CHECK(lookup(1,1,-2.5f)==0);
     CHECK(lookup(NAN,1,0)==0 && lookup(1,1,NAN)==0);
     /* a piece past the edge does not wrap into the next row */
@@ -260,9 +295,9 @@ static void test_wide(void)
     CALL(pc_mapmaker_grid_remove,orig_remove,0x0030851Au,a);
     CHECK(orig_calls==0 && lookup(78,79,4)==0 && lookup(79,79,5)==0);
     /* reset clears the whole wide grid */
-    WORD_AT(g+(79u+80u*(79u+80u*7u))*4u)=0x1234u;
+    WORD_AT(g+(79u+80u*(79u+80u*16u))*4u)=0x1234u;
     CALL(pc_mapmaker_grid_reset,orig_reset,0x002FEC40u,0);
-    CHECK(orig_calls==1 && WORD_AT(g+(79u+80u*(79u+80u*7u))*4u)==0);
+    CHECK(orig_calls==1 && WORD_AT(g+(79u+80u*(79u+80u*16u))*4u)==0);
     /* removal keeps overlapping pieces, last placed wins, only inside the box */
     a=piece(0,10,10,0,3,3,1);b=piece(1,12,12,0,3,3,1);r=piece(2,11,11,0,3,3,1);q=piece(3,30,30,0,1,1,1);
     list[0]=a;list[1]=b;list[2]=r;list[3]=q;place(list,4);
@@ -279,14 +314,21 @@ static void test_wide(void)
     CALL(pc_mapmaker_grid_insert,orig_insert,0x00307FAAu,r);
     CALL(pc_mapmaker_grid_remove,orig_remove,0x0030851Au,r);
     CHECK(lookup(13,11,0)==0 && lookup(12,12,0)==b && lookup(11,11,0)==a);
-    /* floors: up to 4 */
+    /* floors: up to 13, one step per refusal */
     WORD_AT(ED+0x264u)=2;WORD_AT(ED+0x268u)=1;
     CALL(pc_mapmaker_grid_floor_sound,orig_sound,0x00306E99u,0x1576u);
     CHECK(orig_calls==1 && sound_arg==0x157Du && WORD_AT(ED+0x264u)==3u && WORD_AT(ED+0x268u)==2u);
     CALL(pc_mapmaker_grid_floor_sound,orig_sound,0x00306E99u,0x1576u);
     CHECK(sound_arg==0x157Du && WORD_AT(ED+0x264u)==4u && WORD_AT(ED+0x268u)==3u);
+    {
+        int f;
+        for(f=5;f<=13;f++) {
+            CALL(pc_mapmaker_grid_floor_sound,orig_sound,0x00306E99u,0x1576u);
+            CHECK(sound_arg==0x157Du && WORD_AT(ED+0x264u)==(uint32_t)f && WORD_AT(ED+0x268u)==(uint32_t)(f-1));
+        }
+    }
     CALL(pc_mapmaker_grid_floor_sound,orig_sound,0x00306E99u,0x1576u);
-    CHECK(sound_arg==0x1576u && WORD_AT(ED+0x264u)==4u);
+    CHECK(sound_arg==0x1576u && WORD_AT(ED+0x264u)==13u && WORD_AT(ED+0x268u)==12u);
     WORD_AT(ED+0x264u)=(uint32_t)-2;WORD_AT(ED+0x268u)=(uint32_t)-2;  /* floor down refused at -2 */
     CALL(pc_mapmaker_grid_floor_sound,orig_sound,0x00306E99u,0x1576u);
     CHECK(sound_arg==0x1576u && WORD_AT(ED+0x264u)==(uint32_t)-2);
@@ -295,33 +337,160 @@ static void test_wide(void)
     CHECK(sound_arg==0x1576u && WORD_AT(ED+0x264u)==2u);
     CALL(pc_mapmaker_grid_floor_sound,orig_sound,0x00306E99u,0x157Du);
     CHECK(sound_arg==0x157Du && WORD_AT(ED+0x264u)==2u);
-    /* the 7-bar menu shows every bar */
-    g_ebx=4;FLOAT_AT(ESP0+4u+0x18u)=123.f;
+    /* the 16-bar menu keeps its count and shows every bar */
+    g_ebx=(uint32_t)-2;FLOAT_AT(ESP0+4u+0x18u)=123.f;WORD_AT(ESP0+4u+0x20u)=16u;
     CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x0030BFB5u,0);
-    CHECK(FLOAT_AT(g_esp+0x18u)==123.f);
-    /* placement guard: top level 5 */
+    CHECK(FLOAT_AT(g_esp+0x18u)==123.f && WORD_AT(g_esp+0x20u)==16u);
+    g_ebx=13;FLOAT_AT(ESP0+4u+0x18u)=123.f;WORD_AT(ESP0+4u+0x20u)=1u;
+    CALL(pc_mapmaker_grid_floor_bar,orig_bar,0x0030BFB5u,0);
+    CHECK(FLOAT_AT(g_esp+0x18u)==123.f && WORD_AT(g_esp+0x20u)==1u);
+    /* placement guard: top level 14 */
     placement_result=1;
-    WORD_AT(ED+0x264u)=4;a=piece(0,0,0,0,1,1,2);WORD_AT(a+0x40u)=0;WORD_AT(ED+0x2F7Cu)=a;
+    WORD_AT(ED+0x264u)=13;a=piece(0,0,0,0,1,1,2);WORD_AT(a+0x40u)=0;WORD_AT(ED+0x2F7Cu)=a;
     CALL(pc_mapmaker_grid_placement,orig_placement,0x00306EC6u,0);
-    CHECK(orig_calls==1 && g_eax==1u);                /* floors 4..5 */
+    CHECK(orig_calls==1 && g_eax==1u);                /* floors 13..14 */
     WORD_AT(a+0x80u+0x1Cu)=3;
     CALL(pc_mapmaker_grid_placement,orig_placement,0x00306EC6u,0);
-    CHECK(g_eax==0u);                                 /* 4..6 */
-    b=piece(1,0,0,1,1,1,1);WORD_AT(a+0x80u+0x1Cu)=1;WORD_AT(a+0x40u)=b;WORD_AT(ED+0x264u)=3;
+    CHECK(g_eax==0u);                                 /* 13..15 */
+    WORD_AT(ED+0x264u)=12;
     CALL(pc_mapmaker_grid_placement,orig_placement,0x00306EC6u,0);
-    CHECK(g_eax==1u);                                 /* 3 and 4 */
+    CHECK(g_eax==1u);                                 /* 12..14 */
+    b=piece(1,0,0,1,1,1,1);WORD_AT(a+0x80u+0x1Cu)=1;WORD_AT(a+0x40u)=b;WORD_AT(ED+0x264u)=12;
+    CALL(pc_mapmaker_grid_placement,orig_placement,0x00306EC6u,0);
+    CHECK(g_eax==1u);                                 /* 12 and 13 */
     FLOAT_AT(b+8u)=3.f;
     CALL(pc_mapmaker_grid_placement,orig_placement,0x00306EC6u,0);
-    CHECK(g_eax==0u);                                 /* second held piece at 6 */
+    CHECK(g_eax==0u);                                 /* second held piece at 15 */
     WORD_AT(SCENE)=100u;
     CALL(pc_mapmaker_grid_placement,orig_placement,0x00306EC6u,0);
     CHECK(g_eax==1u);
+    WORD_AT(SCENE)=102u;WORD_AT(ED+0x264u)=3;
+    CALL(pc_mapmaker_grid_placement,orig_placement,0x00306EC6u,0);
+    CHECK(g_eax==1u);                                 /* 3 and 6: the old top is no longer a limit */
     WORD_AT(SCENE)=102u;placement_result=0;
     CALL(pc_mapmaker_grid_placement,orig_placement,0x00306EC6u,0);
     CHECK(g_eax==0u);
     /* the limits alone do not allow overlap */
     probe_result=1;CALL(pc_mapmaker_overlap_cell,orig_probe,MAPMAKER_GRID_RET_PROBE,0,0,0);
     CHECK(g_eax==1u);
+}
+
+/* The 3D view's floor change (sub_0032EDA0) reaches floor 13 with the
+ * limits: up/down/both/neither from every floor, glide branch untouched. */
+static void test_preview(void)
+{
+    int f,press;
+    set_env("1",NULL,NULL);reset_world();
+    WORD_AT(PREVIEW)=PV;
+    for(f=-2;f<=13;f++)
+        for(press=0;press<4;press++) {
+            int up=press&1,down=(press&2)!=0,want=f;
+            if(up && f<13) want++;
+            if(down && want>-2) want--;
+            WORD_AT(PV+0x80u)=0;WORD_AT(PV+0x98u)=(uint32_t)f;preview_press=press;
+            CALL(pc_mapmaker_grid_preview_floor,orig_preview,0x0032F20Fu,0);
+            if(WORD_AT(PV+0x98u)!=(uint32_t)want) { fprintf(stderr,"preview floor %d press %d: %d, want %d\n",f,press,(int)WORD_AT(PV+0x98u),want);failures++; }
+        }
+    /* gliding: the original copies the view floor to the editor, as is */
+    WORD_AT(PV+0x80u)=0x800u;WORD_AT(PV+0x98u)=9;WORD_AT(ED+0x264u)=0;preview_press=1;
+    CALL(pc_mapmaker_grid_preview_floor,orig_preview,0x0032F20Fu,0);
+    CHECK(WORD_AT(PV+0x98u)==9u && WORD_AT(ED+0x264u)==9u);
+    /* another caller, another scene, or no view: stock */
+    WORD_AT(PV+0x80u)=0;WORD_AT(PV+0x98u)=5;
+    CALL(pc_mapmaker_grid_preview_floor,orig_preview,0x0032F000u,0);
+    CHECK(orig_calls==1 && WORD_AT(PV+0x98u)==5u);
+    WORD_AT(SCENE)=100u;
+    CALL(pc_mapmaker_grid_preview_floor,orig_preview,0x0032F20Fu,0);
+    CHECK(WORD_AT(PV+0x98u)==5u);
+    WORD_AT(SCENE)=102u;WORD_AT(PREVIEW)=0;
+    WORD_AT(0x00000098u)=5;   /* keep the fake original's null-view read harmless */
+    CALL(pc_mapmaker_grid_preview_floor,orig_preview,0x0032F20Fu,0);
+    CHECK(orig_calls==1);
+    WORD_AT(PREVIEW)=PV;
+    /* without the limits: refused at 2 */
+    set_env(NULL,NULL,NULL);
+    WORD_AT(PV+0x98u)=2;preview_press=1;
+    CALL(pc_mapmaker_grid_preview_floor,orig_preview,0x0032F20Fu,0);
+    CHECK(WORD_AT(PV+0x98u)==2u);
+}
+
+/* Save compatibility (the format is unchanged: signed-byte cells, the floor
+ * byte +6 of each piece record, written by cvttss2si at 0x00300BDD and read
+ * back with movsx at 0x00302194 / 0x0008A87E). A map from the 7-floor build
+ * rebuilds into the 16-floor grid exactly as it was saved, and a map using
+ * floors -2..13 survives save -> load -> grid with every cell in place. */
+typedef struct { int8_t x, y, z; uint8_t rot; int w, d, h; } MapPiece;
+static void save_load(const MapPiece *in,unsigned n,uint8_t *records)
+{
+    unsigned i;
+    for(i=0;i<n;i++) {                       /* the saver: record bytes +4..+7 */
+        uint32_t p=piece(i,(float)in[i].x,(float)in[i].y,(float)in[i].z,in[i].w,in[i].d,in[i].h);
+        records[i*4u+0u]=(uint8_t)(int8_t)(int32_t)FLOAT_AT(p);
+        records[i*4u+1u]=(uint8_t)(int8_t)(int32_t)FLOAT_AT(p+4u);
+        records[i*4u+2u]=(uint8_t)(int8_t)(int32_t)FLOAT_AT(p+8u);
+        records[i*4u+3u]=in[i].rot;
+    }
+}
+static void load_into_grid(const MapPiece *in,const uint8_t *records,unsigned n,uint32_t *nodes)
+{
+    unsigned i;
+    CALL(pc_mapmaker_grid_alloc,orig_alloc,0x00303029u,0);
+    for(i=0;i<n;i++) {                       /* the loader: movsx, then sub_00307EF0 -> insert */
+        nodes[i]=piece(i,(float)(int8_t)records[i*4u],(float)(int8_t)records[i*4u+1u],(float)(int8_t)records[i*4u+2u],
+                       in[i].w,in[i].d,in[i].h);
+        CALL(pc_mapmaker_grid_insert,orig_insert,0x00307FAAu,nodes[i]);
+    }
+}
+static void check_cells(const MapPiece *in,const uint32_t *nodes,unsigned n,int line)
+{
+    unsigned i;
+    int l,j,k;
+    for(i=0;i<n;i++)
+        for(l=0;l<in[i].h;l++) for(j=0;j<in[i].d;j++) for(k=0;k<in[i].w;k++)
+            if(lookup((float)(in[i].x+k),(float)(in[i].y+j),(float)(in[i].z+l))!=nodes[i]) {
+                fprintf(stderr,"%s:%d: piece %u cell (%d,%d,%d) lost\n",__FILE__,line,i,in[i].x+k,in[i].y+j,in[i].z+l);failures++;
+            }
+}
+static void test_saves(void)
+{
+    static const MapPiece old_map[]={       /* every floor of the 7-floor build, both grid corners */
+        {0,0,-2,0,1,1,1},{39,39,-1,1,1,1,1},{10,10,0,2,3,3,1},{20,5,1,3,2,2,2},
+        {5,20,2,0,1,1,2},{40,40,3,0,1,1,1},{79,79,4,0,1,1,2},
+    };
+    static const MapPiece high_map[]={       /* the new floors, a 2-tall piece on the top floor */
+        {0,0,-2,0,1,1,1},{12,12,5,0,2,2,1},{30,30,8,1,1,1,2},{50,50,11,2,3,1,1},
+        {78,78,12,3,2,2,1},{79,0,13,0,1,1,2},{0,79,13,0,1,1,1},
+    };
+    uint8_t rec[4*8],again[4*8];
+    uint32_t nodes[8];
+    unsigned i,n;
+    set_env("1",NULL,NULL);reset_world();
+    n=(unsigned)(sizeof old_map/sizeof old_map[0]);
+    save_load(old_map,n,rec);
+    for(i=0;i<n;i++) CHECK((int8_t)rec[i*4u+2u]==old_map[i].z);          /* old floor bytes unchanged */
+    load_into_grid(old_map,rec,n,nodes);
+    check_cells(old_map,nodes,n,__LINE__);
+    CHECK(lookup(79,79,6)==0 && lookup(0,0,-3)==0);
+    reset_world();
+    n=(unsigned)(sizeof high_map/sizeof high_map[0]);
+    save_load(high_map,n,rec);
+    for(i=0;i<n;i++) CHECK((int8_t)rec[i*4u+2u]==high_map[i].z);
+    load_into_grid(high_map,rec,n,nodes);
+    check_cells(high_map,nodes,n,__LINE__);
+    CHECK(lookup(79,0,14)==nodes[5] && lookup(79,0,15)==0 && lookup(0,79,14)==0);
+    /* save again from the loaded nodes: byte-identical records */
+    for(i=0;i<n;i++) {
+        again[i*4u+0u]=(uint8_t)(int8_t)(int32_t)FLOAT_AT(nodes[i]);
+        again[i*4u+1u]=(uint8_t)(int8_t)(int32_t)FLOAT_AT(nodes[i]+4u);
+        again[i*4u+2u]=(uint8_t)(int8_t)(int32_t)FLOAT_AT(nodes[i]+8u);
+        again[i*4u+3u]=high_map[i].rot;
+    }
+    CHECK(memcmp(rec,again,n*4u)==0);
+    /* the same high map without the limits: the stock 6-level grid simply
+     * does not see floors 4+ (as a 7th-floor glitch map), nothing wraps */
+    set_env(NULL,NULL,NULL);reset_world();
+    load_into_grid(high_map,rec,n,nodes);
+    CHECK(lookup(0,0,-2)==nodes[0] && lookup(12,12,5)==0 && lookup(79,0,13)==0);
 }
 
 static void test_overlap(void)
@@ -571,6 +740,8 @@ int main(void)
     g_xbox_mem_offset=(uintptr_t)memory;
     test_stock();
     test_wide();
+    test_preview();
+    test_saves();
     test_overlap();
     test_stack();
     test_stack_sai();
