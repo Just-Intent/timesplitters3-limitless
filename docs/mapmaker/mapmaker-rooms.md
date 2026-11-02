@@ -543,6 +543,157 @@ before by `TSFP_MAPMAKER_LIMITS=1` and the room-model slots of scene 100) is
 the last commit; it changes nothing outside MapMaker play. Story-level risk
 of stages 2-4 (they are not gated): see "What to test in play".
 
+## Rooms 255 -> 1024: feasibility plan (2026-11-02, static only)
+
+Goal (user): "keep bumping tile limits up ... make 1024 a goal". Basis: the
+255 layout above, the tile caps audit, `logs/limits/*.md`, the disassembly.
+Nothing here was built or played. Counts per piece are the heaviest stock
+tile (14 pads, 14 cover, 46 links) and the measured average (14 portals,
+1.5 pad groups).
+
+### Layouts
+
+The 255 layout repeated at a larger id width: real rooms 1..R, then spare,
+5 player ids, 6 view ids and the global id (13 ids), id space R+14.
+
+| target | real rooms | special ids | id space | view shadow per view |
+| --- | --- | --- | --- | --- |
+| 255 (now) | 1..0xFF | 0x100..0x10C | 0x10D | 0xFC6 of 0xFFC (stride kept) |
+| 327 | 1..0x147 | 0x148..0x154 | 0x155 | rects 0xFFC (full), flags + list in a 2nd region |
+| 511 | 1..0x1FF | 0x200..0x20C | 0x20D | 0x1ECA: new view stride 0x3000 |
+| 1023 | 1..0x3FF | 0x400..0x40C | 0x40D | 0x3CCA: new view stride 0x5000 |
+
+1023 rather than 1024: with the specials at 0x400 (as asked) the last real
+room is 0x3FF; 1024 needs them one higher (0x401..0x40D), same work.
+
+### Every cap between 255 and 1024
+
+| # | cap | now | binds at | needed for 1023 | stage |
+| --- | --- | --- | --- | --- | --- |
+| 1 | draw-bucket room bytes and byte counts (255 per depth) | byte | 256 rooms | words | 6 (done) |
+| 2 | view shadow (12-byte rects per id, stride 0xFFC) | 0x10D ids | 342 ids | stride 0x5000 | 7 |
+| 3 | special ids 0x100..0x10C, 21 `cmp 0xFF` real-room tests, 12 id counts | 255 | 256 | 0x400.. | 8 |
+| 4 | per-room tables (`0x008C0000`.., 256 entries) | 256 | 256 | 0x400 | 9 |
+| 5 | per-id prop tables, drawn flag, id flag bytes `[0x7B977C]` | 0x10D | 0x10D | 0x40D | 9 |
+| 6 | light heads row 0x10C, colour 0x10C, round robin 32 groups | 0x10C | 0x200 | 0x40C, 65 groups | 9 |
+| 7 | model table 0xA08 words, `[0x7087A4]` 0x18 B per model, 4 bounds, prop slots | 0xA06 | 256 | 0xD08 | 10 |
+| 8 | room query buffers (1023 words) | 1023 | 1024 | 2047 | 9 |
+| 9 | C side tables: light side table (uint16, 32 groups), roof/open-air rooms (`MAPMAKER_ROOF_ROOMS` 256), word bucket lists (2047) | 256 | 256 | 0x40D | 9 |
+| 10 | object pool (each room takes one) | 1000 | 1000 - 500 items - 64 chars = 436 | 1600 | 11 (objects area) |
+| 11 | light pool records per room group (`[0x0073D954]`, pool 500 / groups) | ~31 | lights get sparse | larger pool | 11 |
+| 12 | links: editor 12,000; A* int16 indices 32,767 | 12,000 | 260 heavy pieces | 47,058 heavy (above int16: ~712 heavy pieces max) | 12 (pads area) |
+| 13 | regular pads: editor 4,800; ids 7,000..8,000 (13 id compares) | 4,800 | 342 heavy | 14,322 (above the id cap: ~500-570 heavy max) | 12 |
+| 14 | cover pads 9,984 (Layout B) | 9,984 | 713 heavy | 14,322 (int16 room to ~23,766) | 12 |
+| 15 | pad groups 600 (N x N matrix, A* pool 0x20000) | 600 | 400 | ~1,535 | 12 |
+| 16 | portals 0x3FFF (stack flag buffer 0x4000) | 16,383 | ~1,170 average | 14,322 average; heavy unmeasured | 13 |
+| 17 | play memory (Level heap; arena 47,104,000 B, +16 MB max by `TSFP_MAPMAKER_ARENA_MB`) | measured | see below | see below | 14 |
+| 18 | editor memory estimate x8 (16.4 MB) | 16.4 MB | ~390 heavy | 43 MB heavy | 14 |
+| 19 | map container / undo ring | 512 KB / 1 MB | ~1,000+ (tens of KB at 241) | ~250 KB | no |
+| 20 | room AABB scratch (32 KB, 0x1C per room), portal walk recursion (0x1E4 per room, 8 MB stack) | ~1,170 / ~17,000 | | fits | no |
+| 21 | view room list (shadow, cap `cmp ax,0x10C`) | 0x10C | 0x10D | 0x40D | 7 |
+| 22 | editor piece walk (`mapmaker_list_totals`, 4096) and grid 80x80x16 | 4096 | | fits | no |
+
+### Memory budget for 1023
+
+Extension block, rooms sub-range `0x008C0000..0x008E0000` (128 KB; the pads
+A* pool starts at `0x008E0000`): per-room tables 32 B x 0x400 = 32 KB;
+per-id prop tables 5 x 0x40D x 4 = 20.3 KB; light heads 12.1 KB, colour
+12.1 KB, round robin 0.3 KB; drawn flag 4.1 KB; model table 0xD08 words
+6.5 KB (base `0x008CA000` stays: the bosses, characters, khallos and
+mothership areas read it there); query buffers 2 x 4 KB; bucket staging row
+0.5 KB; front-end static view one stride, 20 KB. Total about 116 KB of 128 KB:
+it fits only repacked, with the model table in place.
+
+Heaps: view array 6 x 0x5000 = 120 KB (now 48 KB; every scene, story levels
+too), per-model array 0xD08 x 0x18 = 79 KB (now 60 KB), prop slots +0x30 per
+room model, link pool (links + 16 per piece + 256) x 20 B (about 1 MB at
+32,767 links).
+
+Play memory, from the two measured maps (CONFIRMED numbers, INFERRED rate):
+110 tiles + 67 items left 11.56 MB free, 236 tiles + 200 items 5.56 MB, so
+a tile with its share of content costs roughly 30-48 KB. 1023 tiles would
+need 24-38 MB more than the 236-tile map; the arena switch adds at most
+16 MB of the 64 MB window (textures and the container share it). So 1023
+heavy tiles do not fit in the guest's 64 MB; about 550-650 do with the full
+arena (estimate; to be measured with `TSFP_MAPMAKER_PROBE=32`).
+
+### Verdict
+
+- The room machinery (stages 6-10) can reach 1023 ids; nothing in it caps
+  below that once the view stride changes.
+- Real maps are capped before 1023 by pads (stage 12: ~500-570 heaviest
+  tiles at the regular pad id limit), links (~712 heaviest tiles at int16 A*
+  indices) and play memory (~550-650 tiles, unmeasured). Light tiles (few
+  pads/links) can go further, up to memory.
+- Highest safe next target: **511 pieces** (ids 1..0x1FF, specials
+  0x200..0x20C, view stride 0x3000). Its blockers: stages 7-11, links 12,000
+  -> 23,506, pads (heavy tiles stop at 4,800 / 14 = 342 pieces until stage
+  12; the editor counts pads, so placement stops cleanly), objects 1,075 >
+  1,000, and a probe measurement with the arena raised. Then 1023 for light
+  maps once pads, links and memory allow.
+
+### Stages (sites)
+
+6. Word draw buckets: reimplement the writers `sub_00086C40` and
+   `sub_000897D0`, widen the readers `sub_00086480`/`sub_000865E0` (first).
+7. View stride 0xFFC -> S (0x3000 for 511, 0x5000 for 1023): the 34 `add/imul
+   r, 0xFFC` sites found by a scan (`0x0003C524`, `0x0003C576`, `0x0003C711`,
+   `0x0003C7ED`, `0x00083847`, `0x00083A37`, `0x00088F82`, `0x000899FC`,
+   `0x0008A253`, `0x0008BDB4`, `0x0009FFA6`, `0x000C622E`, `0x000C63C4`,
+   `0x000C79B6`, `0x000C8E2C`, `0x000CCA3B`, `0x000CCA4F`, `0x0010A9B3`,
+   `0x0010AA83`, `0x0010E4C7`, `0x00117D70`, `0x0011A5D2`, `0x0011A8FB`,
+   `0x0011AFE1`, `0x001291FC`, `0x00160AA5`, `0x00176B15`, `0x001848E2`,
+   `0x00185BEE`, `0x00185C08`, `0x00185CC0`, `0x001E4607`, `0x00247E34`,
+   `0x0025F304`, `0x00343055`) plus the remaining stride uses of the earlier
+   count of 38 (`0x001B45B6` lea, `0x001B773E`, `0x00188F70` to classify),
+   the two divisions by 0xFFC (magic multiplies; new magic, same length),
+   the view array allocation/clear (`0x000C61D3`/`0x000C61E7`), the
+   front-end static view (relocated, one stride) and the 67 shadow
+   displacements moved from +0x6000 to +0x1000 (inside the stride: rects
+   +0x1000, flags and list after them). `MAPMAKER_ROOMS_VIEW_STRIDE`,
+   `_VIEW_RECTS`, `_VIEW_LIST`, `_LIST_WORDS` (this file's C) and
+   `OPENVIEW_RECT` follow. Test: decode of every 0xFFC immediate classified
+   (like `test_every_room_constant_is_classified`), allocation = 6 x S.
+   Overlap: the camera view is one of the six views (see "Camera work").
+8. Special ids to R+1.. (155 operand entries: values only), 21 real-room
+   compares, 12 id counts, loop ends, `[0x7B977C]` sizes and displacements,
+   the view list cap; C: `MAPMAKER_ROOMS_IDS_REAL`, `_ID_GLOBAL`,
+   `_VIEW_LIST_CAP`, `_LIGHT_ROW`; `test_table_shape` / `id_space_problems`
+   parameterised by the id space.
+9. Tables (rows 4-6, 8, 9): relocation sizes and the light clear loop as in
+   stage 4 of the 255 raise, a repacked rooms sub-range, `MAPMAKER_ROOF_ROOMS`
+   and the open-air/roof C arrays, light side table groups.
+10. Model table and room-model prop slots for 0x9D0..0x907+R (the compile
+   guard stays: 200 unless all have slots), `[0x7087A4]` allocation/clear,
+   the four model bounds; check no area places its own model ids in
+   0xA08..0xD08.
+11. Objects pool and light pool (owned by the objects area and the light
+   hooks).
+12. Pads area: links to 23,506 (511) / 32,767, regular pad ids past 8,000,
+   pad groups past 600 (A* pools).
+13. Portal flags past 0x3FFF if heavy maps need it (frame 0x8000), and an
+   audit of 16-bit portal ids.
+14. Memory: probe with the arena raised, then `MAPMAKER_LIMIT_PIECES` to the
+   reached target (still gated by `TSFP_MAPMAKER_LIMITS=1` and the
+   room-model slots).
+
+Story-level risk per stage: 6-10 run in every scene (immediates and table
+addresses cannot be per scene), as stages 2-4 of the 255 raise did; only the
+compile guard, prop slots and the editor limit are scene-100 gated. Stage 7
+changes every view's layout (splitscreen, camera screens, front end).
+
+### Camera work (overlap)
+
+Another branch changes the security-camera view (sweep, widescreen aspect,
+rooms missing above about floor 10). The camera view is one of the six
+0xFFC views: it uses the same shadow rects/flags/list, the same depth
+buckets and `[view+0xD28]` (deepest depth, capped at 0x4F: 80 depths, which
+may be why rooms above about floor 10 stop drawing) and `sub_000897D0`'s list
+cap. Stage 6 reimplements `sub_00086C40` and `sub_000897D0` (same results
+below 256 rooms per depth); stage 7 would move every view field above +0xFFC.
+A camera fix that wraps either function, changes the depth cap or adds
+fields to the view must be merged against these hooks.
+
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
 Cause: `sub_000BB850` (explosion/area effect over the rooms touching a box)
