@@ -470,8 +470,10 @@ held prop's light (above).
    255" below. Test: `test_table_shape`, `test_id_space_tables` (+19
    mutations), `test_other_areas_use_the_moved_tables`,
    `test_extension_map_rooms_sub_range`, `check-tables.py`.
-5. Story-level playtest (list in "What to test in play"), then
-   `MAPMAKER_LIMIT_PIECES` 241 -> 255.
+5. Done (2026-11-01, prepared for the playtest): `MAPMAKER_LIMIT_PIECES` and
+   `MAPMAKER_ROOMS_MAX` 241 -> 255, gated as before (`TSFP_MAPMAKER_LIMITS=1`;
+   the compile guard keeps 200 unless room models 0x908..0xA06 all have prop
+   slots, scene 100 only). Play the story list first (S1..S7).
 6. Only for more than 255: word buckets (`sub_00086C40`, `sub_000897D0`
    reimplemented; `0x000864F4`, `0x00086644`, `0x000898F0` widened; the copy
    `0x00086D77`/`0x00086D80`), then the second shadow region past 341 ids.
@@ -614,8 +616,9 @@ Then MapMaker (stage 5):
 1. Story levels (several, including splitscreen with 4 players and a level with
    security-camera screens): rendering, lights, held weapons/items (player
    ids), thrown/held props, particles.
-2. MapMaker with `TSFP_MAPMAKER_LIMITS=1`: a map of 241 pieces; check the log
-   line (rooms = pieces, nothing dropped), draw distance/culling at the far
-   end, lights, doors, items in rooms 201..241, and the front-end menus after
-   leaving the map.
+2. MapMaker with `TSFP_MAPMAKER_LIMITS=1`: a map of 255 pieces (and one of
+   241 built in the previous build); check the log line `rooms 255 of 255`
+   (rooms = pieces, nothing dropped), draw distance/culling at the far end,
+   lights, doors, items in rooms 242..255, open-air tiles near room 255, and
+   the front-end menus after leaving the map.
 3. A map of 200 pieces built in the stock game still loads and plays the same.

@@ -1,4 +1,4 @@
-"""MapMaker rooms 200 -> 241: C policy fixture with mutations, plus the guest-code table's shape."""
+"""MapMaker rooms 200 -> 255: C policy fixture with mutations, plus the guest-code table's shape."""
 import json
 import os
 from pathlib import Path
@@ -14,7 +14,8 @@ SUB_RANGE = (0x008C0000, 0x008E0000)
 
 MUTATIONS = {
     'cap-stock': ('    return MAPMAKER_ROOMS_MAX;\n}', '    return MAPMAKER_ROOMS_STOCK;\n}'),
-    'cap-raised': ('#define MAPMAKER_ROOMS_MAX 241u', '#define MAPMAKER_ROOMS_MAX 242u'),
+    'cap-raised': ('#define MAPMAKER_ROOMS_MAX 255u', '#define MAPMAKER_ROOMS_MAX 256u'),
+    'cap-241': ('#define MAPMAKER_ROOMS_MAX 255u', '#define MAPMAKER_ROOMS_MAX 241u'),
     'query-flags-kept': ('&=0xEFu; /* clear "listed" */', '&=0xFFu;'),
     'query-ignores-box-bit': ('if(word&take) {', 'if(take) {'),
     'query-ignores-max': ('if(++found==max) take=0;', '++found;'),
