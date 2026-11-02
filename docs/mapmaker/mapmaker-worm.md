@@ -2,7 +2,7 @@
 
 Status: implemented in `src/interface/pc_mapmaker_worm.inc` (area `worm`),
 fixture-tested (`tests/mapmaker/mapmaker_worm.c` +
-`tests/mapmaker/test_mapmaker_worm.py`: 82 mutations, plus decode and US XBE data
+`tests/mapmaker/test_mapmaker_worm.py`: 126 mutations, plus decode and US XBE data
 checks of every site below). **Not wired, not built, not played**: the
 wrappers, the picker row and the stubs are the integrator's
 ([Wrappers for the integrator](#wrappers-for-the-integrator)). Switch:
@@ -132,6 +132,7 @@ that map worm, worms 1-4 are parked ([Several mansion worms](#several-mansion-wo
 | `sub_001D9370` -> `pc_mapmaker_worm_props` | return 0x001DA998 during this area's draw: skipped |
 | `sub_001D7200` -> `pc_mapmaker_worm_extra` | return 0x001DA9A9 during this area's draw: skipped |
 | `sub_00234CD0` -> `pc_mapmaker_worm_script` | return 0x001DC45F in scene 100: the mansion script trigger dropped |
+| `sub_001D5E20` -> `pc_mapmaker_worm_gone` | the head's slot 12 (entity removal): that worm's state 4 and head slot cleared in its own block ([Head room and removal](#head-room-and-removal-v040-mapmaker28)) |
 
 **Level init** (`pc_mapmaker_worm_level`), in order:
 1. Allocates the worm block (`sub_001D1E80`).
@@ -341,6 +342,7 @@ WRAP sub_001D9370 -> pc_mapmaker_worm_props      (new; return-address test)
 WRAP sub_001D7200 -> pc_mapmaker_worm_extra      (new; return-address test)
 WRAP sub_00234CD0 -> pc_mapmaker_worm_script     (new; return-address test; 5 callers)
 WRAP sub_0005B980 -> pc_mapmaker_worm_register   (new; level load only; table 0x0048BEC8 count 0x1E test first)
+WRAP sub_001D5E20 -> pc_mapmaker_worm_gone       (new, .28; the head's slot 12, only installed on worm heads)
 (several worms: no new wrapper; the same hooks swap each worm's globals)
 ```
 
@@ -427,3 +429,61 @@ holds the worm crashed in .26 (three dumps, `sub_0010DF90+0xB5` from
 each worm's block is made at its AI start (`wrm_alloc(k)`), in play, and a
 failed scratch leaves the worm a bot. Confirmed by the user: three split
 Crowes loaded once the worm was out of the set.
+
+## Head room and removal (v0.4.0-mapmaker.28)
+
+**User report (.27)**: the first worm level animated but never attacked, and
+the burst/spawn pose stayed; on the next level the worm "attacked" with a
+wrong animation and did no damage.
+
+**Second level** (CONFIRMED, `logs/m27.err`): right after `head bound`, the
+Open air fall check found the head (5 below the floor, as stock binds it)
+outside every room and killed it (`sub_000BD090`). The first level had no
+unbounded tile, so no fall check. Fixed in `pc_mapmaker_roof.inc` (aab606cc:
+model 0x5EA skipped). The worm's log counters were per session, so the second
+level logged no `runs its story update`/`drawn`; they now reset per level
+(160 lines per session at most).
+
+**No damage** (CONFIRMED sites, test `test_head_room_and_slot12`; the miss
+itself INFERRED): the binding `sub_001D9AF0` sets the head's room
++0x34/+0x38 to 0x18 (0x001D9B3D..0x001D9B4B), the mission 5 garden; on a
+MapMaker map that is whatever tile has index 0x18. Both damage rays, the burst
+(`sub_00088C60` at 0x001DC3F4) and the attack (0x001DCCCD), start in the
+head's +0x34 room (`sub_00088950` walks portals from it). The rays missed.
+Now, after each update of a bound head, +0x34/+0x38 are:
+- its spawn room (the MapMaker AI's own +0x34, kept on the ticks before the
+  bind; valid rooms are 1..`[0x007B975C]`, as `sub_000C3B10` checks);
+- while surfaced (state >= 8), the room of the nearest human player within 12
+  units (player structs `[0x007B0C48]` + i*0x1584, +0xA8 position, +0x14
+  entity; count `[0x00790950]`, as the update reads them);
+- unchanged (stock 0x18) if no spawn room was valid.
+A worm that surfaces far from its spawn tile with no player near keeps the
+spawn room.
+
+**Burst pose staying** (SUSPECTED): the first level's two surfacings were
+logged in state 14 (0xE, `wrmburrow`), so the draw never saw state 9: the
+burst ended in the update that started it. `sub_0005BC20` clears the done
+flag (+0x124) on a play, so the play of `wrmburst` was refused
+(`sub_0005F460` / `sub_001C8C20`) or the anim jumped to its end. State 0xE
+waits for `wrmburrow` to finish or the head bone to sink (0x001DC88C). The
+wrong room also decides when the head is drawn; whether that gates its anim
+is unverified. Anim ids are absolute (`sub_0005F460` maps id via
+`0x007E03C0`): the partial registration shifts nothing. The update does not
+depend on mansion script state (the dropped `'SFCC'` call only runs after a
+hit). New log per state change, up to 48 a level per worm:
+`worm k state a -> b (head anim id done d, room r, height h)`; surfacings also
+log the room.
+
+**Removal** (CONFIRMED sites): the binding sets slot 12 to `sub_001D5E20`
+(0x001D9B1A), which `sub_000A7090` calls when the entity goes. It writes 4 to
+`[0x0075B4B4]` + (head +0x60 - `'WRM1'`) * 0x450 + 0x24. A MapMaker head's
++0x60 is its record id (`'WRM1'` only during the hit hook) and the live block
+may be another worm's or none: a write far outside any block.
+`pc_mapmaker_worm_gone` takes it for a bound map worm's head: that worm's
+state 4, its head slot cleared, in its own block; others stock.
+
+**Playtest**: a map with no unbounded tile and one with one; stand near the
+spawn. Expect `head room (spawn room, binding's) (r, 0x18)`, state lines 8
+-> 9 -> 11/14 with `head anim 0x194 done 0`, the burst damaging you, and no
+`fell off the map` for the worm. If 9 never shows or `done 1` follows a
+0x194 play, send the state lines.

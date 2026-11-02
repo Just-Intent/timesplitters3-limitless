@@ -59,6 +59,9 @@
  *    reset, so the 5-kill marker never fires.
  *  - fx: the stock draw in scene 100, with its two mansion callees skipped
  *    and the wall clip off.
+ *  - room: a bound head's room (stock 0x18, the garden) is its spawn room, or
+ *    surfaced, a near player's: the damage rays start there (.28).
+ *  - gone: the head's slot 12 (sub_001D5E20) sets its own worm gone (.28).
  *  - script: the update's trigger of the mansion script object 'SFCC'
  *    (sub_00234CD0 at 0x001DC45A, which reaches level markers and tag
  *    lookups through sub_0025F0C0) dropped. The only other way from the
@@ -164,6 +167,14 @@
 #define WRM_SCRATCH 0x300u              /* +0 script block, +0x50 object table, +0x100 object */
 #define WRM_FAKE_TABLE 0x50u
 #define WRM_FAKE_OBJECT 0x100u
+#define WRM_ENT_ROOM 0x34u            /* +0x34 room (level object index, 1-based), +0x38 */
+#define WRM_STOCK_ROOM 0x18u          /* the binding's room (0x001D9B48): the mansion garden */
+#define WRM_ROOM_COUNT 0x007B975Cu    /* rooms (sub_000C3B10 at 0x000C3B46) */
+#define WRM_PLAYERS 0x007B0C48u       /* player structs, 0x1584 each: +4 < 0 empty, +0x14 entity, +0xA8 position */
+#define WRM_PLAYER 0x1584u
+#define WRM_PLAYER_N 0x00790950u
+#define WRM_PLAYER_MAX 4u
+#define WRM_REACH 12.0f               /* a player this near the surfaced worm lends it his room */
 #define WRM_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define WRM_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -191,7 +202,7 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
     int read, optout;
-    unsigned logged, extras, ticks, hits, draws, scripts, surfacings;
+    unsigned logged, extras, ticks, hits, draws, scripts, surfacings, levels, gones;
 } wrm;
 /* The globals one worm block's code keeps between calls (CONFIRMED, every
  * written [abs] operand of the code reachable from its entry points, test):
@@ -210,6 +221,8 @@ static const uint32_t wrm_win[]={
 struct wrm_worm_s {
     uint32_t state, scratch, effect, record, actor;
     int ready, failed, shifted, drawing, swapped, surfaced;
+    uint32_t head, room, last_state;  /* the bound head, its spawn room (0: none), the state last logged */
+    unsigned states;                  /* state changes logged */
     float dx, dy, dz;
     uint32_t pad[WRM_ROUTE_N], saved[WRM_NCONST], route[WRM_ROUTE_N], wall;
     uint32_t win[WRM_NWIN];             /* its globals while another's (or nobody's) are live */
@@ -255,7 +268,8 @@ static void wrm_leave(int prev)
 
 static void wrm_log(const char *what,uint32_t a,uint32_t b)
 {
-    if(wrm.logged>=24u) return;
+    if(wrm.logged>=24u || wrm.levels>=160u) return;
+    wrm.levels++;
     wrm.logged++;
     fprintf(stderr,"[mapmaker] worm: %s (0x%X, 0x%X)\n",what,(unsigned)a,(unsigned)b);
     fflush(stderr);
@@ -405,6 +419,9 @@ void pc_mapmaker_worm_level(void (*original)(void))
     memset(wrm_inst,0,sizeof wrm_inst);               /* a new level: nothing of the last one */
     memset(&wrm_none,0,sizeof wrm_none);
     wrm_n=0;wrm_cur=-1;wrm_i=&wrm_none;wrm_scratch=0;wrm_effect=0;
+    /* a new level logs its own first lines again (the .27 second worm level
+     * logged neither its update nor its draw) */
+    wrm.logged=wrm.extras=wrm.ticks=wrm.hits=wrm.draws=wrm.scripts=wrm.surfacings=wrm.gones=0;
     if(!wrm_play() || wrm.optout || (has=wrm_set_has())==0) return;
     WORD_AT(WRM_STATE)=0;                              /* a stale pointer of an earlier level */
     scratch=guest_call(sub_0003DFA0,2,WRM_SCRATCH,1u);
@@ -585,21 +602,93 @@ static void wrm_shift(int on,int draw)
     }
 }
 
+/* A room of this map: 1..[0x007B975C] (the level object table's rooms). */
+static int wrm_room_ok(uint32_t r) { return r>=1u && r<=WORD_AT(WRM_ROOM_COUNT); }
+/* The head's room after the update. The binding (sub_001D9AF0 0x001D9B48)
+ * puts the head in room 0x18, the mission 5 garden; on a MapMaker map that is
+ * whatever tile has that index. Both damage rays (the burst at 0x001DC3E8 and
+ * the attack at 0x001DCCC1, sub_00088C60 -> sub_00088950) start from the
+ * head's +0x34, so they missed the player (v0.4.0-mapmaker.27: no damage).
+ * The head gets its spawn room (the MapMaker AI's own, kept before the bind)
+ * or, surfaced with a player within WRM_REACH, the nearest player's room. */
+static void wrm_room(uint32_t ent)
+{
+    uint32_t w=wrm_lv.state,room=wrm_lv.room,players=WORD_AT(WRM_PLAYERS),n=WORD_AT(WRM_PLAYER_N),i,r;
+    float best=WRM_REACH*WRM_REACH;
+    if(!room) return;                                  /* no spawn room: stock */
+    if(n>WRM_PLAYER_MAX) n=WRM_PLAYER_MAX;
+    for(i=0;WORD_AT(w+WRM_W_STATE)>=WRM_SURFACED && i<n && MAPMAKER_PTR_OK(players,(i+1u)*WRM_PLAYER);i++) {
+        uint32_t pl=players+i*WRM_PLAYER,pe=WORD_AT(pl+0x14u);
+        float dx=wrm_getf(pl+0xA8u)-wrm_getf(w),dy=wrm_getf(pl+0xACu)-wrm_getf(w+4u),dz=wrm_getf(pl+0xB0u)-wrm_getf(w+8u),d;
+        if((int32_t)WORD_AT(pl+4u)<0 || !MAPMAKER_PTR_OK(pe,0x40u) || !wrm_room_ok(r=WORD_AT(pe+WRM_ENT_ROOM))) continue;
+        d=dx*dx+dy*dy+dz*dz;
+        if(wrm_sane(d) && d<best) { best=d;room=r; }
+    }
+    WORD_AT(ent+WRM_ENT_ROOM)=room;WORD_AT(ent+WRM_ENT_ROOM+4u)=room;
+}
+/* Each state change (up to 48 a level per worm): state, head anim (anim +0xD4)
+ * and its done flag (+0x124, sub_00059DD0), room. */
+static void wrm_states(int k,uint32_t ent)
+{
+    uint32_t st=WORD_AT(wrm_lv.state+WRM_W_STATE),ctrl=WORD_AT(ent+4u);
+    int ok=MAPMAKER_PTR_OK(ctrl,0x130u);
+    if(st==wrm_lv.last_state) return;
+    if(wrm_lv.states++<48u && wrm.levels<160u) {
+        wrm.levels++;
+        fprintf(stderr,"[mapmaker] worm: worm %d state %u -> %u (head anim 0x%X done %u, room %u, height %.2f)\n",k,
+                (unsigned)wrm_lv.last_state,(unsigned)st,ok?(unsigned)WORD_AT(ctrl+0xD4u):0u,ok?(unsigned)WORD_AT(ctrl+0x124u):0u,
+                (unsigned)WORD_AT(ent+WRM_ENT_ROOM),(double)wrm_getf(ent+WRM_ENT_X+4u));
+        fflush(stderr);
+    }
+    wrm_lv.last_state=st;
+}
+
 /* WRAP sub_000D8E30 (cdecl entity; every character's update, slot 3): for this
  * map's worm head, the stock worm update instead of the character think. */
 void pc_mapmaker_worm_tick(void (*original)(void))
 {
-    uint32_t ent;
+    uint32_t ent,r;
     int k,prev;
     if(!wrm_n || !MAPMAKER_STACK_OK(8) || (k=wrm_worm(ent=WORD_AT(g_esp+4u)))<0) { original();return; }
     prev=wrm_enter(k);                                 /* this worm's block and heads live */
     if(!wrm_lv.ready && !wrm_lv.failed) wrm_setup(ent);
     if(wrm_lv.failed) { wrm_leave(prev);original();return; }
+    if(WORD_AT(WRM_HEADS)!=ent && wrm_room_ok(r=WORD_AT(ent+WRM_ENT_ROOM))) wrm_lv.room=r;   /* not bound yet: its own room */
     wrm_shift(1,0);
     guest_call(sub_001DAAB0,0);
     wrm_shift(0,0);
-    if(WORD_AT(WRM_HEADS)==ent && !WORD_AT(ent+WRM_SLOT3)) WORD_AT(ent+WRM_SLOT3)=WRM_CHAR_UPDATE;   /* bound: keep ticking */
+    if(WORD_AT(WRM_HEADS)==ent) {
+        if(!wrm_lv.head) wrm_log("mansion worm head room (spawn room, binding's)",wrm_lv.room,WORD_AT(ent+WRM_ENT_ROOM));
+        wrm_lv.head=ent;
+        wrm_room(ent);
+        if(!WORD_AT(ent+WRM_SLOT3)) WORD_AT(ent+WRM_SLOT3)=WRM_CHAR_UPDATE;   /* bound: keep ticking */
+    }
+    wrm_states(k,ent);
     if(!wrm.ticks++) wrm_log("mansion worm runs its story update (worm, state)",(uint32_t)k,WORD_AT(wrm_lv.state+WRM_W_STATE));
+    wrm_leave(prev);
+    MAPMAKER_GUEST_RET();
+}
+
+/* WRAP sub_001D5E20 (cdecl entity; the head's slot 12, set by the binding at
+ * 0x001D9B1A, run by sub_000A7090 when the entity goes): stock writes 4 (gone)
+ * to [0x0075B4B4] + (head +0x60 - 'WRM1') * 0x450 + 0x24. A MapMaker head's
+ * +0x60 is not 'WRM1' (the hit hook sets it only during the hit callback) and
+ * [0x0075B4B4] is the live block or none: a write far outside any block. For a
+ * map worm's head: its own worm 0 gone and its head slot cleared. */
+void pc_mapmaker_worm_gone(void (*original)(void))
+{
+    uint32_t ent,j;
+    unsigned k;
+    int prev;
+    if(!wrm_n || !MAPMAKER_STACK_OK(8)) { original();return; }
+    ent=WORD_AT(g_esp+4u);
+    for(k=0;k<wrm_n && !(ent && wrm_inst[k].head==ent && wrm_inst[k].state);k++) {}
+    if(k==wrm_n) { original();return; }
+    prev=wrm_enter((int)k);
+    WORD_AT(wrm_lv.state+WRM_W_STATE)=WRM_GONE;
+    for(j=0;j<WRM_WORMS;j++) if(WORD_AT(WRM_HEADS+j*4u)==ent) WORD_AT(WRM_HEADS+j*4u)=0;
+    wrm_lv.head=0;
+    if(wrm.gones++<4u) wrm_log("mansion worm head removed: worm gone (worm, head)",k,ent);
     wrm_leave(prev);
     MAPMAKER_GUEST_RET();
 }
@@ -657,9 +746,9 @@ static void wrm_height(void)
     if(!head || !MAPMAKER_PTR_OK(head,0x200u) || WORD_AT(w+WRM_W_STATE)<WRM_SURFACED) { wrm_lv.surfaced=0;return; }
     if(WORD_AT(w+WRM_W_ROUTE_FROM)==2u) wrm_setf(head+WRM_ENT_X+4u,wrm_getf(head+WRM_ENT_X+4u)+wrm_lv.dy);
     if(!wrm_lv.surfaced && wrm.surfacings++<8u) {
-        fprintf(stderr,"[mapmaker] worm: surfaced, state %u, head height %.2f, spawn floor %.2f, worm height %.2f%s\n",
+        fprintf(stderr,"[mapmaker] worm: surfaced, state %u, head height %.2f, spawn floor %.2f, worm height %.2f, room %u%s\n",
                 (unsigned)WORD_AT(w+WRM_W_STATE),(double)wrm_getf(head+WRM_ENT_X+4u),(double)(WRM_GROUND+wrm_lv.dy),
-                (double)wrm_getf(w+4u),WORD_AT(w+WRM_W_ROUTE_FROM)==2u?" (state-2 burst point)":"");
+                (double)wrm_getf(w+4u),(unsigned)WORD_AT(head+WRM_ENT_ROOM),WORD_AT(w+WRM_W_ROUTE_FROM)==2u?" (state-2 burst point)":"");
         fflush(stderr);
     }
     wrm_lv.surfaced=1;
