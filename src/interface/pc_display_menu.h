@@ -271,6 +271,7 @@ void pc_mapmaker_worm_props(void (*original)(void));
 void pc_mapmaker_worm_extra(void (*original)(void));
 void pc_mapmaker_worm_script(void (*original)(void));
 void pc_mapmaker_worm_register(void (*original)(void));
+void pc_mapmaker_worm_gone(void (*original)(void));
 void pc_mapmaker_mothership_mount(void (*original)(void));
 void pc_mapmaker_mothership_request(void (*original)(void));
 void pc_mapmaker_mothership_ai_start(void (*original)(void));

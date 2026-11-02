@@ -68,7 +68,7 @@ static int prev_k;
 static int pak_mounted, trophy_mounted, skeleton_mounted, mount_ok=1, alloc_ok=1, scratch_ok=1, bind=1, die;
 static unsigned nmount, nalloc, ninit, nupdate, ndraw, nrelease, neffect, npadcalls;
 static uint32_t mount_arg, scratch_size, effect_args[2], init_objects, init_route_done, refuse=0xFFFFFFFFu;
-static uint32_t seen_route[6], seen_enable, seen_wall, tag_ret[2], seen_props, seen_extra, seen_script;
+static uint32_t seen_room, seen_route[6], seen_enable, seen_wall, tag_ret[2], seen_props, seen_extra, seen_script;
 static float seen_const[11], seen_draw[2];
 static const uint32_t cad[11]={0x0047D78Cu,0x0049DF08u,0x0049DF10u,0x0049DE40u,0x0049DF0Cu,0x0047D69Cu,
                                0x0049DE3Cu,0x0049DE34u,0x0049DE38u,0x0049DDD8u,0x0049DDD4u};
@@ -132,6 +132,7 @@ static void fake_update(void)
     unsigned k;
     uint32_t ent;
     nupdate++;
+    seen_room=WORD_AT(0x0078FAE0u)?WORD_AT(WORD_AT(0x0078FAE0u)+0x34u):0u;   /* the damage rays' start room */
     for(k=0;k<11u;k++) seen_const[k]=F(cad[k]);
     for(k=0;k<6u;k++) seen_route[k]=WORD_AT(0x004FDC24u+k*4u);
     seen_block=WORD_AT(0x0075B4B4u);
@@ -147,6 +148,7 @@ static void fake_update(void)
         ent=tag_ret[0]=inner(pc_mapmaker_worm_tag,fake_tag,ESP1,0x001D9AFDu,0x57524D31u);
         if(ent) {
             WORD_AT(ent+0x160u)=0;WORD_AT(ent+0x164u)=0;WORD_AT(ent+0x19Cu)=0x001D1F30u;
+            WORD_AT(ent+0x184u)=0x001D5E20u;WORD_AT(ent+0x34u)=0x18u;WORD_AT(ent+0x38u)=0x18u;   /* slot 12, the garden room */
             SETF(ent+0x68u,F(ent+0x68u)-5.0f);
             WORD_AT(0x0078FAE0u)=ent;
         }
@@ -253,8 +255,18 @@ static void actor(unsigned i,uint32_t id,uint32_t model,float x,float y,float z)
     WORD_AT(A(i))=ENT(i);HALF_AT(A(i)+0x48u)=(uint16_t)id;WORD_AT(A(i)+0xBF0u)=REC(i);WORD_AT(A(i)+0x678u)=0xFFFFFFFFu;
     WORD_AT(ENT(i)+0x7Cu)=A(i);HALF_AT(ENT(i)+0x94u)=(uint16_t)model;
     SETF(ENT(i)+0x64u,x);SETF(ENT(i)+0x68u,y);SETF(ENT(i)+0x6Cu,z);
-    WORD_AT(ENT(i)+0x160u)=0x000D8E30u;WORD_AT(ENT(i)+0x60u)=0x1234u;
+    WORD_AT(ENT(i)+0x160u)=0x000D8E30u;WORD_AT(ENT(i)+0x60u)=0x1234u;WORD_AT(ENT(i)+0x34u)=3u;WORD_AT(ENT(i)+0x38u)=3u;
     WORD_AT(REC(i))=0x11000000u;WORD_AT(REC(i)+4u)=0;WORD_AT(REC(i)+8u)=R+i+1u;
+}
+/* human player 0 (struct at PLY, entity ENT(7) in room) */
+#define PLY 0x00680000u
+static void player(float x,float y,float z,uint32_t room,int empty)
+{
+    memset((void *)((uintptr_t)PLY+g_xbox_mem_offset),0,0x1584u);
+    WORD_AT(0x007B0C48u)=PLY;WORD_AT(0x00790950u)=1u;
+    WORD_AT(PLY+4u)=empty?0xFFFFFFFFu:0u;WORD_AT(PLY+0x14u)=ENT(7);
+    SETF(PLY+0xA8u,x);SETF(PLY+0xACu,y);SETF(PLY+0xB0u,z);
+    WORD_AT(ENT(7)+0x34u)=room;
 }
 /* pads relative to the spawn (10, 4, -20): flags bit 0 = valid */
 static const float pad_at[12][3]={{12,4,-20},{12.5f,4,-20},{10,4,-15},{5,4,-20},{10,4,-26},{16,4,-26},
@@ -330,6 +342,14 @@ static void multi(void)
     CHECK(wrm_inst[1].win[4]==0 && WORD_AT(WST+0x2000u+0x24u)==4u && wrm_inst[0].win[4]==ENT(0) && wrm_inst[2].win[4]==ENT(2));
     CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
     CHECK(seen_block==WST);
+    /* worm 3's head goes (its slot 12, sub_001D5E20): worm 3 gone, its head slot cleared, nothing else */
+    CHECK(wrm_inst[3].head==ENT(3));
+    CALL(pc_mapmaker_worm_gone,fake,0x000A70A7u,ENT(3),0,0,0);
+    CHECK(WORD_AT(WST+3u*0x2000u+0x24u)==4u && wrm_inst[3].win[4]==0 && !wrm_inst[3].head);
+    CHECK(wrm_inst[2].win[4]==ENT(2) && WORD_AT(WST+2u*0x2000u+0x24u)==0xDu && wrm_inst[0].head==ENT(0));
+    CHECK(WORD_AT(0x0075B4B4u)==0x00777000u && WORD_AT(0x0078FAE0u)==0x888u && wrm_cur==-1);
+    CALL(pc_mapmaker_worm_gone,fake,0x000A70A7u,ENT(4),0,0,1);   /* the fifth (a bot): stock */
+    CALL(pc_mapmaker_worm_gone,fake,0x000A70A7u,ENT(3),0,0,1);   /* gone already: stock */
     /* the next level: no worm */
     container(0x11,without_ids,3);
     level();
@@ -347,7 +367,7 @@ int main(void)
     uint32_t w;
     g_xbox_mem_offset=(uintptr_t)memory;
     stock_consts();stock_route();
-    WORD_AT(0x007B9784u)=OBJS;
+    WORD_AT(0x007B9784u)=OBJS;WORD_AT(0x007B975Cu)=30u;
     pads(12);
     set_env("TSFP_MAPMAKER_POOLS",NULL);
     set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);
@@ -493,6 +513,30 @@ int main(void)
     /* every later tick: the update again, no think, nothing moves */
     CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
     CHECK(nupdate==2 && near_eq(F(W(0)),10.0f) && near_eq(seen_const[1],4.001f) && consts_stock());
+    /* the head's room: the binding's 0x18 replaced by its spawn room (3), seen by the next update */
+    CHECK(wrm_inst[0].room==3u && WORD_AT(ENT(0)+0x34u)==3u && WORD_AT(ENT(0)+0x38u)==3u && seen_room==3u);
+    /* surfaced with a player within reach: his room; far, buried, empty slot or no room: the spawn's */
+    WORD_AT(W(0)+0x24u)=9u;
+    player(14.0f,4.0f,-20.0f,7u,0);
+    CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
+    CHECK(WORD_AT(ENT(0)+0x34u)==7u && WORD_AT(ENT(0)+0x38u)==7u);
+    CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
+    CHECK(seen_room==7u);
+    player(30.0f,4.0f,-20.0f,7u,0);
+    CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
+    CHECK(WORD_AT(ENT(0)+0x34u)==3u && wrm_inst[0].room==3u);
+    player(14.0f,4.0f,-20.0f,7u,1);
+    CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
+    CHECK(WORD_AT(ENT(0)+0x34u)==3u);
+    player(14.0f,4.0f,-20.0f,40u,0);                         /* past the room count (30) */
+    CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
+    CHECK(WORD_AT(ENT(0)+0x34u)==3u);
+    WORD_AT(W(0)+0x24u)=1u;
+    player(14.0f,4.0f,-20.0f,7u,0);
+    CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
+    CHECK(WORD_AT(ENT(0)+0x34u)==3u);
+    player(14.0f,4.0f,-20.0f,7u,1);
+    nupdate=2;
     /* a constant that is not stock is left alone */
     SETF(0x0049DF0Cu,1.5f);
     CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,0);
@@ -626,7 +670,7 @@ int main(void)
     CHECK(level_notes());
     container(0x11,without,3);
     level();
-    CHECK(!wrm_inst[0].record && !wrm_inst[0].state);
+    CHECK(!wrm_inst[0].record && !wrm_inst[0].state && !wrm.ticks && !wrm.draws && !wrm.logged);
     CALL(pc_mapmaker_worm_tick,fake,0x000A77E0u,ENT(0),0,0,1);
     CALL(pc_mapmaker_worm_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(consts_stock() && route_stock() && WORD_AT(0x007B9784u)==OBJS);

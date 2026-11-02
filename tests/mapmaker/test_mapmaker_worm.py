@@ -64,12 +64,26 @@ MUTATIONS = {
     'ai-class-changed': ('        wrm_inst[k].record=rec;wrm_inst[k].actor=a;', '        wrm_inst[k].record=rec;wrm_inst[k].actor=a;WORD_AT(rec)=0;'),
     'head-any-entity': ('    for(k=0;k<wrm_n;k++) if(wrm_inst[k].record && wrm_inst[k].record==rec && wrm_inst[k].state) return (int)k;', '    for(k=0;k<wrm_n;k++) if(wrm_inst[k].state) return (int)k;'),
     'head-any-scene': ('    return k>=0 && WORD_AT(WRM_SCENE)==100u && wrm_on()?k:-1;', '    return k>=0 && wrm_on()?k:-1;'),
-    'tick-thinks': ('    wrm_leave(prev);\n    MAPMAKER_GUEST_RET();', '    wrm_leave(prev);\n    original();'),
+    'tick-thinks': ('WRM_W_STATE));\n    wrm_leave(prev);\n    MAPMAKER_GUEST_RET();', 'WRM_W_STATE));\n    wrm_leave(prev);\n    original();'),
     'tick-no-update': ('    guest_call(sub_001DAAB0,0);\n', ''),
     'tick-setup-every-time': ('    if(!wrm_lv.ready && !wrm_lv.failed) wrm_setup(ent);', '    if(!wrm_lv.failed) wrm_setup(ent);'),
     'tick-failed-runs': ('    if(wrm_lv.failed) { wrm_leave(prev);original();return; }\n', ''),
     'tick-slot-lost': ('!WORD_AT(ent+WRM_SLOT3)) WORD_AT(ent+WRM_SLOT3)=WRM_CHAR_UPDATE;', '!WORD_AT(ent+WRM_SLOT3)) {}'),
-    'tick-slot-after-death': ('    if(WORD_AT(WRM_HEADS)==ent && !WORD_AT(ent+WRM_SLOT3))', '    if(!WORD_AT(ent+WRM_SLOT3))'),
+    'tick-slot-after-death': ('    if(WORD_AT(WRM_HEADS)==ent) {\n        if(!wrm_lv.head)', '    if(1) {\n        if(!wrm_lv.head)'),
+    'room-binding-kept': ('        wrm_room(ent);\n', ''),
+    'room-not-saved': ('wrm_lv.room=r;   /* not bound yet', '(void)r;   /* not bound yet'),
+    'room-saved-after-bind': ('    if(WORD_AT(WRM_HEADS)!=ent && wrm_room_ok(r=', '    if(wrm_room_ok(r='),
+    'room-any-state': ('    for(i=0;WORD_AT(w+WRM_W_STATE)>=WRM_SURFACED && i<n', '    for(i=0;i<n'),
+    'room-any-distance': ('        if(wrm_sane(d) && d<best) { best=d;room=r; }', '        if(wrm_sane(d)) { best=d;room=r; }'),
+    'room-empty-player': ('        if((int32_t)WORD_AT(pl+4u)<0 || !MAPMAKER_PTR_OK(pe,0x40u)', '        if(!MAPMAKER_PTR_OK(pe,0x40u)'),
+    'room-invalid-player': ('!wrm_room_ok(r=WORD_AT(pe+WRM_ENT_ROOM))) continue;', '!(r=WORD_AT(pe+WRM_ENT_ROOM))) continue;'),
+    'room-only-34': ('WORD_AT(ent+WRM_ENT_ROOM)=room;WORD_AT(ent+WRM_ENT_ROOM+4u)=room;', 'WORD_AT(ent+WRM_ENT_ROOM)=room;'),
+    'gone-stock': ('    if(k==wrm_n) { original();return; }\n    prev=wrm_enter((int)k);', '    if(1) { original();return; }\n    prev=wrm_enter((int)k);'),
+    'gone-unswapped': ('    prev=wrm_enter((int)k);\n    WORD_AT(wrm_lv.state+WRM_W_STATE)=WRM_GONE;', '    prev=wrm_cur;wrm_i=&wrm_inst[k];\n    WORD_AT(wrm_lv.state+WRM_W_STATE)=WRM_GONE;'),
+    'gone-state-kept': ('    WORD_AT(wrm_lv.state+WRM_W_STATE)=WRM_GONE;\n    for(j=0', '    for(j=0'),
+    'gone-heads-kept': ('    for(j=0;j<WRM_WORMS;j++) if(WORD_AT(WRM_HEADS+j*4u)==ent) WORD_AT(WRM_HEADS+j*4u)=0;\n', ''),
+    'gone-head-kept': ('    wrm_lv.head=0;\n', ''),
+    'level-counters-kept': ('    wrm.logged=wrm.extras=wrm.ticks=wrm.hits=wrm.draws=wrm.scripts=wrm.surfacings=wrm.gones=0;\n', ''),
     'shift-none': ('    wrm_shift(1,0);\n    guest_call(sub_001DAAB0,0);', '    guest_call(sub_001DAAB0,0);'),
     'shift-not-restored': ('    guest_call(sub_001DAAB0,0);\n    wrm_shift(0,0);', '    guest_call(sub_001DAAB0,0);'),
     'shift-ignores-stock-bits': ('            if(wrm_lv.saved[k]!=wrm_consts[k].bits) continue;\n', ''),
@@ -379,6 +393,23 @@ def test_update_constants_route_and_reachability():
     assert len(calls_to(0x000BB6C0)) > 50
     assert not {0x002274C0, 0x002273C0, 0x002275F0, 0x0023FF20} & reach({0x00234CD0, 0x000BB6C0})
     assert not {0x002274C0, 0x002275F0, 0x0023FF20} & reach({0x00234CD0})
+
+
+def test_head_room_and_slot12():
+    """The binding puts the head in room 0x18 (the garden) and sets slot 12 to sub_001D5E20; both damage
+    rays start from the head's +0x34 room; sub_001D5E20 writes state 4 through head +0x60 and the live
+    block; sub_000A7090 (entity removal) calls slot 12; rooms are 1..[0x007B975C]."""
+    a = by_address()
+    assert ('imm', 0x18) in a[0x001D9B3D].ops and mem(a[0x001D9B48])[0][4] == 0x34 and mem(a[0x001D9B4B])[0][4] == 0x38
+    assert ('imm', 0x001D5E20) in a[0x001D9B1A].ops and ('imm', 0xC) in a[0x001D9B1F].ops and target(a[0x001D9B22]) == 0x000A5CE0
+    for load, ray in ((0x001DC3E8, 0x001DC3F4), (0x001DCCC1, 0x001DCCCD)):
+        assert mem(a[load])[0][4] == 0x34 and mem(a[load])[0][1] == 'edi' and target(a[ray]) == 0x00088C60
+    assert mem(a[0x001D5E24])[0][4] == 0x60 and mem(a[0x001D5E27])[0][4] == 0x0075B4B4 and ('imm', 0x450) in a[0x001D5E2D].ops
+    assert calls_to(0x001D5E20) == set()
+    assert mem(a[0x000A7095])[0][4] == 0x184 and a[0x000A70A5].call
+    assert mem(a[0x000C3B46])[0][4] == 0x007B975C and mem(a[0x000C3B52])[0][4] == 0x007B9784
+    assert mem(a[0x001DAD0B])[0][4] == 0x00790950 and mem(a[0x001DAD1C])[0][4] == 0x007B0C48
+    assert ('imm', 0x1584) in a[0x001DAE7B].ops
 
 
 def test_hit_callback():
