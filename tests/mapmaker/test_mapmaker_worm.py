@@ -149,7 +149,17 @@ MUTATIONS = {
     'multi-cap-high': ('#define WRM_MAX 4u', '#define WRM_MAX 5u'),
     'multi-draw-unswapped': ('        prev=wrm_enter((int)k);\n        if(wrm_state_ok()) {', '        prev=wrm_cur;wrm_i=&wrm_inst[k];\n        if(wrm_state_ok()) {'),
     'multi-hit-unswapped': ('    prev=wrm_enter(k);\n    wrm_hit(ent,original);', '    prev=wrm_cur;\n    wrm_hit(ent,original);'),
-    'level-not-forgotten': ('    memset(wrm_inst,0,sizeof wrm_inst);               /* a new level', '    (void)0;               /* a new level'),
+    'multi3-state-log-index': ('height %.2f)\\n",k,', 'height %.2f)\\n",0,'),
+    'multi3-state-log-level': ('(unsigned)wrm_lv.last_state,(unsigned)st,wrm.serial,', '(unsigned)wrm_lv.last_state,(unsigned)st,0u,'),
+    'multi3-setup-log-index': ('z %.1f..%.1f\\n",(int)(wrm_i-wrm_inst),wrm.serial,', 'z %.1f..%.1f\\n",0,wrm.serial,'),
+    'multi3-setup-wake-unshifted': ('(double)(WRM_WAKE_X0+wrm_lv.dx)', '(double)WRM_WAKE_X0'),
+    'multi3-serial-kept': ('    wrm.serial++;\n', ''),
+    'multi3-bind-log-index': ('ent,(uint32_t)(wrm_i-wrm_inst));', 'ent,0u);'),
+    'multi3-surfaced-log-index': ('                (int)(wrm_i-wrm_inst),(unsigned)WORD_AT(w+WRM_W_STATE),', '                0,(unsigned)WORD_AT(w+WRM_W_STATE),'),
+    'multi3-shift-first-worm': ('off=wrm_consts[k].axis==0?wrm_lv.dx:', 'off=wrm_consts[k].axis==0?wrm_inst[0].dx:'),
+    'multi3-room-first-worm': ('        wrm_room(ent);\n', '        wrm_room(wrm_inst[0].head?wrm_inst[0].head:ent);\n'),
+    'multi3-fx-first-worm': ('    for(k=0;k<wrm_n;k++) {                             /* each map worm', '    for(k=0;k<1u;k++) {                             /* each map worm'),
+    'level-not-forgotten':('    memset(wrm_inst,0,sizeof wrm_inst);               /* a new level', '    (void)0;               /* a new level'),
 }
 
 
@@ -175,6 +185,41 @@ def build(tmp_path, mutation):
     return exe
 
 
+def multi3_log_problems(stderr):
+    """The 3-worm case's log (mapmaker_worm.c multi3): each worm's set-up line
+    with its own index, level and wake region, its own bind, and the state
+    lines of the worms that woke (1 and 2) under their own index. The .28
+    playtest log was misread as one worm's updates; these lines tell worms and
+    levels apart."""
+    part = stderr.split('--- multi3\n', 1)[-1].split('--- multi3 end', 1)[0]
+    if '--- multi3 end' not in stderr:
+        return ['multi3 did not finish']
+    problems = []
+    setups = re.findall(r'worm: worm (\d) \(level (\d+)\): mansion garden moved by .*? route pads; '
+                        r'buried until a player is in x (\S+)\.\.(\S+), z (\S+)\.\.(\S+)\n', part)
+    if [s[0] for s in setups] != ['0', '1', '2'] or len({s[1] for s in setups}) != 1:
+        return [f'set-up lines {setups}']
+    level = setups[0][1]
+    if level in ('0', '1'):                       # the fixture loads many worm levels before this one
+        problems.append(f'level {level}: not counted')
+    for k, (_, _, x0, x1, z0, z1) in enumerate(setups):
+        sx = 10.0 + 30.0 * k
+        want = (sx - 12.55, sx + 10.75, -20.0 - 24.65, -20.0 + 23.55)
+        if any(abs(float(a) - b) > 0.06 for a, b in zip((x0, x1, z0, z1), want)):
+            problems.append(f'worm {k} wake region {(x0, x1, z0, z1)} != {want}')
+    for k in range(3):
+        if f'mansion worm head bound (head, worm) (0x{0x00480000 + k * 0x400:X}, 0x{k:X})' not in part:
+            problems.append(f'worm {k} bind line')
+        if f'worm: worm {k} state 0 -> 1 (level {level},' not in part:
+            problems.append(f'worm {k} first state line')
+    for k in (1, 2):
+        if f'worm: worm {k} state 1 -> 9 (level {level},' not in part or f'worm: worm {k} surfaced' not in part:
+            problems.append(f'worm {k} woke but its lines are missing')
+    if 'worm: worm 0 state 1 -> 9' in part or 'worm: worm 0 surfaced' in part:
+        problems.append('worm 0 logged as woken')
+    return problems
+
+
 @pytest.mark.parametrize('mutation', ['fixed', *MUTATIONS])
 def test_mapmaker_worm(tmp_path, mutation):
     exe = build(tmp_path, mutation)
@@ -184,8 +229,9 @@ def test_mapmaker_worm(tmp_path, mutation):
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'mapmaker worm ok' in result.stdout
+        assert multi3_log_problems(result.stderr) == []
     else:
-        assert result.returncode != 0, f'{mutation} was not detected'
+        assert result.returncode != 0 or multi3_log_problems(result.stderr), f'{mutation} was not detected'
 
 
 def test_no_guest_code_table_and_no_save_byte():

@@ -496,7 +496,7 @@ for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scrol
 list (5 new sets WRAPs; sets_pick outside realbosses_pick; mapmaker-sets.md).
 Multi-boss merge (.26): 28 WRAPs (walker/skeleton/robot/crowe/tank/mothership/khallos statics
 swaps, worm anim register, sky weather); sub_000DAC30 chain: actors, realbosses,
-tank, khallos (log only). See each boss doc.
+tank, khallos (log only). See boss docs.
 .27: sets_spawn_masks (sub_00240C50): slots 11-20 get slot 1's mask;
 worm block at AI start; late walker/skel; fall drop.
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
