@@ -117,6 +117,7 @@ void pc_mapmaker_grid_lookup(void (*original)(void));
 void pc_mapmaker_grid_placement(void (*original)(void));
 void pc_mapmaker_grid_floor_sound(void (*original)(void));
 void pc_mapmaker_grid_floor_bar(void (*original)(void));
+void pc_mapmaker_grid_preview_floor(void (*original)(void));
 void pc_mapmaker_overlap_cell(void (*original)(void));
 void pc_mapmaker_stack_find(void (*original)(void));
 void pc_mapmaker_stack_cell(void (*original)(void));
