@@ -191,6 +191,56 @@ dword). System Link peers without this build see the same fallbacks.
 
 ### Play (scene 100)
 
+**Playtest v0.4.0-mapmaker.31** (`logs/m31.err`, ignored): "Sandstorm still
+isn't visible", with `grains alive 60 of 60`, view 0 flagged, player 1
+outdoors 1.00 and both texture handles set. The stock draw path (static,
+XBE; bytes checked in `test_stock_sandstorm_draw`):
+
+- **Draw (CONFIRMED).** `sub_0011BC60` -> `sub_0011B110` (type 5, view
+  flag `[0x007AC82C+4v]`): first the haze `sub_0011A930(eax 0x7F5A1E05, 8)`
+  (`0x0011B13E`), then for each grain whose age `+0x20` >= 0 one sprite
+  `sub_0001D5F0(x, y, z, colour, size, angle, 0)` with t = age/3 (life 3 s,
+  `0x0011B0E0`), size t + 1.5, angle (t + 1) x `+0x18`, colour
+  `sub_00154FE0(0x7F643C10, fade)` (`0x0011B23D`), fade
+  (sin((1-(1-t)^2) 2pi - pi/2) + 1)/2 (peak near 0.9 s). No room, zone or
+  frustum test: position and age are the only grain fields it reads (spin
+  `+0x1C` and velocity are the update's). Our grains fill every field as the
+  stock emitter does (y is up; box around the player, not behind or below).
+- **Cause: nearly transparent (CONFIRMED).** `sub_00154FE0` scales only the
+  colour's low byte (alpha) by the clamped fade (`0x00155008`, `0x00155028`):
+  a grain is at most 16 of 255 opaque. The haze weight is eax's low byte (5):
+  each quad blends four layers with alpha ((sum of layer alpha) x 5 + 1) x
+  0.125 (`0x0011AB4C..0x0011AB82`), at most 2 of 255. .31 also spread its
+  grains over 24 x 24 m and made 60 a second in the ring of 60, so each was
+  overwritten after 1 s.
+- **Story look (CONFIRMED data, INFERRED effect).** Scenes 2/26/64 use fog
+  row 7 (level `+0x14`; table `0x00515778`, 0x3C a row, `sub_0006A710`):
+  colour 0x2F210F (x2 at `sub_0011CF00`), 25..235.5 m. MapMaker's map start
+  writes the tileset's row (12..15, `sub_00311870`, `0x0023F40A`); the level
+  start applies the row (`sub_001CDE30` -> `sub_0011D3C0` -> `sub_0011D240`
+  -> `sub_0011CF00` -> `sub_00022A20`). Their light block (`+0x2C`, 15
+  floats: warm 0.72, 0.51, 0.185) is not copied (MapMaker tilesets mostly
+  have no directional light; left out).
+- **Scene-2 props (SUSPECTED main stock visual, not changed).** The four
+  `intro_sandstorm_N` models are sand sheets placed for scene 2's terrain:
+  their file headers hold centre/extent floats such as (-1.5, 4.2, 24.9) r
+  32.8 and (-41.3, -6.0, -222.4) r 58.7 (INFERRED meaning). Only a matching
+  emitter scrolls them (`sub_00153550(mat, phase, 0, 0)` -> node 0,
+  `0x0011AF5E`), sets instance alpha `+0x1FA` = gust x 127 and flag
+  `+0x1F6` 0x20 (`0x0011AF9D..0x0011AFAB`). Moving them to the player needs
+  the per-room prop lists (`sub_000A79B0`, a prop is drawn only when listed
+  in a drawn room, `sub_0009FBE0` lists it from its box at `+0x64`): not
+  attempted blind. The probe logs where they are and their alpha.
+- **Fix (.32):** `smx_sand_live()` (armed by us, scene 100, flag set) gates
+  all three. haze (WRAP `sub_0011A930`, return `0x0011B143` only): weight 5
+  -> 0x50 (quad alpha up to 40). grain_colour (WRAP `sub_00154FE0`, return
+  `0x0011B247` and colour 0x7F643C10 only): alpha 0x10 -> 0x60. level (after
+  the map start): fog row 7 in scene 100's level entry `+0x14`. Grains: one
+  per two update steps (30 a second, a 2 s life in the ring: fade 0.12 when
+  replaced), at most 4 a frame, in a 10 x 10 m box 4 m upwind, y -0.7..2.3 m.
+  Snow (`0x0011B95C`, `0x0011BBA2`), menus, scene 2/26/64 and maps without
+  the sandstorm keep the stock values.
+
 **Playtest v0.4.0-mapmaker.28** (`logs/m28-sand.err`, ignored): the extra
 skies render; "Sandstorm does not appear to be working". The log has the
 paks mounted, the flag and models, scene 2's type-5 list kept and every
@@ -417,6 +467,8 @@ WRAP sub_00045DE0 -> pc_mapmaker_skymusic_music          (new in .25; register a
 WRAP sub_00119AB0 -> pc_mapmaker_skymusic_weather_list   (NEW after .25; cdecl count, list; one caller 0x0006E87A; edits its two stack arguments before the original)
 WRAP sub_0011D2C0 -> pc_mapmaker_skymusic_sky_built      (NEW after .25; cdecl view; one caller 0x000CC961; probe after the original)
 WRAP sub_0011BBC0 -> pc_mapmaker_skymusic_weather_frame  (NEW after .25; weather frame update, no args, every frame; callers 0x001CE55F/0x001CE596; .28 fix: sandstorm maps only, hides the emitter rooms during the original, then adds grains; one compare when no sandstorm)
+WRAP sub_0011A930 -> pc_mapmaker_skymusic_haze           (NEW after .31; register argument eax = colour | weight, must see the guest g_eax at entry; return-address test 0x0011B143; edits eax before the original)
+WRAP sub_00154FE0 -> pc_mapmaker_skymusic_grain_colour   (NEW after .31; cdecl colour, fade; many callers (menus too), return-address test 0x0011B247 first; edits its first stack argument before the original)
 ```
 
 All call their original exactly once (no `MAPMAKER_GUEST_RET`). Guest
@@ -460,7 +512,13 @@ order:
   1st, 60th and 600th frame of a sandstorm level (type 5 draws), each
   followed by `sandstorm drawn: grains alive A of 60 (this frame N, level L),
   views flagged a b c d, player 1 outdoors X, textures 0x303 H 0x328 H,
-  scene-2 props ...`.
+  scene-2 props ...`, then `sandstorm grain G: pos x y z velocity .. angle
+  .. spin .. age A; player 1 at x y z` (the newest grain), `sandstorm haze:
+  view 0 layer 0 offset .. depth D alpha H; weight 80 (stock 5), grain
+  alpha 0x60 (stock 0x10), boosted draws haze N grains M, fog row 7
+  (tileset's T)` and four `scene-2 prop K: 0x.. at x y z, rooms R, instance
+  0x.. alpha A flags 0x..` (or `none`);
+- `map start: sandstorm fog row (row, tileset's row) (7, T)`.
 
 Reading the next log: no `map has extra sky` line = the map's row bits are
 not seen in play; `mounted` but no `map start` line = the map start did not
@@ -472,7 +530,12 @@ run the hook; `map start` with record R but `sky built: record` other than R
 mask, draw distance), not assets. Sandstorm: `grains alive 0` with `player 1
 outdoors 0.00` = the player stood indoors (the rain test); grains alive but
 `views flagged 0` = the stock player test failed; a texture handle of
-0xFFFFFFFF or 0 = the global grain/haze texture is not loaded.
+0xFFFFFFFF or 0 = the global grain/haze texture is not loaded; `boosted
+draws haze 0 grains 0` = the two new wrappers are not wired (or the stock
+draw did not run); a grain more than 10 m from `player 1 at` or with age
+past 3 = placement or the update; haze `alpha 0.00` while outdoors = the
+haze layers (`sub_00117D60`) are faded by the view vectors; `fog row` not 7
+= the map start did not run the hook.
 
 ## What the user tests
 
@@ -495,9 +558,22 @@ outdoors 0.00` = the player stood indoors (the rain test); grains alive but
    plays with the MapMaker twin sky, tileset music and no weather; no crash.
 6. Story smoke test afterwards: scene 2 (sandstorm, intro sky) and one level
    using a sky from the table look as before (the emitter rooms are hidden
-   only during a MapMaker sandstorm frame).
+   only during a MapMaker sandstorm frame; the haze, grain alpha and fog
+   changes apply only to scene 100).
+7. Sandstorm (.32): outdoors, sand puffs drift past within a few metres and a
+   sandy haze scrolls across the view; distant tiles take a brown fog;
+   indoors no puffs (the haze fades with the rain test). A snow map and the
+   menus look as before. Send the `sandstorm grain`, `sandstorm haze` and
+   `scene-2 prop` lines.
 
 ## Not verified / risks
+
+- Sandstorm (.32, not played): the alpha values (grains 0x60, haze weight
+  0x50) are chosen, not taken from a stock level; too strong or too faint is
+  a constant change. The story sandstorm's sheets (the scene-2 props) are
+  still not shown in MapMaker, so it looks like puffs, haze and fog rather
+  than drifting sand curtains. Fog row 7 is fainter at mid range than some
+  tilesets' own rows (12: 27.9..90 m), so the fog change is mostly colour.
 
 - Played (.25, .27): music works; skies not or partly drawn, the textures
   pak fix (.27 cause above) is not played yet. Unknowns: that index-only

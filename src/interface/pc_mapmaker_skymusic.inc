@@ -42,7 +42,10 @@
  *    (created at the origin, 0x00118A0C). The grains (60 x 0x24 ring
  *    [0x007AC874], index [0x007AC878]) age and move in sub_0011ACF0 and are
  *    drawn by sub_0011B110 (texture 0x303) in each view whose flag
- *    [0x007AC82C+4v] the haze update (sub_0011A600) set.
+ *    [0x007AC82C+4v] the haze update (sub_0011A600) set: first the 8 haze
+ *    layers (sub_0011A930, texture 0x328), then one sprite per grain
+ *    (sub_0001D5F0: position, colour sub_00154FE0(0x7F643C10, fade), size
+ *    age/3 + 1.5, angle). Scenes 2/26/64 use fog row 7 (level +0x14).
  *
  * With TSFP_MAPMAKER_LIMITS=1:
  *  - rows (WRAP sub_00078590, the three bind return addresses, scene 102):
@@ -75,7 +78,11 @@
  *    sub_0011BBC0) hides scene 2's emitter rooms while the stock frame runs
  *    (MapMaker rooms are piece numbers: a stray match would fade in scene 2's
  *    props at the origin) and then blows grains around each outdoor player
- *    into the stock ring, which the stock code ages, moves and draws;
+ *    into the stock ring, which the stock code ages, moves and draws; the
+ *    stock draw is nearly transparent (grain alpha 16/255, haze quads 2/255),
+ *    so haze (WRAP sub_0011A930) and grain_colour (WRAP sub_00154FE0) raise
+ *    the alpha of the sandstorm's own two calls (return-address tests), and
+ *    the map start (level, above) gives the map scene 2's fog row 7;
  *    music (WRAP sub_00045DE0)
  *    plays the extra track when the map's index is -1.
  * A stock or older build loads such a map with the fallbacks. Requires the
@@ -144,8 +151,16 @@
 #define SMX_TEX_GLOBAL 0x004D2D64u           /* sub_00080F20: handle of global texture id at + id*0x18 */
 #define SMX_TEX_GRAIN 0x303u
 #define SMX_TEX_HAZE 0x328u
-#define SMX_GRAIN_SPREAD 12.0f               /* metres around the player */
-#define SMX_GRAIN_UPWIND 6.0f
+#define SMX_GRAIN_SPREAD 5.0f                /* metres around the player (.31: 12, too sparse to see) */
+#define SMX_GRAIN_UPWIND 4.0f
+#define SMX_GRAIN_EVERY 2u                   /* update steps per grain: 30/s, a 2 s life in the 60 ring */
+#define SMX_RET_HAZE 0x0011B143u             /* sub_0011B110 -> sub_0011A930(eax 0x7F5A1E05, 8 layers) */
+#define SMX_RET_GRAIN_COLOUR 0x0011B247u     /* sub_0011B110 -> sub_00154FE0(0x7F643C10, fade) per grain */
+#define SMX_GRAIN_COLOUR 0x7F643C10u         /* sand R G B, alpha 0x10 (low byte) */
+#define SMX_GRAIN_ALPHA 0x60u                /* MapMaker grain alpha (stock 0x10: 6% at the peak) */
+#define SMX_HAZE_ALPHA 0x50u                 /* MapMaker haze weight (stock 5: quad alpha <= 2 of 255) */
+#define SMX_LEVEL_FOG 0x14u                  /* level entry: fog row of 0x00515778 (0x3C each, sub_0006A710) */
+#define SMX_SAND_FOG 7u                      /* scenes 2/26/64: colour 0x2F210F, 25..235.5 m */
 static const float smx_wind[3]={0.53f,0.0f,-0.85f};   /* scene 2 emitter 1 (+0x18) */
 #define SMX_PATH_MAX 32u
 #define SMX_SCAN 0x00080000u
@@ -191,6 +206,9 @@ static struct {
     int sand_ready;                          /* this level: the sandstorm pak is mounted */
     int sand_on;                             /* this level: sandstorm flag set by us */
     uint32_t grains;                         /* this level: grains emitted */
+    uint32_t sand_steps;                     /* update steps not yet turned into grains */
+    uint32_t haze_boosts, grain_boosts;      /* this level: sandstorm draws made more opaque */
+    uint32_t tileset_fog;                    /* this level: the fog row the map start chose */
     uint32_t rng;                            /* host generator: the guest's stays untouched */
     unsigned long long rows, logged;
 } smx;
@@ -395,13 +413,33 @@ void pc_mapmaker_skymusic_mount(void (*original)(void))
     mapmaker_sky.extra_ready=0;mapmaker_sky.extra_prepare=smx_prepare_sky;
     smx.sky_row=0;smx.sand_ready=0;smx.sand_on=0;smx.level_logs=0;smx.frames=0;
     smx.tex_total=0;smx.tex_loaded=0;smx.grains=0;
+    smx.sand_steps=SMX_GRAIN_EVERY-1u;smx.haze_boosts=0;smx.grain_boosts=0;smx.tileset_fog=0;
     if(pending==100u && smx_on()) smx_log("new MapMaker level (scene now, mounted paks)",smx_scene(),WORD_AT(SMX_MOUNTS));
+}
+
+/* The sandstorm may be drawn this frame: armed by us this level (TSFP_MAPMAKER_LIMITS
+ * on, a sandstorm map), scene 100 and the stock flag still set. */
+static int smx_sand_live(void) { return smx.sand_on==1 && smx_scene()==100u && WORD_AT(SMX_SANDSTORM); }
+
+/* After the map start: a sandstorm map gets scene 2's fog row. The map start
+ * writes the tileset's row (sub_00311870, 0x0023F40A) into scene 100's level
+ * entry +0x14; the level start applies the row (sub_001CDE30 -> sub_0011D3C0
+ * -> sub_0011D240: copy of 0x00515778 + row*0x3C to 0x007AC760, then
+ * sub_0011CF00 -> sub_00022A20 colour, near, far), and so does a restart
+ * (sub_001CDD60). The next map start writes the tileset's row again. */
+static void smx_sand_fog(void)
+{
+    if(!smx_sand_live()) return;
+    smx.tileset_fog=WORD_AT(SMX_LEVEL100+SMX_LEVEL_FOG);
+    WORD_AT(SMX_LEVEL100+SMX_LEVEL_FOG)=SMX_SAND_FOG;
+    smx_log("map start: sandstorm fog row (row, tileset's row)",SMX_SAND_FOG,smx.tileset_fog);
 }
 
 /* WRAP sub_0023F390 (map start: level sky, weather, fog from the info chunk;
  * no args). An extra sky is put in info +0x10 while it runs, so the stock
- * code sets the level's sky and requests its model before the load pass. */
-void pc_mapmaker_skymusic_level(void (*original)(void))
+ * code sets the level's sky and requests its model before the load pass.
+ * A sandstorm map then gets the story sandstorm's fog (smx_sand_fog). */
+static void smx_level_sky(void (*original)(void))
 {
     uint32_t info=smx_play_info(),k,model;
     int old;
@@ -424,6 +462,11 @@ void pc_mapmaker_skymusic_level(void (*original)(void))
     original();
     smx_set16(info+SMX_INFO_SKY,(uint32_t)old);
     smx_log("map start: level sky record after, model requested",WORD_AT(SMX_LEVEL100+0x10u),model);
+}
+void pc_mapmaker_skymusic_level(void (*original)(void))
+{
+    smx_level_sky(original);
+    smx_sand_fog();
 }
 
 /* 1 when the texture id is in the loaded-texture table (sub_00018B90 looks
@@ -567,17 +610,26 @@ static float smx_rand(void)                  /* [0, 1) */
 }
 /* Sand grains for a MapMaker map, written into the stock ring as the stock
  * emitter does (0x0011ADE6..0x0011AED7): position, velocity = wind x 6 with
- * jitter, 0..1.2 up, a random angle and spin, age 0. One grain per update
- * step for each player the weather runs for (the stock player test) and who
- * is outdoors ([0x007AC844+4p] > 0, the stock rain test sub_00119B50), in a
- * box around the player, upwind so the grains blow past. Returns the count. */
+ * jitter, 0..1.2 up, a random angle and spin, age 0. One grain per
+ * SMX_GRAIN_EVERY update steps (at most 4 a frame) for each player the
+ * weather runs for (the stock player test) and who is outdoors
+ * ([0x007AC844+4p] > 0, the stock rain test sub_00119B50), in a 10 m box
+ * around the player, upwind so the grains blow past. The draw
+ * (sub_0011B110) needs no room or zone: a grain is a sprite of size
+ * age/3 + 1.5 m at its position whose alpha rises and falls over its 3 s
+ * life (peak near 0.9 s). .31 made one per step: 60 a second in a ring of
+ * 60, so each was overwritten after 1 s, spread over 24 x 24 m. Returns the
+ * count. */
 static uint32_t smx_sand_emit(void)
 {
     uint32_t ring=WORD_AT(SMX_WX_BUF2),base=WORD_AT(SMX_PLAYERS),n=WORD_AT(SMX_PLAYERS_N),steps=WORD_AT(SMX_STEPS);
     uint32_t p,i,pl,flags,g,e,made=0;
     float x,y,z,s;
     if(!MAPMAKER_PTR_OK(ring,SMX_GRAINS*SMX_GRAIN) || (int32_t)steps<=0) return 0;
-    if(steps>4u) steps=4u;
+    if(steps>4u*SMX_GRAIN_EVERY) steps=4u*SMX_GRAIN_EVERY;
+    steps+=smx.sand_steps%SMX_GRAIN_EVERY;
+    smx.sand_steps=steps%SMX_GRAIN_EVERY;
+    steps/=SMX_GRAIN_EVERY;                  /* grains per player this frame */
     if(n>SMX_PLAYERS_MAX) n=SMX_PLAYERS_MAX;
     if(!smx.rng) smx.rng=0x5A4D5358u;
     for(p=0;p<n;p++) {
@@ -617,7 +669,9 @@ static uint32_t smx_sand_emit(void)
  * levels. Then, while the entry has type 5, our grains (smx_sand_emit). Logs,
  * on the 1st, 60th and 600th frame of the level, the list, the entry's type,
  * the flag, the buffers, and what is drawn: live grains, views flagged for
- * the draw, player 1's exposure and the grain/haze texture handles. */
+ * the draw, player 1's exposure and the grain/haze texture handles, then
+ * smx_sand_probe. */
+static void smx_sand_probe(void);
 void pc_mapmaker_skymusic_weather_frame(void (*original)(void))
 {
     uint32_t list,index,type,k,alive=0,made=0,rooms[SMX_SAND_EMITTER_COUNT*SMX_SAND_ROOM_SLOTS],ring;
@@ -645,7 +699,72 @@ void pc_mapmaker_skymusic_weather_frame(void (*original)(void))
             (double)FLOAT_AT(SMX_WX_EXPOSED),WORD_AT(SMX_TEX_GLOBAL+SMX_TEX_GRAIN*0x18u),WORD_AT(SMX_TEX_GLOBAL+SMX_TEX_HAZE*0x18u),
             WORD_AT(SMX_SAND_EMITTERS+SMX_SAND_PROP),WORD_AT(SMX_SAND_EMITTERS+0x44u+SMX_SAND_PROP),
             WORD_AT(SMX_SAND_EMITTERS+0x88u+SMX_SAND_PROP),WORD_AT(SMX_SAND_EMITTERS+0xCCu+SMX_SAND_PROP));
+    smx_sand_probe();
     fflush(stderr);
+}
+
+/* Frame probe: the newest grain's fields, view 0's first haze layer, the
+ * boosted draws and the fog row, and the four scene-2 props (position +0x64,
+ * instance +4: alpha byte +0x1FA, flags +0x1F6, which only the stock emitter
+ * code sets, 0x0011AF9D/0x0011AFAB). */
+static void smx_sand_probe(void)
+{
+    uint32_t ring=WORD_AT(SMX_WX_BUF2),haze=WORD_AT(SMX_WX_BUF1),pl=WORD_AT(SMX_PLAYERS),k,g,prop,inst;
+    g=(WORD_AT(SMX_WX_RING)+SMX_GRAINS-1u)%SMX_GRAINS;
+    if(MAPMAKER_PTR_OK(ring,SMX_GRAINS*SMX_GRAIN)) {
+        uint32_t e=ring+g*SMX_GRAIN;
+        fprintf(stderr,"[mapmaker] skymusic: sandstorm grain %u: pos %.2f %.2f %.2f velocity %.2f %.2f %.2f angle %.2f spin %.2f age %.2f",
+                g,(double)FLOAT_AT(e),(double)FLOAT_AT(e+4u),(double)FLOAT_AT(e+8u),(double)FLOAT_AT(e+0x0Cu),(double)FLOAT_AT(e+0x10u),
+                (double)FLOAT_AT(e+0x14u),(double)FLOAT_AT(e+0x18u),(double)FLOAT_AT(e+0x1Cu),(double)FLOAT_AT(e+0x20u));
+        if(MAPMAKER_PTR_OK(pl,SMX_PL_POS+12u))
+            fprintf(stderr,"; player 1 at %.2f %.2f %.2f",(double)FLOAT_AT(pl+SMX_PL_POS),(double)FLOAT_AT(pl+SMX_PL_POS+4u),(double)FLOAT_AT(pl+SMX_PL_POS+8u));
+        fputc('\n',stderr);
+    }
+    fprintf(stderr,"[mapmaker] skymusic: sandstorm haze: view 0 layer 0 offset %.2f %.2f depth %.2f alpha %.2f; weight %u (stock 5), "
+            "grain alpha 0x%02X (stock 0x10), boosted draws haze %u grains %u, fog row %u (tileset's %u)\n",
+            MAPMAKER_PTR_OK(haze,0x30u)?(double)FLOAT_AT(haze):0.0,MAPMAKER_PTR_OK(haze,0x30u)?(double)FLOAT_AT(haze+4u):0.0,
+            MAPMAKER_PTR_OK(haze,0x30u)?(double)FLOAT_AT(haze+8u):0.0,MAPMAKER_PTR_OK(haze,0x30u)?(double)FLOAT_AT(haze+0x2Cu):0.0,
+            SMX_HAZE_ALPHA,SMX_GRAIN_ALPHA,smx.haze_boosts,smx.grain_boosts,WORD_AT(SMX_LEVEL100+SMX_LEVEL_FOG),smx.tileset_fog);
+    for(k=0;k<SMX_SAND_EMITTER_COUNT;k++) {
+        prop=WORD_AT(SMX_SAND_EMITTERS+k*0x44u+SMX_SAND_PROP);
+        if(!MAPMAKER_PTR_OK(prop,0x70u)) { fprintf(stderr,"[mapmaker] skymusic: scene-2 prop %u: none (0x%08X)\n",k+1u,prop);continue; }
+        inst=WORD_AT(prop+4u);
+        fprintf(stderr,"[mapmaker] skymusic: scene-2 prop %u: 0x%08X at %.2f %.2f %.2f, rooms %d, instance 0x%08X alpha %d flags 0x%04X\n",
+                k+1u,prop,(double)FLOAT_AT(prop+0x64u),(double)FLOAT_AT(prop+0x68u),(double)FLOAT_AT(prop+0x6Cu),(int)(int8_t)*smx_byte(prop+0x30u),
+                inst,MAPMAKER_PTR_OK(inst,0x200u)?(int)*smx_byte(inst+0x1FAu):-1,MAPMAKER_PTR_OK(inst,0x200u)?(unsigned)(smx_byte(inst+0x1F6u)[0]|smx_byte(inst+0x1F6u)[1]<<8):0u);
+    }
+}
+
+/* WRAP sub_0011A930 (the weather haze: eax = colour 0xRRGGBB00 | weight,
+ * [esp+4] layers; sandstorm 0x7F5A1E05 from 0x0011B13E, snow 0x60707F05 /
+ * 0x60707Fxx). Each quad blends four layers; its alpha is
+ * ((sum of layer alpha) x weight + 1) / 8 (0x0011AB4C..0x0011AB82), at most
+ * 2 of 255 for the sandstorm's weight 5. On a MapMaker sandstorm map the
+ * sandstorm's call gets SMX_HAZE_ALPHA (at most 40); snow and story levels
+ * keep theirs. */
+void pc_mapmaker_skymusic_haze(void (*original)(void))
+{
+    if(MAPMAKER_PTR_OK(g_esp,4u) && WORD_AT(g_esp)==SMX_RET_HAZE && smx_sand_live() && (g_eax&0xFFu)<SMX_HAZE_ALPHA) {
+        g_eax=(g_eax&0xFFFFFF00u)|SMX_HAZE_ALPHA;
+        smx.haze_boosts++;
+    }
+    original();
+}
+
+/* WRAP sub_00154FE0 (cdecl colour, fade: the colour's low byte, its alpha,
+ * times fade clamped to 0..1; menus use it too). The grain draw calls it for
+ * each live grain with 0x7F643C10 (0x0011B23D): alpha 16 of 255 at the
+ * peak, so .31's grains were drawn but nearly transparent. On a MapMaker
+ * sandstorm map that call gets SMX_GRAIN_ALPHA; every other caller, scene
+ * and colour is untouched. The caller pops its own arguments and does not
+ * read the colour again. */
+void pc_mapmaker_skymusic_grain_colour(void (*original)(void))
+{
+    if(MAPMAKER_PTR_OK(g_esp,12u) && WORD_AT(g_esp)==SMX_RET_GRAIN_COLOUR && WORD_AT(g_esp+4u)==SMX_GRAIN_COLOUR && smx_sand_live()) {
+        WORD_AT(g_esp+4u)=(SMX_GRAIN_COLOUR&0xFFFFFF00u)|SMX_GRAIN_ALPHA;
+        smx.grain_boosts++;
+    }
+    original();
 }
 
 /* WRAP sub_00045DE0 (start the level music: eax = music id, -1 = the

@@ -6,7 +6,7 @@ Each area's full wrapper list and history is in its `docs/mapmaker/mapmaker-<are
 More boss areas (2026-11-01): `khallos` (id 0x33 chair prop 0x376; .28 WRAP sub_00045670),
 `worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`; wrapper
 lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
-sky/sand/music, +mem paks, MM sand grains; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
+sky/sand/music, +mem paks, MM sand grains, .32 grain/haze alpha + fog row 7; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
 for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll
 list (mapmaker-sets.md).
 Multi-boss merge (.26): 28 WRAPs (walker/skeleton/robot/crowe/tank/mothership/khallos statics
