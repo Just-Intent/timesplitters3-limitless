@@ -1,4 +1,4 @@
-"""MapMaker rooms 200 -> 255: C policy fixture with mutations, plus the guest-code table's shape."""
+"""MapMaker rooms 200 -> 255 pieces, room machinery for 511: C policy fixture with mutations, plus the guest-code table's shape."""
 import json
 import os
 from pathlib import Path
@@ -95,8 +95,10 @@ def define(name):
     raise AssertionError(name)
 
 
-ID_SPACE = 0x10D                      # room ids 0..0x10C: real 1..0xFF, spare 0x100, players, views, global
-GLOBAL = 0x10C
+ID_SPACE = 0x20D                      # room ids 0..0x20C: real 1..0x1FF, spare 0x200, players, views, global
+GLOBAL = 0x20C
+SHIFT = GLOBAL - 0xD5                  # stock special id -> new
+FLAG_BYTES = (ID_SPACE + 2 + 3) & ~3  # [0x7B977C]: the id space plus the clear's stosw, dword-rounded
 
 
 def by_id(patches):
@@ -115,22 +117,22 @@ def test_table_shape():
     relocs = [p for p in patches if p['kind'] == 'relocate']
     # code entries: only the two stage-6 word loads (test_mapmaker_rooms_buckets.py decodes them)
     assert sorted(p['address'] for p in patches if p['kind'] not in ('operand', 'relocate')) == ['0x000864F4', '0x00086644']
-    # special ids move by 0x37 to 0x100..0x10C (above every byte), nothing else in between
+    # special ids move by SHIFT to 0x200..0x20C (above every real room), nothing else in between
     specials = [p for p in ops if 'room special id' in p['reason']]
     for p in specials:
         old, new = p['reason'].split('room special id ')[1].split(' (')[0].split(' -> ')
-        assert int(new, 16) - int(old, 16) == 0x37 and int(p['value'], 16) == int(new, 16), p
+        assert int(new, 16) - int(old, 16) == SHIFT and int(p['value'], 16) == int(new, 16), p
     by_value = lambda v: [p for p in specials if int(p['value'], 16) == v]
     assert len(by_value(GLOBAL)) == 98        # global room (+ light row width, list cap)
-    assert len(by_value(0x101)) == 19 and len(by_value(0x105)) == 11 and len(by_value(0x106)) == 3
+    assert len(by_value(0xCA + SHIFT)) == 19 and len(by_value(0xCE + SHIFT)) == 11 and len(by_value(0xCF + SHIFT)) == 3
     assert len(by_value(ID_SPACE)) == 12      # id-space counts
     assert len(specials) == 98 + 19 + 11 + 3 + 12
     players = [p for p in ops if p['reason'].endswith('player index = room - first player id')]
-    assert len(players) == 9 and {int(p['value'], 16) for p in players} == {(-0x101) & 0xFFFFFFFF}
-    real = [p for p in ops if 'last real room 200 -> 255' in p['reason']]
-    assert len(real) == 21 and all(int(p['value'], 16) == define('MAPMAKER_ROOMS_IDS_REAL') == 0xFF for p in real)
-    assert define('MAPMAKER_ROOMS_MAX') <= define('MAPMAKER_ROOMS_IDS_REAL') < 0x100
-    assert not [p for p in ops if '241' in p['reason'] or ' -> 0xFE' in p['reason'] or ' -> 0xF3' in p['reason']]
+    assert len(players) == 9 and {int(p['value'], 16) for p in players} == {(-(0xCA + SHIFT)) & 0xFFFFFFFF}
+    real = [p for p in ops if 'last real room 200 -> 511' in p['reason']]
+    assert len(real) == 21 and all(int(p['value'], 16) == define('MAPMAKER_ROOMS_IDS_REAL') == 0x1FF for p in real)
+    assert define('MAPMAKER_ROOMS_MAX') <= define('MAPMAKER_ROOMS_IDS_REAL') == GLOBAL - 0xD
+    assert not [p for p in ops if '241' in p['reason'] or ' -> 0xFE' in p['reason'] or ' -> 0xF3' in p['reason'] or ' -> 0x10C' in p['reason'] or ' -> 0x101' in p['reason']]
     # every new table lies in this area's sub-range, without overlap
     spans = sorted((int(r['new'], 16), int(r['new'], 16) + int(r['new_size'], 16), r['id']) for r in relocs)
     for lo, hi, rid in spans:
@@ -180,8 +182,8 @@ def id_space_problems(patches):
     need(all(b - a >= ID_SPACE * 4 for a, b in zip(bases, bases[1:])), 'per-id table step')
     need(v('0x0009E4E6') == ID_SPACE * 4 and v('0x000A1ED5') == GLOBAL * 4, 'per-id loop ends')
     # per-id flag bytes [0x7B977C]: allocation, clear (dwords + a stosw) and the special displacements
-    need(v('0x0008A6FD') == v('0x0008BA63') == 0x110 and ID_SPACE <= 4 * v('0x00089734') + 2 <= 0x110, 'id flag bytes')
-    need((v('0x00089746'), v('0x00089756'), v('0x00089776')) == (GLOBAL, 0x101, 0x106), 'id flag displacements')
+    need(v('0x0008A6FD') == v('0x0008BA63') == FLAG_BYTES and ID_SPACE <= 4 * v('0x00089734') + 2 <= FLAG_BYTES, 'id flag bytes')
+    need((v('0x00089746'), v('0x00089756'), v('0x00089776')) == (GLOBAL, 0xCA + SHIFT, 0xCF + SHIFT), 'id flag displacements')
     # per-id drawn flag (stage 2)
     need(int(r['rooms-reloc-f-0x7b5180']['new_size'], 16) >= ID_SPACE * 4, 'drawn flag table')
     # light heads [3][0x10C]: base, the clear loop (count, stride, start at row 0's last entry, end)
@@ -221,7 +223,7 @@ def id_space_problems(patches):
     need(6 * stride + 8 <= v('0x000C61D3'), 'view array allocation')
     need(int(r['rooms-reloc-v-0x749890']['new_size'], 16) >= stride, 'front-end static view: one stride')
     # model table: room models 0x908..0x907+255 (0xA06), 0x18-byte per-model array, bounds
-    need(v('0x002427C3') * 2 == 0xA08 > 0x907 + define('MAPMAKER_ROOMS_IDS_REAL'), 'model table clear')
+    need(v('0x002427C3') * 2 == 0xA08 > 0x907 + define('MAPMAKER_ROOMS_MAX'), 'model table clear')   # stage 10: all real rooms
     need(all(v(a) == 0xA08 for a in ('0x000A5E4E', '0x001B59B8', '0x001B5C09', '0x001B618E')), 'model bounds')
     need(v('0x0008392D') == 0xA08 * 0x18 and v('0x00083947') * 4 == v('0x0008392D'), 'per-model array')
     need(define('MAPMAKER_ROOMS_MODEL_TABLE') + 0xA08 * 2 <= int(r['rooms-reloc-lb-0x73d910']['new'], 16), 'model table end')
