@@ -53,8 +53,11 @@ MUTATIONS = {
                             '    MAPMAKER_GUEST_RET();\n}\n\n/* ---- logic tags'),
     'tele-any-scene': ('    if(!mapmaker_objects_scene(100u)) { original(); return; }\n    save_registers(&r);\n    mapmaker_limits_read();',
                        '    save_registers(&r);\n    mapmaker_limits_read();'),
-    'tele-stock-pool-assumed': ('links=mapmaker_limits.pools?MAPMAKER_LIMIT_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;',
-                                'links=MAPMAKER_LIMIT_LINKS;'),
+    'tele-stock-pool-assumed': ('links=mapmaker_limits.pools?MAPMAKER_POOL_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;',
+                                'links=MAPMAKER_POOL_LINKS;'),
+    # The editor limit is not the pool: past it the teleporters still get links.
+    'tele-editor-limit-as-pool': ('links=mapmaker_limits.pools?MAPMAKER_POOL_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;',
+                                  'links=mapmaker_limits.pools?MAPMAKER_LIMIT_LINKS:MAPMAKER_OBJECTS_STOCK_LINKS;'),
     'tag-not-guarded': ('mapmaker_objects_tags_full()) {', '0) {'),
     'tag-stock-cap': ('#define MAPMAKER_OBJECTS_TAGS_CAP 1000u', '#define MAPMAKER_OBJECTS_TAGS_CAP 250u'),
     'tag-no-serial': ('        WORD_AT(0x00519750u)++;\n', '\n'),

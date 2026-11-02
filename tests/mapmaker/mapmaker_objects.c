@@ -292,9 +292,12 @@ int main(void)
             CHECK(links[k][0]==want[k][0]+0x100u && links[k][1]==want[k][1]+0x100u);
         CHECK(WORD_AT(0x007B6660u)==111u);
     }
-    WORD_AT(0x007B6660u)=MAPMAKER_LIMIT_LINKS-2u;nlinks=0;            /* link pool nearly full */
+    WORD_AT(0x007B6660u)=MAPMAKER_POOL_LINKS-2u;nlinks=0;             /* link pool nearly full */
     HOOK(pc_mapmaker_objects_teleporters,fake_original);
-    CHECK(nlinks==2 && WORD_AT(0x007B6660u)==MAPMAKER_LIMIT_LINKS);
+    CHECK(nlinks==2 && WORD_AT(0x007B6660u)==MAPMAKER_POOL_LINKS);
+    WORD_AT(0x007B6660u)=MAPMAKER_LIMIT_LINKS+3u;nlinks=0;            /* past the editor limit, pool not full */
+    HOOK(pc_mapmaker_objects_teleporters,fake_original);
+    CHECK(nlinks==11);
     set_env("TSFP_MAPMAKER_POOLS","0");WORD_AT(0x007B6660u)=4399u;nlinks=0; /* stock link pool */
     HOOK(pc_mapmaker_objects_teleporters,fake_original);
     CHECK(nlinks==1);

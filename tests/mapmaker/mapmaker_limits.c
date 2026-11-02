@@ -104,12 +104,12 @@ int main(void)
     WORD_AT(0x007B6664u)=7;WORD_AT(0x007B666Cu)=9;
     { uint32_t s_=g_esp; pc_display_mapmaker_pools(fake_pools); CHECK(g_esp==s_+4u); g_esp=s_; }
     CHECK(originals==0 && allocs==5);
-    CHECK(alloc_size[0]==8000u*32u && alloc_size[1]==(12000u+16u*255u+256u)*20u && alloc_size[2]==8000u*44u &&
+    CHECK(alloc_size[0]==8000u*32u && alloc_size[1]==32512u*20u && alloc_size[2]==8000u*44u &&
           alloc_size[3]==10496u*32u && alloc_size[4]==0x280u);
     CHECK(alloc_heap[0]==1 && alloc_heap[4]==1);
     CHECK(alloc_size[1]/20u<=0x7FFFu);                                  /* int16 A* link indices */
     CHECK(WORD_AT(0x00715F2Cu)==0x00500000u && WORD_AT(0x00715F30u)==0x00500000u+8000u*32u);
-    CHECK(WORD_AT(WORD_AT(0x00715F2Cu))==0 && WORD_AT(WORD_AT(0x00715F30u)+16112u*20u-4u)==0 &&
+    CHECK(WORD_AT(WORD_AT(0x00715F2Cu))==0 && WORD_AT(WORD_AT(0x00715F30u)+32512u*20u-4u)==0 &&
           WORD_AT(WORD_AT(0x00715F3Cu)+8000u*44u-4u)==0);           /* zeroed */
     CHECK(WORD_AT(0x007B6664u)==0 && WORD_AT(0x007B666Cu)==0);
     allocs=0;
@@ -220,19 +220,40 @@ int main(void)
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEE,1);
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
-    /* Links themselves: 240 heavy tiles (11,040) + held links up to 12000 allowed, past it refused. */
-    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEE,200);            /* 9,200 links */
-    WORD_AT(TYPEB)=2;                                                  /* type 2: 20 links */
-    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,40);                /* + 800 = 10,000 */
+    /* Links themselves: template links + 16 stitch links per piece, placed + held,
+     * up to 32,256 (the 32,512-entry pool less 256 for teleporters and doors). */
+    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEE,200);            /* 9,200 + 3,200 stitch */
+    WORD_AT(TYPEB)=2;                                                  /* type 2 */
+    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,16);                /* + 16 x (L + 16) */
+    WORD_AT(0x00529408u+2u*0x140u)=1225;                               /* 12,400 + 19,856 = 32,256 */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    WORD_AT(0x00529408u+2u*0x140u)=71;                                 /* 40 x 71 = 2,840: 12,040 */
+    CHECK(NEAR(FLOAT_AT(ED+0x274),(16.f*1241.f)/32256.f));            /* held preview counts stitches */
+    WORD_AT(0x00529408u+2u*0x140u)=1226;                               /* 32,272: refused */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
-    WORD_AT(0x00529408u+2u*0x140u)=70;                                 /* 2,800: exactly 12,000 */
-    pc_display_mapmaker_limits(fake_limits);
-    CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
     WORD_AT(0x00529408u+2u*0x140u)=20;
+    /* 511 pieces of the heaviest tile (7,154 pads, 7,154 cover, 23,506 + 8,176
+     * links): no limit but the piece count (rooms area) refuses them; links
+     * stop at 521 of them and pads at 549. */
+    {
+        MapMakerTotals heavy,none;
+        memset(&none,0,sizeof none);
+        heavy=none;heavy.pieces=511;heavy.cost[0]=14u*511u;heavy.cost[1]=14u*511u;heavy.cost[2]=46u*511u;
+        CHECK((mapmaker_limits_over(&heavy,&none,MAPMAKER_LIMIT_MEMORY,MAPMAKER_LIMIT_GROUPS,MAPMAKER_LIMIT_SUB)&
+               ~(unsigned)MAPMAKER_CAP_PIECES)==0);
+        heavy.pieces=520;heavy.cost[2]=46u*520u;
+        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_LINKS));
+        heavy.pieces=521;heavy.cost[2]=46u*521u;
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_LINKS);
+        heavy.pieces=548;heavy.cost[0]=14u*548u;heavy.cost[2]=0;
+        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_PADS));
+        heavy.pieces=549;heavy.cost[0]=14u*549u;
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_PADS);
+        /* 1024 light pieces (15 links each) fit the link budget. */
+        heavy=none;heavy.pieces=1024;heavy.cost[2]=15u*1024u;
+        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_LINKS));
+    }
     WORD_AT(0x0078400Cu)=pieces;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
 
