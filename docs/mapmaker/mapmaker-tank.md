@@ -1,10 +1,68 @@
 # MapMaker castle tank (story mission 2 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_tank.inc` (area `tank`),
-fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 172 mutations, plus
+fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 191 mutations, plus
 decode, US XBE data and game-pak checks of every site below). Wired in
 v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
 No guest-code table entry of its own, no new save bytes.
+
+## v0.4.0-mapmaker.28: the third tank stayed a bot; bars read "Castle Tank" (fixed after .28)
+
+Report: three tanks placed, "only two tanks spawned, the third was a
+prometheus robot", and "the bar header read Castle Tank instead of the Story
+AI name". Log `logs/m28.err` (lines 19457-19489): tanks 1 and 2 log `created
+at the placeholder`, `first draw`, `first update`, `placeholder AI removed`,
+`fight started`. Tank 1's placeholder was pool slot 1, entity `0x8181D218`,
+removed at its first update. Then `castle tank placeholder character created
+(pool slot, object) (0x1, 0x8181D218)` (the third placeholder in the same
+slot and entity), `realbosses: AI start: character 0x12, model 0x5AC, record
+id 0x3`, and no tank line.
+
+Cause (**proven** from the log and the code): the AI start hook's "started
+again" test matched any tank whose placeholder entity was this entity, and
+returned without a line. The removed placeholder's pool entry and entity
+are reused by the next character created (realbosses shows the same reuse),
+so the third placeholder looked like tank 1 restarting. Rejected: the 4-tank
+cap (n was 2), the per-tank tables (allocated once for 4), the diagnostics
+budget (`seen`, 8 entries; the session line budget had 19 of 24 lines used;
+neither gates the create). A second, smaller fault: the general line budget
+was per session (24), and was used up by the fifth level of that log, so a
+later level's refusals would have been silent.
+
+Fix: a tank is "started again" only when its placeholder is still this
+entity (not removed yet) or it was made from this spawn record (same record
+pointer and record id +8). Every refusal (started again, cap, pak, models,
+position, memory, a tank running) logs with its own budget of 16 per level
+(`tnk_refuse`); the general lines' 24 are per level now. The diagnostics
+record of a placeholder (`seen`) starts afresh when its pool entry comes
+back with another record, so the third placeholder's `waiting to spawn`
+and `reached its AI start` lines show. The spawn line ends with the record
+id.
+
+Cause of the label (**proven** by decode): the bar is stock `sub_0014CC80`
+for the focus entity (the tank that woke last), label text 0x165B, which this
+area answered with "Castle Tank". The bosses area draws Story AI bars from
+live AIs; the tank removes its placeholder AI, so its name was gone.
+
+Fix, as Khallos' bars (`bos_bar_proxy`) but for a removed AI:
+`pc_mapmaker_bosses.inc` gains `bos_bar_extra_add` (an area lists its props
+with the removed AI's record id) and `bos_story_name` (every Story AI's
+saved name, boss or not). This area registers at each mount:
+
+- the stock bar (focus tank, with its "Tank exposed" timer) is labelled with
+  that tank's Story AI name (a per-tank 32-byte guest copy, so two tanks
+  never share one); "Castle Tank" when the AI is unnamed;
+- the bosses area draws one bar per other tank whose Story AI is
+  Boss-flagged, in range, alive, with its name, the tank's health and the
+  Boss/health multipliers (the tank's damage subtracts fixed amounts and
+  dies at 0, no threshold on its maximum: CONFIRMED at 0x00255EF0 and
+  0x0025606C). The focus tank is not drawn twice while the stock bar shows
+  it. No bar while the placeholder AI still stands there, or once the object
+  is no longer model 0x281.
+
+The mothership had both faults (same "started again" test; label
+"Timesplitter Mothership"): fixed the same way, see
+[mapmaker-mothership.md](mapmaker-mothership.md).
 
 ## v0.4.0-mapmaker.27: created, but never seen (fixed after .27)
 
@@ -73,7 +131,8 @@ with the nine-boss set; send the `tank:` lines.
 ## Several tanks per map (after v0.4.0-mapmaker.23)
 
 Up to **4** castle tanks per map (`TNK_MAX`); a fifth placeholder stays a
-guard robot bot (logged `at most 4 castle tanks per map`). The tank's code
+guard robot bot (logged `at most 4 castle tanks per map`). A placeholder that
+reuses a removed one's pool entry and entity is a new tank (fixed after .28). The tank's code
 keeps its whole fight in statics (CONFIRMED, test
 `test_per_tank_statics_and_entries`), so each tank gets its own copy and the
 area swaps it in around every way into that code:
@@ -106,8 +165,10 @@ The other hooks (wake, area, target, state, gun, wreck) run inside an entry
 and act on the active tank: its own castle frame offset d, spawn, wake,
 search count, cannon aim and log lines (`[mapmaker] tank N: ...`). Each tank
 removes its own placeholder on its first frame and is parked under its own
-spawn at its death. The boss bar shows the tank that last took player 1's
-focus (stock: the update sets it when a fight starts).
+spawn at its death. The stock boss bar shows the tank that last took player
+1's focus (stock: the update sets it when a fight starts), with its Story
+AI's name; the other Boss-flagged tanks get the bosses area's bars (after
+.28).
 
 ## Fixed after v0.4.0-mapmaker.23: the cannon did not aim at the player
 
@@ -294,7 +355,7 @@ heavy hit (12 s; a second bar shows the time), 10 dead.
 | first drive target (-9, own y, -3.2) set by `sub_00251AA0` | same | moved by +d at spawn |
 | death `sub_00255C20` parks the dead tank at (0, 20, 0) | a point in the open map | **wreck**: parked 50 m under its spawn point |
 | state 9 fires level event 0x16 every frame (`sub_002274C0` at 0x00255A8F) | the map's own logic marker 0x16 | **event**: dropped |
-| boss bar labels 0x165B / 0x1635 (`sub_0014CC80` case 0x281) | the MapMaker level's own text ids | **text**: "Castle Tank" / "Tank exposed" at those two call sites |
+| boss bar labels 0x165B / 0x1635 (`sub_0014CC80` case 0x281) | the MapMaker level's own text ids | **text**: the focus tank's Story AI name (else "Castle Tank") / "Tank exposed" at those two call sites |
 | cannon aim `sub_00251DD0`: a castle cover object near the target, else the target's actor +0xBB4, refreshed only after each shot | no cover; for a player that point is not the aim point the machine guns use | **gun**: in state 4 the cannon aims at the player record +0xB4 before every turn |
 | tagged objects `'TKDR'` (door, 0x00255767) and `'TCV5'..'TCV7'` (`sub_00251DD0`) | absent | none needed: both null-checked by stock code (CONFIRMED) |
 
@@ -331,9 +392,11 @@ define) if the integrator prefers another id.
 - Stock or older builds: the Story AI plays as a guard robot bot.
 - With `TSFP_MAPMAKER_TANK=0`, or when the pak/models cannot be loaded, or
   for a fifth placeholder in the same map: a guard robot bot (logged).
-- The Story AI's own settings (health, Boss flag, logic) do not apply to the
-  tank: it is a prop with its own health and damage rules, and its defeat is
-  not seen by MapMaker logic (no level event, no AI death).
+- The Story AI's name labels the tank's bar; its Boss flag and Boss/health
+  multipliers apply to the tank's health and bar (bosses area, after .28).
+  Its own health setting and logic do not: the tank is a prop with its own
+  damage rules, and its defeat is not seen by MapMaker logic (no level
+  event, no AI death).
 
 Editor: this area adds **no picker row** (the picker hooks belong to
 `pc_mapmaker_realbosses.inc`). Until the integrator adds one, a map gets id
@@ -363,7 +426,9 @@ do; 0x12 has no Arcade row).
    `sub_000A6F90` -> `sub_000A6EC0(type, model, pos, rot, a, b)` ->
    `sub_000A6880` copies pos to +0x64/+0x68/+0x6C and rot to +0xC0/+0x70/
    +0xC8, returns 0 when the model does not load (0x000A695C); the init
-   runs at 0x000A6F3A. Labels are allocated here.
+   runs at 0x000A6F3A. Labels and the 4 x 32-byte bar names are allocated
+   here. Started again (no new tank, logged): a tank whose placeholder is
+   still this entity, or made from this spawn record and id.
 3. **update** (`sub_00255550`, the tank's frame): on its first frame the
    placeholder AI is removed with `sub_0015DDA0` (the Crow walker's removal
    call) after checking the pool entry still holds that AI; a story focus
@@ -398,11 +463,15 @@ unchanged when the switch is off or outside scene 100.
 | `WRAP sub_002274C0 -> pc_mapmaker_tank_event` | level event (cdecl) | **shared** with `pc_mapmaker_realbosses_event` (and other boss ports); order free: each matches only its own return addresses |
 | `WRAP sub_0003D7B0 -> pc_mapmaker_tank_text` | text lookup (cdecl), hot | **shared** with `pc_mapmaker_realbosses_text` (and others); order free: ids 0x165B/0x1635 at their return addresses only |
 
+After .28 no wrapper changed: the bar names use `pc_mapmaker_bosses.inc`
+(`bos_bar_extra_add`, `bos_story_name`, under `BOS_BAR_EXTRA`), included
+before this area as for Khallos' `bos_bar_proxy`.
+
 Guest functions called: `sub_00062260` (is a pak mounted), `sub_000622D0`
 (mount), `sub_000A5E40` (request a model), `sub_000631C0` (find a model's
 request), `sub_000A6F90` (create the tank), `sub_0015DDA0` (remove the
 placeholder AI). Host: `xbox_HeapAlloc` (labels, 32-byte argument buffer, the 4 x 0x224-byte tank tables,
-once per session). The area stubs (`tests/mapmaker/mapmaker_area_stubs.h`)
+the 4 x 32-byte bar names, once per session). The area stubs (`tests/mapmaker/mapmaker_area_stubs.h`)
 need `sub_000622D0`, `sub_000A6F90`, `sub_000A5E40` and `sub_000631C0` when
 the include chain links this area (`sub_00062260` and `sub_0015DDA0` are
 already there).
@@ -445,14 +514,18 @@ Also for the integrator: the editor picker row (above), and the
    0x.. shown`, `placeholder AI removed`, `first update`, `waiting for a
    player`, `first draw` once it is on screen).
 2. Walk within 30 m: it starts (log `fight started`, then `fight state ...
-   (1, 0)`), drives and fires; the bottom bar reads "Castle Tank". The game
-   keeps running; if it stops, the last `fight state` line names the state.
+   (1, 0)`), drives and fires; the bottom bar reads the Story AI's name
+   ("Castle Tank" when unnamed). The game keeps running; if it stops, the
+   last `fight state` line names the state.
 3. Explosives hurt it; a heavy hit shows "Tank exposed" for 12 s
    (log `level event dropped`); map logic markers are unaffected.
 4. Destroy it: wreck and flying turret appear, the tank vanishes
    (log `destroyed`).
-5. Second placeholder in the same map stays a guard robot; `TSFP_MAPMAKER_TANK=0`
-   gives a guard robot; story mission 2 still plays stock.
+5. Three and four named tanks (after .28): every one is a tank (log `tank 3:
+   spawn ... record id 0x..`, `tank 4: ...`), none a guard robot; a fifth
+   stays one (log `at most 4 castle tanks`). Each bar shows its own Story AI
+   name; with Boss on, each tank in range gets a bar. `TSFP_MAPMAKER_TANK=0`
+   gives guard robots; story mission 2 still plays stock.
 
 ## Not appearing in .25/.26: set slot 14 (fixed in .27)
 

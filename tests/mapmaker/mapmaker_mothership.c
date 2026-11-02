@@ -101,6 +101,14 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 }
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
+/* pc_mapmaker_bosses.inc's Boss bar hooks, as in the build (included first there) */
+#define BOS_BAR_EXTRA 1
+typedef int (*BosBarExtra)(unsigned k,uint32_t *entity,uint32_t *id);
+static BosBarExtra bar_extra;
+static unsigned bar_adds;
+static void bos_bar_extra_add(BosBarExtra f) { bar_extra=f;bar_adds++; }
+static const char *story_names[8];                 /* record ids 0x100..0x107 */
+static const char *bos_story_name(uint32_t id) { return id>=0x100u && id<0x108u?story_names[id-0x100u]:0; }
 #include "pc_mapmaker_mothership.inc"
 
 static int failures;
@@ -493,6 +501,81 @@ int main(void)
         WORD_AT(0x00441000u+0x1A0u)=3u;FLOAT_AT(0x00441000u+0x68u)=12.0f;
         CALL(pc_mapmaker_mothership_update,fake_update,0x001234u,0x00441000u,0,0,1);
         CHECK(NEAR(seen_y,10.0f) && NEAR(seen_box[0],2.0f) && NEAR(seen_box[3],40.0f) && constants_stock());
+    }
+
+    /* ---- a removed placeholder's entity, pool entry and record are reused by
+     * the next placeholder (the tank's v0.4.0-mapmaker.28 bug); 3 and 4 ships ---- */
+    container(0x11,with,3,NULL,0);resources(1,1,0x0021A710u);
+    pak_mounted=0;WORD_AT(0x006D7880u)=10u;bar_extra=0;bar_adds=0;
+    CALL(pc_mapmaker_mothership_mount,fake,0x001CDB8Au,0,0,0,1);
+    CALL(pc_mapmaker_mothership_request,fake,0x001CDC25u,0,0,0,1);
+    CHECK(!msh_lv.n && bar_adds==1u && bar_extra==msh_bar_boss);
+    {
+        unsigned s=nspawn,r=nremove,refused;
+        uint32_t ent=0,id=0,b1,b3;
+        story_names[1]="Big Ship";story_names[2]=0;story_names[3]="Third Ship";
+        actor(20,0x75,10.0f,0.5f,10.0f,0.0f);WORD_AT(REC(20)+8u)=0x101u;
+        spawn_obj=0x00450000u;
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);
+        actor(21,0x75,30.0f,0.5f,10.0f,0.0f);WORD_AT(REC(21)+8u)=0x102u;
+        spawn_obj=0x00451000u;
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);
+        CHECK(msh_lv.n==2u && nspawn==s+2u && msh_lv.s[0].place_id==0x101u && msh_lv.s[1].place_id==0x102u);
+        CHECK(bar_extra(0,&ent,&id)==1 && ent==0 && id==0x101u);     /* its AI still stands there */
+        WORD_AT(0x007B0C7Cu)=PLAYER;WORD_AT(PLAYER+0xFF4u)=0;
+        CALL(pc_mapmaker_mothership_update,fake,0x001234u,0x00450000u,0,0,1);
+        CHECK(nremove==r+1u && remove_arg==ENT(20) && !msh_lv.s[0].place);
+        CHECK(bar_extra(0,&ent,&id)==1 && ent==0x00450000u && id==0x101u);
+        CHECK(bar_extra(1,&ent,&id)==1 && ent==0 && bar_extra(2,&ent,&id)==0);
+        refused=msh_lv.refused;
+        actor(22,0x75,10.0f,0.5f,10.0f,0.0f);WORD_AT(A(22)+0xBF0u)=REC(20);   /* the same Story AI again */
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(22),0,0,1);
+        CHECK(msh_lv.n==2u && msh_lv.refused==refused+1u);
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);   /* ship 2's placeholder again */
+        CHECK(msh_lv.n==2u && msh_lv.refused==refused+2u);
+        WORD_AT(A(21)+0xBF0u)=0;                                       /* no record: the entity still decides */
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);
+        CHECK(msh_lv.n==2u && nspawn==s+2u);
+        WORD_AT(A(21)+0xBF0u)=REC(21);refused=msh_lv.refused-2u;
+        actor(20,0x75,50.0f,0.5f,10.0f,0.0f);WORD_AT(A(20)+0xBF0u)=REC(23);WORD_AT(REC(23)+8u)=0x103u;
+        spawn_obj=0x00452000u;
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(20),0,0,1);   /* ship 1's entity reused */
+        CHECK(msh_lv.n==3u && nspawn==s+3u && msh_lv.s[2].obj==0x00452000u && msh_lv.s[2].place_id==0x103u);
+        CALL(pc_mapmaker_mothership_update,fake,0x001234u,0x00452000u,0,0,1);
+        CALL(pc_mapmaker_mothership_update,fake,0x001234u,0x00451000u,0,0,1);
+        CHECK(nremove==r+3u && remove_arg==ENT(21));
+        actor(21,0x75,70.0f,0.5f,10.0f,0.0f);WORD_AT(REC(21)+8u)=0x104u;   /* ship 2's record, rewritten */
+        spawn_obj=0x00453000u;
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(21),0,0,1);
+        CHECK(msh_lv.n==4u && nspawn==s+4u && msh_lv.s[3].place_id==0x104u);
+        actor(24,0x75,90.0f,0.5f,10.0f,0.0f);WORD_AT(REC(24)+8u)=0x105u;
+        CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(24),0,0,1);
+        CHECK(msh_lv.n==4u && nspawn==s+4u && msh_lv.refused==refused+3u);   /* at most 4, logged */
+        spawn_obj=SHIP;
+        CHECK(bar_extra(2,&ent,&id)==1 && ent==0x00452000u && id==0x103u);
+        CHECK(bar_extra(3,&ent,&id)==1 && ent==0 && id==0x104u && bar_extra(4,&ent,&id)==0);
+        HALF_AT(0x00452000u+0x94u)=0x53Au;                             /* state 5 removed it: no bar */
+        CHECK(bar_extra(2,&ent,&id)==1 && ent==0);
+        HALF_AT(0x00452000u+0x94u)=0x539u;
+        WORD_AT(0x0079094Cu)=2u;CHECK(bar_extra(0,&ent,&id)==0);play_scene();
+        /* the stock bar's label: the focus ship's Story AI name */
+        WORD_AT(PLAYER+0xFF4u)=0x00450000u;
+        b1=CALL(pc_mapmaker_mothership_text,fake,0x0014D09Fu,0x164Bu,0,0,0);
+        WORD_AT(PLAYER+0xFF4u)=0x00452000u;
+        b3=CALL(pc_mapmaker_mothership_text,fake,0x0014D09Fu,0x164Bu,0,0,0);
+        CHECK(b1 && b3 && b1!=b3 && !strcmp((const char *)((uintptr_t)b1+g_xbox_mem_offset),"Big Ship"));
+        CHECK(!strcmp((const char *)((uintptr_t)b3+g_xbox_mem_offset),"Third Ship"));
+        WORD_AT(PLAYER+0xFF4u)=0x00451000u;                            /* unnamed */
+        CHECK(CALL(pc_mapmaker_mothership_text,fake,0x0014D09Fu,0x164Bu,0,0,0)==msh.label);
+        WORD_AT(PLAYER+0xFF4u)=0;
+        CHECK(CALL(pc_mapmaker_mothership_text,fake,0x0014D09Fu,0x164Bu,0,0,0)==msh.label);
+        story_names[3]="A name that is longer than thirty-one characters";
+        WORD_AT(PLAYER+0xFF4u)=0x00452000u;
+        b3=CALL(pc_mapmaker_mothership_text,fake,0x0014D09Fu,0x164Bu,0,0,0);
+        CHECK(strlen((const char *)((uintptr_t)b3+g_xbox_mem_offset))==31u && !strcmp((const char *)((uintptr_t)b1+g_xbox_mem_offset),"Big Ship"));
+        WORD_AT(PLAYER+0xFF4u)=0;
+        for(k=0;k<20u;k++) CALL(pc_mapmaker_mothership_ai_start,fake_ai,0x0015F981u,A(24),0,0,1);
+        CHECK(msh_lv.refused==MSH_REFUSE_LOGS);
     }
 
     if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }

@@ -103,6 +103,10 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 
 static uint32_t proxy_from, proxy_to;
 static uint32_t test_proxy(uint32_t ent) { return ent==proxy_from?proxy_to:0u; }
+/* an area's props that replaced removed Boss AIs (pc_mapmaker_tank.inc, _mothership.inc) */
+static uint32_t extra_ent[4], extra_id[4];
+static unsigned extra_n;
+static int test_extra(unsigned k,uint32_t *ent,uint32_t *id) { if(k>=extra_n) return 0; *ent=extra_ent[k];*id=extra_id[k];return 1; }
 static int failures, esp_errors;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
 static void hook1(void (*fn)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t arg,int line)
@@ -555,6 +559,8 @@ int main(void)
     HOOK(pc_mapmaker_bosses_level,fake_plain,0);
     CHECK(bos_play.active && bos_play.level[0]==3u && bos_play.level[3]==1u && !bos_play.level[1] && !bos_play.level[2]);
     CHECK(bos_play.level[8]==2u && bos_play.sub[8]==1u && !bos_play.sub[0] && !bos_play.sub[3] && bos_play.subs==1u);
+    CHECK(!strcmp(bos_story_name(R+0u+1u),"Big Robot") && !strcmp(bos_story_name(R+1u+1u),"Guard"));   /* boss or not */
+    CHECK(!bos_story_name(R+3u+1u) && !bos_story_name(R+2000u) && !bos_story_name(0));   /* unnamed, unknown */
     CHECK(meters_frame()==0);                                       /* no Sub-boss AI live */
 
     CHECK(hud_frame(HUD0));
@@ -616,6 +622,36 @@ int main(void)
     proxy_to=0;setf(ENT(5)+0x64u,8.0f);                             /* none: his own */
     CHECK(hud_frame(HUD0) && nlog==3 && blog[1].edi==ENT(5));
     bos_bar_proxy=0;list_set(5);
+
+    /* Boss AIs replaced by props and removed (the tank, the mothership): their props' bars */
+    setf(ENT(41)+0x64u,7.0f);setf(ENT(41)+0x68u,0.0f);setf(ENT(41)+0x6Cu,0.0f);
+    setf(ENT(41)+0x1D8u,50.0f);setf(ENT(41)+0x1CCu,50.0f);
+    extra_n=2;extra_ent[0]=ENT(41);extra_id[0]=R+0u+1u;              /* "Big Robot" x4 */
+    extra_ent[1]=ENT(42);extra_id[1]=R+1u+1u;                         /* "Guard": no boss */
+    setf(ENT(42)+0x64u,1.0f);setf(ENT(42)+0x1D8u,5.0f);setf(ENT(42)+0x1CCu,5.0f);
+    bos_bar_extra_add(test_extra);bos_bar_extra_add(test_extra);     /* registered once */
+    WORD_AT(PLAYER+0xFF4u)=0;
+    CHECK(hud_frame(HUD0) && nlog==3 && blog[0].edi==ENT(2) && blog[1].edi==ENT(41) && blog[2].edi==ENT(1));
+    CHECK(!strcmp(blog[1].label,"Big Robot"));                      /* the removed AI's name */
+    CHECK(FLOAT_AT(ENT(41)+0x1D8u)==200.0f && FLOAT_AT(ENT(41)+0x1CCu)==200.0f && FLOAT_AT(ENT(42)+0x1D8u)==5.0f);
+    CHECK(hud_frame(HUD0) && FLOAT_AT(ENT(41)+0x1D8u)==200.0f);     /* once */
+    stock_bar=1;WORD_AT(PLAYER+0xFF4u)=ENT(41);                       /* the stock bar shows it: no second bar */
+    CHECK(hud_frame(HUD0) && nlog==2 && blog[0].edi==ENT(2) && blog[1].edi==ENT(1));
+    WORD_AT(PLAYER+0xFF4u)=ENT(40);                                   /* the stock bar shows another */
+    CHECK(hud_frame(HUD0) && nlog==3 && blog[1].edi==ENT(41));
+    stock_bar=0;WORD_AT(PLAYER+0xFF4u)=ENT(41);                       /* focus without a stock bar */
+    CHECK(hud_frame(HUD0) && nlog==3 && blog[1].edi==ENT(41));
+    WORD_AT(PLAYER+0xFF4u)=0;
+    extra_ent[0]=0;                                                   /* the area has no prop for it now */
+    CHECK(hud_frame(HUD0) && nlog==2);
+    extra_ent[0]=0x8000u;                                             /* below guest memory (MAPMAKER_PTR_OK): skipped */
+    setf(extra_ent[0]+0x64u,7.0f);setf(extra_ent[0]+0x1D8u,1.0f);setf(extra_ent[0]+0x1CCu,1.0f);
+    CHECK(hud_frame(HUD0) && nlog==2);
+    extra_ent[0]=ENT(41);setf(ENT(41)+0x1CCu,0.0f);                   /* destroyed */
+    CHECK(hud_frame(HUD0) && nlog==2);
+    setf(ENT(41)+0x1CCu,10.0f);setf(ENT(41)+0x64u,50.0f);            /* out of range */
+    CHECK(hud_frame(HUD0) && nlog==2);
+    extra_n=0;bos_bar_extra[0]=0;
 
     /* a stock bar keeps the bottom slot: ours above it */
     stock_bar=1;
