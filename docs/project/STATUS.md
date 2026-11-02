@@ -1,3 +1,18 @@
+## Camera and mounted-gun view on widescreen (2026-11-02, not built or played)
+
+Source: branch camera-widescreen from mapmaker-recon 6513a37e, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. v0.4.0-mapmaker.34 report: a switch-held camera's view stays 4:3. The .34
+log shows the mode-0x80 3D view already Hor+ (aspect 1.768). Cause (US code): HUD mode 10's draw
+`sub_0014BFF0` frames the view with bars, tint, scanlines and brackets that AUTO placement fitted
+into the centred 4:3 box, and the remote-view static `sub_000F8DC0` tiled only that box. New shared
+wrappers `pc_display_viewfinder` (sub_0014BFF0) and `pc_display_view_static` (sub_000F8DC0), plus
+routing in the existing sub_0001EFB0 / sub_0001F090 / sub_00041DC0 wrappers, fill a wide single
+view at 4:3 proportions and keep the guest random sequence; 4:3, split and partial views unchanged
+(docs/mapmaker/mapmaker-camera.md). `[PC-DISPLAY] Camera view:` logs the path. Tests:
+test_camera_widescreen.py (fixture + 9 mutations, wiring; decoder passed against the main checkout
+XBE), tests/graphics, mapmaker widescreen/camera, mounted and menu mouse: all passed after WinError
+4551 retries (52 skipped). Not run: game, live camera, story CCTV, Mac.
+
 ## MapMaker switch cameras (2026-11-02, not built or played)
 
 Source: branch camera-control from mapmaker-recon 87e134d6, Windows 11 x64, MSVC fixtures and the

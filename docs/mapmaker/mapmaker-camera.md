@@ -36,18 +36,51 @@ Related mouse fix (`pc_mounted.h`): guns with flag 0x1000000 scale aim by
 `+0x5C`, which is also the sweep speed and is negative after a bounce; the
 helper used to drop all mouse input then. It now uses the magnitude.
 
-## 2. The camera view stays 4:3 on a widescreen display (open)
+## 2. The camera view stays 4:3 on a widescreen display (fixed, shared)
 
-Not reproduced offline. Checked: the mounted view is the player camera in
-camera mode 2 (`sub_000CBCF0` record `0x004DCC90`), whose projection is built
-by `sub_000C77C0` from `sub_000CCAB0`; `pc_display_camera` widens that one
-for every caller (the log shows factor 1.325967). The remote-view overlay
-`sub_00137E30` draws, for camera-type guns (`sub_00242EE0`), a flat viewport
-rectangle (`sub_0001EFB0`), which already spans the window. The
-`[PC-DISPLAY] View:` line now records, per change, scene, player mode,
-camera flags `+0x21C`, viewport, factors, the final projection x/y and FOV.
-A 4:3 projection under player mode 0x80 points at the 3D path; a wide
-projection with a boxed picture points at a 2D overlay or texture feed.
+The 3D view was never 4:3: the .34 log has `[PC-DISPLAY] View:` lines for
+player mode 0x80 with factor 1.3260 and aspect 1.7680 (16:9), from
+`sub_000C77C0` widened by `pc_display_camera`. The 4:3 box is 2D.
+
+Cause (confirmed in the US code, not yet seen in a build): HUD mode 10 of the
+table `0x004E6900` (stride 0x1C) pairs the update `sub_0012E100` with the draw
+`sub_0014BFF0`. From `0x0014C281`, single view only, the draw frames the view:
+0x7F black bars around an inset 3% of the view width (`0x00475CF8`) by 15% of
+its height (`0x004765E0`), a green tint `0x1E3C1E28`, a 0x1E tint for camera
+guns (`sub_00242EE0`), scanlines every 3 px, corner brackets (texture 0x11B),
+labels and a meter. All are `sub_0001EFB0` / `sub_0001F090` / `sub_00041DC0`
+draws in guest pixels; AUTO placement fits anything narrower than the canvas
+into the centred 4:3 box, so the side bars, tint, scanlines and brackets boxed
+the picture at 4:3 and left the world untinted beside it. The update also
+raises view effect `+0x5C` (camera guns by 0x50 a tick); `sub_000FE990` draws
+it as static tiles (`sub_000F8DC0`, texture 0x336, one tile per texture size),
+also inside the box. The camera-gun dimming of the other remote view,
+`sub_00137E30` (`0x00137E6A`), could be boxed as a solid rect that inherits a
+texture.
+
+Fix (`src/interface/pc_display_ui.inc`, `pc_ui_layout.h`, shared by Windows
+and native Mac): WRAP `sub_0014BFF0` -> `pc_display_viewfinder` marks the
+frame while the view is wide (HUD scale < 1), single and full. The existing
+`sub_0001EFB0` and `sub_0001F090` wrappers then draw each frame primitive
+(return address in `0x0014C281..0x0014C962`) STRETCH with
+`pc_ui_viewfinder_x`: a span from the left third to the right third keeps each
+edge on its side, other pieces fit (scale k) about their third's edge or
+centre, so the frame meets the window edges with 4:3 thicknesses and bracket
+shapes. Labels (`sub_00041DC0`) use the matching LEFT/CENTRE/RIGHT placement.
+The aim reticle before `0x0014C281` and the tail crosshair `sub_00135620`
+are untouched. WRAP `sub_000F8DC0` -> `pc_display_view_static` draws the full
+view's static STRETCH with the texture record's tile width (+0x26) set to
+w*k for the call, which keeps the texel size and covers the window, then puts
+the width back and leaves the random state (`0x004E7950`, counter
+`0x007497C8`) where the original tiling would have. `0x00137E6F` joins the
+full-canvas fade list. 4:3, narrower, split and partial views are unchanged;
+`TSFP_CAMERA_WIDESCREEN=0` restores the stock placement. Story CCTV and
+mounted guns use the same HUD, so they get the same frame.
+
+Log: `[PC-DISPLAY] Camera view:` (per change, capped) gives the path taken
+(viewfinder frame / view static / stock and why), scene, player mode, gun and
+its kind, viewport, HUD scale, projection x/y and aspect. Test:
+`tests/graphics/test_camera_widescreen.py`.
 
 ## 3. A tall stack seen from the bottom floor stops near floor 10 (open)
 
@@ -68,6 +101,9 @@ operator, angles, limits and sweep speeds.
 
 Take a camera through its switch: it must stop sweeping, follow only the
 mouse/stick, and resume sweeping after release; repeat a second time.
-Story CCTV turrets (Breaking and Entering) unchanged. Send the log with the
-`[mapmaker] camera:` and `[PC-DISPLAY] View:` lines for 2 and 3.
+Story CCTV turrets (Breaking and Entering) unchanged. At 16:9 and 21:9 the
+camera frame, tint, scanlines and static must reach the window edges, corner
+brackets stay square and labels sit by their corners; at 4:3 nothing changes.
+Check one ordinary mounted gun too. Send the log with the `[mapmaker] camera:`,
+`[PC-DISPLAY] View:` and `[PC-DISPLAY] Camera view:` lines.
 `TSFP_MAPMAKER_AREA_OFF=camera` restores the stock update.
