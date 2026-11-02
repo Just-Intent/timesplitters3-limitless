@@ -870,7 +870,7 @@ empty rectangle) and walks from the camera's room with the viewport
 (`sub_00087F80`, `0x00089BD9`). Each portal (room record `[0x00708788]` +
 room*0xB4, `+4` -> {count, ids}; portal `[[0x0070878C]+id*4]` `+0`/`+4` = its
 two rooms) is projected, clipped to the incoming rectangle and merged into
-the neighbour's entry (view `+0x3BC` + 12*room, the `+0x6000` shadow in this
+the neighbour's entry (view `+0x3BC` + 12*room, the `+0x1000` shadow in this
 fork: int32 depth, int16 x0, y0, x1, y1). `sub_000897D0` lists rooms with a
 depth >= 0 and x1 > x0, and every prop of a room is culled and scissored to
 that rectangle (see mapmaker-realbosses.md, "Whole height"). Tiles are joined

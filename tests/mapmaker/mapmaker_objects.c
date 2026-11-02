@@ -212,7 +212,7 @@ int main(void)
     /* ---- engine object pool: MapMaker scenes only ---- */
     WORD_AT(0x00715FACu)=0x00242BA0u;
     WORD_AT(0x0079094Cu)=100u;
-    WORD_AT(0x008C7000u)=1;WORD_AT(0x008C7440u+0x10C*4)=1;WORD_AT(0x008C8100u+4)=1;WORD_AT(0x008C8100u+0x10C*4)=1;  /* relocated by rooms.json */
+    WORD_AT(0x008C7000u)=1;WORD_AT(0x008C5000u+0x20C*4)=1;WORD_AT(0x008C6080u+4)=1;WORD_AT(0x008C6080u+0x20C*4)=1;  /* relocated by rooms.json */
     WORD_AT(0x00716290u)=0x00540000u;WORD_AT(0x00716294u)=9;WORD_AT(0x0072F5F8u)=9;
     allocs=0;calls[0]=0;originals=0;callback_arg=7;
     HOOK(pc_mapmaker_objects_pool,fake_original);
@@ -220,7 +220,7 @@ int main(void)
     CHECK(alloc_size[0]==((1000u*0x2E8u+15u)&~15u) && alloc_size[1]==0x190u && alloc_size[2]==0xA680u);
     CHECK(alloc_heap[0]==1 && alloc_heap[1]==1 && alloc_heap[2]==1);
     CHECK(WORD_AT(0x0072F5E8u)==0x00900000u && WORD_AT(0x00715FB4u)==WORD_AT(0x0072F5ECu)+0x190u);
-    CHECK(WORD_AT(0x008C7000u)==0 && WORD_AT(0x008C7440u+0x10C*4)==0 && WORD_AT(0x008C8100u+4)==0 && WORD_AT(0x008C8100u+0x10C*4)==0);
+    CHECK(WORD_AT(0x008C7000u)==0 && WORD_AT(0x008C5000u+0x20C*4)==0 && WORD_AT(0x008C6080u+4)==0 && WORD_AT(0x008C6080u+0x20C*4)==0);
     CHECK(WORD_AT(0x00716290u)==0 && WORD_AT(0x00716294u)==0 && WORD_AT(0x0072F5F8u)==0);
     CHECK(!strcmp(calls,"B05B0,B3BE0,248970,C3540,1806B0,AEAC0,242BA0,A5AF0,") && callback_arg==0);
     WORD_AT(0x0079094Cu)=102u;allocs=0;calls[0]=0;    /* editor too */

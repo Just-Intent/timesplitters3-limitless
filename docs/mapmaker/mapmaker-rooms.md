@@ -735,6 +735,144 @@ byte-table code, 1500 rooms with 700 in one depth, 300 random room lists
 against stock `sub_000897D0`, 290-room list; 27 C mutations; the reader
 patches decoded with the lifter's decoder; 6 table mutations).
 
+## Stage 7: view stride 0xFFC -> 0x3000 (2026-11-02, static only)
+
+Target 511 (0x5000 for 1023 was not taken: the pads, links and memory caps
+stop real maps near 500 pieces, and 1023 needs the rooms sub-range repacked
+around the model table). Every view in the six-view array `[0x7B0CE4]` is
+now 0x3000 apart: the 0xFFC struct, then its per-room shadow inside the
+stride. Layout per view (sized for the 511 id space 0x20D):
+
+| field | stock | 255 layout | now |
+| --- | --- | --- | --- |
+| rects 12 B per id (depth, x0, y0, x1, y1) | +0x3BC | +0x6000 | +0x1000 (to +0x289C) |
+| visible flag byte per id | +0xD2C | +0x6CA0 | +0x28A0 (0x210) |
+| sorted room list (words) | +0xE0C | +0x6DB0 | +0x2AB0 (to +0x2ECA) |
+| stride / array | 0xFFC / 0x5FF0 | 0xFFC / 0xBFF0 | 0x3000 / 0x12008 (clear 0x4802 dwords) |
+| front-end static view `0x008CD000` | 0xFFC | 0x7000 | 0x3000 |
+
+`rooms.json` (63 new operand entries, plus the 67 shadow displacements and
+the allocation/clear re-valued): the 35 `add/imul r, 0xFFC` steps (the plan's
+34 plus `0x0009FFA6`, shared by `sub_0009FF10`/`sub_0009FF30`);
+`sub_000C61D0`'s unrolled per-view init (`add ecx, k*0xFFC` x4 and 20 fields
+`[ecx + k*0xFFC + 0x214/0x21C/0x2A0/0x2A4]`, view index k = 1..5, which the
+plan's list missed); the two `(view - views) / 0xFFC` divisions
+(`0x000CC92C`/`0x000CC936` in `sub_000CC920`, `0x000D2D33`/`0x000D2D3C` in
+`sub_000D2D20`): magic `0x80200803` -> `0xAAAAAAAB` and `sar edx, 0xB` ->
+`0xD` (2^45/0x3000 rounded up, exact for every signed 32-bit difference).
+Not view strides (reviewed, in `NOT_VIEW_STRIDE`): `0x00188F70`/`0x001B773E`
+(player array `[0x7B0C48]`, stride 0x1584, field +0xFFC), `0x001B45B6`
+(string copy into another record), the 0x1FF8/0x17FC/0x3FF buffer sizes and
+masks. C: `MAPMAKER_ROOMS_VIEW_STRIDE`/`_RECTS`/`_FLAGS`/`_LIST`,
+`OPENVIEW_RECT` (openview), `MAPMAKER_CAMERA_VIEW_RECTS` (camera
+diagnostics), `SMX_PLAYER` (sky music sand grains walk the views by stride).
+
+Tests (`test_mapmaker_rooms.py`): `test_view_stride_table` (+10 mutations:
+a step missing or stock, an init multiple/field stock or missing, magic or
+shift stock, a division missing, the allocation/clear short; the division is
+evaluated for every multiple of the stride, off-by-one values and the 32-bit
+extremes), `test_every_view_stride_is_classified` (decode: every k*0xFFC,
+0x5FF0, 0x17FC, 0x3FF, the magic, and every displacement past 0xFFC in a
+function that reads the view array base or count is patched or reviewed),
+the shadow checks of `id_space_problems`, the other areas' defines in
+`test_other_areas_use_the_moved_tables`; the bucket, camera and openview
+fixtures use the defines. Story risk: every scene allocates the view array
+(72 KB instead of 48 KB, `sub_0003DFA0(.., 1)`); splitscreen, camera screens
+and the front end use the new layout.
+
+## Stage 9: rooms sub-range repacked for 511 (2026-11-02, static only)
+
+Done before stage 8 (the renumbering), so that every table already has the
+room the 511 id space needs when the ids move: each commit is safe alone.
+Blocks (`ROOMS_BLOCKS` in `test_mapmaker_rooms.py`; a table can use less
+than its block until stage 8):
+
+| block | base | bytes | was |
+| --- | --- | --- | --- |
+| t1 float/room | `0x008C0000` | 0x800 (512 rooms) | 0x400 |
+| t3 dword/room (sky mask reads it) | `0x008C0800` | 0x800 | 0x400 |
+| t2 dword/room | `0x008C1000` | 0x800 | `0x008C0400` |
+| t4 float[3]/room | `0x008C1800` | 0x1800 | `0x008C0C00` |
+| bucket staging row (`MAPMAKER_ROOMS_BUCKET_ROW`) | `0x008C3000` | 0x1000 | `0x008C1800`, 0x5000 (the byte rows were only read by the replaced bodies) |
+| t6, t7 (room list, capacity `0x00088D71` 0x200) | `0x008C4000`, `0x008C4800` | 0x800 each | `0x008C6800`, `0x008C6C00` |
+| per-id p2, p3, p5 | `0x008C5000`, `0x008C5840`, `0x008C6080` | 0x840 each | `0x008C7440`, `0x008C7880`, `0x008C8100` |
+| per-id p1, p4 (+ global entry) | `0x008C7000`, `0x008C7CC0` | 0x840 each | same bases |
+| per-id drawn flag | `0x008C8500` | 0x840 | `0x008CC800` |
+| model table (stage 10) | `0x008CA000` | 0xB08 words | 0xA08 words |
+| light round robin | `0x008CB700` | 0x100 (64 groups) | `0x008CB440`, 32 |
+| query buffers | `0x008CB800` | 2 x 0x800 | same |
+| front-end view | `0x008CD000` | 0x3000 | same |
+| light heads [3][0x20C] | `0x008D0000` | 0x1890 | `0x008C8540` |
+| light colour [0x20C][3] (+4) | `0x008D18A0` | 0x1894 | `0x008C9200` |
+
+Free: `0x008C68C0..0x008C7000`, `0x008C7840..0x008C7CC0`,
+`0x008C8D40..0x008CA000`, `0x008CB610..0x008CB700`, `0x008CC800..0x008CD000`,
+`0x008D3140..0x008DFFFF`. Per-room clears `0x0008A796/A2/B0` count 0x200.
+Other areas follow: objects pool clear (p2/p5 addresses), `MAPMAKER_ROOF_ROOMS`
+512 (roof and openview arrays), `MAPMAKER_CAMERA_ROOMS` 511 (camera
+diagnostics), light side table groups 64; the dev sky-mask switch keeps rooms
+0..255 (`MAPMAKER_SKYMASK_ROOMS`, a diagnostic). Tests: `test_rooms_blocks`
+(+4 mutations), `test_other_areas_use_the_moved_tables` (per-room sizes and
+C arrays), `test_extension_map_rooms_sub_range` (blocks), objects/openview/
+skymask fixtures.
+
+## Stage 8: special ids 0x200..0x20C (2026-11-02, static only)
+
+| id | stock | 255 layout | 511 layout |
+| --- | --- | --- | --- |
+| real rooms | 1..0xC8 | 1..0xFF | 1..0x1FF (`cmp 0xC8` x21 -> 0x1FF) |
+| spare (unused) | 0xC9 | 0x100 | 0x200 |
+| held by player p / nobody | 0xCA+p / 0xCE | 0x101+p / 0x105 | 0x201+p / 0x205 (`add -0xCA` x9 -> -0x201) |
+| room of view v | 0xCF+v | 0x106+v | 0x206+v |
+| global / unplaced | 0xD5 | 0x10C | 0x20C |
+| id space | 0xD6 | 0x10D | 0x20D |
+
+Same 155 operand entries as the 255 raise (143 special values, 9 player
+index adds, 12 view special flags at shadow flags + new id), every scene.
+Sizes tied to the id space: per-id loop ends `0x0009E4E6` 0x834 /
+`0x000A1ED5` 0x830; `[0x7B977C]` flag bytes 0x210 (`0x0008A6FD`,
+`0x0008BA63`), clear 0x83 dwords + stosw, displacements 0x20C/0x201/0x206;
+per-id tables p1/p4 0x830 + global entry (`0x008C7830`, `0x008C84F0`),
+p2/p3/p5 0x840; drawn flag 0x840; light heads row 0x20C (head piece 0x508,
+rest `0x008D0508`/0x1388, clear stride 0x830, end `0x008D20BC`); light
+colour 0x1894; view list cap `cmp ax, 0x20C`. C: `MAPMAKER_ROOMS_IDS_REAL`
+0x1FF, `_ID_GLOBAL`/`_LIGHT_ROW`/`_VIEW_LIST_CAP` 0x20C, `_VIEW_LIST_WORDS`
+0x20D, probe `MAPMAKER_PROBE_ROOM_IDS` 0x20D, objects clears 0x20D dwords.
+Lights: real rooms 0x100..0x1FF now also use the light side table; a light
+without a source prop there keeps its colour untinted (`sub_001124D0`'s
+byte path; with a source prop scene 100 reads the prop's dword room).
+Tests: `test_table_shape` and `id_space_problems` parameterised by
+`ID_SPACE`/`GLOBAL`/`SHIFT` (the 19 id-space mutations still fail), bucket
+fixture with the defines (list cap mutation re-checked).
+
+## Stage 10: model table for 511 room models (2026-11-02, static only)
+
+Room r is drawn by a prop of model 0x907 + r, so 511 rooms need models up
+to 0xB06. `rooms.json`: model -> slot table `0x008CA000` 0xB08 words (clear
+`0x002427C3` 0x584 dwords; base unchanged, the 45 operand entries keep
+their values), model bounds `cmp 0x9D0` x4 -> 0xB08, per-model 0x18 B array
+`[0x7087A4]` 0x108C0 bytes (clear 0x4230 dwords; Level heap, +3 KB). C:
+`MAPMAKER_ROOMS_MODEL_ENTRIES` 0xB08 with a compile-time check that every
+real room (0x1FF) and `MAPMAKER_ROOMS_MAX` have an entry; probe
+`MAPMAKER_PROBE_MODEL_ROOMS_END` 0xB08. The prop-slot synthesis
+(`pc_mapmaker_rooms_props`, scene 100) already covers 0x9D0..0x907+MAX, and
+the compile guard keeps 200 unless all of 0x908..0x907+MAX have slots, so
+raising `MAPMAKER_ROOMS_MAX` needs no other room change. The other areas'
+model ids (bosses, characters, khallos, mothership, sky music, tank) are
+all below 0xA00 and only read the table. Tests: `id_space_problems` model
+checks (+3 mutations: bound, clear and array left at the 255 sizes).
+
+## Cap after stages 7-10
+
+The room machinery holds 511 rooms (ids 0x1FF), but `MAPMAKER_ROOMS_MAX`
+and `MAPMAKER_LIMIT_PIECES` stay 255: other caps do not allow 511 yet
+(objects pool 1,000 < 511 rooms + 500 items + 64 characters, no bound check
+on that pool; links 12,000 < 511 x 46; regular pads 4,800 and ids 7,000..8,000
+< 511 x 14; pad groups 600 < ~770). Raise them together once the objects,
+pads and memory work reports: object pool >= 1,100, links >= 23,506, pads
+>= 7,154 with ids past 8,000, pad groups >= 800, and a probe of play memory
+with the arena raised.
+
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
 Cause: `sub_000BB850` (explosion/area effect over the rooms touching a box)
@@ -762,6 +900,12 @@ private XBE is not present.
 
 ## Validation done
 
+- Rooms 511 machinery (stages 7-10, 2026-11-02, static only): `check-tables.py`
+  "table verified" after each stage; `test_mapmaker_rooms.py` (stride table
+  +10, blocks +4, id space +22 mutations, stride decode classification),
+  bucket, camera, openview, roof, skymask, objects, probe, sky music and
+  boss-area fixtures. Not built, not played.
+
 - `check-tables.py` on the folder (00-header, items, rooms): table verified.
 - `tests/mapmaker/test_mapmaker_rooms.py`: fixture + 18 mutations, table shape, and the
   XBE completeness check of every room constant.
@@ -777,6 +921,27 @@ private XBE is not present.
   probe fixtures with the moved tables. Not built, not played.
 
 ## What to test in play
+
+Rooms 511 machinery (stages 7-10, 2026-11-02; every scene, not gated; the
+editor limit is still 255, so MapMaker maps are not larger yet):
+
+- R1. Story missions 1 and 2 for a few minutes each: geometry, doors and
+  portals, props, explosions/grenades (global room 0x20C in the area-effect
+  list), lights and room colours, held/thrown items (player ids 0x201..).
+- R2. Two-player story co-op and four-player Arcade splitscreen (view stride
+  0x3000, unrolled view init, view index divisions): every view draws its
+  rooms, weapon and HUD; the right view gets the right player.
+- R3. A level with security-camera screens and a mounted gun/camera
+  (camera view, widescreen frame, `[mapmaker] camera:` view lines in
+  MapMaker).
+- R4. Front end, pause, level restart and loading a second level (front-end
+  view in one stride, per-id tables, light heads/colour cleared).
+- R5. MapMaker play at 255 pieces with `TSFP_MAPMAKER_LIMITS=1`: `rooms 255 of
+  255`, open-air tiles drawn across (openview), sand grains in Sandstorm sky
+  for two players (sky music walks the views by stride), probe 128 room
+  tables.
+- R6. Any crash at level load points at the view array (72 KB) or the
+  per-model array (68 KB) allocation: note the level.
 
 Rooms 255 (stages 2-4 run in every scene, so story levels come first; no
 `TSFP_MAPMAKER_*` switch is needed for them):

@@ -50,6 +50,8 @@
 #define MAPMAKER_CAMERA_FROZEN 0x1u      /* data +8 bit 0: sub_00246000 skips its state machine */
 #define MAPMAKER_CAMERA_LOG_CAP 96u
 #define MAPMAKER_CAMERA_GUNS 16u
+#define MAPMAKER_CAMERA_ROOMS 511u          /* real rooms 1..0x1FF (rooms.json per-room tables) */
+#define MAPMAKER_CAMERA_VIEW_RECTS 0x1000u /* view shadow: room r at +0x1000+12*r (rooms.json; stock +0x3BC) */
 
 static struct {
     unsigned logs;
@@ -136,10 +138,10 @@ static void mapmaker_camera_view_diag(void)
     uint32_t slot,room,visible=0,key,actor,mode=0;
     int lo=1000,hi=-1000,top_room=0;
     float far_plane,fov;
-    if(WORD_AT(MAPMAKER_CAMERA_SCENE)!=MAPMAKER_CAMERA_PLAY || n<1u || n>255u) return;
-    if(!MAPMAKER_PTR_OK(view,0x6000u+(n+1u)*12u) || !MAPMAKER_PTR_OK(records,(n+1u)*0xB4u)) return;
+    if(WORD_AT(MAPMAKER_CAMERA_SCENE)!=MAPMAKER_CAMERA_PLAY || n<1u || n>MAPMAKER_CAMERA_ROOMS) return;
+    if(!MAPMAKER_PTR_OK(view,MAPMAKER_CAMERA_VIEW_RECTS+(n+1u)*12u) || !MAPMAKER_PTR_OK(records,(n+1u)*0xB4u)) return;
     for(r=1;r<=n;r++) {
-        uint32_t e=view+0x6000u+r*12u;
+        uint32_t e=view+MAPMAKER_CAMERA_VIEW_RECTS+r*12u;
         int16_t x0=*(int16_t *)((uintptr_t)(e+4u)+g_xbox_mem_offset),x1=*(int16_t *)((uintptr_t)(e+8u)+g_xbox_mem_offset);
         float y0=FLOAT_AT(records+r*0xB4u+0x14u),y1=FLOAT_AT(records+r*0xB4u+0x20u);
         int f0,f1;

@@ -124,7 +124,7 @@
 #define MAPMAKER_ROOF_SUFFIX_BYTES 64u
 #define MAPMAKER_ROOF_ITEM_MIN 0x18u           /* item sub-record: (count byte +0x14 * 4 + 0x1B) & ~3 */
 #define MAPMAKER_ROOF_SCENE_PLAY 100u
-#define MAPMAKER_ROOF_ROOMS 256u                /* per-room tables (rooms.json: 256 entries) */
+#define MAPMAKER_ROOF_ROOMS 512u                /* per-room tables (rooms.json: 512 entries) */
 #define MAPMAKER_ROOF_ROOM_MODEL 0x907u         /* room r is drawn by a prop of model 0x907 + r */
 #define MAPMAKER_ROOF_PLAY_PIECES 2048u
 #define MAPMAKER_ROOF_BUILD_SIZE 0x48u          /* reads +0x14 rooms, +0x28 first room, +0x44 mask */

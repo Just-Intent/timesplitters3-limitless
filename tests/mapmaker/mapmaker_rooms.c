@@ -2,7 +2,7 @@
  * 255): the bounded room query keeps the original's result and flag handling
  * past the old ~209-room stack frame; the compile guard drops only pieces that
  * would pass the room or portal limit, with the limit tied to the room-model
- * slots; prop slots for room models 0x9D0..0xA06 are synthesized in scene 100
+ * slots; prop slots for room models 0x9D0..0x907+MAX are synthesized in scene 100
  * only, from room 200's slot, without disturbing existing slots. */
 #include <stdarg.h>
 #include <stdint.h>
@@ -102,7 +102,7 @@ static void fake_compile(void)
 static void room_models(uint32_t last_model,uint32_t slots)
 {
     uint32_t m;
-    for(m=0;m<0xA08u;m++) set16(MAPMAKER_ROOMS_MODEL_TABLE+m*2u,0xFFFFu);
+    for(m=0;m<MAPMAKER_ROOMS_MODEL_ENTRIES;m++) set16(MAPMAKER_ROOMS_MODEL_TABLE+m*2u,0xFFFFu);
     for(m=0x908u;m<=last_model;m++) set16(MAPMAKER_ROOMS_MODEL_TABLE+m*2u,(uint16_t)(10u+m-0x908u));
     WORD_AT(0x0075EAA8u)=slots;
 }
@@ -226,7 +226,7 @@ static void lights(void)
     light_unlink(a);
     CHECK(WORD_AT(lhead(1,5))==b && WORD_AT(b+0x84u)==0 && *u8(a+0x99u)==0);
     /* a room id above 0xFF: its own head entry, never room (id & 0xFF)'s */
-    CHECK(MAPMAKER_ROOMS_LIGHT_GROUP_COUNT>0x10Cu/16u);
+    CHECK(MAPMAKER_ROOMS_LIGHT_GROUP_COUNT>MAPMAKER_ROOMS_ID_GLOBAL/16u);
     {
         c=light_create(0,2,0x101);                         /* group 16: record 16 * per */
         CHECK(c==LPOOL+16u*WORD_AT(MAPMAKER_ROOMS_LIGHT_PER)*0xB8u);

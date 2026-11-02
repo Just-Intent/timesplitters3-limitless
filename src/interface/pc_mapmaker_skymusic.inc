@@ -143,7 +143,7 @@
 #define SMX_GRAIN 0x24u                      /* pos +0, velocity +0xC, angle +0x18, spin +0x1C, age +0x20 (-1 dead) */
 #define SMX_PLAYERS_N 0x007B0CE0u
 #define SMX_PLAYERS 0x007B0CE4u
-#define SMX_PLAYER 0xFFCu
+#define SMX_PLAYER 0x3000u                 /* view stride (rooms.json: 0xFFC -> 0x3000) */
 #define SMX_PL_FLAGS 0x21Cu                  /* weather runs for sign bit + 0x400 (0x0011A68F) */
 #define SMX_PL_POS 0x27Cu
 #define SMX_PLAYERS_MAX 4u

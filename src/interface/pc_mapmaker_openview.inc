@@ -11,7 +11,7 @@
  * record [0x00708788] + room*0xB4, +4 -> {count, portal ids}; portal
  * [[0x0070878C] + id*4]: +0 room A, +4 room B), projects each portal, clips
  * it to the incoming rectangle and stores the union in the view's room entry
- * (stock view +0x3BC + 12*room, moved to the shadow +0x6000 by rooms.json:
+ * (stock view +0x3BC + 12*room, moved to the shadow +0x1000 by rooms.json:
  * int32 depth, int16 x0, y0, x1, y1). sub_000897D0 lists the rooms with a
  * depth >= 0 and x1 > x0, and every prop of a room (its geometry included)
  * is culled and scissored to that rectangle (sub_000862C0, see
@@ -48,13 +48,13 @@
 
 #define OPENVIEW_SCENE 0x0079094Cu
 #define OPENVIEW_PLAY 100u
-#define OPENVIEW_VIEW 0x007B0CC0u        /* current view (0xFFC struct) */
+#define OPENVIEW_VIEW 0x007B0CC0u        /* current view (0xFFC struct, 0x3000 apart with its shadow) */
 #define OPENVIEW_ROOM_COUNT 0x007B975Cu  /* rooms 1..n */
 #define OPENVIEW_PORTAL_COUNT 0x007B9754u /* portal ids 0..n (sub_00088430 0x000884E4) */
 #define OPENVIEW_RECORDS 0x00708788u     /* room r: + r*0xB4, +4 -> {count, ids} */
 #define OPENVIEW_RECORD 0xB4u
 #define OPENVIEW_PORTALS 0x0070878Cu     /* portal id -> struct: +0 room A, +4 room B */
-#define OPENVIEW_RECT 0x6000u            /* view shadow (rooms.json; stock +0x3BC) + 12*room */
+#define OPENVIEW_RECT 0x1000u            /* view shadow (rooms.json; stock +0x3BC) + 12*room */
 #define OPENVIEW_DEEPEST 0xD28u          /* view: deepest walk depth (sub_000897D0 caps it at 0x4F) */
 #define OPENVIEW_DEPTH_CAP 0x40u         /* below the 0x50 depth buckets, room for sub_00086C40's extra */
 #define OPENVIEW_PORTALS_PER_ROOM 64u
@@ -67,8 +67,8 @@ static struct {
     unsigned groups, touched_total, open;
     uint16_t group_first[MAPMAKER_ROOF_ROOMS+1u]; /* touched[group_first[g]..group_first[g+1]) */
     uint16_t members[MAPMAKER_ROOF_ROOMS+1u];     /* member count of group g: first entries are its open rooms */
-    uint8_t touched[OPENVIEW_TOUCHED];
-    uint8_t stamp[MAPMAKER_ROOF_ROOMS];
+    uint16_t touched[OPENVIEW_TOUCHED];          /* room ids (words: rooms past 255) */
+    uint16_t stamp[MAPMAKER_ROOF_ROOMS];         /* group mark + 1 per room */
     unsigned build_logs, peak_logs, peak;
     unsigned long long frames, widened, added, overflow;
 } mapmaker_openview;
@@ -106,17 +106,17 @@ static void mapmaker_openview_build(uint32_t n)
         if(!mapmaker_roof_play.open[r-1u] || mapmaker_openview.stamp[r-1u]) continue;
         /* breadth-first over open rooms: the group's members, in order */
         mark=g+1u;
-        mapmaker_openview.stamp[r-1u]=(uint8_t)mark;queue[tail++]=r;
+        mapmaker_openview.stamp[r-1u]=(uint16_t)mark;queue[tail++]=r;
         while(head<tail) {
             uint32_t m=queue[head++];
             k=mapmaker_openview_neighbours(m,n,next);portals+=k;
             for(i=0;i<k;i++)
                 if(mapmaker_roof_play.open[next[i]-1u] && !mapmaker_openview.stamp[next[i]-1u]) {
-                    mapmaker_openview.stamp[next[i]-1u]=(uint8_t)mark;queue[tail++]=next[i];
+                    mapmaker_openview.stamp[next[i]-1u]=(uint16_t)mark;queue[tail++]=next[i];
                 }
         }
         if(at+tail>OPENVIEW_TOUCHED) { mapmaker_openview.overflow++;break; }
-        for(i=0;i<tail;i++) mapmaker_openview.touched[at++]=(uint8_t)queue[i];
+        for(i=0;i<tail;i++) mapmaker_openview.touched[at++]=(uint16_t)queue[i];
         mapmaker_openview.members[g]=(uint16_t)tail;mapmaker_openview.open+=tail;
         /* closed rooms one portal away, listed once per group (stamped with its
          * mark; marks are unique, so a room next to two areas is in both lists) */
@@ -127,7 +127,7 @@ static void mapmaker_openview_build(uint32_t n)
                 uint32_t o=next[j];
                 if(mapmaker_roof_play.open[o-1u] || mapmaker_openview.stamp[o-1u]==mark) continue;
                 if(at>=OPENVIEW_TOUCHED) { mapmaker_openview.overflow++;break; }
-                mapmaker_openview.stamp[o-1u]=(uint8_t)mark;mapmaker_openview.touched[at++]=(uint8_t)o;
+                mapmaker_openview.stamp[o-1u]=(uint16_t)mark;mapmaker_openview.touched[at++]=(uint16_t)o;
             }
         }
         mapmaker_openview.group_first[g]=(uint16_t)first;
