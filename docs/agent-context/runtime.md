@@ -965,4 +965,4 @@ the first outline draw's projected midpoint. Shared PcUiWorldAnchor retains that
 anchor for labels and resets at placement boundaries; viewport/scissor share it.
 Both common backends and legacy GL consume the helper. Original world projection,
 visibility and objective logic remain guest-owned (Refs #338).
-MapMaker wrapper/table notes (incl. tilesets, multi-boss areas, set slot masks, tile caps, open-air view, 16 floors, sandstorm haze, camera frame, set screens, tile roof menu, skies/music, open air): [limitless](limitless.md).
+MapMaker wrapper/table notes (incl. tilesets, multi-boss areas, set slot masks, tile caps, open-air view, 16 floors, sandstorm haze, camera frame, nav block, set screens, tile roof menu, skies/music, open air): [limitless](limitless.md).
