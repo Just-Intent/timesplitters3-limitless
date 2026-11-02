@@ -17,7 +17,8 @@
  *   0x68 header   tileset word +0xA             < 7        catalogue 0x00524F64 + (id*7 + tileset)*0x1C
  *                 word count byte +0x42         <= 17      editor +0x1190C dwords up to the stock end +0x11950
  *                 piece count dword +4          <= 1024    editor: piece buffer sub_0003DFA0(0x1000) @0x00301BCA, piece pool 0x400
- *                                               <= 505     level: sub_00240C50 frame array [esp+i*8+0xA0] (0x1030 frame)
+ *                                               <= 512     level: sub_00240C50 frame array [esp+i*8+0xA0] = frame+0x90
+ *                                                          (level.json: frame 0x1030 -> 0x1090; stock 500)
  *                 string +0x162 (level)         NUL < 0xE0 strcpy @0x00240DE2 (the editor loader forces it, @0x00301FB5)
  *   0x69 pieces   piece records (count above)   inside the chunk; tile id < 45 (tables 0x00529400, 0x00783F40, 0x00785000)
  *                 items word +0x1E, each item   inside the chunk; item id (word +0xE) 0..79 (catalogue,
@@ -67,7 +68,7 @@
 #define MAPMAKER_VALIDATE_TILESETS 7u
 #define MAPMAKER_VALIDATE_HEADER_WORDS 17u
 #define MAPMAKER_VALIDATE_EDITOR_PIECES 1024u
-#define MAPMAKER_VALIDATE_LEVEL_PIECES 505u     /* (0x1030-0xA0)/8 */
+#define MAPMAKER_VALIDATE_LEVEL_PIECES 512u     /* (0x1090-0x90)/8: level.json frame (stock 0x1030: 500) */
 #define MAPMAKER_VALIDATE_BUFFER 1024u
 #define MAPMAKER_VALIDATE_PATROL 8u
 #define MAPMAKER_VALIDATE_SAI_NAME 0x24u

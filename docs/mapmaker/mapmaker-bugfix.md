@@ -20,7 +20,7 @@ The validator checks only bounds that would make a loader read or write
 outside its memory. It never checks positions, floors, overlap or items per
 tile. The bounds are tabled in the header of `src/interface/pc_mapmaker_validate.inc`:
 - walk inside 512 KB with an end tag
-- header: tileset < 7, word count <= 17, pieces <= 1024 (editor) or <= 505 (level stack array)
+- header: tileset < 7, word count <= 17, pieces <= 1024 (editor) or <= 512 (level stack array; `level.json` grows the 0x1030 frame, which held 500, to 0x1090)
 - pieces fit their chunk: tile id < 45, item id 0..79, pool total 1024
 - patrol count <= 8 and story AI name < 0x24
 - logic links: <= 13 (type 3) or <= 10 (type 0xA), indices inside the 1024-slot buffer

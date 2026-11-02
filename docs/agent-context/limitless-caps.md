@@ -33,8 +33,8 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
 - `pc_mapmaker_objects.inc` teleporter links stop at the pool, not the
   editor limit.
 - Tests: `mapmaker_limits.c` (exact 32,256 boundary with held pieces; 511
-  heavy pass every cap but pieces, links stop at 521, pads at 549, 1024 x 15
-  links fit), `mapmaker_objects.c` (links past the editor limit);
+  heavy-link pieces pass every cap, the 512th only the piece cap; links stop
+  at 521, pads at 549, 1024 x 15 links fit), `mapmaker_objects.c` (links past the editor limit);
   mutations in `test_mapmaker_limits.py` / `test_mapmaker_objects.py`.
 
 ## Pad groups (2026-11-02)
@@ -77,11 +77,23 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
   `mapmaker_limits.c` (pool source and fallback), `mapmaker_budget.c`.
 - Contract: `docs/mapmaker/mapmaker-memory.md` "Round 4".
 
-## What bounds 511 pieces of the heaviest tile now
+## What bounds 511 pieces now (cap 511, 2026-11-02)
 
-Pads stop at 548, links at 520, cover at 713, groups at about 680 (1.5 per
-piece), objects at 1023 - 64 - items. With every other cap raised the
-binding limits are the piece count (rooms area), the editor memory estimate
-(about 386 heavy pieces at the default scale 8; 511 need scale 11, i.e. an
-arena raised by at least 6 MB) and, past that, the Level heap itself
-(unmeasured: probe flag 32 and the map-start line).
+`MAPMAKER_LIMIT_PIECES` is 511 ([rooms](limitless-rooms.md) stage 11; the
+level fill pass frame `level.json` holds 512). Pads stop at 548, links at
+520, cover at 713, groups at about 680 (1.5 per piece), objects at
+1023 - 64 - items. Memory estimate per tile (XBE rows 0..45): light tiles
+(19, <= 8.4 KB) and medium (15, 10-24 KB) stop at the piece cap (1,960 / 676
+would fit scale 8); heavy (12, 32-42 KB) stop on the memory estimate at 386
+(type 21/33, 42,427 B) to 513 (31,882 B), so 511 of the heaviest need scale
+11 = `TSFP_MAPMAKER_ARENA_MB=6`. A map of all types mixed (mean 17.6 KB)
+estimates 9.0 MB of 16.4 MB at 511. Past that: the Level heap itself
+(unmeasured: probe flag 32 and the map-start line). Defaults unchanged
+(scale 8, arena off): no 511-piece or larger-arena play measurement.
+
+Refusal reason: `mapmaker_limits_log` prints `[MAPMAKER] placement refused:`
+with every cap passed (`pads|cover pads|links|pad groups|pieces|items|memory
+estimate|engine objects n of m`) once each time that set changes. Tests:
+`mapmaker_limits.c` (387 heaviest refused on memory alone, 386 fit, 511 at
+scale 11, not 10), `reasons_ok` and `reason-*` mutations in
+`test_mapmaker_limits.py`.

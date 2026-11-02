@@ -1,7 +1,7 @@
 /* Asset-free contract for src/interface/pc_mapmaker_skymask.inc: the dev switch
  * TSFP_MAPMAKER_ROOM_MASK_CLEAR clears node-mask bits in the relocated
  * per-room table after the stock store (sub_00085710), only in scene 100,
- * never in the build record, within the 256-entry table, and logs one summary
+ * never in the build record, within the 512-entry table, and logs one summary
  * per map build. The Python side checks the stderr text. */
 #include <stdint.h>
 #include <stdio.h>
@@ -112,10 +112,10 @@ int main(void)
 
     /* Several bits, 0x prefix, rooms past the table. */
     set_switch("0x09000000");clear_table();
-    b0=piece(0,254,4,0xFFFFFFFFu);
+    b0=piece(0,510,4,0xFFFFFFFFu);
     call(b0);
-    CHECK(WORD_AT(TABLE+254u*4u)==0xF6FFFFFFu && WORD_AT(TABLE+255u*4u)==0xF6FFFFFFu);
-    CHECK(WORD_AT(TABLE+256u*4u)==0u);           /* the next relocated table is not written */
+    CHECK(WORD_AT(TABLE+510u*4u)==0xF6FFFFFFu && WORD_AT(TABLE+511u*4u)==0xF6FFFFFFu);
+    CHECK(WORD_AT(TABLE+512u*4u)==0u);           /* the next relocated table is not written */
     pc_mapmaker_sky_room_mask_flush();
     fflush(stderr);puts("phase bound");fflush(stdout);
 

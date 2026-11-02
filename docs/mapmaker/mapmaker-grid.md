@@ -211,6 +211,6 @@ sites; the hook costs one stack compare when not in the floor menu.
 - Stock mode draws its 5 bars through the loop-count write; the off-screen
   fallback only runs if that slot is unexpected.
 - 80x80 play: longer sightlines, AI pathing over distance, fog; rooms stay
-  capped at 255 pieces.
+  capped at 511 pieces (255 before 2026-11-02).
 - Overlap maps look broken by design; starts/flags/turrets/movers never stack.
 - Stacked teleporters and Story AI are not tested in game (see play time above).

@@ -1,5 +1,5 @@
-/* US 45410066 MapMaker rooms: 200 -> 255 visibility rooms (one per piece),
- * room machinery for 511.
+/* US 45410066 MapMaker rooms: 200 -> 511 visibility rooms (one per piece;
+ * 255 until 2026-11-02), room machinery for 511.
  *
  * The guest-code table config/guest-code-patches/rooms.json renumbers the
  * room special ids above the real rooms (players 0xCA..0xCE -> 0x201..0x205,
@@ -75,7 +75,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAPMAKER_ROOMS_MAX 255u
+#define MAPMAKER_ROOMS_MAX 511u
 #define MAPMAKER_ROOMS_IDS_REAL 0x1FFu          /* rooms.json: real rooms 1..0x1FF, special ids 0x200.. */
 #define MAPMAKER_ROOMS_STOCK 200u
 #define MAPMAKER_ROOMS_PORTALS 0x3FFFu          /* flag bytes at esp+0x1280, 0x4000 B */
