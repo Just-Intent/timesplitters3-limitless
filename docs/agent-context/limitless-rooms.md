@@ -84,8 +84,7 @@ Room machinery reaches 1023 ids (specials 0x400..0x40C) after stages 6-10;
 the view shadow stops at 341 ids until the view stride changes (stage 7).
 Real maps are capped earlier by pads (~500-570 heaviest tiles), links
 (~712, int16 A* indices) and play memory (~550-650 tiles, unmeasured).
-Next safe target: 511 (view stride 0x3000). `MAPMAKER_LIMIT_PIECES` stays
-255 until a target's stages are all done.
+Next safe target: 511 (view stride 0x3000), reached in stage 11.
 
 ## Stage 6: word draw buckets (every scene)
 
@@ -140,5 +139,25 @@ untinted. mapmaker-rooms.md "Stage 8".
 Model -> slot table `0x008CA000` 0xB08 words, bounds 0xB08, per-model array
 0x108C0; `MAPMAKER_ROOMS_MODEL_ENTRIES` with a compile-time fit check;
 probe 0xB08. Prop slots and the compile guard follow `MAPMAKER_ROOMS_MAX`.
-Cap: still 255 (objects pool, links, pads, pad groups bind first; values
-needed: mapmaker-rooms.md "Cap after stages 7-10").
+Cap: 255 until stage 11 (values needed: mapmaker-rooms.md "Cap after
+stages 7-10").
+
+## Stage 11: cap 511 (2026-11-02)
+
+`MAPMAKER_ROOMS_MAX` and `MAPMAKER_LIMIT_PIECES` 511 (real rooms 1..0x1FF;
+a compile-time check refuses more). The compile guard keeps 511 only when
+room models 0x908..0xB06 all have prop slots (else 200); prop slots are
+synthesized for rooms 201..511 (311). New table
+`config/guest-code-patches/level.json` (10 operands): `sub_00240C50`, the
+level fill pass, keeps an 8-byte per-piece array at frame+0x90 in a 0x1030
+frame (500 pieces; entry 500 is the return address, the validator allowed
+505); frame 0x1090 holds 512, arguments `[esp+0x103C/0x1044]` +0x60,
+`MAPMAKER_VALIDATE_LEVEL_PIECES` 512. Sky mask switch covers 512 rooms.
+The editor logs `[MAPMAKER] placement refused: <cap> n of m` once per change
+(`mapmaker_limits_log`). What bounds maps: [caps](limitless-caps.md).
+Tests: `test_mapmaker_rooms.py` (511/512 drop, 256 kept, prop slots 611,
+`cap-255`, `cap-raised` refused at compile time), `test_mapmaker_limits.py`
+(`pieces-255`, `reason-*`, memory first at 387 heaviest),
+`test_mapmaker_validate.py` (`test_level_frame_*`: every frame site decoded,
+512 kept, 513 hidden), `test_mapmaker_skymask.py`. Playtest: mapmaker-rooms.md
+"Stage 11".

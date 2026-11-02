@@ -48,9 +48,16 @@ MUTATIONS = {
     'keycards-round2': ('    {0x00524CECu,2u,16u},', '    {0x00524CECu,2u,8u},'),
     'movers-round2': ('    {0x00524E3Cu,20u,160u},', '    {0x00524E3Cu,20u,80u},'),
     'markers-round2': ('    {0x00524EE4u,20u,160u},', '    {0x00524EE4u,20u,80u},'),
-    'pieces-stock': ('#define MAPMAKER_LIMIT_PIECES 255u', '#define MAPMAKER_LIMIT_PIECES 200u'),
-    'pieces-241': ('#define MAPMAKER_LIMIT_PIECES 255u', '#define MAPMAKER_LIMIT_PIECES 241u'),
-    'pieces-past-rooms': ('#define MAPMAKER_LIMIT_PIECES 255u', '#define MAPMAKER_LIMIT_PIECES 256u'),
+    # Pieces 511 = rooms (rooms.json real rooms 1..0x1FF); 255 was the cap before.
+    'pieces-stock': ('#define MAPMAKER_LIMIT_PIECES 511u', '#define MAPMAKER_LIMIT_PIECES 200u'),
+    'pieces-241': ('#define MAPMAKER_LIMIT_PIECES 511u', '#define MAPMAKER_LIMIT_PIECES 241u'),
+    'pieces-255': ('#define MAPMAKER_LIMIT_PIECES 511u', '#define MAPMAKER_LIMIT_PIECES 255u'),
+    'pieces-past-rooms': ('#define MAPMAKER_LIMIT_PIECES 511u', '#define MAPMAKER_LIMIT_PIECES 512u'),
+    'memory-unchecked': ('    if(memory>MAPMAKER_LIMIT_MEMORY) over|=MAPMAKER_CAP_MEMORY;\n', ''),
+    # The refusal reason (stderr): logged, and only when the caps passed change.
+    'reason-not-logged': ('        mapmaker_limits_log(over,&p,&h,total_mem,groups,sub);\n', ''),
+    'reason-every-frame': ('    if(over==last) return;\n', ''),
+    'reason-wrong-count': ('(unsigned)(p->pieces+h->pieces),MAPMAKER_LIMIT_PIECES)', '(unsigned)p->pieces,MAPMAKER_LIMIT_PIECES)'),
     'categories-always': ('    if(!mapmaker_limits.limits) return;\n    mapmaker_categories_apply();',
                           '    mapmaker_categories_apply();\n    if(!mapmaker_limits.limits) return;'),
     'categories-overwrite': (' && WORD_AT(a)==mapmaker_categories[i].stock)', ')'),
@@ -99,8 +106,18 @@ def test_mapmaker_limits(tmp_path, mutation):
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'mapmaker limits ok' in result.stdout
+        assert reasons_ok(result.stderr), result.stderr
     else:
-        assert result.returncode != 0, f'{mutation} was not detected'
+        assert result.returncode != 0 or not reasons_ok(result.stderr), f'{mutation} was not detected'
+
+
+def reasons_ok(stderr):
+    """The refusal names the cap reached, logged once per change of the caps passed."""
+    lines = [line for line in stderr.splitlines() if 'placement refused' in line]
+    memory = ('[MAPMAKER] placement refused: memory estimate 2052407 of 2048000 at scale 8 '
+              '(TSFP_MAPMAKER_ARENA_MB raises it);')
+    # memory: refused two frames running, logged once
+    return '[MAPMAKER] placement refused: pieces 512 of 511;' in lines and lines.count(memory) == 1
 
 
 def test_stage_a_patch():

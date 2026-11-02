@@ -1,4 +1,4 @@
-"""MapMaker rooms 200 -> 255 pieces, room machinery for 511: C policy fixture with mutations, plus the guest-code table's shape."""
+"""MapMaker rooms 200 -> 511 pieces (255 before 2026-11-02): C policy fixture with mutations, plus the guest-code table's shape."""
 import json
 import os
 from pathlib import Path
@@ -14,8 +14,11 @@ SUB_RANGE = (0x008C0000, 0x008E0000)
 
 MUTATIONS = {
     'cap-stock': ('    return MAPMAKER_ROOMS_MAX;\n}', '    return MAPMAKER_ROOMS_STOCK;\n}'),
-    'cap-raised': ('#define MAPMAKER_ROOMS_MAX 255u', '#define MAPMAKER_ROOMS_MAX 256u'),
-    'cap-241': ('#define MAPMAKER_ROOMS_MAX 255u', '#define MAPMAKER_ROOMS_MAX 241u'),
+    'cap-raised': ('#define MAPMAKER_ROOMS_MAX 511u', '#define MAPMAKER_ROOMS_MAX 512u'),
+    'cap-241': ('#define MAPMAKER_ROOMS_MAX 511u', '#define MAPMAKER_ROOMS_MAX 241u'),
+    'cap-255': ('#define MAPMAKER_ROOMS_MAX 511u', '#define MAPMAKER_ROOMS_MAX 255u'),
+    'cap-ignores-last-room': ('    for(r=1;r<=MAPMAKER_ROOMS_MAX;r++)\n', '    for(r=1;r<MAPMAKER_ROOMS_MAX;r++)\n'),
+    'props-short-of-max': ('last=MAPMAKER_ROOMS_MODEL_FIRST-1u+MAPMAKER_ROOMS_MAX;', 'last=MAPMAKER_ROOMS_MODEL_FIRST-2u+MAPMAKER_ROOMS_MAX;'),
     'query-flags-kept': ('&=0xEFu; /* clear "listed" */', '&=0xFFu;'),
     'query-ignores-box-bit': ('if(word&take) {', 'if(take) {'),
     'query-ignores-max': ('if(++found==max) take=0;', '++found;'),
@@ -69,13 +72,22 @@ def build(tmp_path, mutation):
         args = [compiler, '-std=c11', '-O2', '-Wall', '-Wextra', '-D_POSIX_C_SOURCE=200809L',
                 '-I' + str(tmp_path), '-I' + str(ROOT / 'src'), str(source), '-o', str(exe)]
     result = subprocess.run(args, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=60)
+    if mutation in COMPILE_REFUSED:
+        assert result.returncode != 0 and 'pc_mapmaker_rooms.inc' in result.stdout + result.stderr, mutation
+        return None
     assert result.returncode == 0, result.stdout + result.stderr
     return exe
+
+
+# Refused by a compile-time size check: a cap past the real room ids 1..0x1FF.
+COMPILE_REFUSED = {'cap-raised'}
 
 
 @pytest.mark.parametrize('mutation', ['fixed', *MUTATIONS])
 def test_mapmaker_rooms(tmp_path, mutation):
     exe = build(tmp_path, mutation)
+    if exe is None:
+        return
     result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr

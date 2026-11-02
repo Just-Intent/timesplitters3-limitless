@@ -238,9 +238,9 @@ int main(void)
     m=def();level(&m);CHECK(hidden_seen==1 && end_at_seen);         /* only the chunk already hidden */
     m=def();m.title=0xE0;level(&m);
     CHECK(tag_hidden(chunk_of[0])==1 && tag_hidden(chunk_of[1])==1); /* header and its pieces */
-    m=def();m.header_pieces=506;m.pieces=506;m.items=0;level(&m);
+    m=def();m.header_pieces=513;m.pieces=513;m.items=0;level(&m);
     CHECK(tag_hidden(chunk_of[0])==1 && tag_hidden(chunk_of[1])==1 && tag_hidden(chunk_of[2])==0);
-    m=def();m.header_pieces=505;m.pieces=505;m.items=0;level(&m);
+    m=def();m.header_pieces=512;m.pieces=512;m.items=0;level(&m);
     CHECK(hidden_seen==1);
     m=def();m.bad_tile=45;level(&m);
     CHECK(tag_hidden(chunk_of[0])==0 && tag_hidden(chunk_of[1])==1 && hidden_seen==2);

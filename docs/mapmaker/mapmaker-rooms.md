@@ -864,14 +864,69 @@ checks (+3 mutations: bound, clear and array left at the 255 sizes).
 
 ## Cap after stages 7-10
 
-The room machinery holds 511 rooms (ids 0x1FF), but `MAPMAKER_ROOMS_MAX`
-and `MAPMAKER_LIMIT_PIECES` stay 255: other caps do not allow 511 yet
+(Superseded by stage 11 below, kept for the record.) The room machinery
+holds 511 rooms (ids 0x1FF), but `MAPMAKER_ROOMS_MAX`
+and `MAPMAKER_LIMIT_PIECES` stayed 255: other caps did not allow 511 yet
 (objects pool 1,000 < 511 rooms + 500 items + 64 characters, no bound check
 on that pool; links 12,000 < 511 x 46; regular pads 4,800 and ids 7,000..8,000
 < 511 x 14; pad groups 600 < ~770). Raise them together once the objects,
 pads and memory work reports: object pool >= 1,100, links >= 23,506, pads
 >= 7,154 with ids past 8,000, pad groups >= 800, and a probe of play memory
 with the arena raised.
+
+## Stage 11: cap 511 (2026-11-02, static only)
+
+`MAPMAKER_ROOMS_MAX` (`pc_mapmaker_rooms.inc`) and `MAPMAKER_LIMIT_PIECES`
+(`pc_mapmaker_limits.inc`) are 511, the real rooms 1..0x1FF of stage 8 (a
+compile-time check refuses a larger `MAPMAKER_ROOMS_MAX`). Gating is as
+before: the editor limit only with `TSFP_MAPMAKER_LIMITS=1`, the compile
+guard only in scene 100 and only when room models 0x908..0xB06 all have prop
+slots (else 200; the 512th piece is dropped whole and logged). In scene 100
+the prop-slot hook adds 311 slots (rooms 201..511) copied from room 200's.
+
+Level fill pass frame (new, `config/guest-code-patches/level.json`, 10
+operand entries, every scene but only MapMaker maps reach it):
+`sub_00240C50` writes an 8-byte record per piece at `[esp+i*8+0xA0]`, i.e.
+frame+0x90 with four registers pushed, inside a 0x1030 frame. Stock it holds
+500 pieces; entry 500 lands on the return address (the validator's
+`(0x1030-0xA0)/8 = 505` bound let 501..505 through). The frame grows to
+0x1090 (512 records): `mov eax,0x1030` at 0x00240C50 and `add esp,0x1030`
+at 0x00242427 (its only exit), and the eight argument reads
+`[esp+0x103C]`/`[esp+0x1044]` (+0x60). `__chkstk` probes the larger frame.
+`MAPMAKER_VALIDATE_LEVEL_PIECES` is 512. CONFIRMED by decode
+(`test_level_frame_sites_match_the_code`: every displacement or immediate
+0x1030..0x112F in the function is in the table) and `check-tables.py`.
+
+Other 511 sites: sky-mask switch (`MAPMAKER_SKYMASK_ROOMS` 512, the whole
+relocated table); already sized for 512 before: roof/openview per-room arrays
+(`MAPMAKER_ROOF_ROOMS`), camera (`MAPMAKER_CAMERA_ROOMS` 511), probe (ids
+0x20D, models 0xB08), room query buffer (1023 words), light side table (ids
+up to 0x3FF), editor Story AI (511). Unchanged on purpose: container tiers
+(stock-tier test at 200 pieces), the probe's stock budget line, the validator's
+editor bound (1024).
+
+The editor now names the cap it refuses on: `[MAPMAKER] placement refused:
+<cap> n of m;` on stderr, once each time the set of caps passed changes.
+
+What bounds a map (`TSFP_MAPMAKER_LIMITS=1`, default scale 8, tile rows
+0..45 from the XBE; memory estimate per piece, items extra at 40 KB per new
+item type and 1 KB per repeat):
+
+| Tiles | Memory estimate | Pieces at scale 8 | First cap at 511 |
+| --- | --- | --- | --- |
+| light (19 types, corridors, <= 8.4 KB) | mean 5.1 KB | 1,960 | pieces (511) |
+| medium (15 types, 10-24 KB) | mean 18 KB | 676 | pieces (511) |
+| heavy (12 types, 32-42 KB) | mean 37 KB | 386 (type 21/33) .. 513 | memory estimate |
+
+A mixed map of all 46 types (mean 17.6 KB) estimates 9.0 MB at 511 pieces,
+of the 16.4 MB budget. 511 of the heaviest tile need scale 11, i.e.
+`TSFP_MAPMAKER_ARENA_MB=6` (8 + 6/2); `TSFP_MAPMAKER_MEMORY_SCALE=11`
+without the arena is not measured. Links stop at 520 heavy-link pieces,
+pads at 548, objects at 1023 - 64 - items (511 pieces leave 448 items).
+Defaults stay: scale 8 and no arena. The only play measurement (186 pieces,
+103 items, full at scale 3: 8.79 MB Level heap free) projects about 4 MB
+free at scale 8; nothing measured a larger arena's window headroom or a
+511-piece map, so raising either default has no evidence yet.
 
 ## Fix 2026-10-30: crash after an exploding barrel (story level 1)
 
@@ -922,8 +977,22 @@ private XBE is not present.
 
 ## What to test in play
 
-Rooms 511 machinery (stages 7-10, 2026-11-02; every scene, not gated; the
-editor limit is still 255, so MapMaker maps are not larger yet):
+Cap 511 (stage 11, 2026-11-02), MapMaker with `TSFP_MAPMAKER_LIMITS=1`:
+
+- M1. 300 pieces (past the old cap 255): build, save, reload in the editor,
+  play. Log: `rooms 300 of
+  511`, no `DROPPED`; geometry, props and lights in rooms 256..300.
+- M2. 400 light/medium pieces plus items: the meter, `placement refused`
+  lines when a cap is reached; play: AI navigation, doors, lights and
+  explosions in high rooms; map-start memory line.
+- M3. 511 pieces (light tiles): the 512th refused (`pieces 512 of 511`);
+  play loads (level fill frame 0x1090, `sub_00240C50`): `rooms 511 of 511`,
+  every room draws, sky/open-air tiles, two-player splitscreen.
+- M4. Heavy tiles: refusal at about 386 on `memory estimate`; with
+  `TSFP_MAPMAKER_ARENA_MB=6` 511 heavy pieces place and play (map-start
+  memory line, probe flag 32); note min Level heap free.
+
+Rooms 511 machinery (stages 7-10, 2026-11-02; every scene, not gated):
 
 - R1. Story missions 1 and 2 for a few minutes each: geometry, doors and
   portals, props, explosions/grenades (global room 0x20C in the area-effect
@@ -937,7 +1006,7 @@ editor limit is still 255, so MapMaker maps are not larger yet):
 - R4. Front end, pause, level restart and loading a second level (front-end
   view in one stride, per-id tables, light heads/colour cleared).
 - R5. MapMaker play at 255 pieces with `TSFP_MAPMAKER_LIMITS=1`: `rooms 255 of
-  255`, open-air tiles drawn across (openview), sand grains in Sandstorm sky
+  511`, open-air tiles drawn across (openview), sand grains in Sandstorm sky
   for two players (sky music walks the views by stride), probe 128 room
   tables.
 - R6. Any crash at level load points at the view array (72 KB) or the

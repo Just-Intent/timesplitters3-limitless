@@ -1,3 +1,17 @@
+## MapMaker piece cap 255 -> 511 (2026-11-02, not built or played)
+
+Source: branch cap-511 from mapmaker-recon a9c05312, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. `MAPMAKER_ROOMS_MAX` and `MAPMAKER_LIMIT_PIECES` are 511 (behind
+`TSFP_MAPMAKER_LIMITS=1`). New `config/guest-code-patches/level.json` grows the level fill pass
+`sub_00240C50` frame 0x1030 -> 0x1090: its per-piece stack array held 500 pieces (entry 500 was the
+return address; the validator allowed 505), now 512, and the validator's level bound is 512. Sky
+mask switch covers 512 rooms. The editor logs `[MAPMAKER] placement refused: <cap> n of m`. Light
+and medium tiles stop at 511 pieces; the heaviest-memory tiles stop on the memory estimate at 386
+(scale 8; 511 need `TSFP_MAPMAKER_ARENA_MB=6`). Defaults unchanged (no measurement). check-tables
+"table verified" (1516 entries); tests/mapmaker + test_menu_mouse + test_guest_code_patches: 3094
+passed, 1 skipped, 10 WinError 4551 failures that pass on rerun. Not run: game build, story levels,
+MapMaker play, Mac. Playtest: docs/mapmaker/mapmaker-rooms.md "What to test in play" (M1..M4, R1..R6).
+
 ## Camera and mounted-gun view on widescreen (2026-11-02, not built or played)
 
 Source: branch camera-widescreen from mapmaker-recon 6513a37e, Windows 11 x64, MSVC fixtures and the

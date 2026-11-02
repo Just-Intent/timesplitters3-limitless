@@ -28,9 +28,10 @@
  * sub-entries, and writes the meter (editor+0x270, placed only) and the held
  * piece preview (editor+0x274) from the same limits. After the original runs,
  * the decision and both values are recomputed with pads 4800, links 12000,
- * pad groups 600, 500 items ("sub-entries"; cover pads stay 1024) and 255
+ * pad groups 600, 500 items ("sub-entries"; cover pads stay 1024) and 511
  * pieces (one visibility room each: the engine's 200-room limit is raised to
- * 255 by config/guest-code-patches/rooms.json, see src/interface/pc_mapmaker_rooms.inc);
+ * 511 by config/guest-code-patches/rooms.json, see src/interface/pc_mapmaker_rooms.inc;
+ * 255 until 2026-11-02);
  * memory (raised separately by TSFP_MAPMAKER_MEMORY_SCALE) keeps its limit.
  * The editor's item node pool is 5300 (config/guest-code-patches/items.json):
  * 500 items, their clipboard copies and up to 81 start points fit twice over.
@@ -61,6 +62,7 @@
  * Requires the includer's WORD_AT, FLOAT_AT, guest_writable, guest_call,
  * save_registers/restore_registers, g_xbox_mem_offset and
  * mapmaker_budget_apply (pc_mapmaker_budget.inc). */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -96,7 +98,11 @@
  * count; the N x N distance matrix sub_00275F70 builds is (N+1) x N x 4 B,
  * 4.2 MB at 1024, and takes N x N route searches at load (unmeasured). */
 #define MAPMAKER_LIMIT_GROUPS 1024
-#define MAPMAKER_LIMIT_PIECES 255u    /* = MAPMAKER_ROOMS_MAX */
+/* Pieces (2026-11-02, was 255): one visibility room each, so = MAPMAKER_ROOMS_MAX
+ * (rooms.json real rooms 1..0x1FF). 511 light or medium pieces stop here; 511
+ * of the heaviest-memory tiles stop first on the memory estimate (386 at the
+ * default scale 8; scale 11 = TSFP_MAPMAKER_ARENA_MB >= 6 fits them). */
+#define MAPMAKER_LIMIT_PIECES 511u
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
 /* Engine objects (2026-11-02): in play each piece (room) and about each item
@@ -285,6 +291,31 @@ static unsigned mapmaker_limits_over(const MapMakerTotals *p,const MapMakerTotal
     if(mapmaker_objects_needed(p->pieces+h->pieces,sub)>MAPMAKER_LIMIT_OBJECTS) over|=MAPMAKER_CAP_OBJECTS;
     return over;
 }
+/* The refusal reason, logged once each time the set of limits passed changes
+ * (the check runs every frame): every limit placed + held content passes, the
+ * first-named one first in the order the meter lists them. */
+static void mapmaker_limits_log(unsigned over,const MapMakerTotals *p,const MapMakerTotals *h,
+                                uint32_t memory,int32_t groups,uint32_t sub)
+{
+    static unsigned last;
+    if(over==last) return;
+    last=over;
+    if(!over) return;
+    fprintf(stderr,"[MAPMAKER] placement refused:");
+    if(over&MAPMAKER_CAP_PADS) fprintf(stderr," pads %u of %u;",(unsigned)(p->cost[0]+h->cost[0]),MAPMAKER_LIMIT_PADS);
+    if(over&MAPMAKER_CAP_COVER) fprintf(stderr," cover pads %u of %u;",(unsigned)(p->cost[1]+h->cost[1]),MAPMAKER_LIMIT_COVER);
+    if(over&MAPMAKER_CAP_LINKS) fprintf(stderr," links %u of %u;",(unsigned)(mapmaker_link_cost(p)+mapmaker_link_cost(h)),
+                                        (unsigned)MAPMAKER_LIMIT_LINKS);
+    if(over&MAPMAKER_CAP_GROUPS) fprintf(stderr," pad groups %d of %d;",(int)groups,MAPMAKER_LIMIT_GROUPS);
+    if(over&MAPMAKER_CAP_PIECES) fprintf(stderr," pieces %u of %u;",(unsigned)(p->pieces+h->pieces),MAPMAKER_LIMIT_PIECES);
+    if(over&MAPMAKER_CAP_SUB) fprintf(stderr," items %u of %u;",(unsigned)sub,MAPMAKER_LIMIT_SUB);
+    if(over&MAPMAKER_CAP_MEMORY) fprintf(stderr," memory estimate %u of %u at scale %u (TSFP_MAPMAKER_ARENA_MB raises it);",
+                                         (unsigned)memory,MAPMAKER_LIMIT_MEMORY,mapmaker_budget_scale());
+    if(over&MAPMAKER_CAP_OBJECTS) fprintf(stderr," engine objects %u of %u (pieces + items + %u characters);",
+                                          (unsigned)mapmaker_objects_needed(p->pieces+h->pieces,sub),MAPMAKER_LIMIT_OBJECTS,
+                                          MAPMAKER_OBJECTS_RESERVE);
+    fputc('\n',stderr);
+}
 static float mapmaker_fraction_max(const float *f,unsigned n)
 {
     float m=0;
@@ -328,7 +359,12 @@ void pc_display_mapmaker_limits(void (*original)(void))
     f[5]=(float)(total_mem>placed_mem?total_mem-placed_mem:0u)/MAPMAKER_LIMIT_MEMORY;
     FLOAT_AT(editor+0x274)=mapmaker_fraction_max(f,6);
     /* Placement decision over placed + held. */
-    refuse=mapmaker_limits_over(&p,&h,total_mem,groups,p.sub+h.sub+(held_id>9?1u:0u)+extra)!=0;
+    {
+        uint32_t sub=p.sub+h.sub+(held_id>9?1u:0u)+extra;
+        unsigned over=mapmaker_limits_over(&p,&h,total_mem,groups,sub);
+        mapmaker_limits_log(over,&p,&h,total_mem,groups,sub);
+        refuse=over!=0;
+    }
     flags=WORD_AT(editor+0x25c);
     WORD_AT(editor+0x25c)=refuse?(flags|0x400000u):(flags&~0x400000u);
 }
