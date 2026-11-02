@@ -28,6 +28,14 @@ Crowe egg skip (WRAP sub_002AB1B0) and the shared boss statics holder
 (`sub_0005F460`), and WRAP sub_001CDD60 (level restart, no pak mount)
 resets the chairs ([area doc](../mapmaker/mapmaker-khallos.md)).
 
+Anim slot budget (after .34): the stock anim slot table has 940 static slots
+with an unchecked count (`sub_00057F30`); boss paks registered their whole
+story cast and slot 940 crashed the load (grenade.pak entry 10). In scene 100
+`pc_mapmaker_animslots.inc`, run first by the existing `pc_mapmaker_worm_register`
+(WRAP sub_0005B980, no new wrapper), registers only each boss's own anims,
+skips ids already registered, never passes 940
+([area doc](../mapmaker/mapmaker-animslots.md); test_mapmaker_animslots.py).
+
 Restart audit (after .31): "START restart" runs `sub_001CDAF0` + `sub_001CDD60`,
 never `sub_001CDB80` (pak mount, `sub_0015E7C0`/`sub_0025F720` level init),
 and skips the map start `sub_00240C50` (`[0x006F32EC]`). New WRAP sub_001CDD60
