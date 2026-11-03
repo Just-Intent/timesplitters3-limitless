@@ -51,7 +51,8 @@ void sub_00087720(void) {}  /* rooms: view room list (sub_000897D0) */
 void sub_00300670(void) {}
 void sub_0031BB60(void) {}
 void sub_003C85D4(void) {}
-/* restable: meter font and outlined text */
+/* restable: meter font, text measure, backdrop and outlined text */
+void sub_0001EFB0(void) {}
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines sub_0003FA10 */
 void sub_0003FA10(void) {}
 #endif

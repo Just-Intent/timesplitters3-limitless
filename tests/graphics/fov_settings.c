@@ -58,6 +58,7 @@ void pc_controls_mapmaker_row_press(void) {}
 void pc_controls_mapmaker_editor(int active) { (void)active; }
 void pc_controls_mapmaker_zoom(int notches) { (void)notches; }
 void pc_controls_mapmaker_pulse(int button) { (void)button; }
+int pc_controls_mapmaker_table_key(void) { return 0; }
 void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *ow,unsigned *oh)
 { (void)w;(void)h;CHECK(slider_capture_enabled);*ow=1920;*oh=1080; }
 #define MOUSE_STUB(name) void name(void) { CHECK(0); }

@@ -679,6 +679,20 @@ void pc_controls_mapmaker_pulse(int button)
     ReleaseSRWLockExclusive(&lock);
 }
 
+/* Polled from the guest meter input (pc_mapmaker_restable.inc), which checks
+ * for the editor screen itself; never while the bindings are evaluated. */
+int pc_controls_mapmaker_table_key(void)
+{
+    int bound[PC_ACTION_COUNT][PC_BINDING_SLOTS], have, down;
+    if (InterlockedCompareExchange(&editing, 0, 0)) return 0;
+    have = pc_settings_bound_keys(bound);
+    AcquireSRWLockExclusive(&lock);
+    down = !text_input.owner && (replaying || GetForegroundWindow() == window_handle) &&
+           pc_input_down(&input, PC_MAPMAKER_TABLE_KEY, GetTickCount64());
+    ReleaseSRWLockExclusive(&lock);
+    return pc_mapmaker_table_key(down, have ? &bound[0][0] : NULL, PC_ACTION_COUNT * PC_BINDING_SLOTS);
+}
+
 void pc_controls_mapmaker_zoom(int notches)
 {
     AcquireSRWLockExclusive(&lock);

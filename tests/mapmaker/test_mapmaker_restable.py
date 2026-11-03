@@ -12,6 +12,7 @@ TABLE = ROOT / 'src/interface/pc_mapmaker_restable.inc'
 LIMITS = ROOT / 'src/interface/pc_mapmaker_limits.inc'
 EDITOR = ROOT / 'src/interface/pc_mapmaker_editor.inc'
 OBJECTS = ROOT / 'src/interface/pc_mapmaker_objects.inc'
+POLICY = ROOT / 'src/interface/pc_mapmaker_pointer.h'
 GUEST = ROOT / 'src/interface/pc_menu_mouse_guest.inc'
 
 # (file, old, new): each breaks one contract the fixture must detect.
@@ -29,8 +30,8 @@ MUTATIONS = {
     'view-any-editor': (TABLE, 'mapmaker_limits_view.editor!=editor || ', ''),
     'tiles-stock-cap': (TABLE, 'MAPMAKER_TABLE_ROW("Tiles",v->pieces,MAPMAKER_LIMIT_PIECES,',
                         'MAPMAKER_TABLE_ROW("Tiles",v->pieces,200u,'),
-    'pads-wrong-bit': (TABLE, 'MAPMAKER_TABLE_ROW("Cover pads",v->cover,MAPMAKER_LIMIT_COVER,MAPMAKER_CAP_COVER);',
-                       'MAPMAKER_TABLE_ROW("Cover pads",v->cover,MAPMAKER_LIMIT_COVER,MAPMAKER_CAP_PADS);'),
+    'pads-wrong-bit': (TABLE, 'MAPMAKER_TABLE_ROW("Cover",v->cover,MAPMAKER_LIMIT_COVER,MAPMAKER_CAP_COVER);',
+                       'MAPMAKER_TABLE_ROW("Cover",v->cover,MAPMAKER_LIMIT_COVER,MAPMAKER_CAP_PADS);'),
     'memory-bytes': (TABLE, 'MAPMAKER_TABLE_ROW("Memory",memory_kb,', 'MAPMAKER_TABLE_ROW("Memory",v->memory,'),
     'memory-rounded-down': (TABLE, '((uint64_t)v->memory+MAPMAKER_TABLE_KB-1u)/MAPMAKER_TABLE_KB', '((uint64_t)v->memory)/MAPMAKER_TABLE_KB'),
     'pickups-no-keycards': (TABLE, '{8u,9u,10u,11u,12u,13u,19u,20u,21u,31u}', '{8u,9u,19u,20u,21u,31u}'),
@@ -52,13 +53,44 @@ MUTATIONS = {
     'full-only-over': (TABLE, 'if(refused || used>=max) return MAPMAKER_TABLE_STATE_FULL;', 'if(refused || used>max) return MAPMAKER_TABLE_STATE_FULL;'),
     'refusal-ignored': (TABLE, 'rows[n].state=mapmaker_table_state((u),(m),(v->over&(bit))!=0);', 'rows[n].state=mapmaker_table_state((u),(m),0);'),
     'no-blink': (TABLE, '            MAPMAKER_TABLE_BLINK:MAPMAKER_TABLE_FULL;', '            MAPMAKER_TABLE_FULL:MAPMAKER_TABLE_FULL;'),
+    # Collapsed: the fullest row, worst state first, then used/max.
+    'default-expanded': (TABLE, '        mapmaker_table.initialized=1;\n', '        mapmaker_table.initialized=1;mapmaker_table.expanded=1;\n'),
+    'never-expands': (TABLE, '        lines=1+n;\n', '        lines=1;\n'),
+    'fullest-ratio-only': (TABLE, '    if(a->state!=b->state) return a->state>b->state;\n', ''),
+    'fullest-state-only': (TABLE, '    return (uint64_t)a->used*b->max>(uint64_t)b->used*a->max;', '    return 0;'),
+    'header-plain-colour': (TABLE, 'mapmaker_table_slot(0),mapmaker_table_colour(rows[worst].state),',
+                            'mapmaker_table_slot(0),MAPMAKER_TABLE_OK,'),
+    # Toggle: a click on the panel or the free I key, editor screen only, A taken from the editor.
+    'no-swallow': (TABLE, '    mapmaker_table.swallow=1;\n    WORD_AT(menu+0xc4)&=~(MAPMAKER_TABLE_A|MAPMAKER_TABLE_A_HIGH);\n'
+                          '    WORD_AT(menu+0xc8)&=~(MAPMAKER_TABLE_A|MAPMAKER_TABLE_A_HIGH);\n', '    mapmaker_table.swallow=1;\n'),
+    'swallow-press-only': (TABLE, '    mapmaker_table.swallow=1;\n', '    mapmaker_table.swallow=0;\n'),
+    'release-kept': (TABLE, '        WORD_AT(menu+0xc8)&=~(MAPMAKER_TABLE_A|MAPMAKER_TABLE_A_HIGH);\n    }\n', '    }\n'),
+    'hit-anywhere': (TABLE, 'x>=b->x0 && x<b->x1 && y>=b->y0 && y<b->y1;', '1;'),
+    'hit-while-hidden': (TABLE, 'return mapmaker_table.shown && mapmaker_table.stale<=MAPMAKER_TABLE_STALE &&',
+                         'return mapmaker_table.shown &&'),
+    'toggle-in-menus': (TABLE, '       WORD_AT(menu+0x178) || WORD_AT(menu+0x170)) return;', '       0) return;'),
+    'toggle-any-scene': (TABLE, '       (int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_TABLE_SCENE ||', '      '),
+    'toggle-ignores-switch': (TABLE, 'if(!mapmaker_table_enabled() || !MAPMAKER_PTR_OK(0x0079094Cu,4) ||',
+                              'if(!MAPMAKER_PTR_OK(0x0079094Cu,4) ||'),
+    'key-repeats': (TABLE, 'if(key && !mapmaker_table.key_was && ', 'if(key && '),
+    'key-while-hidden': (TABLE, ' && mapmaker_table.shown && mapmaker_table.stale<=MAPMAKER_TABLE_STALE)\n', ')\n'),
+    'key-bound-ignored': (POLICY, 'if (bound[i] == PC_MAPMAKER_TABLE_KEY) return 0;', 'if (0) return 0;'),
+    # Expanded: two aligned columns, a pitch that fits the glyph, over a backdrop.
+    'values-left': (TABLE, 'mapmaker_table_bits(box.value_right-widths[1+n+i])', 'mapmaker_table_bits(box.value_right-value_w)'),
+    'title-column-first': (TABLE, 'if(widths[1+i]>title_w) title_w=widths[1+i];', 'if(!i) title_w=widths[1+i];'),
+    'value-scale-digits': (TABLE, 'snprintf(line,sizeof line," %u/%u%s"', 'snprintf(line,sizeof line,"%u/%u%s"'),
+    'estimate-only': (TABLE, 'return isfinite(w) && w>0.f && w<MAPMAKER_TABLE_CANVAS_W?w:', 'return 0?w:'),
+    'measure-over-frame': (TABLE, '    uint32_t sp=g_esp-32u;\n', '    uint32_t sp=g_esp;\n'),
+    'line-ignores-glyph': (TABLE, '        return glyph_h+MAPMAKER_TABLE_LEAD;', '        return MAPMAKER_TABLE_LINE;'),
+    'tight-rows': (TABLE, '#define MAPMAKER_TABLE_LINE 11.5f', '#define MAPMAKER_TABLE_LINE 9.0f'),
+    'scale-75': (TABLE, '#define MAPMAKER_TABLE_SCALE 60 ', '#define MAPMAKER_TABLE_SCALE 75 '),
+    'no-backdrop': (TABLE, '    guest_call(sub_0001EFB0,5,', '    if(0) guest_call(sub_0001EFB0,5,'),
     # Drawing: replaces the meter, in its font and place, and leaves the game's state.
-    'no-ret': (TABLE, '    restore_registers(&r);\n    MAPMAKER_GUEST_RET();', '    restore_registers(&r);'),
+    'no-ret': (TABLE, 'mapmaker_table.stale=0;\n    MAPMAKER_GUEST_RET();', 'mapmaker_table.stale=0;'),
     'also-stock': (TABLE, '    save_registers(&r);\n    align=', '    original();\n    save_registers(&r);\n    align='),
     'font-not-restored': (TABLE, '    guest_call(sub_0003FA10,1,font);\n', ''),
     'align-not-restored': (TABLE, '    WORD_AT(MAPMAKER_TABLE_ALIGN_WORD)=align;\n', ''),
     'wrong-font': (TABLE, '#define MAPMAKER_TABLE_FONT 0x12u', '#define MAPMAKER_TABLE_FONT 0x13u'),
-    'tight-rows': (TABLE, '#define MAPMAKER_TABLE_LINE 12.0f', '#define MAPMAKER_TABLE_LINE 8.0f'),
     'no-bottom-clamp': (TABLE, '    if(y+h>MAPMAKER_TABLE_CANVAS_H-MAPMAKER_TABLE_MARGIN) y=MAPMAKER_TABLE_CANVAS_H-MAPMAKER_TABLE_MARGIN-h;\n', ''),
     'no-right-clamp': (TABLE, '    if(x+w>MAPMAKER_TABLE_CANVAS_W-MAPMAKER_TABLE_MARGIN) x=MAPMAKER_TABLE_CANVAS_W-MAPMAKER_TABLE_MARGIN-w;\n', ''),
     'nan-position': (TABLE, '    if(!isfinite(x)) x=MAPMAKER_TABLE_MARGIN;\n', ''),
@@ -67,7 +99,8 @@ MUTATIONS = {
     'before-check': (TABLE, '!mapmaker_limits_view.valid ||', '0 ||'),
     'probe-ignored': (TABLE, '(mapmaker_probe_flags()&MAPMAKER_PROBE_METER) || ', ''),
     'switch-ignored': (TABLE, "mapmaker_table.enabled=!(v && v[0]=='0' && !v[1]);", 'mapmaker_table.enabled=1;'),
-    'no-buffer-check': (TABLE, '    if(!mapmaker_table.text) { mapmaker_probe_meter(original);return; }\n', ''),
+    'no-buffer-check': (TABLE, '    if(!mapmaker_table.text) { mapmaker_table.shown=0;mapmaker_probe_meter(original);return; }\n', ''),
+    'stock-keeps-panel': (TABLE, '        mapmaker_table.shown=0;           /* the stock meter: clicks there are the editor\'s */\n', ''),
 }
 
 
@@ -87,7 +120,7 @@ def build(tmp_path, mutation):
     if mutation != 'fixed':
         path, old, new = MUTATIONS[mutation]
         text = path.read_text(encoding='utf-8')
-        assert old in text, mutation
+        assert text.count(old) == 1, mutation
         (tmp_path / path.name).write_text(text.replace(old, new), encoding='utf-8')
     exe = tmp_path / ('restable.exe' if os.name == 'nt' else 'restable')
     source = ROOT / 'tests/mapmaker/mapmaker_restable.c'
@@ -126,6 +159,9 @@ def test_restable_wiring():
     for before in ('pc_mapmaker_limits.inc', 'pc_mapmaker_editor.inc', 'pc_mapmaker_objects.inc'):
         assert guest.index(f'#include "{before}"') < guest.index('#include "pc_mapmaker_restable.inc"')
     assert guest.index('#include "pc_mapmaker_restable.inc"') < guest.index('/* MapMaker capacity area includes (end) */')
+    # The toggle input runs after the editor's own input read, beside the mouse pointer.
+    hook = guest[guest.index('void pc_display_menu_mouse_input(void (*original)(void))'):]
+    assert hook.index('original();') < hook.index('mapmaker_pointer_input(menu);') < hook.index('mapmaker_table_input(menu);')
     # One definition of the hook whichever way the probe is included.
     assert '#ifndef MAPMAKER_RESTABLE\nvoid pc_display_mapmaker_meter(void (*original)(void)) { mapmaker_probe_meter(original); }\n#endif' \
         in probe.replace('\r\n', '\n')
@@ -136,10 +172,21 @@ def test_restable_wiring():
     assert 'pc_display_mapmaker_meter(sub_0030C210_gen);' in patch
     wrappers = next(ROOT.glob('patches/**/*-mapmaker-meter-wrappers.patch')).read_text(encoding='utf-8')
     assert 'sub_0030C210' not in wrappers
-    # Whole-chain fixtures link the two text functions.
+    # The toggle key on both hosts, through the shared policy; declared once.
+    controls_h = (ROOT / 'src/input/pc_controls.h').read_text(encoding='utf-8')
+    assert 'int pc_controls_mapmaker_table_key(void);' in controls_h
+    for host in ('src/input/pc_controls.c', 'src/native/input_sdl.c'):
+        text = (ROOT / host).read_text(encoding='utf-8')
+        assert 'int pc_controls_mapmaker_table_key(void)' in text, host
+        assert 'pc_mapmaker_table_key(' in text and 'pc_settings_bound_keys(bound)' in text, host
+    # Whole-chain fixtures link the text, measure and backdrop functions and the key.
     stubs = (ROOT / 'tests/mapmaker/mapmaker_area_stubs.h').read_text(encoding='utf-8')
-    assert 'void sub_00041E30(void) {}' in stubs and 'void sub_0003FA10(void) {}' in stubs
+    for name in ('sub_00041E30', 'sub_0003FA10', 'sub_0001EFB0'):
+        assert f'void {name}(void) {{}}' in stubs, name
+    for fixture in ('tests/input/menu_mouse.c', 'tests/graphics/fov_settings.c'):
+        assert 'pc_controls_mapmaker_table_key(void)' in (ROOT / fixture).read_text(encoding='utf-8'), fixture
     # The documented contract.
     doc = (ROOT / 'docs/mapmaker/mapmaker-restable.md').read_text(encoding='utf-8')
-    for word in ('TSFP_MAPMAKER_TABLE', 'sub_0030C210', 'Engine objects', 'Pickups', 'Teleporters'):
-        assert word in doc
+    for word in ('TSFP_MAPMAKER_TABLE', 'sub_0030C210', 'Engine objects', 'Pickups', 'Teleporters', 'Collapsed',
+                 'Expanded', 'I key', 'sub_0003FCF0', 'sub_0001EFB0'):
+        assert word in doc, word
