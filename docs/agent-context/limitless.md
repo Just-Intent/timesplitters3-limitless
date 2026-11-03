@@ -576,7 +576,8 @@ so the late Back was lost. `mapmaker_pointer_tick_back` sets it in
 clears the right-click action for the row hook. Every other MapMaker list descriptor
 in `0x0052C000..0x0052F000` relies on `+0x1C0` (scan of ticks testing `+0xC4 & 0x20`;
 tile/item/Story AI/logic/settings observed with `+0x1C0` set). No guest regeneration. Fixture:
-`tests/mapmaker/test_mapmaker_pointer.py`. Mac: MAC-128.
+`tests/mapmaker/test_mapmaker_pointer.py`. Mac: MAC-128. Next:
+`mapmaker_table_input` (panel toggle, eats its A): [caps](limitless-caps.md).
 
 ### MapMaker editor widescreen
 

@@ -193,9 +193,23 @@ meter scope becomes `static mapmaker_probe_meter`) now defines
 `pc_display_mapmaker_meter`, the existing manual wrapper of the meter painter
 `sub_0030C210` (cdecl x, y floats; probe patch, no new wrapper or
 regeneration). With `TSFP_MAPMAKER_LIMITS=1` it replaces the painter (pops
-the return address) with 15 outlined rows `Title: used/max` at the meter's
-x, y, font 0x12 at `\vs75`, 12 units apart, via `sub_00041E30` (alignment
-`[0x007E7260]` zeroed and restored): the caps of `pc_display_mapmaker_limits`
+the return address) with a panel at the meter's x, y in font 0x12 at `\vs60`
+(alignment `[0x007E7260]` zeroed and restored): a `sub_0001EFB0` backdrop
+(`0x0F0F0F64`), then outlined `sub_00041E30` text. Collapsed (default) it is
+one line `+ Fullest: <row> used/max` (worst state, then used/max); expanded,
+`- Resources` and 15 rows, short titles left and `" used/max"` right-aligned
+at one edge, widths from `sub_0003FCF0(&w,&h,text,0)` (scratch below
+`g_esp`; 5.2/char fallback), pitch 11.5 or measured glyph + 1.5. Values
+start with a space because `\vs` reads all following digits (0x00040082).
+`mapmaker_table_input(menu)` (called in `pc_display_menu_mouse_input` after
+`mapmaker_pointer_input`) toggles it on the editor screen (scene 102, menu
+`+0x178`/`+0x170` zero, panel drawn within 4 ticks) for an A press
+(`+0xC4 & 0x10`) with the game pointer (`0x007BA260 + player*0x1E0 +
+0x20/0x24`) on the panel, clearing `0x00100010` from `+0xC4`/`+0xC8` until
+release, or for the I key (`pc_controls_mapmaker_table_key`, Windows
+`pc_controls.c`, Mac `input_sdl.c`; off when any binding uses I,
+`pc_mapmaker_table_key` in `pc_mapmaker_pointer.h`). State is per process.
+Rows: the caps of `pc_display_mapmaker_limits`
 from `mapmaker_limits_view` (placed counts; red on its `over` bits), pickups
 of 768, Story AI `editor+0x280`/511, logic ops `editor+0x41E0`/120, and the
 per-category counts of `sub_00303460`/`sub_00308420` (catalogue
@@ -203,9 +217,13 @@ per-category counts of `sub_00303460`/`sub_00308420` (catalogue
 props, turrets 27-29 and teleporters 14-18. Stock meter when the limits are
 off, the view is not valid for this editor, `TSFP_MAPMAKER_TABLE=0`, probe
 flag 1, or no text buffer. Whole-chain fixtures link `sub_0003FA10`/
-`sub_00041E30` from `mapmaker_area_stubs.h`. Tests:
-`tests/mapmaker/test_mapmaker_restable.py` (rows, colours, fallbacks, 4:3 and
-wide layout, 39 mutations). Contract and playtest steps:
+`sub_0001EFB0`/`sub_00041E30` from `mapmaker_area_stubs.h` and stub
+`pc_controls_mapmaker_table_key` (`menu_mouse.c`, `fov_settings.c`); the
+restable fixture gives its guest-call stubs distinct bodies (MSVC folds
+identical functions, and its `guest_call` dispatches by address). Tests:
+`tests/mapmaker/test_mapmaker_restable.py` (rows, colours, collapsed/expanded,
+click/key toggle and A removal, column alignment, pitch, 4:3 and wide layout,
+64 mutations). Contract and playtest steps:
 `docs/mapmaker/mapmaker-restable.md`. Not built or played.
 
 `mapmaker_limits_view` (in `pc_mapmaker_limits.inc`): placed pieces, items +

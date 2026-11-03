@@ -26,6 +26,8 @@ int pc_controls_mapmaker_editor_active(void);
 void pc_controls_mapmaker_zoom(int notches);
 /* MapMaker editor: press A or Back (PC_MAPMAKER_PULSE_*) briefly. */
 void pc_controls_mapmaker_pulse(int button);
+/* MapMaker resource table: 1 while its toggle key (I) is down and bound to no action. */
+int pc_controls_mapmaker_table_key(void);
 void pc_controls_menu_mode(int active);
 PcMenuPointer pc_controls_menu_pointer(void);
 PcMenuPointer pc_controls_menu_hover_pointer(void);
