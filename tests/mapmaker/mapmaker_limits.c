@@ -301,14 +301,25 @@ int main(void)
         MapMakerTotals heavy,none;
         memset(&none,0,sizeof none);
         heavy=none;heavy.pieces=511;heavy.cost[0]=14u*511u;heavy.cost[1]=14u*511u;heavy.cost[2]=46u*511u;
-        CHECK(mapmaker_limits_over(&heavy,&none,MAPMAKER_LIMIT_MEMORY,MAPMAKER_LIMIT_GROUPS,448u)==0);
+        CHECK(mapmaker_limits_over(&heavy,&none,MAPMAKER_LIMIT_MEMORY,MAPMAKER_LIMIT_GROUPS,384u)==0);
         heavy.pieces=512;heavy.cost[0]=14u*512u;heavy.cost[1]=14u*512u;heavy.cost[2]=46u*512u;
-        CHECK(mapmaker_limits_over(&heavy,&none,MAPMAKER_LIMIT_MEMORY,MAPMAKER_LIMIT_GROUPS,447u)==MAPMAKER_CAP_PIECES);
+        CHECK(mapmaker_limits_over(&heavy,&none,MAPMAKER_LIMIT_MEMORY,MAPMAKER_LIMIT_GROUPS,383u)==MAPMAKER_CAP_PIECES);
         heavy.pieces=511;heavy.cost[0]=14u*511u;heavy.cost[1]=14u*511u;heavy.cost[2]=46u*511u;
-        /* Engine objects: 511 rooms + 448 items + 64 characters = 1023, the pool. */
-        CHECK(mapmaker_limits_over(&heavy,&none,0,0,449u)&MAPMAKER_CAP_OBJECTS);
-        CHECK(!(mapmaker_limits_over(&none,&heavy,0,0,448u)&MAPMAKER_CAP_OBJECTS));   /* held pieces count */
-        CHECK(mapmaker_limits_over(&none,&heavy,0,0,449u)&MAPMAKER_CAP_OBJECTS);
+        /* Engine objects: 511 rooms + 384 items + 64 characters + 64 for
+         * explosions and debris = 1023, the pool. */
+        CHECK(MAPMAKER_OBJECTS_RESERVE==128u);
+        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,384u)&MAPMAKER_CAP_OBJECTS));
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,385u)&MAPMAKER_CAP_OBJECTS);
+        CHECK(!(mapmaker_limits_over(&none,&heavy,0,0,384u)&MAPMAKER_CAP_OBJECTS));   /* held pieces count */
+        CHECK(mapmaker_limits_over(&none,&heavy,0,0,385u)&MAPMAKER_CAP_OBJECTS);
+        /* The v0.4.0-mapmaker.37 map (459 pieces + 500 items) filled the pool in
+         * play: refused now. 395 pieces keep 500 items, 396 do not. */
+        heavy.pieces=459;
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS);
+        heavy.pieces=395;
+        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS));
+        heavy.pieces=396;
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS);
         heavy.pieces=255;                                               /* 255 pieces keep 500 items */
         CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS));
         heavy.pieces=511;

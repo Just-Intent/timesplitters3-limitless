@@ -33,6 +33,7 @@ address; **INFERRED** means it was reasoned, not seen.
 | Logic tag groups `0x0075CE68` | 150 | 150 (unchanged) | - | - |
 | Cover props (category 33) | 66 | 132 (editor) | `mapmaker_categories[]` | editor |
 | Placed-pickup records `[0x00732E60]` | 120 | 768 | `obj-pickups-*` | all |
+| Class-0x80 prop block pointers `[0x0072F728]` | 60 | 2048 | `obj-propblocks-*` | all |
 
 Two limits are unchanged:
 
@@ -126,9 +127,9 @@ them untouched.
 - **Editor bound.** Each piece (room) and about each item takes one object in
   play (462 at 236 pieces + 200 items), characters up to 64. With
   `TSFP_MAPMAKER_LIMITS=1` the editor refuses placement when placed + held
-  pieces + items + 64 pass 1023 (`MAPMAKER_LIMIT_OBJECTS`,
+  pieces + items + 128 pass 1023 (`MAPMAKER_LIMIT_OBJECTS`,
   `mapmaker_objects_needed` in `pc_mapmaker_limits.inc`; the meter shows the
-  same share). 255 pieces keep all 500 items; 511 pieces allow 448 items.
+  same share). 255 pieces keep all 500 items; 511 pieces allow 384 items (reserve 128: 64 characters + 64 effects, 2026-11-03).
   Past 1023 objects the handle format (10 slot bits) has to change.
 - **No other table blocks the raise.** The visibility bitset in
   `sub_000A0130` holds 2512 bits. The 214-entry tables are per room. The

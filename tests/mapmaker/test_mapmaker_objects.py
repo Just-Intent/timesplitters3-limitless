@@ -66,6 +66,10 @@ MUTATIONS = {
     # The placed-pickup table: the `cmp ah,n` test needs a multiple of 256, above the 500 items.
     'pickups-stock': ('#define MAPMAKER_OBJECTS_PICKUPS 768u', '#define MAPMAKER_OBJECTS_PICKUPS 120u'),
     'pickups-below-items': ('#define MAPMAKER_OBJECTS_PICKUPS 768u', '#define MAPMAKER_OBJECTS_PICKUPS 256u'),
+    # Prop blocks: two per pool slot, within the 8 KB table.
+    'propblocks-stock': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 60u'),
+    'propblocks-pool-only': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 1024u'),
+    'propblocks-past-table': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 4096u'),
 }
 
 
@@ -158,6 +162,14 @@ def test_table_matches_policy():
     assert entries['obj-pickups-clear']['new_hex'] == 'b9' + (pickups * record // 4).to_bytes(4, 'little').hex()
     assert entries['obj-pickups-cap']['original_hex'] == '83f878'
     assert entries['obj-pickups-cap']['new_hex'] == '80fc%02x' % (pickups >> 8)
+    # Prop blocks: the pointer table and its clear hold the same count, at least
+    # two per pool slot (placed props plus creations during play), stock 60.
+    blocks = _define('MAPMAKER_OBJECTS_PROP_BLOCKS')
+    assert blocks >= 2 * _define('MAPMAKER_OBJECTS_POOL')
+    assert entries['obj-propblocks-alloc']['original_hex'] == '68' + (60 * 4).to_bytes(4, 'little').hex()
+    assert entries['obj-propblocks-alloc']['new_hex'] == '68' + (blocks * 4).to_bytes(4, 'little').hex()
+    assert entries['obj-propblocks-clear']['original_hex'] == 'b9' + (60).to_bytes(4, 'little').hex()
+    assert entries['obj-propblocks-clear']['new_hex'] == 'b9' + blocks.to_bytes(4, 'little').hex()
     for e in table['patches']:
         if e['kind'] == 'code':
             assert len(e['original_hex']) == len(e['new_hex']) and e['original_hex'] != e['new_hex']

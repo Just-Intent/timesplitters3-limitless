@@ -9,7 +9,8 @@
  * block (slot 9 at 0x008A0000, 30 -> 128; slot 8 at 0x008A0200, 50 -> 200;
  * slot 0 at 0x008A0600, 112 -> 448); the room bucket buffer doubled; the logic
  * tag links (0x008A2400) and tags (0x008A4400) relocated at 250 -> 1000 each;
- * the placed-pickup records 120 -> 768 (MAPMAKER_OBJECTS_PICKUPS below).
+ * the placed-pickup records 120 -> 768 (MAPMAKER_OBJECTS_PICKUPS below); the
+ * class-0x80 prop block pointers 60 -> 2048 (MAPMAKER_OBJECTS_PROP_BLOCKS).
  * Logic tag groups stay at 150 (sub_0023FFA0 and sub_00240360 drop safely when
  * full).
  *
@@ -94,6 +95,16 @@ typedef char mapmaker_objects_pool_limit[(MAPMAKER_OBJECTS_POOL<1024u && MAPMAKE
 #define MAPMAKER_OBJECTS_PICKUP_BYTES 0xD8u
 typedef char mapmaker_objects_pickup_table[(MAPMAKER_OBJECTS_PICKUPS%256u==0u && MAPMAKER_OBJECTS_PICKUPS<0x8000u &&
                                             MAPMAKER_LIMIT_SUB<MAPMAKER_OBJECTS_PICKUPS)?1:-1];
+/* Prop blocks (2026-11-03, v0.4.0-mapmaker.37 barrel crash): sub_000AC940, the
+ * init of class 0x80 (props, barrels), gives every prop whose template lacks
+ * flag 8 a 0x160-byte block (+0x7C) through the pointer table [0x0072F728]
+ * indexed by [0x007327A8], which only the loader's cancel (0x0006D1F9) ever
+ * lowers; stock sized it 60 (sub_000A92A0). objects.json obj-propblocks-*
+ * make it 2048 in every scene: every placed prop holds a pool slot, plus as
+ * many again for creations during play. Flag-8 props use the 30-block ring. */
+#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u
+typedef char mapmaker_objects_prop_blocks[(MAPMAKER_OBJECTS_PROP_BLOCKS>=2u*MAPMAKER_OBJECTS_POOL &&
+                                           MAPMAKER_OBJECTS_PROP_BLOCKS*4u<=0x2000u)?1:-1];
 #define MAPMAKER_OBJECTS_BUCKET_BYTES 0xA680u /* obj-bucket-bytes */
 #define MAPMAKER_OBJECTS_TAGS 0x008A4400u     /* obj-tag-entries-relocate */
 #define MAPMAKER_OBJECTS_TAGS_CAP 1000u
