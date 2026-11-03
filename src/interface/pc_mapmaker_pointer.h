@@ -60,6 +60,18 @@ static inline int pc_mapmaker_key(int editor, int key, int cancel_key, int down,
 #define PC_MAPMAKER_PULSE_MS 120u
 enum { PC_MAPMAKER_PULSE_Y = 0 };
 
+/* The editor resource table (pc_mapmaker_restable.inc) expands or collapses
+ * on I, a key no default binding uses. If the player binds I to an action,
+ * that action keeps it and the table toggles by click only. bound: every
+ * bound key of player 1 (n entries), or NULL when unknown. */
+#define PC_MAPMAKER_TABLE_KEY 'I'
+static inline int pc_mapmaker_table_key(int down, const int *bound, int n)
+{
+    if (!down) return 0;
+    for (int i = 0; bound && i < n; i++) if (bound[i] == PC_MAPMAKER_TABLE_KEY) return 0;
+    return 1;
+}
+
 /* The editor's movement keys (forward, backward, left, right): the mouse moves
  * the pointer there, so they report up; left/right step the toolbar instead,
  * as the D-pad (queried as VK_LEFT/VK_RIGHT). Returns the key to alias. */

@@ -1,3 +1,17 @@
+## MapMaker resource panel: collapsed, click/I toggle, aligned columns (2026-11-03, not built or played)
+
+Source: branch restable-compact from mapmaker-recon 04cc2691, Windows 11 x64, MSVC fixtures only.
+After playtest feedback (rows unaligned, tight and large), the table is one line by default
+(`+ Fullest: <row> used/max`), expanded by a click on it (A press over the game pointer, taken
+from the editor until release) or the I key when unbound; expanded rows are short titles plus
+right-aligned values measured with `sub_0003FCF0`, at 60% with an 11.5-unit (or glyph + 1.5)
+pitch over a `sub_0001EFB0` backdrop. `test_mapmaker_restable.py`: 66 passed (fixed, 64
+mutations detected, wiring). Also passed: test_menu_mouse, test_mapmaker_pointer, _probe, _limits,
+test_mounted_mouse, test_reload_keys, test_scope_wheel (WinError 4551 launches rerun). Not run:
+test_fov_settings (needs the external runtime's `recomp_pad.h`), game build, the panel in game at any aspect (glyphs `+`/`-`,
+measure with `\vs60`), Mac build of the `input_sdl.c` key. Playtest:
+docs/mapmaker/mapmaker-restable.md "Playtest checks".
+
 ## MapMaker resource table (2026-11-03, not built or played)
 
 Source: branch resource-table from mapmaker-recon a5947b1d, Windows 11 x64, MSVC fixtures only.
