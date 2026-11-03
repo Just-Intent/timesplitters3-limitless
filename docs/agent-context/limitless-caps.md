@@ -50,10 +50,11 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
   list caps 1000 -> 1023 (handle serial 1..0x3FFFFF, so slots 0..1022 never
   form -1); `objects.json` list sizes 0xFFC, slot-0 clear 1023 dwords.
 - `pc_mapmaker_limits.inc`: `MAPMAKER_LIMIT_OBJECTS` 1023,
-  `MAPMAKER_OBJECTS_RESERVE` 64; placed + held pieces + items + 64 must fit
-  (`MAPMAKER_CAP_OBJECTS`, meter share). Compile check ties it to the pool.
-- Tests: `mapmaker_limits.c` (511 pieces + 448 items fit, 449 refused, held
-  pieces count, 255 pieces keep 500 items), `mapmaker_objects.c` (1023
+  `MAPMAKER_OBJECTS_RESERVE` 128 (64 characters + 64 effects, 2026-11-03);
+  placed + held pieces + items + 128 must fit (`MAPMAKER_CAP_OBJECTS`, meter
+  share). Compile checks tie it to the pool and the effects to 30 + 20 + 5.
+- Tests: `mapmaker_limits.c` (511 pieces + 384 items fit, 385 refused, held
+  pieces count, 459 + 500 refused, 395 pieces keep 500 items, 396 not), `mapmaker_objects.c` (1023
   pools and lists), mutations `objects-*`, `pool-round3`; `check-tables.py`.
 
 ## Placed pickups (2026-11-02, v0.4.0-mapmaker.36 playtest)
@@ -89,11 +90,10 @@ the null result into guest 0x28..0x60). Dropped weapons use the separate
   a signed test of the handle (null is 0, tested with `je`/`jbe`), and the 14
   signed tests of a loaded dword +0x2C are other structs. So no slot-order
   change (option a) or sign rewrites (option b) are needed.
-- Not explained: barrels that do not explode. Ruled out: handle signs, the
-  object lists (no `object list full` line in m36.err), the area-effect
-  global room id (rooms.json 0x000BBA05/0x000BBA33 = 0x20C). Open: pool
-  headroom (`sub_000AB590` refuses flag-8 objects when fewer than 5 slots are
-  free; `sub_0009EE00` itself has no bound) and room-bucket state.
+- Barrels that do not explode: pool headroom, see "Prop blocks" below.
+  Ruled out: handle signs, the object lists (no `object list full` line in
+  m36.err), the area-effect global room id (rooms.json 0x000BBA05/0x000BBA33
+  = 0x20C).
 - Tests: `test_mapmaker_pickups_classified.py` (table sites, `cmp ah,3`
   semantics, handle-sign scan, 2 mutations), `test_mapmaker_objects.py`
   (table policy, `pickups-*` mutations).
@@ -101,6 +101,47 @@ the null result into guest 0x28..0x60). Dropped weapons use the separate
   last) shows them all; probe flag 64 for `[0x007B4FAC]` minus
   `[0x007B65B8]` (live objects) on a full map; shoot a barrel at once after
   load and again with bots active.
+
+## Prop blocks and the effects reserve (2026-11-03, v0.4.0-mapmaker.37)
+
+Symptom: 459 pieces + about 500 items (engine objects at the 1023 cap):
+shooting an exploding barrel did nothing; with 9 armour or 17 barrels
+removed it crashed (`logs/m37c/crash-20261102-233938555-*`).
+
+- Crash cause (CONFIRMED in code; the dump agrees, the index itself was not
+  captured): class 0x80 (props, barrels; registered by `sub_000AE8B0`, init
+  `sub_000AC940`, release `sub_000A92F0`) gives each prop a 0x160-byte block
+  at object +0x7C. Template flag 8 props use a 30-block ring (`[0x0072F730]`,
+  owners `0x0072F6B0`, size `[0x007313EC]` <= 30, oldest released). Others
+  take entry `[0x007327A8]` of the pointer table `[0x0072F728]` (0 allocates
+  a block and stores it there), then `inc [0x007327A8]`; only the level reset
+  (0x000A9221) and the loader's cancel (`sub_000AB610` from 0x0006D1F9) lower
+  it, releases never do. `sub_000A92A0` sized the table 60 (push 0xF0, rep
+  stosd 0x3C). Prop 61 on read past it: a non-zero foreign dword became its
+  block, a zero one made the init write a block pointer into the next
+  allocation. The release walks the ten effect handles at block+0x100 into
+  `sub_000FF200`; the dump has ebx 7 (fourth handle) and esi 0xFFFF0000,
+  chain 0x000A77E8 -> `sub_000AC560` (prop broken, 0x000AC641) ->
+  `sub_000A9070` -> `sub_0009E330` -> 0x000A9321.
+- Fix: `objects.json` `obj-propblocks-alloc` / `-clear`: 2048 entries
+  (8 KB Level heap, every scene, static so no wrapper);
+  `MAPMAKER_OBJECTS_PROP_BLOCKS` in `pc_mapmaker_objects.inc` (compile check:
+  two per pool slot). That runtime creations are flag 8 (ring) is INFERRED:
+  stock 60 would otherwise overflow in stock levels.
+- Did-nothing cause (CONFIRMED in code, INFERRED for this map): breaking a
+  prop spawns debris through `sub_000AB590` (up to 20 in `0x00732688`),
+  which refuses flag-8 objects unless 5 slots stay free (`sub_000A4C70`:
+  live + 1 + 4 < `[0x0072F5E4]`). Pieces + items + 64 characters left none.
+  `MAPMAKER_OBJECTS_EFFECTS` 64 joins the reserve; 511 pieces now allow 384
+  items and 500 items 395 pieces.
+- Tests: `test_mapmaker_propblocks_classified.py` (every table/ring/count
+  site, count writers, ring <= 30, 2 mutations), `test_mapmaker_objects.py`
+  (policy, `propblocks-*`), `test_mapmaker_limits.py` (`objects-*`);
+  `check-tables.py`.
+- Play check: the m37 map refuses placement at the pool (log line
+  `engine objects n of 1023 (pieces + items + 128 reserved)`); a map past 60
+  barrels/props (about 395 pieces + 500 items): shoot several barrels at once,
+  restart the level, shoot again; story level 1 barrels.
 
 ## Play memory and the memory estimate (2026-11-02)
 
@@ -128,7 +169,7 @@ the null result into guest 0x28..0x60). Dropped weapons use the separate
 `MAPMAKER_LIMIT_PIECES` is 511 ([rooms](limitless-rooms.md) stage 11; the
 level fill pass frame `level.json` holds 512). Pads stop at 548, links at
 520, cover at 713, groups at about 680 (1.5 per piece), objects at
-1023 - 64 - items. Memory estimate per tile (XBE rows 0..45): light tiles
+1023 - 128 - items. Memory estimate per tile (XBE rows 0..45): light tiles
 (19, <= 8.4 KB) and medium (15, 10-24 KB) stop at the piece cap (1,960 / 676
 would fit scale 8); heavy (12, 32-42 KB) stop on the memory estimate at 386
 (type 21/33, 42,427 B) to 513 (31,882 B), so 511 of the heaviest need scale
