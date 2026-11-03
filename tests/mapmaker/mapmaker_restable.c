@@ -208,7 +208,7 @@ int main(void)
         char want[15][48];
         snprintf(want[0],48,"Tiles: 90/511");
         snprintf(want[1],48,"Items: %u/500",(unsigned)items);
-        snprintf(want[2],48,"Engine objects: %u/1023",(unsigned)(90u+items+64u));
+        snprintf(want[2],48,"Engine objects: %u/1023",(unsigned)(90u+items+128u));
         snprintf(want[3],48,"Pickups: 40/768");            /* weapons + keycards + health */
         snprintf(want[4],48,"Regular pads: 900/7680");
         snprintf(want[5],48,"Cover pads: 810/9984");
@@ -268,15 +268,15 @@ int main(void)
     CHECK(mapmaker_limits_view.over&MAPMAKER_CAP_PIECES);
     meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
     CHECK(colour_of("Tiles: 511/511")==MAPMAKER_TABLE_FULL);
-    /* Engine objects: pieces + items + 64 characters, as the check. */
-    WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,400);
-    WORD_AT(ED+0x306c)=500u<<16;                                  /* 400 + 500 + 64 = 964 */
+    /* Engine objects: pieces + items + 128 reserved (64 characters, 64 for effects), as the check. */
+    WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,340);
+    WORD_AT(ED+0x306c)=500u<<16;                                  /* 340 + 500 + 128 = 968 */
     WORD_AT(ED+0x2f7c)=0;
     pc_display_mapmaker_limits(fake_limits);
     meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
-    CHECK(drawn("\vs75Engine objects: 964/1023\vs100")>=0);
+    CHECK(drawn("\vs75Engine objects: 968/1023\vs100")>=0);
     CHECK(colour_of("Items: 500/500")==MAPMAKER_TABLE_FULL);
-    CHECK(colour_of("Engine objects: 964/1023")==MAPMAKER_TABLE_NEAR);
+    CHECK(colour_of("Engine objects: 968/1023")==MAPMAKER_TABLE_NEAR);
     WORD_AT(ED+0x306c)=5u<<16;
     WORD_AT(0x0078400Cu)=pieces;WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     pc_display_mapmaker_limits(fake_limits);
