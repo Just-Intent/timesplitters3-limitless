@@ -391,6 +391,12 @@ void pc_controls_mapmaker_editor(int active) { (void)active; }
 int pc_controls_mapmaker_editor_active(void) { return 0; }
 void pc_controls_mapmaker_zoom(int notches) { (void)notches; }
 void pc_controls_mapmaker_pulse(int button) { (void)button; }
+/* The resource table toggle key, as on Windows (pc_mapmaker_pointer.h). */
+int pc_controls_mapmaker_table_key(void) {
+    int bound[PC_ACTION_COUNT][PC_BINDING_SLOTS],have=pc_settings_bound_keys(bound);
+    return pc_mapmaker_table_key(tsfp_native_key_down(PC_MAPMAKER_TABLE_KEY),have?&bound[0][0]:NULL,
+                                 PC_ACTION_COUNT*PC_BINDING_SLOTS);
+}
 void pc_controls_mapmaker_row_press(void) {
     pthread_mutex_lock(&camera_lock);
     pc_mapmaker_row_press(&mapmaker_click);

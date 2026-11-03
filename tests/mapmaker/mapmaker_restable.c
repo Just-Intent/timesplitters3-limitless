@@ -1,9 +1,13 @@
 /* Asset-free contract for src/interface/pc_mapmaker_restable.inc: the MapMaker
- * editor resource table replaces the capacity meter while the raised limits
- * are on; its rows show the numbers the editor's own checks compare
- * (pc_mapmaker_limits.inc, the per-category maxima, Story AI and logic
- * limits), coloured near and at their caps, inside the 640 x 480 canvas and
- * its left third (4:3 and wide outputs). The stock meter is kept otherwise.
+ * editor resource panel replaces the capacity meter while the raised limits
+ * are on. Collapsed by default to the fullest row; a click on it (A over the
+ * game pointer) or the I key expands it to every row, titles left and
+ * "used/max" right-aligned in one measured column, over a backdrop, with a
+ * line pitch that fits the measured glyph. The rows show the numbers the
+ * editor's own checks compare (pc_mapmaker_limits.inc, the per-category
+ * maxima, Story AI and logic limits), coloured near and at their caps, inside
+ * the 640 x 480 canvas, its left third and left of the toolbar (4:3 and wide
+ * outputs). The stock meter is kept otherwise.
  * Built by tests/mapmaker/test_mapmaker_restable.py, which passes the
  * editor/objects limits read from their sources with -D. */
 #include <math.h>
@@ -12,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pc_mapmaker_pointer.h"
 
 static uint32_t memory[0x800000/4], g_eax, g_ecx, g_edx, g_esp;
 static uintptr_t g_xbox_mem_offset;
@@ -23,16 +28,39 @@ static void save_registers(GuestRegisters *r) { r->a=g_eax;r->c=g_ecx;r->d=g_edx
 static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r->d;g_esp=r->sp; }
 
 #define TEXT_BUF 0x00600000u
-static uint32_t heap_result=TEXT_BUF;
-uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment) { (void)bytes;(void)alignment;return heap_result; }
+static uint32_t heap_result=TEXT_BUF,heap_bytes;
+uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment) { (void)alignment;heap_bytes=bytes;return heap_result; }
 
-/* Recorded draws: sub_0003FA10 (font) and sub_00041E30 (x, y, text, colour, outline). */
-void sub_0003DFA0(void) {}
-void sub_0003FA10(void) {}
-void sub_00041E30(void) {}
-static struct { float x,y; char text[64]; uint32_t colour,outline,align; } draws[32];
-static unsigned ndraws,font_calls;
+/* The host toggle key (pc_controls_mapmaker_table_key). */
+static int table_key;
+int pc_controls_mapmaker_table_key(void) { return table_key; }
+
+/* Recorded calls: sub_0003FA10 (font), sub_0003FCF0 (measure &w, &h, text, 0),
+ * sub_0001EFB0 (backdrop x0, y0, x1, y1, colour), sub_00041E30 (x, y, text,
+ * colour, outline). The measure returns visible characters x measure_k wide
+ * (0: nothing, so the estimate applies) and measure_h tall. */
+static volatile int stub_seen;  /* distinct bodies: the linker must not fold the stubs */
+void sub_0003DFA0(void) { stub_seen=1; }
+void sub_0003FA10(void) { stub_seen=2; }
+void sub_0003FCF0(void) { stub_seen=3; }
+void sub_0001EFB0(void) { stub_seen=4; }
+void sub_00041E30(void) { stub_seen=5; }
+#define MAX_DRAWS 48
+static struct { float x,y; char text[64]; uint32_t colour,outline,align,font; } draws[MAX_DRAWS];
+static unsigned ndraws,font_calls,measures,rects;
+static int rect[4];
+static uint32_t rect_colour,rect_font;
 static uint32_t font_now=7u,font_seen;
+static float measure_k=5.f,measure_h=9.6f;
+static unsigned visible(const char *s)
+{
+    unsigned n=0;
+    while(*s) {
+        if(s[0]=='\v' && s[1]=='s') { s+=2;while(*s>='0' && *s<='9') s++;continue; }
+        n++;s++;
+    }
+    return n;
+}
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -41,13 +69,24 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     if(f==sub_0003FA10 && n==1) {
         r=font_now;font_now=va_arg(a,uint32_t);font_calls++;
         if(font_calls==1) font_seen=font_now;
+    } else if(f==sub_0003FCF0 && n==4) {
+        uint32_t wp=va_arg(a,uint32_t),hp=va_arg(a,uint32_t),text=va_arg(a,uint32_t);
+        unsigned v=visible((const char *)((uintptr_t)text+g_xbox_mem_offset));
+        if(wp>=g_esp && hp>=g_esp && font_now==0x12u) {  /* scratch at the stack, drawing font */
+            FLOAT_AT(wp)=(float)v*measure_k;FLOAT_AT(hp)=measure_h;
+        }
+        measures++;
+    } else if(f==sub_0001EFB0 && n==5) {
+        unsigned i;
+        for(i=0;i<4;i++) rect[i]=(int)va_arg(a,uint32_t);
+        rect_colour=va_arg(a,uint32_t);rect_font=font_now;rects++;
     } else if(f==sub_00041E30 && n==5) {
         uint32_t x=va_arg(a,uint32_t),y=va_arg(a,uint32_t),text=va_arg(a,uint32_t);
-        if(ndraws<32) {
+        if(ndraws<MAX_DRAWS) {
             memcpy(&draws[ndraws].x,&x,4);memcpy(&draws[ndraws].y,&y,4);
             snprintf(draws[ndraws].text,sizeof draws[ndraws].text,"%s",(const char *)((uintptr_t)text+g_xbox_mem_offset));
             draws[ndraws].colour=va_arg(a,uint32_t);draws[ndraws].outline=va_arg(a,uint32_t);
-            draws[ndraws].align=WORD_AT(0x007E7260u);
+            draws[ndraws].align=WORD_AT(0x007E7260u);draws[ndraws].font=font_now;
         }
         ndraws++;
     }
@@ -83,7 +122,7 @@ static void set_env(const char *name,const char *value)
     if(value)setenv(name,value,1); else unsetenv(name);
 #endif
     memset(&mapmaker_limits,0,sizeof mapmaker_limits);
-    memset(&mapmaker_table,0,sizeof mapmaker_table);
+    mapmaker_table.initialized=0;
     mapmaker_budget.initialized=0;
 }
 
@@ -91,6 +130,8 @@ static void set_env(const char *name,const char *value)
 #define TYPEA 0x00330000u
 #define TYPEB 0x00330010u
 #define STACK 0x00700000u
+#define MENU 0x006FEBE8u
+#define POINTER (0x007BA260u+1u*0x1E0u)
 static uint32_t make_list(uint32_t base,uint32_t type_cell,unsigned n)
 {
     unsigned i;
@@ -119,17 +160,31 @@ static void set_category(uint32_t id,uint16_t category)
 static void meter_at(float x,float y)
 {
     g_esp=STACK;WORD_AT(STACK)=0x00311748u;FLOAT_AT(STACK+4u)=x;FLOAT_AT(STACK+8u)=y;
-    ndraws=0;font_calls=0;originals=0;
+    ndraws=0;font_calls=0;originals=0;measures=0;rects=0;memset(rect,0,sizeof rect);
 }
-static int drawn(const char *text) { unsigned i; for(i=0;i<ndraws && i<32;i++) if(!strcmp(draws[i].text,text)) return (int)i; return -1; }
-static uint32_t colour_of(const char *row)
+static void draw(void) { meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter); }
+static void wrap(char *out,size_t n,const char *s) { snprintf(out,n,"\vs60%s\vs100",s); }
+static int drawn(const char *text)
 {
-    char text[64];
-    int i;
-    snprintf(text,sizeof text,"\vs75%s\vs100",row);
-    i=drawn(text);
-    return i<0?0xDEADu:draws[i].colour;
+    char want[64];
+    unsigned i;
+    wrap(want,sizeof want,text);
+    for(i=0;i<ndraws && i<MAX_DRAWS;i++) if(!strcmp(draws[i].text,want)) return (int)i;
+    return -1;
 }
+static uint32_t colour_of(const char *text) { int i=drawn(text);return i<0?0xDEADu:draws[i].colour; }
+
+/* One editor tick of the input hook (after sub_00073870): c4 pressed bits,
+ * c8 held/released bits, the game pointer at x, y. */
+static void editor_tick(uint32_t c4,uint32_t c8,float x,float y)
+{
+    WORD_AT(MENU+0xc4)=c4;WORD_AT(MENU+0xc8)=c8;
+    FLOAT_AT(POINTER+0x20)=x;FLOAT_AT(POINTER+0x24)=y;
+    mapmaker_table_input(MENU);
+}
+#define A_EDGE 0x00100010u   /* press: bit 4 and its repeat bit */
+#define A_HELD 0x00000010u
+#define A_UP 0x00100000u     /* release edge in +0xC8 */
 
 /* Stock category maxima (0x00524BE0 + c*24 + 4); categories_apply raises them. */
 static void stock_categories(void)
@@ -137,6 +192,37 @@ static void stock_categories(void)
     static const uint32_t m[37]={32,32,16,1,1,1,4,1,32,32,2,2,2,2,2,2,2,2,2,16,16,12,1,16,50,20,20,8,8,8,10,32,20,66,66,4,4};
     unsigned i;
     for(i=0;i<37;i++) WORD_AT(0x00524BE0u+i*24u+4u)=m[i];
+}
+
+/* The expanded panel's geometry contract on the current draws. */
+static void check_columns(unsigned n,float line_min)
+{
+    unsigned i;
+    float value_right,title_right=0.f,title_x=draws[0].x;
+    CHECK(ndraws==1u+2u*n && rects==1);
+    CHECK(rect_colour==MAPMAKER_TABLE_PANEL && rect_font==0x12u);
+    value_right=draws[2].x+(float)visible(draws[2].text)*(measure_k>0?measure_k:MAPMAKER_TABLE_GLYPH);
+    for(i=0;i<n;i++) {
+        unsigned t=1u+2u*i,v=t+1u;
+        float k=measure_k>0?measure_k:MAPMAKER_TABLE_GLYPH;
+        float vr=draws[v].x+(float)visible(draws[v].text)*k,tr=draws[t].x+(float)visible(draws[t].text)*k;
+        CHECK(draws[t].x==title_x);                               /* titles left-aligned */
+        CHECK(fabsf(vr-value_right)<1e-3f);                       /* values right-aligned in one column */
+        CHECK(draws[t].y==draws[v].y);                            /* same line */
+        CHECK(draws[t].colour==draws[v].colour && draws[t].outline==0x80u && draws[v].outline==0x80u);
+        CHECK(draws[t].font==0x12u && draws[v].font==0x12u && draws[t].align==0u);
+        if(tr>title_right) title_right=tr;
+        CHECK(fabsf(draws[t].y-(draws[0].y+(float)(i+1u)*(draws[1].y-draws[0].y)))<1e-3f);  /* even pitch */
+    }
+    CHECK(draws[1].y-draws[0].y>=line_min-1e-3f);                 /* rows clear of the glyph height */
+    for(i=0;i<n;i++)                                              /* every value clear of every title */
+        CHECK(draws[2u+2u*i].x>=title_right+MAPMAKER_TABLE_GAP-1e-3f);
+    /* The backdrop holds every line. */
+    CHECK((float)rect[0]<=title_x-MAPMAKER_TABLE_PAD+1e-3f && (float)rect[2]>=value_right+MAPMAKER_TABLE_PAD-1e-3f);
+    CHECK((float)rect[1]<=draws[0].y && (float)rect[3]>=draws[2u*n-1u].y+(draws[1].y-draws[0].y));
+    /* \vs reads every digit after it (0x00040082): no text may start with one. */
+    for(i=0;i<ndraws && i<MAX_DRAWS;i++)
+        CHECK(!strncmp(draws[i].text,"\vs60",4) && !(draws[i].text[4]>='0' && draws[i].text[4]<='9'));
 }
 
 int main(void)
@@ -151,6 +237,8 @@ int main(void)
     WORD_AT(ED+0x280)=37;                              /* Story AI */
     WORD_AT(ED+0x41E0)=12;                             /* logic ops */
     WORD_AT(0x007E7260u)=0x55u;                        /* text alignment, restored after */
+    WORD_AT(0x0079094Cu)=102u;                         /* the editor scene */
+    WORD_AT(0x007BA9E0u)=1u;                           /* pointer of player 1 */
     /* Tile type 1: 10 pads, 9 cover, 20 links, 10,000 B; held type 2: 2, 9, 20, 1,000 B. */
     WORD_AT(TYPEA)=1;WORD_AT(TYPEB)=2;
     WORD_AT(0x00529400u+0x140u)=10;WORD_AT(0x00529404u+0x140u)=9;WORD_AT(0x00529408u+0x140u)=20;WORD_AT(0x00529410u+0x140u)=10000;
@@ -176,183 +264,357 @@ int main(void)
     add_items(pieces+0x2D0u,0x0050B000u,90,1);         /* past the catalogue: ignored */
     WORD_AT(ED+0x278)=mapmaker_placed_memory(pieces)+mapmaker_budget_apply(1000u);
 
+    /* ---- the host toggle key policy (pc_mapmaker_pointer.h) ---- */
+    {
+        int bound[4]={'W','E',0,'R'};
+        CHECK(PC_MAPMAKER_TABLE_KEY=='I');
+        CHECK(pc_mapmaker_table_key(1,bound,4) && !pc_mapmaker_table_key(0,bound,4));
+        CHECK(pc_mapmaker_table_key(1,NULL,0));
+        bound[2]='I';
+        CHECK(!pc_mapmaker_table_key(1,bound,4));                /* an action bound to I keeps it */
+    }
+
     /* ---- limits off: the stock meter, no table ---- */
     set_env("TSFP_MAPMAKER_POOLS",NULL);set_env("TSFP_MAPMAKER_LIMITS",NULL);set_env("TSFP_MAPMAKER_TABLE",NULL);
     pc_display_mapmaker_limits(fake_limits);
-    meter_at(22.f,36.f);
-    pc_display_mapmaker_meter(fake_meter);
-    CHECK(originals==1 && ndraws==0 && g_esp==STACK+4u);
+    draw();
+    CHECK(originals==1 && ndraws==0 && rects==0 && g_esp==STACK+4u);
+    /* Nothing drawn: a click there is the editor's. */
+    editor_tick(A_EDGE,A_HELD,30.f,40.f);
+    CHECK(!mapmaker_table.expanded && WORD_AT(MENU+0xc4)==A_EDGE && WORD_AT(MENU+0xc8)==A_HELD);
+    editor_tick(0,A_UP,30.f,40.f);
 
     /* ---- limits on, but the check has not run for this editor ---- */
     set_env("TSFP_MAPMAKER_LIMITS","1");
-    meter_at(22.f,36.f);
-    pc_display_mapmaker_meter(fake_meter);
+    draw();
     CHECK(originals==1 && ndraws==0);
 
-    /* ---- the table ---- */
+    /* ---- collapsed (the default): one line, the fullest row ---- */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(mapmaker_limits_view.valid && mapmaker_limits_view.editor==ED);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));             /* placement allowed */
-    meter_at(22.f,36.f);
-    pc_display_mapmaker_meter(fake_meter);
+    draw();
     CHECK(originals==0);                               /* replaces the stock meter */
     CHECK(g_esp==STACK+4u);                            /* and does its ret */
-    CHECK(ndraws==MAPMAKER_TABLE_ROWS);
+    CHECK(heap_bytes>=MAPMAKER_TABLE_SLOTS*MAPMAKER_TABLE_TEXT);
+    CHECK(!mapmaker_table.expanded && ndraws==1 && rects==1);
     CHECK(font_seen==0x12u && font_now==7u && font_calls==2);    /* meter font, then restored */
     CHECK(WORD_AT(0x007E7260u)==0x55u && draws[0].align==0u);    /* left aligned while drawing */
+    /* Turrets (type 27 at its maximum) beat movers (150/160, amber) and pad groups (68%). */
+    CHECK(drawn("+ Fullest: Turrets 26/72")==0);
+    if(drawn("+ Fullest: Turrets 26/72")) fprintf(stderr,"collapsed: '%s'\n",draws[0].text);
+    CHECK(draws[0].colour==MAPMAKER_TABLE_FULL && draws[0].outline==0x80u);
+    CHECK(draws[0].x==22.f+MAPMAKER_TABLE_PAD && draws[0].y==36.f+MAPMAKER_TABLE_PAD);
+    CHECK(rect[0]==22 && rect[1]==36);
+    CHECK((float)rect[2]>=draws[0].x+(float)visible(draws[0].text)*measure_k+MAPMAKER_TABLE_PAD-1.f);
+    CHECK((float)rect[3]>=draws[0].y+measure_h && (float)rect[3]<=36.f+2.f*MAPMAKER_TABLE_PAD+MAPMAKER_TABLE_LINE+1.f);
+    CHECK(rect[2]<200);                                /* compact: far left of the toolbar (x 388) */
+    CHECK(WORD_AT(STACK)==0x00311748u && FLOAT_AT(STACK+4u)==22.f && FLOAT_AT(STACK+8u)==36.f);  /* caller's frame kept */
+
+    /* ---- the click toggle: A over the panel, taken from the editor ---- */
+    editor_tick(A_EDGE,A_HELD,400.f,40.f);                       /* elsewhere: the editor's */
+    CHECK(!mapmaker_table.expanded && WORD_AT(MENU+0xc4)==A_EDGE && WORD_AT(MENU+0xc8)==A_HELD);
+    editor_tick(0,A_UP,400.f,40.f);
+    draw();
+    editor_tick(0,0,30.f,40.f);                                  /* hover only */
+    CHECK(!mapmaker_table.expanded);
+    draw();
+    editor_tick(A_EDGE,A_HELD,30.f,40.f);
+    CHECK(mapmaker_table.expanded);
+    CHECK(!(WORD_AT(MENU+0xc4)&A_EDGE) && !(WORD_AT(MENU+0xc8)&A_HELD));
+    WORD_AT(MENU+0xc4)=0;
+    draw();
+    editor_tick(0x00100000u,A_HELD,200.f,300.f);                 /* held (repeat), moved off: still taken */
+    CHECK(mapmaker_table.expanded && WORD_AT(MENU+0xc4)==0 && WORD_AT(MENU+0xc8)==0);
+    draw();
+    editor_tick(0,A_UP,200.f,300.f);                             /* the release too */
+    CHECK(WORD_AT(MENU+0xc8)==0 && !mapmaker_table.swallow);
+    draw();
+    editor_tick(A_EDGE|0x20u,A_HELD,200.f,300.f);                /* the next press is the editor's */
+    CHECK(WORD_AT(MENU+0xc4)==(A_EDGE|0x20u) && WORD_AT(MENU+0xc8)==A_HELD && mapmaker_table.expanded);
+    editor_tick(0,A_UP,200.f,300.f);
+    CHECK(WORD_AT(MENU+0xc8)==A_UP);
+    /* Other buttons on the panel pass through. */
+    draw();
+    editor_tick(0x00200020u,0x20u,30.f,40.f);
+    CHECK(mapmaker_table.expanded && WORD_AT(MENU+0xc4)==0x00200020u);
+
+    /* ---- expanded: two columns ---- */
+    draw();
+    CHECK(originals==0 && g_esp==STACK+4u && font_now==7u && WORD_AT(0x007E7260u)==0x55u);
+    CHECK(measures==1u+2u*MAPMAKER_TABLE_ROWS);
     {
         /* Placed counts: 90 tiles; items 30+3+7+150+4+24+2+1 (ids > 9; 1 id-90 item too) + 5 free;
          * pads 900, cover 810, links 90*20 + 16*90; memory placed estimate / 1024 rounded up. */
         uint32_t items=30u+3u+7u+150u+4u+24u+2u+1u+1u+5u;
         uint32_t kb=(mapmaker_placed_memory(pieces)+1023u)/1024u;
-        char want[15][48];
-        snprintf(want[0],48,"Tiles: 90/511");
-        snprintf(want[1],48,"Items: %u/500",(unsigned)items);
-        snprintf(want[2],48,"Engine objects: %u/1023",(unsigned)(90u+items+128u));
-        snprintf(want[3],48,"Pickups: 40/768");            /* weapons + keycards + health */
-        snprintf(want[4],48,"Regular pads: 900/7680");
-        snprintf(want[5],48,"Cover pads: 810/9984");
-        snprintf(want[6],48,"Links: 3240/32256");
-        snprintf(want[7],48,"Pad groups: 700/1024");
-        snprintf(want[8],48,"Memory: %u/2000 KB",(unsigned)kb);
-        snprintf(want[9],48,"Story AI: 37/511");
-        snprintf(want[10],48,"Logic: 12/120");
-        snprintf(want[11],48,"Movers: 150/160");
-        snprintf(want[12],48,"Props: 4/160");
-        snprintf(want[13],48,"Turrets: 26/72");
-        snprintf(want[14],48,"Teleporters: 1/40");
+        static const char *titles[15]={"Tiles","Items","Objects","Pickups","Pads","Cover","Links","Groups",
+                                      "Memory","Story AI","Logic","Movers","Props","Turrets","Teleports"};
+        char want[15][32],text[64];
+        snprintf(want[0],32," 90/511");
+        snprintf(want[1],32," %u/500",(unsigned)items);
+        snprintf(want[2],32," %u/1023",(unsigned)(90u+items+128u));
+        snprintf(want[3],32," 40/768");            /* weapons + keycards + health */
+        snprintf(want[4],32," 900/7680");
+        snprintf(want[5],32," 810/9984");
+        snprintf(want[6],32," 3240/32256");
+        snprintf(want[7],32," 700/1024");
+        snprintf(want[8],32," %u/2000 KB",(unsigned)kb);
+        snprintf(want[9],32," 37/511");
+        snprintf(want[10],32," 12/120");
+        snprintf(want[11],32," 150/160");
+        snprintf(want[12],32," 4/160");
+        snprintf(want[13],32," 26/72");
+        snprintf(want[14],32," 1/40");
+        CHECK(drawn("- Resources")==0 && draws[0].colour==MAPMAKER_TABLE_FULL);
         for(i=0;i<15;i++) {
-            char text[64];
-            snprintf(text,sizeof text,"\vs75%s\vs100",want[i]);
-            CHECK(i<ndraws && !strcmp(draws[i].text,text));
-            if(i<ndraws && strcmp(draws[i].text,text)) fprintf(stderr,"row %u: '%s' want '%s'\n",i,draws[i].text+4,want[i]);
-            CHECK(draws[i].outline==0x80u);
-            CHECK(draws[i].x==22.f && draws[i].y==36.f+12.f*(float)i);
+            wrap(text,sizeof text,titles[i]);
+            CHECK(1u+2u*i<ndraws && !strcmp(draws[1u+2u*i].text,text));
+            wrap(text,sizeof text,want[i]);
+            CHECK(2u+2u*i<ndraws && !strcmp(draws[2u+2u*i].text,text));
+            if(2u+2u*i<ndraws && strcmp(draws[2u+2u*i].text,text))
+                fprintf(stderr,"row %u: '%s' want '%s'\n",i,draws[2u+2u*i].text+4,want[i]);
         }
-        /* The same numbers as the check: the meter fraction is the fullest of them. */
-        CHECK(fabsf(FLOAT_AT(ED+0x270)-700.f/1024.f)<1e-4f);       /* pad groups are the fullest row */
-        CHECK(colour_of(want[0])==MAPMAKER_TABLE_OK);
-        CHECK(colour_of(want[11])==MAPMAKER_TABLE_NEAR);          /* movers 150/160 */
-        CHECK(colour_of(want[13])==MAPMAKER_TABLE_FULL);          /* turret type 27 at 24/24 */
-        CHECK(colour_of(want[12])==MAPMAKER_TABLE_OK);
+        check_columns(15,measure_h+MAPMAKER_TABLE_LEAD);
+        CHECK(draws[0].x==22.f+MAPMAKER_TABLE_PAD && draws[0].y==36.f+MAPMAKER_TABLE_PAD);
+        CHECK(rect[2]<200 && rect[3]<260);                       /* compact and above the floor buttons */
+        /* The same numbers as the check: the meter fraction is the fullest of the capped rows. */
+        CHECK(fabsf(FLOAT_AT(ED+0x270)-700.f/1024.f)<1e-4f);
+        CHECK(colour_of("Tiles")==MAPMAKER_TABLE_OK && colour_of(want[0])==MAPMAKER_TABLE_OK);
+        CHECK(colour_of("Movers")==MAPMAKER_TABLE_NEAR && colour_of(want[11])==MAPMAKER_TABLE_NEAR);
+        CHECK(colour_of("Turrets")==MAPMAKER_TABLE_FULL);       /* turret type 27 at 24/24 */
+        CHECK(colour_of("Props")==MAPMAKER_TABLE_OK);
         WORD_AT(0x007497B0u)=0x20u;                               /* blink phase */
-        meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
-        CHECK(colour_of(want[13])==MAPMAKER_TABLE_BLINK);
+        draw();
+        CHECK(colour_of("Turrets")==MAPMAKER_TABLE_BLINK && colour_of(want[13])==MAPMAKER_TABLE_BLINK);
         WORD_AT(0x007497B0u)=0;
+        /* The game's measure fails: estimated widths, still one column. */
+        measure_k=0.f;
+        draw();
+        check_columns(15,measure_h+MAPMAKER_TABLE_LEAD);
+        measure_k=5.f;
+        /* A taller glyph: the pitch follows it. */
+        measure_h=14.f;
+        draw();
+        check_columns(15,14.f+MAPMAKER_TABLE_LEAD);
+        measure_h=0.f;                                            /* no height: the default pitch */
+        draw();
+        CHECK(fabsf(draws[1].y-draws[0].y-MAPMAKER_TABLE_LINE)<1e-3f);
+        measure_h=9.6f;
     }
+
+    /* ---- the key toggle: once per press, only while the panel is up ---- */
+    draw();
+    table_key=1;editor_tick(0,0,400.f,300.f);
+    CHECK(!mapmaker_table.expanded);
+    draw();
+    editor_tick(0,0,400.f,300.f);                                /* still held */
+    CHECK(!mapmaker_table.expanded);
+    table_key=0;editor_tick(0,0,400.f,300.f);
+    draw();
+    table_key=1;editor_tick(0,0,400.f,300.f);
+    CHECK(mapmaker_table.expanded);
+    table_key=0;editor_tick(0,0,400.f,300.f);
+    draw();
+    table_key=1;editor_tick(0,0,400.f,300.f);
+    CHECK(!mapmaker_table.expanded);
+    table_key=0;editor_tick(0,0,400.f,300.f);
+    /* Kept for the session: the next draw is still collapsed. */
+    draw();
+    CHECK(ndraws==1 && drawn("+ Fullest: Turrets 26/72")==0);
+
+    /* ---- the toggle is the editor screen's only ---- */
+    WORD_AT(MENU+0x178)=0x00650000u;                            /* a menu with rows (pause, lists) */
+    editor_tick(A_EDGE,A_HELD,30.f,40.f);
+    CHECK(!mapmaker_table.expanded && WORD_AT(MENU+0xc4)==A_EDGE);
+    editor_tick(0,A_UP,30.f,40.f);
+    WORD_AT(MENU+0x178)=0;WORD_AT(MENU+0x170)=0x00650000u;      /* a child menu open */
+    draw();
+    table_key=1;editor_tick(A_EDGE,A_HELD,30.f,40.f);
+    CHECK(!mapmaker_table.expanded && WORD_AT(MENU+0xc4)==A_EDGE);
+    table_key=0;editor_tick(0,A_UP,30.f,40.f);
+    WORD_AT(MENU+0x170)=0;WORD_AT(0x0079094Cu)=100u;            /* play */
+    draw();
+    editor_tick(A_EDGE,A_HELD,30.f,40.f);
+    CHECK(!mapmaker_table.expanded && WORD_AT(MENU+0xc4)==A_EDGE);
+    WORD_AT(0x0079094Cu)=102u;
+    editor_tick(0,A_UP,30.f,40.f);
+    /* Not drawn for a while (a mode without the meter): clicks are the editor's. */
+    draw();
+    for(i=0;i<MAPMAKER_TABLE_STALE+1u;i++) editor_tick(0,0,400.f,300.f);
+    editor_tick(A_EDGE,A_HELD,30.f,40.f);
+    CHECK(!mapmaker_table.expanded && WORD_AT(MENU+0xc4)==A_EDGE);
+    table_key=1;editor_tick(0,A_HELD,30.f,40.f);
+    CHECK(!mapmaker_table.expanded);
+    table_key=0;editor_tick(0,A_UP,30.f,40.f);
+    /* TSFP_MAPMAKER_TABLE=0: no toggle either. */
+    draw();
+    set_env("TSFP_MAPMAKER_TABLE","0");set_env("TSFP_MAPMAKER_LIMITS","1");
+    editor_tick(A_EDGE,A_HELD,30.f,40.f);
+    CHECK(!mapmaker_table.expanded && WORD_AT(MENU+0xc4)==A_EDGE);
+    editor_tick(0,A_UP,30.f,40.f);
+    set_env("TSFP_MAPMAKER_TABLE",NULL);set_env("TSFP_MAPMAKER_LIMITS","1");
+    pc_display_mapmaker_limits(fake_limits);
+    mapmaker_table.expanded=1;
 
     /* A refused cap turns its row red at the placed count (placed + held over). */
     WORD_AT(0x00762CB8u)=1024;                                    /* groups at the cap: allowed, red (full) */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
-    CHECK(colour_of("Pad groups: 1024/1024")==MAPMAKER_TABLE_FULL);
+    draw();
+    CHECK(colour_of(" 1024/1024")==MAPMAKER_TABLE_FULL && colour_of("Groups")==MAPMAKER_TABLE_FULL);
     WORD_AT(0x00762CB8u)=922;                                     /* 90% (922/1024) */
     pc_display_mapmaker_limits(fake_limits);
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
-    CHECK(colour_of("Pad groups: 922/1024")==MAPMAKER_TABLE_NEAR);
+    draw();
+    CHECK(colour_of(" 922/1024")==MAPMAKER_TABLE_NEAR);
     WORD_AT(0x00762CB8u)=700;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,800);         /* held: 800 x 9 cover = 7200 + 810 */
     WORD_AT(0x00529404u+0x280u)=12;                               /* 9600 + 810 > 9984: refused on cover */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     CHECK(mapmaker_limits_view.over&MAPMAKER_CAP_COVER);
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
-    CHECK(colour_of("Cover pads: 810/9984")==MAPMAKER_TABLE_FULL);  /* placed shown, refusal coloured */
-    CHECK(colour_of("Regular pads: 900/7680")==MAPMAKER_TABLE_OK);
+    draw();
+    CHECK(colour_of(" 810/9984")==MAPMAKER_TABLE_FULL);            /* placed shown, refusal coloured */
+    CHECK(colour_of(" 900/7680")==MAPMAKER_TABLE_OK);
     WORD_AT(0x00529404u+0x280u)=9;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     /* Pieces: 511 placed + 1 held refused, the row at 511/511 red. */
     WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,511);
     pc_display_mapmaker_limits(fake_limits);
     CHECK(mapmaker_limits_view.over&MAPMAKER_CAP_PIECES);
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
-    CHECK(colour_of("Tiles: 511/511")==MAPMAKER_TABLE_FULL);
+    draw();
+    CHECK(colour_of(" 511/511")==MAPMAKER_TABLE_FULL);
+    /* Collapsed, the fullest row by ratio among the red ones: tiles 511/511. */
+    mapmaker_table.expanded=0;
+    draw();
+    CHECK(drawn("+ Fullest: Tiles 511/511")==0 && draws[0].colour==MAPMAKER_TABLE_FULL);
+    mapmaker_table.expanded=1;
     /* Engine objects: pieces + items + 128 reserved (64 characters, 64 for effects), as the check. */
     WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,340);
     WORD_AT(ED+0x306c)=500u<<16;                                  /* 340 + 500 + 128 = 968 */
     WORD_AT(ED+0x2f7c)=0;
     pc_display_mapmaker_limits(fake_limits);
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
-    CHECK(drawn("\vs75Engine objects: 968/1023\vs100")>=0);
-    CHECK(colour_of("Items: 500/500")==MAPMAKER_TABLE_FULL);
-    CHECK(colour_of("Engine objects: 968/1023")==MAPMAKER_TABLE_NEAR);
+    draw();
+    CHECK(drawn(" 968/1023")>=0);
+    CHECK(colour_of(" 500/500")==MAPMAKER_TABLE_FULL);
+    CHECK(colour_of(" 968/1023")==MAPMAKER_TABLE_NEAR);
+    /* Collapsed with no red row: the fullest amber row by ratio, items 92% over
+     * groups 90.8% and objects 90.7% (listed before items would win a tie). */
+    mapmaker_table.expanded=0;
+    WORD_AT(ED+0x306c)=460u<<16;                                  /* items 460/500, objects 928/1023 */
+    WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,340);
+    WORD_AT(0x00762CB8u)=930;                                     /* groups 930/1024 */
+    pc_display_mapmaker_limits(fake_limits);
+    draw();
+    CHECK(drawn("+ Fullest: Items 460/500")==0 && draws[0].colour==MAPMAKER_TABLE_NEAR);
+    if(drawn("+ Fullest: Items 460/500")) fprintf(stderr,"collapsed: '%s'\n",draws[0].text);
+    WORD_AT(0x00762CB8u)=950;                                     /* groups 92.8%, after items: groups now */
+    pc_display_mapmaker_limits(fake_limits);
+    draw();
+    CHECK(drawn("+ Fullest: Groups 950/1024")==0);
+    WORD_AT(ED+0x306c)=420u<<16;WORD_AT(0x00762CB8u)=930;        /* items 84%, objects 86.8% (ok) */
+    pc_display_mapmaker_limits(fake_limits);
+    draw();
+    CHECK(drawn("+ Fullest: Groups 930/1024")==0);
+    WORD_AT(0x00762CB8u)=700;
+    mapmaker_table.expanded=1;
     WORD_AT(ED+0x306c)=5u<<16;
     WORD_AT(0x0078400Cu)=pieces;WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     pc_display_mapmaker_limits(fake_limits);
 
     /* ---- the stock meter instead ---- */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);                         /* limits turned off after a check */
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
-    CHECK(originals==1 && ndraws==0);
+    draw();
+    CHECK(originals==1 && ndraws==0 && rects==0);
+    editor_tick(A_EDGE,A_HELD,30.f,40.f);                         /* the stock meter's place: the editor's */
+    CHECK(WORD_AT(MENU+0xc4)==A_EDGE && WORD_AT(MENU+0xc8)==A_HELD);
+    editor_tick(0,A_UP,30.f,40.f);
     set_env("TSFP_MAPMAKER_LIMITS","1");
     probe_flags=MAPMAKER_PROBE_METER;                             /* the probe measures the stock meter */
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
+    draw();
     CHECK(originals==1 && ndraws==0);
     probe_flags=0;
     WORD_AT(0x007844A8u)=ED+0x1000u;                              /* another editor object */
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
+    draw();
     CHECK(originals==1 && ndraws==0);
     WORD_AT(0x007844A8u)=ED;
     WORD_AT(0x007844A8u)=0x05000000u;                             /* a frame whose check could not run */
     pc_display_mapmaker_limits(fake_limits);
     WORD_AT(0x007844A8u)=ED;
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
+    draw();
     CHECK(originals==1 && ndraws==0);
     pc_display_mapmaker_limits(fake_limits);
-    heap_result=0;memset(&mapmaker_table,0,sizeof mapmaker_table);  /* no text buffer */
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
+    heap_result=0;mapmaker_table.text=0;                          /* no text buffer */
+    draw();
     CHECK(originals==1 && ndraws==0);
     heap_result=TEXT_BUF;
     set_env("TSFP_MAPMAKER_TABLE","0");
     set_env("TSFP_MAPMAKER_LIMITS","1");
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
+    draw();
     CHECK(originals==1 && ndraws==0);
     set_env("TSFP_MAPMAKER_TABLE",NULL);set_env("TSFP_MAPMAKER_LIMITS","1");
-    meter_at(22.f,36.f);pc_display_mapmaker_meter(fake_meter);
-    CHECK(originals==0 && ndraws==MAPMAKER_TABLE_ROWS);
+    draw();
+    CHECK(originals==0 && ndraws==1u+2u*MAPMAKER_TABLE_ROWS);
 
-    /* ---- layout: 4:3 and wide outputs ----
+    /* ---- layout: 4:3 and wide outputs, collapsed and expanded ----
      * The meter's own position (sub_0030C3C0): safe-area margins of the 640 x 480
      * canvas, x 22 or 32, y 36 or 24, plus the HUD slide. The editor HUD is drawn
      * in the centred 4:3 box on a wide output (mapmaker-widescreen.md), so the
-     * guest rectangle maps to output = box_left + guest * h / 480. */
+     * guest rectangle maps to output = box_left + guest * h / 480. Widths are the
+     * estimate for the longest strings the caps allow. */
     {
         static const float pos[][2]={{22.f,36.f},{32.f,24.f},{22.f-40.f,36.f-64.f},{600.f,470.f}};
         static const unsigned outputs[][2]={{640,480},{1024,768},{1920,1080},{2560,1080},{3840,1080}};
-        unsigned p,o;
-        for(p=0;p<sizeof pos/sizeof pos[0];p++) {
-            float xs[MAPMAKER_TABLE_ROWS],ys[MAPMAKER_TABLE_ROWS],right;
-            right=mapmaker_table_layout(pos[p][0],pos[p][1],MAPMAKER_TABLE_ROWS,25u,xs,ys);
-            CHECK(xs[0]>=MAPMAKER_TABLE_MARGIN && ys[0]>=MAPMAKER_TABLE_MARGIN);
-            CHECK(ys[MAPMAKER_TABLE_ROWS-1]+MAPMAKER_TABLE_LINE<=480.f-MAPMAKER_TABLE_MARGIN+1e-3f);
-            CHECK(right<=640.f-MAPMAKER_TABLE_MARGIN+1e-3f && right-xs[0]<0.98f*640.f);
-            if(p<2) {
-                /* At the meter: left third (the renderer's side anchor), clear of the
-                 * toolbar (x 388-599, y 50-55) and floor buttons (x 585). */
-                CHECK(xs[0]==pos[p][0] && ys[0]==pos[p][1]);
-                CHECK(pc_ui_side_anchor(xs[0],right,640.f)==0.f);
-                CHECK(right<388.f);
+        const float header_w=(float)strlen("+ Fullest: Teleports 32256/32256 KB")*MAPMAKER_TABLE_GLYPH;
+        const float title_w=(float)strlen("Teleports")*MAPMAKER_TABLE_GLYPH;
+        const float value_w=(float)strlen("32256/32256 KB")*MAPMAKER_TABLE_GLYPH;
+        const float line=mapmaker_table_line(9.6f);
+        unsigned p,o,e;
+        CHECK(line>=9.6f+MAPMAKER_TABLE_LEAD-1e-4f && line<=12.f);    /* fits the 60% glyph, not looser */
+        CHECK(MAPMAKER_TABLE_SCALE>=60 && MAPMAKER_TABLE_SCALE<=65);
+        /* The unmeasured pitch fits font 0x12 (~16 units at 100%) at this scale. */
+        CHECK(MAPMAKER_TABLE_LINE>=16.f*(float)MAPMAKER_TABLE_SCALE/100.f+MAPMAKER_TABLE_LEAD-1e-4f);
+        CHECK(mapmaker_table_line(40.f)==MAPMAKER_TABLE_LINE && mapmaker_table_line(NAN)==MAPMAKER_TABLE_LINE);
+        for(e=0;e<2;e++)
+            for(p=0;p<sizeof pos/sizeof pos[0];p++) {
+                MapMakerTableBox b;
+                unsigned lines=e?1u+MAPMAKER_TABLE_ROWS:1u;
+                mapmaker_table_layout(pos[p][0],pos[p][1],lines,e?(float)strlen("- Resources")*MAPMAKER_TABLE_GLYPH:header_w,
+                                      title_w,value_w,line,&b);
+                CHECK(b.x0>=MAPMAKER_TABLE_MARGIN && b.y0>=MAPMAKER_TABLE_MARGIN);
+                CHECK(b.y1<=480.f-MAPMAKER_TABLE_MARGIN+1e-3f && b.x1<=640.f-MAPMAKER_TABLE_MARGIN+1e-3f);
+                CHECK(mapmaker_table_line_y(&b,lines-1u)+line<=b.y1+1e-3f);
+                if(e) CHECK(b.value_right+MAPMAKER_TABLE_PAD<=b.x1+1e-3f &&
+                            b.value_right-value_w>=b.text_x+title_w+MAPMAKER_TABLE_GAP-1e-3f);
+                if(p<2) {
+                    /* At the meter: left third (the renderer's side anchor), clear of the
+                     * toolbar (x 388-599, y 50-55) and the floor buttons (x 585). */
+                    CHECK(b.x0==pos[p][0] && b.y0==pos[p][1]);
+                    CHECK(pc_ui_side_anchor(b.x0,b.x1,640.f)==0.f);
+                    CHECK(b.x1<388.f);
+                    if(e) CHECK(b.y1<240.f);                   /* the upper half */
+                    else CHECK(b.y1-b.y0<=line+2.f*MAPMAKER_TABLE_PAD+1e-3f);
+                }
+                for(o=0;o<sizeof outputs/sizeof outputs[0];o++) {
+                    float w=(float)outputs[o][0],h=(float)outputs[o][1];
+                    float k=h/480.f<w/640.f?h/480.f:w/640.f,left=(w-640.f*k)*.5f,top=(h-480.f*k)*.5f;
+                    float x0=left+b.x0*k,x1=left+b.x1*k,y0=top+b.y0*k,y1=top+b.y1*k;
+                    CHECK(x0>=left && x1<=left+640.f*k && y0>=top && y1<=top+480.f*k);
+                    CHECK(x0>=0.f && x1<=w && y0>=0.f && y1<=h);
+                    CHECK(line*k>=11.f);                         /* rows no tighter than at 640 x 480 */
+                }
             }
-            for(o=0;o<sizeof outputs/sizeof outputs[0];o++) {
-                float w=(float)outputs[o][0],h=(float)outputs[o][1];
-                float k=h/480.f<w/640.f?h/480.f:w/640.f,left=(w-640.f*k)*.5f,top=(h-480.f*k)*.5f;
-                float x0=left+xs[0]*k,x1=left+right*k,y0=top+ys[0]*k,y1=top+(ys[MAPMAKER_TABLE_ROWS-1]+MAPMAKER_TABLE_LINE)*k;
-                CHECK(x0>=left && x1<=left+640.f*k && y0>=top && y1<=top+480.f*k);
-                CHECK(x0>=0.f && x1<=w && y0>=0.f && y1<=h);
-                CHECK(MAPMAKER_TABLE_LINE*k>=12.f);   /* rows no tighter than at 640 x 480 */
-            }
-        }
         {
-            float xs[MAPMAKER_TABLE_ROWS],ys[MAPMAKER_TABLE_ROWS];
-            mapmaker_table_layout(NAN,INFINITY,MAPMAKER_TABLE_ROWS,25u,xs,ys);
-            CHECK(isfinite(xs[0]) && isfinite(ys[0]));
+            MapMakerTableBox b;
+            mapmaker_table_layout(NAN,INFINITY,1u+MAPMAKER_TABLE_ROWS,header_w,title_w,value_w,line,&b);
+            CHECK(isfinite(b.x0) && isfinite(b.y0));
         }
     }
-    /* The text fits its buffer: the longest row at the largest values. */
+    /* The text fits its slots: the longest header at the largest values. */
     {
-        char line[MAPMAKER_TABLE_TEXT];
-        int len=snprintf(line,sizeof line,"\vs%d%s: %u/%u%s\vs100",MAPMAKER_TABLE_SCALE,"Engine objects",4294967295u,4294967295u," KB");
+        char text[MAPMAKER_TABLE_TEXT];
+        int len=snprintf(text,sizeof text,"\vs%d+ Fullest: %s %u/%u%s\vs100",MAPMAKER_TABLE_SCALE,"Teleports",
+                         4294967295u,4294967295u," KB");
         CHECK(len<(int)MAPMAKER_TABLE_TEXT);
     }
 
