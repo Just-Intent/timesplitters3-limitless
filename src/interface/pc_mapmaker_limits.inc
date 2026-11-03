@@ -37,7 +37,7 @@
  * 500 items, their clipboard copies and up to 81 start points fit twice over.
  * In play items are Level-heap arrays by count (sub_00240590) and about one
  * engine object each (pool 1023, pc_mapmaker_objects.inc; the editor keeps
- * pieces + items + 64 characters within it, MAPMAKER_LIMIT_OBJECTS).
+ * pieces + items + a 128-slot reserve within it, MAPMAKER_LIMIT_OBJECTS).
  *
  * Cover pads stay at the stock 1024: the map adds about 60 more when it loads
  * (measured: 60 on a 142-tile, 50-item map and on a 110-tile, 67-item map, so
@@ -109,9 +109,18 @@
  * takes one slot of the engine object pool (pc_mapmaker_objects.inc, 1023
  * slots, taken without a bound check; 462 used at 236 pieces + 200 items),
  * characters up to 64 more. The editor refuses placement past the pool, so
- * 511 pieces leave 448 items; 255 pieces keep the 500 items. */
+ * 511 pieces leave 384 items; 395 pieces keep the 500 items.
+ * The reserve (2026-11-03, v0.4.0-mapmaker.37: 459 pieces + about 500 items
+ * filled all 1023 slots in play and shot barrels did nothing) is 64
+ * characters plus 64 for what explodes and breaks: sub_000AB590 refuses a
+ * flag-8 object (debris, fragments) unless 5 slots stay free (sub_000A4C70),
+ * flag-8 props live in a 30-block ring (sub_000AC940) and broken props keep
+ * up to 20 debris pieces (0x00732688). */
 #define MAPMAKER_LIMIT_OBJECTS 1023u  /* = MAPMAKER_OBJECTS_POOL */
-#define MAPMAKER_OBJECTS_RESERVE 64u  /* characters in MapMaker story play */
+#define MAPMAKER_OBJECTS_CHARACTERS 64u /* characters in MapMaker story play */
+#define MAPMAKER_OBJECTS_EFFECTS 64u    /* >= 30 ring + 20 debris + 5 refusal margin */
+#define MAPMAKER_OBJECTS_RESERVE (MAPMAKER_OBJECTS_CHARACTERS+MAPMAKER_OBJECTS_EFFECTS)
+typedef char mapmaker_limits_effects_reserve[(MAPMAKER_OBJECTS_EFFECTS>=30u+20u+5u)?1:-1];
 /* Regular pads: the pool fits the handle range and every pool id stays at or
  * below the raised id threshold 0x2328. */
 typedef char mapmaker_limits_pad_ids[(MAPMAKER_POOL_PADS<=0x1F40u && 0x3E9u+MAPMAKER_POOL_PADS-1u<=0x2328u &&
@@ -311,7 +320,7 @@ static void mapmaker_limits_log(unsigned over,const MapMakerTotals *p,const MapM
     if(over&MAPMAKER_CAP_SUB) fprintf(stderr," items %u of %u;",(unsigned)sub,MAPMAKER_LIMIT_SUB);
     if(over&MAPMAKER_CAP_MEMORY) fprintf(stderr," memory estimate %u of %u at scale %u (TSFP_MAPMAKER_ARENA_MB raises it);",
                                          (unsigned)memory,MAPMAKER_LIMIT_MEMORY,mapmaker_budget_scale());
-    if(over&MAPMAKER_CAP_OBJECTS) fprintf(stderr," engine objects %u of %u (pieces + items + %u characters);",
+    if(over&MAPMAKER_CAP_OBJECTS) fprintf(stderr," engine objects %u of %u (pieces + items + %u reserved);",
                                           (unsigned)mapmaker_objects_needed(p->pieces+h->pieces,sub),MAPMAKER_LIMIT_OBJECTS,
                                           MAPMAKER_OBJECTS_RESERVE);
     fputc('\n',stderr);

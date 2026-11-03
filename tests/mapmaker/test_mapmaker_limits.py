@@ -30,9 +30,13 @@ MUTATIONS = {
     'links-held-ignored': ('mapmaker_link_cost(p)+mapmaker_link_cost(h)>MAPMAKER_LIMIT_LINKS',
                            'mapmaker_link_cost(p)>MAPMAKER_LIMIT_LINKS'),
     'no-held-pieces': ('p->pieces+h->pieces>MAPMAKER_LIMIT_PIECES', 'p->pieces>MAPMAKER_LIMIT_PIECES'),
-    # Engine objects: pieces + items + 64 characters within the 1023-slot pool.
+    # Engine objects: pieces + items + 64 characters + 64 effects within the 1023-slot pool.
     'objects-unchecked': ('    if(mapmaker_objects_needed(p->pieces+h->pieces,sub)>MAPMAKER_LIMIT_OBJECTS) over|=MAPMAKER_CAP_OBJECTS;\n', ''),
     'objects-no-reserve': ('    return pieces+sub+MAPMAKER_OBJECTS_RESERVE;', '    return pieces+sub;'),
+    # The reserve keeps 64 slots for explosions and debris on top of the characters.
+    'objects-characters-only': ('#define MAPMAKER_OBJECTS_RESERVE (MAPMAKER_OBJECTS_CHARACTERS+MAPMAKER_OBJECTS_EFFECTS)',
+                                '#define MAPMAKER_OBJECTS_RESERVE (MAPMAKER_OBJECTS_CHARACTERS)'),
+    'objects-effects-32': ('#define MAPMAKER_OBJECTS_EFFECTS 64u ', '#define MAPMAKER_OBJECTS_EFFECTS 32u '),
     'objects-placed-only': ('mapmaker_objects_needed(p->pieces+h->pieces,sub)', 'mapmaker_objects_needed(p->pieces,sub)'),
     'objects-stock-pool': ('#define MAPMAKER_LIMIT_OBJECTS 1023u', '#define MAPMAKER_LIMIT_OBJECTS 1000u'),
     # Pad groups 1024: 511 pieces at the measured 1.5 groups each fit.

@@ -922,7 +922,7 @@ A mixed map of all 46 types (mean 17.6 KB) estimates 9.0 MB at 511 pieces,
 of the 16.4 MB budget. 511 of the heaviest tile need scale 11, i.e.
 `TSFP_MAPMAKER_ARENA_MB=6` (8 + 6/2); `TSFP_MAPMAKER_MEMORY_SCALE=11`
 without the arena is not measured. Links stop at 520 heavy-link pieces,
-pads at 548, objects at 1023 - 64 - items (511 pieces leave 448 items).
+pads at 548, objects at 1023 - 128 - items (511 pieces leave 384 items).
 Defaults stay: scale 8 and no arena. The only play measurement (186 pieces,
 103 items, full at scale 3: 8.79 MB Level heap free) projects about 4 MB
 free at scale 8; nothing measured a larger arena's window headroom or a
