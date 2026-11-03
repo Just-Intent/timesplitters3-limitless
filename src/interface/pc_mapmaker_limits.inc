@@ -325,6 +325,17 @@ static void mapmaker_limits_log(unsigned over,const MapMakerTotals *p,const MapM
                                           MAPMAKER_OBJECTS_RESERVE);
     fputc('\n',stderr);
 }
+/* What the last limit check saw, for the editor's resource table
+ * (pc_mapmaker_restable.inc): the placed counts the meter divides and the
+ * caps placed + held content passes. valid = 0 until the check has run with
+ * the raised limits on; the table then shows the stock meter instead. */
+typedef struct MapMakerLimitsView {
+    int valid;
+    uint32_t editor, pieces, items, objects, pads, cover, links, memory;
+    int32_t groups;
+    unsigned over;
+} MapMakerLimitsView;
+static MapMakerLimitsView mapmaker_limits_view;
 static float mapmaker_fraction_max(const float *f,unsigned n)
 {
     float m=0;
@@ -343,6 +354,7 @@ void pc_display_mapmaker_limits(void (*original)(void))
     mapmaker_limits_read();
     if(!mapmaker_limits.limits) return;
     mapmaker_categories_apply();
+    mapmaker_limits_view.valid=0;                 /* until this check completes */
     if(!MAPMAKER_PTR_OK(0x007844A8u,4) || !MAPMAKER_PTR_OK(0x0078400Cu,4) ||
        !MAPMAKER_PTR_OK(0x00762CB8u,4)) return;
     editor=WORD_AT(0x007844A8u);
@@ -373,6 +385,12 @@ void pc_display_mapmaker_limits(void (*original)(void))
         unsigned over=mapmaker_limits_over(&p,&h,total_mem,groups,sub);
         mapmaker_limits_log(over,&p,&h,total_mem,groups,sub);
         refuse=over!=0;
+        mapmaker_limits_view.pieces=p.pieces;mapmaker_limits_view.items=p.sub+extra;
+        mapmaker_limits_view.objects=mapmaker_objects_needed(p.pieces,p.sub+extra);
+        mapmaker_limits_view.pads=p.cost[0];mapmaker_limits_view.cover=p.cost[1];
+        mapmaker_limits_view.links=mapmaker_link_cost(&p);mapmaker_limits_view.memory=placed_mem;
+        mapmaker_limits_view.groups=groups;mapmaker_limits_view.over=over;
+        mapmaker_limits_view.editor=editor;mapmaker_limits_view.valid=1;
     }
     flags=WORD_AT(editor+0x25c);
     WORD_AT(editor+0x25c)=refuse?(flags|0x400000u):(flags&~0x400000u);
