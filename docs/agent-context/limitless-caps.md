@@ -184,3 +184,32 @@ estimate|engine objects n of m`) once each time that set changes. Tests:
 `mapmaker_limits.c` (387 heaviest refused on memory alone, 386 fit, 511 at
 scale 11, not 10), `reasons_ok` and `reason-*` mutations in
 `test_mapmaker_limits.py`.
+
+## Resource table (area restable, 2026-11-03)
+
+`src/interface/pc_mapmaker_restable.inc` (included last among the capacity
+areas; `#define MAPMAKER_RESTABLE` before `pc_mapmaker_probe.inc`, whose
+meter scope becomes `static mapmaker_probe_meter`) now defines
+`pc_display_mapmaker_meter`, the existing manual wrapper of the meter painter
+`sub_0030C210` (cdecl x, y floats; probe patch, no new wrapper or
+regeneration). With `TSFP_MAPMAKER_LIMITS=1` it replaces the painter (pops
+the return address) with 15 outlined rows `Title: used/max` at the meter's
+x, y, font 0x12 at `\vs75`, 12 units apart, via `sub_00041E30` (alignment
+`[0x007E7260]` zeroed and restored): the caps of `pc_display_mapmaker_limits`
+from `mapmaker_limits_view` (placed counts; red on its `over` bits), pickups
+of 768, Story AI `editor+0x280`/511, logic ops `editor+0x41E0`/120, and the
+per-category counts of `sub_00303460`/`sub_00308420` (catalogue
+`0x00524F58 + id*0xC4 + 2`, maxima `0x00524BE0 + c*24 + 4`) for movers,
+props, turrets 27-29 and teleporters 14-18. Stock meter when the limits are
+off, the view is not valid for this editor, `TSFP_MAPMAKER_TABLE=0`, probe
+flag 1, or no text buffer. Whole-chain fixtures link `sub_0003FA10`/
+`sub_00041E30` from `mapmaker_area_stubs.h`. Tests:
+`tests/mapmaker/test_mapmaker_restable.py` (rows, colours, fallbacks, 4:3 and
+wide layout, 39 mutations). Contract and playtest steps:
+`docs/mapmaker/mapmaker-restable.md`. Not built or played.
+
+`mapmaker_limits_view` (in `pc_mapmaker_limits.inc`): placed pieces, items +
+free objects, objects, pads, cover, links, groups, placed memory, `over` and
+the editor pointer of the last completed check; `valid` is cleared at the
+start of each check. A cap changed here changes its row; the fixture reads
+the editor/objects limits from their sources.

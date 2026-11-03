@@ -1,3 +1,13 @@
+## MapMaker resource table (2026-11-03, not built or played)
+
+Source: branch resource-table from mapmaker-recon a5947b1d, Windows 11 x64, MSVC fixtures only.
+With `LIMITS` the editor meter (`sub_0030C210`, existing probe wrapper) draws 15 rows of
+used/max from the editor's own checks (`mapmaker_limits_view`, per-category counts, Story AI,
+logic); `test_mapmaker_restable.py` 41 passed (fixed, 39 mutations detected, wiring). Also
+passed: test_mapmaker_limits, _probe, _budget, test_menu_mouse. Not run here: test_fov_settings
+(needs the external runtime checkout), game build, editor display at any aspect, Mac. Playtest:
+docs/mapmaker/mapmaker-restable.md "Playtest checks".
+
 ## MapMaker placed pickups 120 -> 768 (2026-11-02, not built or played)
 
 Source: branch objects-high from mapmaker-recon 04496239, Windows 11 x64, MSVC fixtures and the

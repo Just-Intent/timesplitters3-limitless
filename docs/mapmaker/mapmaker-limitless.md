@@ -52,6 +52,7 @@ are not in the launcher.
 | `TSFP_MAPMAKER_POINTER=0` | Mouse on | Turns the editor mouse controls off. | Editor mouse checked in game |
 | `TSFP_MAPMAKER_POOLS=0` | Pools on | Restores the original AI navigation pools in MapMaker play. This also turns `LIMITS` off. Troubleshooting only. | - |
 | `TSFP_MAPMAKER_ROOM_MASK_CLEAR=<hex>` | Off | Developer test for open-air (sky) tiles. Not a player feature. | Work in progress |
+| `TSFP_MAPMAKER_TABLE=0` | Table on with `LIMITS` | Shows the original memory meter instead of the [resource table](mapmaker-restable.md). | Automated tests only |
 | `TSFP_MAPMAKER_PROBE=<flags>` | Off | Read-only diagnostic log; see the [probe guide](mapmaker-meter-probe.md). Flag 32 also shows how much memory is left for a larger arena. | Developer use |
 | `TSFP_MAPMAKER_ARENA_MB=0..16` | 0 (off) | Gives the game's heap that many more MB in every scene (also story levels), taken from the same 64 MB block as textures. Measure with probe flag 32 first; see [memory](mapmaker-memory.md). | Not tested in game |
 | `TSFP_MAPMAKER_BOSS_RANGE=<units>` | 30 | How close you must be for a Boss Story AI's health bar to show (1..100000 game units). | Automated tests only |
@@ -77,6 +78,10 @@ are not in the launcher.
 | Pads / pad links / pad groups | 2400 / 4400 / 300 | 4800 / 12000 / 600 |
 | Map file | 32 KB | 512 KB |
 | Memory budget meter | 1x | 8x |
+
+With `LIMITS` the editor's memory meter becomes a [resource table](mapmaker-restable.md):
+one row per limit above ("Tiles: 123/511"), amber near the limit and red at
+it. *Automated tests only.*
 
 **Tested (STATUS.md, 2026-10-30):** editor and play on maps with 236 tiles,
 200 items and more than 102 Story AI, up to 64 characters in MapMaker Story,
