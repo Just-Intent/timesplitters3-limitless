@@ -376,7 +376,10 @@ static void mapmaker_probe_pools(void)
     mapmaker_probe_pools_state.last=now;
 }
 
-void pc_display_mapmaker_meter(void (*original)(void))
+/* The meter painter sub_0030C210 (cdecl, x and y floats). The resource
+ * table (pc_mapmaker_restable.inc, MAPMAKER_RESTABLE) owns the wrapper when
+ * it is included and runs this scope whenever it draws the stock meter. */
+static void mapmaker_probe_meter(void (*original)(void))
 {
     unsigned flags=mapmaker_probe_flags(),i;
     int outer;
@@ -422,6 +425,10 @@ void pc_display_mapmaker_meter(void (*original)(void))
         mapmaker_probe.last_time=now;mapmaker_probe.repeats=0;mapmaker_probe.emitted++;
     }
 }
+
+#ifndef MAPMAKER_RESTABLE
+void pc_display_mapmaker_meter(void (*original)(void)) { mapmaker_probe_meter(original); }
+#endif
 
 /* Flag 8: menus laid out while MapMaker runs. Called by the existing
  * sub_00073750 wrapper after the original layout, before any of its checks,
