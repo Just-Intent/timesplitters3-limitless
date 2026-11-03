@@ -329,6 +329,24 @@
       "original_hex": "83f878",
       "new_hex": "80fc03",
       "reason": "cmp eax,0x78 -> cmp ah,3 before the jge: placed-pickup count [0x00732E64] full at 768 (= 3 << 8) instead of 120"
+    },
+    {
+      "id": "obj-propblocks-alloc",
+      "kind": "code",
+      "function": "0x000A92A0",
+      "address": "0x000A92C0",
+      "original_hex": "68f0000000",
+      "new_hex": "6800200000",
+      "reason": "class-0x80 prop block pointers [0x0072F728] 60 -> 2048 x 4 B (Level heap, every scene): sub_000AC940 indexes it with the never-bounded count [0x007327A8] of placed (non-flag-8) props, so prop 61 read past the table and took a foreign pointer as its 0x160-byte block (release sub_000A92F0 then freed garbage effect handles)"
+    },
+    {
+      "id": "obj-propblocks-clear",
+      "kind": "code",
+      "function": "0x000A92A0",
+      "address": "0x000A92DA",
+      "original_hex": "b93c000000",
+      "new_hex": "b900080000",
+      "reason": "prop block pointer clear: 2048 dwords (rep stosd)"
     }
   ]
 }
