@@ -40,6 +40,8 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
     WORD_AT(s->pressed_address)|=buttons;
 }
 
+/* The resource table (pc_mapmaker_restable.inc, below) owns the meter wrapper. */
+#define MAPMAKER_RESTABLE 1
 #include "pc_mapmaker_probe.inc"
 #include "pc_mapmaker_pointer.inc"
 #include "pc_mapmaker_budget.inc"
@@ -79,6 +81,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_matchbots.inc"
 #include "pc_mapmaker_weaponset.inc"
 #include "pc_mapmaker_tilesets.inc"
+#include "pc_mapmaker_restable.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in
