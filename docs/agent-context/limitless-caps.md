@@ -267,3 +267,16 @@ free objects, objects, pads, cover, links, groups, placed memory, `over` and
 the editor pointer of the last completed check; `valid` is cleared at the
 start of each check. A cap changed here changes its row; the fixture reads
 the editor/objects limits from their sources.
+
+## Story AI points past piece 255 (2026-11-06)
+
+Entry point: `pc_mapmaker_editor_sai_point` in `src/interface/pc_mapmaker_editor.inc`,
+a new `WRAP sub_00332330` that acts only on the editor loader's call (return
+address `0x0030246B`). Saved Story AI points keep their piece as one byte
+(`0x00301570`). On maps of more than 256 pieces, points on piece 256 and above
+reloaded onto the wrong piece. They then vanished from the map, drew at the
+pointer (`sub_003096A0`, `0x00309727`) and were dropped at the next save. A
+failed pad-id decode is now retried on the pieces whose index has the same low
+byte (+256, +512). The save format is unchanged. Contract:
+`tests/mapmaker/test_mapmaker_editor.py` (`sai-point-*`). Details:
+`docs/mapmaker/mapmaker-editor.md`.

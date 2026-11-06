@@ -22,6 +22,7 @@ rewrites), `src/interface/pc_mapmaker_editor.inc` (C policy, wrappers),
     WRAP sub_0033F480 -> pc_mapmaker_editor_logic_slot
     WRAP sub_00304330 -> pc_mapmaker_editor_free_place
     WRAP sub_002F7F30 -> pc_mapmaker_editor_free_move
+    WRAP sub_00332330 -> pc_mapmaker_editor_sai_point
 
 Hooks that replace their original (`sai_add`, `logic_can_add`,
 `logic_full`, `node_room`, and the refusal paths of `objective` and
@@ -151,6 +152,42 @@ clears the bit after a successful add, so the scroll position (and the
 selection) stay where they were and several AI can be created in a row.
 Limits off: stock jump. The new row is appended at the bottom and is only
 visible once the player scrolls there.
+
+### Story AI points on pieces past 255 (2026-11-06, v0.4.0-mapmaker.39/.40 bug)
+
+Symptom: after test play (or reopening a map) placed Story AIs were gone
+from the editor map and one AI drew at the pointer in every toolbar slot,
+including Items. CONFIRMED cause: the map writer `sub_00300800` stores each
+point as {u16 pad id from `sub_00331E50`, u8 piece index, u8 flags} at chunk
++0x44 + 4k; the index is the piece's position in the placed list
+`[0x0078400C]`, stored with `mov byte ptr [eax], cl` (`0x00301570`). With the
+511-piece cap, pieces 256..510 save as index & 0xFF. The editor loader
+`sub_00301A90` picks the piece from its 1024-entry table (loop `[esp+0x1C]`,
+`0x00302454`) by that byte and decodes the pad id against it with
+`sub_00332330(piece, &point+4, id)` (`0x00302466`). On the wrong piece the
+decode writes x = y = z = 0x8008 (`0x003323C4`). `sub_003096A0` draws a point
+whose position is invalid at the editor pointer (`0x00309727`), so the AI
+follows the cursor whatever the toolbar slot, and the next save drops the
+point (`sub_00331E50` answers -1 for 0x8008, `0x00301537`). Play is not
+affected: `sub_00240C50` uses only the pad id (`0x00241E28`). Neither
+`+0x2F10` (the held Story AI, reset by the toolbar switch at `0x003067A5`)
+nor the resource table's A-press swallowing is involved.
+
+Fix: `pc_mapmaker_editor_sai_point` (WRAP `sub_00332330`, return address
+`0x0030246B` only). The pad id is global (cover pads `0x2329` + pads of the
+earlier pieces + local index, regular pads `0x3E9` + pads of the later pieces
++ local index), so it decodes on exactly one piece. When the loader's decode
+fails on a map of more than 256 pieces, the hook reruns it on the table's
+pieces at index + 256 and + 512 and keeps the one that decodes (point +0 is
+set to it, `0x0030245B`). The save format is unchanged, so maps from any
+build load the same way. A .39/.40 map that was not re-saved after a reload
+gets its points back; one re-saved since lost those points in the file (the
+AI shows "!" and needs placing again). stderr: `story AI point restored on
+piece N (saved as M)`, three times at most.
+
+Test: `tests/mapmaker/mapmaker_editor.c` `test_sai_points` (300/600/200-piece
+maps, other callers, foreign frames) with the `sai-point-*` mutations.
+Not built or played.
 
 ## Logic (stage 2)
 
