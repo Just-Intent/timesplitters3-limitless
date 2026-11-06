@@ -553,6 +553,42 @@ void pc_mapmaker_aitemplates_load(void (*original)(void))
 }
 
 /* ---- play (scene 100) ---------------------------------------------------- */
+/* Story AI logic has two triggers (sub_003396E0): 0xB "killed" (flag 2, set
+ * by the death event sub_0033E560 from sub_00228B40, whose three callers are
+ * the stock deaths right before sub_0015DDA0 removes the AI) and 0x14
+ * "spotted the player" (sub_00339600: a live actor of the id whose AI state
+ * class, +0x10 in story mode [0x007DE455] == 10 else +0x18, has bit 4, then
+ * the delay [0x004E8CEC]). With group logic on a leader, the leader's
+ * triggers mean the WHOLE group: "killed" fires once every placed member has
+ * died, "spotted" once every placed member has spotted the player (a member
+ * killed first no longer blocks it). Ported bosses never reach either stock
+ * condition: their fights remove the AI with sub_0015DDA0 without the death
+ * event (skeleton 0x0029E069, walker, robot, Crowe) and their boss class
+ * never becomes state 4. So a removal of a hurt boss-class AI (spawn record
+ * class not MapMaker's 0x11000000/0 or 0x10000000/1) without the event gets
+ * it (WRAP sub_0015DDA0), and a boss-class AI counts as having spotted the
+ * player once it is hurt or a player is within AIT_SPOT_RANGE. Placeholder
+ * AIs removed by tank/mothership/Khallos keep MapMaker's class: no event. */
+#define AIT_DESC 0x0074C36Cu            /* level: +0x74 spawn records (0x98 each, id +8), +0x78 count */
+#define AIT_REC_STRIDE 0x98u
+#define AIT_LIST 0x00900100u            /* live AI list (actors-list.json relocation of 0x007A3580) */
+#define AIT_LIST_COUNT 0x0074C37Cu
+#define AIT_HUMANS 0x00790950u
+#define AIT_LIST_MAX 64u
+#define AIT_MODE 0x007DE455u            /* byte: 10 = story */
+#define AIT_NOW 0x007DE318u
+#define AIT_DELAY 0x004E8CECu
+#define AIT_ACTOR_RECORD 0xBF0u
+#define AIT_ENT_AI 0x7Cu
+#define AIT_ENT_POS 0x64u
+#define AIT_ENT_HEALTH 0x1CCu
+#define AIT_ENT_MAX 0x1D8u
+#define AIT_SPOTTED 4u                  /* AI state class bit tested by sub_00339600 */
+#define AIT_SPOT_RANGE 30.0f            /* game units (the bosses bar range) */
+#define AIT_SEEN 16u
+
+extern void sub_0033E560(void);
+
 typedef struct { uint32_t index[AIT_LEVEL_SLOTS], word[AIT_LEVEL_SLOTS]; } AitLevel;
 static void ait_level_chunk(uint32_t data,unsigned ordinal,void *ctx)
 {
@@ -560,8 +596,21 @@ static void ait_level_chunk(uint32_t data,unsigned ordinal,void *ctx)
     x->index[ordinal]=ait_get16(data+AIT_CHUNK_INDEX);
     x->word[ordinal]=ait_get16(data+AIT_CHUNK_LINK);
 }
+static struct {
+    int scanned, any_placed;
+    uint8_t placed[AIT_LEVEL_SLOTS], killed[AIT_LEVEL_SLOTS], spotted[AIT_LEVEL_SLOTS], fired[AIT_LEVEL_SLOTS];
+    uint32_t seen[AIT_SEEN];            /* entities whose death event was delivered, not yet removed */
+    unsigned seen_next, logged;
+} ait_run;
+static void ait_play_log(const char *what,unsigned a,unsigned b)
+{
+    if(ait_run.logged>=24u) return;
+    ait_run.logged++;
+    fprintf(stderr,"[mapmaker] story AI groups: %s (%u, %u)\n",what,a,b);
+    fflush(stderr);
+}
 /* sub_00240C50: a MapMaker map starts; build index -> leader. A leader's id
- * means "any member" with group logic (0x8000) or for an old template. */
+ * means the whole group with group logic (0x8000) or for an old template. */
 void pc_mapmaker_aitemplates_level(void (*original)(void))
 {
     static AitLevel x;
@@ -570,6 +619,7 @@ void pc_mapmaker_aitemplates_level(void (*original)(void))
     unsigned n,k,groups=0;
     original();
     memset(&ait_level,0,sizeof ait_level);
+    memset(&ait_run,0,sizeof ait_run);
     if(!ait_on()) return;
     n=ait_walk(WORD_AT(AIT_CONTAINER),AIT_LEVEL_SLOTS,ait_level_chunk,&x);
     memset(present,0,sizeof present);
@@ -586,11 +636,13 @@ void pc_mapmaker_aitemplates_level(void (*original)(void))
         }
         ait_level.template_of[k]=(int16_t)t;
         if(w&AIT_SAVE_NEW) ait_level.group[t]=(uint8_t)((word_of[t]&(AIT_SAVE_NEW|AIT_SAVE_GROUP))==(AIT_SAVE_NEW|AIT_SAVE_GROUP));
-        else ait_level.group[t]=1;                /* old template: "any copy" */
+        else ait_level.group[t]=1;                /* old template: the group of its copies */
         if(k+1u>ait_level.n) ait_level.n=k+1u;
+        if(t+1u>ait_level.n) ait_level.n=t+1u;
     }
     for(k=0;k<AIT_LEVEL_SLOTS;k++) groups+=ait_level.group[k];
-    ait_level.active=groups!=0;
+    ait_level.active=1;                           /* boss deaths and sightings need it without groups too */
+    if(groups) ait_play_log("map start: groups with whole-group logic",groups,ait_level.n);
 }
 static int ait_play(void) { return ait_level.active && WORD_AT(AIT_SCENE)==100u && mapmaker_limits.limits; }
 static uint32_t ait_play_index(uint32_t id) { return id-WORD_AT(AIT_SAI_BASE)-1u; }
@@ -602,23 +654,143 @@ static int ait_play_leader(uint32_t i)
     if(i>=AIT_LEVEL_SLOTS || (t=ait_level.template_of[i])<0 || !ait_level.group[t]) return -1;
     return t;
 }
+/* The whole-group leader whose group holds i (i itself for a leader), or -1. */
+static int ait_group_of(uint32_t i)
+{
+    if(i>=AIT_LEVEL_SLOTS) return -1;
+    if(ait_level.group[i] && ait_level.template_of[i]<0) return (int)i;
+    return ait_play_leader(i);
+}
+/* Which Story AIs have a spawn record (placed: an AI without points has
+ * none, 0x00241DDD). Read once, after the records exist. Unreadable: all. */
+static void ait_scan_placed(void)
+{
+    uint32_t d=WORD_AT(AIT_DESC),r,n,k,i;
+    if(ait_run.scanned) return;
+    ait_run.scanned=1;
+    if(!MAPMAKER_PTR_OK(d,0x80u)) return;
+    r=WORD_AT(d+0x74u);n=WORD_AT(d+0x78u);
+    if(!n || n>AIT_LEVEL_SLOTS || !MAPMAKER_PTR_OK(r,n*AIT_REC_STRIDE)) return;
+    for(k=0;k<n;k++)
+        if((i=ait_play_index(WORD_AT(r+k*AIT_REC_STRIDE+8u)))<AIT_LEVEL_SLOTS) { ait_run.placed[i]=1;ait_run.any_placed=1; }
+}
+static int ait_member(uint32_t k,uint32_t t)
+{
+    if(k!=t && ait_level.template_of[k]!=(int)t) return 0;
+    return !ait_run.any_placed || ait_run.placed[k];
+}
+/* Every placed member of t's group (or t alone) killed, or for sightings:
+ * spotted or killed, at least one spotted. */
+static int ait_all(uint32_t t,int group,int sight)
+{
+    uint32_t k,n=group?ait_level.n:t+1u,members=0,spotted=0;
+    ait_scan_placed();
+    for(k=group?0u:t;k<n && k<AIT_LEVEL_SLOTS;k++) {
+        if(!ait_member(k,t)) continue;
+        members++;
+        if(sight) { if(ait_run.spotted[k]) spotted++; else if(!ait_run.killed[k]) return 0; }
+        else if(!ait_run.killed[k]) return 0;
+    }
+    return members && (!sight || spotted);
+}
 
-/* sub_0033E560(actor): flag kind-2 triggers/actions of the actor's id. */
+static float ait_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)a+g_xbox_mem_offset),4);return f; }
+/* A spawn record whose class is not MapMaker's own: a ported boss or creature. */
+static int ait_boss_record(uint32_t rec)
+{
+    uint32_t lo=WORD_AT(rec),hi=WORD_AT(rec+4u);
+    return !((lo==0x11000000u && hi==0u) || (lo==0x10000000u && hi==1u));
+}
+/* AI a (entity ent, record rec) of a Story AI: entity +0x7C = a, a+0xBF0 = rec. */
+static int ait_actor(uint32_t ent,uint32_t *a,uint32_t *rec)
+{
+    if(!MAPMAKER_PTR_OK(ent,0x200u) || !MAPMAKER_PTR_OK(*a=WORD_AT(ent+AIT_ENT_AI),AIT_ACTOR_RECORD+4u) ||
+       !MAPMAKER_PTR_OK(*rec=WORD_AT(*a+AIT_ACTOR_RECORD),12u)) return 0;
+    return 1;
+}
+static int ait_player_near(uint32_t ent)
+{
+    uint32_t humans=WORD_AT(AIT_HUMANS),h,a,p;
+    float x=ait_getf(ent+AIT_ENT_POS),y=ait_getf(ent+AIT_ENT_POS+4u),z=ait_getf(ent+AIT_ENT_POS+8u);
+    for(h=0;h<humans && h<4u;h++) {
+        float dx,dy,dz;
+        if(!MAPMAKER_PTR_OK(a=WORD_AT(AIT_LIST+h*4u),4u) || !MAPMAKER_PTR_OK(p=WORD_AT(a),0x200u)) continue;
+        dx=ait_getf(p+AIT_ENT_POS)-x;dy=ait_getf(p+AIT_ENT_POS+4u)-y;dz=ait_getf(p+AIT_ENT_POS+8u)-z;
+        if(dx*dx+dy*dy+dz*dz<=AIT_SPOT_RANGE*AIT_SPOT_RANGE) return 1;
+    }
+    return 0;
+}
+/* Has this live AI spotted the player: the stock state bit, or for a boss
+ * class (whose fight never asks for state 4) hurt or a player near. */
+static int ait_spots(uint32_t a,uint32_t ent,uint32_t rec)
+{
+    uint32_t state=(WORD_AT(AIT_MODE)&0xFFu)==10u?WORD_AT(a+0x10u):WORD_AT(a+0x18u);
+    float hp,max;
+    if(state&AIT_SPOTTED) return 1;
+    if(!ait_boss_record(rec)) return 0;
+    hp=ait_getf(ent+AIT_ENT_HEALTH);max=ait_getf(ent+AIT_ENT_MAX);
+    if(hp<max) return 1;
+    return ait_player_near(ent);
+}
+/* Latch the sightings of every live Story AI; 1 when a boss-class AI has id i. */
+static int ait_scan_sightings(uint32_t i)
+{
+    uint32_t count=WORD_AT(AIT_LIST_COUNT),humans=WORD_AT(AIT_HUMANS),l;
+    int boss=0;
+    if(count>AIT_LIST_MAX) count=AIT_LIST_MAX;
+    for(l=humans;l<count;l++) {
+        uint32_t a=WORD_AT(AIT_LIST+l*4u),ent,rec,k;
+        if(!MAPMAKER_PTR_OK(a,AIT_ACTOR_RECORD+4u) || !ait_actor(ent=WORD_AT(a),&a,&rec) ||
+           WORD_AT(a)!=ent || (k=ait_play_index(WORD_AT(rec+8u)))>=AIT_LEVEL_SLOTS) continue;
+        if(k==i && ait_boss_record(rec)) boss=1;
+        if(!ait_run.spotted[k] && ait_spots(a,ent,rec)) {
+            ait_run.spotted[k]=1;
+            if(ait_boss_record(rec)) ait_play_log("boss-class story AI spotted the player (index, record class)",k,WORD_AT(rec+4u));
+        }
+    }
+    return boss;
+}
+
+/* sub_0033E560(actor): flag kind-2 triggers/actions of the actor's id (its
+ * death). A whole-group leader's own id waits for the last member. */
 void pc_mapmaker_aitemplates_event(void (*original)(void))
 {
-    uint32_t actor=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,a,record,id;
+    uint32_t actor=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,a,record,id,i;
     int t;
-    original();
-    if(!ait_play() || !MAPMAKER_PTR_OK(actor,0x80u)) return;
-    a=WORD_AT(actor+0x7Cu);
-    if(!MAPMAKER_PTR_OK(a,0xBF4u)) return;
-    record=WORD_AT(a+0xBF0u);
-    if(!MAPMAKER_PTR_OK(record,12u)) return;
+    if(!ait_play() || !ait_actor(actor,&a,&record)) { original();return; }
+    ait_run.seen[ait_run.seen_next++%AIT_SEEN]=actor;
     id=WORD_AT(record+8u);
-    if((t=ait_play_leader(ait_play_index(id)))<0) return;
+    if((i=ait_play_index(id))>=AIT_LEVEL_SLOTS) { original();return; }
+    ait_run.killed[i]=1;
+    if((t=ait_group_of(i))<0) { original();return; }
+    if((uint32_t)t!=i) original();               /* a copy's own logic */
+    else MAPMAKER_GUEST_RET();                   /* the leader's id means the whole group */
+    if(ait_run.fired[t] || !ait_all((uint32_t)t,1,0)) return;
+    ait_run.fired[t]=1;
     WORD_AT(record+8u)=ait_play_id((uint32_t)t);
     guest_call(original,1,actor);
     WORD_AT(record+8u)=id;
+    ait_play_log("whole group killed: the leader's logic fires (leader, last member)",(unsigned)t,i);
+}
+
+/* WRAP sub_0015DDA0 (cdecl entity): remove an AI. A boss fight's own death
+ * (skeleton 0x0029E069, walker, robot, Crowe) comes here without the death
+ * event; it is delivered first, through the wrapped sub_0033E560. */
+void pc_mapmaker_aitemplates_removed(void (*original)(void))
+{
+    uint32_t ent=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,a,rec,k;
+    if(ait_play() && ait_actor(ent,&a,&rec) && WORD_AT(a)==ent &&
+       ait_play_index(WORD_AT(rec+8u))<AIT_LEVEL_SLOTS && ait_boss_record(rec)) {
+        for(k=0;k<AIT_SEEN && ait_run.seen[k]!=ent;k++) {}
+        if(k<AIT_SEEN) ait_run.seen[k]=0;             /* its event came already */
+        else if(ait_getf(ent+AIT_ENT_HEALTH)<ait_getf(ent+AIT_ENT_MAX)) {
+            ait_play_log("boss-class story AI removed after its fight: death event delivered (index, record class)",
+                         ait_play_index(WORD_AT(rec+8u)),WORD_AT(rec+4u));
+            guest_call(sub_0033E560,1,ent);
+            for(k=0;k<AIT_SEEN;k++) if(ait_run.seen[k]==ent) ait_run.seen[k]=0;
+        }
+    }
+    original();
 }
 
 /* sub_00163780(id): action type 2 on every live actor of that id. */
@@ -643,25 +815,26 @@ void pc_mapmaker_aitemplates_spawn_gate(void (*original)(void))
 }
 
 /* sub_00339600(trigger): trigger 0x14 poll; id at +0x14, state at +0x18
- * (7 = found, waiting for its delay). */
+ * (7 = found, waiting until +0x1C), 3 + return 1 = fired (0x003396BF). On a
+ * whole-group leader, or on an AI of boss class, the condition is ours: the
+ * whole group (or the AI) has spotted the player; the delay is stock. */
 void pc_mapmaker_aitemplates_alert(void (*original)(void))
 {
-    uint32_t trigger=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,id,t,k,state,r;
+    uint32_t trigger=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u,i,state,now;
+    int group,boss;
     if(!ait_play() || !MAPMAKER_PTR_OK(trigger,0x20u) ||
-       (t=ait_play_index(id=WORD_AT(trigger+0x14u)))>=AIT_LEVEL_SLOTS || !ait_level.group[t]) {
-        original();
-        return;
-    }
-    state=WORD_AT(trigger+0x18u);
-    original();
-    r=g_eax;
-    for(k=0;k<ait_level.n && !r && !(state!=7u && WORD_AT(trigger+0x18u)==7u);k++) {
-        if(ait_level.template_of[k]!=(int)t) continue;
-        WORD_AT(trigger+0x14u)=ait_play_id(k);
-        r=guest_call(original,1,trigger);
-        WORD_AT(trigger+0x14u)=id;
-    }
-    g_eax=r;
+       (i=ait_play_index(WORD_AT(trigger+0x14u)))>=AIT_LEVEL_SLOTS) { original();return; }
+    boss=ait_scan_sightings(i);
+    group=ait_level.group[i] && ait_level.template_of[i]<0;
+    if(!group && !boss) { original();return; }
+    MAPMAKER_GUEST_RET();
+    g_eax=0;
+    state=WORD_AT(trigger+0x18u);now=WORD_AT(AIT_NOW);
+    if(state==7u && (int32_t)WORD_AT(trigger+0x1Cu)>=(int32_t)now) return;
+    if(!ait_all(i,group,1)) return;
+    if(state!=7u) { WORD_AT(trigger+0x18u)=7u;WORD_AT(trigger+0x1Cu)=now+WORD_AT(AIT_DELAY);return; }
+    WORD_AT(trigger+0x18u)=3u;WORD_AT(trigger+0x1Cu)=0;g_eax=1;
+    ait_play_log(group?"whole group spotted the player: the leader's logic fires":"boss-class story AI spotted the player: its logic fires",i,0);
 }
 
 /* sub_000715E0(): the first free item of the menu item pool [0x007BB1DC]
