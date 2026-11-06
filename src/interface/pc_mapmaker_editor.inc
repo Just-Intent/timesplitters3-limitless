@@ -262,9 +262,8 @@ void pc_mapmaker_editor_sai_point(void (*original)(void))
             break;
         }
     }
-    WORD_AT(sp+4u)=piece;
-    g_esp=sp+4u;
-}
+    WORD_AT(sp+4u)=piece;                             /* the caller's argument slot */
+}                                                      /* each original call left esp = sp+4 */
 
 /* ---- MapMaker level start (scene 100) --------------------------------- */
 void pc_mapmaker_editor_level_load(void (*original)(void))
