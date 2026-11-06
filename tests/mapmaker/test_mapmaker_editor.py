@@ -57,6 +57,15 @@ MUTATIONS = {
     'replacing-hook-no-ret': ('static void mapmaker_ret(uint32_t n) { g_esp+=4u+n; }', 'static void mapmaker_ret(uint32_t n) { (void)n; }'),
     'replacing-hook-ret-8': ('static void mapmaker_ret(uint32_t n) { g_esp+=4u+n; }', 'static void mapmaker_ret(uint32_t n) { g_esp+=8u+n; }'),
     'room-ret-after-original': ('ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;  /* before the original pops it */', 'ret=0u;'),
+    'sai-point-no-retry': ('    for(k=j+MAPMAKER_PIECE_BYTE;k<n;k+=MAPMAKER_PIECE_BYTE) {', '    for(k=n;k<n;k+=MAPMAKER_PIECE_BYTE) {'),
+    'sai-point-first-candidate-only': ('k<n;k+=MAPMAKER_PIECE_BYTE)', 'k<n;k+=n)'),
+    'sai-point-any-caller': ('    if(ret!=MAPMAKER_SAI_POINT_RET || !MAPMAKER_PTR_OK(out-4u,0x10)', '    if(!MAPMAKER_PTR_OK(out-4u,0x10)'),
+    'sai-point-piece-kept': ('            WORD_AT(out-4u)=cand;                      /* point +0: its piece (0x0030245B) */\n', ''),
+    'sai-point-retry-success': ('(WORD_AT(out)&0xFFFFu)!=MAPMAKER_SAI_POINT_NONE) return;', '(WORD_AT(out)&0xFFFFu)==MAPMAKER_SAI_POINT_NONE) return;'),
+    'sai-point-esp': ('    WORD_AT(sp+4u)=piece;\n    g_esp=sp+4u;', '    WORD_AT(sp+4u)=piece;'),
+    'sai-point-arg-clobbered': ('    WORD_AT(sp+4u)=piece;\n    g_esp=sp+4u;', '    g_esp=sp+4u;'),
+    'sai-point-any-table': ('    if(j==MAPMAKER_PIECE_BYTE) return;                 /* not the loader\'s frame */', '    if(j==MAPMAKER_PIECE_BYTE) j=0;'),
+    'sai-point-small-maps': ('    if(n<=MAPMAKER_PIECE_BYTE || !MAPMAKER_PTR_OK(table,n*4u)) return;', '    if(!MAPMAKER_PTR_OK(table,n*4u)) return;\n    n=MAPMAKER_PIECES_TABLE;'),
     'slot-no-dedup': ('        if((int32_t)WORD_AT(obj+0x13Cu+i*0x8Cu)==record) { original();return; } /* already has a slot */', ''),
 }
 
