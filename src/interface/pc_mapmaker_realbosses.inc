@@ -418,7 +418,7 @@ static struct {
 typedef char rbs_fx_is_the_shared_window[(RBS_FX==MAPMAKER_FX && RBS_FX_SIZE==MAPMAKER_FX_SIZE)?1:-1];
 typedef struct {
     uint32_t state, parts, record;
-    unsigned throws, skipped, fire;
+    unsigned throws, skipped, fire, aimed;
     float floor;
     int floor_set;
     MapmakerFx fx;
@@ -812,6 +812,15 @@ static void *rbs_g(uint32_t a) { return (void *)((uintptr_t)a+g_xbox_mem_offset)
 static float rbs_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)a+g_xbox_mem_offset),4);return f; }
 static void rbs_setf(uint32_t a,float f) { memcpy((void *)((uintptr_t)a+g_xbox_mem_offset),&f,4); }
 static int rbs_sane(float f) { return f==f && f>-100000.0f && f<100000.0f; }
+/* Square root of x >= 0 (Newton; no libm in the fixture builds). */
+static float rbs_sqrt(float x)
+{
+    float r=x>1.0f?x:1.0f;
+    int i;
+    if(!(x>0.0f)) return 0.0f;
+    for(i=0;i<40;i++) r=0.5f*(r+x/r);
+    return r;
+}
 
 /* Swap an instance in around a call into its stock code: the boss pointer
  * (global) and the statics RBS_FX get the instance's, and after the call the
@@ -923,43 +932,101 @@ void pc_mapmaker_realbosses_level(void (*original)(void))
     }
     memcpy(rbs_g(RBS_FX),base,RBS_FX_SIZE);            /* the statics as they were */
 }
+/* New blocks for one instance, made as the level init makes them: from the
+ * level's statics (rbs_fx_base), with the stock sub_00287E00 / sub_002976F0
+ * (each call allocates a state block and a particle block, the walker's also
+ * its effect blocks, from the level heap); the instance keeps its statics
+ * copy, the live statics and the boss pointers are put back. 0: no memory. */
+static int rbs_skel_alloc(RbsSkel *k)
+{
+    uint8_t cur[RBS_FX_SIZE];
+    uint32_t st,pt,home=WORD_AT(RBS_SKEL_STATE),hparts=WORD_AT(RBS_SKEL_PARTS);
+    int ok;
+    memcpy(cur,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);
+    WORD_AT(RBS_SKEL_STATE)=0u;WORD_AT(RBS_SKEL_PARTS)=0u;
+    guest_call(sub_00287E00,0);
+    st=WORD_AT(RBS_SKEL_STATE);pt=WORD_AT(RBS_SKEL_PARTS);
+    ok=st && pt && MAPMAKER_PTR_OK(st,RBS_SKEL_STATE_SIZE) && MAPMAKER_PTR_OK(pt,RBS_SKEL_PARTS_SIZE);
+    k->state=ok?st:0u;k->parts=ok?pt:0u;
+    if(ok) memcpy(k->fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),cur,RBS_FX_SIZE);
+    WORD_AT(RBS_SKEL_STATE)=home;WORD_AT(RBS_SKEL_PARTS)=hparts;
+    return ok;
+}
+static int rbs_walk_alloc(RbsWalk *w)
+{
+    uint8_t cur[RBS_FX_SIZE];
+    uint32_t st,home=WORD_AT(RBS_WALK_STATE);
+    int ok;
+    memcpy(cur,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);
+    WORD_AT(RBS_WALK_STATE)=0;
+    guest_call(sub_002976F0,0);
+    st=WORD_AT(RBS_WALK_STATE);
+    ok=st && MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE);
+    w->state=ok?st:0u;
+    if(ok) memcpy(w->fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),cur,RBS_FX_SIZE);
+    WORD_AT(RBS_WALK_STATE)=home;
+    return ok;
+}
 /* WRAP sub_001CDD60 (the level restart, no args; only at 0x0003D4E1, after
- * the teardown, never the level init above): after the original, every
- * skeleton and walker instance of this level gets the stock reset of its
- * state block (sub_00287860 / sub_00297690, what sub_0025F6A0 runs on a
- * restart of scenes 1/0x11 and 0x51 only) with its own state and statics
- * swapped in, and starts its fight afresh (counters and once-per-fight
- * flags cleared: the walker's guns are deployed again). Blocks, records and
- * statics copies stay (level memory); the log budget starts afresh. */
+ * the teardown, never the level init above). Its first call
+ * sub_0003E740(3) (0x001CDD62) ends in sub_0003E240, which puts the level
+ * heap's top [0x006B8388] back to its base [0x006B8380]: every block
+ * sub_0003DFA0(n, 1) handed out this level is free again, our skeleton and
+ * walker blocks included (the split Crowe area forgets its blocks for the
+ * same reason), and whatever the restart allocates next reuses them. Until
+ * v0.4.0-mapmaker.40 this kept the old blocks and ran the stock reset on
+ * them (user report: four giant skeletons "not spawning correctly and kind
+ * of flickering in and out" after a story restart; no throw for minutes in
+ * m40b.err, a fight on memory something else then used). So after the
+ * original, every instance of this level, late ones too, gets new blocks
+ * as at level init (rbs_skel_alloc / rbs_walk_alloc, which end with the
+ * stock reset sub_00287860 / sub_00297690) and starts its fight afresh:
+ * counters, floor and once-per-fight flags cleared (the walker's guns are
+ * deployed again); its spawn record is kept, so the restarted AI start finds
+ * it again. One that gets no memory, and any after it, are dropped (bot
+ * behaviour, or a late instance at its AI start). The boss pointers go to
+ * the first instance's new blocks; the log budget starts afresh. */
 void pc_mapmaker_realbosses_restart(void (*original)(void))
 {
-    unsigned k,skels=0,walks=0;
-    RbsSave s;
+    unsigned k,n,skels=0,walks=0;
+    uint32_t rec;
     original();
     if(!rbs_on()) return;
     rbs.logged=0;
     rbs_skelf.extras=rbs_skelf.events=rbs_skelf.deaths=0;
     rbs_walkf.extras=rbs_walkf.events=rbs_walkf.seen=0;
-    if(WORD_AT(RBS_SCENE)!=100u) return;
-    for(k=0;k<rbs_skelf.n && k<RBS_INST_MAX;k++) {
+    if(WORD_AT(RBS_SCENE)!=100u || (!rbs_skelf.n && !rbs_walkf.n)) return;
+    mapmaker_fx_forget(rbs_skels,sizeof rbs_skels);mapmaker_fx_forget(rbs_walks,sizeof rbs_walks);
+    rbs_skelf.cur=0;rbs_walkf.cur=0;
+    n=rbs_skelf.n<RBS_INST_MAX?rbs_skelf.n:RBS_INST_MAX;
+    rbs_skelf.n=0;
+    for(k=0;k<n;k++) {
         RbsSkel *t=&rbs_skels[k];
-        if(!t->state || !MAPMAKER_PTR_OK(t->state,RBS_SKEL_STATE_SIZE)) continue;
-        rbs_skel_in(t,&s);
-        guest_call(sub_00287860,0);                    /* the stock skeleton reset */
-        rbs_skel_out(t,&s);
-        t->throws=t->skipped=t->fire=0;t->floor=0.0f;t->floor_set=0;
-        skels++;
+        rec=t->record;
+        memset(t,0,sizeof *t);                         /* the old blocks are free level heap */
+        t->record=rec;
+        if(!rbs_skel_alloc(t)) { t->record=0;break; }
+        rbs_skelf.n=k+1u;skels++;
     }
-    for(k=0;k<rbs_walkf.n && k<RBS_INST_MAX;k++) {
+    for(k=rbs_skelf.n;k<RBS_INST_MAX;k++) memset(&rbs_skels[k],0,sizeof rbs_skels[k]);
+    n=rbs_walkf.n<RBS_INST_MAX?rbs_walkf.n:RBS_INST_MAX;
+    rbs_walkf.n=0;
+    for(k=0;k<n;k++) {
         RbsWalk *w=&rbs_walks[k];
-        if(!w->state || !MAPMAKER_PTR_OK(w->state,RBS_WALK_STATE_SIZE)) continue;
-        rbs_walk_in(w,&s);
-        guest_call(sub_00297690,0);                    /* the stock walker reset */
-        rbs_walk_out(w,&s);
-        w->actor=0;w->wells=w->drawn=w->ticks=w->beats=w->woken=w->roars=w->armed=w->moves=0;w->last=0;
-        walks++;
+        rec=w->record;
+        memset(w,0,sizeof *w);
+        w->record=rec;
+        if(!rbs_walk_alloc(w)) { w->record=0;break; }
+        rbs_walkf.n=k+1u;walks++;
     }
-    if(skels || walks) rbs_log("level restart: giant skeleton and Crow walker states reset (skeletons, walkers)",skels,walks);
+    for(k=rbs_walkf.n;k<RBS_INST_MAX;k++) memset(&rbs_walks[k],0,sizeof rbs_walks[k]);
+    WORD_AT(RBS_SKEL_STATE)=rbs_skelf.n?rbs_skels[0].state:0u;
+    WORD_AT(RBS_WALK_STATE)=rbs_walkf.n?rbs_walks[0].state:0u;
+    rbs_log("level restart: giant skeleton and Crow walker blocks made again (the restart frees the level heap) (skeletons, walkers)",skels,walks);
 }
 /* The boss pointer still holds one of this level's instances (home or a
  * swapped one): nothing else has replaced it. */
@@ -1069,6 +1136,55 @@ void pc_mapmaker_realbosses_risen(void (*original)(void))
     MAPMAKER_GUEST_RET();
 }
 
+/* The throw's aim at a target on a higher floor (user report,
+ * v0.4.0-mapmaker.40: "not able to aim correctly at player if player is
+ * positioned one floor above them"). The stock aim (0x00287F02..0x00287FB0)
+ * is the unit vector from the hand (the fight's bone point, the shot's
+ * origin) to the target point state +0x4164 + i*12 (i = state +0x4158),
+ * which sub_00289290 sets to the player's feet (entity +0x68) plus a
+ * horizontal lead. Mission 5's courtyard is flat; in a MapMaker map the hand
+ * swings from the boss's floor to about 11 units over it (m40b.err: origins
+ * from y -10.1 to 5.9 with the boss at -9.5), so a straight line to the feet
+ * of a player one floor up (about 5 units) starts below that floor and meets
+ * its edge or underside. For a target more than RBS_SKEL_UP over the boss's
+ * own floor, the aim point is raised by RBS_SKEL_BODY (its body, not its
+ * feet) and the climb is held to RBS_SKEL_PITCH (about 60 degrees). Targets
+ * on the boss's floor keep the stock aim. */
+#define RBS_SKEL_TARGET 0x4164u        /* state: target points, 12 bytes each */
+#define RBS_SKEL_TARGET_I 0x4158u      /* state: which one (0/1) */
+#define RBS_SKEL_UP 2.0f               /* a target this far over the boss's floor is a floor up */
+#define RBS_SKEL_BODY 1.5f             /* aim this far over its feet */
+#define RBS_SKEL_PITCH 0.866f          /* most upward component of the unit aim */
+static void rbs_skel_aim(RbsSkel *k,uint32_t st)
+{
+    uint32_t shot=st+RBS_SKEL_SHOT,i=WORD_AT(st+RBS_SKEL_TARGET_I),t;
+    float o[3],d[3],h,len;
+    unsigned j;
+    if(!k->floor_set || i>1u) return;
+    t=st+RBS_SKEL_TARGET+i*12u;
+    for(j=0;j<3u;j++) {
+        o[j]=rbs_getf(shot+j*4u);d[j]=rbs_getf(t+j*4u);
+        if(!rbs_sane(o[j]) || !rbs_sane(d[j])) return;
+    }
+    if(!(d[1]-k->floor>RBS_SKEL_UP)) return;           /* the boss's floor: stock aim */
+    d[0]-=o[0];d[1]+=RBS_SKEL_BODY-o[1];d[2]-=o[2];
+    h=rbs_sqrt((d[0]*d[0]+d[2]*d[2]));
+    len=rbs_sqrt((h*h+d[1]*d[1]));
+    if(!(len>0.001f)) return;
+    d[0]/=len;d[1]/=len;d[2]/=len;h/=len;
+    if(d[1]>RBS_SKEL_PITCH) {                          /* steeper than that: held there */
+        float s=h>0.0001f?rbs_sqrt((1.0f-RBS_SKEL_PITCH*RBS_SKEL_PITCH))/h:0.0f;
+        if(s==0.0f) return;
+        d[0]*=s;d[2]*=s;d[1]=RBS_SKEL_PITCH;
+    }
+    for(j=0;j<3u;j++) rbs_setf(shot+0xCu+j*4u,d[j]);
+    if(k->aimed++<4u) {
+        fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u aims at a target a floor up (%.1f over its floor %.1f): dir (%.2f, %.2f, %.2f)\n",
+                (unsigned)(k-rbs_skels)+1u,(double)(rbs_getf(t+4u)-k->floor),(double)k->floor,(double)d[0],(double)d[1],(double)d[2]);
+        fflush(stderr);
+    }
+}
+
 /* WRAP sub_00287E20 (cdecl entity, out): the feeble throw as in scene 1. */
 void pc_mapmaker_realbosses_throw(void (*original)(void))
 {
@@ -1085,6 +1201,7 @@ void pc_mapmaker_realbosses_throw(void (*original)(void))
         original();
         WORD_AT(RBS_SCENE)=100u;
         rbs_skel_out(k,&s);
+        if(WORD_AT(st+RBS_SKEL_PHASE)==1u) rbs_skel_aim(k,st);   /* aimed this frame */
         return;
     }
     if(phase==1) {                                     /* fire, in the real scene */
@@ -1475,48 +1592,22 @@ static RbsWalk *rbs_walk_free(uint32_t rec)
  * Crowe area allocates late the same way (four Crowes played in .26). */
 static RbsWalk *rbs_walk_more(void)
 {
-    uint8_t cur[RBS_FX_SIZE];
-    uint32_t st,home=WORD_AT(RBS_WALK_STATE);
     unsigned k=rbs_walkf.n;
     if(k>=RBS_INST_MAX) return 0;
-    memcpy(cur,rbs_g(RBS_FX),RBS_FX_SIZE);
-    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);
-    WORD_AT(RBS_WALK_STATE)=0;
-    guest_call(sub_002976F0,0);
-    st=WORD_AT(RBS_WALK_STATE);
-    if(st && MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE)) {
-        memset(&rbs_walks[k],0,sizeof rbs_walks[k]);
-        rbs_walks[k].state=st;
-        memcpy(rbs_walks[k].fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
-        rbs_walkf.n=k+1u;
-    }
-    memcpy(rbs_g(RBS_FX),cur,RBS_FX_SIZE);
-    WORD_AT(RBS_WALK_STATE)=home;
+    memset(&rbs_walks[k],0,sizeof rbs_walks[k]);
+    if(rbs_walk_alloc(&rbs_walks[k])) rbs_walkf.n=k+1u;
     rbs_log(rbs_walkf.n>k?"Crow walker not counted at level init: its state allocated at its AI start (state, walker)":
-                          "no level memory for another Crow walker; bot behaviour",st,k);
+                          "no level memory for another Crow walker; bot behaviour",rbs_walks[k].state,k);
     return rbs_walkf.n>k?&rbs_walks[k]:0;
 }
 static RbsSkel *rbs_skel_more(void)
 {
-    uint8_t cur[RBS_FX_SIZE];
-    uint32_t st,pt,home=WORD_AT(RBS_SKEL_STATE),hparts=WORD_AT(RBS_SKEL_PARTS);
     unsigned k=rbs_skelf.n;
     if(k>=RBS_INST_MAX) return 0;
-    memcpy(cur,rbs_g(RBS_FX),RBS_FX_SIZE);
-    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);
-    WORD_AT(RBS_SKEL_STATE)=0u;WORD_AT(RBS_SKEL_PARTS)=0u;
-    guest_call(sub_00287E00,0);
-    st=WORD_AT(RBS_SKEL_STATE);pt=WORD_AT(RBS_SKEL_PARTS);
-    if(st && pt && MAPMAKER_PTR_OK(st,RBS_SKEL_STATE_SIZE) && MAPMAKER_PTR_OK(pt,RBS_SKEL_PARTS_SIZE)) {
-        memset(&rbs_skels[k],0,sizeof rbs_skels[k]);
-        rbs_skels[k].state=st;rbs_skels[k].parts=pt;
-        memcpy(rbs_skels[k].fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
-        rbs_skelf.n=k+1u;
-    }
-    memcpy(rbs_g(RBS_FX),cur,RBS_FX_SIZE);
-    WORD_AT(RBS_SKEL_STATE)=home;WORD_AT(RBS_SKEL_PARTS)=hparts;
+    memset(&rbs_skels[k],0,sizeof rbs_skels[k]);
+    if(rbs_skel_alloc(&rbs_skels[k])) rbs_skelf.n=k+1u;
     rbs_log(rbs_skelf.n>k?"giant skeleton not counted at level init: its state allocated at its AI start (state, skeleton)":
-                          "no level memory for another giant skeleton; bot behaviour",st,k);
+                          "no level memory for another giant skeleton; bot behaviour",rbs_skels[k].state,k);
     return rbs_skelf.n>k?&rbs_skels[k]:0;
 }
 
