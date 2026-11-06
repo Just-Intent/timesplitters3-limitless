@@ -321,6 +321,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-129 | MapMaker raised level memory budget (opt-in) | Awaiting validation |
 | MAC-130 | MapMaker capacity stage A: AI pools and editor limits | Awaiting validation |
 | MAC-131 | Launcher MapMaker settings tab | Awaiting validation |
+| MAC-132 | MapMaker map export/import (.tsmap) | Awaiting validation |
 
 ### MAC-048 - Companion vehicle zero-flag joins (#100)
 
@@ -8186,4 +8187,27 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
 - **Mac adaptation needed:** None identified.
 - **Mac acceptance checks:** Native launcher build and `--test`; open Settings →
   MapMaker, save, confirm the keys and that Play exports only chosen switches.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-132 — MapMaker map export/import (.tsmap)
+
+- **Status:** Awaiting validation
+- **PC behavior:** The launcher Saves page lists the MapMaker maps of the active
+  save folder, exports one to a portable `.tsmap` file and imports a `.tsmap`
+  as a new map (renamed on collision, CRC and signature recomputed). Import
+  refuses while the game runs, holds the save lock and makes a save backup
+  first. See `docs/mapmaker/mapmaker-map-transfer.md`.
+- **PC source:** Branch `map-transfer` (uncommitted to main);
+  `tools/launcher/MapTransfer.cs`, `tools/launcher/SavesPage.cs`,
+  `tools/launcher/SaveBackups.cs`, `tools/launcher/Launcher.cs`; tests
+  `tests/launcher/launcher_maps.cs`, `tests/launcher/launcher_shared_ui.cs`.
+- **PC validation:** Windows shared UI checks pass (38 groups, including the
+  five map transfer groups and the Saves page map test), 2026-11-06. Loading
+  an imported map in the game is not verified.
+- **Existing Mac support:** Shared model and page; `NativeLauncher.csproj`
+  compiles `MapTransfer.cs` and `launcher_maps.cs`; `NativeWindow.cs`
+  supplies Avalonia save/open file pickers.
+- **Mac adaptation needed:** None identified beyond the pickers already added.
+- **Mac acceptance checks:** Native launcher build and `--test` (shared UI);
+  export a map with the save picker and import it with the open picker.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
