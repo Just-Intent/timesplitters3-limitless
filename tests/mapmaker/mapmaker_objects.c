@@ -34,12 +34,16 @@ void sub_0009A5B0(void) { stub_id=12; }
 void sub_0009CCA0(void) { stub_id=13; }
 void sub_00333700(void) { stub_id=14; }
 void sub_002FDF50(void) { stub_id=15; }
+void sub_0003E0B0(void) { stub_id=16; }
+void sub_00165760(void) { stub_id=17; }
+void fake_break(void) { stub_id=18; }
 
 static int failures;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
 
 /* Fakes. */
-static uint32_t heap_next, alloc_size[8], alloc_heap[8];
+static uint32_t heap_next, alloc_size[16], alloc_heap[16], alloc_align[16], pool_reset_n;
+#define MAPMAKER_HALF(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 static unsigned allocs;
 static char calls[256];
 static uint32_t callback_arg=0xFFFFFFFFu;
@@ -60,9 +64,15 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     if(f==sub_0003DFA0) {
         p=heap_next;heap_next+=(args[0]+15u)&~15u;
         memset((char *)memory+p,0xCD,args[0]);        /* dirty: must be cleared where the original clears */
-        if(allocs<8) { alloc_size[allocs]=args[0];alloc_heap[allocs]=args[1]; }
+        if(allocs<16) { alloc_size[allocs]=args[0];alloc_heap[allocs]=args[1];alloc_align[allocs]=0; }
         allocs++;
     }
+    else if(f==sub_0003E0B0) {                        /* (align, size, heap) */
+        p=(heap_next+args[0]-1u)&~(args[0]-1u);heap_next=p+args[1];
+        if(allocs<16) { alloc_size[allocs]=args[1];alloc_heap[allocs]=args[2];alloc_align[allocs]=args[0]; }
+        allocs++;log_call("E0B0,");
+    }
+    else if(f==sub_00165760) { log_call("165760,");pool_reset_n=MAPMAKER_HALF(0x0074C49Cu); }
     else if(f==sub_000B05B0) log_call("B05B0,");
     else if(f==sub_000B3BE0) log_call("B3BE0,");
     else if(f==sub_00248970) log_call("248970,");
@@ -257,6 +267,64 @@ int main(void)
     HOOK(pc_mapmaker_objects_twin_pool,fake_original);
     CHECK(originals==1 && allocs==0);
     WORD_AT(0x0079094Cu)=100u;
+
+    /* ---- physics bodies (sub_0016C430): 1024 in MapMaker play ---- */
+    {
+        const uint32_t n=1024u+0x60u;
+        FLOAT_AT(0x00475C78u)=1.0f;
+        for(i=0x0074C410u;i<0x0074C458u;i+=4u) WORD_AT(i)=0xDEADBEEFu;
+        WORD_AT(0x007A20CCu)=5;WORD_AT(0x007A20C8u)=5;MAPMAKER_HALF(0x0074C49Eu)=0x7777u;
+        WORD_AT(0x0079094Cu)=100u;originals=0;allocs=0;calls[0]=0;pool_reset_n=0;heap_next=0x00A00001u;
+        HOOK(pc_mapmaker_objects_physics,fake_original);
+        CHECK(originals==0 && allocs==9 && MAPMAKER_HALF(0x0074C49Cu)==1024u && MAPMAKER_HALF(0x0074C49Eu)==0x7777u);
+        CHECK(!strcmp(calls,"E0B0,E0B0,E0B0,E0B0,E0B0,E0B0,165760,") && pool_reset_n==1024u);
+        CHECK(alloc_size[0]==(n<<9) && alloc_size[1]==n*4u && alloc_size[2]==n*4u && alloc_size[3]==(n<<5) &&
+              alloc_size[4]==n*4u && alloc_size[5]==n*2u);
+        CHECK(alloc_size[6]==0x2E80u && alloc_size[7]==0xBAu && alloc_size[8]==0x6D60u);
+        for(i=0;i<9;i++) CHECK(alloc_heap[i]==1u && (i>=6 || alloc_align[i]==0x40u));
+        CHECK(WORD_AT(0x0074C458u)%0x40u==0 && WORD_AT(0x0074C480u)==WORD_AT(0x0074C458u)+(n<<9));
+        CHECK(WORD_AT(0x0074C46Cu) && WORD_AT(0x0074C48Cu) && WORD_AT(0x0074C494u) && WORD_AT(0x0074C488u) &&
+              WORD_AT(0x0074C464u) && WORD_AT(0x0074C498u) && WORD_AT(0x0074C478u));
+        CHECK(WORD_AT(0x007A20CCu)==0 && WORD_AT(0x007A20C8u)==0 && WORD_AT(0x0074C450u)==0);
+        CHECK(WORD_AT(0x0074C410u)==0xDEADBEEFu);                      /* below the 15 floats: kept */
+        for(i=0x0074C414u;i<0x0074C450u;i+=4u) CHECK(FLOAT_AT(i)==1.0f);
+        heap_next=0x00900000u;
+        WORD_AT(0x0079094Cu)=53u;allocs=0;                              /* story levels: original */
+        HOOK(pc_mapmaker_objects_physics,fake_original);
+        WORD_AT(0x0079094Cu)=102u;                                       /* the editor has no play physics */
+        HOOK(pc_mapmaker_objects_physics,fake_original);
+        WORD_AT(0x0079094Cu)=100u;set_env("TSFP_MAPMAKER_POOLS","0");
+        HOOK(pc_mapmaker_objects_physics,fake_original);
+        set_env("TSFP_MAPMAKER_POOLS",NULL);
+        CHECK(originals==3 && allocs==0);
+    }
+    /* ---- prop break log: says what was refused, then runs the original ---- */
+    {
+        const uint32_t prop=0x00570000u;
+        unsigned j;
+        static const struct { uint16_t used,bodies; uint32_t hw,freed,pool; unsigned slot; } c[]={
+            {0x58u+100u,100u,900u,0u,1023u,0},     /* kind 1 full: no explosion */
+            {0x58u+99u,100u,1019u,0u,1023u,0},    /* body free; 4 slots left: debris refused */
+            {0x58u+99u,100u,1022u,5u,1023u,1},    /* both free: 1017 + 5 < 1023 */
+        };
+        WORD_AT(0x0072F6A4u)=3u;
+        for(j=0;j<3;j++) {
+            mapmaker_objects_breaks[0]=mapmaker_objects_breaks[1]=0;
+            MAPMAKER_HALF(0x0074C45Eu)=c[j].used;MAPMAKER_HALF(0x0074C49Cu)=c[j].bodies;
+            WORD_AT(0x007B4FACu)=c[j].hw;WORD_AT(0x007B65B8u)=c[j].freed;WORD_AT(0x0072F5E4u)=c[j].pool;
+            frame(0x000AE7F7u,prop,1u,0);originals=0;
+            HOOK(pc_mapmaker_objects_prop_break,fake_original);
+            CHECK(originals==1 && mapmaker_objects_breaks[c[j].slot]==1u && mapmaker_objects_breaks[!c[j].slot]==0u);
+        }
+        MAPMAKER_HALF(0x0074C45Eu)=0x58u+1024u;MAPMAKER_HALF(0x0074C49Cu)=1024u;  /* the raised pool can fill too */
+        mapmaker_objects_breaks[0]=0;
+        HOOK(pc_mapmaker_objects_prop_break,fake_original);
+        CHECK(mapmaker_objects_breaks[0]==1u);
+        WORD_AT(0x0079094Cu)=53u;mapmaker_objects_breaks[0]=0;originals=0;  /* story levels: silent */
+        HOOK(pc_mapmaker_objects_prop_break,fake_original);
+        CHECK(originals==1 && mapmaker_objects_breaks[0]==0u);
+        WORD_AT(0x0079094Cu)=100u;
+    }
 
     /* ---- teleporters: 14 of 3 colours (stock arrays hold 10) ---- */
     for(i=0x0A;i<=0x0E;i++) colour((int)i,i==0x0Bu?0x22u:i==0x0Cu?0x33u:0x11u);
