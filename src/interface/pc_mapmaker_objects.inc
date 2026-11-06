@@ -265,6 +265,75 @@ void pc_mapmaker_objects_twin_pool(void (*original)(void))
     MAPMAKER_GUEST_RET();
 }
 
+/* ---- physics bodies --------------------------------------------------- */
+/* 2026-11-06 (v0.4.0-mapmaker.39/.40: shot barrels on a map near the object
+ * cap neither exploded nor hurt anyone). sub_0016C430 (level init, right
+ * after the object pools) sizes the rigid-body pool: P = word [0x0074C49C],
+ * 50 unless mode [0x007DE455] is 0xA or [0x007DE458] has 0x40, 40 above scene
+ * 100, else a per-scene table (scene 100: the default 100). Of the P + 0x60
+ * bodies, kind 1 (objects knocked loose or broken) counts up from 0x58 in
+ * [0x0074C45E] and is full at P + 0x58 (sub_0016C020(1); it never steals),
+ * kind 2 counts down from the top and steals its oldest. The prop break
+ * sub_000AE4F0 asks sub_0016C020(1) first; with no kind-1 body free it only
+ * fades the prop out (state 9, then sub_000AC560): no explosion
+ * (sub_000EFBD0), no effects, no damage. Each body belongs to one object
+ * (+0x80), so P >= the 1023 pool slots can never refuse it. In MapMaker play
+ * this wrapper runs the same allocations with P = MAPMAKER_OBJECTS_PHYSICS
+ * (about 610 KB of Level heap); other scenes keep the original sizes. */
+#define MAPMAKER_OBJECTS_PHYSICS 1024u
+#define MAPMAKER_OBJECTS_HALF_AT(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+typedef char mapmaker_objects_physics_bodies[(MAPMAKER_OBJECTS_PHYSICS>=MAPMAKER_OBJECTS_POOL &&
+                                              MAPMAKER_OBJECTS_PHYSICS+0x60u<0x8000u)?1:-1];
+extern void sub_0003E0B0(void),sub_00165760(void);
+void pc_mapmaker_objects_physics(void (*original)(void))
+{
+    GuestRegisters r;
+    uint32_t n=MAPMAKER_OBJECTS_PHYSICS,a,one;
+    mapmaker_limits_read();
+    if(!mapmaker_limits.pools || !mapmaker_objects_scene(100u)) { original(); return; }
+    save_registers(&r);
+    MAPMAKER_OBJECTS_HALF_AT(0x0074C49Cu)=(uint16_t)n;
+    WORD_AT(0x0074C458u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)<<9,1u);
+    WORD_AT(0x0074C480u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*4u,1u);
+    WORD_AT(0x0074C46Cu)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*4u,1u);
+    WORD_AT(0x0074C48Cu)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)<<5,1u);
+    WORD_AT(0x0074C494u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*4u,1u);
+    WORD_AT(0x0074C488u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*2u,1u);
+    WORD_AT(0x0074C464u)=guest_call(sub_0003DFA0,2,0x2E80u,1u);   /* 0x5D x 0x80, not per body */
+    WORD_AT(0x0074C498u)=guest_call(sub_0003DFA0,2,0xBAu,1u);
+    WORD_AT(0x0074C478u)=guest_call(sub_0003DFA0,2,0x6D60u,1u);
+    guest_call(sub_00165760,0);                                   /* free lists and counters */
+    WORD_AT(0x007A20CCu)=0;WORD_AT(0x007A20C8u)=0;
+    one=WORD_AT(0x00475C78u);
+    for(a=0x0074C414u;a<0x0074C450u;a+=4u) WORD_AT(a)=one;
+    WORD_AT(0x0074C450u)=0;
+    restore_registers(&r);
+    MAPMAKER_GUEST_RET();
+}
+/* sub_000AE4F0(prop, 1), the prop break (barrels, crates): in MapMaker play,
+ * says on stderr why a break gets no explosion (no kind-1 body) or no debris
+ * (sub_000AB590/sub_000A4C70: live + 5 slots must stay below the pool), with
+ * the counts; the first few normal breaks too. Then runs the original. */
+static unsigned mapmaker_objects_breaks[2];
+void pc_mapmaker_objects_prop_break(void (*original)(void))
+{
+    if(mapmaker_objects_scene(100u) && MAPMAKER_STACK_OK(8)) {
+        int32_t used=(int16_t)MAPMAKER_OBJECTS_HALF_AT(0x0074C45Eu)-0x58;
+        int32_t bodies=(int32_t)MAPMAKER_OBJECTS_HALF_AT(0x0074C49Cu);
+        int32_t live=(int32_t)(WORD_AT(0x007B4FACu)-WORD_AT(0x007B65B8u)),slots=(int32_t)WORD_AT(0x0072F5E4u);
+        int explode=used<bodies,debris=live+1+4<slots;
+        unsigned *n=&mapmaker_objects_breaks[explode && debris];
+        if((*n)++<(explode && debris?3u:16u)) {
+            fprintf(stderr,"[mapmaker] prop break: object 0x%08X: %s; physics bodies %d of %d, objects %d of %d, debris %u of 20\n",
+                    WORD_AT(g_esp+4),!explode?"no explosion or damage, refused: no physics body free":
+                    !debris?"explosion; debris refused: fewer than 5 object slots free":"explosion",
+                    (int)used,(int)bodies,(int)live,(int)slots,WORD_AT(0x0072F6A4u));
+            fflush(stderr);
+        }
+    }
+    original();
+}
+
 /* ---- teleporters ------------------------------------------------------ */
 static uint32_t mapmaker_objects_tele_pad[MAPMAKER_OBJECTS_TELEPORTER_CAP];
 static uint32_t mapmaker_objects_tele_colour[MAPMAKER_OBJECTS_TELEPORTER_CAP];

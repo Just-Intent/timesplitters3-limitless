@@ -70,6 +70,31 @@ MUTATIONS = {
     'propblocks-stock': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 60u'),
     'propblocks-pool-only': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 1024u'),
     'propblocks-past-table': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 4096u'),
+    # Physics bodies (sub_0016C430): one kind-1 body per pool slot in MapMaker play.
+    'physics-stock': ('#define MAPMAKER_OBJECTS_PHYSICS 1024u', '#define MAPMAKER_OBJECTS_PHYSICS 100u'),
+    'physics-below-pool': ('#define MAPMAKER_OBJECTS_PHYSICS 1024u', '#define MAPMAKER_OBJECTS_PHYSICS 1000u'),
+    'physics-any-scene': ('if(!mapmaker_limits.pools || !mapmaker_objects_scene(100u)) { original(); return; }',
+                          'if(!mapmaker_limits.pools) { original(); return; }'),
+    'physics-pools-off-ignored': ('if(!mapmaker_limits.pools || !mapmaker_objects_scene(100u))', 'if(!mapmaker_objects_scene(100u))'),
+    'physics-count-not-stored': ('    MAPMAKER_OBJECTS_HALF_AT(0x0074C49Cu)=(uint16_t)n;\n', '\n'),
+    'physics-count-dword': ('    MAPMAKER_OBJECTS_HALF_AT(0x0074C49Cu)=(uint16_t)n;', '    WORD_AT(0x0074C49Cu)=n;'),
+    'physics-bodies-short': ('(n+0x60u)<<9,1u);', 'n<<9,1u);'),
+    'physics-handles-short': ('WORD_AT(0x0074C480u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*4u,1u);',
+                              'WORD_AT(0x0074C480u)=guest_call(sub_0003E0B0,3,0x40u,n*4u,1u);'),
+    'physics-free-list-short': ('(n+0x60u)*2u,1u);', 'n*2u,1u);'),
+    'physics-records-short': ('(n+0x60u)<<5,1u);', 'n<<5,1u);'),
+    'physics-wrong-heap': ('WORD_AT(0x0074C494u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*4u,1u);',
+                           'WORD_AT(0x0074C494u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*4u,0u);'),
+    'physics-no-reset': ('    guest_call(sub_00165760,0);', '   '),
+    'physics-floats-short': ('a<0x0074C450u;a+=4u', 'a<0x0074C44Cu;a+=4u'),
+    'physics-floats-low': ('for(a=0x0074C414u;', 'for(a=0x0074C410u;'),
+    'physics-lists-kept': ('    WORD_AT(0x007A20CCu)=0;WORD_AT(0x007A20C8u)=0;\n', '\n'),
+    # The prop break log: kind 1 full is the explosion refusal; 5 free slots for debris.
+    'break-log-kind1-off-by-one': ('int explode=used<bodies,', 'int explode=used<=bodies,'),
+    'break-log-debris-margin': ('debris=live+1+4<slots;', 'debris=live+1<slots;'),
+    'break-log-any-scene': ('    if(mapmaker_objects_scene(100u) && MAPMAKER_STACK_OK(8)) {\n        int32_t used',
+                            '    if(MAPMAKER_STACK_OK(8)) {\n        int32_t used'),
+    'break-no-original': ('    original();\n}\n\n/* ---- teleporters', '}\n\n/* ---- teleporters'),
 }
 
 
