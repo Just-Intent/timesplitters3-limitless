@@ -577,7 +577,7 @@ clears the right-click action for the row hook. Every other MapMaker list descri
 in `0x0052C000..0x0052F000` relies on `+0x1C0` (scan of ticks testing `+0xC4 & 0x20`;
 tile/item/Story AI/logic/settings observed with `+0x1C0` set). No guest regeneration. Fixture:
 `tests/mapmaker/test_mapmaker_pointer.py`. Mac: MAC-128. Next:
-`mapmaker_table_input` (panel toggle, eats its A): [caps](limitless-caps.md).
+`mapmaker_table_input` (panel toggle, eats its A), SAI pts: [caps](limitless-caps.md).
 
 ### MapMaker editor widescreen
 
