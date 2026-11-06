@@ -57,6 +57,8 @@ void pc_mapmaker_objects_list_add(void (*original)(void));
 void pc_mapmaker_objects_register(void (*original)(void));
 void pc_mapmaker_objects_pool(void (*original)(void));
 void pc_mapmaker_objects_twin_pool(void (*original)(void));
+void pc_mapmaker_objects_physics(void (*original)(void));
+void pc_mapmaker_objects_prop_break(void (*original)(void));
 void pc_mapmaker_objects_teleporters(void (*original)(void));
 void pc_mapmaker_objects_tag(void (*original)(void));
 void pc_mapmaker_editor_sai_add(void (*original)(void));

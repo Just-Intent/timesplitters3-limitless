@@ -33,6 +33,7 @@ address; **INFERRED** means it was reasoned, not seen.
 | Logic tag groups `0x0075CE68` | 150 | 150 (unchanged) | - | - |
 | Cover props (category 33) | 66 | 132 (editor) | `mapmaker_categories[]` | editor |
 | Placed-pickup records `[0x00732E60]` | 120 | 768 | `obj-pickups-*` | all |
+| Kind-1 physics bodies `[0x0074C49C]` (barrel explosions) | 100 (50) | 1024 | `pc_mapmaker_objects_physics` | 100 (pools on) |
 | Class-0x80 prop block pointers `[0x0072F728]` | 60 | 2048 | `obj-propblocks-*` | all |
 
 Two limits are unchanged:
@@ -60,6 +61,8 @@ Include `pc_mapmaker_objects.inc` after `pc_mapmaker_limits.inc` in
     WRAP sub_0008DBF0 -> pc_mapmaker_objects_twin_pool
     WRAP sub_0009CD00 -> pc_mapmaker_objects_teleporters
     WRAP sub_002402B0 -> pc_mapmaker_objects_tag
+    WRAP sub_0016C430 -> pc_mapmaker_objects_physics
+    WRAP sub_000AE4F0 -> pc_mapmaker_objects_prop_break
 
 All of these functions are cdecl with a plain `ret` (CONFIRMED).
 `sub_0006CE80` also takes `edi`, `ebx` and `esi` in registers; the hook leaves
