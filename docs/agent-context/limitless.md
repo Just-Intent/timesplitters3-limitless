@@ -188,7 +188,7 @@ compile the whole include chain take link stubs from
 runtime pad handles 0x4740.., bounded A* pools, pad/link/object/memory caps: [caps](limitless-caps.md), group A* pool relocated to
 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
-`objects` (768 pickups, 2048 props: [caps](limitless-caps.md)), `editor`, `rooms` (511 pieces, `level.json` frame, word buckets, view stride 0x3000, plan to 1023: [rooms](limitless-rooms.md)) and `actors` (64 characters / 63 AI
+`objects` (768 pickups, 2048 props, 1024 bodies: [caps](limitless-caps.md)), `editor`, `rooms` (511 pieces, `level.json` frame, word buckets, view stride 0x3000, plan to 1023: [rooms](limitless-rooms.md)) and `actors` (64 characters / 63 AI
 in a local MapMaker story map instead of 20 alive; live list moved to
 0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
 `actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;
