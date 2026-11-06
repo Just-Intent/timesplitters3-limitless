@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3661 @@
+@@ -1037,6 +1037,3672 @@
      sub_002FA720_gen();
  #endif
  }
@@ -571,6 +571,17 @@
 +    else sub_002F7F30_gen();
 +#else
 +    sub_002F7F30_gen();
++#endif
++}
++
++extern void sub_00332330_gen(void);
++void sub_00332330(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("editor","pc_mapmaker_editor_sai_point")) pc_mapmaker_editor_sai_point(sub_00332330_gen);
++    else sub_00332330_gen();
++#else
++    sub_00332330_gen();
 +#endif
 +}
 +
