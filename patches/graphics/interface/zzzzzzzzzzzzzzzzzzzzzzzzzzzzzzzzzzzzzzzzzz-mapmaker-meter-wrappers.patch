@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3639 @@
+@@ -1037,6 +1037,3661 @@
      sub_002FA720_gen();
  #endif
  }
@@ -338,6 +338,28 @@
 +    else sub_002402B0_gen();
 +#else
 +    sub_002402B0_gen();
++#endif
++}
++
++extern void sub_0016C430_gen(void);
++void sub_0016C430(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("objects","pc_mapmaker_objects_physics")) pc_mapmaker_objects_physics(sub_0016C430_gen);
++    else sub_0016C430_gen();
++#else
++    sub_0016C430_gen();
++#endif
++}
++
++extern void sub_000AE4F0_gen(void);
++void sub_000AE4F0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("objects","pc_mapmaker_objects_prop_break")) pc_mapmaker_objects_prop_break(sub_000AE4F0_gen);
++    else sub_000AE4F0_gen();
++#else
++    sub_000AE4F0_gen();
 +#endif
 +}
 +

@@ -134,6 +134,7 @@ void sub_00292550(void) {} void sub_00292630(void) {} void sub_002A62C0(void) {}
 void sub_000A5E40(void) {} void sub_000631C0(void) {}  /* tank: model request at level init */
 void sub_00096330(void) {}  /* mothership: texture registration */
 void sub_002F7920(void) {}  /* sets: spawn mode mask of an editor item */
+void sub_0003E0B0(void) {} void sub_00165760(void) {}  /* objects: physics body pools */
 /* khallos, worm (pc_mapmaker_khallos.inc, pc_mapmaker_worm.inc) */
 void sub_0009A420(void) {} void sub_000A9070(void) {} void sub_0010E2A0(void) {} void sub_001D1E80(void) {}
 void sub_0010E730(void) {}  /* khallos: the jet emitter's position */
