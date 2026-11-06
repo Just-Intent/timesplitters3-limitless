@@ -10,7 +10,12 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Imported music (0059-custom-music-voice.patch) is the last slot. */
+#ifdef RECOMP_AUDIO_SLOT_MUSIC
+#define SLOT_COUNT (RECOMP_AUDIO_SLOT_MUSIC + 1)
+#else
 #define SLOT_COUNT (RECOMP_AUDIO_SLOT_MOVIE + 1)
+#endif
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static SDL_AudioDeviceID device;
 static int initialized, stopped, audio_initialized;
