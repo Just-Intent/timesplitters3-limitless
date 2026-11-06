@@ -1,3 +1,15 @@
+## MapMaker map export/import in the launcher (2026-11-06, launcher tests only, not played)
+
+Source: branch map-transfer from mapmaker-recon abc041c4, Windows 11 x64, .NET Framework 4.8 csc.
+Saves page exports a map to a checksummed `.tsmap` and imports one as a new save directory
+(`docs/mapmaker/mapmaker-map-transfer.md`). Map folder hash, body layout, CRC and zero-key
+signature confirmed against the disposable `private/test-saves/mapmaker-probe` saves and the
+XBE (`sub_0037DCE0`). Passed: compiled launcher tests `--shared-ui` (38 groups, including the
+five `launcher_maps.cs` groups and the Saves page map test) and a focused map-only harness.
+The full `build-launcher.ps1 -Test` run did not complete here: the settings tests hit a
+too-long path under the scratch output folder, and a later run could not overwrite a locked
+`build/launcher/launcher-tests.exe`. Not run: native Mac launcher build/`--test` and the
+Avalonia pickers; importing a map and loading, playing and re-saving it in the game.
 ## MapMaker resource panel: collapsed, click/I toggle, aligned columns (2026-11-03, not built or played)
 
 Source: branch restable-compact from mapmaker-recon 04cc2691, Windows 11 x64, MSVC fixtures only.
