@@ -143,6 +143,42 @@ removed it crashed (`logs/m37c/crash-20261102-233938555-*`).
   barrels/props (about 395 pieces + 500 items): shoot several barrels at once,
   restart the level, shoot again; story level 1 barrels.
 
+## Physics bodies: barrels that do not explode (2026-11-06, after .40)
+
+Symptom (.39/.40, maps near the object cap, `logs/m40a.err`, `m40b.err`):
+a shot barrel no longer crashed but neither exploded nor hurt anyone. The
+logs have no object, pool or effect line for it (no counter was logged).
+
+- Cause (CONFIRMED in code; the full pool in play is INFERRED, not measured):
+  the prop break `sub_000AE4F0(prop, 1)` (callers 0x000AE7F2, 0x000AE8A4,
+  0x001EE132) first asks `sub_0016C020(1)` for a kind-1 rigid body (full when
+  word `[0x0074C45E]` >= word P `[0x0074C49C]` + 0x58; never steals). With
+  none free it sets state 9 and schedules `sub_000AC560`: the prop fades and
+  is destroyed with no explosion (`sub_000EFBD0`), effects or damage. The
+  object-slot refusal of `sub_000AB590` only drops debris. P comes from
+  `sub_0016C430` (level init, called once at 0x001CDC0C after the object
+  pools): 50 unless mode `[0x007DE455]` is 0xA or `[0x007DE458]` & 0x40, 40
+  above scene 100, else a scene table (scene 100: 100). Kind-1 bodies (props
+  knocked loose, dropped objects; one per object at +0x80) count up from 0x58,
+  kind 2 down from P + 0x60 and steals its oldest; only the free (0x0016C401)
+  lowers kind 1.
+- Fix: `pc_mapmaker_objects_physics` (new `WRAP sub_0016C430`) runs the same
+  nine allocations in scene 100 (pools on) with P = 1024
+  (`MAPMAKER_OBJECTS_PHYSICS` >= the 1023 slots, so kind 1 cannot fill; about
+  610 KB Level heap). The 0x5D-record contact table stays stock. Other scenes
+  run the original. The editor's 128-slot reserve is unchanged.
+- Log: `pc_mapmaker_objects_prop_break` (new `WRAP sub_000AE4F0`) prints
+  `[mapmaker] prop break: object ...: no explosion or damage, refused: no
+  physics body free` / `explosion; debris refused: fewer than 5 object slots
+  free` / `explosion`, with bodies, live objects of the pool and debris of 20
+  (16 refusals, 3 normal breaks per run).
+- Tests: `mapmaker_objects.c` (sizes, order, heap, alignment, word store,
+  reset, floats; scene/pool gates; log cases) with 19 `physics-*`/`break-*`
+  mutations; `test_mapmaker_physics_classified.py` (P's only writer, every
+  reader, sizer calls, kind-1 writers, break order, 2 mutations).
+- Play check: on the m40 map shoot several barrels, push crates around, then
+  shoot again; each break should log `explosion` and hurt nearby characters.
+
 ## Play memory and the memory estimate (2026-11-02)
 
 - `pc_mapmaker_memory.inc` nav block: 6 MB (`MAPMAKER_NAV_BYTES`) from the
