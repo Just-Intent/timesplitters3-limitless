@@ -1,3 +1,15 @@
+## MapMaker Story AI points past piece 255 restored on editor reload (2026-11-06, not built or played)
+
+v0.4.0-mapmaker.39/.40: on maps of more than 256 pieces, Story AIs placed on
+pieces 256+ vanished from the editor after test play or reopening and one drew
+at the pointer in every toolbar slot. Cause and fix in
+docs/mapmaker/mapmaker-editor.md ("Story AI points on pieces past 255"): the
+saved piece index is one byte; `pc_mapmaker_editor_sai_point` (new WRAP
+sub_00332330) re-decodes a failed point on the pieces with the same low byte.
+Save format unchanged. Validation: tests/mapmaker/test_mapmaker_editor.py
+(fixed + 49 mutations) on Windows x64 MSVC; game not built or run; Mac fixture
+not run.
+
 ## MapMaker resource panel: collapsed, click/I toggle, aligned columns (2026-11-03, not built or played)
 
 Source: branch restable-compact from mapmaker-recon 04cc2691, Windows 11 x64, MSVC fixtures only.
