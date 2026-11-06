@@ -49,6 +49,11 @@
  *    appends chunks to the arrays with no bound. Chunks past an array's
  *    capacity (and kind-1 ops past 8) are hidden from the loader (tag 0,
  *    which its switch skips) and restored afterwards.
+ *  - pc_mapmaker_editor_sai_point (WRAP sub_00332330, loader call only):
+ *    Story AI points save their piece as one byte, so on maps of more than
+ *    256 pieces a point on piece 256+ decoded on the wrong piece, vanished
+ *    from the map and drew at the pointer. A failed decode is retried on the
+ *    pieces with the same low byte and the one the pad id decodes on is kept.
  *  - pc_mapmaker_editor_level_load (WRAP sub_00240C50): a MapMaker map being
  *    started. Its count pass sub_00240590 keeps one stack slot per story AI
  *    chunk with no bound; editor.json grows that frame to
@@ -200,6 +205,65 @@ void pc_mapmaker_editor_load(void (*original)(void))
     if(!pc_mapmaker_validate_editor_load(container,original)) return; /* refused the stock way */
     mapmaker_hide_run(container+8u,container+MAPMAKER_CONTAINER_LIMIT,mapmaker_editor_caps,
                       MAPMAKER_EDITOR_CAPS,original);
+}
+
+/* ---- Story AI points on pieces past 255 (editor loader) --------------- */
+/* The map writer sub_00300800 stores each Story AI point as {u16 pad id
+ * (sub_00331E50), u8 piece index, u8 flags} at chunk +0x44 + 4k: the index
+ * is the piece's position in the placed list [0x0078400C], written with
+ * `mov byte ptr [eax], cl` (0x00301570), so pieces 256..510 save as index &
+ * 0xFF. The editor loader sub_00301A90 takes the piece from its table
+ * (sub_0003DFA0(0x1000): 1024 pointers in chunk order, at the loop's
+ * [esp+0x1C], 0x00302454) by that byte and decodes the pad id against it with
+ * sub_00332330(piece, &point+4, id) (0x00302466). On the wrong piece the
+ * decode fails and writes x = y = z = 0x8008 (0x003323C4); sub_003096A0 then
+ * draws that point at the editor pointer (0x00309727) in every toolbar slot,
+ * the map shows the AI nowhere else, and the next save drops the point
+ * (sub_00331E50 answers -1 for 0x8008, 0x00301537). Play is unaffected: the
+ * level loader sub_00240C50 uses the pad id alone (0x00241E28).
+ *
+ * The pad id is global (cover pads: 0x2329 + pads of the earlier pieces +
+ * local index; regular pads: 0x3E9 + pads of the later pieces + local index),
+ * so it decodes on exactly one piece. When the loader's decode fails, try
+ * the pieces whose index has the same low byte (index + 256, + 512) and keep
+ * the one it decodes on. Maps of 256 pieces or fewer, and points that decode,
+ * are untouched; the saved format is unchanged, so maps saved by any build
+ * load the same way, and .39/.40 maps not re-saved since get their points
+ * back. */
+#define MAPMAKER_SAI_POINT_RET 0x0030246Bu   /* sub_00301A90's call of sub_00332330 */
+#define MAPMAKER_SAI_POINT_TABLE 0x2Cu       /* loop [esp+0x1C] + 3 args + return address */
+#define MAPMAKER_SAI_POINT_NONE 0x8008u      /* sub_00332330's "no such pad" coordinate */
+#define MAPMAKER_PIECES_HEAD 0x0078400Cu     /* placed pieces, linked by +0x40 */
+#define MAPMAKER_PIECES_TABLE 1024u          /* the loader's 0x1000-byte table */
+#define MAPMAKER_PIECE_BYTE 256u             /* the saved index is one byte */
+static unsigned mapmaker_sai_points_restored;
+void pc_mapmaker_editor_sai_point(void (*original)(void))
+{
+    uint32_t sp=g_esp,ret,piece,out,table,p,n=0,j,k;
+    if(!MAPMAKER_STACK_OK(MAPMAKER_SAI_POINT_TABLE+4u)) { original();return; }
+    ret=WORD_AT(sp);piece=WORD_AT(sp+4u);out=WORD_AT(sp+8u);
+    table=WORD_AT(sp+MAPMAKER_SAI_POINT_TABLE);
+    original();                                        /* pops the return address */
+    if(ret!=MAPMAKER_SAI_POINT_RET || !MAPMAKER_PTR_OK(out-4u,0x10) || WORD_AT(out-4u)!=piece ||
+       (WORD_AT(out)&0xFFFFu)!=MAPMAKER_SAI_POINT_NONE) return;
+    for(p=WORD_AT(MAPMAKER_PIECES_HEAD);p && n<MAPMAKER_PIECES_TABLE && MAPMAKER_PTR_OK(p,0x44);p=WORD_AT(p+0x40u)) n++;
+    if(n<=MAPMAKER_PIECE_BYTE || !MAPMAKER_PTR_OK(table,n*4u)) return;
+    for(j=0;j<MAPMAKER_PIECE_BYTE && WORD_AT(table+j*4u)!=piece;j++) {}
+    if(j==MAPMAKER_PIECE_BYTE) return;                 /* not the loader's frame */
+    for(k=j+MAPMAKER_PIECE_BYTE;k<n;k+=MAPMAKER_PIECE_BYTE) {
+        uint32_t cand=WORD_AT(table+k*4u);
+        if(!MAPMAKER_PTR_OK(cand,0x44)) continue;
+        g_esp=sp;WORD_AT(sp)=ret;WORD_AT(sp+4u)=cand;  /* the same call on the candidate */
+        original();
+        if((WORD_AT(out)&0xFFFFu)!=MAPMAKER_SAI_POINT_NONE) {
+            WORD_AT(out-4u)=cand;                      /* point +0: its piece (0x0030245B) */
+            if(mapmaker_sai_points_restored++<3u)
+                fprintf(stderr,"[mapmaker] story AI point restored on piece %u (saved as %u)\n",(unsigned)k,(unsigned)j);
+            break;
+        }
+    }
+    WORD_AT(sp+4u)=piece;
+    g_esp=sp+4u;
 }
 
 /* ---- MapMaker level start (scene 100) --------------------------------- */

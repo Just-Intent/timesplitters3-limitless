@@ -118,6 +118,82 @@ static void fake_move(void)
     g_eax=0x66u;
     g_esp+=4u;
 }
+/* ---- Story AI points on pieces past 255 -------------------------------- */
+/* sub_00332330(piece, out, id) stand-in: every piece owns the pad ids
+ * [piece+0x30, +0x34) (global numbering); on another piece the decode fails
+ * with 0x8008 in every coordinate, as the original. */
+#define SP_PIECES 0x00200000u
+#define SP_STRIDE 0x50u
+#define SP_TABLE 0x00300000u
+#define SP_POINT 0x00310000u
+static unsigned decode_calls;
+static void fake_decode(void)
+{
+    uint32_t piece=WORD_AT(g_esp+4u),out=WORD_AT(g_esp+8u),id=WORD_AT(g_esp+12u)&0xFFFFu;
+    uint32_t first=WORD_AT(piece+0x30u),n=WORD_AT(piece+0x34u);
+    decode_calls++;
+    if(id>=first && id<first+n) { WORD_AT(out)=(id-first)|(7u<<16);WORD_AT(out+4u)=(WORD_AT(out+4u)&0xFFFF0000u)|3u; }
+    else { WORD_AT(out)=0x80088008u;WORD_AT(out+4u)=(WORD_AT(out+4u)&0xFFFF0000u)|0x8008u; }
+    g_eax=0xDEADu;
+    g_esp+=4u;
+}
+static uint32_t sp_piece(unsigned i) { return SP_PIECES+i*SP_STRIDE; }
+static void sp_map(unsigned pieces)
+{
+    unsigned i;
+    WORD_AT(0x0078400Cu)=pieces?sp_piece(0):0u;
+    for(i=0;i<pieces;i++) {
+        uint32_t p=sp_piece(i);
+        WORD_AT(p+0x40u)=i+1u<pieces?sp_piece(i+1u):0u;
+        WORD_AT(p+0x30u)=0x2329u+i*4u;WORD_AT(p+0x34u)=4u;   /* 4 cover pads each */
+        WORD_AT(SP_TABLE+i*4u)=p;
+    }
+}
+/* One loader call: the point saved on piece `saved` (low byte of the true
+ * index), pad id `id`; returns the piece the point ends on. */
+static uint32_t sp_load(uint32_t ret,unsigned saved,uint32_t id)
+{
+    WORD_AT(ESP0)=ret;WORD_AT(ESP0+4u)=sp_piece(saved);WORD_AT(ESP0+8u)=SP_POINT+4u;
+    WORD_AT(ESP0+12u)=id;WORD_AT(ESP0+0x2Cu)=SP_TABLE;
+    WORD_AT(SP_POINT)=sp_piece(saved);WORD_AT(SP_POINT+4u)=0;WORD_AT(SP_POINT+8u)=0x55550000u;
+    decode_calls=0;
+    HOOK(pc_mapmaker_editor_sai_point,fake_decode);
+    CHECK(WORD_AT(ESP0+4u)==sp_piece(saved));                 /* the caller's argument kept */
+    CHECK((WORD_AT(SP_POINT+8u)&0xFFFF0000u)==0x55550000u);   /* nothing past z written */
+    return WORD_AT(SP_POINT);
+}
+static void test_sai_points(void)
+{
+    const uint32_t loader=0x0030246Bu;
+    sp_map(300);
+    /* piece 270 saved as byte 14: restored on 270, decoded there */
+    CHECK(sp_load(loader,14,0x2329u+270u*4u+2u)==sp_piece(270));
+    CHECK((WORD_AT(SP_POINT+4u)&0xFFFFu)==2u && decode_calls==2u);
+    /* a point that decodes stays where it is, one call */
+    CHECK(sp_load(loader,14,0x2329u+14u*4u+1u)==sp_piece(14));
+    CHECK((WORD_AT(SP_POINT+4u)&0xFFFFu)==1u && decode_calls==1u);
+    /* a pad id no piece has: unchanged, stock "no pad" coordinates */
+    CHECK(sp_load(loader,14,0x9000u)==sp_piece(14));
+    CHECK((WORD_AT(SP_POINT+4u)&0xFFFFu)==0x8008u && decode_calls==2u);
+    /* another caller of sub_00332330: stock */
+    CHECK(sp_load(0x00401234u,14,0x2329u+270u*4u)==sp_piece(14) && decode_calls==1u);
+    /* 600 pieces: byte 14 is 14, 270 or 526 */
+    sp_map(600);
+    CHECK(sp_load(loader,14,0x2329u+526u*4u+3u)==sp_piece(526));
+    CHECK((WORD_AT(SP_POINT+4u)&0xFFFFu)==3u && decode_calls==3u);
+    CHECK(sp_load(loader,255,0x2329u+511u*4u)==sp_piece(511));
+    /* 256 pieces or fewer: nothing to retry */
+    sp_map(200);
+    CHECK(sp_load(loader,14,0x2329u+270u*4u)==sp_piece(14) && decode_calls==1u);
+    /* a piece the loader's table does not hold below 256: not its frame */
+    sp_map(300);
+    WORD_AT(SP_TABLE+14u*4u)=sp_piece(299);
+    CHECK(sp_load(loader,14,0x2329u+270u*4u)==sp_piece(14) && decode_calls==1u);
+    WORD_AT(SP_TABLE+14u*4u)=sp_piece(14);
+    CHECK(mapmaker_sai_points_restored>=2u);
+    WORD_AT(0x0078400Cu)=0;
+}
+
 static unsigned count_tag(uint32_t c,uint32_t tag)
 {
     unsigned n=0,guard=0;
@@ -400,6 +476,7 @@ int main(void)
         CHECK(move_seen==100u);                                      /* stock: original decides */
     }
 
+    test_sai_points();
     CHECK(esp_errors==0);
     if(failures) return 1;
     puts("mapmaker editor ok");
