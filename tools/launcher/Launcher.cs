@@ -373,6 +373,8 @@ namespace TimeSplitters.Launcher
                 savesPage.OpenFolder+=relative=>OpenFolder(relative);
                 savesPage.OpenSaveLocation+=path=>{Directory.CreateDirectory(path);Process.Start(new ProcessStartInfo(path){UseShellExecute=true});};
                 savesPage.PickSaveFolder=()=>{using(var picker=new System.Windows.Forms.FolderBrowserDialog {Description="Choose an empty folder or an existing TimeSplitters save folder."})return Task.FromResult(picker.ShowDialog()==System.Windows.Forms.DialogResult.OK?picker.SelectedPath:null);};
+                savesPage.PickMapExportFile=name=>{var picker=new Microsoft.Win32.SaveFileDialog {Title="Export MapMaker map",FileName=name,DefaultExt=MapTransfer.Extension,Filter="TimeSplitters map (*.tsmap)|*.tsmap",OverwritePrompt=true,AddExtension=true};return Task.FromResult(picker.ShowDialog(Window)==true?picker.FileName:null);};
+                savesPage.PickMapImportFile=()=>{var picker=new Microsoft.Win32.OpenFileDialog {Title="Import MapMaker map",Filter="TimeSplitters map (*.tsmap)|*.tsmap",CheckFileExists=true,Multiselect=false};return Task.FromResult(picker.ShowDialog(Window)==true?picker.FileName:null);};
                 savesPage.BusyChanged+=value=>{busy=value;Refresh();};
                 Find<ContentControl>("SavesHost").Content=savesPage.View;
             }

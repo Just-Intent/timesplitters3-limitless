@@ -6,6 +6,8 @@ publication still requires both host checks and all ten verified launcher assets
 Mac Online formula notices now use the existing flat `.txt` license layout;
 notice bytes and the installer's protected-file rules stay unchanged.
 
+MapMaker map export/import (.tsmap) lives on the Saves page through shared MapTransfer.cs, with WPF/Avalonia file pickers supplied by each host; see [map transfer](map-transfer.md). Import backs up first (reason `Before map import`).
+
 Save-folder selection and custom-volume backup/restore now share SaveLocations.cs; see [save locations](save-locations.md). SavesPage exposes native Windows/Mac folder pickers and explicit copy without deleting original saves.
 
 README download buttons now use stable platform ZIP aliases. Launcher publication
