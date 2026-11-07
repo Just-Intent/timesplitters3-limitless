@@ -44,11 +44,15 @@ MUTATIONS = {
     'turret-any-caller': ('WORD_AT(g_esp)!=SP_TURRET_OPT_RET || !(e=sp_editor())', '!(e=sp_editor())'),
     'turret-any-item': ('sp_kind_of(WORD_AT(n))!=1 || !sp_alloc()) return;\n    WORD_AT(n+SP_NODE_VAR)', 'sp_kind_of(WORD_AT(n))<0 || !sp_alloc()) return;\n    WORD_AT(n+SP_NODE_VAR)'),
     'turret-no-end': ('    guest_call(sub_00078590,1,n+SP_NODE_VAR);\n    guest_call(sub_000783D0,0);\n}', '    guest_call(sub_00078590,1,n+SP_NODE_VAR);\n}'),
-    'mount-whole-pak': ('guest_call(sub_000622D0,3,sp.paks[k],0u,1u)', 'guest_call(sub_000622D0,3,sp.paks[k],1u,1u)'),
+    'mount-whole-pak': ('guest_call(sub_000622D0,3,sp.paks[j],0u,1u)', 'guest_call(sub_000622D0,3,sp.paks[j],1u,1u)'),
+    'mount-no-texture-pak': ('    for(j=0;j<2u*SP_KINDS;j++) {', '    for(j=0;j<SP_KINDS;j++) {'),
+    'mount-cell-texture-pak': ('"pak/challengemem/l_64_chm.pak"', '"pak/challenge/l_64_chm.pak"'),
+    'mount-gun-texture-pak': ('"pak/storymem/l_26_stm.pak"', '"pak/storymem/l_2_stm.pak"'),
+    'mount-textures-without-model': ('        if(j>=SP_KINDS && !sp_mounted(k)) continue;     /* no model, no textures */\n', ''),
     'mount-wrong-pak': ('"pak/story/l_26_st.pak"', '"pak/story/l_2_st.pak"'),
     'mount-cell-pak': ('"pak/challenge/l_64_ch.pak"', '"pak/story/l_64_ch.pak"'),
-    'mount-any-map': ('        if(!sp_lv.want[k] || !sp_pak(k) || sp_mounted(k)) continue;', '        if(!sp_pak(k) || sp_mounted(k)) continue;'),
-    'mount-twice': ('        if(!sp_lv.want[k] || !sp_pak(k) || sp_mounted(k)) continue;', '        if(!sp_lv.want[k] || !sp_pak(k)) continue;'),
+    'mount-any-map': ('        if(!sp_lv.want[k] || !sp_pak(j) || sp_slot(j)!=-1) continue;', '        if(!sp_pak(j) || sp_slot(j)!=-1) continue;'),
+    'mount-twice': ('        if(!sp_lv.want[k] || !sp_pak(j) || sp_slot(j)!=-1) continue;', '        if(!sp_lv.want[k] || !sp_pak(j)) continue;'),
     'mount-table-full': ('if((mounted=WORD_AT(SP_MOUNTS))+SP_MOUNT_KEEP>SP_MOUNT_MAX)', 'if((mounted=WORD_AT(SP_MOUNTS))>SP_MOUNT_MAX)'),
     'mount-skip-ignored': ('    if(WORD_AT(SP_MOUNT_SKIP)) { original();return; }\n    original();', '    original();'),
     'mount-editor': ('static int sp_play(void) { return sp_on() && WORD_AT(SP_SCENE)==100u; }', 'static int sp_play(void) { return sp_on() && WORD_AT(SP_SCENE)>=100u; }'),
@@ -60,9 +64,15 @@ MUTATIONS = {
                          "((ret=WORD_AT(g_esp)),0)) { original();return; }\n    original();\n    if(ret==SP_GUN_RET)"),
     'model-wrong-case': ('       (ret==SP_PROP_RET)!=(k==0) || SP_B(g_esi+SP_REC_VAR)!=1u) return;', '       SP_B(g_esi+SP_REC_VAR)!=1u) return;'),
     'model-unread': ('    return r && WORD_AT(r+0x10u)!=0;', '    return r!=0;'),
-    'model-no-textures': ('    sp_textures((unsigned)k);\n    g_eax=sp_kind[k].model;', '    g_eax=sp_kind[k].model;'),
-    'textures-every-time': ('    if(sp_lv.textured[k]) return;\n', ''),
+    'textures-every-time': ('    if(sp_lv.textured[k] || !sp_ready(k)) return;', '    if(!sp_ready(k)) return;'),
+    'textures-unread': ('    if(sp_lv.textured[k] || !sp_ready(k)) return;', '    if(sp_lv.textured[k]) return;'),
     'textures-ignore-mark': ("    if(!(SP_B(r+2u)&0x10u)) {", "    if(0) {"),
+    'textures-keep-mark': ('    SP_B(r+2u)&=(uint8_t)~0x10u;                       /* registered: no creation-time pass */\n', ''),
+    'textures-creation-way': ('    guest_call(sub_00096220,1,path);', '    guest_call(sub_00096220,1,file);'),
+    'textures-outside-play': ('    if(sp_play()) for(k=0;k<SP_KINDS;k++) if(sp_lv.want[k]) sp_register(k);', '    for(k=0;k<SP_KINDS;k++) if(sp_lv.want[k]) sp_register(k);'),
+    'lift-none': ('#define SP_CELL_LIFT 0.737f', '#define SP_CELL_LIFT 0.0f'),
+    'lift-guns': ('    else if(MAPMAKER_PTR_OK(g_ebp,0x60u)) SP_F(g_ebp+SP_REC_Y)+=SP_CELL_LIFT;', '    if(MAPMAKER_PTR_OK(g_ebp,0x60u)) SP_F(g_ebp+SP_REC_Y)+=SP_CELL_LIFT;'),
+    'lift-wrong-field': ('#define SP_REC_Y 0x14u', '#define SP_REC_Y 0x10u'),
     'guntype-any-item': ('    if(sp_lv.gun_item && sp_lv.gun_item==g_esi && sp_play()) g_eax=SP_PRISON_GUN_TYPE;', '    if(sp_lv.gun_item && sp_play()) g_eax=SP_PRISON_GUN_TYPE;'),
     'guntype-sticks': ('    if(sp_lv.gun_item && sp_lv.gun_item==g_esi && sp_play()) g_eax=SP_PRISON_GUN_TYPE;\n    sp_lv.gun_item=0;', '    if(sp_lv.gun_item && sp_lv.gun_item==g_esi && sp_play()) g_eax=SP_PRISON_GUN_TYPE;'),
     'guntype-any-caller': ('    if(!MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=SP_GUNTYPE_RET) { original();return; }', '    if(!MAPMAKER_STACK_OK(12)) { original();return; }'),
@@ -100,7 +110,10 @@ def test_mapmaker_storyprops(tmp_path, mutation):
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'mapmaker storyprops ok' in result.stdout
-        assert '[mapmaker] storyprops: mounted l_64_ch.pak for the power cells' in result.stderr
+        assert '[mapmaker] storyprops: mounted pak/challenge/l_64_ch.pak for the power cells' in result.stderr
+        assert '[mapmaker] storyprops: mounted pak/storymem/l_26_stm.pak for the prison guns' in result.stderr
+        assert '[mapmaker] storyprops: power cell 0x53D textures: 2 of 3 in pak/challengemem/l_64_chm.pak (missing 123456' in result.stderr
+        assert '[mapmaker] storyprops: prison gun 0xE6 textures: 1 of 1 in pak/storymem/l_26_stm.pak' in result.stderr
         assert '[mapmaker] storyprops: drum placed as the mission 1 power cell' in result.stderr
         assert '[mapmaker] storyprops: fixed gun placed as the mission 1 prison gun' in result.stderr
     else:
@@ -116,7 +129,7 @@ def test_no_guest_code_table_no_chunk():
     guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
     assert '#include "pc_mapmaker_storyprops.inc"' in guest
     header = (ROOT / 'src/interface/pc_display_menu.h').read_text(encoding='utf-8')
-    for hook in ('compile', 'load', 'category', 'build', 'turret_options', 'mount', 'preload_model', 'model', 'gun_type'):
+    for hook in ('compile', 'load', 'category', 'build', 'turret_options', 'mount', 'textures', 'preload_model', 'model', 'gun_type'):
         assert f'void pc_mapmaker_storyprops_{hook}(void (*original)(void));' in header
         assert f'void pc_mapmaker_storyprops_{hook}(void (*original)(void)) {{ original(); }}' in guest
 
@@ -322,3 +335,92 @@ def test_models_and_paks():
             with open(other, 'rb') as g:
                 for c in common:
                     assert body(f, gun[c]) == body(g, oi[c]), (other.name, hex(c))
+
+
+def test_texture_queue_site():
+    """The texture queue's load sub_00063900 runs once, after the load pass and before
+    the fill; sub_00096220 (the load pass's registration) queues "textures/%06x.xbt"
+    through sub_000637E0; scene 100 skips the creation-time pass (0x00096556); the
+    fill's prop record pointer is ebp when sub_002F7790 is called (y at +0x14)."""
+    a = by_address()
+    assert callers_of(0x63900) == {0x0003D5E5}
+    order = [0x0003D5AD, 0x0003D5E5, 0x0003D64A]
+    assert [a[x].text.split(';')[0].split()[-1] for x in order] == ['0x63390', '0x63900', '0x6ec10']
+    assert '0x96220' in a[0x0006355D].text and ('imm', 0x10) in a[0x00063548].ops    # deferred mark +2 |= 0x10
+    assert '0x637e0' in a[0x000962D9].text and '0x631c0' in a[0x00096227].text
+    assert 0x14 in disp(a[0x0024176B]) and mem(a[0x0024176B])[0][1] == 'ebp'
+    assert 0xC in disp(a[0x00241795]) and mem(a[0x00241795])[0][1] == 'ebp'
+
+
+def _model(path):
+    pk = path.split('/')
+    name = 'assets/ts/models/{0}/xbox/output/{1}.xbr'.format(path, pk[-1])
+    return zlib.crc32(name.encode()) & 0xFFFFFFFF
+
+
+def _body(pak, crc):
+    e = _index(pak)[crc]
+    with open(pak, 'rb') as f:
+        f.seek(e[0])
+        return f.read(e[2] or e[1])
+
+
+def test_variant_textures_in_memory_paks():
+    """Every texture the power cell / prison gun model lists is in its memory pak
+    (and in no model pak or MapMaker pak), and every file those memory paks share
+    with another pak is byte-identical there."""
+    if not (GAME / 'story/l_26_st.pak').exists():
+        pytest.skip('game paks not available locally')
+    for model, mpak, tpak in (('farfuture2/powercell', 'challenge/l_64_ch.pak', 'challengemem/l_64_chm.pak'),
+                              ('level29/props/prisonfixedgun', 'story/l_26_st.pak', 'storymem/l_26_stm.pak')):
+        d = _body(GAME / mpak, _model(model))
+        off, ids = struct.unpack_from('<I', d, 0)[0], []
+        while struct.unpack_from('<I', d, off)[0] != 0xFFFFFFFF:
+            ids.append(struct.unpack_from('<I', d, off + 4)[0] & 0xFFFFFF)
+            off += 16
+        tex = _index(GAME / tpak)
+        crc = lambda i: zlib.crc32(('textures/%06x.xbt' % i).encode()) & 0xFFFFFFFF
+        assert ids and all(crc(i) in tex for i in ids), model
+        for other in ('arcade/l_100.pak', 'arcademem/l_100m.pak', mpak):
+            if (GAME / other).exists():
+                oi = _index(GAME / other)
+                assert not any(crc(i) in oi for i in ids), (model, other)
+    for tpak in ('challengemem/l_64_chm.pak', 'storymem/l_26_stm.pak'):
+        ti = _index(GAME / tpak)
+        with open(GAME / tpak, 'rb') as f:
+            for other in sorted(GAME.rglob('*.pak')):
+                if other.samefile(GAME / tpak):
+                    continue
+                try:
+                    oi = _index(other)
+                except (OSError, struct.error):
+                    continue
+                common = set(ti) & set(oi)
+                if not common:
+                    continue
+                with open(other, 'rb') as g:
+                    for c in common:
+                        f.seek(ti[c][0]); g.seek(oi[c][0])
+                        assert f.read(ti[c][2] or ti[c][1]) == g.read(oi[c][2] or oi[c][1]), (tpak, other.name, hex(c))
+
+
+def test_power_cell_height():
+    """0x53D's vertices span y 0..1.471 but its bounds block (after the texture list:
+    count, centre x/y/z, half extents) is centred at y -0.001 with half height 0.736,
+    so it is drawn centred on its origin (the intro's upright and lying cells share
+    one height); the drum's vertices start at y 0 and it has no such block."""
+    if not (GAME / 'challenge/l_64_ch.pak').exists():
+        pytest.skip('game paks not available locally')
+    d = _body(GAME / 'challenge/l_64_ch.pak', _model('farfuture2/powercell'))
+    off = struct.unpack_from('<I', d, 0)[0]
+    while struct.unpack_from('<I', d, off)[0] != 0xFFFFFFFF:
+        off += 16
+    count, cx, cy, cz, hx, hy, hz = struct.unpack_from('<I6f', d, off + 16)
+    assert count == 1 and abs(cx) < 1e-3 and abs(cz) < 1e-3 and abs(hx - 0.546) < 0.01
+    lift = hy - cy
+    src = INC.read_text(encoding='utf-8')
+    want = float(src.split('#define SP_CELL_LIFT ')[1].split('f')[0])
+    assert abs(lift - want) < 0.002, lift
+    # the vertex rows {x, y, z, packed} of the cell's body: y from 0 to 2 * half height
+    ys = [struct.unpack_from('<f', d, 0x3804 + 16 * i + 4)[0] for i in range(352)]
+    assert abs(min(ys)) < 1e-3 and abs(max(ys) - 2 * hy) < 0.01
