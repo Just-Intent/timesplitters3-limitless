@@ -13,6 +13,7 @@ _Static_assert(CONTROL_COUNT == PC_ACTION_COUNT, "PC settings action order must 
 static SRWLOCK g_pc_weapon_lock=SRWLOCK_INIT;
 static PcWeaponKeys g_pc_weapon_keys;
 static unsigned long long now_ms(void);
+static int g_pc_developer_enabled;
 int pc_weapon_slot_take(void)
 {
     int active=pc_controls_weapon_slots_active(),slot;
@@ -68,6 +69,7 @@ const char *const pc_action_labels[PC_ACTION_COUNT] = {
 #define PC_WEAPON_SLOT(n,key) "Weapon slot " #n,
 #include "pc_weapon_slots.def"
 #undef PC_WEAPON_SLOT
+    "Developer Tools", "Toggle no-clip", "Toggle free-cam",
 };
 
 void pc_settings_defaults(PcSettings *s)
@@ -80,6 +82,7 @@ void pc_settings_defaults(PcSettings *s)
 #define PC_WEAPON_SLOT(n,key) {key},
 #include "pc_weapon_slots.def"
 #undef PC_WEAPON_SLOT
+        {VK_F1}, {0}, {0},
     };
     memset(s, 0, sizeof *s);
     memcpy(s->keys, keys, sizeof keys);
@@ -120,7 +123,7 @@ int pc_settings_conflict(const PcSettings *s, int action, int key)
 
 int pc_settings_key_allowed(int key)
 {
-    return key>=0 && key<=255 && key!=VK_F1 && key!=VK_F2 &&
+    return key>=0 && key<=255 && key!=VK_F2 &&
         key!=VK_F9 && key!=VK_F10 && key!=VK_F11 && key!=VK_F12 &&
         key!=VK_LWIN && key!=VK_RWIN;
 }
@@ -213,7 +216,7 @@ static const char *pc_member(const char *object, const char *wanted, const char 
     return NULL;
 }
 
-static const char *pc_controller(const char *text)
+static const char *pc_controller_port(const char *text,int wanted)
 {
     const char *p = pc_member(text, "controllers", NULL), *port;
     int index=0;
@@ -223,12 +226,14 @@ static const char *pc_controller(const char *text)
         const char *next = jskip(p);
         if (!next || *p != '{') return NULL;
         port = pc_member(p, "port", NULL);
-        if ((port && strtol(port,NULL,10) == 1) || (!port && index == 0)) return p;
+        if ((port && strtol(port,NULL,10) == wanted+1) || (!port && index == wanted)) return p;
         p = ws(next); if (*p == ',') p = ws(p+1);
         index++;
     }
     return NULL;
 }
+
+static const char *pc_controller(const char *text) {return pc_controller_port(text,0);}
 
 static int pc_replace_member(char **text, const char *object, const char *name, const char *value)
 {
@@ -278,10 +283,209 @@ static int pc_write_config(const char *text)
 #endif
 }
 
+int pc_settings_developer_enabled(void)
+{
+    recomp_bindings_init();
+    AcquireSRWLockShared(&g_pc_bindings_lock);int enabled=g_pc_developer_enabled;
+    ReleaseSRWLockShared(&g_pc_bindings_lock);return enabled;
+}
+void pc_settings_developer_keys(int keys[PC_BINDING_SLOTS])
+{ pc_settings_action_keys(PC_DEVELOPER_ACTION,keys); }
+void pc_settings_action_keys(int action,int keys[PC_BINDING_SLOTS])
+{
+    recomp_bindings_init();memset(keys,0,PC_BINDING_SLOTS*sizeof *keys);
+    AcquireSRWLockShared(&g_pc_bindings_lock);
+    if(action<0 || action>=PC_ACTION_COUNT){ReleaseSRWLockShared(&g_pc_bindings_lock);return;}
+    const Binding *binding=&g_ctl[0].bind[action];
+    for(int i=0;i<binding->count && i<PC_BINDING_SLOTS;i++)
+        if(binding->src[i].kind==SRC_KEY)keys[i]=binding->src[i].arg;
+    ReleaseSRWLockShared(&g_pc_bindings_lock);
+}
+int pc_settings_developer_save(int enabled,char *error,size_t bytes)
+{
+    recomp_bindings_init();
+    char *text=g_have_path?read_file(g_path):NULL;
+    int ok=text && pc_replace_member(&text,ws(text),"developer_tools_enabled",enabled?"true":"false") && pc_write_config(text);
+    free(text);
+    if(!ok){snprintf(error,bytes,"Could not save Developer Tools. Your previous setting was kept.");return 0;}
+    AcquireSRWLockExclusive(&g_pc_bindings_lock);g_pc_developer_enabled=!!enabled;
+    ReleaseSRWLockExclusive(&g_pc_bindings_lock);return 1;
+}
+
+/* Public local-player assignments: -2 keyboard, -1 disabled, 0..3 pad. */
+#include "pc_local_join.h"
+static PcLocalJoin g_players_join;
+static unsigned g_players_auto_ports; /* Visible, but not claimed by another player yet. */
+static int g_players_preferred[4]={-1,-1,-1,-1};
+static void pc_settings_players_detect(void)
+{
+    int devices[4];unsigned connected=0;
+    for(int i=0;i<4;i++) {RecompPadState pad;if(recomp_pad_read(i,&pad))connected|=1u<<i;}
+    AcquireSRWLockExclusive(&g_pc_bindings_lock);
+    for(int i=0;i<4;i++) {
+        devices[i]=g_ctl[i].device==DEV_KEYBOARD?-2:g_ctl[i].device==DEV_PAD?g_ctl[i].pad:-1;
+        if(devices[i]>=0)g_players_preferred[i]=devices[i];
+    }
+    pc_local_detect(devices,g_players_preferred,connected);
+    for(int i=1;i<4;i++)if(g_ctl[i].device==DEV_NONE && devices[i]>=0) {
+        Controller *c=&g_ctl[i];c->device=DEV_PAD;c->pad=devices[i];
+        int has_pad=0;
+        for(int k=0;k<CONTROL_COUNT;k++)for(int b=0;b<c->bind[k].count;b++)
+            if(c->bind[k].src[b].kind!=SRC_KEY && c->bind[k].src[b].kind!=SRC_NONE)has_pad=1;
+        c->pad_fallback=c->has_key&&!has_pad;
+        g_players_auto_ports|=1u<<i;
+        g_players_preferred[i]=devices[i];describe(c,c->label,sizeof c->label);
+    }
+    ReleaseSRWLockExclusive(&g_pc_bindings_lock);
+}
+
+int pc_settings_players_join(unsigned used_ports)
+{
+    recomp_bindings_init();
+    int devices[4];unsigned starts=0;unsigned char keys[256];
+    pc_settings_players_read(devices);
+    if(!pc_controls_binding_keys(keys)) {
+        g_players_join.held=15;g_players_join.pending=0;return -1;
+    }
+    for(int i=0;i<4;i++) {
+        RecompPadState pad;
+        if(recomp_pad_read(i,&pad) && (pad.buttons&RECOMP_PAD_START))starts|=1u<<i;
+    }
+    if(used_ports&~15u) {
+        g_players_join.held=starts;g_players_join.pending=0;g_players_join.initialized=1;
+        return -1;
+    }
+    int port=pc_local_join(&g_players_join,devices,starts,used_ports);
+    if(port<0)return -1;
+    AcquireSRWLockExclusive(&g_pc_bindings_lock);
+    g_players_auto_ports&=~(1u<<port);
+    for(int i=0;i<4;i++)if(devices[i]>=0 && (g_ctl[i].device!=DEV_PAD || g_ctl[i].pad!=devices[i])) {
+        Controller *c=&g_ctl[i];int has_pad=0;
+        c->device=DEV_PAD;c->pad=devices[i];
+        for(int k=0;k<CONTROL_COUNT;k++)for(int b=0;b<c->bind[k].count;b++)
+            if(c->bind[k].src[b].kind!=SRC_KEY && c->bind[k].src[b].kind!=SRC_NONE)has_pad=1;
+        c->pad_fallback=c->has_key&&!has_pad;describe(c,c->label,sizeof c->label);
+    }
+    ReleaseSRWLockExclusive(&g_pc_bindings_lock);
+    return port;
+}
+int pc_settings_keyboard_player(void)
+{
+    int active;recomp_bindings_init();AcquireSRWLockShared(&g_pc_bindings_lock);
+    active=g_ctl[0].device==DEV_KEYBOARD;ReleaseSRWLockShared(&g_pc_bindings_lock);return active;
+}
+void pc_settings_players_read(int devices[4])
+{
+    recomp_bindings_init();AcquireSRWLockShared(&g_pc_bindings_lock);
+    for(int i=0;i<4;i++)devices[i]=g_ctl[i].device==DEV_KEYBOARD?-2:g_ctl[i].device==DEV_PAD?g_ctl[i].pad:-1;
+    ReleaseSRWLockShared(&g_pc_bindings_lock);
+}
+int pc_settings_players_save(const int devices[4],char *error,size_t bytes)
+{
+    unsigned used=0;char *text=NULL;int ok=0;
+    recomp_bindings_init();
+    for(int i=0;i<4;i++) {
+        int d=devices[i];
+        if(d < -2 || d>3 || (i && d==-2) || (!i && d==-1)) {
+            snprintf(error,bytes,"Player 1 needs a device; keyboard and mouse belong to Player 1.");return 0;
+        }
+        if(d>=0 && (used&(1u<<d))) {
+            snprintf(error,bytes,"Assign each controller to only one player.");return 0;
+        }
+        if(d>=0)used|=1u<<d;
+    }
+    text=g_have_path?read_file(g_path):NULL;if(!text)goto fail;
+    /* Ambiguous profiles cannot be safely edited: the normal loader could
+     * otherwise select a different duplicate after the next restart. */
+    {
+        const char *p=pc_member(text,"controllers",NULL);unsigned ports=0;int index=0;
+        if(!p || *p++!='[')goto fail;
+        p=ws(p);
+        while(*p && *p!=']') {
+            const char *next=jskip(p),*port=pc_member(p,"port",NULL);char *tail;
+            long slot=port?strtol(port,&tail,10)-1:index;
+            if(!next || *p!='{' || slot<0 || slot>3 || (ports&(1u<<slot)))goto fail;
+            if(port && *ws(tail)!=',' && *ws(tail)!='}')goto fail;
+            ports|=1u<<slot;index++;p=ws(next);if(*p==',')p=ws(p+1);
+        }
+        if(*p!=']')goto fail;
+    }
+    for(int i=0;i<4;i++) {
+        const char *profile=pc_controller_port(text,i);char value[40];
+        if(!profile) {
+            const char *end,*array=pc_member(text,"controllers",&end);
+            if(!array || *array!='[' || end<=array || end[-1]!=']')goto fail;
+            size_t n=(size_t)(end-array)-1;char *expanded=malloc(n+64);
+            if(!expanded)goto fail;
+            memcpy(expanded,array,n);
+            snprintf(expanded+n,64,"%s{\"port\":%d,\"device\":\"none\"}]",*ws(array+1)==']'?"":",",i+1);
+            int changed=pc_replace_member(&text,ws(text),"controllers",expanded);free(expanded);
+            if(!changed)goto fail;
+            profile=pc_controller_port(text,i);if(!profile)goto fail;
+        }
+        if(devices[i]>=0)snprintf(value,sizeof value,"\"gamepad:%d\"",devices[i]);
+        else snprintf(value,sizeof value,"\"%s\"",devices[i]==-2?"keyboard":"none");
+        if(!pc_replace_member(&text,profile,"device",value))goto fail;
+    }
+    /* Validate with the normal parser before touching disk or publishing.
+     * Its destination is global, so keep the temporary state private under
+     * the same lock used by the sampler, then restore it before file I/O. */
+    Controller before[4],next[4];int valid=1;
+    AcquireSRWLockExclusive(&g_pc_bindings_lock);memcpy(before,g_ctl,sizeof before);
+    for(int i=0;i<4;i++) {
+        int bad=0;
+        if(!parse_controller(pc_controller_port(text,i),i,&bad) || bad)valid=0;
+        describe(&g_ctl[i],g_ctl[i].label,sizeof g_ctl[i].label);
+    }
+    memcpy(next,g_ctl,sizeof next);memcpy(g_ctl,before,sizeof before);
+    ReleaseSRWLockExclusive(&g_pc_bindings_lock);
+    if(!valid || !pc_write_config(text))goto fail;
+    for(int i=0;i<4;i++)if(before[i].device==DEV_PAD)recomp_pad_rumble(before[i].pad,0,0);
+    AcquireSRWLockExclusive(&g_pc_bindings_lock);
+    for(int i=0;i<4;i++)if(before[i].device==DEV_PAD)g_players_preferred[i]=before[i].pad;
+    memcpy(g_ctl,next,sizeof next);g_players_auto_ports=0;
+    ReleaseSRWLockExclusive(&g_pc_bindings_lock);
+    ok=1;
+fail:
+    free(text);if(!ok)snprintf(error,bytes,"Could not save player devices. Active assignments were kept.");
+    return ok;
+}
+int pc_settings_pad_status(int slot,char *name,size_t bytes,int *pressed)
+{
+    RecompPadState pad;*pressed=0;
+    if(slot<0 || slot>=4 || !recomp_pad_read(slot,&pad)) {snprintf(name,bytes,"Disconnected");return 0;}
+    recomp_pad_name(slot,name,bytes);
+    *pressed=pad.buttons!=0;return 1;
+}
+
 static int pc_debug_bool(const char *object, const char *name)
 {
     const char *end, *value = pc_member(object,name,&end);
     return value && end-value>=4 && !strncmp(value,"true",4) && ws(value+4)==end;
+}
+
+int pc_settings_menu_visible(void)
+{
+    char *text;
+    int visible;
+    recomp_bindings_init();
+    text=g_have_path?read_file(g_path):NULL;
+    visible=text && pc_debug_bool(text,"pc_menu_visible");
+    free(text);
+    return visible;
+}
+
+int pc_settings_save_menu_visible(int visible)
+{
+    char *text;
+    int ok;
+    recomp_bindings_init();
+    text=g_have_path?read_file(g_path):NULL;
+    if(!text) return 0;
+    ok=*ws(text)=='{' && pc_replace_member(&text,ws(text),"pc_menu_visible",
+                                          visible?"true":"false") && pc_write_config(text);
+    free(text);
+    return ok;
 }
 
 void pc_debug_config_read(PcDebugOptions *s)
@@ -342,7 +546,7 @@ int pc_settings_save(const PcSettings *s, char *error, size_t bytes)
         for (j=0;j<PC_BINDING_SLOTS;j++) {
             int key=s->keys[i][j];
             if (!pc_settings_key_allowed(key)) {
-                snprintf(error,bytes,"A binding uses an invalid key, a system key, or a reserved function key (F1, F2, F9, F10, F11, F12)."); return 0;
+                snprintf(error,bytes,"A binding uses an invalid key, a system key, or a reserved function key (F2, F9, F10, F11, F12)."); return 0;
             }
             if (key) used += (size_t)snprintf(bindings+used,sizeof bindings-used,"%s\"key:#%d\"",j?",":"",key);
             else used += (size_t)snprintf(bindings+used,sizeof bindings-used,"%s\"none\"",j?",":"");
@@ -392,6 +596,15 @@ static void pc_weapon_bindings_migrate(const char *text)
     const char *controller=pc_controller(text);
     const char *bindings=controller?pc_member(controller,"bindings",NULL):NULL;
     Controller *c=&g_ctl[0];
+    const char *enabled=pc_member(text,"developer_tools_enabled",NULL);
+    g_pc_developer_enabled=enabled && !strncmp(enabled,"true",4);
+    if(!bindings || !pc_member(bindings,"developer_tools",NULL)) {
+        Binding *binding=&c->bind[PC_DEVELOPER_ACTION];memset(binding,0,sizeof *binding);
+        int used=0;
+        for(int i=0;i<PC_DEVELOPER_ACTION;i++)for(int j=0;j<c->bind[i].count;j++)
+            if(c->bind[i].src[j].kind==SRC_KEY && c->bind[i].src[j].arg==VK_F1)used=1;
+        if(!used){binding->count=1;binding->src[0].kind=SRC_KEY;binding->src[0].arg=VK_F1;}
+    }
     if(!bindings || c->device!=DEV_KEYBOARD)return;
     if(!pc_member(bindings,"weapon_slot_1",NULL)) {
         const int actions[2]={5,4},keys[2]={'1','2'};

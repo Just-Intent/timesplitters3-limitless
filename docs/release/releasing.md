@@ -1,10 +1,15 @@
 # Game releases: Stable and named previews
 
+[Discord release notifications](discord-announcements.md): Stable and previews post to release-updates; announcements is for team posts.
+
 [Back to the README](../../README.md) | [Launcher releases](launcher-releases.md)
 
 Game and launcher versions are independent. The next Stable game source version
-is **0.4.0**, adding native Mac multiplayer and save-folder selection after `0.3.6`. This source change does not
-publish a release or establish full campaign/platform validation. Historical
+is **0.5.3**, including the Vietnam gameplay dispatch performance fix and
+bundling the already published launcher **1.5.2**. Build Windows, Apple Silicon
+Mac and Linux packages from the same clean source and verify all nine assets
+before publication. Version preparation does not establish full campaign or
+platform validation. Historical
 alpha and `-preview.N` releases remain available in Game versions; do not
 relabel their assets or offer them as Beta updates.
 
@@ -88,6 +93,16 @@ This appears as **Preview -> Beta**. Repeat the same branch argument without
 name is fixed; `-ChannelName` customizes named feature tracks only.
 
 ## Build, inspect and publish
+
+Game 0.5.0 includes a Linux x64 package on Stable, with experimental platform
+support. Build it from the same clean source with `--release-media` and use
+`tools/release/package-native-linux.py --version v0.5.0` after the native and
+launcher checks. Retain its dependency source audit, actual launcher minimum and
+optional-texture policy. Verify the clean-userspace package and isolated gameplay
+checks in [Linux acceptance](../development/linux-acceptance.md); publish the
+remaining native desktop GPU/Wayland/controller/Steam Deck gaps explicitly.
+Attach the verified Linux ZIP, checksum and BUILD receipt alongside Windows/Mac,
+then verify all nine assets and combined platform metadata before publishing.
 
 The complete regression suite uses up to four workers and reuses successful
 compiler environment setup. No cases are omitted. Use `-TestWorkers 1` for a
@@ -241,3 +256,30 @@ The release CI suite includes publisher/version/channel checks; both launcher
 hosts run shared channel-selection/preferences/metadata fixtures. Run native Mac
 launcher/package/lifecycle checks on macOS. A source version change requires no
 gameplay test by itself; publishing still runs the actual build/package gates.
+
+## Explicit repair of an existing preview
+
+Normal publication refuses existing releases and never moves a published tag.
+Only when a user explicitly requests replacing an existing preview, use the
+Python publisher's `--replace-existing` mode with the same `--branch`,
+`--channel-name` and reviewed `--notes-file` arguments. First run it with
+`--prepare-only`, review its new assets/notes, then repeat without that switch.
+This mode rejects Stable, drafts and immutable GitHub releases. It requires a
+new, clean, pushed source commit and runs the full normal validation pipeline.
+
+Retain the old release's three published assets and receipt locally for recovery
+before recycling the ordinary output names. The prepared replacement receipt
+pins the old release identity, notes and asset hashes; concurrent edits stop the
+repair. Publication temporarily drafts the release, updates its tag to the
+verified source commit, replaces the three exact assets, verifies uploaded
+sizes/digests/source, and republishes the same release ID/URL without becoming
+Latest. Unexpected assets are preserved by refusing the operation. A failure
+after drafting leaves the release hidden for manual inspection/recovery; never
+blindly repeat or overwrite an uncertain result.
+
+Explain the correction and repack date in the release notes. Already-installed
+copies with the same version will not be selected as a newer update; users must
+reinstall the corrected package (preserving Data/Settings/Saves/Textures) or use
+a launcher repair route verified to fetch the current assets. Do not claim
+same-version clients update automatically. This exception does not authorize
+replacing other releases, moving unrelated tags or publishing a launcher.

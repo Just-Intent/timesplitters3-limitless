@@ -33,7 +33,7 @@ letters show as `?`.
 - **MP3:** MPEG audio files (ID3 tags are skipped), decoded with the FFmpeg
   libraries the Windows game already ships for movies (`avcodec`, `avutil`,
   `swresample` in `Bin`). MP3 rows appear only when those libraries load; the
-  native Mac build has no FFmpeg yet, so it offers WAV only (MAC-133). A sample
+  native Mac build has no FFmpeg yet, so it offers WAV only (MAC-138). A sample
   rate change inside one file ends the track.
 
 Mono and stereo play as they are; surround WAVs play their front left/right
@@ -102,4 +102,4 @@ The Saves page has an **Imported music** section on Windows and macOS:
    setup: the row is still selected; pick a stock row: stock music again.
 6. Remove the MP3 from the launcher: it goes to the Recycle Bin; a map using it
    plays the tileset music.
-7. Repeat on macOS (native build): WAV rows only until MAC-133's FFmpeg adapter.
+7. Repeat on macOS (native build): WAV rows only until MAC-138's FFmpeg adapter.

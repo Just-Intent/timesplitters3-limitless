@@ -1,4 +1,537 @@
+Uplink throw impulse (uncommitted aftera24c3b60): shared numeric policy in
+pc_native_uplink.h/pc_native_numeric.h, no OS-specific gameplay adapter.
+Windows original-code physics fixture covers normal/quarter-speed throws;
+the user confirmed matching live throw distance at60/240. Mac/Linux native
+execution and live Uplink throws remain pending. See STATUS.
+
+Network eligibility CPU fix (uncommitted after816ae00a): implemented in shared
+transport and menu code for Windows/Mac/Linux. Host atomics use Windows intrinsics
+or compiler acquire/release operations; no duplicate gameplay policy. Windows
+transport/startup/live-transition and menu fixtures pass. Native Mac/Linux
+execution and gameplay performance remain unverified. See STATUS.
+
+Inline Developer Tools launcher warning (uncommitted after f8d3bae6): implemented,
+native acceptance pending. Shared SettingsPage uses the existing TextBlock/brush
+adapters for warning and assigned-shortcut guidance beneath the checkbox. No
+new host adapter or OS service is needed; WPF checks pass. Mac/Linux launcher
+build/visual validation and native interaction remain pending; see STATUS.md.
+
+Opt-in Developer Tools / match policy (committed aa81002d): implemented,
+native acceptance pending. Shared developer access, native match Options row,
+LAN/Online TSFTOOL1 policy and launcher page/model require no duplicate host logic.
+The Cocoa help text describes enabling in Extras or the launcher and shortcut access. Existing
+native networking/input adapters are reused; no new OS service is needed.
+Windows results are in [STATUS](STATUS.md). Remaining Mac/Linux acceptance: build,
+host/guest policy across lobby/start/revocation, keyboard/camera input, renderer
+and launcher visual checks. Windows/socket fixtures do not prove native gameplay.
+
+Sidebar Video Settings (uncommitted after45b1b7b8): implemented, native acceptance
+pending. Shared pc_video_sidebar.h/.inc and pc_video_sidebar_ui.inc reuse the
+existing native display, graphics and settings adapters with a value-only
+guest-frame mailbox. Input/Video categories, selectors, staged FOV and Apply/
+Revert require no duplicate platform logic. Legacy GL retains unsupported
+preferences and disables effect controls. Windows checks are in [STATUS](STATUS.md).
+Remaining: Mac/Linux build/link, resolution enumeration/preview/restore, native
+profile subtitle save, fullscreen, Retina/DPI layout and Vulkan/legacy GL visuals.
+
+Developer Tools shared typography (uncommitted after f73c38e9): implemented,
+native acceptance pending. Shared src/graphics/pc_developer_font.c measures and
+rasterizes embedded Selawik/Cousine with one native C implementation. Patch2620
+links it into common RHI/input owners; legacy GL uses the same callback. Host
+font choice no longer changes sidebar baselines, weights or text measurement.
+All package scripts retain OFL/stb notices. No duplicated Mac/Linux layout or
+font logic is needed. Windows evidence is in [STATUS](STATUS.md). Remaining:
+native build/link, font embedding/package notices, Retina/fractional DPI, glyph
+coverage, layout/scroll and actual Vulkan/legacy GL captures. Shared source and
+Windows fixtures do not prove pixel parity on untested hosts.
+
+Sidebar visual refinement (uncommitted after f73c38e9): implemented, native
+acceptance pending. Shared layout/canvas now use host DPI, final-size styled glyphs,
+geometry icons and continuous cards. SDL supplies display scale; CoreText and
+FreeType provide sized/weighted font coverage through the optional styled RHI
+callback. Legacy GL adds a state-preserving straight-alpha canvas compositor so
+transparency/shadows have the same policy as RHI. No host gameplay logic is
+copied. Windows checks and visual evidence are in [STATUS](STATUS.md). Remaining
+native acceptance: build/link, font weight/baselines, Retina and monitor-DPI
+changes, alpha/shadow compositing plus GL state restoration and existing scene
+rendering. Windows checks cannot verify these native adapters.
+
+Developer Tools sidebar (uncommitted after f73c38e9): implemented, native acceptance
+pending. Shared src/interface/pc_developer_sidebar.inc and
+src/graphics/pc_developer_canvas.h own layout, input and compositing once for all
+hosts. Patch2600 uploads the canvas through common RHI; legacy GL and Cocoa/Linux
+font adapters are updated, and SDL supplies fullscreen status. Existing native
+capture/settings paths remain in use. No duplicated platform policy is needed.
+Windows build, input/canvas/native-Extras and real D3D11 presentation checks pass;
+see [STATUS](STATUS.md). Remaining native Mac/Linux acceptance: build/link, font
+legibility, pointer/DPI alignment, dock/scroll/search/value/binding input, warning
+footer and final-target presentation on Vulkan/legacy GL. This Windows validation
+does not establish native visual parity or physical input support.
+
+Latest Developer Tools notes (uncommitted): one native multiline warning row and
+session audio-scaling toggle are shared source changes. Patch2590 routes XMV
+audio through the shared toggle; existing XAudio/SDL voice-rate paths are reused.
+Windows build, focused checks, native warning/audio-toggle UI and loopback lobby
+wrench acceptance pass; see [STATUS](STATUS.md). Native Mac/Linux UI and actual audio/video
+acceptance remain pending. No additional platform policy or preference reset.
+
+Further Developer Tools notes (uncommitted after a7271130): shared native submenu,
+37-action binding model, owned-body opaque draw, native lobby wrench and dormant
+footer are implemented in src/interface, src/input and src/network. Patches2560-
+2580 extend shared runtime voice rates/media clocks and lobby draw wrappers;
+src/native/audio_sdl.c supplies the same in-place SDL rate/clock contract. No new
+Mac feature policy is duplicated. Windows acceptance is tracked in [STATUS](STATUS.md).
+Status: implemented, native acceptance pending. Native Mac/Linux builds, submenu
+layout/input, physical audio timing, body opacity and actual lobby wrench acceptance
+remain unrun; existing settings/saves and unsupported preferences are preserved.
+
+Developer Tools revised notes (included in this revision after906a2c8e): shared opt-in,
+native Extras selector, assigned shortcut/warning, current-session named lobby
+metadata, native cinematic clock and near-eye fade scope are implemented once.
+Windows XAudio and SDL movie streams change rate without replacing queued
+voices. Cocoa uses the shared binding model. No new host policy is duplicated.
+Windows Build12, launcher and affected fixtures pass; bounded native movie rates
+and Online/System Link disabled-client notices are verified in [STATUS](STATUS.md).
+Native Mac/Linux build, UI, movie/voice timing, first-level body opacity and
+physical Online/System Link acceptance remain pending. Preserve settings/saves;
+run isolated native checks before marking those hosts verified.
+
+Developer Tools notes follow-up (committed906a2c8e after af616873): shared configured flight,
+weapon routing, HUD/viewport masks, held speed, God/ammo services and patch2530
+need no duplicated host gameplay implementation. Windows focused fixtures pass;
+Windows Build and bounded weapon/cheat/speed/flight acceptance pass; native
+Mac/Linux build and gameplay checks remain pending; see [STATUS](STATUS.md).
+
+## Developer Tools overlay - implemented, native acceptance pending
+
+Committed locally as af616873 on developer-tools-overlay, based on d2d2c8d5. Shared
+`src/interface/pc_developer.c`, `pc_developer_guest.inc` and clock policy provide
+F1 overlay, PC Settings, HUD/watermark toggles, flight, Story checkpoint advance
+and game speed. Windows/SDL adapters own capture, fullscreen and log operations.
+Common RHI and native legacy GL draw rows and suppress HUD draws while retaining
+guest logic. No separate Mac gameplay implementation is required; existing
+F2/F12 settings remain available. Windows Build, CPU/GPU checks and bounded Story/menu acceptance passed; see
+[STATUS](STATUS.md).
+Native Mac/Linux build and gameplay acceptance remain pending: F1 isolation,
+settings/persistence, focus/fullscreen/pointer scaling, original/native rates,
+flight geometry and camera return/visibility, HUD/watermark recovery, Story
+checkpoint restoration/final ending, bracket repeats and pause. Windows CPU
+fixtures do not verify these hosts. Use isolated saves/settings for checks.
+
+## Fullscreen Video option — native acceptance pending
+
+Local feature/fullscreen-options after5c5acf91: shared pc_display_menu.c adds
+Window mode to frontend/pause Display, staged across tabs with Apply/Keep and
+15-second rollback. Existing runtime.conf fullscreen key is shared with launcher.
+pc_display.c marshals SDL queries/transitions to the main thread, reusing the
+same code for Mac/Linux and both native renderers. Windows patch2620 dispatches
+to its shadow-window thread. No separate Mac feature implementation is needed.
+Windows evidence and Linux verification at7a6fea3c are recorded in STATUS.
+Native Ubuntu/WSL source build, protected-MMIO, input/display fixtures, launcher
+UI tests and actual X11 frontend/pause fullscreen Apply/Keep/persistence and
+timeout restoration pass with software Vulkan. Wayland/WSLg self-tests pass on
+sequential retry after an initial transient failure; general compositor and
+physical Linux/Steam Deck acceptance remain pending. Native Mac build and live
+windowed/fullscreen, timeout, pause, hotkey and save/relaunch checks remain pending.
+The Linux result does not establish native Mac support.
+
+## Native multiplayer wrapper admission - MAC-013 validation pending
+
+Follow-up based on dc642eb3: patch2625 enables the thirteen existing shared
+Arcade return/result/profile-save wrappers for TSFP_NATIVE_DISPLAY, as well as
+Windows controls. Native Mac/Linux compiled the adapters but bypassed them under
+Windows-only wrapper guards. Applied-wrapper CPU tests reproduce that omission
+and pass with the repair. No duplicate native policy or OS adapter is needed.
+Windows-host/WSL-Linux-guest pause and real-results returns now pass with retained
+room membership and another round on e84135ad. Native Mac and physical three-peer
+acceptance remain pending. Windows duplicate fixture recovery is local storage
+maintenance, not a native adapter change; see STATUS.
+
+## Retained multiplayer profile-save scope - MAC-013 validation pending
+
+Uncommitted follow-up on multiplayer-lobby-return, base3ff65a51: shared Arcade
+profile mapping now follows the active host/member session after the lobby
+factory consumes the exit destination. Windows original-US CRC/save regression
+and shared menu checks pass; stock errors remain visible for actual corruption
+or failed writes. No new native adapter or transport change is required. Native
+Mac/Linux and physical System Link acceptance remain pending; see STATUS.
+
+## Arcade host lobby return - MAC-013 validation pending
+
+Implemented on multiplayer-lobby-return (initial validation base337be3bc). Shared
+src/network/pc_multiplayer_exit.inc and patch2620 implement host Return to Lobby
+with connected guests, including pause/results and explicit host-loss routing.
+The user's final scope keeps guests' own Leave Match/Quit and browser Back
+original. Shared pc_network_profiles.inc reuses Story's persistent profile mapping
+so a returning guest reaches its usable lobby rather than a save-error screen.
+Existing native Online/socket adapters provide the same transport calls; no new
+OS adapter is needed. Shared CPU fixtures run via the existing Windows/macOS menu
+suite. Physical native Mac/Linux gameplay and two-machine System Link are pending:
+check host return during play/results, real host loss, original guest exits and
+another match after return. STATUS.md records measured Windows build/acceptance;
+Windows tests do not verify Mac.
+
+## MAC-130 - macOS Application Support storage (#502) - Awaiting validation
+
+Mac-specific installation convention; Windows/Linux portable storage is unchanged.
+Implementation c1b53dc8 on `feature/macos-application-support`, integrated with
+main 9da83f36: `MacStorage.cs`, `NativeStorageWindow.cs` and native startup route
+Finder launches to a writable game folder independent of the entry-point app.
+The default is ~/Library/Application Support/TimeSplitters. Legacy installations
+beside the app migrate automatically through MacStorageMigration.cs; a folder
+copy-folder picker imports installations elsewhere; a separate chooser selects
+external/moved installations in place. Originals remain as backups; verified
+staging resumes and an atomic directory rename publishes only the completed copy.
+Existing destination data is never merged or overwritten. Internal custom save
+paths follow the copy; external paths remain unchanged. Explicit folder selections,
+root/portable overrides and developer checkouts skip automatic migration.
+The existing shared transactional launcher updater handles the managed copy.
+
+Windows MACOS cross-compilation, Windows launcher build, isolated WSL storage
+contracts and Python launcher checks pass; see STATUS. Native ARM64 build,
+`--test`, `--test-ui`, packaged signature/helper/restart checks and read-only
+`--check` still require a Mac host. Accept with fresh /Applications-only app,
+existing and moved game folders, disconnected/reconnected external storage,
+portable mode, custom save locations, newer/older entry apps, interrupted/canceled
+migration, low space/conflicting destinations and interrupted launcher/game updates.
+Confirm saves/settings/texture bytes survive app
+replacement and that Gatekeeper permits the managed signed bundle. No release
+has been published.
+
+## Uplink native holding — validation pending
+
+Shared pc_native_numeric.h and pc_native_uplink.h admit Uplink physics
+function1 holding on fractional intervals. Coreb3545910 on fix/discord-uplink
+requires no new host adapter. The original-US input/charge regression covers
+60/120/144/180/240; Windows live Russian Connection barrel pickup, floating
+and release pass at120/180. The supported Windows build passes with the
+recorded local MSVC workaround; native Mac/Linux builds and live acceptance
+remain pending. Check lift/hold/release, throw, pause, map mode and ordinary gun
+cadence at the native presets. See STATUS.md and native-uplink.md.
+
+## Shared MSAA texture resize — host acceptance pending
+
+Code ae271f20 on fix/discord-msaa-rendering after221c6b32: rendering2600 repairs
+the common offscreen color resize preceding MSAA companion creation. No new
+OS adapter is required. Windows WARP regression fails before/passes after;
+the isolated Windows Chinese8x scene passes with the documented CPU compiler
+workaround. Native Mac/Linux GPU and Chinese-map gameplay at2/4/8x remain pending.
+See STATUS for the compatibility baseline and full-build acceptance limits.
+
+## Saved native fullscreen startup — validation pending
+
+Local fix/linux-deck-desktop-input: window_startup_sdl.h applies the existing
+runtime fullscreen preference when creating shared SDL/Vulkan and legacy GL
+windows. No separate Mac adapter is needed. Windows already reads this setting
+through its existing window path. Linux saved-windowed/fullscreen startup and
+render/present checks are recorded in STATUS.md; native Mac builds and visual
+acceptance remain pending. Check both renderers with saved fullscreen=0/1,
+F11 transitions and unchanged personal settings on a native Mac host.
+
+## Joined-player device settings — validation pending
+
+Shared pc_keyboard_menu.inc/pc_controls_menu.inc map UI player rows to native
+ports and resolve Automatic before publishing joined devices. No new OS adapter
+is needed. Windows menu regression passes; native Mac/Linux build and physical
+controller checks remain pending. Source is local/uncommitted after e0496b89.
+
+Controller detection/reconnect follow-up (local after cc8b05fb): shared presence
+mask provisioning, Automatic labels and SDL patch2360 need no separate host
+implementation. Windows automated tests include real SDL virtual reconnects.
+Mac/Linux physical device enumeration, profile joining and USB/Bluetooth
+reconnect acceptance remain pending; do not infer them from Windows results.
+
+Local player devices (local feat/local-player-devices, uncommitted): shared
+pc_bindings.inc, keyboard/Controls menus, patch2350 and launcher GameSettings/
+SettingsPage implement assignment, identification and exclusive routing. The
+native SDL mouse adapter uses the same ownership guard; SDL pad path reservation
+is common across hosts. No additional Mac adapter is currently identified.
+Windows validation and remaining live/hardware gaps are recorded in STATUS.md.
+Native Mac and Linux acceptance pending: launcher selectors/persistence, main
+and pause menu layout, keyboard+pad and two-pad play, disconnect/reconnect,
+changed device enumeration and assignment failure rollback. Windows fixtures
+do not establish physical-device or native-host acceptance.
+
+Profile footer fit (local feature/fab-input-prompts): shared profile text
+rendering scopes compact imported icon faces to the native two-line clip.
+Select/Back keeps native Y, Delete is native+2; hover/hit regions follow the same
+baselines and scoped icon state is restored. No OS adapter or controller
+layout change. Windows evidence is in STATUS; native Mac visual acceptance
+is pending (complete key faces, bottom margin and footer hover).
+
+Imported prompt artwork (local feature/julio-input-prompts): shared
+`pc_keycaps.inc`, `pc_input_icons.inc` and generated data replace the prior
+Rendrify art with Julio Cacko CC0 keyboard/mouse and Xbox-style controller icons.
+Native token/VK banks, glyph bounds, text advances and fade remain shared;
+no OS adapter is needed. Controller-family detection is unchanged.
+Quality follow-up (locald0be611e) preserves128px pixels, uses shared native
+textured quads and recorded immediate/deferred GPU state scopes (patch2610),
+Morton-ordered premultiplied mips. A local2026-11-06 follow-up replaces linear
+sampling with cached exact-size coverage bitmaps, point sampling without mips,
+and shared aspect-specific size/pixel-step policy
+(pc_input_icon_layout.h), preserving compact profile clips. Binding icons grow inside
+existing rows/columns. The same D3D8/RHI API is used on all hosts; no new OS
+adapter is identified. Mac/Linux builds and actual GPU acceptance remain pending,
+including legacy GL texture locks/state getters, pause scissor, footer fades,
+controller prompts, resize/device reset and capture/replay parity. Windows
+fixtures/build and available visual evidence are recorded in STATUS. Mac and
+Linux builds and visual acceptance remain pending: profile/main/pause footer
+fit, binding dialogs, device switching and tutorial/HUD wrapping. Source PNGs
+stay private; compiled CC0 derivatives and complete credits travel through Git.
+
+Linux experimental release preparation (2026-11-04, local
+feature/linux-experimental-release): SDL key/pad exports fix the native link
+against current shared settings navigation; Windows/SDL use one menu-alias
+helper. Linux release source/media audits, relocated desktop dependencies and
+Unicode installer checks are covered locally. Shared runtime-license retrieval
+retains the existing Mac policy and Mac packaging regressions pass on Windows;
+actual native Mac execution remains pending. See [Linux release evidence and
+limits](../development/linux-experimental-release.md). No Mac driver/OS/gameplay
+parity is inferred from WSL results.
+
+Keycap prompts (local feature/flat-settings-menu, uncommitted): shared
+pc_keycaps.inc and pc_prompts vocabulary plus additive2340 render keyboard/mouse
+prompts through native glyph geometry. Binding-menu cells share the renderer.
+Existing native font/rectangle/input adapters serve both hosts; no new adapter.
+Windows Release build/shared checks and main/pause menu review pass; native Mac keycap/layout acceptance
+remains pending (menus, tutorial wrapping, HUD, device switch and remapped keys).
+
+Settings section shortcuts (local feature/flat-settings-menu): shared
+pc_settings_navigation.inc adds native hover/transition sounds, physical arrow
+keys and LB/RB tab switching, with device-sensitive footer hints. Shared launcher
+SettingsPage explains the shortcuts. Footer hints reuse native Select/Back
+glyph scales and final gray/fade colour on both hosts. Common input/font/sound adapters
+serve both hosts; no new Mac adapter needed. Windows focused tests, launcher
+tests and main/pause keyboard visual review pass. Physical controller and native
+Mac acceptance remain pending (tap/hold/release, wrap, capture/modal exclusion,
+footer device switching and sound deduplication).
+
+Flat settings headers (2026-11-03, local feature/flat-settings-menu): shared
+pc_settings_tabs.inc uses plain section labels, blue current-page text and one
+rounded hover/focus highlight in Video/Controls. Existing guest pointer, colour,
+font and rectangle helpers serve both hosts; no new adapter is needed. Windows
+focused UI/input checks, Release build and isolated main/pause review pass;
+native Mac visual acceptance remains pending.
+
+Settings visual refinement (2026-11-03, local feature/settings-visual-refinements):
+shared Video/Controls tab captions use one measured reference, short pages
+balance native leading rather than blank footer rows, Video retains its native
+Y anchor, and owned row focus uses a brighter tint. Existing guest/font interfaces
+serve both hosts; no OS adapter is required. Windows build/shared checks pass;
+live review is recorded in STATUS. Native Mac visual acceptance remains pending.
+
+Controls pause visual review (2026-11-03, local): shared tabbed roots compensate
+for section height changes through the native Y offset, keeping the header still
+without reintroducing footer padding. Keyboard diagram/column labels now fit
+measured cells with explicit glyph scale and restoration. Both changes use common
+guest/font helpers; no OS adapter required. Windows live review is recorded in
+STATUS; native Mac visual acceptance remains pending.
+
+Controls Accept state and keyboard footers (2026-11-03, local): shared menu
+compares the original per-player native draft to enable Accept only for edits,
+including reversion and tab retention. Keyboard pages omit on-screen Back and
+put binding pagination below the divider; native Back remains. Windows shared
+checks pass; no OS adapter needed. Native Mac visual acceptance remains pending.
+
+Native menu styling (2026-11-03, local): shared Video/Controls tab painter uses
+muted vertical shading, silver edges and uppercase captions. Controls keyboard
+labels format uppercase display copies. Existing native font/tint/fade helpers
+serve both hosts; no OS adapter changes. Windows focused checks/build pass;
+native Mac visual acceptance remains pending.
+
+Controls visual follow-up (2026-11-03, local): common focus painter suppresses
+the full-row header hover backdrop, and Controller removes footer padding after
+Turn Speed. No host adapter changes; native Mac visual acceptance is pending.
+
+Unified Controls (2026-11-03, local feature/unified-controls): shared menu source
+combines General Controls, Controller and Keyboard & Mouse under one entry,
+using the Video tab skin, compact fonts and native dividers. Native profile
+Accept/Cancel/Customize and keyboard live/debounced persistence remain intact.
+No new OS adapter is needed: existing guest dispatch, font and hover-pointer
+interfaces serve both hosts. Source/contracts: [Controls](../agent-context/controls-options.md).
+Windows shared fixtures and isolated main/pause visual evidence are recorded in
+[STATUS](STATUS.md). Native Mac visual/navigation acceptance remains pending;
+this local revision has not been synchronized or verified on a Mac.
+
+Direct Video tab targets (2026-11-03, local): shared mouse dispatch samples
+Video tab edges before native row gating and applies the latest target after
+the outer dispatcher returns. Hover pointers already exist on both hosts;
+no new OS adapter is needed. Native Mac visual acceptance remains pending.
+
+Apply-only AF/AO/cache (2026-11-03, local follow-up): shared Video Options
+stages all three across tabs and saves them only on Apply, without adding
+restart prompts. Shared main/pause logic needs no separate host adapter.
+Rapid tab rebuilds retain their existing hit bounds until repaint; fresh
+sessions/dialogs invalidate them. Native Mac visual acceptance remains pending.
+
+Apply keeps the current Video section (2026-11-03, local follow-up): shared
+callbacks remember the originating section through saves, failures, confirmation
+and restart dialogs. Main/pause need no separate OS adapter. Windows fixture
+passes; native Mac visual acceptance remains pending.
+
+Video tab repeated clicks and Advanced footer (2026-11-03, local follow-up):
+common callbacks keep active tabs stable and distinguish unmatched mouse clicks
+from keyboard cycling. Graphics puts Advanced below the lower divider and above
+Apply. No host adaptation is needed; native Mac visual acceptance is pending.
+
+Conditional restart labels (2026-11-03, local follow-up): common Video Options
+removes the general notice and conditionally marks MSAA/Supersampling beside
+their names. Status is below all controls; Advanced uses Back/tab navigation
+without a redundant button. Shared behavior covers main and pause; no OS adapter
+change is needed. Native Mac visual acceptance remains pending.
+
+Video Options silver dividers (2026-11-03): shared menu builder uses the original
+native skin separator below tabs and above Apply in all four sections. Native
+layout supplies non-selectable lines and pointer/keyboard row placement; return
+focus accounts for the header line. Windows visual review and shared fixtures
+cover this follow-up; native Mac visual acceptance remains pending.
+
+Apply-only restart prompts and compact settings font (2026-11-02): shared Video
+Options stages MSAA/supersampling until Apply, preserves drafts across tabs,
+discards on leaving and rolls back restart values if a later save fails. Owned
+Video settings labels/choice text use65% glyph scale; foreign menus retain their
+existing fonts. Main/pause share these guest rules on all hosts. Native Mac
+visual review and full-game restart acceptance remain pending.
+
+Paused Video Options fit (2026-11-02, PR472 follow-up): shared guest row-font
+scope now admits only this menu during pause; custom tabs fit measured caption
+bounds and restore font state. Shared fixture coverage includes pause ownership,
+scale restoration and caption limits. The same code serves Windows/Mac; actual
+native Mac paused-menu visual acceptance remains pending.
+
+Supersampling/main integration (2026-11-02): common HUD resolve now follows the
+published SMAA patch and bypasses both post-AA filters during HUD presentation.
+Windows GPU fixtures cover SMAA with supersampling/MSAA and preserve native HUD
+pixels. Game and shared WPF/Avalonia launcher place supersampling in Advanced,
+retaining the unified Off/FXAA/SMAA selector. Native Mac/Vulkan GPU/menu checks
+remain required; no additional platform acceptance is claimed.
+
 # PC features awaiting Mac adaptation
+
+Linux standalone/UI/media completion (2026-11-02, local
+`feature/linux-runtime-completion`, based on unmerged `11bb17ab`): **Implemented**
+as Linux adapters and shared contracts. GTK uses the common settings/display/debug
+models. Shared XMV host playback now compiles for POSIX Vulkan; Windows keeps its
+existing clock/path adapter. Legacy Mac GL retains its movie stub, and native
+Mac codec integration/execution remains pending (MAC-009). No Mac GTK adapter
+is needed; Cocoa remains its UI. Native game-package verification is shared
+between Mac/Linux and now starts the installed Python/Tk/TLS interpreter; POSIX
+installation preserves the executable permissions of its two fixed interpreter
+paths. Mac signatures still use the existing native callback. Linux source/
+package contracts and unprivileged relocated self-tests pass; native Mac build,
+GPU/movie/installer execution is unavailable here. See STATUS for exact scope.
+
+Cross-platform base-game audit (2026-11-02, local `perf/linux-upload-waits`):
+**Implemented** as shared code and test corrections. Default uniform update
+and dynamic CPU-write map paths now use legal buffer descriptors on all RHIs;
+Windows D3D11 WARP and Linux hardware/software Vulkan pixel checks pass.
+Shared Story cinematic sequencing is unchanged while compiling cleanly under
+Linux GCC fatal warnings; demo mutation tests accept host assertion diagnostics.
+Linux CI now includes shared timing/input/HUD/menu/audio contracts already
+covered by the Windows/macOS native jobs. Native Mac GPU and full-game acceptance
+still require a Mac; source/test portability is not a native verification claim.
+See [STATUS](STATUS.md) for results and [shared-platform rules](../development/shared-platform.md)
+for feature/adapter boundaries.
+
+Shared Vulkan upload efficiency (2026-11-02, local `perf/linux-upload-waits`,
+runtime `6d38019a`): **Implemented** in shared patch2411 and
+`src/graphics/upload_copy.h`. Tight image copies batch; exact CPU uniform mirrors
+reuse same-frame GPU snapshots. No Mac adapter is needed; D3D11 is unchanged.
+Linux hardware Vulkan1.2/software Vulkan1.3 pixel/replay tests and portable
+Windows/Linux byte tests pass. Native Mac Vulkan/pixel/arena-reuse validation
+remains pending on a Mac. The recycler's optional active-save scope preserves
+existing Mac callers; Linux opts into scoped cleanup. See [STATUS](STATUS.md)
+for measured work reduction, unchanged average FPS and host acceptance limits.
+
+Linux host build optimization (2026-11-02, local `perf/linux-host-runtime`):
+**Not applicable** as a new Mac behavior. Only the Linux builder enables host
+`-O2 -g`, retaining Debug assertions and the title numeric flags. Windows/Mac
+build settings remain unchanged. Final patch2409 enables the same existing
+Windows/Mac late-vblank observation on Linux; native Mac behavior is unchanged
+and execution remains unverified locally. The Linux test runner now selects isolated 60/120/180/240 presets explicitly; this does not
+alter launcher choices or console timing. Linux execution is measured in
+STATUS; no Mac source/build change or new native validation is claimed.
+
+Shared Vulkan 1.2 / WSL hardware support (2026-11-02, local `9e451a55` through
+`2b0a7fd8`): **Implemented** in the common Vulkan backend, with descriptor arena,
+baked state and SPIR-V interface fallbacks. Vulkan1.3/Mac selection is retained;
+Windows WARP and Linux RTX/software contracts pass. Native Mac GPU revalidation
+is pending on a Mac host. Linux-only live VMA query and explicit experimental
+WSL Dozen environment are thin host adapters, with no duplicate gameplay policy.
+The private driver does not replace system Mesa. See STATUS and
+[GPU contracts](../agent-context/linux-game.md) for evidence and remaining30 FPS/
+full-game/Deck acceptance limits.
+
+Linux launcher (2026-11-01, `feature/linux-launcher`, local commits beginning
+`c8b3a534`): **Not applicable** as a new Mac feature. Linux links the existing
+Avalonia host and shared C# models/pages; native calls, ELF/package names and
+checkout paths are selected by the Linux adapter. Mac retains CoreGraphics,
+Mach-O validation, open, app bundles, mac.lock and its pinned SDK. Release CI
+adds Linux without removing Windows/Mac checks. Mac native build/UI/package
+revalidation is pending on a Mac host; portable Mac launcher tests pass locally.
+See STATUS for measured Linux and Windows evidence.
+
+Linux native game integration (local `45078c9f` through `c1b5a016`,
+`feature/linux-x64`): common native
+boot, SDL input/audio, shared debug/configuration/network code and the full
+Xbox/Vulkan frontend are reused. ARM64 and Linux x64 protected-register adapters
+now call one native MMIO device-policy helper. Shared POSIX crash handling keeps
+Darwin services and adds Linux OS adapters. Existing Mac controls/frameworks and
+GL route remain selected on Mac; native Mac build and protected-MMIO/crash
+acceptance remain pending. Linux desktop editing/debug dialogs, movie decoding
+and portable packaging remain explicit Linux gaps. See
+[integration contracts](../agent-context/linux-game.md) and STATUS for evidence.
+Linux now passes reviewed first-level movement/firing/pause/resume checks under
+software Vulkan. The native vblank producer also uses writable aliases shared
+with Mac, preserving guest write-to-clear semantics; Mac execution is unverified.
+
+Linux x64 foundation (2026-11-01, `feature/linux-x64`, local `1c981c0a`): **Not
+applicable** as a new Mac feature. The common Vulkan backend gains Linux SDK
+library selection and frontend/replay build guards; existing Mac SDK/driver,
+GL fallback and Cocoa adapters remain in place. Windows host-memory/SDK checks
+pass; Mac build/GPU regression execution is pending. The subsequent game
+integration above supplies the Linux title target. See [Linux scope](../development/linux.md) and STATUS for validation
+and remaining adapters. Shared policy must serve all three platforms.
+Linux renderer/replay validation now passes at local `14866028`; Linux Clang
+memory/SDK checks pass at `93861d06`. Mac's VMA diagnostic flag remains enabled
+through the common Clang guard; physical Mac revalidation is still pending.
+
+Output-resolution HUD with supersampling (2026-11-02, local follow-up to
+27c2925b): **Common implementation, native validation pending**. The common
+Windows/Vulkan frontend shares `graphics/native_hud*.h`, the scene-owner adapter
+and guest HUD hints. Deferred/captured hints use the existing placement ABI;
+original HUD/kill-feed logic executes once. Single-view depth/stencil history, MSAA
+and frame reset pass Windows GPU fixtures. Patch 2517 adds sampled stencil
+plane views to the D3D11/Vulkan adapters; native GPU acceptance remains pending. Legacy GL ignores these hints and retains its
+existing whole-frame path; separate GL color/depth target switching and native
+Mac Retina, resize, pause/fades and gameplay checks remain. No native Mac or
+physical Linux acceptance is claimed. See the [HUD contract](../development/graphics-options.md#output-resolution-hud-with-supersampling).
+
+Supersampling (2026-11-02, local `feature/supersampling`, based on graphics-options
+327eb4c0): **Implemented, native validation pending**. Shared percentages,
+V1/V2 preferences, in-game/launcher UI and common Vulkan scene/box resolve are
+implemented once. Legacy GL consumes the shared scene-size helper and retains
+its linear framebuffer blit. No separate Mac policy is needed. Windows model,
+menu and WARP pixel checks pass; native Mac builds, all-scale/main/pause UI,
+Retina Auto resizing, failure recovery, performance and scene acceptance remain
+unrun. Legacy GL fractional-filter quality requires native review. See
+[graphics contract](../development/graphics-options.md#supersampling) and STATUS.
+
+FPS / Ping counter (2026-11-01, uncommitted): shared settings/formatting and
+common RHI scaling; legacy GL uses the same layout helper. No new network
+provider; existing Online RTT is used where supported. Native Mac rendering,
+menu persistence and live Online validation remain pending.
+
+PC Settings menu-bar visibility (2026-11-01): **Not applicable** to native Mac.
+The Windows F1 bar now persists `pc_menu_visible` in the active input profile;
+Mac has no equivalent in-window bar and retains its system menu and F1 pointer
+capture. Shared JSON accessors preserve unknown settings on either host; no
+new platform adapter or Mac feature is introduced. Windows checks are in STATUS.
+
+Optional Arcade kill feed (2026-11-01, uncommitted): shared HUD hook, core and
+preference storage serve both hosts. No new native adapter required; native
+Mac menu/rendering and online acceptance pending. See
+[contract](../development/arcade-kill-feed.md) and STATUS.
 
 This tracks platform exceptions and native validation for shared PC/Mac features.
 Ordinary feature logic now belongs in shared source by default; follow
@@ -315,14 +848,35 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-121 | High-FPS interaction input (#357) | Awaiting validation |
 | MAC-122 | Temporary material matrix cache epoch (#398) | Awaiting validation |
 | MAC-123 | Bounded guest-memory crash evidence and model history | Awaiting validation |
-| MAC-126 | MapMaker capacity meter probe (debug instrumentation) | Awaiting validation |
-| MAC-127 | Compile-only Windows build mode | Not applicable |
-| MAC-128 | MapMaker editor mouse controls (on by default) | Awaiting validation |
-| MAC-129 | MapMaker raised level memory budget (opt-in) | Awaiting validation |
-| MAC-130 | MapMaker capacity stage A: AI pools and editor limits | Awaiting validation |
-| MAC-131 | Launcher MapMaker settings tab | Awaiting validation |
-| MAC-132 | MapMaker map export/import (.tsmap) | Awaiting validation |
-| MAC-133 | Imported music (MapMaker and Arcade) | Awaiting validation |
+| MAC-126 | Launcher Discord community button | Awaiting validation |
+| MAC-127 | Complete launcher language packs | Awaiting validation |
+| MAC-128 | Fresh weapon trigger timing (#434) | Awaiting validation |
+| MAC-129 | Optional SMAA anti-aliasing | Awaiting validation |
+| MAC-131 | MapMaker capacity meter probe (debug instrumentation) | Awaiting validation |
+| MAC-132 | Compile-only Windows build mode | Not applicable |
+| MAC-133 | MapMaker editor mouse controls (on by default) | Awaiting validation |
+| MAC-134 | MapMaker raised level memory budget (opt-in) | Awaiting validation |
+| MAC-135 | MapMaker capacity stage A: AI pools and editor limits | Awaiting validation |
+| MAC-136 | Launcher MapMaker settings tab | Awaiting validation |
+| MAC-137 | MapMaker map export/import (.tsmap) | Awaiting validation |
+| MAC-138 | Imported music (MapMaker and Arcade) | Awaiting validation |
+
+### MAC-126 - Launcher Discord community button
+
+- **Status:** Awaiting validation
+- **Behavior:** The labeled Discord logo in the launcher sidebar and the Home
+  community card's Join Discord button open the
+  project's public invite in the browser on Windows and native Mac. GitHub
+  Support remains a separate action. No automatic join, Rich Presence change,
+  diagnostic upload or saved preference is involved.
+- **Shared source:** `tools/launcher/Launcher.xaml` owns the accessible button
+  and mark; `ReleaseClient.DiscordInvite` owns the target. Windows `Launcher.cs`
+  and Mac `macos/NativeWindow.cs` call their existing browser adapters.
+  PR #435, branch `feature/discord-community-link`; Home card follow-up initially
+  uncommitted.
+- **Remaining:** On native Mac, build/test the launcher and check the translated
+  mark, sidebar/Home card fit, keyboard activation and browser destination. Windows
+  checks do not establish native Mac execution or physical keyboard behavior.
 
 ### MAC-048 - Companion vehicle zero-flag joins (#100)
 
@@ -400,6 +954,15 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
   and ordinary scene occlusion on the existing shared-depth path.
 
 ### MAC-046 - Update transaction rename contention
+
+Preview publication follow-up (uncommitted, `online-story-coop`): shared
+`Core.AtomicReplace` now covers metadata, session and settings replacement.
+Only Windows errors32/33/1175 receive bounded retry; Mac retains its original
+first operation/error behavior. Existing backup and WriteThrough contracts stay
+intact. Windows real-lock/error-injection and complete launcher checks pass;
+native Mac execution remains unverified. No additional Mac adapter is needed
+for this Windows contention policy; existing entry acceptance remains separate.
+
 
 - **Status:** Queued
 - **PC behavior:** Retry Windows access/sharing/lock failures when promoting a
@@ -602,6 +1165,18 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
   supersedes the initial cropped banner viewport.
 
 ### MAC-039 — Recoverable launcher startup security interruptions
+
+Issue #476 follow-up (`fix/476-antivirus-errors`, publication change): Windows
+antivirus codes 225/226 now identify affected startup/update file paths and
+preserve native diagnostics, retry actions and long-path readability. Shared
+hash/extraction/recovery code transports the failure context; classification is
+disabled on MACOS/LINUX. Existing native IO exceptions and adapters retain their
+behavior; no new Mac antivirus adapter is required. Windows build/regressions and
+portable compatibility checks pass (see STATUS). Native Mac/Linux shared-suite
+execution is pending; verify non-Windows errors remain unchanged there. Actual
+McAfee blocking/retest is unverified. This diagnostic change does not resolve the
+vendor detection or authorize closing the issue before publication.
+
 
 - **Status:** Not applicable
 - **Scope:** Windows bootstrap only.
@@ -965,6 +1540,16 @@ before checking release, matching the existing asynchronous settings contract.
   actual native renderer, input, Cocoa settings/debug checks and three CTests
   on the Apple M4/macOS 27 host with isolated settings. Gameplay code is unchanged;
   final clean release validation follows after integration.
+
+- **v0.5.2 input self-test (2026-11-06,9b6db3ee / PR517):** Implemented, native
+  Mac acceptance pending. The shared SDL self-test in `src/native/input_sdl.c`
+  exercises mouse capture with click/Escape after F1 became optional Developer
+  Tools access. Only synthetic self-test events change; production capture and
+  shortcut handling retain their existing shared behavior. Linux x64 input,
+  menu-pointer, focus and virtual-pad checks pass after the correction. Mac
+  uses the same test and needs no adapter change; run its native `--test`
+  input checks on the final release revision. Physical mouse capture and
+  gameplay remain separate acceptance. See [STATUS](STATUS.md).
 
 - **v0.3.3 input self-test (2026-10-25):** The shared keyboard profile parser
   deliberately keeps two bindings per action. The synthetic SDL test now checks
@@ -1546,6 +2131,32 @@ before checking release, matching the existing asynchronous settings contract.
 - **Mac implementation and evidence:** Existing implementation unchanged. In the final bounded run, paused Options opened Display Settings, previewed 2560x1440, displayed the countdown and automatically restored 1920x1080 after 15 seconds. The isolated saved mode remained 1920x1080, and the run returned to visible first-mission gameplay. Apply/Keep/reopen and explicit Revert remain pending. [Validation and evidence](STATUS.md#mac-backlog-renderer-camera-and-prompts-2026-10-15).
 
 ### MAC-011 — Real texture-pack gameplay coverage
+
+- **2026-11-01 original-based 2x production (uncommitted, issue #74):** shared
+  `tools/textures/texture-upscale-originals.py` adds local model inference and
+  DDS production from verified original game payloads. Alpha, dimensions,
+  provenance, budgets and conservative specialist/data routing are shared.
+  Synthetic contracts are in `tests/textures/test_texture_upscale_originals.py`.
+  Windows completed/activated 6,648 original-based 2x pairs with 131 targeted tests,
+  native parser/alpha/hash audits and selected offline comparisons. 164 icons
+  were initially retained. The user's later approval adds all 164 faithful 2x
+  icons to the active and installed Windows pack (6,812 total pairs), with native
+  parser/alpha/hash checks and unchanged prior-file/settings hashes. Explicit
+  policy approval makes future generation reproducible. Mac execution and
+  in-game icon acceptance remain unverified. One stationary bot-free Hotel on/off view is now captured
+  on Windows (85 replacement keys loaded); broad scene validation remains
+  pending. A separate sixteen-key 4x Hotel preview also passes Windows offline
+  and runtime dimension checks; its 1080p visual gain is subtle and the active
+  pack remains 2x. See the Hotel capture/preview entries in STATUS. Local activation uses
+  shared logic with a Windows installation/process adapter. Mac model execution
+  and real-scene rendering remain unverified. The optional launcher install
+  currently targets the Windows `.exe` layout; Mac needs app-layout/process
+  adapter acceptance before using that installation option. No new renderer adapter is needed
+  for common RGBA8/DXT1 DDS; legacy GL RGBA limitations remain unchanged.
+  **Awaiting validation:** run synthetic tests on Mac, supply a compatible local
+  ncnn executable, verify deterministic non-AI paths and representative common
+  renderer scenes, alpha and residency. Do not infer Mac validation from PC.
+
 
 - Classic request deferral (commit carrying this entry): `src/textures/texture_pack.c`
   and `src/native/gl_texture_pack.inc` leave new replacements unrequested until
@@ -2255,6 +2866,366 @@ validation. This version bump alone is not publication evidence.
 
 ### MAC-013 — System Link and Online multiplayer
 
+- **Story flag version ownership repair (2026-11-01, PR #451 / 7ebf2082):** Shared
+  menu code now calls the diagnostics-owned `pc_build_version()` used by the
+  watermark, rather than reading a private definition from another build
+  target. The provider is compiled on both hosts; no native adapter is needed.
+  Separate-unit menu/provider tests exercise both display variants, including
+  conflicting private definitions. Windows real linked build tests verify
+  stable/preview state. Native runtime/launcher CI passed on both hosts; physical menu acceptance remains distinct;
+  native Story transport is still pending. See STATUS for actual results.
+
+- **Story release flag (2026-11-01, uncommitted):** The chooser now uses the
+  shared compiled version policy in `src/interface/pc_feature_flags.h`,
+  `src/network/pc_story_menu.inc` and `src/interface/pc_display_menu.c`.
+  Only versions containing `story-coop` expose Local/Online; stable versions
+  retain original Story entry. No additional Mac adapter is needed for this
+  policy: both CMake paths already inject `TSFP_PC_VERSION`. Windows and native
+  display fixture variants pass the six-version matrix. Physical native menu
+  acceptance and the existing native Story transport gap remain unverified.
+
+- **Story cinematic staging and timing (2026-11-01, this change):**
+  `src/network/pc_story_cinematic.inc` extends first-mission cinematic snapshots
+  with numeric destinations for all guests, active anchor refresh, preparation
+  movement lock with explicit camera-end authority, all-human host cue capture
+  and active-only placement through original D2DE0
+  and shared spatial refresh. Windows fixtures cover slots1/2/3, camera cue
+  deduplication, release/no reteleport, checksum/mask/finite and rejoin guards.
+  Windows build and57 affected checks pass. Human testing accepts all-player
+  transport and the early marine stop; a brief extra guest freeze afterward
+  persists and was explicitly deferred by the user.
+  The existing Windows Story gate remains: native Story transport integration,
+  physical Mac/mixed-host positioning, ground clearance and scene acceptance
+  remain pending. Reuse the shared guest-memory policy and guest APIs.
+
+- **Story barricade presentation (2026-10-31, uncommitted):**
+  `src/network/pc_story_effects.inc` replays the original pair of profile18
+  cosmetic explosions, and `pc_story_world.inc` restores the recorded local
+  static1345/tag47525442 replacement for1344/tag47525452 cleanup. Windows original-callback
+  and protocol fixtures cover emitters, deduplication and no guest damage/script
+  pass. These remain in the existing Windows Story adapter; native transport
+  integration and physical Mac/mixed-host barricade/debris acceptance are pending.
+  Reuse the same guest APIs and numeric transform policy when wiring native Story.
+
+- **Story falling-bomb feedback (2026-10-31, uncommitted):**
+  `src/network/pc_story_effects.inc` now replays the original distance-sensitive
+  camera shake and impact feedback after host profile39 explosions. The current
+  Story adapter remains Windows-gated; native Story transport/context integration
+  is still required. Reuse this guest-memory policy and original guest routines,
+  without a second host-specific implementation. Windows original-routine and
+  network-event tests cover the fix; physical Mac/mixed-host visual acceptance
+  must verify nearby/distant bombs and all guest slots once native Story is wired.
+
+- **Four-player Story rewards (2026-10-31, uncommitted):** Shared menu adapter
+  and patch2465 map the single rewards frontend context independently of network
+  profile slots. Windows engine fixture covers all guests; native fallback
+  retains original behavior. Native Story integration and physical Mac/mixed-host
+  visual reward acceptance remain pending under this entry.
+
+- **NPC facing (2026-10-31, uncommitted):** Shared
+  `pc_network_bot_motion.h` interpolates body rotations/heading in degrees.
+  Windows/native-network dispatch fixtures cover the same helper, and no OS
+  adapter is needed. Physical Mac/mixed-host visual acceptance remains pending:
+  compare NPC facing during turns and0/360 crossings, with animation/corpse checks.
+
+- **Online bot animation cadence (2026-10-31, uncommitted):** Shared
+  `pc_network_bots_guest.inc` publishes complete poses each simulation tick,
+  including crossfades/death, without advancing guest AI or changing human
+  replication. Windows/native-network dispatch fixtures cover cadence and
+  duplicate suppression; no new Mac adapter is required. Physical Mac/mixed-host
+  visual acceptance remains pending: compare guest running, aiming, crossfades
+  and death animations, including loss/jitter and corpse retention.
+
+
+- **Online bot corpse follow-up (2026-10-31, uncommitted):** Shared
+  `pc_network_bots_guest.inc`, `pc_character_corpses.inc` and menu bridge reuse
+  Story corpse copying for guest death/absence/respawn. Windows and native-network
+  fixtures cover deduplication; no additional Mac adapter is needed because
+  TSFP_NATIVE_NETWORK uses the same bridge and pre-destruction A9070 adapter.
+  Physical Mac/mixed-host acceptance
+  remains pending: kill a bot, retain its cosmetic body through respawn, repeat
+  deaths to exercise bounded recycling, then change map and check cleanup.
+
+Story guest lobby host loss (2026-10-31, uncommitted): shared patch2460/menu
+adapter returns the guest directly to main when its host closes the lobby and
+reuses the chooser Back's main-layout rebuild. Reopening Story also rebuilds
+its own cached Local/Online child using the same shared helper. Existing native Online Story
+transport integration remains the missing capability; no separate menu policy
+is needed. Accept host lobby Back, automatic guest main layout and subsequent
+reconnect/discovery on native Mac. Windows evidence is recorded in STATUS.
+
+Story Game Over Quit (2026-10-31, uncommitted): shared result-action handling
+routes failed first-mission Quit through the existing leave flow, retaining the
+host party or disconnecting only the guest. Existing2390 wrapper covers the
+native callback; no additional platform policy is needed. Native live Online
+acceptance still requires host/guest Game Over Quit and a retained-lobby relaunch.
+Windows validation is recorded in STATUS.
+
+Story rejoin camera/weapon lifetime (2026-10-31, uncommitted): shared cinematic
+and world adapters reconcile a missed camera-end transition and exclude native
+first-person viewport models from persistent prop identities. Original camera
+and cleanup routines remain; no separate platform policy is introduced. Native
+Online transport and immediate rejoin/host weapon-switch model visibility remain
+acceptance checks under this entry. Windows evidence is in STATUS.
+
+Story in-progress rejoin follow-up (2026-10-31, uncommitted): shared Story
+load/NPC/restart adapters accept the native phase12 received-config boundary,
+adopt the host reload epoch via a peer/config/nonce-bound reliable reply and
+spawn near its current position through original safe pad placement. Subsequent
+reloads clear the temporary pad. No second platform policy is needed; native
+transport integration and live leave/rejoin, movement, checkpoint/level reload
+acceptance remain pending. Windows validation is recorded in STATUS.
+
+Story guest-departure follow-up (2026-10-31, uncommitted): patch2450 and the shared
+Story load adapter distinguish remote departure from coupled Story death, retire
+the departed context, reconcile directly restored checkpoint/level bodies and
+exclude inactive remote slots from restart/payload readiness. Existing Story platform scope remains. Windows checks do not prove
+native live transport: accept guest departure while remaining players continue,
+restart without ghost bodies and unchanged real combat deaths on Mac.
+
+Story abort follow-up (2026-10-30, uncommitted): shared menu lookup and
+src/network/pc_story_restart.inc plus patch2440 route host Leave to the retained
+lobby and guest Leave/host loss to main, skipping campaign rewards. Existing
+Story platform guards remain; no second OS implementation is added. Windows
+fixtures do not establish native Online behavior. Native acceptance must cover
+host abort/relaunch, guest departure with remaining game active, host transport
+loss, local rewards unchanged and companion cleanup.
+
+
+Cinematic send-gate follow-up (uncommitted): pc_network_guest_tick is shared by
+Windows and TSFP_NATIVE_NETWORK. It retains control/heartbeat pumping while
+holding gameplay inventory/ammo sends during movies/frontend. Host-independent
+native cadence fixtures pass; real native Online cinematic/next-load acceptance
+is still required. No new OS adapter or separate Mac policy is needed.
+
+Unlock-page follow-up (uncommitted): shared preparation handles actual frontend
+GO2D3980 once, and shared menu adapters render a guest waiting page instead
+of empty unlock pages. Native Story must validate the same GO/generation and
+waiting-page contracts, then the next authored load; Windows fixtures alone do
+not verify native/mixed-host gameplay.
+
+Movie lifetime follow-up (uncommitted): shared patch2410 retains a guest movie
+stream during the host wait at99BBC; actual load cleanup remains original.
+The original-engine fixture is Windows evidence only. Native Story must also
+validate guest skip/end, retained presentation and cleanup on the next load.
+
+First-mission rewards follow-up (2026-10-30, uncommitted): shared Story stage,
+ready and result adapters in src/network preserve the party and host-only next
+level action; shared menu lookup in src/interface routes the guest Continue.
+Existing Story Windows transport guards remain, and native Local/Arcade guards
+are preserved. Original-engine and native-enabled/fallback fixtures are Windows
+validation only. Native Story acceptance must cover ending/rewards, guest wait,
+host progression to the next mission and retained party ownership; no new OS
+adapter is introduced here and no native Mac gameplay result is claimed.
+
+
+Main integration (2026-10-30, uncommitted): native System Link/Online adapter
+support from main is retained alongside the first-mission Story Windows guards.
+Story sources and shared pose/effect records now use src/network; main's native
+enabled/fallback dispatch tests remain. The Story/Unlock Content callback clash
+is resolved with separate verified padding IDs. Native Mac gameplay and Story
+transport acceptance remain unverified; Windows checks do not establish them.
+
+
+Splitter camouflage (included in this change): shared numeric body-fade state and original
+material presentation are reused for Story NPCs and Online bots. Source:
+src/pc_character_effects.h, pc_story_npc.inc, pc_network_bots_guest.inc,
+pc_network_bots_state.h, pc_network_bot_motion.h and pc_display_menu.c. No new
+OS adapter is needed within the existing transport; native Online remains queued.
+Mac acceptance must show host/guest Splitter fade/shimmer and uncloaking, retained
+weapon/room/corpse behavior and Online bot fade transitions without guest AI.
+Windows fixture/build evidence is separate from native Mac gameplay validation.
+
+
+Barrel follow-up (included in this change): shared Story source now recognizes the recorded
+218650 blast and scopes host ownership for its remote credited source, preserving
+original hit broadcasts and NPC health dispatch. New EFF90/35AF40 wrappers join
+the cosmetic guards in the common patch stack; no OS-specific policy is added.
+Native Online remains queued; Mac acceptance must include guest-shot barrel
+fireball visibility and authoritative enemy blast damage without duplicates.
+
+
+- **Barrel explosion cosmetics (2026-10-28, uncommitted):** Shared
+  `src/pc_story_effects.inc` and `*-story-barrel-cosmetics.patch` replay the
+  original first-mission barrel particles/audio/camera feedback while suppressing
+  duplicate damage/Story events/navigation mutation. Original-engine and
+  native-fallback fixtures cover the adapter boundary; native Online still
+  requires this entry's transport adapter. Acceptance: native/mixed-peer host
+  and guest shots, one visible/audible blast, host-only damage/removal and no
+  repeated chain reactions. Windows evidence does not establish native play.
+
+
+- First-mission NPC/objective/pause repairs (uncommitted, 2026-10-26): shared
+  `pc_story_npc.inc` constructs replicas in their host room coordinates, uses
+  resolved variants, rebuilds reused generations and publishes every simulation
+  tick. `pc_story_objectives.inc` supplies host objective Status/HUD data without
+  copying VM callbacks. `pc_story_restart.inc` scopes compact pause metrics to
+  Story Options. Windows source/build and bounded startup evidence is recorded
+  in STATUS; opening visibility, guest Status and pause bounds are reviewed.
+  Checkpoint/sniper and intermittent NPC scene acceptance remain unverified.
+  The additional checkpoint, cinematic and effects adapters use shared source
+  (`pc_story_checkpoint.inc`, `pc_story_cinematic.inc`, `pc_story_effects.inc`)
+  and separate runtime patches. Native adapters need the same typed packets,
+  owned-view camera replay and local bookmark capture; no pointer transfer.
+  Native fallbacks retain original behavior. The remaining native XNet/session
+  adapter is still required before native/mixed-peer acceptance of NPC visibility,
+  animation, objectives and pause layout; Windows results do not establish it.
+
+- First-mission Story level restart (uncommitted, 2026-10-26): shared
+  pc_story_restart.inc and the separate restart patch coordinate the original
+  level reload and isolate NPC/loadout epochs. Source tests pass on Windows;
+  Windows four-peer reload/fresh-handoff validation passed (see STATUS).
+  Native fallback remains unchanged; Online still
+  needs this entry's XNet transport/session adapter. Validate host confirmation,
+  every peer reloading, fresh handoff and late old-packet rejection on native
+  and mixed hosts. Checkpoint acceptance is tracked with the newer repairs above.
+- Story guest damage authority (uncommitted, 2026-10-26): shared damage
+  dispatch suppresses replica health/death simulation before tracing and sends
+  owned-human hits through the original reliable sender. Source checks and
+  changed Windows runtime acceptance are tracked in STATUS. Native fallback
+  stays original; validate via the MAC-013 transport adapter on native/mixed
+  peers, including death and late snapshot handling.
+- Story initialization team correction (uncommitted, 2026-10-26): the shared
+  D7570 return adapter immediately normalizes completed human bodies, preserving
+  NPC/native/Arcade fallback. A new four-peer startup exposed teams2/4 after the
+  older frame-only correction. Source fixtures and changed Windows four-peer
+  startup/reload team checks pass; native/mixed-host acceptance remains pending
+  under MAC-013.
+- Shared Story human teams (uncommitted): `pc_story_load.inc` and the separate
+  human-teams patch plus existing frame adapter preserve original Story team1
+  when the ordinary network pump or remote-body initializer reapplies Arcade teams. The scoped original setter still runs; NPC/lobby/native
+  fallback is unchanged. Windows source checks and four-peer team acceptance
+  pass; native acceptance is pending. Reuse the shared policy after native transport and verify human
+  allegiance/AI targeting and original Arcade/Local behavior on Mac.
+
+- Story handoff authority (uncommitted): shared `pc_story_loadout.inc` and the
+  separate handoff-authority patch keep first-level NPC inventory callbacks on
+  the host. Remote players receive deduplicated pistol/rifle awards through the
+  shared reliable channel, including original co-op slot1. Windows source tests
+  pass; changed runtime ammo parity is pending. Native original fallback remains
+  until transport exists; reuse this policy and verify replicated poses cannot
+  duplicate inventory or affect another player's profile after native support.
+
+- Story NPC poses (uncommitted): `src/pc_character_pose.h` and the common pose
+  renderer in `src/pc_display_menu.c` serve both bot and Story numeric snapshots.
+  SNP2 carries animation channels/bounds; existing shared guest hooks evaluate
+  replicas without a second simulation and retain local handles. Windows source
+  tests pass; live pose/hit validation is pending. Native original fallback is
+  retained until this entry's transport exists; reuse the shared implementation
+  and verify NPC animation, collision bounds and hits on Mac after that adapter.
+
+- Extra Story loadouts (uncommitted): `src/pc_story_loadout.inc` and the
+  `*-story-extra-loadout.patch` observe the authored first-level weapon handoff,
+  delivering its original inventory API calls to locally owned extra players
+  through the shared reliable Story protocol. Windows source checks and the
+  four-peer load/movement/ammo-consumption probe pass. Native original fallback is retained
+  until this entry's transport is implemented; reuse the policy and test four
+  peer ownership, replay/refill prevention and usable firearms on Mac afterward.
+
+- Story extra starts (uncommitted): `src/pc_story_load.inc` and the separate
+  `*-story-extra-starts.patch` add first-level slots2/3 through the common
+  pad lookup/tag/index adapters and original spawn wire. The Windows build,
+  source fixtures and historical Mac patch migration pass. The Windows four-peer
+  probe confirms distinct starts and bounded movement; extra loadouts remain
+  incomplete. Native adapters retain original behavior until this entry's
+  transport exists. Reuse the shared start policy after transport support,
+  then verify distinct collision-free starts and checkpoint preservation on Mac.
+
+- Story NPC creation (uncommitted): shared source and a separate patch extend
+  the original reliable NPC spawn channel with pointer-free constructor and
+  initial actor state. Guests validate host/generation and prepare replicas
+  through original game constructors; loading arrivals queue. Native fallback
+  remains original until this transport entry exists. Adapter tests run on
+  Windows; live NPC replication and Mac acceptance remain unverified.
+
+- Story NPC activity (uncommitted): shared source accepts existing non-player
+  actors only at the original actor-update activity caller, preserving the later
+  host-authority check. Native fallback remains original; reuse this shared
+  policy after transport support, then validate first-level scripts/NPCs and
+  peer interactions on Mac. Windows runtime acceptance is pending.
+
+- Authored Story eligibility (uncommitted): the shared6B100 adapter selects
+  authored co-op records for three/four humans and removes their ordinary network
+  exclusion while preserving difficulty filters. Native fallback stays inert;
+  reuse this policy after native transport exists. Original-US/source tests run
+  on Windows; native four-peer NPC/script/start acceptance remains pending.
+
+- Story continuation (uncommitted): guest intro handoff accepts the original
+  changed-generation pending-copy boundary at phase15; pending Story gameplay
+  skips Arcade staging-pad placement during ready. Both are shared adapter logic
+  in `src/pc_story_load.inc`, with unchanged inert native fallback. Windows source
+  checks pass; native runtime acceptance still requires this entry's transport
+  adapter and four-peer intro/authored-start tests on Mac.
+
+- **Story cinematic transport readiness (uncommitted, 2026-10-22):**
+  The shared load adapter and cinematic-ready patch invoke the stock network
+  ready exchange without its gameplay body loop, restoring cinematic flags and
+  character count after the call. Original-US and adapter fixtures verify that
+  boundary. Native Online remains queued under this entry; reuse the same policy
+  after transport support. Four-peer movie stability, duplicate-free views and
+  reliable gameplay handoff remain runtime acceptance requirements on each host.
+
+- **Story intro handshake (uncommitted, 2026-10-22):** Shared
+  `src/pc_story_load.inc` and the separate intro-transition patch retain original
+  stage0 movie construction and host-only advance through reliable start packets.
+  Native transport/session-mode support is still absent under MAC-013; reuse
+  these guest policies after that adapter exists. Source tests cover authority/
+  stage metadata; fresh Windows and native/mixed-host movie, full-view and
+  coordinated next-load acceptance remain pending.
+
+- **Story startup/character roster (uncommitted, 2026-10-22):**
+  `src/pc_story_load.inc` selects the original gameplay factory stage for direct
+  loads and preserves Story NPC membership at Arcade's network-only prune
+  callsite through a separate reproducible patch. It retains original death/
+  script removals. Native Online remains blocked on this entry's transport/
+  session adapter; inert fallback uses the original code. Windows runtime and
+  native/mixed-host NPC, startup and world-authority acceptance remain pending.
+
+- **Revised Story header (uncommitted, 2026-10-22):** Shared
+  `src/pc_story_lobby.inc` adds localized year, selected difficulty and actual
+  population to the existing Story header callback. Native Online still needs
+  the MAC-013 XNet/session-mode adapter before this callback is reachable; no
+  separate Mac menu model is required. Asset-free checks cover scoped font and
+  stack restoration. Native and mixed-host visual/runtime acceptance is pending.
+
+
+- **Story load experiment (uncommitted, 2026-10-22):** Shared
+  `src/pc_story_load.inc` and existing guest config wrappers add an opt-in Windows
+  Story pending-load experiment, with native fallback inert. Both simulation
+  integration and the paired load/movement probe still await Windows runtime
+  validation; this does not establish Story world/script synchronization. Native
+  Online lacks XNet transport and typed session mode, so this cannot be activated
+  by common guest logic alone. Adapt those host capabilities, reuse the same
+  config model, then validate native and mixed-host Story load, independent views,
+  movement/interactions, lobby authority and next-level coordination with isolated
+  profiles. Asset-free Windows/native-fallback tests do not verify native gameplay.
+
+- **Online Story host controls (uncommitted, 2026-10-22):**
+  `src/pc_story_lobby.inc` adds host Options and own Player Progress routing,
+  plus difficulty confirmation without local-game launch, through the shared
+  guest menu dispatcher. This currently requires the Windows-only online mode
+  adapter. Native transport remains queued; remove that adapter boundary when
+  MAC-013 supplies session mode, then run native host/guest navigation and
+  two-instance Story acceptance. Windows callback tests pass; no live validation
+  of this new host-control slice has been performed on either platform.
+
+- **Story/main merge (2026-10-23, uncommitted on online-story-coop):**
+  Shared Story callbacks move to verified unused 0x1237b..0x1237e so main's
+  keyboard callbacks and drive selection coexist. No new host API is needed;
+  native Online transport and live acceptance remain queued under this entry.
+  Windows/native-fallback fixtures cover source behavior; Mac execution remains
+  unverified. Reuse the existing native Story/menu and mixed-peer acceptance above.
+
+- **Online Story entry (uncommitted, 2026-10-21):** Shared
+  `src/pc_story_menu.inc` supplies Local/Online after Story; Local retains the
+  original guest descriptor. Windows `pc_online.c` supplies the typed Story
+  companion connection. The native chooser reports Online unavailable because
+  the XNet/companion transport adapter remains queued here; no duplicate Story
+  policy is intended. Shared/native-fallback callback tests cover this boundary;
+  actual native menu navigation and two-instance Story play remain unverified.
+  Remaining acceptance includes the native transport adapter, shared Story lobby
+  and coordinated loading/gameplay; a Windows build cannot establish this.
+
 - **Layout convergence (PR432, 2026-10-30):** The shared browser ignores repeated
   geometry notifications once content dimensions, background and scrollbar
   visibility are unchanged. Windows real-widget tests pass11; physical Mac
@@ -2468,6 +3439,24 @@ validation. This version bump alone is not publication evidence.
 
 ### MAC-018 — Story audio timing, queue retry and ADPCM resume (issue #8)
 
+- **PR433 exit/stress follow-up (2026-10-31):** Shared HLE and both adapters
+  emit normal-exit health counters; shutdown is idempotent. Native SDL already
+  exits through CRT cleanup; Windows WM_QUIT and shadow-window HostExit now do
+  too (real isolated Windows close verified). The combined fixture
+  links real HLE with each real adapter and runs 32 pause/loss/release/recovery
+  teardown rounds per beta mode. Windows fixture execution passes. Native Mac
+  CI and hardware listening remain separate acceptance evidence; see STATUS.
+
+- **Final buffer Release/diagnostics follow-up (2026-10-31, fix/audio-release-diagnostics):**
+  Shared patch 2300 preserves original guest refcounts/destruction and retires
+  host effects slots on final release, with reentrant reuse protection.
+  Shared health reports distinguish pool exhaustion, starvation episodes and
+  refused attempts; XAudio/SDL supply lifetime failure/recovery counters.
+  Windows deterministic audio tests pass (92 tests, one opt-in device skip).
+  Existing dual-host CI suites include the new cases. Native Mac execution and
+  long-session/headset listening remain pending; no second policy adapter is
+  required. See audio-buffers.md and STATUS.md for scope/evidence.
+
 - **Main/beta integration (2026-10-30):** The prior local fixes, preserved in
   `c61f77e4`, now apply after beta audio as patches 0055-0058. Recovery is always
   enabled. XAudio and SDL adapter doubles pass enhanced-on/off recovery and
@@ -2620,6 +3609,16 @@ validation. This version bump alone is not publication evidence.
   60/120 FPS. Mac compilation, GPU execution and other-device sync are unverified.
 
 ### MAC-021 — Published-release launcher and pre-game settings
+
+- **Story co-op beta track alias (2026-11-01, PR #444 / a7da87b9):** Shared
+  `tools/launcher/ReleaseClient.cs` groups `story-coop-beta` into `story-coop`
+  after validating the original tag/metadata identity, and migrates saved track
+  choices without changing unrelated preferences. Both launchers already use
+  this policy; no Mac adapter is needed. The shared UI fixture covers catalog,
+  metadata, installed-version and preference behavior on both hosts. Windows
+  build/tests and native launcher CI passed; physical Mac selector
+  validation remains pending. Publication belongs to another user; see
+  [handoff](../release/story-coop-beta-handoff.md).
 
 - **PR #390 malformed-metadata recovery:** All 28 hosted shared UI groups passed
   after notification repair. Packaged repair then exposed a native JSON exception
@@ -4239,6 +5238,18 @@ Windows loopback evidence in `docs/project/STATUS.md` does not establish native 
   and a source checkout, then reuse existing loader evidence. Actual Mac texture
   scene fidelity remains under MAC-011 and the near-completion playtest policy.
 ### MAC-060 — Native fractional updates at 60/120/144 FPS
+
+2026-11-05 projectile follow-up (`fix/flare-projectile-timing`, patch2605,
+code3b9a4540): **Awaiting validation.** Shared numeric/projectile headers repair
+moving-family gates, flare step/look-ahead/velocity, vector drag, scripted
+steering and RNG cadence; the54-entry audit includes tank weapon59 / kind51.
+No host adapter or Windows guard is added. Windows original-code timing140 and
+patch/repository82 checks pass; paired live flare travel/impact now matches60 Hz
+at the180 target. The supported local build and its seven active compiler
+exceptions are recorded in STATUS. Shared Windows/Mac checks and patch upgrades,
+and Linux foundation CI pass. Live tank firing and native Mac/Linux private-game
+acceptance remain pending; check distance/speed, steering, gravity, impact/expiry,
+pause, trails and reused slots at the native presets.
 
 - Handheld minigun spin (2026-10-30, fix/handheld-minigun-native-fps): shared
   src/gameplay/pc_native_minigun_guest.h, pc_native_numeric.h and patch 2140
@@ -6661,6 +7672,62 @@ Copy this template for each new entry and add its queue row. Replace all placeho
 - **Mac implementation and evidence:** Commit/files, host checks and a link to
   the relevant `STATUS.md` validation record; pending until performed.
 
+MAC-013 follow-up (uncommitted): Story shot events, deferred checkpoint inventory,
+NPC retirement/hit encoding/death authority and completion staging are implemented
+in the shared Windows guest adapter. Targetless bot shots and gameplay payload
+lifetime also improve the existing Online modes. Mac Online transport/adapter
+work and native runtime validation remain required under MAC-013; portable fixture
+fallback checks do not establish native Mac multiplayer support.
+
+MAC-013 revised HANDLE FIRST continuation (after8ed77577, uncommitted): present
+corpses remain after roster removal, current bounds precede room queries, and
+opening weapons validate their original hand-record ownership. Windows/native
+fallback fixtures pass. No new host API or separate Mac logic is needed; Online
+runtime acceptance still depends on MAC-013 transport and native scene testing.
+The subsequent six-bug pass adds pre-A0130 replica visibility eligibility,
+owned held-model cleanup. The mode3 lifetime extension was superseded: it
+persisted into play and is now released when the opening pistol is equipped.
+Built-in model-free shot replay is shared with Arcade; it needs no separate Mac
+policy. Source/fallback fixtures are distinct from native Online/scene acceptance.
+The user-guided follow-up adds the shared A2430 replica portal-scissor adapter,
+dormant guest body collision suppression, aligned remote opening pads and
+non-draining ammo pickups (uncommitted). No additional OS adapter policy; native
+Online still needs transport and these scene acceptance checks under MAC-013.
+
+MAC-013 preview1 HANDLE FIRST follow-up (8ed77577): shared guest adapters now
+cover NPC interleaved packet assembly/loaded-mesh reconstruction, numeric cloak
+state, dialogue/lip clocks, attached opening visibility, inset camera cues,
+stable prop hit/removal identity and local blood-decal creation. Host result
+reloads preserve transport; guests cannot independently continue/restart. The
+signed16 pickup clamp also applies to existing PC Online modes. Native fallback
+retains original calls and fixtures; no second gameplay implementation is needed.
+Mac still requires the transport adapter and isolated native multiplayer validation
+of these behaviors, including WAN speech and completion/restarts. Windows evidence
+and remaining limits are recorded in STATUS.md; native support is not verified.
+
+MAC-013 revised four-bug continuation (after8ed77577, uncommitted): shared NPC
+refresh follows original movement cache invalidation, benefiting Online bots.
+The Story clip adapter preserves real room/portal state; the full-viewport
+workaround is superseded. Incoming Story weapon drops use their wire inventory
+through the scoped C2090 adapter, with native/non-Story fallbacks preserved.
+Opening mode3 no longer extends pose suppression after pistol handoff. Windows
+original-engine fixtures cover these contracts; native transport and gameplay
+acceptance remain queued under MAC-013. No duplicated Mac policy is introduced.
+
+MAC-013 corpse-only fix (after8ed77577, uncommitted): the shared Story replica
+retirement path now copies a final dead pose into the stock cosmetic corpse ring
+before freeing the NPC actor. It retains local model/bone ownership and original
+ring limits, and suppresses duplicate Story callbacks. No new OS adapter or wire
+contract is added. Windows native/original-engine lifecycle fixtures pass; native
+Mac Online transport and rendered corpse acceptance remain queued under MAC-013.
+
+MAC-013 NPC weapon-drop continuation (after8ed77577, uncommitted): shared Story
+source snapshots original completed NPC pickups and replicates numeric creation,
+throw/landing positions, exact ammo and removal in the first mission. Guests use
+the original item constructor and host runtime ID for pickup requests. No new OS
+adapter is introduced; current native transport remains queued. Windows state/
+original-constructor/corpse fixtures pass; Mac transport and real pickup scene
+acceptance remain unverified. Stock non-Story/human drop routes are preserved.
 
 ### MAC-092 - Independent x87 emission
 
@@ -8051,6 +9118,91 @@ on1c72cbf4 with protected26/fixture intact. PR413 externally merged into main
 Keep Awaiting validation for remaining runtime replacement and native Mac title
 acceptance; exact scope/counts/hashes/limits in STATUS stage0240 completed record.
 
+MAC-013 movie score snapshots (2026-10-30, uncommitted): shared network2415 and
+pc_network_guest_scores reject gameplay-only3578A0 snapshots during movie or
+frontend scenes, preventing Story NPC ranking overflow into the movie stream.
+Windows and native-network/fallback fixtures cover this shared boundary; no new
+Mac adapter is needed. Mac live Story/Online transitions remain Awaiting
+validation; Windows reproduction/build checks do not establish Mac acceptance.
+
+MAC-013 guest Story rewards (2026-10-30, uncommitted): existing shared Story
+source records a validated host completion in the guest's own loaded profile
+and retains original unlock pages before waiting. Patch2420 catches both A and
+the original timer's page callback. Windows Story scope is unchanged; native
+Local/Arcade uses the original callback. Shared engine/fallback fixtures cover
+the routing; native Online Story adapter/scene acceptance remains Awaiting
+validation. No separate profile model or copied host save is introduced.
+
+MAC-013 guest reward save view (2026-10-30, uncommitted): patch2425 temporarily
+maps the guest's network profile bodies to persistent profile-ID order during
+original1922D0. It retains checksum/signature validation and restores network
+ownership afterward. The engine fixture checks original accessors/metadata and
+aggregate restoration. Existing Windows Story guard is retained; native original
+save behavior is unchanged and Online Story acceptance remains queued.
+
+MAC-013 empty guest reward entry (2026-10-30, uncommitted): shared patch2430
+wraps original79860 so the existing Windows first-mission Story adapter routes
+zero-unlock rewards106 away from the stock loading descriptor to its wait panel.
+The actual unlock count/save/transport paths remain original. Native fallback
+keeps the original factory; native Online Story acceptance remains Awaiting
+validation under MAC-013. Windows engine checks cover positive/empty and original
+host/offline routes; no new OS adapter or duplicate profile policy is introduced.
+
+MAC-013 Online reward baseline parity (2026-10-30, uncommitted): remove the
+Windows Story guest-only2CB210 snapshot; the original Online host also skips
+it. Keep own-profile selection/completion and shared original reward pages,
+save view and final wait. Engine tests cover already-completed local profiles
+without copying the host. No new OS adapter; native original fallback remains
+unchanged and native Online Story acceptance remains Awaiting validation.
+
+MAC-013 Story browser level details (2026-10-30, uncommitted): shared patch2435
+and [pc_story_browser.inc](../../src/network/pc_story_browser.inc) wrap
+1CBDA0/2BECE0 to use advertised Story scene metadata for the original
+thumbnail and localized level name in Matches Available. The existing Windows
+Story adapter guard remains; native fallback retains its original draws. No
+duplicate native metadata/UI model is introduced. Native Online Story acceptance
+remains Awaiting validation. Engine policy/fallback checks cover the ABI and
+restoration. Windows browser-only live captures verify Time to Split and a
+changed Scotland selection; native live validation remains pending.
+
+MAC-013 Story Online frontend Back (2026-10-30, uncommitted):
+[src/network/pc_story_menu.inc](../../src/network/pc_story_menu.inc) scopes original
+browser/host/guest Back callbacks and the existing factory wrapper in
+[pc_story_restart.inc](../../src/network/pc_story_restart.inc) returns them to the
+Story chooser while preserving original callback cleanup and closing the peer's
+companion. Shared guest-menu logic stays in one adapter; native Local remains
+unchanged. Native Online Story is still Awaiting validation under MAC-013; its
+remaining transport entry is a prerequisite for these live Back acceptance checks.
+Windows and native-fallback fixture results do not establish native live support.
+
+MAC-013 Story Back lifecycle follow-up (2026-10-30, uncommitted): the shared
+Story adapter rebuilds the returned main record with original78980 in its own
+layout context after Back, validating parent/child and captured descriptor.
+The existing Windows Online adapter also runs the original1CC360 guest-network
+reset before closing its companion, required for recreated match discovery.
+No new OS adapter is introduced. Native shared Local menu rebuild is covered
+by the fallback fixture; native Online recreation remains Awaiting validation.
+
+
+MAC-013 authored barrel-effects follow-up (2026-10-30, uncommitted):
+[src/network/pc_story_effects.inc](../../src/network/pc_story_effects.inc) preserves
+first-mission barrel profiles40/47 and direction, allowing the original EDD40
+four-emitter/scaling/audio/camera branch on guests while retaining cosmetic
+no-damage guards. Windows build and original-US routine tests pass; the user
+confirmed restored effects in Windows gameplay. Ordinary Online keeps original
+profiles. No new OS adapter or duplicate native policy is needed; this existing
+Story Online transport path remains Awaiting validation on Mac. Native fallback
+compiles in the shared fixture; that does not establish native Online playback.
+
+MAC-013 game 0.4.1 release-link repair (2026-11-01, uncommitted): the actual
+Apple Silicon build exposed missing mode/lobby exports after Story integration.
+`online_macos.m` tracks accepted Arcade mode, clears it on disconnect and rejects
+unsupported Story requests. `pc_story_lobby.inc` supplies inactive native lobby
+exports for shared guest dispatch. This preserves existing Arcade support without
+claiming native Story transport. Native fallback fixture and real supervisor
+mode-state acceptance were extended; fresh host build/package checks are pending.
+Native Story transport and physical mixed-host Story acceptance remain deferred.
+
 ## MAC-125 - Assault objective widescreen placement (#338) - Awaiting validation
 
 Patches2290/2291 and shared PcUiWorldAnchor fit a complete marker around its
@@ -8061,7 +9213,955 @@ checks pass. Local uncommitted source based on c511bd52. Native Mac acceptance:
 Assault Mars Prison Red, movement/turning, repeated/multiple markers, off-screen
 arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
 
-### MAC-126 — MapMaker capacity meter probe (debug instrumentation)
+
+MAC-013 replica arm/held-weapon pose follow-up (2026-10-31, uncommitted):
+shared PcCharacterPose now includes numeric arm clip IDs, mask, blend and aim
+frame; original local asset lookup and attachment updates are shared by Windows
+and TSFP_NATIVE_NETWORK. No additional OS adapter or copied native gameplay policy
+is required. Windows-hosted native-network engine fixtures cover the branch;
+physical Mac Story/Online and rendered weapon acceptance remain Awaiting validation.
+
+MAC-013 dropped-weapon cadence (2026-10-31, uncommitted): existing shared
+first-mission Story drop snapshots now publish changed transforms per simulation
+tick instead of every six ticks. Native Online Story transport remains the
+existing prerequisite; no OS-specific timing policy or second implementation
+was added. Native fallback compiles; physical Mac drop motion remains Awaiting
+validation. Windows build and cadence/lifecycle regressions pass; the user confirmed motion
+in Windows gameplay.
+
+
+MAC-013 guest physical state (2026-10-31, uncommitted on online-story-coop):
+common numeric rigid/ragdoll helpers now construct local rag groups and generated
+clips for Online bots; first-mission Story uses them in its existing Windows
+snapshot adapter. No new OS API or duplicated Mac gameplay logic is needed.
+Windows-hosted native-network fixtures pass; native Story transport remains its
+existing prerequisite. Physical Mac acceptance remains Awaiting validation:
+Splitter death/tumbling/contact poses, dropped weapon spin/bounce/pickup,
+respawn/checkpoint/rejoin and repeated deaths without leaked groups or crashes.
+
+MAC-013 ragdoll grounding follow-up (2026-10-31, uncommitted): shared guest
+ragdolls now pause local integration between host poses and bake their final
+corpse pose into a separate ring clip. Story/Online use the same corpse helper;
+no OS adapter or separate Mac policy is needed. Windows/native-network fixtures
+and original-engine activity-list/corpse-clip checks pass. Physical Mac remains
+Awaiting validation: Splitter floor contact, settled corpses, packet gaps, repeated
+deaths/NPC clip reuse and the unchanged dropped-weapon physics/pickup path.
+
+### MAC-127 - Complete launcher language packs
+
+- **Status:** Awaiting validation
+
+Source: [PR #436](https://github.com/TheDoffman/timesplitters-future-perfect-pc/pull/436),
+implementation commit 1d262bb0; GitHub host validation pending.
+
+Local uncommitted source on `feature/launcher-language-packs`, based on
+4c49f143. Shared GameSettings/SettingsPage save one en/fr/de/it/es language,
+pass TSFP_GAME_LANGUAGE and validate the selected imported pack. Shared platform
+patch 2310 answers individual and section EEPROM reads consistently so the
+original title selects complete language assets. Both build/package manifests
+advertise support; older games keep saved choices and reject unsupported launch.
+No separate audio/text controls or original-data changes. NativeHost already
+preserves the shared launch environment; no duplicate adapter is needed.
+
+Windows launcher build/full regressions, game Build action, production EEPROM
+contracts and translated supported-US pack selection pass; evidence is in
+[STATUS](STATUS.md#launcher-language-packs-2026-10-31). Native Mac build and shared
+UI execution remain unverified on this Windows host. Acceptance on native Mac:
+build/test/prerequisite checks, installed/development paths, all five language
+round trips and return to English, missing-pack/old-game errors, then a bounded
+isolated menu/cutscene/voice check. Listening and complete localized gameplay
+also remain unverified on Windows.
+
+MAC-127 follow-up (2026-11-01, local uncommitted): US-region startup skipped
+the language query in the initial implementation. Shared
+src/interface/pc_game_language_guest.h now scopes initialization/text-reset
+hooks through pc_native_numeric.h at both original/native rates. Five-routine
+original-XBE coverage exercises both region states; 12 language and14 production
+hook/scope cases pass. Windows full Build and bounded French/German menu sessions
+pass with unchanged US region. The repaired paired test runtime is language-test.2;
+user settings/profile hashes were preserved. Native Mac build/menu/voice and
+localized gameplay acceptance remains pending. See STATUS's US startup repair.
+
+MAC-127 PR436 review repair: native package manifests now forward language_packs
+from the native build to the installed top level. Three portable real-writer
+regressions cover enabled/disabled/absent flags; native host CI remains the gate.
+
+### MAC-129 - Optional SMAA anti-aliasing
+
+Release 0.5.0 preparation (2026-11-04): a real native build with reused dependencies
+could not find the current SMAA settings header. Additive2595 gives xbox_config
+the active TSFP_SHARED_SOURCE before its legacy dependency-relative path. The
+relocated-source CMake regression includes a stale-header negative control for
+Windows/native routes. The shader/settings behavior is unchanged; native build
+and scene validation remain separate, with fresh release build checks pending.
+
+- **Status:** Awaiting validation
+- **Source:** [PR #469](https://github.com/TheDoffman/timesplitters-future-perfect-pc/pull/469), initial implementation `fa75cb41`.
+
+Video click feedback (same local branch): shared `menu_video_click_sound` uses
+the original guest menu-switch sound for fresh Video setting-row/FOV-bar clicks.
+Native arrow feedback remains owned by the original dispatcher. No Mac adapter
+change is required; physical Mac audibility/input acceptance remains pending.
+See [Video contracts](../agent-context/video-options.md).
+
+In-game follow-up (2026-11-02, same local branch): the common Video Options
+frontend/pause selector now stages SMAA and saves the same runtime key on Apply.
+`src/graphics/pc_smaa_settings.h` publishes live after atomic persistence; the
+RHI renderer reads this shared model. Include Back/discard, resolution Keep/
+Revert, failed-save rollback and switching without restart in native acceptance.
+No separate Mac feature logic is needed; legacy GL still lacks the effect.
+
+2026-11-02, `feature/smaa-antialiasing` (PR #469): shared launcher
+`GameSettings.Smaa`/`SettingsPage` and patch `2470-smaa-antialiasing.patch` add
+default-Off SMAA 1x High through `src/graphics/pc_smaa.inc`. The common Vulkan
+frontend uses the same shader/lookup algorithm and resources as Windows D3D11;
+no separate Mac feature implementation is needed. The fallback legacy GL
+renderer lacks the RHI pass and retains but does not apply the saved key.
+Porting this effect to legacy GL is deferred because that adapter has a separate
+resource/shader pipeline; do not duplicate the common algorithm there.
+
+Acceptance: build native Mac Vulkan and launcher; confirm checkbox persistence,
+diagonal edges, HUD/menu text, 1080p/4K/ultrawide fit, window resize, Classic and
+Enhanced textures, Off and fallback; measure GPU cost and check validation logs.
+Windows pixel-fixture evidence is in [STATUS](STATUS.md); it does not establish
+native Mac scene fidelity or performance.
+
+### MAC-128 - Fresh weapon trigger timing (#434)
+
+- **Status:** Awaiting validation
+
+Shared patch2180 and pc_native_player_trigger_guest preserve already-eligible
+fresh requests when raw input and game ticks have different phases. Cooldowns,
+held fire and continuation calls remain original. Windows original-code tests
+cover680 short-click schedules through240FPS, including pause offsets; the
+asset-free64-case scope test is selected by the same runtime CI suite on Mac.
+On a Mac, build the full patch stack and test sci-fi handgun short clicks at
+Original60 and supported native120/180/240, before/after pause, reload and live
+rate changes. Verify one shot per eligible click and unchanged held-fire rate.
+Physical Mac build/gameplay is unverified on this Windows computer.
+
+
+Windows exFAT sparse fallback (2026-11-01): `guest_kernel_storage.c` now accepts
+unsupported Windows sparse marking with checked regular allocation. This is a
+Windows API adapter repair; shared geometry/ownership and native POSIX ftruncate
+are unchanged. No Mac port change is required. Physical exFAT gameplay on either
+host remains unverified; see STATUS and host-storage.md for injected Windows tests.
+
+System Link menu activation repair (2026-11-01, `fix-system-link-activation`): the shared
+`src/interface/pc_display_menu.c` now enables LAN on the original row's select
+event before its direct browser tail call. Windows and native Mac consume the
+same lookup/activation policy; no additional Mac adapter is required. Windows
+production-resolver and original-US callback regressions pass. Native Mac build
+and real two-machine LAN acceptance are pending; a loopback test with startup
+network overrides does not validate this path. See STATUS for Windows build evidence.
+
+
+Graphics settings cleanup (local, `feature/graphics-settings-cleanup`, base
+`627b05bd`): shared launcher/game now have one Off/FXAA/SMAA selector, separate
+MSAA and cache controls under Advanced, consistent AF labels and reorganized
+launcher General/View & HUD sections. Existing files are preserved; the common
+resolve prevents stacked FXAA/SMAA. No new host adapter is needed. Windows
+validation is in STATUS; native Mac/Linux UI and game acceptance remain pending.
+
+Optional graphics (uncommitted, feature/graphics-options): shared Video Options
+and launcher SettingsPage expose MSAA, FXAA, AF, half-size SSAO, shader caching,
+Clear Cache and FPS/Ping. Patches2495–2513 implement shared policy plus D3D11/
+Vulkan adapters; the native launcher compiles the same model and page. Windows
+build, WARP GPU fixtures, captured 1x/2x/4x/8x replay and one AO scene comparison
+pass. Native Mac compilation, Vulkan resolves/depth sampling, cache reuse and
+main/pause/launcher visual acceptance remain unverified. Legacy GL feature
+capability/fallback also needs native acceptance. Linux launcher integration and software Vulkan rendering passed in an isolated
+copy combined with feature/linux-launcher at 80239186. That platform branch is
+not merged here; physical Linux GPU gameplay remains unverified. See docs/development/graphics-options.md for exact evidence
+and outstanding requirements. No release or cross-device synchronization claimed.
+
+Legacy OpenGL compatibility: `src/native/graphics_preferences_gl.inc` now owns
+get/set/clear definitions for that renderer, which does not link d3d8_display.c.
+It preserves the shared saved choices and clears recognized title cache blobs.
+The in-game menu explicitly says graphics effects require Vulkan on this path.
+A standalone adapter test passes on Windows and Ubuntu WSL, including legacy AF
+migration, saving/reloading all effect choices and absent-cache clearing. This
+prevents a new missing-symbol regression; it does not implement these effects
+on legacy GL. A full native Mac GL build remains required. GCC's strict format
+warning also prompted an explicitly bounds-checked temporary-path copy.
+
+Video restart follow-up (uncommitted): compact rounded tabs and MSAA prompt are
+shared. Native main calls the POSIX wait/exec bootstrap; macOS executable lookup
+uses _NSGetExecutablePath, Linux uses /proc/self/exe. Windows and Ubuntu WSL
+process-handoff fixtures pass. Native Mac compilation and real quit/relaunch
+with saved graphics settings remain unverified. No platform exemption claimed.
+
+Stage0241 extended integer product (2026-11-02, c7f276a7/PR465): original shared
+unsigned bit arithmetic and fixed guest-frame adapter replace ordinal281 on both
+build paths. No host adapter or native API is needed. Windows Release and local
+product/numeric/context/migration and isolated Story checks pass (STATUS); native Mac portable CI passed runtime41404919917; native Mac title execution
+remains pending. Mac selects the same mathematical/adapter suite with undefined-
+behavior sanitizer. Division/magic helpers and complete runtime independence
+remain separate unfinished work; Windows integration is not Mac title evidence.
+
+
+Stage0242 extended division (2026-11-02, PR465 continuation): common
+pure arithmetic and checked16/20-byte imports need no host-specific math adapter.
+The original fatal divide boundary now belongs to the shared kernel library;
+Windows uses its existing host exception, Mac its existing POSIX signal path.
+Windows Release/utility/focused/Story checks pass (STATUS); new-stage native Mac
+execution/CI pending. Portable tests use independent Python arithmetic and
+undefined-behavior sanitizer on Mac; actual x86 ntdll/SEH reference is Windows-
+only. Earlier ad9f product stage passed both-host runtime41404919917 and
+launcher41404919890. Native Mac title/gameplay and complete guest SEH remain
+separate unfinished requirements, not inferred from shared source or Windows.
+
+
+Stage0242 CI follow-up (2026-11-02, PR465): shared patch installation now preserves
+source EOL metadata independently of the host Git setting, including strict
+current/historical reverse migrations. The negative-control fixture now asserts
+caller-address preservation so its deliberately missing fault call still compiles
+with Clang fatal warnings. Windows73 distinct focused/repository cases passed;
+Mac repair execution/CI and native Mac title remain pending. See STATUS for the
+failed fdce CI jobs and exact unchanged game-build provenance. No new host adapter
+or alternate Mac arithmetic is introduced.
+
+
+Stage0243 original memory/bit services (2026-11-02, PR465 continuation): same pure
+provider and guest adapters serve Windows and Mac; no host adapter needed. Uses
+standard memmove/memset and fixed guest-width bit/byte operations. Swaps
+read ECX with no guest cleanup; the actual native Windows reference uses x86
+fastcall. Windows69 focused tests and Release/built-in/provider checks pass;
+Story and all35 migrations passed; new-stage Mac CI/title execution
+pending (STATUS). Portable cases run with undefined-behavior sanitizer on Mac;
+4305 real ntdll reference cases require Windows/WoW64. Previous083d repair stage
+passed both-host runtime41412095577 and launcher41412095536. Native Mac gameplay
+and full runtime independence remain unverified.
+
+
+Stage0244 counted conversion/free (2026-11-02, PR465 continuation): shared original
+checked descriptor/encoding/ownership policy serves both hosts. Windows NLS is a
+thin standard API adapter; Mac keeps the existing Latin-1/single-byte fallback.
+No new Mac code-page equivalence is claimed. Windows92 focused cases, Release/
+utilities/archive/generation and isolated Story movement/fire/pause/resume pass;
+see STATUS and guest-text-codec.md for exact limits and ownership contracts.
+Portable cases use undefined-behavior sanitizer on Mac; four Windows-only native/
+code-page references skip. New-stage Mac CI/title acceptance is pending. Prior
+85363cc5 passed both-host runtime41415470820 and launcher41415470866. Complete
+runtime replacement and snapshot-unavailable production acceptance remain open.
+
+
+Stage0245 string creation/case (2026-11-02, PR465 continuation): same
+original shared checked records/ownership/staging provider and standard libc
+character-mapping leaf serve Windows and Mac. No OS adapter is needed; each keeps
+its existing locale policy, not promised full NT NLS case tables. Windows92
+focused tests, Release/built-ins/archive/generation and isolated Scotland movement/
+fire/pause/resume pass (STATUS). Portable tests use undefined-behavior sanitizer;
+6000 native ntdll references are Windows-only. Mac title/gameplay and new-stage CI
+remain pending, as do full runtime and snapshot-unavailable production acceptance.
+
+
+Stage0246 raw charset services (2026-11-02, PR465 continuation): one shared original
+provider replaces five raw bridges, reusing existing original host codec/case
+leaves. Mac keeps its single-byte/Latin-1 and standard libc policy; Windows keeps
+standard ACP NLS. No new Mac adapter or claimed NT case table equivalence. Raw32-
+bit/no-NUL/prefix/status policy is shared. Windows81 distinct focused cases,
+Release/built-ins/archive/generation and fresh isolated Story movement/fire/pause/
+resume pass (STATUS). Portable cases use undefined-behavior sanitizer; four actual
+Windows native/code-page cases skip on Mac. New-stage Mac CI/title validation and
+complete runtime/snapshot-unavailable production acceptance remain pending.
+
+Stage0245 portable CI acceptance:7a88cd4c passed runtime41427412517 and
+launcher41427412497 across both hosts, including native/GPU/upgrade/transition
+and package jobs. Native Mac title/gameplay remains unverified. Stage0246 all35
+local migrations also passed; its new-head Mac CI is still pending.
+
+
+Stage0247 stack/assert diagnostics (2026-11-02, PR465 continuation): one original
+shared EBP walker and thread-storage extent query serve both builds. No new host
+stack-walking dependency or OS adapter is introduced; assertion logging retains
+the existing debug-only Windows/POSIX trap leaf. Windows76 focused and35 full
+migration cases, Release/built-ins/archive/generation pass (STATUS). Portable
+cases use undefined-behavior sanitizer; the527-call real x86 ntdll oracle skips
+on Mac. New-stage Mac CI/title gameplay remains pending; previous5c24789c passed
+both-host runtime41429855993 and launcher41429856151. Full guest context/SEH,
+other inherited services and snapshot-unavailable production acceptance remain
+unfinished. Diagnostic replacement is not full exception delivery.
+
+Stage0247 Windows isolated Story retry passed with exact audited6bbf7486 bytes,
+movement/fire/pause/resume and26 protected files unchanged. The first attempt's
+operator-driven menu delay/controller timeout is retained and not accepted as a
+pass. Native Mac title/gameplay is still pending; see STATUS for bounded scope.
+
+Stage0248 in progress (2026-11-02, PR465, uncommitted): common title CMake enables
+original persistent status recording on both hosts. Canonical storage, compiler
+and register scopes are shared. Windows focused113 pass; real x86 oracle skips
+on Mac. Shared native CI selects both new suites. Previous9003b35d runtime and
+launcher CI both passed. Current generation/migration is running; production
+build/game and native Mac acceptance remain pending. This does not implement
+full CONTEXT/SEH or complete the broader runtime replacement.
+
+Stage0248 regression repair in progress: Windows sampled Story stall exposed
+stale x87 FPREM completion status. Shared x87 compiler now publishes quotient
+bits and completed C2, with31 focused checks (native x87 cases Windows only).
+New generation/build/game acceptance remains pending; no Mac title claim.
+
+Stage0248 Windows repaired production accepted:124 focused and55 migration/
+context cases; generation/Release/built-ins/audit; clean isolated Story movement,
+fire and pause/resume all pass with8c2c5757 bytes. Earlier failed attempts retained.
+26 protected files unchanged. Code/test selection shared; native Mac title and
+new-head CI acceptance remain pending. Full EFLAGS/context/SEH remains open.
+
+Stage0249 in progress (2026-11-02, PR465): shared persistent shift/rotate
+status/zero-count/cross-call carry emission,195 Windows focused checks. Native
+x86 oracle skips on Mac, portable model/negative/production routes selected
+in shared CI. Previous0b9d2456 native jobs both failed scalar-name/template ABI
+checks; exact-name check and additive0249 template synchronization repair
+these locally. Launcher/upgrade/package jobs passed; runtime overall failed.
+New generation0fail; fresh build/game, complete migrations and new-head CI
+pending. Full context/SEH and native Mac title acceptance remain incomplete.
+
+Stage0249 final Windows acceptance:195 focused and55 migration/context tests
+pass, production generation/Release/built-ins/audit, fresh isolated Story
+movement/fire/pause/resume pass with9c0f5a59 bytes;26 protected files unchanged.
+Shared implementation, portable tests selected for both hosts; native Mac title
+and new-head CI acceptance pending. PreviousCI failure is recorded, not green.
+
+Stage0250 in progress (2026-11-02, PR465): original shared integer producer
+status for products/bit/scans/exchanges,281 Windows focused and21 fresh-install/
+context checks pass. Portable models/compiled controls/production routes are
+selected on both hosts; actual ML64 oracle is Windows-only. Precedingf6edb895
+runtime41449486367 and launcher41449486247 CI both green. Current generation
+0fail; Release is running, new game/new-head CI/native Mac title pending. No
+OS-specific adapter duplicated; full saved context/SEH remains unfinished.
+
+Stage0250 final Windows local acceptance:281 focused/21 fresh-repeat-install
+and context checks, generation/Release/built-ins/audit and fresh isolated Story
+movement/fire/pause/resume pass withfe25b7b4 bytes.26 protected files unchanged.
+Implementation remains shared; native hardware oracle Windows-only, portable
+contracts selected for both CI hosts. New-head CI/native Mac title pending;
+floating/string/control flags and actual context/SEH remain unfinished.
+
+Stage0251 in progress (2026-11-02, PR465): portable sampled floating/string
+comparison flag publishers plus REPnoncompare preservation;307focused and21
+install/context Windows checks pass. Portable model/production/negative tests
+selected for both CI hosts; raw ML64oracles Windows-only, FS/narrow wrapping
+validated by portable model. No guest MXCSR/unmasked-FPU/tag/80bit claim.
+Preceding96255dc2 both workflows green. New generation0fail; Release/game/
+new-headCI/native Mac title acceptance pending. Control flags/context/SEH open.
+
+Stage0251 final Windows local acceptance: production generation/Release/built-ins/
+audit and bounded Story movement/fire/pause/resume pass withcda96a1a bytes.
+307 focused/21 install-context pass,26 protected files unchanged. Shared code and
+portable checks selected for both hosts; native oracles Windows-only. No new
+OS adapter. New-head CI and native Mac title remain pending; control/context/
+SEH and wider replacement unfinished. See STATUS stage0251 for evidence/limits.
+
+Stage0252 in progress afterf49e53b8: original protected-mode flags stack provider
+and production16/32-bit routes shared across hosts.138 initial Windows checks
+pass; portable model/negative/production checks selected in both-host CI.512
+actual native ring3 cases Windows-only; CPL0 uses explicit model/manual rules.
+No OS adapter duplicated. Generation/Release/Story/new-head CI/native Mac title
+pending. TF/AC exceptions, IRQ scheduling/context/SEH and wider replacement open.
+
+Stage0252 final Windows local acceptance:299 focused/21 install-context pass,
+production generation/Release/built-ins/audit and bounded Story movement/fire/
+pause/resume pass with33f5d2c6 bytes.26 protected files unchanged. No duplicated
+host adapter; portable contracts selected both hosts, real ring3 oracle Windows
+only. Previousf49e53b8 both workflows fully green. New-head CI/native Mac title
+acceptance pending. Full control/context/exception/IRQ and wider replacement open.
+
+Stage0253 in progress (2026-11-02, PR465): original716-byte i386 context codec
+(all six groups, host-independent words/rawFP images) and cdecl callback primitive,
+with shared archive selection through0253. This does not replace live capture265
+or raise302/unwind312 yet.31 initial checks pass13.49s, including SDK layout,
+alias/preservation/negative tests, both callback ABIs and actual16-case Win32 x86
+unwind continuation evidence. Portable tests selected both hosts; native probes
+Windows-only. No native Mac title/full-context/SEH/IRQ claim. Full migrations,
+generation/build/fresh Story/new-head CI pending.
+Preceding81f3808d runtime41467203151 FAILED Mac native due to missing stdlib.h
+in the test abort preamble; Windows native and both upgrades passed, transition
+gates propagated that failure. Launcher41467203152 passed. Added the header
+without changing production flag behavior; Mac revalidation pending.
+
+Stage0253 production checkpoint:309 broader checks pass71.63s; generation
+15838/15863/0fail,6575724lines103.75s lift. Release/built-ins/crash symbols pass.
+Audit selects one original context provider and finds codec/cdecl symbols in
+the kernel archive; all generated C/header bytes match the preceding stage.
+Executable SHA256:
+0001c4388b43f599560d02807104533f105d172f928ea93226acf5945a7806fc.
+All26 protected files unchanged. Full migrations remain live; fresh Story
+acceptance waits for a separate TSFP Launcher game session to finish. This is
+not yet new-stage gameplay or CI acceptance; live context/SEH adapters remain
+inherited and full replacement remains incomplete.
+
+Stage0253 migration gate:78passed/1failure1209.87s; only repository-context's
+exact54-tail expectation was stale. It now asserts all55 entries with0253 last;
+all20 context checks pass on rerun. The59 patch upgrade/tracking cases passed
+without a patch/loader/provider change afterward. Fresh gameplay remains pending
+while the separate installed game is open. Production source/executable hashes
+remain exact; the only post-build code-tree change is that repository test.
+
+Flag-stack CI repair (2026-11-02, after81f3808d, PR465): Mac native job
+125351318125 failed six test compilations because the abort fixture lacked
+stdlib.h. Both-host patch upgrades and Windows native passed; transition gates
+correctly propagated the native failure. The test preamble now includes the
+standard declaration. Local flag-stack/production translation checks pass;
+production runtime bytes are unchanged by this repair. Exact-head CI and native
+Mac title gameplay are separate; CI revalidation remains pending.
+
+Stage0253 final Windows local acceptance:309 focused checks71.63s plus59
+patch migration/tracking cases and20 repository-context checks now pass.
+Original combined migration run78pass/one stale54-tail assertion1209.87s;
+its full55-entry order repaired and all20 context checks rerun5.80s.
+Generation15838/15863/0fail,6575724lines103.75s lift; Release/built-ins/crash
+symbols pass. Canonical header/template/feature and current source/archive
+audit pass; codec selected once, codec/cdecl symbols archived, generated bytes
+unchanged. Executable SHA256:
+0001c4388b43f599560d02807104533f105d172f928ea93226acf5945a7806fc.
+Runner37205/controller21885 both exited0: scene4/mission1/inputenabled,
+forward11.1762388966/back6.1848863931, ammo8to6, pause38 frozen/resume58
+advancing, last112.909s under240. Reviewed3fresh captures; source inputs and
+actual run executable provenance match. All26 protected files unchanged,
+profiles/fixture valid, no lock/dump/Partition images. Windows11 Pro10.0.26300
+x64/MSVC19.44.35224.0, D3D11 flip, Classic/Original60/minimized synthetic/
+movies skipped; guest presentation57.7/57.9/58.4 FPS, not scanout. Not physical
+input/listening/full-campaign/native Mac title proof. Evidence logs/context-
+foundation-{build,game-check}.json, final game/controller logs, accepted report/
+provenance/run0.err and captures.
+Standalone test-header CI repair is committed/pushed asc573b863; runtime
+41475286277 and launcher41475286281 remain live at this checkpoint. No test
+weakening or production flag change; new-stage CI remains required.
+This stage provides original context-record/cdecl primitives, not live265/302/
+312 replacement. Translated-PC continuation, missing live architectural state
+and actual exception/unwind/IRQ support remain open, as does the full runtime/
+tooling/title/header/fixture/provenance and toolkit-unavailable production goal.
+
+Context primitive CI follow-up (2026-11-02, aftera0d4fd9a, PR465): runtime
+41476378361 failed only test_io_lifetime callback-7 on both hosts before its
+mutation compiled: the mutation's exact old balance expression was stale.
+The repair targets the unique result-capture prefix, preserves the cleanup
+formula and still requires the compiled wrong caller-EAX provider to fail.
+Other native cases: Windows2739pass/Mac2644pass; Windows upgrades passed, Mac
+upgrades cancelled, transition/PR gates inherited failure. No production change;
+existing0001c438 Windows build/Story evidence remains current for committed code.
+New-head CI pending; live context/SEH and full replacement remain unfinished.
+
+Continuation checkpoint prerequisite (2026-11-02, PR465): original
+src/runtime/guest_context_execution.c/.h now has live native checkpoints,
+validated guest PC/state admission, deepest-first per-root ledger cleanup and
+explicit yield/return outcomes. A jump or context transfer to the stop PC cannot
+fake a completed return. Tests reproduced the ledger and false-completion bugs
+before repair;72 focused tests pass26.73s, including7 compiled wrong providers,
+400 threaded transfers and real Windows fiber transport. All26 protected files
+retain hashes/sizes/times. The provider is not selected by production CMake or
+called by the game; no new production gameplay result is claimed. Existing
+stage0253 build/Story evidence remains the latest game acceptance. There is no
+production Mac fiber adapter; portable native cases are now selected in both-host
+CI, but new-provider Mac results remain pending. See context-execution guide.
+Live architectural snapshots, instruction-boundary dispatch and actual guest
+raise/unwind remain open, as does full upstream removal/final independence audit.
+All114 repository-context/CI-scope/PR-gate tests pass4.12s; context map and
+staged whitespace checks pass. Exact90086818 CI is now fully green: all11 runtime
+41482780542 jobs, including both native hosts/upgrades/transitions and PR gate,
+completed success; standalone launcher41482780544 also completed success. This
+is acceptance of the preceding commit; the new prerequisite needs its own CI.
+
+Original instruction-continuation prerequisite (2026-11-02, follow-up to PR465): opt-in
+FunctionTranslator context methods and translation_continuation.py emit one
+instruction per step plus an exact-PC dispatcher over disjoint owned spans.
+CALL samples before push; RET reads its actual guest PC and emits RETURN;
+entering at Jcc consumes restored flags without repeating CMP. Canonical EBP
+is maintained directly. Unknown required flags and unsupported policy/ISA forms
+reject explicitly. Normal game generation does not use this cold path yet;
+manual/native capabilities, live selector/FP snapshots, lifetime/fiber integration
+and actual exception/unwind bindings remain required. This is not their removal.
+All212 compiler/checkpoint/status checks pass31.89s; final42 continuation and
+generation-fingerprint tests pass10.79s (214 distinct checks covered). The40
+continuation checks include1024 independent condition cases, five compiled bad
+providers, full GPR/status/FP/vector/RAM parity and actual native checkpoint
+resumption at an edited translated PC. An EBP parity mismatch was traced to the
+normal fast path's frame cache; cold EBP uses an independent architectural oracle.
+The initial title scan revealed repeated whole-image helper discovery per function;
+reusing immutable discoveries fixes that quadratic work, guarded by a test.
+Supported-US metadata scan:15771/15863 selected functions emitted,92 rejected,
+28.063s. It omits production manual/forced-return policy adapters and proves
+translation coverage only. Rejections include privileged I/O/selectors/far control
+and further x87/stack opcodes; inspect local scan JSON before production enablement.
+Generation8087 exited0:15838/15863 functions,0fail,6575724lines,93.22s lift;
+all22 normal generated C/headers byte-identical to accepted0253. Release63331
+exited0 including built-ins/crash symbols; archive/header/feature/current-generation
+and source hash audit pass. Native checkpoint provider remains unselected.
+Executable SHA256 f842f6961e2cb59a46292f5b6aabf7b5d16de125502847e4fd17cc959d1fd478.
+Fresh disposable Story runner27011/controller2203 both exited0. Scene4/mission1,
+input enabled, forward11.17454/back6.07313, ammo8to6, pause39 frozen samples,
+resume58 advancing; last96.771s below240. Three fresh captures reviewed;
+source/run/executable provenance matches, fixture valid,26 protected files retain
+hashes/sizes/times; no live owned game, run lock, dump or Partition image. Windows11
+Pro10.0.26300x64/D3D11 flip/Classic/Original60/minimized synthetic/movies skipped.
+This is normal-path regression acceptance, not gameplay through the cold provider,
+physical-input/listening/full-campaign or native Mac title verification. The
+first-person mode remains2; it is a view mode, not an animation-phase assertion.
+Evidence logs/continuation-{generate,build,game,game-controller}.log,
+continuation-{build,game-check}.json, accepted report/provenance/run0.err and
+private/test-saves/independent-continuations-20261102 captures. Prior2a84fd6c CI
+fully passed: runtime41487615373 and launcher41487615218. New-stage CI is required;
+portable cases are registered for both hosts, but new-generator native Mac results
+remain pending. Full runtime/tooling/title/header/fixture/provenance replacement
+and checkout/snapshot-unavailable production generation/build/package remain open.
+
+Final repository-context/CI-scope/PR-gate checks:114pass4.28s (328 distinct
+covered checks with the214 compiler cases). Staged whitespace and context map
+pass. Final source/executable hashes unchanged since accepted game. Last guest
+presentation samples57.8/58.0/58.2 FPS are not scanout measurements.
+
+PR465 merged as main a1f039cb while this follow-up was being finalized. The
+new continuation commit is preserved on feature/context-continuations, with
+latest main integrated. This follow-up requires its own review and CI; no
+merge of the new work was performed.
+
+Canonical EBP/live register preparation (2026-11-02, PR466): regenerated normal
+functions bind EBP to the existing architectural TLS cell, instead of a copied C
+local and inherited FPO frame-cache value. Saved contexts now use macro-safe r_*
+register member names; the712-byte host state and716-byte guest record offsets
+are unchanged. The shared runtime/header ABI is unchanged; no capability flag,
+new patch or CMake provider is introduced. Existing guest epilogues restore EBP.
+The menu tab stack adapter changes only its stale local-EBP comment. Continuation
+reference fixtures now explicitly enable their capability macro, and actual
+edited-context checkpoint resumption runs in both reference modes.
+Before repair, all four native caller/return EBP cases failed; divide-fault
+publication already passed and remains checked. A compiled cached-cell provider
+must fail. Final246 native/compiler/context/callback checks pass59.23s,46 extra
+US/float/vehicle/control contracts pass8.88s,116 repository/context/scope/generation
+checks pass50.93s:408 distinct checks covered. During the first full rebuild one
+thread test hit its unchanged10s wait; after compilation became idle all27
+installed-header/nonlocal/generation checks passed10.99s without relaxing it.
+The prototype capability header failed source/template identity audit; that
+unnecessary flag was removed in favor of the existing g_ebp ABI. Its4bb21d7f
+executable and logs remain rejected, distinct from final production acceptance.
+Final generation17568 exited0:15838/15863 functions,0fail,6595934lines126.09s lift.
+Final Release32678 exited0 including built-ins/crash symbols. The audit verifies
+15838 function scopes/6447 live EBP bindings,16 changed regular C units, identical
+canonical source/template/generated types headers, archive selection/exports and
+current generation/source hashes. Executable SHA256:
+a7fc10be9fb228d6ff4b7959babe6746d4ad1892b74f4b581021a9e1bbc669d5.
+The first unprofiled run4176/controller77521 failed the intro checkpoint: scene101/
+mission0,2.4-3 FPS and timed inputs landing on earlier frontend menus. It remains
+rejected in independent-canonical-ebp-20261102. The unchanged executable passed a
+profiled retry47368/controller44416 and then the final unprofiled acceptance28575/
+controller73192, all four processes exited0. No product change was made between
+these attempts. The first slowdown's cause is unproven; do not label it a repaired
+EBP/interrupt bug or claim a proven external-load cause. A suspected main.c save
+was actually crash diagnostics, not an interrupt register save.
+Final clean run independent-canonical-ebp-final-20261102: scene4/mission1/input
+enabled, forward11.17624/back6.18489, ammo8to6, pause39 frozen/resume58 advancing,
+last99.188s below240. Three fresh captures reviewed; source/run/executable hashes
+match. Fixture valid; all26 protected files retain hashes/sizes/times; no owned
+live game/controller, lock, dump or Partition image. Guest presentation samples
+58.1/57.9/58.0 FPS, not scanout. Windows11 Pro10.0.26300x64/D3D11 flip/Classic/
+Original60/minimized synthetic/movies skipped; not physical-input/listening,
+full-campaign or native Mac title proof. Evidence logs/canonical-ebp-{generate,
+build,final-game,final-controller}.log, canonical-ebp-{build,game-check}.json,
+accepted report/provenance/run0.err and final isolated captures. Initial failure
+and profiled retry are separate retained runs.
+Priorcbee4c17 runtime41491790255 passed all jobs, but standalone launcher
+41491790215 failed. Its failed job is being inspected; do not report that run
+as successful. This phase needs its own new-head CI. Shared changes and portable contracts serve both hosts, but
+new-stage Mac results remain pending. Native/context adapters, opaque lifetime
+barriers and actual raise/unwind remain unfinished. The cold dispatcher is still
+opt-in, and265/302/312 remain inherited. Wider runtime/tooling/title/headers/
+fixtures/provenance removal and checkout/snapshot-unavailable production proof
+remain required; the full objective is active.
+
+Canonical EBP CI follow-up (2026-11-02; uncommitted):16754532 launcher
+41502644418 succeeded; runtime41502644343 failed both native host suites.
+Downloaded job logs125477468688/125477469190 establish four stale inherited
+frame assertions plus the original product fixture requiring old EBP/cache
+behavior, propagated through eight installed-consumer tests. Replaced the two
+inherited fixture bodies with original checks via the shared patch stack and
+corrected the original divide probe to require real EBP with a distinct stale
+cache. Local Windows83 selected cases pass33.54s, including every failing outer
+consumer and compiled canonical EBP checks (logs/canonical-frame-ci-repair.log).
+No production C change or new game artifact in this repair; prior bounded
+Windows Story acceptance remains the evidence for the unchanged game. New-head
+CI/native Mac confirmation remains pending; full replacement remains active.
+
+
+### Stage0257: production continuation export (2026-11-02)
+
+Shared split generation now exports original decoded-control blocks and an exact
+PC registry. Consistent shared tails and overlapping streams validate byte and
+operand identity, with lowest-entry ownership. Local branches execute within a
+block; CALL/RET retain guest stack/target semantics. Restored Jcc retains the
+maintained static branch policy. Manual-only entries remain explicit native
+capabilities, and unsupported bodies reject rather than become cold-path no-ops.
+Generation stages chunks before publication; manifest-last text hashes and full
+owned-file-set checks prevent accepting partial/stale output as current.
+
+Windows95 compiler/CLI/manifest checks pass17.44s;114 repository/scope/gate cases
+pass4.20s. Earlier CI repair858721c8 separately passed83 cases33.54s. New index
+and exporter tests are registered in the common both-host runtime workflow.
+Supported-US Generate97218 exits0: normal15838/15863/0fail6595934lines unchanged,
+cold15746 bodies1198926 exact PCs62486 shared entries158 chunks13880749 lines,
+92 unsupported bodies and25 opaque entries; lift139.84s. These counts establish
+export coverage, not dynamic execution or complete CPU support. The normal
+path's previously reported728 unsupported instruction comments remain unchanged.
+
+Release68938 exits0, including built-in tests and matching crash-symbol archive.
+Audit logs/verify-continuation-production.py confirms all159 new C units selected
+once and compiled, complete/current manifest, original context headers, and all
+prior normal generated files byte-identical to the accepted canonical EBP stage.
+The kernel still does NOT select guest_context_execution.c; native state/ownership
+adapters, opaque host barriers, wrapper lifetimes and actual302/312 remain open.
+The game does not yet execute the new cold continuation dispatcher.
+
+Executable SHA25602537f12303269f9e90147903c05a5afddd4bc0ccc34f5abd835e48006a4a0d8.
+Fresh isolated independent-context-export-20261102 runner74054/controller42965
+both exit0. Story intro30/1 and playable4/1/input enabled verified. Forward
+movement11.15251329/back6.18489098, ammo8to6, pause39 samples with frozen ticks,
+resume58 with advancing ticks, last101.212s below240. Three fresh start/fire/pause
+captures visually reviewed. Source/runner/executable provenance matches; fixture
+valid;26 protected files retain hashes/sizes/times; no owned game left running,
+lock, dump or disposable Partition image. Evidence logs/continuation-production-
+{generate,build}.log, continuation-production-build.json, context-export-{game,
+controller}.log, context-export-game-check.json and the isolated report/provenance.
+Windows11/D3D11 flip/Classic/Original60/minimized synthetic/movies skipped only;
+not physical-input/listening, full-campaign, native Mac title or cold-path game
+execution proof. Shared generator/receipt changes serve native Mac too; new-stage
+Mac checks and new-head CI remain pending. Current858 repair runs41508449633
+runtime/41508449624 launcher were queued at last observation; no green claim.
+
+Guide: docs/agent-context/continuation-generation.md. This stage remains part of
+the full objective: live context/SEH plus remaining kernel, graphics, audio/movie,
+input/device/network, title/tooling/header/fixture and provenance replacement.
+Final generation/build/package with BOTH old checkout and snapshot unavailable
+has not passed and remains required. No PR merged and no full completion claim.
+
+
+### Stage0258: original exception registration dispatcher (2026-11-02)
+
+Original guest_exception.c/.h implements checked raise/search/unwind bodies,
+guarded cdecl callbacks, noncontinuability, nested/collided dispositions, edited
+contexts, target retention, corrupt-chain failures and context baseline
+preservation.0258-original-exception-dispatch.patch selects it in the shared
+kernel archive after0253; historical tail is56. This is NOT a completed kernel
+import replacement:265/302/312 remain inherited and the execution core remains
+unselected. Native live capture, guard capabilities, actual import binding,
+resource/guest-lock/lifted-state ownership and opaque host barriers remain open.
+
+Native Win32 i386 oracles cover eight actual RtlRaiseException cases and24
+RtlUnwind cases. Measurements corrected two prototype assumptions: nested flags
+stay visible to the boundary handler and clear afterward; collided unwind does
+not itself add flag64. Modern Windows raise's extra/XSTATE groups are not adopted
+as Xbox semantics. Native probes own their temporary stack FS registrations,
+with SafeSEH disabled solely in the oracle binaries. They establish Windows
+behavior, not complete physical Xbox conformance.
+
+The compiled integration calls a real translated cdecl handler, edits context
+EIP/EAX, then actually transfers via the original native checkpoint into decoded
+translated code at the edited PC, bypassing the old MOV. Both true GPR reference
+modes pass. This exposed callback_plan's esp field colliding with register
+macros; it is now r_esp with unchanged layout/behavior. Full caller snapshots
+preserve unselected context groups; final control-only/integer-only/group-free
+cases exposed and fixed an overly strict completion check. The before-fix case
+fails at runtime (logs/exception-partial-flags-before.log). No zero-filled live
+state or silent successful exception no-op substitutes for the missing adapters.
+
+Final183 focused compiler/callback/lifetime/context/continuation/codec/native
+checks pass50.52s (logs/exception-dispatch-partial-final-broad.log). Deliberately
+incorrect providers compile then fail. Full historical migration/repository/CI
+scope/gate suite149 passes901.12s (handle38330 terminal0; exception-dispatch-
+migrations.log). Context map and affected-owner checks pass. New portable tests
+and native SDK oracles are registered in the both-host workflow (SDK cases skip
+on Mac). Full migrations were not restarted on observation timeout.
+
+Final Release2786 exits0, including built-in checks and matching crash symbols.
+Audit logs/verify-exception-dispatch-build.py confirms one original provider
+selection and both archived symbols, valid current generation receipt, all159
+continuation units, unchanged normal generated C and inherited imports still
+present. Generation was not repeated: no generation source/header contract
+changed, and exact generated-file hashes match the accepted0257 output.
+Executable SHA25604ec7fb20ed747fc09b235bd14f1e1b2051a4c7eb15c3c6d04f2a665ee981392.
+Fresh isolated independent-exception-dispatch-final-20261102 runner84321/
+controller76913 both exit0. Intro30/1 and playable4/1/input enabled pass; forward
+11.1745451650/back6.1848909969, ammo8to6, pause39 frozen/resume58 advancing,
+last160.977s below240. The controller started later in this run; no timing
+threshold was weakened. Three fresh start/fire/pause captures reviewed.
+Source/runner/executable provenance matches; fixture valid;26 protected files
+retain hashes/sizes/times; no owned game, lock, dump or disposable Partition image.
+Earlier candidate9f3f and its102.318s run remain separate retained evidence, not
+the final source acceptance after the partial-context fix.
+Evidence logs/exception-dispatch-{build,final-game-check}.json, final build/game/
+controller logs and isolated report/provenance. Windows11/D3D11 flip/Classic/
+Original60/minimized synthetic/movies skipped only; not physical-input/listening,
+full-campaign/native Mac title or actual game exception-dispatch proof.
+
+Prior756e0f46 CI: Windows native, both upgrades and embedded dual-host launchers
+passed. First native Mac125504473134 and standalone Mac125503051059 were cancelled
+with runner_id0; GitHub annotations prove hosted-runner allocation failure and
+macOS arm64 capacity notices (logs/ci-context-export-cancellations.json). Both
+failed workflows were retried. Runtime41510644956 retry Mac125513992322 actually
+ran and exposed two Clang C11 failures: the separate CLI harness omitted generated
+admit/step declarations. Added explicit matching prototypes; eight local Windows
+CLI exporter checks pass2.88s. This test-only repair changes no production ABI/
+generation or executable. Its test input hash was refreshed in the audit; every
+production input remained unchanged. New-head Mac confirmation remains required.
+Standalone41510644990 retry Mac125517034554 was queued at last check. Neither
+workflow is reported fully green. No PR merged. Actual native adapter/import
+binding, wider runtime/tooling/title/header/fixture/provenance replacement and
+final generation/build/package with BOTH upstream sources unavailable remain
+incomplete. See docs/agent-context/guest-exceptions.md.
+
+
+### Stage0259: original production execution ownership (2026-11-02)
+
+Original guest_execution_state.c/.h now owns per-host-thread lock and active
+nesting, with exact thread/domain-checked snapshots. guest_execution_scope.c/.h
+binds normal return and abandonment to the existing object ledger. Kernel dispatch
+uses the new scopes; the seven inherited GuestLock/GuestLifted bodies and old
+private depth storage are replaced through0259-original-execution-ownership.patch.
+The host binding retains the remaining parking, optional affinity, configuration
+and diagnostic policies as delegates; whole-platform provenance replacement is
+not complete. Shared CMake selects each new provider once; ordering tail is57.
+
+Nonlocal restoration validates its mark before effects, suspends execution,
+drains all leases/cleanup while inactive/unlocked, then restores the oldest
+abandoned snapshot once. Reacquisition is exact rather than additive across
+nested callbacks. Failure still drains remaining scopes and reports failure.
+Thread exit uses a separate abort mode that never reacquires a saved lock just
+to terminate. Object/thread teardown releases ownership before guest stack free;
+normal worker exit no longer performs the former early partial exit. The existing
+CRT lifetime hook now restores both object and execution ownership before native
+longjmp. This does not permit unwinding foreign OS/C++/Objective-C frames or
+switching peer guest TIB/fiber identity. Actual265/302/312 imports are STILL
+inherited and guest_context_execution.c remains unselected; live capture and
+native exception/callback transport are the next integration work.
+
+Tests:281 broad ownership/object/device/boot/callback/context/continuation/
+nonlocal/thread-memory/profile cases pass109.32s;149 full historical migration/
+repository/context/scope/gate cases pass905.18s.430 distinct cases covered; the
+initial84 native binding cases41.59s are a subset. The new core checks256 exact
+state transitions, resource-close-before-reactivation order, a real guest CRT
+longjmp, stale/duplicate/foreign-owner rejection, failed cleanup and four native
+threads doing64 restoration cycles each. Seven compiled incorrect providers
+must fail at runtime. Windows binding fixtures now use the real provider and a
+native recursive critical section, assert zero ownership before stack release,
+and preserve their publication/suspended/explicit-exit/failed-creation negatives.
+All relevant tests remain selected on both CI hosts (Windows-only API cases skip
+on Mac). Full migrations were awaited on their original live handle98601.
+
+Final Release39454 exits0, including built-in tests and matching crash symbols.
+Audit logs/verify-execution-ownership-build.py confirms both new providers once,
+archived state/scope/domain symbols, actual kernel enter/leave/unwind/exit
+bindings, no inherited depth cell, valid generation receipt and all159 existing
+continuation units. All normal generated C is byte-identical to accepted0257;
+no generation input/ABI changed, so generation was not repeated. Audit includes
+current project source, the changed actual kernel sources/CMake/headers and the
+kernel archive checksum. Exception imports remain explicitly marked inherited.
+Executable SHA256b4bbf2ecdf4006f465e50115c33e43199fb957fbe7eb3b81b720eb017106151c.
+
+Two fresh bounded Story runs of the SAME rebuilt executable pass. Lock-off root
+independent-execution-ownership-off-20261102 runner6583/controller47663 both exit0:
+scene4/mission1/input enabled, forward11.1745441952/back6.1859750900, ammo8to6,
+pause39 frozen/resume58 advancing, last99.352s below240. Diagnostic samples
+report peak2 counted guest threads/90 overlap entries. Lock-on root
+independent-execution-ownership-on-20261102 runner75466/controller49358 both exit0:
+forward11.1745438671/back5.9700438212, ammo8to6, pause39/resume58, last95.011s below240.
+The lock-on startup message and provenance confirm the requested mode; every
+reported concurrency row has peak1/overlaps0. These are observations of counted
+guest threads, not proof that all retained host/callback paths are independent.
+Last guest presentation samples58.0(off)/58.2(on) FPS, not monitor scanout.
+Six fresh start/fire/pause captures reviewed. Source/runner/executable hashes
+match both actual runs; all26 protected files retain hashes/sizes/times, fixture
+valid, no owned games, lock, dump or disposable Partition images remain.
+
+Windows runner options --guest-lock and --watch-guest-execution apply only to
+the isolated session after prepare_run strips parent diagnostic variables; both
+requested modes are recorded in provenance. Shipping defaults stay lock-off.
+Evidence execution-ownership-{build,off-game-check,on-game-check}.json, final
+build/off/on game/controller/migration logs, and both isolated reports/provenance.
+Windows11/D3D11 flip/Classic/Original60/minimized synthetic/movies skipped scope;
+not physical-input/listening/full-campaign/native Mac title or actual game SEH
+resumption proof. New runtime logic is shared with Mac, whose new-stage CI and
+title gameplay confirmation remain pending.
+
+Prior36e752d8 CI is FULLY successful: runtime41517937798 all11 jobs, including
+Mac native125526457084, Windows native125526457100, both upgrades, embedded dual-
+host launcher and gates; standalone41517937692 all5 jobs, including native Mac
+125527974718. This resolves the prior harness declaration repair. This new0259
+source still requires its own head CI. No PR merged. Broader kernel/graphics/
+audio/movies/input/devices/network/title/tooling/header/fixture and provenance
+replacement, plus final generation/build/package with BOTH upstream sources
+unavailable, remain incomplete. Guide: docs/agent-context/execution-ownership.md.
+
+
+## Stage0260: original host execution policies (2026-11-02)
+
+Local source afterd36e0303. guest_execution_host.inc replaces inherited guest
+lock bootstrap, cached switches, dispatch parking, concurrency diagnostics and
+Windows affinity selection through0260-original-execution-host-policy.patch.
+Owned guest_kernel_execution.inc now delegates to that own host policy.
+guest_cpu_choice.h and guest_execution_cpu.inc implement bounded mask selection
+and SDK-field CPU enumeration. Native Mac shares locking/parking/counters through
+the existing platform adapter and omits Windows affinity. The platform adapter,
+IRQL/DPC scheduler and actual265/302/312 imports remain provenance work.
+
+113 focused ownership/host/object/boot/device-host/thread-memory cases pass249.21s.
+The12 new cases are a subset: deterministic ownership/timeouts/configuration and
+malformed CPU queries, nine compiled wrong providers rejected at runtime, plus
+actual Windows threads/critical sections/events/InitOnce/affinity with four
+workers doing100 suspend/restore cycles. The initial12 also pass4.73s. Both-host
+runtime CI selects the shared tests; the native Windows API case skips on Mac.
+No new Mac result is claimed. Parking remains optional and best-effort at50/100ms
+bounds. A timed-out requester cannot steal or release another owner's gate;
+nested release retains the outer owner. Oversized CPU settings reject before
+shifting. CPU-set selection is independent of record order and stays group-local.
+
+Production apply60626 and Release49959 exit0, including built-ins and matching
+crash symbols. Audit logs/verify-execution-host-build.py confirms actual own
+includes/archive exports and removal of inherited policy bodies; all normal
+and159 cold generated C units remain unchanged with a current generation receipt.
+EXE3315060a9648b86640ddb641598f128c954ea44569de7a62f78f299eee5dbc77.
+Full177 historical migration/repository/context/scope/backlog/gate cases pass
+1172.30s on the original handle25162, terminal0. Combined with113 focused cases,
+290 distinct checks passed; no run was restarted for silence or buffered output.
+
+Fresh default-off Story root independent-execution-host-off2-20261102 runner35111/
+controller88608 both exit0: forward11.1762443920/back6.3910484303, ammo8to6,
+pause39 frozen/resume58 advancing, last98.728s below240. Diagnostic peak2 counted
+threads/126 overlap entries. Fresh enabled root independent-execution-host-on-
+20261102 runner25530/controller76442 both exit0: guest lock plus dispatch parking
+and automatic Windows affinity requested, startup confirms mask0x8000 and lockon;
+forward11.1745438671/back5.9700438212, ammo8to6, pause39/resume58, last99.193s.
+Every enabled concurrency row reports peak1/overlaps0. These observations do not
+prove every legacy callback is accounted for or that actual game IRQL paths were
+exercised. Native/deterministic policy tests supply those separate API contracts.
+
+The final verifier checks all1680 build-input hashes, runner/executable hashes,
+actual mode provenance, gameplay assertions, clean runner PASS, no unresolved
+calls/crash/ownership diagnostic and no disposable disk/lock/dump artifacts.
+Six fresh start/fire/pause captures reviewed. All26 protected personal files
+retain hashes/sizes/times. Evidence logs/execution-host-{build,final-check}.json,
+focused/build/migration logs, off2/on runner/controller logs and both isolated
+reports/provenance/captures. Windows11/D3D11 flip/Classic/Original60/minimized
+synthetic/movies-skipped scope; not physical input/listening/full-campaign/Mac
+native title or actual edited-context/exception resumption proof.
+
+The first off run is retained as a failed test invocation: --manual-start disabled
+the route's required profile replay, the capture showed the profile menu and the
+controller stopped at its intro assertion. No production change was made for
+that failure. An initial controller started before its marker existed and sent
+no input; the later on launch was refused while another checkout ran its game.
+Those terminal test attempts were not called successful or bypassed. The other
+session was left alone; the final enabled run started after the inventory cleared.
+
+Isolated runner --dispatch-lock and --guest-one-cpu apply after prepare_run strips
+parent variables and are recorded in provenance. Shipping settings are unchanged.
+Prior exactd36 CI is fully successful: runtime41527543804 all11 jobs, including
+Windows native125559250416, Mac native125559250446, both upgrades, both launchers,
+dual-platform package verification and transition/PR gates; standalone41527543813
+all5 jobs, including Mac125560698934. The new stage needs its own head CI. No PR merged. See
+docs/agent-context/execution-host.md. Whole runtime/tooling/title/header/fixture
+replacement and generation/build/package with both upstream sources unavailable
+remain incomplete. Live architectural capture and native callback barriers are
+still required before binding the original exception provider to game imports.
+
+
+PR466 integration checkpoint:0260 committed/pushed asfe70be4a, with its290 local
+checks/build/both Story runs recorded above. Main advanced to623acff4 (PR469 SMAA
+and Video Options sounds), causing loader/order/index conflicts and preventing
+fe70 pull-request CI dispatch. The safe merge retains both sets of code, applies
+SMAA2470 after0260 (tail59), retains all historical omission entries and regenerates
+the index. No resets or personal-file changes. Merged Release64865 exits0 with built-ins/matching crash symbols;117 quick
+repository/context/CI/path checks pass6.96s and15 host-policy/SMAA cases pass8.51s.
+The full177 merged migrations pass907.81s on the original83784 handle, terminal0.
+The117 quick checks are a subset; merged validation covers192 distinct cases
+when combined with the15 host-policy/SMAA checks.
+Actual merged source/archive audit confirms unchanged generated C/current receipt
+and includes the six pinned SMAA inputs. Executable SHA256:
+c38d267424e2d529e783eec0b0990b01eb80f3b74adff20a77e78a6845e6770c.
+
+Both fresh merged Story runs pass on that SAME executable: default-off runner12983/
+controller14915 both0, last99.172s, forward11.1950150209/back6.1848924481;
+enabled lock/dispatch/auto-CPU runner18222/controller49894 both0, last99.267s,
+forward11.1745396311/back6.2879705023. Each fires ammo8to6, freezes39 pause
+samples and advances58 resumed samples. Diagnostics peak2/overlap104 off and
+peak1/overlap0 on. Six fresh captures reviewed; all1693 current build inputs,
+runner/executable hashes and actual mode provenance match. All26 protected
+personal files unchanged, no owned game/lock/dump/disposable Partition images
+remain. Evidence logs/execution-host-merged-{build,final-check}.json and fresh
+independent-execution-host-merged-off/on-20261102 reports/logs/captures.
+Windows-only synthetic/minimized/Classic/Original60 scope; not native Mac title,
+full campaign, physical input/listening, or actual game exception resumption.
+
+Current revision0477fdb1 is committed/pushed and contains main623acff4; no PR
+merged. Exact-head runtime41532493664 and standalone41532493218 are live, not
+fully green yet. The failed fe70 CI dispatch is superseded by this real merged-
+head run. Earlier d36 CI was fully successful; that is not0477 acceptance.
+
+
+Exact0477 CI: standalone41532493218 succeeds all5 jobs. Runtime41532493664 fails
+Mac native125576134602 at one negative host-policy case;2759 other cases and18
+subtests pass,385 skip. The deliberate mutation removes the same-owner park
+exemption, leaving its me variable set-but-unused. Clang rejects the mutated
+fixture under the required fatal warnings before runtime rejection can run.
+The mutation now explicitly consumes me while retaining the wrong behavior;
+no warning suppression, assertion removal or production policy change. Windows
+native125576134548 and upgrade125576134626 pass; Mac upgrade125576134653 cancels
+and aggregate gates fail with the Mac result. A new head needs fresh CI.
+
+Merged local177 migrations pass907.81s;117 quick cases are a subset. With15
+host/SMAA cases this is192 distinct checks, plus both fresh merged99.172/99.267s
+Story runs, six reviewed captures and26 protected files unchanged, as above.
+The CI repair changes only the negative fixture and validation notes; it requires
+no product regeneration/rebuild. Separate native-boundary/DPC source work is
+still local and is not included in this test-only repair or its acceptance.
+
+Audio buffering/completion follow-up (PR478): shared patches2304/2305 change
+natural completion and learned effects lead; patch2306 supplies a dedicated
+finite-tail drain in the SDL adapter. The earlier claim that SDL already
+exposed queue depth was incorrect. Its hardware position remains unavailable;
+stream/movie wall-clock fallback is preserved. End-of-input flushing releases
+resampler-held samples once, and pending converted output keeps the tail alive.
+Complete-HLE/complete-adapter regression tests cover both hosts' adapters via
+host doubles; the SDL case fails without2306. Physical native Mac gameplay and
+listening remain pending. Windows FPS limits/residual underruns are in STATUS;
+release publication is pending. This does not change the Enhanced Audio beta.
+
+Visibility switches HUD & UI and Version watermark now live in
+Settings > Video Settings > View & HUD, with no Tools HUD category. These remain
+immediate session settings (not staged video drafts), usable while the host
+disables Tools. Host policy polling preserves explicit HUD/watermark choices;
+revoking an active free camera still restores its automatically hidden HUD.
+The input fixture checks placement and live updates under denied host policy.
+
+Linux launcher icon/storage follow-up (fix/linux-launcher-icon, uncommitted): Linux windows use the existing embedded launcher icon; Mac bundle icon handling is unchanged. Shared destination-volume free-space checks replace filesystem-root checks in install/import and diagnostics. Native failure dialogs now also show on Home. Windows/Linux validation is recorded in STATUS; native Mac regression and physical Steam Deck acceptance remain pending.
+
+
+Compiler-memory PR #508 reverted locally (2026-11-06, revert/508-compiler-memory):
+The user requested restoring the prior policy. Ordinary generated files again
+use count-only grouping with a 1,000-function default; Windows no longer supplies
+CL_MPCount or exposes -CompileJobs. The pre-existing continuation byte limit and
+native Mac/Linux build worker settings are retained. This is shared Python policy;
+no separate Mac adapter is needed. Prior PR #508 measurements remain historical in
+STATUS. Focused compiler checks cover the revert; fresh native Mac/Linux full-build
+memory, timing and gameplay acceptance remain unmeasured.
+
+Developer Tools free-camera player input (uncommitted after819489f4): implemented,
+native gameplay acceptance pending. Shared patch2630 routes SDL keyboard sampling
+through the existing gameplay guard and extends the existing pad gate to native
+sampling; raw keys/mouse remain available to the camera. Windows already guards
+keyboard input and retains its pad policy; Mac/Linux reuse the same contracts.
+No new OS capability or guest-code regeneration is needed. Tests cover actual
+native keyboard dispatch and both host sampler branches; measured build/test
+evidence is in [STATUS](STATUS.md). Physical camera-only gameplay and native
+controller/Windows/Linux host checks remain pending.
+
+Developer Tools Retina pointer alignment (uncommitted after a8d2e47e): implemented,
+native acceptance pending. Shared `src/interface/pc_developer_sidebar.inc` maps
+window-space pointers to the painted drawable before DPI/docking hit testing;
+Windows' equal-size path remains unchanged. Mac SDL already provides logical
+pointer bounds; RHI/legacy GL provide physical canvas bounds. No additional
+adapter is needed. Synthetic Mac compilation/execution covers fractional/Retina
+ratios and both docks; see [STATUS](STATUS.md). Physical clicks, monitor changes
+and Windows/Linux host acceptance remain unverified.
+
+### MAC-131 — MapMaker capacity meter probe (debug instrumentation)
 
 - **Status:** Awaiting validation
 - **PC behavior:** Off by default. With `TSFP_MAPMAKER_PROBE` flags (runner option
@@ -8086,7 +10186,7 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
   `private/test-saves/native-mac/mapmaker-probe.log`; confirm no log without the option.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
-### MAC-127 — Compile-only Windows build mode
+### MAC-132 — Compile-only Windows build mode
 
 - **Status:** Not applicable
 - **PC behavior:** `tsfp.ps1 -Action Build -CompileOnly` compiles every target but
@@ -8104,7 +10204,7 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
 - **Mac acceptance checks:** None beyond existing native build checks.
 - **Mac implementation and evidence:** Not applicable.
 
-### MAC-128 — MapMaker editor mouse controls (on by default)
+### MAC-133 — MapMaker editor mouse controls (on by default)
 
 - **Status:** Awaiting validation
 - **PC behavior:** On the MapMaker editor screen (scene 102) the mouse drives
@@ -8128,7 +10228,7 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
   controller still moves the pointer when the mouse is still.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
-### MAC-129 — MapMaker raised level memory budget (opt-in)
+### MAC-134 — MapMaker raised level memory budget (opt-in)
 
 - **Status:** Awaiting validation
 - **PC behavior:** With `TSFP_MAPMAKER_MEMORY_SCALE=N` (2..8) the MapMaker
@@ -8146,7 +10246,7 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
   minimum free memory stays positive.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
-### MAC-130 — MapMaker capacity stage A: AI pools and editor limits
+### MAC-135 — MapMaker capacity stage A: AI pools and editor limits
 
 - **Status:** Awaiting validation
 - **PC behavior:** When a MapMaker map is played the AI navigation pools are
@@ -8167,7 +10267,7 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
   pad groups; play with probe flags 96 and check counts and free memory.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
-### MAC-131 — Launcher MapMaker settings tab
+### MAC-136 — Launcher MapMaker settings tab
 
 - **Status:** Awaiting validation
 - **PC behavior:** Game settings gains a **MapMaker** tab: Raised MapMaker
@@ -8190,7 +10290,7 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
   MapMaker, save, confirm the keys and that Play exports only chosen switches.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
-### MAC-132 — MapMaker map export/import (.tsmap)
+### MAC-137 — MapMaker map export/import (.tsmap)
 
 - **Status:** Awaiting validation
 - **PC behavior:** The launcher Saves page lists the MapMaker maps of the active
@@ -8213,7 +10313,7 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
   export a map with the save picker and import it with the open picker.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
 
-### MAC-133 — Imported music (MapMaker and Arcade)
+### MAC-138 — Imported music (MapMaker and Arcade)
 
 - **Status:** Awaiting validation
 - **PC behavior:** WAV and MP3 files in the music folder (`TSFP_MUSIC_DIR`; `Music`

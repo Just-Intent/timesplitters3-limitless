@@ -87,4 +87,4 @@ Any game run (MP3 decode was only exercised by the fixture); the Arcade menu's o
 two known readers were checked); whether the stock player keeps channel 0
 state consistent when id 0 plays; Mac build of the thread/`dirent` paths;
 Mac launcher build (Avalonia picker, Trash move); Mac MP3 needs an FFmpeg
-adapter (MAC-133). FFmpeg log lines (`Header missing`) may reach stderr on junk.
+adapter (MAC-138). FFmpeg log lines (`Header missing`) may reach stderr on junk.

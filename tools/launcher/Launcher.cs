@@ -37,7 +37,7 @@ namespace TimeSplitters.Launcher
                 bool fromBootstrap = args.Length == 2 && args[0] == "--from-bootstrap";
                 if (args.Length == 0)
                 {
-                    Process.Start(new ProcessStartInfo(Core.PathIn(root, Core.LauncherName)) { WorkingDirectory = root, UseShellExecute = true });
+                    AntivirusErrors.Start(new ProcessStartInfo(Core.PathIn(root, Core.LauncherName)) { WorkingDirectory = root, UseShellExecute = true });
                     return 0;
                 }
                 if (!preview && !fromBootstrap) throw new ArgumentException("Unknown launcher arguments.");
@@ -92,8 +92,8 @@ namespace TimeSplitters.Launcher
         {
             // This executable lives outside the replaceable payload. Parent exits first.
             return UpdateRestart.ApplyGame(root, parent, action == "--rollback",
-                () => { if (relaunch) Process.Start(LauncherPlatform.RestartInfo(root)); },
-                ex => { if (relaunch) MessageBox.Show(ex.Message + "\n\nKeep the .launcher folder for recovery. Details: .launcher\\launcher.log",
+                () => { if (relaunch) AntivirusErrors.Start(LauncherPlatform.RestartInfo(root)); },
+                ex => { if (relaunch) MessageBox.Show((AntivirusErrors.Find(ex) == null ? ex.Message : RecoveryInfo.From(ex, false).Message) + "\n\nKeep the .launcher folder for recovery. Details: .launcher\\launcher.log",
                     "TimeSplitters — Update failed", MessageBoxButton.OK, MessageBoxImage.Error); });
         }
     }
@@ -268,6 +268,8 @@ namespace TimeSplitters.Launcher
             };
             Button("SavesNav").Click += (s, e) => ShowSaves();
             Button("SupportNav").Click += (s, e) => Open("https://github.com/" + ReleaseClient.Repository + "/issues");
+            Button("DiscordNav").Click += (s, e) => Open(ReleaseClient.DiscordInvite);
+            Button("JoinDiscordButton").Click += (s, e) => Open(ReleaseClient.DiscordInvite);
             Button("LogsButton").Click += (s, e) => OpenFolder(".launcher");
             Window.Loaded += async (s, e) =>
             {
@@ -619,8 +621,8 @@ namespace TimeSplitters.Launcher
                         token.ThrowIfCancellationRequested();
                         string helper=Core.PathIn(root,".launcher/self-helper.exe");
                         Core.Require(!Core.GameRunning(),"Close the game before repairing files.");
-                        File.Copy(Core.PathIn(root,".launcher/self-pending/payload/"+Core.LauncherName),helper,true);
-                        Process.Start(new ProcessStartInfo(helper,"--apply-launcher "+Quote(root)+" "+Process.GetCurrentProcess().Id){UseShellExecute=true,WorkingDirectory=root});
+                        AntivirusErrors.Copy(Core.PathIn(root,".launcher/self-pending/payload/"+Core.LauncherName),helper,true);
+                        AntivirusErrors.Start(new ProcessStartInfo(helper,"--apply-launcher "+Quote(root)+" "+Process.GetCurrentProcess().Id){UseShellExecute=true,WorkingDirectory=root});
                         handingOff=true;Window.Close();
                     } else {
                         Core.Require(gameVerification!=null && gameVerification.Version.Length>0,"Verify the game before repairing it.");
@@ -651,6 +653,8 @@ namespace TimeSplitters.Launcher
             if (lifetime.IsCancellationRequested) return;
             SetStatus(ex.Message);
             try { Program.Log(root, ex.ToString()); } catch { }
+            if (AntivirusErrors.Find(ex) != null)
+                MessageBox.Show(Window, RecoveryInfo.From(ex, false).Message, "Antivirus blocked a file", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         void ClearRecovery()
         {
@@ -878,9 +882,9 @@ namespace TimeSplitters.Launcher
             Core.Require(!Core.GameRunning(), "Close the game before changing the installed release.");
             string helper = Core.PathIn(root, ".launcher/update-helper.exe");
             Directory.CreateDirectory(Path.GetDirectoryName(helper));
-            File.Copy(Assembly.GetExecutingAssembly().Location, helper, true);
+            AntivirusErrors.Copy(Assembly.GetExecutingAssembly().Location, helper, true);
             var info = new ProcessStartInfo(helper, (rollback ? "--rollback " : "--apply ") + Quote(root) + " " + Process.GetCurrentProcess().Id) { UseShellExecute = true, WorkingDirectory = root };
-            Process.Start(info);
+            AntivirusErrors.Start(info);
             handingOff = true; Window.Close();
         }
         public static string Quote(string value)

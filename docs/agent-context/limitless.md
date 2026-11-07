@@ -17,14 +17,14 @@ reserved by `src/runtime/guest_image.c` (`tsfp_image_set_extension`) through
 `patches/platform/*-guest-memory-extension.patch`, Mac in `src/native/main.c`.
 Switches are `TSFP_MAPMAKER_*` (default off except pools/mouse controls).
 Tests: `tests/mapmaker/`, `tests/compiler/test_guest_code_patches.py`,
-`tests/input/test_scope_wheel.py`. Mac follow-up: MAC-126 and later.
+`tests/input/test_scope_wheel.py`. Mac follow-up: MAC-131 and later.
 <!-- packet:end -->
 
 Fork-specific subsystem notes, kept out of the shared size-capped guides so
 upstream merges stay clean. Each part names the shared guide it extends.
 MapMaker player/contract docs live in `docs/mapmaker/`; measured results in
 `docs/project/STATUS.md`; Mac follow-up in `docs/project/MAC_PORT_BACKLOG.md`
-(MAC-126 and later).
+(MAC-131 and later).
 
 ## Subsystem map rows (extends [systems.md](systems.md))
 
@@ -95,7 +95,7 @@ calls in the existing `pc_display_menu_mouse` (`sub_00073750`) wrapper: the
 layout after the original runs (before its context checks, so rejected menus
 are logged too), and the click after hit testing. No guest regeneration. It must never write guest memory or registers;
 `tests/mapmaker/test_mapmaker_probe.py` enforces this with mutations. Usage and the
-experiment protocol: `docs/mapmaker/mapmaker-meter-probe.md`. Mac: MAC-126.
+experiment protocol: `docs/mapmaker/mapmaker-meter-probe.md`. Mac: MAC-131.
 Flag 128 (scene 100, 5 s windows every 30 s) logs room draws, their props and
 the model draws inside them through two further wrappers,
 `pc_mapmaker_probe_room_draw` (`sub_000A2900`) and
@@ -575,7 +575,7 @@ so the late Back was lost. `mapmaker_pointer_tick_back` sets it in
 clears the right-click action for the row hook. Every other MapMaker list descriptor
 in `0x0052C000..0x0052F000` relies on `+0x1C0` (scan of ticks testing `+0xC4 & 0x20`;
 tile/item/Story AI/logic/settings observed with `+0x1C0` set). No guest regeneration. Fixture:
-`tests/mapmaker/test_mapmaker_pointer.py`. Mac: MAC-128. Next:
+`tests/mapmaker/test_mapmaker_pointer.py`. Mac: MAC-133. Next:
 `mapmaker_table_input` (panel toggle, eats its A), SAI pts: [caps](limitless-caps.md).
 
 ### MapMaker editor widescreen

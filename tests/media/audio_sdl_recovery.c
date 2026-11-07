@@ -7,6 +7,55 @@ static int submit(unsigned slot) {
 }
 int main(int argc, char **argv) {
     assert(argc==2);
+    if(!strcmp(argv[1],"tail")) {
+        assert(submit(0) && submit(1));
+        SDL_AudioStream *s=voices[0].stream;
+        uint64_t played=123;uint32_t queued=456;
+        assert(!recomp_audio_output_position(0,&played,&queued));
+        assert(played==123 && queued==456); /* no invented SDL device clock */
+        s->queued=4;
+        assert(recomp_audio_output_tail_pending(0,0) && !s->flushes);
+        assert(recomp_audio_output_tail_pending(0,1));
+        assert(s->flushes==1 && !s->queued && s->available==4);
+        assert(recomp_audio_output_tail_pending(0,1) && s->flushes==1);
+        s->available=0;assert(!recomp_audio_output_tail_pending(0,1));
+        recomp_audio_output_reset_voice(0);
+        assert(!recomp_audio_output_tail_pending(0,1));
+        assert(submit(0));s=voices[0].stream;assert(!voices[0].flushed);
+        fail_flush=1;assert(!recomp_audio_output_tail_pending(0,1));
+        assert(!voices[0].stream && voices[1].stream);
+        assert(recomp_audio_output_take_discontinuity(0));
+        fail_flush=0;sdl_now=1000;assert(submit(0));
+        fail_available=1;assert(!recomp_audio_output_tail_pending(0,0));
+        assert(!voices[0].stream && voices[1].stream);
+        fail_available=0;recomp_audio_output_shutdown();
+        assert(!recomp_audio_output_tail_pending(1,1));
+        assert(!recomp_audio_output_tail_pending(SLOT_COUNT,1));
+        return 0;
+    }
+    if(!strcmp(argv[1],"exit-failure")) {
+        fail_open=1; assert(!submit(0)); return 0;
+    }
+    if(!strcmp(argv[1],"exit-muted")) { assert(!submit(0)); return 0; }
+    if(!strcmp(argv[1],"diagnostics")) {
+        RecompAudioEngineStats stats;
+        fail_open=1; assert(!submit(0));
+        assert(!recomp_audio_output_engine_stats(&stats));
+        assert(stats.open_attempts==1 && stats.device_failed==1 && stats.unavailable==1 && !stats.opens);
+        fail_open=0; sdl_now=1000; assert(submit(0));
+        queued_bytes=96001; assert(!submit(0)); queued_bytes=0;
+        assert(!recomp_audio_output_submit(0,pcm,3,48000,2,16,0));
+        fail_put=1; assert(!submit(0)); fail_put=0; assert(!submit(0));
+        recomp_audio_output_engine_stats(&stats);
+        assert(stats.queue_full==1 && stats.invalid_pcm==1 && stats.voice_failed==1 && stats.retry_wait==1);
+        sdl_now=2000; assert(submit(0));
+        recomp_audio_output_reset_voice(0); recomp_audio_output_shutdown();
+        recomp_audio_output_shutdown();
+        assert(!recomp_audio_output_engine_stats(&stats));
+        assert(stats.open_attempts==2 && stats.opens==1 && stats.device_failed==1);
+        assert(stats.queue_full==1 && stats.invalid_pcm==1 && stats.voice_failed==1);
+        return 0;
+    }
     if(!strcmp(argv[1],"enhanced-on") || !strcmp(argv[1],"enhanced-off")) {
         const int enabled=!strcmp(argv[1],"enhanced-on");
         recomp_audio_output_set_spatial(0,-1,enabled);

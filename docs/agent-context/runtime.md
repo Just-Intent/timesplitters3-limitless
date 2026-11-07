@@ -1,38 +1,84 @@
-# Runtime and patch navigation
+[Tools](developer-tools-integration.md).
 
-Effects buffering: `media/0055-dsound-busy-buffer-recovery.patch` extends the
-shared `hle_dsound.c` pump. Its default 40 ms lead grows per buffer to the
-observed active service interval plus 10 ms, capped at 90 ms. Explicit
-`RECOMP_DSOUND_LEAD_MS` values stay fixed, including legacy zero. Play still
-submits immediately; pause/stop resets prevent learning inactive intervals.
-After a >100 ms output-model interval, stale data is skipped only up to now,
-then the future lead is submitted in the same call. Refused submissions keep
-the output cursor unchanged; expired one-shots stay expired. Guest clocks,
-stream/music policy and host audio adapters are unchanged. The existing audio
-timing CI suite now exercises 64 voices under delayed service and recovery.
+[Full](video-options.md); [Uplink](native-uplink.md).
+[UI](controls-options.md); [Kill feed](../development/arcade-kill-feed.md).
 
-`media/0056-dsound-invalid-buffer-retirement.patch` makes every unusable-buffer
-exit in `model_for_known` retire an existing slot/host voice, including null
-settings holders and invalid rate/alignment. DirectSoundDoWork therefore reclaims
-invalid stopped buffers as well as playing ones. Valid stopped/paused buffers
-are retained; no live voice is evicted to admit another sound. See
-[audio lifecycle tests](audio-buffers.md). Guest Release remains unchanged.
-`media/0059-custom-music-voice.patch` adds output slot 273
-(`RECOMP_AUDIO_SLOT_MUSIC`) for [imported music](custom-music.md).
-`media/2160-custom-music-codec.patch` (pinned after 2140-native-online in
-`patch_records`) adds the title's MP3 adapter TU `pc_music_codec.c`.
+[Imported music](custom-music.md): `media/0059-custom-music-voice.patch` (slot 273,
+`RECOMP_AUDIO_SLOT_MUSIC`); `media/2160-custom-music-codec.patch` (last in
+`patch_records`) adds the MP3 adapter `pc_music_codec.c`. 0056: [audio](audio-buffers.md).
+[Effect depth](native-effect-depth.md).
+[Linux](linux-game.md); [MSAA](smaa.md).
+[MP hooks](multiplayer-exit.md)
+2465 wraps356800 for rewards;
+profile mapper356870 stays original. See [contract](systems-details.md#four-player-rewards-context).
 
-`media/0057-dsound-format-and-tail-recovery.patch` includes rate/alignment in
-buffer identity, retains raw source size while clocking complete frames, and
-preserves stream packet boundaries for rate-only SetFormat. Exact unheard PCM
-and ADPCM suffixes survive voice resets/pause; encoding layout changes keep the
-previous policy. See [format regression coverage](audio-buffers.md).
+Story lobby host loss: additive2460 wraps1AF950. The shared menu adapter scopes
+the native guest-lobby8D notification to main return, preserving transport reset
+and rebuilding main in its own layout context. See [contracts](systems-details.md).
 
-`media/0058-audio-device-recovery.patch` adds one-second XAudio engine/voice
-retries and a shared per-slot discontinuity signal for streams and movies.
-Their wall-clock fallback skips elapsed audio and establishes a fresh playback
-origin after reconnecting. Explicit reset clears the signal; mute/shutdown
-remain terminal. See [device recovery and tests](audio-buffers.md).
+Rejoin view/weapon lifetime uses existing D4BE0 camera and A9070 world-remove
+wrappers. Rejoin restores a missed camera-end transition once;
+world identity excludes native first-person viewport models before cached-key
+lookup. No wrapper or generated-code change is needed. See
+[contracts](systems-details.md).
+
+Story in-progress rejoin uses existing2D398D pending-copy,9A420 synthetic-pad
+and class1e adapters; no new wrapper or generated-code edit is required. The
+original spawn resolves the temporary host-relative pad through D4F50/2B05A0.
+See [rejoin contract](systems-details.md).
+
+Story peer departure: additive2450 wraps BABA0. Its adapter replaces only the
+first-mission remote departure caller35C199 with native context inactivity,
+leaving the original peer cleanup and actual combat deaths intact. See
+[departure contract](systems-details.md).
+
+Story abort routing: additive2440 wraps3592F0 (reliable lobby-return receiver)
+and65420 (full-disconnect scheduler). Original unloading and reliable classB
+transport remain; Story adapters select lobby/main and avoid campaign recording
+on abort. Online confirmation2EBE60 uses existing menu lookup. See
+[contracts](systems-details.md).
+
+Story browser level details: additive2435 wraps1CBDA0/2BECE0. Only validated
+Story advertisements in the System Link list scope a Story metadata lookup;
+its1CBFC4 picture draw uses the thumbnail and adds the localized level name.
+Arcade, joined lobbies and native fallback retain original callbacks. See
+[contracts](systems-details.md).
+
+Empty guest rewards: additive2430 wraps menu factory79860. Only joined first-
+mission guest rewards106 with an actual zero unlock count redirects descriptor
+5236DC (loading) to523900 (reward pages/waiting), preserving save and transport.
+See [contracts](systems-details.md).
+
+Guest profile saves: additive2425 wraps original1922D0 through a scoped
+persistent-profile view for joined first-mission reward saves; network slots
+are restored afterward. Original validation, checksums, signed writes and
+error/retry UI remain. See [contracts](systems-details.md).
+
+Guest reward pages: additive2420 wraps2CBAF0 so original automatic timer tail
+calls reach the same final-page waiting policy as confirmation. Guest completion
+recording and own-profile selection use existing shared Story source; native fallback
+keeps the original page callback. See [contracts](systems-details.md).
+
+Network score lifetime: additive2415 wraps stock3578A0 after the shared
+network adapter include. Movie/frontend scenes hold late gameplay score
+snapshots before their actor/ranking writes. See [contracts](systems-details.md).
+
+Story movie lifetime: additive network2410 wraps original60310 through the
+shared Story adapter so a guest's blocked movie advance does not release its
+still-rendered stream at99BB7. Real load teardown and other modes retain the
+original close. See [contracts](systems-details.md) and [fixture](build-test-details.md).
+
+# Runtime ([MSAA](smaa.md))
+
+Patch2180 wraps US1C2AF0 for an already-eligible fresh player trigger only;
+the patch loader orders it after native minigun/timing wrappers. It preserves
+held-fire and continuation calls. See [input contract](interaction-input.md#fresh-weapon-clicks-434).
+
+Story co-op integration: [contracts](systems-details.md).
+
+Audio recovery patches0055-0058: [buffering, lifecycle, format and device contracts](audio-buffers.md).
+Audio release/exit/completion patches2300-2306: [contracts and diagnostics](audio-buffers.md).
+
 
 Patch 2140-native-minigun-intent follows the native weapon wrappers in loader dependency order. It scopes held-primary intent around original US 1C74D0 event 1. Generic shots remain on whole ticks; numeric site 1C7600 normalizes release damping. See native-minigun.md.
 
@@ -897,45 +943,7 @@ Ordinal81 repair/test: [next-packet ABI](kernel-objects.md#guest-next-packet-abi
 
 Request allocation/ownership through0218: [contracts](kernel-objects.md#original-request-storage-and-initialization).
 
-## Profile early-access hooks
-
-See [Unlock Content](unlock-content.md) for the shared menu, profile extension,
-original predicate hooks and isolated validation routes.
-
-
-Original sharing bridges and ordinal80 cleanup: [contracts and checks](kernel-sharing.md).
-
-
-Original request lifetime/callback prerequisites: [contracts and ABI boundary](request-lifetime.md).
-
-
-Stage0222: [original driver-call composition and opaque stack payload](driver-call.md).
-
-
-Stage0223: [private request construction and completion delivery](transfer-completion.md).
-
-Stage0224: [host-owned FIFO request scheduling](transfer-completion.md#host-owned-request-queue).
-
-Stage0225: [StartIo callback composition and acceptance](transfer-completion.md#startio-callback-composition); maintained maps include the new provider.
-
-Stage0226: [exclusive waiting membership and device queue mirrors](transfer-completion.md#device-queue-mirrors).
-
-Stage0227: [persistent device queue lifetime and scoped scheduler APIs](transfer-completion.md#persistent-device-queue-lifetime).
-
-Stage0228: [read-only caller-owned request adoption and range lifetime](transfer-completion.md#caller-owned-request-adoption).
-
-Stages0229/0231: [events and targets](transfer-completion.md). Stage0232: [symbolic links](symbolic-links.md).
-
-Stages0233/0234: [routing](guest-paths.md), [original host storage](host-storage.md).
-
-`2080-tank-driver-controls.patch` wraps 1730E0 through shared
-`pc_tank_guest.inc`. The local keyboard/mouse scope selects signed track input
-and restores actor links after the original call; controller behavior retains
-the original camera-relative branch. See [scope guards](mounted-mouse.md).
-
-Stage0235: [original pool imports and native surface retirement](kernel-pool.md).
-
-Stage0236: [original absolute-time codec and guest calendar imports](kernel-time.md).
+Profile early-access hooks: [continuation](runtime-continuation.md#profile-early-access-hooks).
 
 ## Native Online integration (2026-10-30)
 
@@ -970,3 +978,14 @@ anchor for labels and resets at placement boundaries; viewport/scissor share it.
 Both common backends and legacy GL consume the helper. Original world projection,
 visibility and objective logic remain guest-owned (Refs #338).
 MapMaker wrapper/table notes (incl. tilesets, multi-boss areas, set slot masks, tile caps, open-air view, 16 floors, sandstorm haze, camera frame, nav block, physics bodies, set screens, tile roof menu, skies/music, open air, skeleton frustum log, object create guard, music restart): [limitless](limitless.md).
+
+## Languages
+
+[Language contracts](language-packs.md).
+
+
+0241: [product/ABI](guest-integer-product.md).
+
+RTL: [arithmetic/memory](guest-memory-ops.md), [strings](guest-stack-trace.md); [host policy](execution-host.md).
+
+2350: controls-options.md.

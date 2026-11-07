@@ -49,7 +49,7 @@ def test_parser_sources_and_bridge_invalidate_generation(tmp_path, monkeypatch):
         path = runtime / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('original')
-    for name in ('xbe_image.py', 'xbe_kernel_exports.def', 'recomp_image.py', 'x86_decode.py', 'x86_flow.py', 'x86_recovery.py', 'x86_functions.py', 'recomp_symbols.py', 'analysis_cache.py', 'analysis_config.py', 'analysis_output.py', 'analysis_runner.py', 'xdk_catalog.py', 'compile_pipeline.py', 'function_evidence.py', 'function_categories.py', 'function_catalog.py', 'c_source_scan.py', 'generation_output.py', 'translation_decode.py', 'translation_layout.py', 'translation_hooks.py', 'branch_feedback.py', 'unresolved_report.py', 'translation_operands.py', 'translation_moves.py', 'translation_integer.py', 'translation_bits.py', 'translation_product.py', 'translation_bitops.py', 'translation_exchange.py', 'translation_compare.py', 'translation_strings.py', 'translation_conditions.py', 'translation_sse.py', 'translation_mmx.py', 'translation_x87.py', 'translation_control.py', 'translation_lifting.py', 'translation_context.py', 'translation_helpers.py', 'translation_names.py', 'translation_host_symbols.txt', 'translation_host_symbols.json', 'translation_batch.py', 'translation_discovery.py', 'translation_function.py', 'translation_cli.py', 'guest_code_patches.py'):
+    for name in ('xbe_image.py', 'xbe_kernel_exports.def', 'recomp_image.py', 'x86_decode.py', 'x86_flow.py', 'x86_recovery.py', 'x86_functions.py', 'recomp_symbols.py', 'analysis_cache.py', 'analysis_config.py', 'analysis_output.py', 'analysis_runner.py', 'xdk_catalog.py', 'compile_pipeline.py', 'function_evidence.py', 'function_categories.py', 'function_catalog.py', 'c_source_scan.py', 'generation_output.py', 'translation_decode.py', 'translation_layout.py', 'translation_hooks.py', 'branch_feedback.py', 'unresolved_report.py', 'translation_operands.py', 'translation_moves.py', 'translation_integer.py', 'translation_bits.py', 'translation_product.py', 'translation_bitops.py', 'translation_exchange.py', 'translation_compare.py', 'translation_strings.py', 'translation_conditions.py', 'translation_sse.py', 'translation_mmx.py', 'translation_x87.py', 'translation_control.py', 'translation_lifting.py', 'translation_context.py', 'translation_helpers.py', 'translation_names.py', 'translation_host_symbols.txt', 'translation_host_symbols.json', 'translation_batch.py', 'translation_discovery.py', 'translation_function.py', 'translation_continuation.py', 'continuation_index.py', 'continuation_output.py', 'translation_cli.py', 'guest_code_patches.py'):
         path = project / 'tools/compiler' / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('original')
@@ -58,12 +58,14 @@ def test_parser_sources_and_bridge_invalidate_generation(tmp_path, monkeypatch):
     header.write_text('original')
     support = header.with_name('tsfp_branch_feedback.h')
     support.write_text('original')
+    for name in ('guest_context_execution.h','guest_x86_context.h'):
+        header.with_name(name).write_text('original')
     monkeypatch.setattr(generation, '__file__', str(project / 'tools/build/recomp-generation.py'))
-    for path in (header, support, project / 'tools/compiler/xbe_image.py', project / 'tools/compiler/xbe_kernel_exports.def',
+    for path in (header, support, header.with_name('guest_context_execution.h'), header.with_name('guest_x86_context.h'), project / 'tools/compiler/continuation_index.py', project / 'tools/compiler/continuation_output.py', project / 'tools/compiler/xbe_image.py', project / 'tools/compiler/xbe_kernel_exports.def',
                  project / 'tools/compiler/recomp_image.py', project / 'tools/compiler/x86_decode.py', project / 'tools/compiler/x86_flow.py', project / 'tools/compiler/x86_recovery.py', project / 'tools/compiler/x86_functions.py', project / 'tools/compiler/recomp_symbols.py',
                  project / 'tools/compiler/analysis_cache.py', project / 'tools/compiler/analysis_config.py', project / 'tools/compiler/analysis_output.py', project / 'tools/compiler/analysis_runner.py',
                  project / 'tools/compiler/xdk_catalog.py', project / 'tools/compiler/compile_pipeline.py',
-                 project / 'tools/compiler/function_evidence.py', project / 'tools/compiler/function_categories.py', project / 'tools/compiler/function_catalog.py', project / 'tools/compiler/c_source_scan.py', project / 'tools/compiler/generation_output.py', project / 'tools/compiler/translation_decode.py', project / 'tools/compiler/translation_layout.py', project / 'tools/compiler/translation_hooks.py', project / 'tools/compiler/branch_feedback.py', project / 'tools/compiler/unresolved_report.py', project / 'tools/compiler/translation_operands.py', project / 'tools/compiler/translation_moves.py', project / 'tools/compiler/translation_integer.py', project / 'tools/compiler/translation_bits.py', project / 'tools/compiler/translation_product.py', project / 'tools/compiler/guest_code_patches.py',
+                 project / 'tools/compiler/function_evidence.py', project / 'tools/compiler/function_categories.py', project / 'tools/compiler/function_catalog.py', project / 'tools/compiler/c_source_scan.py', project / 'tools/compiler/generation_output.py', project / 'tools/compiler/translation_decode.py', project / 'tools/compiler/translation_layout.py', project / 'tools/compiler/translation_hooks.py', project / 'tools/compiler/branch_feedback.py', project / 'tools/compiler/unresolved_report.py', project / 'tools/compiler/translation_operands.py', project / 'tools/compiler/translation_moves.py', project / 'tools/compiler/translation_integer.py', project / 'tools/compiler/translation_bits.py', project / 'tools/compiler/translation_product.py', project / 'tools/compiler/translation_continuation.py', project / 'tools/compiler/guest_code_patches.py',
                  runtime / 'tools/xbe_parser/xbe_parser.py', runtime / 'tools/disasm/engine.py', runtime / 'tools/xdk_symbols/__main__.py', runtime / 'tools/func_id/__main__.py'):
         generation.record(runtime)
         assert generation.current(runtime)
@@ -96,7 +98,7 @@ def test_guest_code_patch_table_invalidates_generated_code(tmp_path):
 
 def test_builds_pass_the_project_guest_patch_table():
     import json
-    for script, count in (('tsfp.ps1', 2), ('tools/build/build-native-mac.py', 1)):
+    for script, count in (('tsfp.ps1', 2), ('tools/build/build-native-mac.py', 1), ('tools/build/build-native-linux.py', 1)):
         assert (ROOT / script).read_text(encoding='utf-8').count('--guest-patches') == count, script
     header = json.loads((ROOT / 'config/guest-code-patches/00-header.json').read_text(encoding='utf-8'))
     assert header['title_id'] == '45410066'
@@ -106,3 +108,55 @@ def test_builds_pass_the_project_guest_patch_table():
         if table.name != '00-header.json':
             part = json.loads(table.read_text(encoding='utf-8'))
             assert set(part) <= {'patches'}, f'{table.name}: only the header carries title/XBE/extension'
+
+
+# Continuation receipts must detect partial/stale C publication, not just source edits.
+import hashlib
+import json
+import pytest
+
+
+def context_fixture(tmp_path):
+    directory=tmp_path/'titles/futureperfect/src/recomp/gen'
+    directory.mkdir(parents=True)
+    for name in ('scripts/recompile.py','titles/futureperfect/src/recomp_manual.c'):
+        path=tmp_path/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'original')
+    (directory/'recomp_funcs.h').write_bytes(b'original')
+    names=('recomp_context_0000.c','recomp_context_dispatch.c','guest_context_execution.h','guest_x86_context.h')
+    hashes={}
+    for name in names:
+        (directory/name).write_bytes(b'original\n')
+        hashes[name]=hashlib.sha256(b'original\n').hexdigest()
+    record={'version':1,'mode':'decoded-control-blocks','chunks':1,'sha256_text':hashes}
+    manifest=directory/'recomp_context_manifest.json';manifest.write_text(json.dumps(record),encoding='utf-8')
+    return directory,manifest,record
+
+
+def test_context_output_receipt_accepts_native_newlines_and_rejects_edited_code(tmp_path):
+    directory,manifest,record=context_fixture(tmp_path)
+    generation.record(tmp_path)
+    assert generation.current(tmp_path)
+    (directory/'recomp_context_0000.c').write_bytes(b'original\r\n')
+    assert generation.current(tmp_path)
+    (directory/'recomp_context_0000.c').write_bytes(b'changed\n')
+    assert not generation.current(tmp_path)
+    with pytest.raises(ValueError,match='changed'):generation.record(tmp_path)
+    (directory/'recomp_context_0000.c').write_bytes(b'original\n')
+    assert generation.current(tmp_path)
+    manifest.unlink()
+    assert not generation.current(tmp_path)
+
+
+@pytest.mark.parametrize('kind',['missing','extra','traversal','version','chunks','hash','array'])
+def test_invalid_context_publication_cannot_be_recorded(tmp_path,kind):
+    directory,manifest,record=context_fixture(tmp_path)
+    if kind=='missing':(directory/'recomp_context_0000.c').unlink()
+    if kind=='extra':(directory/'recomp_context_0001.c').write_bytes(b'unlisted')
+    if kind=='traversal':record['sha256_text']['../outside.c']='0'*64
+    if kind=='version':record['version']=2
+    if kind=='chunks':record['chunks']=True
+    if kind=='hash':record['sha256_text']['guest_x86_context.h']='bad'
+    if kind=='array':record=[]
+    manifest.write_text(json.dumps(record),encoding='utf-8')
+    assert not generation.current(tmp_path)
+    with pytest.raises(ValueError):generation.record(tmp_path)
