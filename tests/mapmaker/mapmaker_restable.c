@@ -351,7 +351,7 @@ int main(void)
         static const char *titles[15]={"Tiles","Items","Objects","Pickups","Pads","Cover","Links","Groups",
                                       "Memory","Story AI","Logic","Movers","Props","Turrets","Teleports"};
         char want[15][32],text[64];
-        snprintf(want[0],32," 90/511");
+        snprintf(want[0],32," 90/1023");
         snprintf(want[1],32," %u/500",(unsigned)items);
         snprintf(want[2],32," %u/1023",(unsigned)(90u+items+128u));
         snprintf(want[3],32," 40/768");            /* weapons + keycards + health */
@@ -478,17 +478,21 @@ int main(void)
     CHECK(colour_of(" 900/7680")==MAPMAKER_TABLE_OK);
     WORD_AT(0x00529404u+0x280u)=9;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
-    /* Pieces: 511 placed + 1 held refused, the row at 511/511 red. */
-    WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,511);
+    /* Pieces: 1023 placed + 1 held refused (template links 0 so only the
+     * pieces and the engine objects pass), the row at 1023/1023 red. */
+    WORD_AT(0x00529408u+0x280u)=0;
+    WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,1023);
     pc_display_mapmaker_limits(fake_limits);
-    CHECK(mapmaker_limits_view.over&MAPMAKER_CAP_PIECES);
+    CHECK(mapmaker_limits_view.over==(MAPMAKER_CAP_PIECES|MAPMAKER_CAP_OBJECTS));
     draw();
-    CHECK(colour_of(" 511/511")==MAPMAKER_TABLE_FULL);
-    /* Collapsed, the fullest row by ratio among the red ones: tiles 511/511. */
+    CHECK(colour_of(" 1023/1023")==MAPMAKER_TABLE_FULL);
+    CHECK(colour_of(" 1156/1023")==MAPMAKER_TABLE_FULL);          /* 1023 + 5 free objects + 128 */
+    /* Collapsed, the fullest row by ratio among the red ones: objects 1156/1023 over tiles 1023/1023. */
     mapmaker_table.expanded=0;
     draw();
-    CHECK(drawn("+ Fullest: Tiles 511/511")==0 && draws[0].colour==MAPMAKER_TABLE_FULL);
+    CHECK(drawn("+ Fullest: Objects 1156/1023")==0 && draws[0].colour==MAPMAKER_TABLE_FULL);
     mapmaker_table.expanded=1;
+    WORD_AT(0x00529408u+0x280u)=20;
     /* Engine objects: pieces + items + 128 reserved (64 characters, 64 for effects), as the check. */
     WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,340);
     WORD_AT(ED+0x306c)=500u<<16;                                  /* 340 + 500 + 128 = 968 */

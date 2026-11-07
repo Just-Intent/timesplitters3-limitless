@@ -29,9 +29,9 @@ EXPECTED = '\n'.join([
     'phase rebuild',
     M + 'dev switch TSFP_MAPMAKER_ROOM_MASK_CLEAR=0x09000000 (MapMaker play only)',
     M + 'cleared 0x09000000 on 2 rooms (build 1: 2 rooms in 1 pieces)',
-    M + 'room 511 0xFFFFFFFF -> 0xF6FFFFFF',
-    M + 'room 512 0xFFFFFFFF -> 0xF6FFFFFF',
-    M + '2 rooms past the 512-entry table left unchanged',
+    M + 'room 1023 0xFFFFFFFF -> 0xF6FFFFFF',
+    M + 'room 1024 0xFFFFFFFF -> 0xF6FFFFFF',
+    M + '2 rooms past the 1024-entry table left unchanged',
     'phase bound',
     M + 'dev switch TSFP_MAPMAKER_ROOM_MASK_CLEAR=0x02000000 (MapMaker play only)',
     M + 'room build in scene 102 ignored (play is scene 100)',
@@ -46,7 +46,7 @@ EXPECTED = '\n'.join([
 MUTATIONS = {
     'default-on': ('strtoul(text,&end,16):0ul;', 'strtoul(text,&end,16):0x02000000ul;'),
     'any-scene': ('if(scene==MAPMAKER_SKYMASK_SCENE_PLAY) build=', 'if(1) build='),
-    'stock-table': ('#define MAPMAKER_SKYMASK_TABLE 0x008C0800u', '#define MAPMAKER_SKYMASK_TABLE 0x00703460u'),
+    'stock-table': ('#define MAPMAKER_SKYMASK_TABLE 0x008C1000u', '#define MAPMAKER_SKYMASK_TABLE 0x00703460u'),
     'no-bound': ('if(room>=MAPMAKER_SKYMASK_ROOMS) {', 'if(0) {'),
     'writes-build': ('WORD_AT(address)=old&~clear;', 'WORD_AT(address)=old&~clear;WORD_AT(build+0x44u)&=~clear;'),
     'zeroes-mask': ('WORD_AT(address)=old&~clear;', 'WORD_AT(address)=0u;'),
@@ -101,7 +101,7 @@ def test_mapmaker_skymask(tmp_path, mutation):
 
 def test_room_mask_table_has_one_writer():
     """The hook relies on sub_00085710 being the only store into the per-room
-    mask table (stock 0x00703460, relocated to 0x008C0800) and on rooms.json
+    mask table (stock 0x00703460, relocated to 0x008C1000) and on rooms.json
     relocating every reference. Decoded with the lifter's decoder."""
     import json
     from mapmaker_decoded import decoded
@@ -116,7 +116,7 @@ def test_room_mask_table_has_one_writer():
     rooms = json.loads((ROOT / 'config/guest-code-patches/rooms.json').read_text(encoding='utf-8'))
     entries = rooms['patches']
     reloc = next(e for e in entries if e.get('id') == 'rooms-reloc-t3-0x703460')
-    assert int(reloc['new'], 16) == 0x008C0800 and int(reloc['new_size'], 16) >= 512 * 4   # 512 rooms; the switch covers them all
+    assert int(reloc['new'], 16) == 0x008C1000 and int(reloc['new_size'], 16) >= 1024 * 4   # 1024 rooms; the switch covers them all
     for site in (0x00083974, 0x000857A3, 0x00085DCA, 0x0008A79B):
         assert reloc['sites'][f'0x{site:08X}'] == 'offset'
 

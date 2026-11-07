@@ -425,7 +425,7 @@ int main(int argc,char **argv)
     CHECK(room_originals==2 && draw_originals==4);
     CHECK(checksum()==before);
     read_log();
-    CHECK(strstr(log_text,"rooms-window begin n=1 tables=0x008C7000/0x008C7CC0\n")!=NULL);
+    CHECK(strstr(log_text,"rooms-window begin n=1 tables=0x008CC000/0x008CD040\n")!=NULL);
     CHECK(count("room-draw ret=0x00086BDE room=5 pass=0 props=2\n")==1);
     CHECK(strstr(log_text,"  prop room=5 index=0 at=0x00350000 model=0x90C geometry=1 type(+20)=0x80 flags(+28)=0x00400000"
                           " mask(+0C)=0x00000001 +31=0 +32=1 room(+34)=5 inst=0x00351000 inst+30=0x02000000 inst+1F4=0x00080000\n")!=NULL);

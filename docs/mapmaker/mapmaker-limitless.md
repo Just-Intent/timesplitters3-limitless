@@ -63,7 +63,7 @@ are not in the launcher.
 
 | Limit | Original | Limitless |
 | --- | --- | --- |
-| Tiles (pieces) | 200 | 255 |
+| Tiles (pieces) | 200 | 1023 (see below) |
 | Items | 50 | 500 |
 | Keycards | 2 per colour | 16 per colour |
 | Pickups (weapons, ammo, health, armour, power-ups) | original per-type maxima | x4 |
@@ -75,13 +75,24 @@ are not in the launcher.
 | Bots per MapMaker Arcade match (local play) | 10 (16 characters) | 20 (24 characters) |
 | Logic operations / nodes / records | 30 / 130 / 100 | 120 / 520 / 400 |
 | Free-standing objects | 40 / 30 / 100 | 160 / 120 / 400 |
-| Pads / pad links / pad groups | 2400 / 4400 / 300 | 4800 / 12000 / 600 |
+| Pads / pad links / pad groups | 2400 / 4400 / 300 | 7680 / 32256 / 1024 |
+| Engine objects (tiles + items + 128 kept for characters and explosions) | 550 | 1023 |
 | Map file | 32 KB | 512 KB |
 | Memory budget meter | 1x | 8x |
 
 With `LIMITS` the editor's memory meter becomes a [resource table](mapmaker-restable.md):
-one row per limit above ("Tiles: 123/511"), amber near the limit and red at
+one row per limit above ("Tiles: 123/1023"), amber near the limit and red at
 it. *Automated tests only.*
+
+**Tiles past 511 (2026-11-07, not yet tested in game).** The tile limit is
+1023, but every tile is also one engine object, and the game has room for
+1023 of those in all: tiles + items + 128 must fit. So a map can hold about
+895 tiles with no items, 600 tiles with 295 items, or 511 tiles with 384
+items; the Objects row of the resource table shows how close you are.
+Heavy tiles (many pads and links) stop earlier on Pads (about 549) or Links
+(about 521), and typical maps near 680 tiles on Pad groups. Saving, loading
+and every edit get slower as the tile count grows (the editor recomputes
+the whole map each time). Old maps load as before.
 
 **Tested (STATUS.md, 2026-10-30):** editor and play on maps with 236 tiles,
 200 items and more than 102 Story AI, up to 64 characters in MapMaker Story,

@@ -245,7 +245,65 @@ play, every load; no MapMaker line before it.
   `mapmaker_limits.c` (pool source and fallback), `mapmaker_budget.c`.
 - Contract: `docs/mapmaker/mapmaker-memory.md` "Round 4".
 
-## What bounds 511 pieces now (cap 511, 2026-11-02)
+## Tiles 511 -> 1023 (2026-11-07, static analysis and fixtures only)
+
+`MAPMAKER_LIMIT_PIECES` and `MAPMAKER_ROOMS_MAX` are 1023 (rooms stage 12 in
+[rooms](limitless-rooms.md)). Each piece is one engine object, so the objects
+cap (pieces + items + 128 <= 1023) binds first: 895 pieces without items,
+600 with 295, 511 with 384. The piece cap itself becomes reachable only when
+the pool grows past the 1024-handle encoding. Old maps load unchanged; stock
+behaviour (limits off, story levels) keeps every editor limit; the rooms
+tables run in every scene as before.
+
+What binds past 511, ranked (for 1023 pieces; heaviest tile 14 pads, 46 links):
+
+| # | cap | where | now | 1023 pieces need | cost / status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | engine object handles | pool `[0x0072F5E8]`, handle slot << 22 (167 `shr 0x16` decodes) | 1023 | 1023 + items + 128 | binds at 895 - items. Next: slot << 21 (2047 slots): every decode/encode, serial mask 0x3FFFFF, lists 0xFFC, twin pool; +1.5 MB pool, +1 MB twins (Level heap) |
+| 2 | pad groups | `[0x00762CB8]`, matrix `sub_00275F70` (N+1) x N x 4 in the 6 MB nav block | 1024 | ~1,535 (1.5/piece) | binds ~680 pieces; 1,536 groups = 9.4 MB matrix and 2.4 M route searches at load |
+| 3 | links (int16 A* indices) | `MAPMAKER_POOL_LINKS` 32,512 | 32,256 | 47 K heavy | 521 heavy, 1,024 at <= 15 links; hard int16 limit |
+| 4 | regular pads (ids <= 0x2328) | `pads.json` thresholds | 7,680 | 14 K heavy | 549 heavy |
+| 5 | memory estimate | scale 8, 16.4 MB | 2,048,000 x 8 | | 386 heaviest-memory, 1,960 light |
+| 6 | Level heap in play | arena 47 MB (+16 MB by `TSFP_MAPMAKER_ARENA_MB`) | unmeasured | ~30-48 KB per tile with content (two maps) | real limit for heavy content; probe flag 32 |
+| 7 | cover pads | 10,240 handles | 9,984 | 14 K heavy | 713 heavy |
+| 8 | portal flags | stack 0x4000 (`MAPMAKER_ROOMS_PORTALS`) | 16,383 | ~14 per piece | ~1,170 average; the compile guard drops pieces past it |
+| 9 | light records per room group | pool 500 / (rooms / 16) | ~7 per 16 rooms | | quality only (sparser lights), unmeasured |
+| 10 | editor piece pool | `0x00302FF0`, `0x00307C43/4F/61` | 1024 -> **2048** (items.json, +72 KB editor) | 1023 placed + a copy of all + 1 | done; a group copy past the pool wrote through a null node (`sub_002F9920`) |
+| 11 | level fill frame | `level.json` `sub_00240C50` | 512 -> **1024** records (frame 0x2090) | 1023 | done (+4 KB stack) |
+| 12 | room machinery | `rooms.json` | 511 -> **1023** ids | | done: +48 KB view array, +12 KB per-model array (every scene), +25 KB prop slots (scene 100) |
+| 13 | container / undo | 512 KB, tiers to 0x7FFE0 | | 1023 x 248 B (type 41) = 254 KB + items | fits |
+| 14 | loader piece table, Story AI piece byte | `sub_00301A90` 1024 pointers; retries +256/+512/+768 | 1024 | | fits |
+| 15 | pickups 768, physics bodies 1024, prop blocks 2048 | objects area | | follow items/objects, not tiles | fit within the object pool |
+
+New table entries: `items.json` `mm-piece-pool-bytes/-loop/-last/-count`
+(2048 nodes); `level.json` re-valued (frame 0x2090, arguments +0x1060);
+`rooms.json` re-valued (see rooms stage 12). No new wrapper. Tests:
+`mapmaker_limits.c` (895 cost-free fit, 896th refused on objects, 1024
+also on pieces, 520 heavy fit and the 521st refused on links, 600 + 295),
+`test_mapmaker_limits.py` (`pieces-511`, `pieces-past-rooms`, refusal lines
+`engine objects 1024 of 1023` and `pieces 1024 of 1023; engine objects`),
+`test_mapmaker_limits_classified.py` (`test_piece_pool_*`: four sites in two
+functions, the count only set/dec/inc), `mapmaker_restable.c` (Tiles 1023 row
+red, collapsed `Objects 1156/1023`), `mapmaker_validate.c` (1024 kept, 1025
+hidden).
+
+Save/load delay (decoded, not measured): `sub_002FC470` (piece variant)
+first calls `sub_002FC3D0`, which walks the whole placed list (loop
+0x002FC3F5..0x002FC41C, maximum z + height), so each call is O(pieces).
+The writer's pad-id helper `sub_00331E50` (once per item, Story AI point and
+logic reference) walks the pieces before its target calling `sub_002FC470`
+for each (0x00331EC2..0x00331EF6), and `sub_002FC680` per piece calls it
+~30 times: about (items + points) x n^2 / 2 list steps, ~50 M at 511 pieces
++ 384 items, 4x at 1023. A save compiles twice (`sub_00312DF0` 0x00312E05,
+then the undo shadow `sub_00336640`), a load once, every edit once
+(`sub_00337600` 0x003376BA). Cheap fix (not done): memoize `sub_002FC3D0`
+while `sub_003006C0`/`sub_00301A90` run (the placed list does not change
+inside them), or prefix-sum the pad counts for `sub_00331E50` once per
+compile.
+
+Play check (user): see [rooms](limitless-rooms.md) stage 12.
+
+## What bounded 511 pieces (cap 511, 2026-11-02; see above for 1023)
 
 `MAPMAKER_LIMIT_PIECES` is 511 ([rooms](limitless-rooms.md) stage 11; the
 level fill pass frame `level.json` holds 512). Pads stop at 548, links at

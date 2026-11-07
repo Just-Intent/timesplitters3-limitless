@@ -136,11 +136,11 @@ def test_room_prop_lists_are_rebuilt_per_frame_before_the_views():
     assert target(a[0x0009E574]) == 0x0009E430 and a[0x0009E570].text == 'edx, dword ptr [ebp]'
     # sub_0009E430: a full room grows its capacity, then the pool bound drops the prop (raised cap kept)
     assert a[0x0009E46B].text == 'eax, 0x14cd'          # stock; objects.json obj-bucket-bound makes it 0x299D
-    assert ('mem', None, 'edx', 4, 0x007B5BA0, 4) in a[0x0009E462].ops     # stock; rooms.json p3 -> 0x008C5840
+    assert ('mem', None, 'edx', 4, 0x007B5BA0, 4) in a[0x0009E462].ops     # stock; rooms.json p3 -> 0x008CF0C0
 
 
 def test_rooms_reach_props_only_through_their_lists():
     a = by_address()
-    # sub_00086480 (reader): sub_000A79B0(room) then the draw; sub_000A79B0 walks [0x008C7CC0 + 4*room]
+    # sub_00086480 (reader): sub_000A79B0(room) then the draw; sub_000A79B0 walks [0x008CD040 + 4*room]
     assert target(a[0x00086579]) == 0x000A79B0 and a[0x00086579].function == 0x00086480
     assert target(a[0x000A79E6]) == 0x000A2430
