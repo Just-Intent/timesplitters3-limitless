@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3770 @@
+@@ -1037,6 +1037,3803 @@
      sub_002FA720_gen();
  #endif
  }
@@ -3645,6 +3645,39 @@
 +    else sub_00071800_gen();
 +#else
 +    sub_00071800_gen();
++#endif
++}
++
++extern void sub_0008E3E0_gen(void);
++void sub_0008E3E0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("tilesets","pc_mapmaker_disco_textures")) pc_mapmaker_disco_textures(sub_0008E3E0_gen);
++    else sub_0008E3E0_gen();
++#else
++    sub_0008E3E0_gen();
++#endif
++}
++
++extern void sub_002FC0A0_gen(void);
++void sub_002FC0A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("tilesets","pc_mapmaker_disco_menu_close")) pc_mapmaker_disco_menu_close(sub_002FC0A0_gen);
++    else sub_002FC0A0_gen();
++#else
++    sub_002FC0A0_gen();
++#endif
++}
++
++extern void sub_00338180_gen(void);
++void sub_00338180(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("tilesets","pc_mapmaker_disco_stream")) pc_mapmaker_disco_stream(sub_00338180_gen);
++    else sub_00338180_gen();
++#else
++    sub_00338180_gen();
 +#endif
 +}
 +
