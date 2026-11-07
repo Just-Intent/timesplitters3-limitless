@@ -626,9 +626,8 @@ patches until full-stack migration; fresh stacks apply all patches.
 `test_text_read_scope.py` covers scoped queries, nesting, fresh writes and
 mutations; Windows prompt fixtures verify actual page protections and ABI.
 
-The PR #285 CI index check also caught three pre-existing Windows patch files
-with residual CRLF bytes despite their LF attributes. They were normalized to
-the exact committed Git blobs and the index refreshed. Patch record hashes
+PR #285's CI index check caught three Windows patch files with residual CRLF
+bytes despite LF attributes; they were normalized to the committed blobs. Patch record hashes
 identify actual bytes: refresh from canonical attribute-compliant files, keeping
 the explicitly binary watermark patch unchanged. Local index success alone
 does not prove a fresh checkout has the same patch bytes.
@@ -641,8 +640,9 @@ clean command reads stdin without a destination filename: an existing pointer
 filename can supply the wrong size and truncate the streamed DDS. Exact pointer
 hash/size comparison remains mandatory. `tests/textures/test_build_textures.py` covers
 first export and updating an existing pointer with a DDS larger than 1 KiB.
-Use `tests/textures/test_texture_release.py` for format/hash/privacy and package limits.
-No game launch is required for this export-only change.
+Use `tests/textures/test_texture_release.py` for format/hash/privacy and package limits;
+no game launch. `tools/textures/tileset-survey.py` (read-only) lists
+model texture ids; PNGs go only to `private/`.
 
 ## Original character icon policy
 
