@@ -488,7 +488,7 @@ after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 `rbs_extra` table in realbosses.inc (159/160 Prometheus); `storyprops`: drum/gun variants (+mem-pak textures); bigdraw adds 0x5F2/0x5E8. Tank WRAPs
 `sub_0015E7C0` -> `_tank_request` (level-init models), `sub_000A2740` -> `_draw`
-(log); shown (+0x28 bit 0) at create. .22: tank yard/target search bounded;
+(log), `sub_00228B50` -> `_mine` (.55 TNT); shown at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Boss areas/skies/open air/set slots/pak table/restart heap: [boss notes](limitless-bosses.md); [.tsmap](map-transfer.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm

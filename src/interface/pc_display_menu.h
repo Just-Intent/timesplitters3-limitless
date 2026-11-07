@@ -324,6 +324,7 @@ void pc_mapmaker_tank_damage(void (*original)(void));
 void pc_mapmaker_tank_bar(void (*original)(void));
 void pc_mapmaker_tank_draw(void (*original)(void));
 void pc_mapmaker_tank_restart(void (*original)(void));
+void pc_mapmaker_tank_mine(void (*original)(void));
 void pc_mapmaker_khallos_mount(void (*original)(void));
 void pc_mapmaker_khallos_anims(void (*original)(void));
 void pc_mapmaker_khallos_request(void (*original)(void));
