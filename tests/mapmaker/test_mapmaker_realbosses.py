@@ -1067,3 +1067,27 @@ def test_restart_resets_only_the_mission_bosses():
     assert calls(0x00287860) == {0x0025F6FB} and calls(0x00297690) == {0x0025F6EA}
     assert target(a[0x00287E19]) == 0x00287860 and target(a[0x0029773D]) == 0x00297690   # init = allocate + reset
     assert mem(a[0x00287861])[0][4] == 0x0078B1EC and mem(a[0x00297690])[0][4] == 0x0078B1E8
+
+
+def test_prometheus_rows_data():
+    """Picker rows 159/160 (Machine Wars "Prometheus" robots, story-assets item 18):
+    0x62 PROMETHEUS SK/8 and 0x36 PROMETHEUS SD/7 are in the robot list sub_000D6DD0
+    (byte table 0x000D6E00 from id 0x12, entry 0 = robot), have no Arcade row,
+    share the name text of their Arcade twins 0xAA/0xA9 (the previews), and are
+    not used by another port (0x12 = castle tank, 0x75 = mothership)."""
+    rd = xbe_reader()
+    for rid in (0x62, 0x36, 0xA9, 0xAA):
+        assert rd(0x000D6E00 + rid - 0x12, 1)[0] == 0, hex(rid)
+    assert struct.unpack('<2I', rd(0x000D6DF8, 8)) == (0x000D6DEC, 0x000D6DF2)
+    ids = {struct.unpack_from('<I', rd(0x00521A18 + i * 0x30 + 4, 4))[0]: i for i in range(150)}
+    assert 0x62 not in ids and 0x36 not in ids and ids[0xAA] == 89 and ids[0xA9] == 88
+    text = lambda c: struct.unpack('<H', rd(0x0053A3C8 + c * 0x30, 2))[0]
+    assert text(0x62) == text(0xAA) == 0xDF8 and text(0x36) == text(0xA9) == 0xDDC
+    model = lambda c: struct.unpack('<I', rd(0x0053A3CC + c * 0x30 + 4, 4))[0]
+    assert (model(0x62), model(0x36)) == (0x633, 0x5F8)
+    src = INC.read_text(encoding='utf-8')
+    assert '{159u,0x62u,0x52420062u,0xAAu,"Prometheus SK/8"}' in src
+    assert '{160u,0x36u,0x52420036u,0xA9u,"Prometheus SD/7"}' in src
+    for other in ('pc_mapmaker_tank.inc', 'pc_mapmaker_mothership.inc', 'pc_mapmaker_robot.inc', 'pc_mapmaker_crowe.inc'):
+        body = (ROOT / 'src/interface' / other).read_text(encoding='utf-8')
+        assert '0x62u' not in body and '0x36u' not in body, other
