@@ -56,6 +56,19 @@ Crowe restart allocated new blocks per restart (Level heap used up, about
 stock non-allocating init rest: `rbs_skel_again`/`rbs_walk_again`/`crw_again`,
 block sizes in `pc_mapmaker_bossfx.inc`), as the worm already did.
 
+Restart anims (after .43, CONFIRMED decode + US XBE, `test_restart_drops_the_mansion_anims`):
+the skeletons "glitching out after restarting" (no throw after any restart in
+m40b/m42/m43b.err) were not their blocks. The restart's `sub_0005FC60`
+(0x001CDD6A) -> `sub_0005C2F0` unmaps every loaded anim whose slot word +4
+has 0x4000 (pointer 0, id map 0xFFFF; next slot back to the mark
+`[0x006D77FC]`) and nothing registers them again (`sub_001CA2F0` only on a
+full load). All kept lv1_6/lv1_3 anims have it (lv81/lv14 not), so the
+restarted skeleton never played princess_start and stayed in its entrance.
+`pc_mapmaker_realbosses_restart` notes this map's ids (set + pak mounted)
+before the original and maps them to the same slot/data after it (data is
+in the Level heap pak buffer) when the slot is empty and below the next
+slot. The worm's lv1_2 anims carry the flag too (worm area, not fixed).
+
 .34 Khallos/bars: the focus chair keeps its stock bar (rider's Story AI name,
 khallos text hook); pc_mapmaker_bosses_hud skips a proxied focus and logs
 each bar drawn or skipped once per entity and reason (story AI bosses: bar
