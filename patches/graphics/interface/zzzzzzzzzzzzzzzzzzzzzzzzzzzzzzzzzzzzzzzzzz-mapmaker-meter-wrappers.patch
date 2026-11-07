@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4035 @@
+@@ -1911,6 +1911,4127 @@
      sub_002FA720_gen();
  #endif
  }
@@ -252,13 +252,23 @@
 +#endif
 +}
 +
-+void sub_003006C0(void)
++static void sub_003006C0_layer9(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_compile")) pc_mapmaker_storyprops_compile(sub_003006C0_layer8);
 +    else sub_003006C0_layer8();
 +#else
 +    sub_003006C0_layer8();
++#endif
++}
++
++void sub_003006C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_compile")) pc_mapmaker_vehicles_compile(sub_003006C0_layer9);
++    else sub_003006C0_layer9();
++#else
++    sub_003006C0_layer9();
 +#endif
 +}
 +
@@ -509,13 +519,23 @@
 +#endif
 +}
 +
-+void sub_00301A90(void)
++static void sub_00301A90_layer7(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_load")) pc_mapmaker_storyprops_load(sub_00301A90_layer6);
 +    else sub_00301A90_layer6();
 +#else
 +    sub_00301A90_layer6();
++#endif
++}
++
++void sub_00301A90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_load")) pc_mapmaker_vehicles_load(sub_00301A90_layer7);
++    else sub_00301A90_layer7();
++#else
++    sub_00301A90_layer7();
 +#endif
 +}
 +
@@ -1871,13 +1891,23 @@
 +#endif
 +}
 +
-+void sub_00319300(void)
++static void sub_00319300_layer1(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_build")) pc_mapmaker_storyprops_build(sub_00319300_layer0);
 +    else sub_00319300_layer0();
 +#else
 +    sub_00319300_layer0();
++#endif
++}
++
++void sub_00319300(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_build")) pc_mapmaker_vehicles_build(sub_00319300_layer1);
++    else sub_00319300_layer1();
++#else
++    sub_00319300_layer1();
 +#endif
 +}
 +
@@ -1996,13 +2026,23 @@
 +#endif
 +}
 +
-+void sub_00062790(void)
++static void sub_00062790_layer4(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_mount")) pc_mapmaker_storyprops_mount(sub_00062790_layer3);
 +    else sub_00062790_layer3();
 +#else
 +    sub_00062790_layer3();
++#endif
++}
++
++void sub_00062790(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_mount")) pc_mapmaker_vehicles_mount(sub_00062790_layer4);
++    else sub_00062790_layer4();
++#else
++    sub_00062790_layer4();
 +#endif
 +}
 +
@@ -3793,7 +3833,7 @@
 +}
 +
 +extern void sub_00063900_gen(void);
-+void sub_00063900(void)
++static void sub_00063900_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_textures")) pc_mapmaker_storyprops_textures(sub_00063900_gen);
@@ -3803,8 +3843,18 @@
 +#endif
 +}
 +
++void sub_00063900(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_textures")) pc_mapmaker_vehicles_textures(sub_00063900_layer0);
++    else sub_00063900_layer0();
++#else
++    sub_00063900_layer0();
++#endif
++}
++
 +extern void sub_002F7770_gen(void);
-+void sub_002F7770(void)
++static void sub_002F7770_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_category")) pc_mapmaker_storyprops_category(sub_002F7770_gen);
@@ -3814,14 +3864,34 @@
 +#endif
 +}
 +
++void sub_002F7770(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_category")) pc_mapmaker_vehicles_category(sub_002F7770_layer0);
++    else sub_002F7770_layer0();
++#else
++    sub_002F7770_layer0();
++#endif
++}
++
 +extern void sub_0006C090_gen(void);
-+void sub_0006C090(void)
++static void sub_0006C090_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_preload_model")) pc_mapmaker_storyprops_preload_model(sub_0006C090_gen);
 +    else sub_0006C090_gen();
 +#else
 +    sub_0006C090_gen();
++#endif
++}
++
++void sub_0006C090(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_preload_model")) pc_mapmaker_vehicles_preload_model(sub_0006C090_layer0);
++    else sub_0006C090_layer0();
++#else
++    sub_0006C090_layer0();
 +#endif
 +}
 +
@@ -3844,6 +3914,28 @@
 +    else sub_0033DD80_gen();
 +#else
 +    sub_0033DD80_gen();
++#endif
++}
++
++extern void sub_0033DDA0_gen(void);
++void sub_0033DDA0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_def")) pc_mapmaker_vehicles_def(sub_0033DDA0_gen);
++    else sub_0033DDA0_gen();
++#else
++    sub_0033DDA0_gen();
++#endif
++}
++
++extern void sub_00182A20_gen(void);
++void sub_00182A20(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_create")) pc_mapmaker_vehicles_create(sub_00182A20_gen);
++    else sub_00182A20_gen();
++#else
++    sub_00182A20_gen();
 +#endif
 +}
 +
