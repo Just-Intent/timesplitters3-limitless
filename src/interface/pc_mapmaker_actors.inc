@@ -109,13 +109,32 @@
 
 extern void sub_0003DFA0(void),sub_001CD040(void),sub_001638F0(void),sub_003533F0(void);
 
+/* Engine objects (2026-11-07, v0.4.0-mapmaker.45 crash with 106 Story AI):
+ * the slot allocator sub_0009EE00 appends at the count [0x007B4FAC] with no
+ * bound once no slot is free ([0x007B65B8] 0), so object 1023+ was written
+ * past the pool [0x0072F5E8] and its 0x200-byte twin past the twin pool,
+ * which ends where the object pool starts (dump: twin 1026 at 0x8174B070 =
+ * object slot 2 + 0x30, whose room count became 0x40 and room id a pointer;
+ * sub_0009FF10 then faulted). Pieces + items + 64 characters fit the editor's
+ * budget, so each AI takes more than its body (held weapons: INFERRED).
+ * In local MapMaker play a new AI therefore needs this many free slots of the
+ * pool [0x0072F5E4]: the editor's 64-slot effects reserve plus room for the
+ * character's own objects (body, the two temporaries of sub_000D73B0, weapons). */
+#define MAPMAKER_ACTORS_OBJECT_HEADROOM 72u
+#define MAPMAKER_ACTORS_OBJ_CAP 0x0072F5E4u   /* pool slots (1023 in MapMaker play) */
+#define MAPMAKER_ACTORS_OBJ_COUNT 0x007B4FACu /* slots handed out (high-water mark) */
+#define MAPMAKER_ACTORS_OBJ_FREE 0x007B65B8u  /* freed slots below the count */
+#ifdef MAPMAKER_OBJECTS_EFFECTS
+typedef char mapmaker_actors_object_headroom[(MAPMAKER_ACTORS_OBJECT_HEADROOM>MAPMAKER_OBJECTS_EFFECTS)?1:-1];
+#endif
 enum { MAPMAKER_ACTORS_DROP_SLOT, MAPMAKER_ACTORS_DROP_PLACED, MAPMAKER_ACTORS_DROP_LIST,
        MAPMAKER_ACTORS_DROP_PICK, MAPMAKER_ACTORS_DROP_SCORE, MAPMAKER_ACTORS_DROP_BLIP,
-       MAPMAKER_ACTORS_DROPS };
+       MAPMAKER_ACTORS_DROP_OBJECTS, MAPMAKER_ACTORS_DROPS };
 static const char *const mapmaker_actors_drop_name[MAPMAKER_ACTORS_DROPS]={
     "actor pool full: AI not spawned","level AI past the AI table: not created",
     "live character list full: character not listed","AI target list full: candidate skipped",
-    "kill of character >= 32 in an arcade sub-mode: not recorded","radar blip buffer full: blip not drawn"};
+    "kill of character >= 32 in an arcade sub-mode: not recorded","radar blip buffer full: blip not drawn",
+    "engine objects nearly full: AI not spawned yet, free object slots"};
 static struct {
     int initialized;
     unsigned alive;
@@ -153,6 +172,17 @@ static int mapmaker_actors_local100(void)
 }
 /* Ids >= 32 may exist: a MapMaker story map played locally. */
 static int mapmaker_actors_wide(void) { return mapmaker_actors_local100() && mapmaker_actors_story(); }
+
+/* Free engine object slots in local MapMaker play; -1: no check (other
+ * scenes, System Link, or no pool yet). */
+static int32_t mapmaker_actors_objects_free(void)
+{
+    uint32_t cap=WORD_AT(MAPMAKER_ACTORS_OBJ_CAP);
+    int32_t live;
+    if(!mapmaker_actors_local100() || !cap) return -1;
+    live=(int32_t)WORD_AT(MAPMAKER_ACTORS_OBJ_COUNT)-(int32_t)WORD_AT(MAPMAKER_ACTORS_OBJ_FREE);
+    return live>=(int32_t)cap?0:(int32_t)cap-live;
+}
 
 /* Slots in the pool [0x007356D8] now points at. */
 static uint32_t mapmaker_actors_pool_slots(uint32_t pool)
@@ -274,7 +304,7 @@ static int32_t mapmaker_actors_next_slot(uint32_t pool,uint32_t humans,uint32_t 
 void pc_mapmaker_actors_slot(void (*original)(void))
 {
     uint32_t pool,humans,used,cap,pairs,ai_cap;
-    int32_t slot;
+    int32_t slot,free_objects;
     int story,wide;
     pool=WORD_AT(MAPMAKER_ACTORS_POOLPTR);humans=WORD_AT(MAPMAKER_ACTORS_HUMANS);used=WORD_AT(MAPMAKER_ACTORS_USED);
     if(!pool || humans>MAPMAKER_ACTORS_MAX || used>MAPMAKER_ACTORS_AI_CAP) { original(); return; }
@@ -293,6 +323,15 @@ void pc_mapmaker_actors_slot(void (*original)(void))
         MAPMAKER_GUEST_RET();
         return;
     }
+    free_objects=mapmaker_actors_objects_free();
+    if(free_objects>=0 && free_objects<(int32_t)MAPMAKER_ACTORS_OBJECT_HEADROOM) {
+        /* Same refusal: the spawner sub_00164010 skips it and tries again on
+         * a later frame, once deaths or effects have freed object slots. */
+        mapmaker_actors_drop(MAPMAKER_ACTORS_DROP_OBJECTS,(uint32_t)free_objects,WORD_AT(MAPMAKER_ACTORS_OBJ_CAP));
+        g_eax=0xFFFFFFFFu;
+        MAPMAKER_GUEST_RET();
+        return;
+    }
     original();
 }
 
@@ -300,11 +339,19 @@ void pc_mapmaker_actors_slot(void (*original)(void))
 void pc_mapmaker_actors_placed(void (*original)(void))
 {
     uint32_t level=WORD_AT(0x0074C36Cu),n,humans,slots,cap;
+    int32_t free_objects;
     if(!MAPMAKER_PTR_OK(level+0x30u,4)) { original(); return; }
     n=WORD_AT(level+0x30u);humans=WORD_AT(MAPMAKER_ACTORS_HUMANS);
     slots=mapmaker_actors_pool_slots(WORD_AT(MAPMAKER_ACTORS_POOLPTR));
     cap=slots>humans?slots-humans:0u;
     if(cap>MAPMAKER_ACTORS_MAX) cap=MAPMAKER_ACTORS_MAX;
+    /* One object each at least, and the spawn headroom kept (see above). */
+    free_objects=mapmaker_actors_objects_free();
+    if(free_objects>=0) {
+        uint32_t room=(uint32_t)free_objects>MAPMAKER_ACTORS_OBJECT_HEADROOM?
+                      (uint32_t)free_objects-MAPMAKER_ACTORS_OBJECT_HEADROOM:0u;
+        if(room<cap) cap=room;
+    }
     if((int32_t)n>(int32_t)cap) {
         mapmaker_actors_drop(MAPMAKER_ACTORS_DROP_PLACED,n,cap);
         WORD_AT(level+0x30u)=cap;              /* kept: the level data then matches the AI table */

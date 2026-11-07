@@ -339,8 +339,13 @@ the 0xEA0 actor entry, which grows with the pool.
 - Without the hooks (non-display builds, `TSFP_MAPMAKER_AREA_OFF=actors`)
   the patrol copy is all zero and the blip buffer unbounded, in addition to
   the first-round caveats (slot cap 63, gate 0).
-- More AI means more engine objects and Level heap (the objects area's
-  1000-object pool); not measured.
+- More AI means more engine objects and Level heap. A map with 395 pieces
+  and about 106 Story AI ran the 1023-slot object pool past its end (m45c,
+  2026-11-07). The slot hook now refuses a new AI in local scene-100 play
+  while fewer than `MAPMAKER_ACTORS_OBJECT_HEADROOM` (72) object slots are
+  free, the placed hook clamps to free - 72, and the objects area refuses a
+  create past the pool. Objects per AI beyond its body (held weapons) are
+  INFERRED, not measured; see `docs/agent-context/limitless-caps.md`.
 - `objects.json` and `tests/mapmaker/test_mapmaker_objects.py` were changed (perception
   slice 0xA00 -> 0xC00); the objects owner should confirm.
 
