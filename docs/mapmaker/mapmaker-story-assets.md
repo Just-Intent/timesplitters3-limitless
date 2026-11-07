@@ -78,7 +78,7 @@ Mission numbers follow the story table `0x004D1AC0`: 1 intro (scene 2),
 | 15 | Mission 8 mutants = 0x59 "The Freak" | chr.pak; anims 0x76B..0x770 lv22.pak | class 8000:0 `sub_00264A10`, no level state | roster char placeable, stock AI | yes | **medium** | lv22 mount (shared with item 14) | **wave 2: row 163 "Mutant (Story)"** (fixture only) |
 | 16 | Mission 8 "rail cameras" | none of their own | the player pilots a rail bot from a wall terminal (`sub_0037ACB0`) | none | - | very hard (drop) | wall-panel pool exists only in scenes 6/17/22 | - |
 | 17 | Followers (Ash 0x08, Tipper 0x00, Jo-Beth 0x19, Amy 0x44, R-110 0x2D; R-107 0x90) | chr.pak, roster rows | buddy = `sub_00277FE0` by scene tag, one buddy, single player only | placeable as normal AI | placing yes; buddy behaviour 1 | cheap to place, **hard** for story follow | follow movement not located | - |
-| 18 | Machine Wars "Prometheus" robots = PROMETHEUS SK/8 rocket robot 0x62 (SD/7 guard robots 0x12/0x36/0x75) | chr.pak; anims `animrb.pak` (already mounted in scene 100) | robot list `sub_000D6DD0`, per id, no class | 0xA9/0xAA roster twins already placeable | yes | **cheap** | picker rows only | **wave 1: picker rows 159/160** (fixture only) |
+| 18 | Machine Wars "Prometheus" robots = PROMETHEUS SK/8 rocket robot 0x62 (SD/7 guard robots 0x12/0x36/0x75) | chr.pak; anims `animrb.pak` (already mounted in scene 100) | robot list `sub_000D6DD0`, per id, story class 4 | 0xA9/0xAA roster twins already placeable | yes | **cheap** | picker rows + class | **rows 159/160, class 4 after .58** (fixture only) |
 | 19 | Machine Wars tank = driveable future tank, vehicle def 2 | 0xB/0xC/0xD + gibs, stream/lv5/prop1.pak (2.6 MB) | stock vehicle system, builder `sub_00181D40` | vehicles exist (cat. 35, max 4); not our boss tank | yes (4 vehicles) | **medium** | scene-5 gate in `sub_00174120`; templates +0x30/+0x34 | **wave 3: vehicle option "Future tank", area vehicles** (fixture only; not destroyed in scene 100) |
 | 20 | Scotland the Brave truck = vehicle def 0 | model 7 + Vickers turret 0xE, stream/lv4/prop3.pak (1.36 MB) | builder `sub_00180BA0` | vehicles exist | yes (4 vehicles) | **medium** | seat anims 0x78..0x83 location | **wave 3: vehicle options "Castle truck" with/without Vickers, area vehicles** (fixture only; anims in animcar.pak) |
 | 21 | Mission 1 big turrets = 0xE6 prisonfixedgun | 88,716 B, l_2_st / l_26_st | generic class-0x200 turret, gun type 7 | turret categories 27-29 (cat. 29 same system) | yes | **cheap** | gun type 7 effects, flag 0x10000 | **wave 1: fixed gun Model option, area storyprops** (played .55; textures fixed after) |
@@ -522,6 +522,11 @@ used: they are the castle tank and mothership placeholders. Both ids are in
 the robot list (byte table 0x000D6E00) and have no Arcade row (decode test
 `test_prometheus_rows_data`). No play hook: the stock robot AI runs them.
 Several per map: yes (ordinary Story AIs).
+
+**After the .58 report** (SK/8 looped its fire pose, no rockets): the rows
+kept the MapMaker bot class. They are now rows of the story creatures table
+with the story class 0:0x10000004 (robot handler `sub_00283730`, built-in
+rocket weapon 0x43): [story creatures](mapmaker-creatures.md).
 
 ### 19 and 20. Vehicles: Machine Wars tank and Scotland the Brave truck
 

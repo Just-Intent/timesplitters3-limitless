@@ -513,11 +513,9 @@ static const struct { uint32_t row, id, text, standin; char label[16]; } rbs_ext
     {156u,0x33u,0x52420033u,0x02u,"Khallos (Chair)"},  /* pc_mapmaker_khallos.inc; preview: Arcade Khallos */
     {157u,0x2Cu,0x5242002Cu,0x6Bu,"Mansion Worm"}, /* pc_mapmaker_worm.inc; preview: Arcade mansion zombie nurse */
     {158u,0x75u,0x52420075u,0x4Eu,"Mothership"},   /* pc_mapmaker_mothership.inc; preview: Arcade Timesplitter */
-    /* Machine Wars "Prometheus" robots (docs/mapmaker/mapmaker-story-assets.md item 18):
-     * the story ids, in the robot list sub_000D6DD0 (robot AI, animrb.pak anims,
-     * mounted in scene 100), no level state; previews: their Arcade twins. */
-    {159u,0x62u,0x52420062u,0xAAu,"Prometheus SK/8"},  /* rocket robot (set 10); preview: Arcade 0xAA */
-    {160u,0x36u,0x52420036u,0xA9u,"Prometheus SD/7"},  /* guard robot (0x12/0x75 are taken); preview: Arcade 0xA9 */
+    /* Machine Wars "Prometheus" robots 159/160 (story-assets item 18) and the
+     * story creatures 161+ come from pc_mapmaker_creatures.def (the creatures
+     * area owns their play side: the story robot class 4) */
     /* the story creatures (pc_mapmaker_creatures.inc owns their play side):
      * rows 161+, text 0x52420000 | id, preview their row's Arcade id */
 #define MAPMAKER_CREATURE(row,id,look,preview,label,lo,hi,pak,pak_name,table,count,first,n,level) {row,id,0x52420000u|(id),preview,label},
