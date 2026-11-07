@@ -22,7 +22,9 @@
  *    entry of grenade.pak's table 0x0048F738 at 0x001CB1C3).
  * A MapMaker set holding the story bosses mounts their story level anim
  * paks, whose tables name the whole level cast (158 entries for lv1_3,
- * lv1_6, lv81, lv14, lv11, lv1_2); the scene's own paks fill the rest.
+ * lv1_6, lv81, lv14, lv11, lv1_2), and the story creatures' paks
+ * (pc_mapmaker_creatures.def: lv17, lv6, lv22); the scene's own paks fill
+ * the rest.
  *
  * In scene 100 with TSFP_MAPMAKER_LIMITS=1 (story levels stay stock):
  *  - a boss pak's table registers only the boss's own anims (ans_paks: the
@@ -66,6 +68,11 @@ static const struct ans_pak_s {
     {0x0047E938u,0x29u,{{23,3},{29,9},{0,0}},"lv14"},     /* giant robot giantrob_* 0x807..0x809; Crowe splitcrowe* 0x80E..0x815, eggnoise 0x816 */
     {0x00484410u,0x21u,{{32,1},{0,0},{0,0}},"lv11"},      /* seated Khallos: khallosidle 0xBFB */
     {0x0048BEC8u,0x1Eu,{{5,1},{21,8},{0,0}},"lv1_2"},     /* mansion worm: barney_worm 0x149, wrmburst..wrmdeath 0x194..0x19B */
+    /* the story creatures (pc_mapmaker_creatures.def): one run per row; rows
+     * sharing a pak keep the union of their runs (ans_keep) */
+#define MAPMAKER_CREATURE(row,id,look,preview,label,lo,hi,pak,pak_name,table,count,first,n,level) {table,count,{{first,n},{0,0},{0,0}},pak_name},
+#include "pc_mapmaker_creatures.def"
+#undef MAPMAKER_CREATURE
 };
 #define ANS_NPAKS (sizeof ans_paks/sizeof ans_paks[0])
 
@@ -89,9 +96,13 @@ static const struct ans_pak_s *ans_find(uint32_t table,uint32_t count)
 }
 static int ans_keep(const struct ans_pak_s *p,uint32_t k)
 {
-    unsigned r;
+    unsigned i,r;
     if(!p) return 1;
-    for(r=0;r<3u;r++) if(k>=p->run[r].first && k<(uint32_t)p->run[r].first+p->run[r].n) return 1;
+    for(i=0;i<ANS_NPAKS;i++) {
+        const struct ans_pak_s *q=&ans_paks[i];
+        if(q->table!=p->table || q->count!=p->count) continue;
+        for(r=0;r<3u;r++) if(k>=q->run[r].first && k<(uint32_t)q->run[r].first+q->run[r].n) return 1;
+    }
     return 0;
 }
 

@@ -393,6 +393,7 @@
 #define RBS_WALK_STUN_AT 0x584u         /* state: stage-1 health that triggers the stun (0x00298AB5) */
 #define RBS_WALK_MOVES 40u              /* fight-state changes logged per level */
 /* several giant skeletons / Crow walkers per map (user, 2026-11-01) */
+#define RBS_EXTRA_MAX 16u                /* synthetic picker rows of other areas (rbs_extra), labels kept in rbs */
 #define RBS_INST_MAX 4u                 /* per boss and map */
 #define RBS_FX 0x0078B080u              /* particle/effect statics both fights use: 0x0078B080..0x0078B1DB */
 #define RBS_FX_SIZE 0x15Cu              /* (sub_002A62C0..sub_002A8760; the boss pointers follow at 0x0078B1DC) */
@@ -409,7 +410,7 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
     int read, optout;
-    uint32_t label, skel_label, walk_label, well[RBS_INST_MAX], extra_label[6];
+    uint32_t label, skel_label, walk_label, well[RBS_INST_MAX], extra_label[RBS_EXTRA_MAX];
     unsigned logged, meters;
     struct { uint32_t record; uint8_t boss; } real[RBS_REAL_MAX];
 } rbs;
@@ -504,8 +505,7 @@ static uint32_t rbs_walk_label(void)
  * (model 0x5F2), 0x46 split Crowe (0x5E8), 0x12 the guard robot that stands in
  * for the castle tank prop (pc_mapmaker_tank.inc). sub_002BE270 is 0 for all
  * three (byte table 0x002BE29C entry 1), so the variant is -1 as for 0x15. */
-#define RBS_EXTRA_N 8u
-static const struct { uint32_t row, id, text, standin; char label[16]; } rbs_extra[RBS_EXTRA_N]={
+static const struct { uint32_t row, id, text, standin; char label[16]; } rbs_extra[]={
     {153u,0x42u,0x52420042u,0xA8u,"Giant Robot"},  /* preview: the Arcade giant robot */
     {154u,0x46u,0x52420046u,0x1Eu,"Split Crowe"},  /* preview: Arcade Old Crow */
     {155u,0x12u,0x52420012u,0xA8u,"Castle Tank"},  /* preview: the Arcade giant robot */
@@ -517,7 +517,14 @@ static const struct { uint32_t row, id, text, standin; char label[16]; } rbs_ext
      * mounted in scene 100), no level state; previews: their Arcade twins. */
     {159u,0x62u,0x52420062u,0xAAu,"Prometheus SK/8"},  /* rocket robot (set 10); preview: Arcade 0xAA */
     {160u,0x36u,0x52420036u,0xA9u,"Prometheus SD/7"},  /* guard robot (0x12/0x75 are taken); preview: Arcade 0xA9 */
+    /* the story creatures (pc_mapmaker_creatures.inc owns their play side):
+     * rows 161+, text 0x52420000 | id, preview their row's Arcade id */
+#define MAPMAKER_CREATURE(row,id,look,preview,label,lo,hi,pak,pak_name,table,count,first,n,level) {row,id,0x52420000u|(id),preview,label},
+#include "pc_mapmaker_creatures.def"
+#undef MAPMAKER_CREATURE
 };
+#define RBS_EXTRA_N ((unsigned)(sizeof rbs_extra/sizeof rbs_extra[0]))
+typedef char rbs_extra_labels_fit[RBS_EXTRA_N<=RBS_EXTRA_MAX?1:-1];
 static unsigned rbs_extra_by_row(uint32_t row)
 {
     unsigned k;
