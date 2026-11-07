@@ -164,7 +164,7 @@ def test_rows_and_wiring():
     guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
     header = (ROOT / 'src/interface/pc_display_menu.h').read_text(encoding='utf-8')
     assert '#include "pc_mapmaker_creatures.inc"' in guest
-    for hook in ('anims', 'request', 'create', 'ai_start', 'robot_weapon', 'robot_fire', 'robot_muzzle'):
+    for hook in ('anims', 'request', 'create', 'ai_start', 'robot_weapon', 'robot_muzzle'):  # robot_fire: not wrapped (upstream defines sub_001BB5C0)
         assert f'void pc_mapmaker_creatures_{hook}(void (*original)(void));' in header
         assert f'void pc_mapmaker_creatures_{hook}(void (*original)(void)) {{ original(); }}' in guest
     assert not (ROOT / 'config/guest-code-patches/creatures.json').exists()
