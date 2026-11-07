@@ -480,20 +480,20 @@ aim and logs throws. Freeze after a throw: unexplained.
 mapmaker.40: _restart reallocates (restart frees level heap); 
 bs_skel_aim aims a floor up.
 Robot doors (.45): stacked one-floor portals combine; `rbt_hold` puts back knee-level moves through low ones (mapmaker-robot.md).
-Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
+Ported bosses, own areas (2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, walk stops at ledges: mapmaker-crowe.md), `tank`
 (`pc_mapmaker_tank.inc`: guard robot id 0x12 placeholder -> castle tank prop
 0x281 from prop6.pak, mapmaker-tank.md). Wrappers, restart: each doc. ORDER puts them
 after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
-`rbs_extra` table in realbosses.inc (159/160 Prometheus); `storyprops`: drum/gun (mem-pak textures, lift env); bigdraw adds 0x5F2/0x5E8. Tank WRAPs
+`rbs_extra` table in realbosses.inc (159/160 Prometheus); `storyprops`: drum/gun (mem-pak textures, lift env); `vehicles`: tank/truck (cat. 35 = pool 4); bigdraw adds 0x5F2/0x5E8. Tank WRAPs
 `sub_0015E7C0` -> `_tank_request` (level-init models), `sub_000A2740` -> `_draw`
 (log), `sub_00228B50` -> `_mine` (.55 TNT); shown at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Boss areas/skies/open air/set slots/pak table/restart heap: [boss notes](limitless-bosses.md); [.tsmap](map-transfer.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
 draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; music gain/ticks: custom-music.md.
-Pak table test: `tests/mapmaker/test_mapmaker_paktable.py`.
+Pak table: test_mapmaker_paktable.py.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
 of `sub_0029CE00` (+0x3E88 == 1, `sub_002A7F30`). Walker missing: log-only
 WRAP `sub_000DAC30` -> `pc_mapmaker_realbosses_create`, AI-start log; per-level

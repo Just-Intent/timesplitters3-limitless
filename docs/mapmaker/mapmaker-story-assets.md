@@ -79,8 +79,8 @@ Mission numbers follow the story table `0x004D1AC0`: 1 intro (scene 2),
 | 16 | Mission 8 "rail cameras" | none of their own | the player pilots a rail bot from a wall terminal (`sub_0037ACB0`) | none | - | very hard (drop) | wall-panel pool exists only in scenes 6/17/22 | - |
 | 17 | Followers (Ash 0x08, Tipper 0x00, Jo-Beth 0x19, Amy 0x44, R-110 0x2D; R-107 0x90) | chr.pak, roster rows | buddy = `sub_00277FE0` by scene tag, one buddy, single player only | placeable as normal AI | placing yes; buddy behaviour 1 | cheap to place, **hard** for story follow | follow movement not located | - |
 | 18 | Machine Wars "Prometheus" robots = PROMETHEUS SK/8 rocket robot 0x62 (SD/7 guard robots 0x12/0x36/0x75) | chr.pak; anims `animrb.pak` (already mounted in scene 100) | robot list `sub_000D6DD0`, per id, no class | 0xA9/0xAA roster twins already placeable | yes | **cheap** | picker rows only | **wave 1: picker rows 159/160** (fixture only) |
-| 19 | Machine Wars tank = driveable future tank, vehicle def 2 | 0xB/0xC/0xD + gibs, stream/lv5/prop1.pak (2.6 MB) | stock vehicle system, builder `sub_00181D40` | vehicles exist (cat. 35, max 4); not our boss tank | yes (4 vehicles) | **medium** | scene-5 gate in `sub_00174120`; templates +0x30/+0x34 | - |
-| 20 | Scotland the Brave truck = vehicle def 0 | model 7 + Vickers turret 0xE, stream/lv4/prop3.pak (1.36 MB) | builder `sub_00180BA0` | vehicles exist | yes (4 vehicles) | **medium** | seat anims 0x78..0x83 location | - |
+| 19 | Machine Wars tank = driveable future tank, vehicle def 2 | 0xB/0xC/0xD + gibs, stream/lv5/prop1.pak (2.6 MB) | stock vehicle system, builder `sub_00181D40` | vehicles exist (cat. 35, max 4); not our boss tank | yes (4 vehicles) | **medium** | scene-5 gate in `sub_00174120`; templates +0x30/+0x34 | **wave 3: vehicle option "Future tank", area vehicles** (fixture only; not destroyed in scene 100) |
+| 20 | Scotland the Brave truck = vehicle def 0 | model 7 + Vickers turret 0xE, stream/lv4/prop3.pak (1.36 MB) | builder `sub_00180BA0` | vehicles exist | yes (4 vehicles) | **medium** | seat anims 0x78..0x83 location | **wave 3: vehicle options "Castle truck" with/without Vickers, area vehicles** (fixture only; anims in animcar.pak) |
 | 21 | Mission 1 big turrets = 0xE6 prisonfixedgun | 88,716 B, l_2_st / l_26_st | generic class-0x200 turret, gun type 7 | turret categories 27-29 (cat. 29 same system) | yes | **cheap** | gun type 7 effects, flag 0x10000 | **wave 1: fixed gun Model option, area storyprops** (played .55; textures fixed after) |
 
 ## Per-item notes
@@ -551,6 +551,17 @@ and +0x30 = -1. The tank-track and seat adapters exist.
 **Work for both:** mount the prop pak, a hook on `sub_0033DDA0` or the fill
 for def/model/templates, and the scene gate for the tank's gibs.
 
+**Wave 3 (done, fixture only):** [story vehicles](mapmaker-vehicles.md).
+The vehicle item's options choose tank / truck + gun / truck (record byte
++0xC). Hooks: `sub_0033DDA0` (def at preload and fill), `sub_00182A20`
+(story record fields: tank +0x28 4, +0x2C 4, +0x30 1, +0x34 2; truck 0, 1,
+0 or -1), the gun templates preloaded with `sub_000B3B20`, the stream paks
+mounted index-only (models and textures are in the same pak). The
+truck's seat anims are all in `pak/anim/animcar.pak`, which scene 100
+mounts. The scene-5 wreck is left alone: in scene 100 a tank is not
+destroyed, as the buggies. The limits' raise of category 35 to 8 was
+removed: the pool has 4 blocks and no bound check.
+
 ### 21. Mission 1 big turrets
 
 - Model 0xE6 (twin 0x7B1) `level29/props/prisonfixedgun`, type 0x200,
@@ -661,7 +672,6 @@ spiders).
 - The time-grenade slow-motion effect (P2).
 - The meaning of the weapon variant flag (twins).
 - The ghost and electric-zombie character ids (P1).
-- Truck seat anim pak.
 - 'VDMN'/'VNMN'.
 - Damage type 0x2F as "use".
 - The follow movement.

@@ -39,7 +39,8 @@
  *   Pickups: placed pickups of categories 8-13, 19-21, 31 against the
  *   768 placed-pickup records of play (MAPMAKER_OBJECTS_PICKUPS; the editor
  *   item cap 500 keeps it below).
- *   Movers, Props, Turrets (27-29), Teleports (14-18): the per-category
+ *   Movers, Props, Turrets (27-29), Teleports (14-18), Vehicles (35, the
+ *   4-block vehicle pool, stock and story vehicles alike): the per-category
  *   counts sub_00303460 compares (sub_00308420 over every placed piece's
  *   items, category int16 at catalogue 0x00524F58 + id * 0xC4 + 2) against
  *   the live maxima at 0x00524BE0 + c * 24 + 4; groups add their members and
@@ -81,7 +82,7 @@ extern void sub_0003FA10(void),sub_0003FCF0(void),sub_0001EFB0(void),sub_00041E3
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 int pc_controls_mapmaker_table_key(void);
 
-#define MAPMAKER_TABLE_ROWS 15u
+#define MAPMAKER_TABLE_ROWS 16u
 #define MAPMAKER_TABLE_SLOTS (1u+2u*MAPMAKER_TABLE_ROWS) /* header, titles, values */
 #define MAPMAKER_TABLE_TEXT 64u             /* bytes per text slot */
 #define MAPMAKER_TABLE_FONT 0x12u           /* the meter's font (0x0030C214) */
@@ -135,6 +136,7 @@ static const unsigned mapmaker_table_turrets[]={27u,28u,29u};
 static const unsigned mapmaker_table_teleporters[]={14u,15u,16u,17u,18u};
 static const unsigned mapmaker_table_movers[]={25u};
 static const unsigned mapmaker_table_props[]={26u};
+static const unsigned mapmaker_table_vehicles[]={35u};
 
 static unsigned mapmaker_table_state(uint32_t used,uint32_t max,int refused)
 {
@@ -207,6 +209,7 @@ static unsigned mapmaker_table_rows(const MapMakerLimitsView *v,const MapMakerTa
     rows[n++]=mapmaker_table_group("Props",c,mapmaker_table_props,1);
     rows[n++]=mapmaker_table_group("Turrets",c,mapmaker_table_turrets,3);
     rows[n++]=mapmaker_table_group("Teleports",c,mapmaker_table_teleporters,5);
+    rows[n++]=mapmaker_table_group("Vehicles",c,mapmaker_table_vehicles,1);
     return n;
 }
 
