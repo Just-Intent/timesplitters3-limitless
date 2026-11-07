@@ -101,7 +101,8 @@ filename sorting. Independent translation-moves, translation-integer, translatio
 translation-product are final, after radial stick deadzone and title instrumentation
 that their removed handlers contain. Historical fixtures omit replacements until
 the complete-stack upgrade. Update the ordering assertion when intentionally
-adding another final patch.
+adding another final patch; media `2160-custom-music-codec.patch` (imported MP3
+music) is now the last one.
 
 ## Working note (not committed)
 
