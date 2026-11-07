@@ -229,6 +229,7 @@ void pc_mapmaker_robot_handler(void (*original)(void));
 void pc_mapmaker_robot_message(void (*original)(void));
 void pc_mapmaker_robot_callback(void (*original)(void));
 void pc_mapmaker_robot_damage(void (*original)(void));
+void pc_mapmaker_robot_goal(void (*original)(void));
 void pc_mapmaker_crowe_anims(void (*original)(void));
 void pc_mapmaker_crowe_level(void (*original)(void));
 void pc_mapmaker_crowe_ai_start(void (*original)(void));
