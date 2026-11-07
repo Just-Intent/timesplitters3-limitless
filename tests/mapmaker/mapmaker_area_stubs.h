@@ -52,8 +52,8 @@ void sub_00300670(void) {}
 void sub_0031BB60(void) {}
 void sub_003C85D4(void) {}
 /* restable: meter font, text measure, backdrop and outlined text */
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines sub_0001EFB0 and sub_0003FA10 */
 void sub_0001EFB0(void) {}
-#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines sub_0003FA10 */
 void sub_0003FA10(void) {}
 #endif
 void sub_00041E30(void) {}
@@ -137,6 +137,17 @@ void sub_002F7920(void) {}  /* sets: spawn mode mask of an editor item */
 void sub_0003E0B0(void) {} void sub_00165760(void) {}  /* objects: physics body pools */
 void sub_0033E560(void) {}  /* aitemplates: the AI death event */
 void sub_000C3C50(void) {}  /* crowe: the floor finder */
+void sub_00045A70(void) {}  /* imported music: music off test */
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines sub_000717D0 */
+void sub_000717D0(void) {}  /* imported music: jukebox row */
+#endif
+int recomp_audio_output_submit(uint32_t slot,const uint8_t *pcm,uint32_t bytes,uint32_t rate,uint32_t channels,
+                               uint32_t bits,int32_t volume) { (void)slot;(void)pcm;(void)bytes;(void)rate;(void)channels;(void)bits;(void)volume;return 0; }
+int recomp_audio_output_position(uint32_t slot,uint64_t *played,uint32_t *queued)
+{ (void)slot;if(played)*played=0;if(queued)*queued=0;return 0; }
+int recomp_audio_output_set_volume(uint32_t slot,int32_t volume) { (void)slot;(void)volume;return 0; }
+void recomp_audio_output_reset_voice(uint32_t slot) { (void)slot; }
+int recomp_audio_output_take_discontinuity(uint32_t slot) { (void)slot;return 0; }
 /* khallos, worm (pc_mapmaker_khallos.inc, pc_mapmaker_worm.inc) */
 void sub_0009A420(void) {} void sub_000A9070(void) {} void sub_0010E2A0(void) {} void sub_001D1E80(void) {}
 void sub_0010E730(void) {}  /* khallos: the jet emitter's position */
