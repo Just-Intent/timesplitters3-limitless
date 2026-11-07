@@ -132,11 +132,14 @@
 #define PIT_FLOCK_ACTIVE 0x24u           /* slot +0x24: launched (sub_0028A0A0 sets 1) */
 #define PIT_FIGHT 6u                    /* fight states 6..13: the rack is up, the fight proper */
 #define PIT_RELEASE_WAIT 300u           /* frames a release waits for ragbugs still joining */
-#define PIT_VIEW 0x007B0CC0u            /* the view being set up: +0x214 its slot (0..15) */
-#define PIT_POSED 0x14u                 /* prop word: pose computed for view slot n (bit n), sub_000A1B80 */
 #define PIT_ROOMS 0x30u                 /* prop: int8 listed rooms, +0x38 up to 10 ids */
 #define PIT_TRACE_EVERY 120u            /* frames between trace lines (60 a second) */
 #define PIT_TRACES 24u
+#define PIT_ENT_YAW 0x70u               /* entity yaw (radians); the fight sets 0 at its start (0x0029EA49) */
+#define PIT_MOUTH_UP 11.0f              /* the mouth over the boss's feet (m66: eye bandage 12.35 up, 2.27 ahead) */
+#define PIT_MOUTH_AHEAD 2.5f
+#define PIT_BODY_SHARE 0.25f            /* a hit on the boss's collision hull counts a quarter of a bottle hit */
+#define PIT_BOTTLE_CB 0x0028C2F0u       /* the bottle's damage callback (object +0x19C) */
 #define PIT_ST_PADS 0x4BF0u             /* 13 pad indices (sub_0009CC40 of 0x4B5..0x4C1) */
 #define PIT_PADS_N 13u
 #define PIT_PAD_TABLE 0x00715F2Cu       /* -> pads, 0x20 each (+0 id, +4 1, +8 0x1A, +0xC x/y/z, +0x18 yaw) */
@@ -166,7 +169,7 @@
 #define PIT_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define PIT_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
-extern void sub_0028A0A0(void),sub_000A1B80(void);
+extern void sub_0028A0A0(void);
 extern void sub_0029E0A0(void),sub_0028C560(void),sub_00287E00(void),sub_00287860(void),sub_0015DDA0(void),
     sub_00059DD0(void),sub_000A9070(void),sub_000622D0(void),sub_00062260(void),sub_000A5E40(void),
     sub_000631C0(void),sub_00096220(void);
@@ -205,6 +208,18 @@ static const float pit_pad_xyz[PIT_PADS_N][4]={
     {-0.4593f,-94.4096f,59.7972f,252.0f},
 };
 #define PIT_PAD_FIRST 0x4B5u
+/* The rim pads go in the pad pool's last entries (pc_mapmaker_limits.inc:
+ * MAPMAKER_POOL_PADS handles; the map's own use the first [0x007B6664]). The
+ * ragbugs' dives read them through sub_0009A420(index), which sends 0x1F40..
+ * 0x243F (scene 100) to the cover pool and returns 0 for a pad its check
+ * sub_0009A330 refuses: the .66/.68 heap block's index was past 0x1F40, so the
+ * dives had no target and the ragbugs hung in phase 4 (m68.err "4 4 4"). */
+#ifdef MAPMAKER_POOL_PADS
+#define PIT_PAD_POOL MAPMAKER_POOL_PADS
+#else
+#define PIT_PAD_POOL 8000u
+#endif
+#define PIT_PAD_COUNT 0x007B6664u        /* the map's regular pads */
 #define PIT_MODELS 4u
 static const uint32_t pit_models[PIT_MODELS]={0x249u,0x24Bu,0x24Au,0x246u};   /* collision, bandage, bottle, rack */
 static const char *const pit_paks[2]={"pak/story/l_17_st.pak","pak/storymem/l_17_stm.pak"};
@@ -214,7 +229,7 @@ typedef struct {
     float dx, dy, dz;
     int placed, started, ready, released;
     uint32_t props[4];                  /* the props last seen (bottle, collision, rack, bandage): logged when made */
-    unsigned no_bottle, waited, traces, hits, frames, posed;
+    unsigned no_bottle, waited, traces, hits, frames, mouthed, forwarded, pads_full;
     uint8_t bug_phase[6];
     uint8_t boss;
     unsigned bugs, moves, last;
@@ -225,7 +240,7 @@ typedef struct { uint32_t record, ent; int owner, slot, filled; } PitBug;
 static struct {
     int read;
     unsigned logged;
-    uint32_t paks[2], pad_raw[PIT_MAX];
+    uint32_t paks[2];
 } pit;
 static struct {
     unsigned n, nbugs, removed, events, fails, waits, meters, textured;
@@ -418,22 +433,22 @@ static PitInst *pit_owner(uint32_t obj)
  * the pad table: sub_00288230/sub_00288540 read [0x00715F2C] + index * 0x20. */
 static void pit_pads(PitInst *k)
 {
-    uint32_t base=WORD_AT(PIT_PAD_TABLE),raw,p,i;
+    uint32_t base=WORD_AT(PIT_PAD_TABLE),idx,p,i;
     unsigned n=(unsigned)(k-pit_lv.k);
-    if(n>=PIT_MAX) return;
-    if(!pit.pad_raw[n]) {
-        raw=xbox_HeapAlloc((PIT_PADS_N+1u)*0x20u,4u);
-        if(!raw || !MAPMAKER_PTR_OK(raw,(PIT_PADS_N+1u)*0x20u)) { pit_log("no memory for the rim pads",n,0);return; }
-        pit.pad_raw[n]=raw;
+    if(n>=PIT_MAX || !base) return;
+    idx=PIT_PAD_POOL-PIT_PADS_N*(n+1u);                 /* the pool's tail: below 0x1F40, so sub_0009A420 reads the pad table */
+    if(WORD_AT(PIT_PAD_COUNT)>idx || !MAPMAKER_PTR_OK(base+idx*0x20u,PIT_PADS_N*0x20u)) {
+        if(!k->pads_full++) pit_log("pad pool too full for the rim pads: the fire and dives keep stock targets (pads, first free)",WORD_AT(PIT_PAD_COUNT),idx);
+        return;
     }
-    p=pit.pad_raw[n]+((base-pit.pad_raw[n])&0x1Fu);   /* p - base is a multiple of 0x20 */
+    p=base+idx*0x20u;
     for(i=0;i<PIT_PADS_N;i++) {
         uint32_t r=p+i*0x20u;
         memset((void *)((uintptr_t)r+g_xbox_mem_offset),0,0x20u);
         WORD_AT(r)=PIT_PAD_FIRST+i;WORD_AT(r+4u)=1u;WORD_AT(r+8u)=0x1Au;
         pit_setf(r+0xCu,pit_pad_xyz[i][0]+k->dx);pit_setf(r+0x10u,pit_pad_xyz[i][1]+k->dy);
         pit_setf(r+0x14u,pit_pad_xyz[i][2]+k->dz);pit_setf(r+0x18u,pit_pad_xyz[i][3]);
-        WORD_AT(k->state+PIT_ST_PADS+i*4u)=(uint32_t)((int32_t)(r-base)/0x20);
+        WORD_AT(k->state+PIT_ST_PADS+i*4u)=idx+i;
     }
     k->pads=p;
 }
@@ -669,23 +684,13 @@ static void pit_remove(uint32_t ent,const char *why)
 static void pit_props(PitInst *k);
 static void pit_props_rooms(PitInst *k,uint32_t ent);
 static void pit_trace(PitInst *k,uint32_t ent,uint32_t st);
-/* The boss's pose for this frame before its fight reads bone points (playtest
- * .66: the bottle was made at the skeleton's feet, once at NaN, the bandage at
- * its feet too). The model's world bone matrices ([entity+4]+0x10, 0x40 each)
- * are computed by sub_000A1B80(prop) once per view slot (prop word +0x14 bit
- * [view+0x214]) when the prop is drawn (sub_0008F6B0 at 0x0008F700); the
- * catacombs boss is always on screen, a MapMaker one far or behind a wall is
- * not, so its bones were stale or never posed. Stock sub_0018F8E0 calls
- * sub_000A1B80 the same way before reading bones. Here: the slot bit cleared
- * and the pose computed every fight frame. */
-static void pit_pose(PitInst *k,uint32_t ent)
-{
-    uint32_t ac=WORD_AT(ent+PIT_ENT_ANIM),view=WORD_AT(PIT_VIEW);
-    if(!MAPMAKER_PTR_OK(ac,0x20u) || !WORD_AT(ac+0x10u) || !MAPMAKER_PTR_OK(view,0x218u)) return;
-    PIT_H(ent+PIT_POSED)&=(uint16_t)~(1u<<(WORD_AT(view+0x214u)&15u));
-    guest_call(sub_000A1B80,1,ent);
-    if(!k->posed++) pit_log("pit skeleton pose computed before its fight each frame (skeleton, view slot)",(uint32_t)(k-pit_lv.k)+1u,WORD_AT(view+0x214u)&15u);
-}
+static void pit_mouth(PitInst *k,uint32_t ent,uint32_t st);
+/* Playtest .68 (after .66's pose call): "even more glitched out and messes up
+ * my camera view". sub_000A1B80 computes the pose for the view slot being set
+ * up ([0x007B0CC0]+0x214, 0 = the player's camera) and is meant for the draw;
+ * called from the AI frame it disturbed that view, and the bone point was
+ * still at the feet or NaN (m68.err). Removed: the mouth is placed by
+ * pit_mouth below instead. */
 static void pit_release(PitInst *k,uint32_t ent);
 /* WRAP sub_0029FE00 (cdecl entity; class 0x20000): the pit fight for a pit
  * skeleton, with its block, statics and arena swapped in. The lifted fight
@@ -706,7 +711,6 @@ void pc_mapmaker_pitboss_princess(void (*original)(void))
     k->ent=ent;
     if(!k->started) { k->started=1;pit_log("pit skeleton fight starts (skeleton, block)",(uint32_t)(k-pit_lv.k)+1u,k->state); }
     pit_flock(k);
-    pit_pose(k,ent);
     pit_in(k,&s);
     pit_move(k,saved);
     sub_0029E0A0();
@@ -720,6 +724,7 @@ void pc_mapmaker_pitboss_princess(void (*original)(void))
         if(st) pit_pads(k);                               /* after state 0 looked the pads up */
         pit_props(k);
         pit_props_rooms(k,ent);
+        pit_mouth(k,ent,st);
         if(st>=PIT_FIGHT && st<PIT_DEATH) pit_release(k,ent);
         pit_trace(k,ent,st);
     }
@@ -767,6 +772,48 @@ static void pit_props_rooms(PitInst *k,uint32_t ent)
         for(j=0;j<(unsigned)n;j++) WORD_AT(o+0x38u+j*4u)=WORD_AT(ent+0x38u+j*4u);
         WORD_AT(o+0x34u)=WORD_AT(ent+0x38u);
     }
+}
+/* The gas bottle at the mouth (playtests .62-.68: made and kept at the feet,
+ * at NaN in states 4-7, m68.err). Stock puts it at model bone 0x29's point
+ * (0x0029E46E..0x0029E517 then 0x0029E5EE..0x0029E6FC every frame) from the
+ * boss's world bone matrices, which a MapMaker boss does not have posed when
+ * the fight runs (they come from the draw, sub_000A1B80 per view). After each
+ * fight frame (states 1..13) the bottle is put at PIT_MOUTH_UP over the
+ * boss's feet and PIT_MOUTH_AHEAD in front of it (yaw +0x70: forward = (sin,
+ * 0, cos), +z at the fight's yaw 0 as the .66 eye bandage showed), facing as
+ * the boss; a NaN yaw or tilt is cleared. Nothing the fight wrote stays NaN.
+ * The collision hull 0x249 gets the bottle's damage callback (stock: none,
+ * so hits destroyed it as a plain prop, .66 "easily destroyed"); its hits
+ * count PIT_BODY_SHARE of a bottle hit (pc_mapmaker_pitboss_bottle_damage). */
+static int pit_finite(float f) { return f==f && f>-1.0e6f && f<1.0e6f; }
+static float pit_sin(float a)
+{
+    float x=a,t,r;
+    int i;
+    while(x>3.14159265f) x-=6.28318531f;
+    while(x<-3.14159265f) x+=6.28318531f;
+    for(t=x,r=x,i=1;i<8;i++) { t*=-x*x/(float)((2*i)*(2*i+1));r+=t; }
+    return r;
+}
+static void pit_mouth(PitInst *k,uint32_t ent,uint32_t st)
+{
+    uint32_t b=WORD_AT(k->state+PIT_ST_BOTTLE),h=WORD_AT(k->state+PIT_ST_COLL);
+    float yaw=pit_getf(ent+PIT_ENT_YAW),x,y,z;
+    int was_nan;
+    if(h && MAPMAKER_PTR_OK(h,0x200u) && WORD_AT(h+0x19Cu)!=PIT_BOTTLE_CB) WORD_AT(h+0x19Cu)=PIT_BOTTLE_CB;
+    if(!b || !MAPMAKER_PTR_OK(b,0x200u) || st<1u || st>=PIT_DEATH) return;
+    if(!pit_finite(yaw)) yaw=0.0f;
+    was_nan=!pit_finite(pit_getf(b+0x64u)) || !pit_finite(pit_getf(b+0x68u)) || !pit_finite(pit_getf(b+0x6Cu));
+    x=pit_getf(ent+PIT_ENT_POS)+PIT_MOUTH_AHEAD*pit_sin(yaw);
+    y=pit_getf(ent+PIT_ENT_POS+4u)+PIT_MOUTH_UP;
+    z=pit_getf(ent+PIT_ENT_POS+8u)+PIT_MOUTH_AHEAD*pit_sin(yaw+1.57079633f);
+    if(!pit_finite(x) || !pit_finite(y) || !pit_finite(z)) return;
+    pit_setf(b+0x64u,x);pit_setf(b+0x68u,y);pit_setf(b+0x6Cu,z);
+    pit_setf(b+PIT_ENT_YAW,yaw);pit_setf(b+0xC4u,yaw);
+    if(!pit_finite(pit_getf(b+0xC0u))) pit_setf(b+0xC0u,0.0f);
+    if(!k->mouthed++ || (was_nan && k->mouthed<1000u && (k->mouthed+=1000u)))
+        fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: gas bottle held at the mouth (%.2f, %.2f, %.2f)%s\n",(unsigned)(k-pit_lv.k)+1u,
+                (double)x,(double)y,(double)z,was_nan?"; the fight's bone point was NaN":"");
 }
 /* Every PIT_TRACE_EVERY frames (PIT_TRACES lines a fight): the boss and bottle
  * positions, the bottle's rooms, room and damage callback, its health and each
@@ -870,10 +917,16 @@ void pc_mapmaker_pitboss_bottle_damage(void (*original)(void))                  
     uint32_t r=pit_arg(),o=r && MAPMAKER_PTR_OK(r,0x2Cu)?WORD_AT(r):0u;
     PitInst *k=pit_lv.n?pit_owner(o):0;
     float before=k?pit_getf(k->state+PIT_ST_HEALTH):0.f;
+    int body=k && o==WORD_AT(k->state+PIT_ST_COLL);
     pit_run(original,o);
+    if(body) {                                           /* the hull: a quarter of the bottle's loss */
+        float after=pit_getf(k->state+PIT_ST_HEALTH);
+        if(pit_finite(after) && after<before) pit_setf(k->state+PIT_ST_HEALTH,before-(before-after)*PIT_BODY_SHARE);
+        if(!k->forwarded++) pit_log("hits on the pit skeleton's body count a quarter of a gas bottle hit (skeleton, hull)",(uint32_t)(k-pit_lv.k)+1u,o);
+    }
     if(k && k->hits++<16u) {                            /* each hit on the bottle: type, kind, amount, health (8 at the start) */
-        fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: gas bottle hit (type 0x%X, kind 0x%X, amount %.2f): health %.2f -> %.2f\n",
-                (unsigned)(k-pit_lv.k)+1u,(unsigned)WORD_AT(r+0x14u),(unsigned)WORD_AT(r+0x24u),(double)pit_getf(r+0x20u),
+        fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: gas bottle %s (type 0x%X, kind 0x%X, amount %.2f): health %.2f -> %.2f\n",
+                (unsigned)(k-pit_lv.k)+1u,body?"hit through the body":"hit",(unsigned)WORD_AT(r+0x14u),(unsigned)WORD_AT(r+0x24u),(double)pit_getf(r+0x20u),
                 (double)before,(double)pit_getf(k->state+PIT_ST_HEALTH));
         fflush(stderr);
     }
