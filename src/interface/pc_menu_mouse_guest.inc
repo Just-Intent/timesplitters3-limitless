@@ -1049,13 +1049,13 @@ void pc_mapmaker_weaponset_pickup(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_preload(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_row(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_label(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_textures(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_compile(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_load(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_category(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_build(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_turret_options(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_mount(void (*original)(void)) { original(); }
-void pc_mapmaker_storyprops_textures(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_preload_model(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_model(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_gun_type(void (*original)(void)) { original(); }

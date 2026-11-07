@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,3908 @@
+@@ -1911,6 +1911,3919 @@
      sub_002FA720_gen();
  #endif
  }
@@ -3673,6 +3673,17 @@
 +    else sub_00064E70_gen();
 +#else
 +    sub_00064E70_gen();
++#endif
++}
++
++extern void sub_00063900_gen(void);
++void sub_00063900(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_textures")) pc_mapmaker_storyprops_textures(sub_00063900_gen);
++    else sub_00063900_gen();
++#else
++    sub_00063900_gen();
 +#endif
 +}
 +
