@@ -268,16 +268,16 @@ time, not GPU completion. Reading/validation/fallback and live texture switching
 are unchanged. Logging occurs after the measured end, can perturb subsequent
 frames and is capped at 8,192 rows/below 4 MiB; do not use it as clean pacing data.
 Cached rows have zero read/image/view stages and retain existing request/cache state.
-The legacy GL path also closes a trace with `path_rejected` for an oversized path.
+Legacy GL also closes a trace with `path_rejected` for an oversized path.
 Older `2230901` traces began after hashing and excluded cached calls.
-See `docs/textures/textures.md` and the runtime tests for usage and failure/bound checks.
+See `docs/textures/textures.md` and runtime tests for usage and failure/bound checks.
 
 | Area | Start here (tracked root unless noted) | Useful checks/docs |
 | --- | --- | --- |
 | Bindings, input prompts | `src/input/pc_controls.c`, `pc_input.c`, `pc_bindings.inc`, `pc_prompts.c` (MM table key: limitless-caps) | `tests/input/pc_controls.c`, `tests/input/pc_prompts.c`, `docs/players/windows-settings.md` |
 | Mouse/menu handling | `src/interface/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc`, `pc_menu_briefing.inc` (briefings: fresh left click off footer = Confirm; MM lighting right-click: limitless) | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
 | Auto-look / camera / cutscene | `src/gameplay/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/gameplay/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py`, `test_camera_widescreen.py` |
-| Limitless fork (MapMaker, scope wheel; `pc_display_menu.h`/`pc_menu_mouse_guest.inc` stubs; rooms 511/props/body/bossfloor/walk/bossdraw/AIobj:limitless-*) | [limitless.md](limitless.md) | `tests/mapmaker/`, `tests/input/test_scope_wheel.py` |
+| Limitless fork (MapMaker+Disco, scope wheel; `pc_display_menu.h`/`pc_menu_mouse_guest.inc` stubs; rooms 511/props/body/bossfloor/walk/bossdraw/AIobj:limitless-*) | [limitless.md](limitless.md) | `tests/mapmaker/`, `tests/input/test_scope_wheel.py` |
 | Display model and native UI | `src/interface/pc_display.c`, `pc_display_*.inc`, `pc_settings.c`, `src/native/` | `tests/graphics/test_pc_display_modes.py`, `test_debug_settings_model.py` |
 | GPU clear / screen copies / sampling | `src/graphics/pc_clear_rhi.inc`, `src/graphics/`, runtime `src/d3d/` | `tests/graphics/test_rhi_menu_sampling.py`, `tests/rhi/`, `docs/development/shared-platform.md` |
 | Texture loading and formats | `src/textures/texture_pack.c`, `texture_pack_format.h`, `texture_pack_io.h`, `texture_pack_stream.h`, `texture_mode.c` | `tests/textures/test_texture_runtime.py`, `tests/textures/texture_pack_tools.py` |

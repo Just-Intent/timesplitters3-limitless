@@ -295,8 +295,21 @@ the game files. It shares Lab's music and most of Lab's props (with its own
 keycards). Playing an Abstract map loads the editor's game file as well,
 which needs no switch; if that is not possible the map plays as Lab and the
 log says so. Abstract maps save in the fork's format, so the original game
-and System Link refuse them. *Automated tests only.* Details:
+and System Link refuse them. Its tile textures (in another game file) now load
+in play too. *Automated tests only.* Details:
 [tilesets](mapmaker-tilesets.md).
+
+### Disco tileset (`LIMITS`)
+
+**Map Settings → Tileset** also offers **Disco**, right after Virtual: Virtual's
+rooms dressed in the Disco arcade level's own textures (starry floor, gold
+wallpaper, red plush, leather, tiger print), read from your game files. The
+editor reloads the tiles when you switch. With Music and Sky on *Recommended*
+a Disco map plays the Disco track under a dark sky. It is saved as a Virtual
+map with a Disco mark, so the original game, older builds and System Link
+peers without this build simply see Virtual. If the Disco game file is missing it shows plain
+Virtual and the log says so. *Automated tests only.* Details:
+[Disco variant](mapmaker-disco-variant.md).
 
 ## Mouse controls
 

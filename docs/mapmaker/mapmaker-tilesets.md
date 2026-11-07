@@ -74,7 +74,10 @@ Hook: **`pc_mapmaker_tilesets_menu_row`** (WRAP `sub_00071800`, add a list row,
 cdecl text, value). Only for return 0x0031354A (the tileset loop of
 `sub_003133E0`), value 5 (Virtual, the last stock row),
 `TSFP_MAPMAKER_LIMITS=1` and scene 102: after the original it adds
-`sub_00071800(sub_0003D7B0(0xAAF), 0)`, so **Abstract** is the sixth row.
+`sub_00071800("Disco", 6)` (label once in guest heap; the Virtual variant of
+[mapmaker-disco-variant.md](mapmaker-disco-variant.md)) and
+`sub_00071800(sub_0003D7B0(0xAAF), 0)`, so **Disco** and **Abstract** follow
+Virtual.
 Every other caller (bosses, sets, weaponset, sky list 0x003135D4, ...) runs
 the original only.
 
@@ -97,6 +100,16 @@ before the original:
   is never mounted twice. The stock teardown `sub_00062720` unmounts it with
   the level's other paks. Cost: 4.2 MB of level heap; with `tileset1.pak`
   (2.2 MB) that is 6.4 MB, less than Lab (7.3 MB) or Military (9.4 MB) alone.
+- then mount `pak/arcademem/l_102m.pak` index-only (`sub_000622D0(path, 0,
+  1)`, entries read on demand): the 87 textures Abstract's 29 tile models list
+  are only there, and scenes 100..102 mount only their own memory pak
+  (`sub_00062610(scene, 1)` at 0x0006289E: play gets `l_100m.pak`), so before
+  this fix (2026-11-07) Abstract tiles had no textures in play (CONFIRMED in
+  code and paks; the in-game look is not yet checked). Its names shared with
+  `l_100m.pak` (24) and `gun.pak` (31) are byte-identical
+  (`test_mapmaker_disco.py::test_abstract_textures_audit`). Without it the map
+  still plays (untextured tiles), logged as `[mapmaker] tilesets: Abstract map
+  without l_102m.pak; its tiles have no textures`.
 - **not gated** on `TSFP_MAPMAKER_LIMITS`: stock maps never have tileset 0, and
   an Abstract map must not be played without it.
 - if the mount is impossible (fewer than 8 of the 30 mount slots,
