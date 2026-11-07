@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00800000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
+static uint32_t memory[0x00C00000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -36,6 +36,8 @@ static int near_eq(float a,float b) { return fabsf(a-b)<0.01f; }
 #define ESP1 0x00610000u
 #define CST 0x00700000u                 /* fake Crowe state (0x2E04) */
 #define PRT 0x00710000u                 /* fake particle block */
+#define EFF1_K(i) (0x00900000u+(uint32_t)(i)*0x10000u)   /* boss i's effect blocks [0x0078B090] / [0x0078B098], 0x55F0 each */
+#define EFF0_K(i) (EFF1_K(i)+0x8000u)
 #define OLDPRT 0x00720000u
 #define R 10u
 #define A(i) (POOL+(uint32_t)(i)*0xEA0u)
@@ -48,6 +50,7 @@ void sub_0005A130(void) { g_ecx=2; }
 void sub_00062260(void) { g_ecx=3; }
 void sub_0028D6D0(void) { g_ecx=4; }
 void sub_002A62C0(void) { g_ecx=5; }
+void sub_0028D0C0(void) { g_ecx=55; }
 void sub_0028D710(void) { g_ecx=6; }
 void sub_000EFBD0(void) { g_ecx=7; }
 void sub_0015DDA0(void) { g_ecx=8; }
@@ -58,6 +61,8 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)hook;ret
 
 static int pak_mounted, mount_ok=1, alloc_ok=1, parts_ok=1;
 static unsigned nmount, nalloc, nparts, ndraw, nexplode, nremove, alloc_idx;
+static unsigned reinit_n;               /* sub_0028D0C0 alone: a restart's set-up in place */
+static uint32_t reinit_seen[8][5];      /* state, effect blocks, count, particle block it saw */
 static uint32_t draw_state[8], draw_parts[8];
 static uint32_t mount_arg, draw_scene, explode_args[8], remove_arg;
 /* MapMaker rooms for the room query sub_00087310(box, out, max): boxes min
@@ -112,12 +117,19 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     if(f==sub_0028D6D0) {   /* sub_002A8300, [0x0075F5E8] = alloc, sub_0028D0C0 */
         nalloc++;
         if(alloc_ok) {   /* boss n of this level: its own blocks */
-            WORD_AT(0x0078B090u)=0x00730000u+alloc_idx*0x2000u;WORD_AT(0x0078B098u)=0x00731000u+alloc_idx*0x2000u;
+            WORD_AT(0x0078B090u)=EFF1_K(alloc_idx);WORD_AT(0x0078B098u)=EFF0_K(alloc_idx);WORD_AT(0x0078B08Cu)=0x1F4u;
             WORD_AT(0x0078B080u)=0xA0u+alloc_idx;WORD_AT(0x0078B0ECu)=0xB0u+alloc_idx;WORD_AT(0x0078B188u)=0xC0u+alloc_idx;
             WORD_AT(0x0075F5E8u)=CST+alloc_idx*0x3000u;build_grid(CST+alloc_idx*0x3000u);
         }
         alloc_idx++;
         return 0;
+    }
+    if(f==sub_0028D0C0) {   /* every field and the arena grid */
+        if(reinit_n<8u) {
+            reinit_seen[reinit_n][0]=WORD_AT(0x0075F5E8u);reinit_seen[reinit_n][1]=WORD_AT(0x0078B090u);
+            reinit_seen[reinit_n][2]=WORD_AT(0x0078B098u);reinit_seen[reinit_n][3]=WORD_AT(0x0078B08Cu);reinit_seen[reinit_n][4]=WORD_AT(0x0078B0D0u);
+        }
+        reinit_n++;WORD_AT(0x0078B080u)=0xD0u;build_grid(WORD_AT(0x0075F5E8u));return 0;
     }
     if(f==sub_002A62C0) { nparts++;WORD_AT(0x0078B0D0u)=parts_ok?(alloc_idx<=1u?PRT:0x00740000u+(alloc_idx-1u)*0x8000u):0u;return 0; }
     if(f==sub_0028D710) { if(ndraw<8u) { draw_state[ndraw]=WORD_AT(0x0075F5E8u);draw_parts[ndraw]=WORD_AT(0x0078B0D0u); }
@@ -378,7 +390,7 @@ static void multi(void)
     for(k=0;k<4u;k++) CHECK(crw_inst[k].record==REC(k) && crw_inst[k].state==CST+k*0x3000u && WORD_AT(REC(k)+4u)==0x40000u);
     CHECK(WORD_AT(REC(4)+4u)==0 && WORD_AT(REC(4))==0x11000000u && WORD_AT(REC(5)+4u)==0);   /* the fifth and sixth: bots */
     CHECK(WORD_AT(0x0078B090u)==0x00777000u && WORD_AT(0x0078B0D0u)==0x00778000u && WORD_AT(0x0075F5E8u)==0);
-    CHECK(FXW(crw_inst[1].fx,0x0078B090u)==0x00732000u && FXW(crw_inst[1].fx,0x0078B0D0u)==0x00748000u && FXW(crw_inst[1].fx,0x0078B080u)==0xA1u);
+    CHECK(FXW(crw_inst[1].fx,0x0078B090u)==EFF1_K(1) && FXW(crw_inst[1].fx,0x0078B0D0u)==0x00748000u && FXW(crw_inst[1].fx,0x0078B080u)==0xA1u);
     CHECK(crw_inst[3].state==CST+0x9000u && FXW(crw_inst[3].fx,0x0078B188u)==0xC3u && FXW(crw_inst[2].fx,0x0078B0ECu)==0xB2u);
     CHECK(FXW(crw_inst[2].fx,0x0078B1D8u)==0x5A5A5A5Au && !mapmaker_fx_holder);   /* the rest of the window from outside */
     CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);   /* the same record again */
@@ -470,34 +482,59 @@ static void multi(void)
     CALL(pc_mapmaker_crowe_fx,fake,0x001CEE8Cu,0,0,0,1);
     CHECK(ndraw==0);
     WORD_AT(0x0079094Cu)=100u;
-    /* a restart from the pause menu (sub_001CDD60, no level init): the blocks
-     * are level heap, set up again; every Crowe comes back with its record and
-     * gets new blocks at its AI start, the first one too, and relocates again */
-    WORD_AT(0x0075F5E8u)=0x00740000u;nalloc=0;
+    /* a restart from the pause menu (sub_001CDD60, no level init) frees only
+     * heap 0: every Crowe keeps its Level heap blocks and record and sets the
+     * blocks up again in place (zeroed: the last run poisoned them; the stock
+     * tail sub_0028D0C0, then its particle block), with no allocation; the
+     * same records find them at the AI start and relocate again */
+    WORD_AT(0x0075F5E8u)=0x00740000u;nalloc=0;nparts=0;
+    for(k=0;k<4u;k++) {
+        WORD_AT(CST+k*0x3000u+0x40u)=0xDEAD0000u+k;WORD_AT(CST+k*0x3000u+0x2E00u)=0x2Fu;
+        WORD_AT(EFF1_K(k)+0x55ECu)=0xBEEF0000u+k;WORD_AT(EFF0_K(k)+4u)=0xBEEF0010u+k;
+    }
+    WORD_AT(PRT+0x7CFCu)=0xFEEDu;WORD_AT(0x00740000u+3u*0x8000u+0x10u)=0xFEEEu;WORD_AT(EFF1_K(0)+0x55F0u)=0xC0FFEEu;   /* past its block: kept */
+    reinit_n=0;crw.logged=99u;
+    (void)mapmaker_fx_enter(&crw_inst[1].fx);                         /* a call that never came back */
     CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);
-    CHECK(restart_seen_n==0 && restart_seen_state==0 && !crw_n && !crw_inst[0].record && !crw_inst[3].state && !mapmaker_fx_holder);
-    CHECK(WORD_AT(0x0078B090u)==0x00777000u && WORD_AT(0x0078B0D0u)==0x00778000u);   /* the outside statics */
+    CHECK(restart_seen_n==4u && restart_seen_state==0 && crw_n==4u && nalloc==0 && nparts==0 && reinit_n==4u && !mapmaker_fx_holder && crw.logged<99u);
+    for(k=0;k<4u;k++) {
+        CHECK(crw_inst[k].state==CST+k*0x3000u && crw_inst[k].record==REC(k) && !crw_inst[k].relocated && !crw_inst[k].actor);
+        CHECK(reinit_seen[k][0]==CST+k*0x3000u && reinit_seen[k][1]==EFF1_K(k) && reinit_seen[k][2]==EFF0_K(k) && reinit_seen[k][3]==0x1F4u);
+        CHECK(reinit_seen[k][4]==0x00778000u);                             /* the particle block comes after the tail */
+        CHECK(FXW(crw_inst[k].fx,0x0078B0D0u)==(k?0x00740000u+k*0x8000u:PRT) && FXW(crw_inst[k].fx,0x0078B090u)==EFF1_K(k));
+        CHECK(FXW(crw_inst[k].fx,0x0078B098u)==EFF0_K(k) && FXW(crw_inst[k].fx,0x0078B08Cu)==0x1F4u && FXW(crw_inst[k].fx,0x0078B080u)==0xD0u);
+        CHECK(!WORD_AT(CST+k*0x3000u+0x40u) && !WORD_AT(CST+k*0x3000u+0x2E00u) && !WORD_AT(EFF1_K(k)+0x55ECu) && !WORD_AT(EFF0_K(k)+4u));
+    }
+    CHECK(!WORD_AT(PRT+0x7CFCu) && !WORD_AT(0x00740000u+3u*0x8000u+0x10u) && WORD_AT(EFF1_K(0)+0x55F0u)==0xC0FFEEu);
+    CHECK(!crw_inst[1].removed && !crw_inst[2].eggs);
+    CHECK(WORD_AT(0x0078B090u)==0x00777000u && WORD_AT(0x0078B0D0u)==0x00778000u && WORD_AT(0x0075F5E8u)==0);   /* the outside statics */
     for(k=0;k<4u;k++) { actor(k,0x46,0x5E8,k);CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(k),0,0,1); }
-    CHECK(crw_n==4u && nalloc==4u && crw_inst[0].state==CST && crw_inst[3].state==CST+0x9000u && WORD_AT(REC(0)+4u)==0x40000u);
-    CHECK(!crw_inst[1].removed && !crw_inst[0].relocated && WORD_AT(0x0075F5E8u)==0);
+    CHECK(crw_n==4u && nalloc==0 && crw_inst[0].state==CST && crw_inst[3].state==CST+0x9000u && WORD_AT(REC(0)+4u)==0x40000u);
+    CHECK(!crw_inst[1].removed && !crw_inst[0].relocated && WORD_AT(0x0075F5E8u)==0 && crw_inst[2].actor==A(2));
     for(k=0;k<4u;k++) { SETF(ENT(k)+0x64u,20.0f+40.0f*k);SETF(ENT(k)+0x68u,4.0f);SETF(ENT(k)+0x6Cu,-20.0f); }
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(1),0,0,1);
     CHECK(crw_inst[1].relocated && seen_state_ptr==CST+0x3000u && near_eq(F(CST+0x3000u+0x970u+18u*0x28u+0x10u),60.0f));
-    nalloc=0;
-    CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);    /* restarted again */
-    CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
-    CHECK(crw_n==1u && nalloc==1u && crw_inst[0].record==REC(2));
-    CHECK(crw.restarted);
-    level();                                                               /* a new level forgets the restart */
-    CHECK(!crw.restarted);
-    WORD_AT(0x0079094Cu)=14u;                                              /* mission 10's own restart: stock */
+    CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);    /* restarted again: the same blocks */
+    CHECK(crw_n==4u && nalloc==0 && crw_inst[1].state==CST+0x3000u && !crw_inst[1].relocated);
+    FXW(crw_inst[2].fx,0x0078B08Cu)=0x1234u;                              /* an effect count of neither size: it and the rest dropped */
     CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);
-    CHECK(!crw_n && !crw.restarted);
+    CHECK(crw_n==2u && crw_inst[1].state==CST+0x3000u && !crw_inst[2].state && !crw_inst[2].record && !crw_inst[3].state && nalloc==0);
+    crw_inst[0].state=0x100u;                                              /* not a usable block */
+    CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);
+    CHECK(!crw_n && !crw_inst[0].record && !crw_inst[1].state);
+    CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);      /* none left: bot behaviour, no allocation */
+    CHECK(!crw_n && nalloc==0);
+    level();
+    CALL(pc_mapmaker_crowe_ai_start,fake_ai,0x0015F981u,A(2),0,0,1);
+    WORD_AT(0x0079094Cu)=14u;                                              /* mission 10's own restart: stock */
+    k=reinit_n;
+    CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);
+    CHECK(!crw_n && reinit_n==k);
     CALL(pc_mapmaker_crowe_restart,fake_restart,0x0003D4F0u,0,0,0,1);    /* no Crowe: nothing */
-    CHECK(!crw.restarted);
+    CHECK(!crw_n && reinit_n==k);
     WORD_AT(0x0079094Cu)=100u;
     /* the next level: no boss, the outside values live; a stale state pointer cleared */
-    WORD_AT(0x0075F5E8u)=0x00740000u;
+    WORD_AT(0x0075F5E8u)=0x00740000u;crw.logged=20u;
     level();
     CHECK(WORD_AT(0x0075F5E8u)==0);
     CHECK(crw_cur==-1 && crw_n==1u && !crw_inst[1].state);
