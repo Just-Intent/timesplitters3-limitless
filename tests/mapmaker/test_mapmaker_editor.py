@@ -7,6 +7,7 @@ must apply, see tools/compiler/guest_code_patches.py); these checks
 cover what the lift cannot know: that each rewrite moves its value by
 exactly its array's delta and that the layout is consistent with the C side."""
 import json
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -66,6 +67,18 @@ MUTATIONS = {
     'sai-point-any-table': ('    if(j==MAPMAKER_PIECE_BYTE) return;                 /* not the loader\'s frame */', '    if(j==MAPMAKER_PIECE_BYTE) j=0;'),
     'sai-point-small-maps': ('    if(n<=MAPMAKER_PIECE_BYTE || !MAPMAKER_PTR_OK(table,n*4u)) return;', '    if(!MAPMAKER_PTR_OK(table,n*4u)) return;\n    n=MAPMAKER_PIECES_TABLE;'),
     'slot-no-dedup': ('        if((int32_t)WORD_AT(obj+0x13Cu+i*0x8Cu)==record) { original();return; } /* already has a slot */', ''),
+    # Save/load delay: sub_002FC3D0 remembered only inside a compile/load, keyed on every input.
+    'top-no-count-key': (' &&\n       mapmaker_top_memo.head==head && mapmaker_top_memo.count==count)', ' &&\n       mapmaker_top_memo.head==head)'),
+    'top-no-head-key': ('mapmaker_top_memo.head==head && mapmaker_top_memo.count==count', 'mapmaker_top_memo.count==count'),
+    'top-no-flag-key': ('mapmaker_top_memo.editor==editor && mapmaker_top_memo.flag==flag &&', 'mapmaker_top_memo.editor==editor &&'),
+    'top-outside-scope': ('    if(!mapmaker_top_memo.depth) { original();return; }\n', ''),
+    'top-registers': ('g_eax=mapmaker_top_memo.eax;g_ecx=mapmaker_top_memo.ecx;g_edx=mapmaker_top_memo.edx;', 'g_eax=mapmaker_top_memo.eax;'),
+    'top-load-unscoped': ('    mapmaker_top_scope(1,"load");\n', ''),
+    'top-compile-unscoped': ('    mapmaker_top_scope(1,"save compile");\n', ''),
+    'top-depth-flat': ('    if(!mapmaker_top_memo.depth || --mapmaker_top_memo.depth) return;',
+                       '    if(!mapmaker_top_memo.depth) return;\n    mapmaker_top_memo.depth=0;'),
+    'top-switch-ignored': ("mapmaker_top_memo.off=v && v[0]=='0';", 'mapmaker_top_memo.off=0;'),
+    'top-not-popped': ('        mapmaker_top_memo.hits++;\n        MAPMAKER_GUEST_RET();\n', '        mapmaker_top_memo.hits++;\n'),
 }
 
 
@@ -98,6 +111,7 @@ def test_mapmaker_editor(tmp_path, mutation):
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'mapmaker editor ok' in result.stdout
+        assert re.search(r'piece top: \d+ calls, 7 walks', result.stdout), result.stdout
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 

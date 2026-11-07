@@ -756,6 +756,8 @@ void pc_mapmaker_editor_logic_slot(void (*original)(void)) { original(); }
 void pc_mapmaker_editor_free_place(void (*original)(void)) { original(); }
 void pc_mapmaker_editor_free_move(void (*original)(void)) { original(); }
 void pc_mapmaker_editor_sai_point(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_top(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_query(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_tree(void (*original)(void)) { original(); }
 void pc_mapmaker_rooms_compile(void (*original)(void)) { original(); }

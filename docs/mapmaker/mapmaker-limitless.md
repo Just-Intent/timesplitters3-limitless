@@ -58,6 +58,7 @@ are not in the launcher.
 | `TSFP_MAPMAKER_BOSS_RANGE=<units>` | 30 | How close you must be for a Boss Story AI's health bar to show (1..100000 game units). | Automated tests only |
 | `TSFP_MAPMAKER_REAL_BOSS=0` | Story behaviour on | With `LIMITS`: the giant trophy monster and the giant skeleton fight like normal bots instead of with its story behaviour. See [real bosses](mapmaker-realbosses.md). | Automated tests only |
 | `TSFP_MAPMAKER_CREATURE_PROBE=1` | Off | Read-only log of the characters each level spawns and whether story-only creature models can load; write it to a file with `TSFP_MAPMAKER_CREATURE_PROBE_LOG=<file>`. See [bosses](mapmaker-bosses.md). | Developer use |
+| `TSFP_MAPMAKER_SAVE_MEMO=0` | Faster save on | Saves and loads the slow original way, to compare times (the log shows the milliseconds of each large save/load). | Automated tests only |
 
 ## Raised limits (`TSFP_MAPMAKER_LIMITS=1`)
 
@@ -76,7 +77,7 @@ are not in the launcher.
 | Logic operations / nodes / records | 30 / 130 / 100 | 120 / 520 / 400 |
 | Free-standing objects | 40 / 30 / 100 | 160 / 120 / 400 |
 | Pads / pad links / pad groups | 2400 / 4400 / 300 | 7680 / 32256 / 1024 |
-| Engine objects (tiles + items + 128 kept for characters and explosions) | 550 | 1023 |
+| Engine objects (tiles + items + 128 kept for characters and explosions) | 550 | 2047 |
 | Map file | 32 KB | 512 KB |
 | Memory budget meter | 1x | 8x |
 
@@ -85,14 +86,14 @@ one row per limit above ("Tiles: 123/1023"), amber near the limit and red at
 it. *Automated tests only.*
 
 **Tiles past 511 (2026-11-07, not yet tested in game).** The tile limit is
-1023, but every tile is also one engine object, and the game has room for
-1023 of those in all: tiles + items + 128 must fit. So a map can hold about
-895 tiles with no items, 600 tiles with 295 items, or 511 tiles with 384
-items; the Objects row of the resource table shows how close you are.
-Heavy tiles (many pads and links) stop earlier on Pads (about 549) or Links
-(about 521), and typical maps near 680 tiles on Pad groups. Saving, loading
-and every edit get slower as the tile count grows (the editor recomputes
-the whole map each time). Old maps load as before.
+1023. Every tile is also one engine object; since 2026-11-07 the game has
+room for 2047 of those (it was 1023), so 1023 tiles and all 500 items fit
+together and tiles no longer use up the item budget. Heavy tiles (many pads
+and links) stop earlier on Pads (about 549) or Links (about 521), and
+typical maps near 680 tiles on Pad groups. Saving and loading large maps should be
+quicker: the editor no longer re-measures every tile for each
+item. Every edit still recomputes the map. Old maps load as before, and
+System Link with other builds is unaffected.
 
 **Tested (STATUS.md, 2026-10-30):** editor and play on maps with 236 tiles,
 200 items and more than 102 Story AI, up to 64 characters in MapMaker Story,

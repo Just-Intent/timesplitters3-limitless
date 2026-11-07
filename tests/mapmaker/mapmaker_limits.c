@@ -236,18 +236,20 @@ int main(void)
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEC,1);
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    /* 895 cost-free placed, no items: the engine objects (895 + 128 reserved =
-     * 1023) bind before the 1023-piece cap. */
-    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,895);
+    /* 1023 cost-free placed, no items: the engine objects (1023 + 128 reserved
+     * = 1151 of 2047, handles slot << 21) no longer bind; the piece cap does. */
+    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,1023);
     WORD_AT(ED+0x2f7c)=0;
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
-    CHECK(NEAR(FLOAT_AT(ED+0x270),1.0f));                             /* objects 1023/1023 */
-    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEC,1);                 /* + 1 held: refused */
+    CHECK(NEAR(FLOAT_AT(ED+0x270),1.0f));                             /* pieces 1023/1023 */
+    CHECK(mapmaker_limits_view.objects==1151u);
+    /* 1023 placed + 1 held: past the piece cap only (logged) */
+    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEC,1);
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
-    /* 1023 placed + 1 held: past the piece cap too (logged with the objects) */
-    WORD_AT(0x0078400Cu)=make_list(0x00440000u,TYPEC,1023);
+    /* 1023 placed + 897 held: the piece cap and, at 2048, the object pool */
+    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEC,897);
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     /* The heaviest stock tile (type 14/42: 14 pads, 14 cover, 46 links): 520 of
@@ -315,22 +317,21 @@ int main(void)
         heavy.pieces=512;heavy.cost[0]=14u*512u;heavy.cost[1]=14u*512u;heavy.cost[2]=46u*512u;
         CHECK(mapmaker_limits_over(&heavy,&none,MAPMAKER_LIMIT_MEMORY,MAPMAKER_LIMIT_GROUPS,383u)==0);    /* the old cap */
         heavy.pieces=511;heavy.cost[0]=14u*511u;heavy.cost[1]=14u*511u;heavy.cost[2]=46u*511u;
-        /* Engine objects: 511 rooms + 384 items + 64 characters + 64 for
-         * explosions and debris = 1023, the pool. */
-        CHECK(MAPMAKER_OBJECTS_RESERVE==128u);
-        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,384u)&MAPMAKER_CAP_OBJECTS));
-        CHECK(mapmaker_limits_over(&heavy,&none,0,0,385u)&MAPMAKER_CAP_OBJECTS);
-        CHECK(!(mapmaker_limits_over(&none,&heavy,0,0,384u)&MAPMAKER_CAP_OBJECTS));   /* held pieces count */
-        CHECK(mapmaker_limits_over(&none,&heavy,0,0,385u)&MAPMAKER_CAP_OBJECTS);
-        /* The v0.4.0-mapmaker.37 map (459 pieces + 500 items) filled the pool in
-         * play: refused now. 395 pieces keep 500 items, 396 do not. */
-        heavy.pieces=459;
-        CHECK(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS);
-        heavy.pieces=395;
-        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS));
-        heavy.pieces=396;
-        CHECK(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS);
-        heavy.pieces=255;                                               /* 255 pieces keep 500 items */
+        /* Engine objects: rooms + items + 64 characters + 64 for explosions and
+         * debris within the 2047-slot pool (handles slot << 21). 511 rooms and
+         * 384 items were the 1023-slot pool's limit; now 1023 + 896 = 2047. */
+        CHECK(MAPMAKER_OBJECTS_RESERVE==128u && MAPMAKER_LIMIT_OBJECTS==2047u);
+        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,385u)&MAPMAKER_CAP_OBJECTS));
+        heavy.pieces=1023;
+        CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,896u)&MAPMAKER_CAP_OBJECTS));
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,897u)&MAPMAKER_CAP_OBJECTS);
+        CHECK(!(mapmaker_limits_over(&none,&heavy,0,0,896u)&MAPMAKER_CAP_OBJECTS));   /* held pieces count */
+        CHECK(mapmaker_limits_over(&none,&heavy,0,0,897u)&MAPMAKER_CAP_OBJECTS);
+        /* Tiles no longer take items away: every piece count up to the cap keeps
+         * all 500 items (the m37 map, 459 + 500, fits). */
+        for(heavy.pieces=255;heavy.pieces<=1023u;heavy.pieces+=64u)
+            CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS));
+        heavy.pieces=1023;
         CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)&MAPMAKER_CAP_OBJECTS));
         heavy.pieces=511;
         heavy.pieces=520;heavy.cost[2]=46u*520u;
@@ -346,20 +347,19 @@ int main(void)
         /* 1024 light pieces (15 links each) fit the link budget. */
         heavy=none;heavy.pieces=1024;heavy.cost[2]=15u*1024u;
         CHECK(!(mapmaker_limits_over(&heavy,&none,0,0,0)&MAPMAKER_CAP_LINKS));
-        /* Cost-free pieces: 895 fit (objects 1023), 896 only pass the objects,
-         * 1023 too, 1024 also the piece cap (the rooms machinery: 1..0x3FF). */
+        /* Cost-free pieces: 1023 fit with 500 items (objects 1651 of 2047),
+         * 1024 pass the piece cap only (the rooms machinery: 1..0x3FF). */
         heavy=none;heavy.pieces=895;
         CHECK(mapmaker_limits_over(&heavy,&none,0,0,0)==0);
-        heavy.pieces=896;
-        CHECK(mapmaker_limits_over(&heavy,&none,0,0,0)==MAPMAKER_CAP_OBJECTS);
         heavy.pieces=1023;
-        CHECK(mapmaker_limits_over(&heavy,&none,0,0,0)==MAPMAKER_CAP_OBJECTS);
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,0)==0);
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)==0);
         heavy.pieces=1024;
-        CHECK(mapmaker_limits_over(&heavy,&none,0,0,0)==(MAPMAKER_CAP_OBJECTS|MAPMAKER_CAP_PIECES));
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,0)==MAPMAKER_CAP_PIECES);
         heavy.pieces=1023;                                              /* held pieces count */
-        CHECK(mapmaker_limits_over(&none,&heavy,0,0,0)==MAPMAKER_CAP_OBJECTS);
-        heavy.pieces=600;                                               /* 600 pieces keep 295 items */
-        CHECK(mapmaker_limits_over(&heavy,&none,0,0,295u)==0 && mapmaker_limits_over(&heavy,&none,0,0,296u)==MAPMAKER_CAP_OBJECTS);
+        CHECK(mapmaker_limits_over(&none,&heavy,0,0,0)==0);
+        heavy.pieces=600;                                               /* 600 pieces keep all 500 items */
+        CHECK(mapmaker_limits_over(&heavy,&none,0,0,MAPMAKER_LIMIT_SUB)==0);
     }
     WORD_AT(0x0078400Cu)=pieces;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
