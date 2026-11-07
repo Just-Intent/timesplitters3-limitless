@@ -135,6 +135,7 @@ void pc_mapmaker_editor_free_place(void (*original)(void));
 void pc_mapmaker_editor_free_move(void (*original)(void));
 void pc_mapmaker_editor_sai_point(void (*original)(void));
 void pc_mapmaker_rooms_light_spread(void (*original)(void));
+void pc_mapmaker_rooms_ray_step(void (*original)(void));
 void pc_mapmaker_rooms_portal_link(void (*original)(void));
 void pc_mapmaker_rooms_tree(void (*original)(void));
 void pc_mapmaker_rooms_query(void (*original)(void));
