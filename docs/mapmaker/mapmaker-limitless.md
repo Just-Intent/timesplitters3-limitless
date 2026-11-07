@@ -291,11 +291,13 @@ Details: [real bosses](mapmaker-realbosses.md).
 
 The custom character set's picker ends with two more rows: **Prometheus
 SK/8** (the Machine Wars rocket robot) and **Prometheus SD/7** (the guard
-robot). Put them in Story AIs; any number per map. They use the game's own
-robot behaviour and animations; the preview shows their Arcade look-alikes.
-The original game plays such a map with the same robots but shows an empty
-name in the editor. *Automated tests only.* Details:
-[story assets](mapmaker-story-assets.md) item 18.
+robot). Put them in Story AIs; any number per map. In Story play they get
+the Machine Wars robot behaviour: the SK/8 fires its own rockets without a
+weapon (until .58 it only played its firing pose). The preview shows their
+Arcade look-alikes. `TSFP_MAPMAKER_CREATURES=0` plays them as bots. The
+original game plays such a map with bots and shows an empty name in the
+editor. *Automated tests only.* Details:
+[story creatures](mapmaker-creatures.md#the-prometheus-robots-rows-159160-after-the-v040-mapmaker58-report).
 
 ### Story props: power cells and prison guns (`LIMITS`)
 
