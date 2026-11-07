@@ -245,6 +245,25 @@ static void test_chain(void)
     CHECK(WORD_AT(MAPMAKER_ASTAR_COUNTER)==MAPMAKER_ASTAR_NODES);
 }
 
+/* equal f: a new node goes after the open nodes with the same f. Three
+ * mirror-image ways from group 0; the first is a dead end, so the second
+ * one inserted (link 0-2) is expanded next and gives the route. */
+static void test_ties(void)
+{
+    uint32_t g[5],p[5],l02,k,n;
+    static const float pos[5][3]={{0,0,0},{10,0,10},{10,0,-10},{20,0,0},{10,10,0}};
+    reset(9);
+    for(k=0;k<5;k++) { g[k]=add_group(1);p[k]=add_pad(g[k],pos[k][0],pos[k][1],pos[k][2]); }
+    add_link(0x10000u,p[0],p[1],1.0f);
+    l02=add_link(0x10000u,p[0],p[2],1.0f);
+    add_link(0x10000u,p[0],p[4],1.0f);
+    add_link(0x10000u,p[2],p[3],1.0f);
+    add_link(0x10000u,p[4],p[3],1.0f);
+    g_esp=STACK-0x14u;
+    n=mapmaker_astar_search((int32_t)p[0],(int32_t)p[3],ROUTES,300);
+    CHECK(n==2 && *(uint16_t *)((char *)memory+ROUTES)==3u && *(uint16_t *)((char *)memory+ROUTES+2u)==l02);
+}
+
 /* the wrapper reads the cdecl arguments and returns like the original's ret */
 static void original_called(void) { failures++; }
 static void test_wrapper(void)
@@ -285,6 +304,7 @@ int main(int argc,char **argv)
     }
     if(argc==2 && !strcmp(argv[1],"golden")) { test_counts_equal_walks(1);return 0; }
     test_chain();
+    test_ties();
     test_wrapper();
     test_counts_equal_walks(0);
     if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }
