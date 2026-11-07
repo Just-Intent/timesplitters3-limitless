@@ -2,10 +2,13 @@
 
 Status 2026-11-07: played in v0.4.0-mapmaker.55 (user): both variants
 appear and work, but untextured, and the power cell sat half in the floor.
-Fixed after .55 (below, "Fixed after .55"); the fix is not built or played.
+Fixed after .55 (below, "Fixed after .55"). v0.4.0-mapmaker.57 (user):
+"textures now show for both"; "Big barrel is now floating well above the
+floor" (the .55 height fix was wrong; see "Height after .57"). Not yet
+played since.
 Implemented in `src/interface/pc_mapmaker_storyprops.inc`
 (area `storyprops`), fixture-tested (`tests/mapmaker/mapmaker_storyprops.c`
-+ `tests/mapmaker/test_mapmaker_storyprops.py`: 54 mutations, plus decode,
++ `tests/mapmaker/test_mapmaker_storyprops.py`: 56 mutations, plus decode,
 US XBE data and game-pak checks of every site below). **Not wired, not
 built, not played**: the wrappers are the integrator's (list below). Switch:
 `TSFP_MAPMAKER_LIMITS=1` (editor and play). No guest-code table, no fork
@@ -102,14 +105,37 @@ queue's load `sub_00063900` (once, 0x0003D5E5: after the load pass
 - The mothership (same pak, same deferral) probably has the same gap; its
   textures are in l_64_chm too (not changed here).
 
-**Height (CONFIRMED, test `test_power_cell_height`).** The cell's vertices
-span y 0..1.471, but the bounds block after its texture list (count 1,
-centre (0, -0.001, 0), half extents (0.546, 0.736, 0.546)) is centred on the
-origin: the game draws it centred, as the intro's upright and lying cells at
-one height show. The drum's vertices start at y 0 and it has no such block.
-The fill now adds 0.737 (half height - centre y) to a power cell's record y
-(+0x14; ebp is the record at the model call, 0x0024176B), so it stands on the
-floor like the drum. The editor still shows the drum model (no change).
+**Height (as fixed after .55; wrong, see below).** The .55 build raised the
+cell's record y by 0.737, reading the bounds block after its texture list
+(count 1, centre (0, -0.001, 0), half extents (0.546, 0.736, 0.546)) as the
+drawn box.
+
+## Height after .57: back to the drum's height
+
+Evidence (m57.err: `drum placed as the mission 1 power cell` twice, textures
+7 of 7, no physics or position lines; user: "floating well above the floor"):
+- CONFIRMED (test `test_power_cell_height`): the cell's drawn vertices span
+  y 0..1.471 and the drum's start at y 0 as well (0xD50, 0x256C): **both
+  models stand on their origin**. The bounds block is a box around the origin
+  (y -0.737..0.735), not the drawn extent, so lifting by its half height
+  floated the cell by about that much, as seen in .57.
+- CONFIRMED (decode): the fill writes the same record y for both (the piece
+  cell + 0.01, 0x0024175E) and both are created by `sub_000A6F90` from that
+  record (`sub_000AB590` only forwards for type 0x80); the drum's init 38
+  (`sub_00340470`) moves nothing. The cell's init 20 adds a kind-1 physics
+  body (`sub_0016C170(obj, 1)`, `sub_00172760(body, 3, ...)`); the drum has
+  none.
+- Not explained: the "slightly" sunk cell of .55 (INFERRED: the physics body
+  or the floor surface; the intro puts upright and lying cells at one height,
+  -5.05, so its records do not settle it).
+- Now: the default offset is **0** (`SP_CELL_LIFT`), the drum's height. One
+  line per level says what is applied and what the model's bounds block
+  holds: `power cell height: record y +0.000 (model base y 0; bounds centre y
+  -0.001, half height 0.736)`. For a playtest `TSFP_MAPMAKER_POWERCELL_LIFT=<m>`
+  (-1..2, read once; anything else is ignored and logged) adds that much to
+  the record y (+0x14; ebp is the record at the model call, 0x0024176B), so
+  the right value for the .55 sink can be measured in one run and made the
+  default.
 
 ## Hooks (WRAP lines for the integrator, area `storyprops`)
 
@@ -153,9 +179,8 @@ gun`, `pak mount table full`, `model not read this level`).
 - Memory: the indexes of l_26_st / l_26_stm (325 / 416 entries) and l_64_ch /
   l_64_chm, the two models (34,412 B and 88,716 B) and their textures per
   level that uses them.
-- That the queued textures load and bind in scene 100 (the load pass's own
-  path for prop-stream models), and that the physics body rests where the
-  raised cell starts.
+- The cause of .55's slight sink and whether the physics body moves the cell
+  (see "Height after .57").
 
 ## User test steps
 
@@ -169,7 +194,10 @@ gun`, `pak mount table full`, `model not read this level`).
 4. Test map: stderr has the four `mounted pak/...` lines, `power cell 0x53D
    textures: 7 of 7` and `prison gun 0xE6 textures: 5 of 5`, `drum placed as
    the mission 1 power cell`, `fixed gun placed as the mission 1 prison gun`.
-   The cell is textured (the intro's power cell) and stands on the floor;
+   The cell is textured (the intro's power cell); stderr has `power cell
+   height: record y +0.000 ...`. If it still sinks a little, rerun with
+   `TSFP_MAPMAKER_POWERCELL_LIFT=0.05` (then 0.1, ...) and report the value
+   that sits on the floor;
    shoot it: a bigger blast than the drum's. The prison gun is textured; mount
    and fire it.
 5. Several cells and prison guns in one map all work. Without the switch the
