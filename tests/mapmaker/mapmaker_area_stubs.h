@@ -80,7 +80,7 @@ void sub_0015DDA0(void) {}
 void sub_0029CCB0(void) {}
 void sub_002A7F30(void) {}  /* realbosses: skeleton fire */
 void sub_0005F460(void) {}  /* realbosses: the Crow walker's roar */
-void sub_00287860(void) {} void sub_00297690(void) {}  /* realbosses: the stock skeleton/walker resets at a restart */
+void sub_00287860(void) {} void sub_00297690(void) {} void sub_002BD480(void) {}  /* realbosses: the stock skeleton/walker resets at a restart, the walker grid */
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it */
 void sub_00019D70(void) {}
 #endif
@@ -130,7 +130,7 @@ void sub_00071B10(void) {} void sub_00071C50(void) {}
 #endif
 /* robot, crowe, tank (pc_mapmaker_robot.inc, pc_mapmaker_crowe.inc, pc_mapmaker_tank.inc) */
 void sub_000A6F90(void) {} void sub_000EFBD0(void) {} void sub_0028D6D0(void) {} void sub_0028D710(void) {}
-void sub_00292550(void) {} void sub_00292630(void) {} void sub_002A62C0(void) {}
+void sub_00292550(void) {} void sub_00292630(void) {} void sub_002A62C0(void) {} void sub_0028D0C0(void) {}
 void sub_000A5E40(void) {} void sub_000631C0(void) {}  /* tank: model request at level init */
 void sub_00096330(void) {}  /* mothership: texture registration */
 void sub_002F7920(void) {}  /* sets: spawn mode mask of an editor item */

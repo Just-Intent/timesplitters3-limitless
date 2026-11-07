@@ -96,7 +96,7 @@ SDL tests (`tools/build/build-native-mac.py --test`) cover the two-slot E/Space
 cap, requested capture, release and frame-applied mouse disable. They preserve
 bindings; physical input remains unverified.
 
-CI: `runtime-patches.yml` selects work; `ci-pr-gate.py` requires both hosts.
+CI: `runtime-patches.yml` selects work (restart heap: limitless-bosses.md); `ci-pr-gate.py` requires both hosts.
 Native jobs allow 45 minutes on Windows and 30 on Mac; patch upgrades allow 30.
 Required check names remain.
 `test_ci_pr_gate.py` rejects missing/failed/skipped results;
@@ -649,7 +649,7 @@ No game launch is required for this export-only change.
 `config/textures/texture-originals.json` excludes user-retained original icons from
 `texture-worklist.py` and `texture-hybrid-plan.py`. Offline regression coverage
 is in `tests/textures/texture_pack_tools.py` (including rejection of accidental reinstall)
-and `tests/textures/test_texture_hybrid_plan.py`. These tests are already registered in CI.
+and `tests/textures/test_texture_hybrid_plan.py`, both registered in CI.
 Asset removal also requires pack count/size audit and unchanged-file hashes;
 no game rebuild is needed.
 
@@ -892,7 +892,6 @@ exists. fetch-launcher-art.ps1 recovers the pinned banner/backdrop/logo without
 executing downloaded code. -RequireArtwork checks the selected resources; normal
 local rebuilds now reuse the same verified art as release CI when cached.
 
-
 Beta publication (2026-10-23): release_channels.identity defaults to history parsing;
 publishing=True rejects alpha/preview/rc/legacy suffixes. Version preparation,
 both package entry points and publisher preflight enforce that mode. Beta's
@@ -920,9 +919,7 @@ See [water tests](water-tests.md) for CPU/GPU validation and live limits; see
 CI discovers unittest in each owning test folder. Changes to project_paths.py
 or conftest.py select all runtime and launcher suites.
 
-
 [Request CI](kernel-objects.md).
-
 
 Stage0219 device/name source and contracts use maintained src/runtime and tests/compiler
 paths; see [device ownership](kernel-devices.md). Shared CI selects every new portable
@@ -931,9 +928,7 @@ that skip does not replace native Mac compilation or title gameplay.
 
 [Unlock migrations](unlock-content.md).
 
-
 Original sharing bridges and ordinal80 cleanup: [contracts and checks](kernel-sharing.md).
-
 
 Stage0220 migration models: native-checkpoint, old-controls and old-Mac fixtures
 omit0220 together with its0219 prerequisite while constructing historical inputs.
@@ -941,13 +936,11 @@ Each complete upgrade explicitly asserts the original sharing include/provider
 and ordinal80/16byte cleanup. Full current stacks still include0220. No loader,
 patch bytes, runtime behavior, strict warnings or final upgrade checks are weakened.
 
-
 Online loopback CI synchronization: test_online.py's three-peer handshake waits
 for the host's two authenticated latency replies as well as each guest's first
 reply, matching its existing assertions. The same four-second deadline, nonce/
 credential/replay checks and relay assertions remain. A partial host roster must
 not end that wait. This test-only fix changes no transport or runtime behavior.
-
 
 Original request lifetime/callback prerequisites: [contracts and ABI boundary](request-lifetime.md).
 

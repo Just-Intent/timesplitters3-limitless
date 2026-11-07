@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00A00000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
+static uint32_t memory[0x00C00000/4], g_eax, g_ecx, g_edx, g_esp, g_ebx, g_esi, g_edi;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -38,13 +38,9 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 #define SKPT_K(k) ((k)?0x00880000u+(uint32_t)(k)*0x8000u:SKPT)
 #define WKST_K(k) ((k)?0x00900000u+(uint32_t)(k)*0x8000u:WKST)
 #define WKPT_K(k) (0x00940000u+(uint32_t)(k)*0x8000u)
-#define WKEF_K(k) (0x00980000u+(uint32_t)(k)*0x1000u)
+#define WKEF_K(k) (0x00A00000u+(uint32_t)(k)*0x10000u)          /* effect blocks [0x0078B090] / [0x0078B098], 0x55F0 each */
+#define WKEF0_K(k) (WKEF_K(k)+0x8000u)
 static unsigned skel_seq(void), walk_seq(void);   /* instances made so far this level */
-/* after a restart (the level heap freed): blocks elsewhere, so new ones are seen */
-static uint32_t heap_gen;static unsigned alloc_fail_n;   /* this skeleton allocation (count) fails */
-#define SKGEN_ST(k) (heap_gen?0x00990000u+(uint32_t)(k)*0xD000u:SKST_K(k))
-#define SKGEN_PT(k) (heap_gen?0x00990000u+(uint32_t)(k)*0xD000u+0x4C80u:SKPT_K(k))
-#define WKGEN_ST(k) (heap_gen?0x009C4000u+(uint32_t)(k)*0x7000u:WKST_K(k))
 #define A(i) (POOL+(uint32_t)(i)*0xEA0u)
 #define ENT(i) (ENTS+(uint32_t)(i)*0x400u)
 #define REC(i) (RECS+(uint32_t)(i)*0x100u)
@@ -70,8 +66,10 @@ void sub_002A7F30(void) { g_ecx=17; }
 void sub_0005F460(void) { g_ecx=18; }
 void sub_00287860(void) { g_ecx=19; }
 void sub_00297690(void) { g_ecx=20; }
+void sub_002BD480(void) { g_ecx=21; }
 /* the stock skeleton / walker resets: the boss pointer and particle block (walker: effect block) each saw */
-static unsigned nskel_reset, nwalk_reset;
+static unsigned nskel_reset, nwalk_reset, ngrid;
+static uint32_t grid_args[8][4];
 static uint32_t skel_reset_seen[8][2], walk_reset_seen[8][2];
 static unsigned nanim;
 static uint32_t fire_parts;
@@ -134,7 +132,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     }
     if(f==sub_00287E00) {   /* sub_0003DFA0 twice, then sub_00287860 */
         nalloc++;alloc_scene=WORD_AT(0x0079094Cu);
-        if(alloc_ok && nalloc!=alloc_fail_n) { unsigned q=skel_seq();WORD_AT(0x0078B1ECu)=SKGEN_ST(q);WORD_AT(0x0078B0D0u)=SKGEN_PT(q);WORD_AT(SKGEN_ST(q)+0x4160u)=0; }
+        if(alloc_ok) { unsigned q=skel_seq();WORD_AT(0x0078B1ECu)=SKST_K(q);WORD_AT(0x0078B0D0u)=SKPT_K(q);WORD_AT(SKST_K(q)+0x4160u)=0; }
         return 0;
     }
     if(f==sub_00059DB0) { nstart++;start_args[0]=x[0];start_args[1]=x[1];return x[1]==0x19Cu?0x77u:0x66u; }
@@ -147,13 +145,18 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     if(f==sub_002E4B80) return (uint32_t)player_dead;
     if(f==sub_002976F0) {   /* effect blocks, particles, state */
         unsigned q=walk_seq();
-        nwalk_alloc++;if(alloc_ok) WORD_AT(0x0078B1E8u)=WKGEN_ST(q);
+        nwalk_alloc++;if(alloc_ok) WORD_AT(0x0078B1E8u)=WKST_K(q);
         WORD_AT(0x0078B0D0u)=q?WKPT_K(q):SKPT;WORD_AT(0x0078B090u)=WKEF_K(q);
+        WORD_AT(0x0078B098u)=WKEF0_K(q);WORD_AT(0x0078B08Cu)=0x1F4u;    /* two-player story count: 0x55F0 each */
         return 0;
     }
     if(f==sub_00287860) {
         if(nskel_reset<8u) { skel_reset_seen[nskel_reset][0]=WORD_AT(0x0078B1ECu);skel_reset_seen[nskel_reset][1]=WORD_AT(0x0078B0D0u); }
         nskel_reset++;WORD_AT(WORD_AT(0x0078B1ECu)+0x3E88u)=0;return 0;
+    }
+    if(f==sub_002BD480) {   /* the walker init's grid (8, 8, 1.0, state + 0x5C4) */
+        if(ngrid<8u) memcpy(grid_args[ngrid],x,sizeof grid_args[0]);
+        ngrid++;return 0;
     }
     if(f==sub_00297690) {   /* also emits into the particle block: the count moves */
         if(nwalk_reset<8u) { walk_reset_seen[nwalk_reset][0]=WORD_AT(0x0078B1E8u);walk_reset_seen[nwalk_reset][1]=WORD_AT(0x0078B090u); }
@@ -1309,68 +1312,88 @@ int main(void)
             rbs_skelf.n=n0;rbs_walkf.n=w0;
         }
         CHECK(FXW(rbs_skels[2].fx,0x0078B0E0u)==0xF0000060u);                 /* from the level's statics */
+        CHECK(FXW(rbs_walks[1].fx,0x0078B0E0u)==0xF0000060u);                 /* the late walker too */
         CHECK(WORD_AT(0x0078B0E0u)==0xE0000060u);                             /* the live ones put back */
         CHECK(WORD_AT(0x0078B1ECu)==rbs_skels[0].state && WORD_AT(0x0078B1E8u)==rbs_walks[0].state);
         for(q=0;q<0x15Cu;q+=4u) WORD_AT(0x0078B080u+q)=0xF0000000u+q;
-        {   /* the pause menu's restart (sub_001CDD60, no level init) frees the level
-             * heap (sub_0003E740(3) -> sub_0003E240): four skeletons, the fourth a
-             * late one, and two walkers get new blocks as at level init, from the
-             * level's statics, their records kept, the old blocks left alone; the
-             * same records find them again (v0.4.0-mapmaker.40) */
+        {   /* the pause menu's restart (sub_001CDD60, no level init) frees only
+             * heap 0 (sub_0003E740(3) -> sub_0003E240): four skeletons, the
+             * fourth a late one, and two walkers keep their Level heap blocks
+             * (heap 1) and set them up again as at level init: zeroed (the
+             * last run poisoned them), from the level's statics, the stock
+             * init's rest, no allocation; their records kept, the same
+             * records find them again */
             uint8_t live[0x15C];
-            unsigned a0,b0;
+            unsigned a0,b0,s0,w0,g0;
             actor(15,0x28u,0x5E9u,15);
             CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(15),0,0,1);   /* the fourth, late */
             CHECK(rbs_skelf.n==4u && rbs_skels[3].record==REC(15) && rbs_skels[3].state==SKST_K(3));
-            a0=nalloc;b0=nwalk_alloc;
+            CHECK(FXW(rbs_walks[1].fx,0x0078B098u)==WKEF0_K(1) && FXW(rbs_walks[1].fx,0x0078B08Cu)==0x1F4u);
+            a0=nalloc;b0=nwalk_alloc;s0=nskel_reset;w0=nwalk_reset;g0=ngrid;
+            WORD_AT(0x0078B0E0u)=0xE0000060u;                            /* the outside statics differ from the level's */
             memcpy(live,(void *)((uintptr_t)0x0078B080u+g_xbox_mem_offset),sizeof live);
             rbs_walks[0].armed=1u;rbs_walks[1].roars=1u;rbs_walks[1].woken=1u;rbs_skels[2].floor_set=1;rbs_skels[1].throws=5u;
             rbs_skels[3].floor_set=1;rbs_skels[3].aimed=3u;rbs_walks[1].actor=A(14);
-            WORD_AT(SKST_K(2)+0x3E88u)=6u;WORD_AT(SKST_K(3)+0x3E88u)=6u;  /* the old blocks: not written */
+            for(q=0;q<4u;q++) {                                           /* the last run in every block */
+                WORD_AT(SKST_K(q)+0x100u)=0xDEAD0000u+q;WORD_AT(SKST_K(q)+0x4C78u)=0xDEAD0010u+q;
+                WORD_AT(SKPT_K(q)+0x40u)=0xBEEF0000u+q;WORD_AT(SKPT_K(q)+0x7CFCu)=0xBEEF0010u+q;
+            }
+            WORD_AT(WKST_K(1)+0x200u)=0xFEED0001u;WORD_AT(WKST_K(1)+0x64D8u)=0xFEED0002u;WORD_AT(WKPT_K(1)+0x7CFCu)=0xFEED0003u;
+            WORD_AT(WKEF_K(1)+0x55ECu)=0xFEED0004u;WORD_AT(WKEF0_K(1)+0x10u)=0xFEED0005u;WORD_AT(WKEF_K(1)+0x55F0u)=0xC0FFEEu;   /* past its block: kept */
             FXW(rbs_skels[1].fx,0x0078B0CCu)=0x99u;                      /* last run's particle count */
             (void)mapmaker_fx_enter(&rbs_skels[1].fx);                    /* a call that never came back */
-            rbs.logged=99u;heap_gen=1u;
+            rbs.logged=99u;
             CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
-            CHECK(nalloc==a0+4u && nwalk_alloc==b0+2u && rbs_skelf.n==4u && rbs_walkf.n==2u);
-            for(q=0;q<4u;q++) CHECK(rbs_skels[q].state==SKGEN_ST(q) && rbs_skels[q].parts==SKGEN_PT(q) && FXW(rbs_skels[q].fx,0x0078B0D0u)==SKGEN_PT(q));
-            CHECK(rbs_walks[0].state==WKGEN_ST(0) && rbs_walks[1].state==WKGEN_ST(1) && FXW(rbs_walks[1].fx,0x0078B090u)==WKEF_K(1));
+            CHECK(nalloc==a0 && nwalk_alloc==b0 && rbs_skelf.n==4u && rbs_walkf.n==2u);   /* no Level heap used */
+            CHECK(nskel_reset==s0+4u && nwalk_reset==w0+2u && ngrid==g0+2u);
+            for(q=0;q<4u;q++) {
+                CHECK(rbs_skels[q].state==SKST_K(q) && rbs_skels[q].parts==SKPT_K(q) && FXW(rbs_skels[q].fx,0x0078B0D0u)==SKPT_K(q));
+                CHECK(skel_reset_seen[(s0+q)&7u][0]==SKST_K(q) && skel_reset_seen[(s0+q)&7u][1]==SKPT_K(q));
+                CHECK(!WORD_AT(SKST_K(q)+0x100u) && !WORD_AT(SKST_K(q)+0x4C78u) && !WORD_AT(SKPT_K(q)+0x40u) && !WORD_AT(SKPT_K(q)+0x7CFCu));
+            }
+            CHECK(rbs_walks[0].state==WKST_K(0) && rbs_walks[1].state==WKST_K(1) && FXW(rbs_walks[1].fx,0x0078B090u)==WKEF_K(1));
+            CHECK(FXW(rbs_walks[1].fx,0x0078B098u)==WKEF0_K(1) && FXW(rbs_walks[1].fx,0x0078B08Cu)==0x1F4u && FXW(rbs_walks[1].fx,0x0078B0D0u)==WKPT_K(1));
+            CHECK(walk_reset_seen[(w0+1u)&7u][0]==WKST_K(1) && walk_reset_seen[(w0+1u)&7u][1]==WKEF_K(1));
+            CHECK(grid_args[(g0+1u)&7u][0]==8u && grid_args[(g0+1u)&7u][1]==8u && grid_args[(g0+1u)&7u][2]==0x3F800000u && grid_args[(g0+1u)&7u][3]==WKST_K(1)+0x5C4u);
+            CHECK(!WORD_AT(WKST_K(1)+0x200u) && !WORD_AT(WKST_K(1)+0x64D8u) && !WORD_AT(WKPT_K(1)+0x7CFCu));
+            CHECK(!WORD_AT(WKEF_K(1)+0x55ECu) && !WORD_AT(WKEF0_K(1)+0x10u) && WORD_AT(WKEF_K(1)+0x55F0u)==0xC0FFEEu);
             CHECK(rbs_skels[0].record==REC(10) && rbs_skels[2].record==REC(12) && rbs_skels[3].record==REC(15));
             CHECK(rbs_walks[0].record==REC(13) && rbs_walks[1].record==REC(14));
-            CHECK(FXW(rbs_skels[1].fx,0x0078B0CCu)==0xF000004Cu && FXW(rbs_skels[3].fx,0x0078B0E0u)==0xF0000060u);   /* the level's statics */
-            CHECK(WORD_AT(SKST_K(2)+0x3E88u)==6u && WORD_AT(SKST_K(3)+0x3E88u)==6u);
-            CHECK(fx_is(live) && WORD_AT(0x0078B1ECu)==SKGEN_ST(0) && WORD_AT(0x0078B1E8u)==WKGEN_ST(0));
+            CHECK(FXW(rbs_skels[1].fx,0x0078B0CCu)==0xF000004Cu && FXW(rbs_skels[3].fx,0x0078B0E0u)==0xF0000060u && FXW(rbs_walks[1].fx,0x0078B0E0u)==0xF0000060u);   /* the level's statics */
+            CHECK(fx_is(live) && WORD_AT(0x0078B1ECu)==SKST_K(0) && WORD_AT(0x0078B1E8u)==WKST_K(0));
             CHECK(!rbs_skelf.cur && !rbs_walkf.cur && !mapmaker_fx_holder);
             CHECK(!rbs_walks[0].armed && !rbs_walks[1].roars && !rbs_walks[1].woken && !rbs_skels[2].floor_set && !rbs_skels[1].throws);
             CHECK(!rbs_skels[3].floor_set && !rbs_skels[3].aimed && !rbs_walks[1].actor && rbs.logged<99u);
             for(q=10;q<16u;q++) CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(q),0,0,1);   /* started again */
-            CHECK(rbs_skelf.n==4u && rbs_walkf.n==2u && nalloc==a0+4u && nwalk_alloc==b0+2u);   /* no fifth */
+            CHECK(rbs_skelf.n==4u && rbs_walkf.n==2u && nalloc==a0 && nwalk_alloc==b0);   /* no fifth */
             CHECK(rbs_skels[3].record==REC(15) && rbs_walks[1].record==REC(14) && rbs_walks[1].actor==A(14));
             CHECK(WORD_AT(REC(15)+4u)==0x20000u && WORD_AT(REC(14)+4u)==0x100000u);
             q=nprincess;
-            CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(15),0,0,0);   /* the fourth fights on its new blocks */
-            CHECK(nprincess==q+1u && princess_state==SKGEN_ST(3) && princess_parts==SKGEN_PT(3));
+            CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(15),0,0,0);   /* the fourth fights on its own blocks */
+            CHECK(nprincess==q+1u && princess_state==SKST_K(3) && princess_parts==SKPT_K(3));
             CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(11),0,0,0);
-            CHECK(princess_state==SKGEN_ST(1) && princess_parts==SKGEN_PT(1) && WORD_AT(0x0078B1ECu)==SKGEN_ST(0));
-            alloc_fail_n=nalloc+2u;                                       /* no memory for the second: it and the rest dropped */
+            CHECK(princess_state==SKST_K(1) && princess_parts==SKPT_K(1) && WORD_AT(0x0078B1ECu)==SKST_K(0));
+            CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);   /* a second restart: the same blocks again */
+            CHECK(nalloc==a0 && nwalk_alloc==b0 && rbs_skelf.n==4u && rbs_walkf.n==2u && rbs_skels[3].state==SKST_K(3) && rbs_walks[1].state==WKST_K(1));
+            rbs_skels[1].parts=0x100u;                                    /* not a usable block: it and the rest dropped */
             CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
-            alloc_fail_n=0;
-            CHECK(rbs_skelf.n==1u && rbs_skels[0].state==SKGEN_ST(0) && rbs_skels[0].record==REC(10) && WORD_AT(0x0078B1ECu)==SKGEN_ST(0));
+            CHECK(rbs_skelf.n==1u && rbs_skels[0].state==SKST_K(0) && rbs_skels[0].record==REC(10) && WORD_AT(0x0078B1ECu)==SKST_K(0));
             CHECK(!rbs_skels[1].record && !rbs_skels[1].state && !rbs_skels[3].record && !rbs_skels[3].state && rbs_walkf.n==2u);
-            alloc_ok=0;                                                   /* none at all */
+            FXW(rbs_walks[0].fx,0x0078B08Cu)=0x1234u;                    /* an effect count of neither size: dropped */
+            rbs_skels[0].state=0x100u;
             CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
-            alloc_ok=1;
             CHECK(!rbs_skelf.n && !rbs_walkf.n && !rbs_skels[0].record && !WORD_AT(0x0078B1ECu) && !WORD_AT(0x0078B1E8u));
-            heap_gen=0;
+            CHECK(nalloc==a0 && nwalk_alloc==b0);
             CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
             for(q=10;q<15u;q++) CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(q),0,0,1);
-            a0=nalloc;
+            a0=nalloc;s0=nskel_reset;
             WORD_AT(0x0079094Cu)=1u;                                       /* mission 5 resets its own */
             CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
-            CHECK(nalloc==a0 && rbs_skels[0].state==SKST);
+            CHECK(nalloc==a0 && nskel_reset==s0 && rbs_skels[0].state==SKST);
             WORD_AT(0x0079094Cu)=100u;
             set_env("TSFP_MAPMAKER_LIMITS",NULL);
             CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);   /* off: the original only */
-            CHECK(nalloc==a0 && rbs_skels[0].state==SKST);
+            CHECK(nalloc==a0 && nskel_reset==s0 && rbs_skels[0].state==SKST);
             set_env("TSFP_MAPMAKER_LIMITS","1");
         }
         {   /* placed through a set slot 11-20 (sets chunk) */

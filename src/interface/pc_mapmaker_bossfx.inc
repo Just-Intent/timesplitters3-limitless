@@ -47,4 +47,25 @@ static void mapmaker_fx_forget(const void *copies,size_t bytes)
     const uint8_t *h=(const uint8_t *)mapmaker_fx_holder,*lo=(const uint8_t *)copies;
     if(h && h>=lo && h<lo+bytes) mapmaker_fx_enter(0);
 }
+
+/* The Level heap blocks a copy names (CONFIRMED, the only allocating writers
+ * of the window): the particle block [0x0078B0D0] (sub_002A62C0, 0x7D00) and
+ * the two effect blocks [0x0078B098]/[0x0078B090] of sub_002A8300, 0x55F0
+ * each when it set the count [0x0078B08C] to 0x1F4, 0xF0A0 when 0x578. A
+ * level restart frees none of them (sub_0003E240 resets only heap 0, the
+ * top-down [0x006B8388]; the Level heap is [0x006B837C], heap 1), so a
+ * restarted boss sets its own blocks up again instead of allocating more. */
+#define MAPMAKER_FX_PARTS 0x0078B0D0u
+#define MAPMAKER_FX_PARTS_SIZE 0x7D00u
+#define MAPMAKER_FX_EFF_N 0x0078B08Cu
+#define MAPMAKER_FX_EFF0 0x0078B098u
+#define MAPMAKER_FX_EFF1 0x0078B090u
+static uint32_t mapmaker_fx_word(const MapmakerFx *c,uint32_t a)
+{
+    uint32_t v;
+    memcpy(&v,c->b+(a-MAPMAKER_FX),4);
+    return v;
+}
+static void mapmaker_fx_put(uint32_t a,uint32_t v) { memcpy((void *)((uintptr_t)a+g_xbox_mem_offset),&v,4); }
+static uint32_t mapmaker_fx_eff_size(uint32_t n) { return n==0x1F4u?0x55F0u:n==0x578u?0xF0A0u:0u; }
 #endif
