@@ -154,6 +154,9 @@ void pc_mapmaker_openview_walk(void (*original)(void))
     uint32_t view,n,base,g;
     unsigned widened=0,added=0;
     int32_t deepest;
+#ifdef MAPMAKER_SKELVIS
+    mapmaker_skelvis_pass();       /* pc_mapmaker_skelvis.inc (log only): ends the previous pass */
+#endif
     original();
 #ifdef MAPMAKER_CAMERA_VIEW_DIAG
     mapmaker_camera_view_diag();   /* pc_mapmaker_camera.inc: what this view reaches */

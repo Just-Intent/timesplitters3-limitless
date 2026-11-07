@@ -1128,6 +1128,9 @@ void pc_mapmaker_realbosses_restart(void (*original)(void))
     uint32_t rec,st,pt;
     rbs_anims_note();                                  /* before the original unmaps them */
     original();
+#ifdef MAPMAKER_SKELVIS
+    mapmaker_skelvis_reset("level restart");           /* pc_mapmaker_skelvis.inc, log only */
+#endif
     if(!rbs_on()) return;
     rbs.logged=0;
     anims=rbs_anims_again(&missed);

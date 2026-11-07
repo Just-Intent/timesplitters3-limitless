@@ -46,6 +46,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_pointer.inc"
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
+#include "pc_mapmaker_skelvis.inc"   /* skeleton draw log; hooks in rooms, openview, tank, bigdraw, realbosses */
 /* MapMaker capacity area includes (begin) */
 #include "pc_mapmaker_memory.inc"
 #include "pc_mapmaker_pads.inc"
@@ -983,6 +984,7 @@ void pc_mapmaker_weaponset_preload(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_row(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_label(void (*original)(void)) { original(); }
 void pc_mapmaker_bigdraw_rect(void (*original)(void)) { original(); }
+void pc_mapmaker_skelvis_frustum(void (*original)(void)) { original(); }
 void pc_mapmaker_tilesets_menu_row(void (*original)(void)) { original(); }
 void pc_mapmaker_tilesets_play_pak(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
