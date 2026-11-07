@@ -291,11 +291,13 @@ Details: [real bosses](mapmaker-realbosses.md).
 
 The custom character set's picker ends with two more rows: **Prometheus
 SK/8** (the Machine Wars rocket robot) and **Prometheus SD/7** (the guard
-robot). Put them in Story AIs; any number per map. They use the game's own
-robot behaviour and animations; the preview shows their Arcade look-alikes.
-The original game plays such a map with the same robots but shows an empty
-name in the editor. *Automated tests only.* Details:
-[story assets](mapmaker-story-assets.md) item 18.
+robot). Put them in Story AIs; any number per map. In Story play they get
+the Machine Wars robot behaviour: the SK/8 fires its own rockets without a
+weapon (until .58 it only played its firing pose). The preview shows their
+Arcade look-alikes. `TSFP_MAPMAKER_CREATURES=0` plays them as bots. The
+original game plays such a map with bots and shows an empty name in the
+editor. *Automated tests only.* Details:
+[story creatures](mapmaker-creatures.md#the-prometheus-robots-rows-159160-after-the-v040-mapmaker58-report).
 
 ### Story props: power cells and prison guns (`LIMITS`)
 
@@ -335,6 +337,24 @@ that mission's small animation file only when the set uses the creature.
 `TSFP_MAPMAKER_CREATURES=0` plays them as ordinary bots. The original game
 plays such a map with bots and shows an empty name in the editor. *Automated
 tests only.* Details: [story creatures](mapmaker-creatures.md).
+
+### Pit Skeleton and Ragbugs: the mission 6 boss (`LIMITS`)
+
+Two more picker rows: **Pit Skeleton** (the giant skeleton of the catacombs
+pit, a different fight from the mansion's **Giant Skeleton**) and **Ragbug**
+(its flying imps). Put the Pit Skeleton in a Story AI where its pit should
+be and up to six Ragbug Story AIs nearby, and play in Story. The skeleton
+plays its catacombs intro, then roars, breathes fire and throws, while its
+ragbugs circle and dive. It cannot be hurt: shoot the **gas bottle** it
+holds (and later sets down) until it blows; then it dies, its ragbugs
+explode, and some seconds later the skeleton is removed. The catacombs
+arena (torture rack, rim points) is moved to the skeleton's spawn point,
+facing the catacombs' way. There is no hostage and no time limit. Several
+per map (up to 4, each with its own ragbugs). A Ragbug with no Pit Skeleton
+in the map is removed at the start (it only flies with its skeleton). The
+level also loads the catacombs' prop list for the bottle and rack.
+`TSFP_MAPMAKER_CREATURES=0` plays both as ordinary bots. *Automated tests
+only.* Details: [pit skeleton](mapmaker-pitboss.md).
 
 ### Clouds per map (`LIMITS`)
 

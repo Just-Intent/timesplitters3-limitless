@@ -5,7 +5,7 @@ Each area's full wrapper list and history is in its `docs/mapmaker/mapmaker-<are
 
 More boss areas (2026-11-01): `khallos` (id 0x33 chair prop 0x376; .28 WRAP sub_00045670),
 `worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`
-(159/160 Prometheus SK/8 0x62, SD/7 0x36: editor rows only, stock robot AI); wrapper
+(159/160 Prometheus SK/8 0x62, SD/7 0x36: creatures.def rows, class 4 after .58); wrapper
 lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
 sky/sand/music, +mem paks, MM sand grains, .32 grain/haze alpha + fog row 7; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
 for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll
@@ -161,3 +161,15 @@ sub_000DAC30, sub_0015B830): mapmaker-creatures.md. `test_mapmaker_creatures.py`
 (decode: dispatcher, no scene state, kept anims, story spawn records). Unplayed.
 Cleaning bot deferred (scripted class 0x80000). Realbosses' `extra_label` now
 holds RBS_EXTRA_MAX 16 (it held 6 for 8 rows).
+
+Pit skeleton (wave 3, area `pitboss`, `pc_mapmaker_pitboss.inc`, after
+creatures): creature rows 164 "Pit Skeleton" (carrier 0x31, look 0x28,
+0x20000:0x10000000) and 165 "Ragbug" (0xB0, 0x200000:0x10000000), lv17_4
+entries 16..27. The mission 6 fight `sub_0029E0A0` runs per instance (<= 4)
+with its own skeleton block and statics, the 34 catacombs arena constants
+moved to the spawn for the call, l_17_st/l_17_stm kept open for props
+0x246/0x249/0x24A/0x24B, 'NMME' answered (NEW WRAP sub_00234270), rack timer
+held (no hostage), rim pads 0x4B5..0x4C1 copied; ragbugs join the nearest
+skeleton's flock (NEW WRAP sub_0028B610), removed without one; realbosses
+skips char 0x31. 11 NEW WRAPs + 11 chains: mapmaker-pitboss.md.
+`test_mapmaker_pitboss.py`. Unplayed.

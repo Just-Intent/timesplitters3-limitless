@@ -179,6 +179,8 @@ static unsigned kind_of(uint32_t id) { return crt_kind_of(id); }
 #define GHOST kind_of(0x2Fu)
 #define MUT kind_of(0x30u)
 #define SECB kind_of(0x4Du)
+#define PIT kind_of(0x31u)
+#define RAG kind_of(0xB0u)
 
 int main(void)
 {
@@ -191,9 +193,10 @@ int main(void)
         static const uint16_t set[]={0x0C,0x2F,0x44,0x4D,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x30};   /* 0x30 in slot 12 */
         map(0x11u,set,sizeof set/sizeof set[0]);
     }
-    /* the table: three rows, as documented */
-    CHECK(CRT_KINDS>=5u);
-    CHECK(SK8==0 && SD7==1 && GHOST==2 && SECB==3 && MUT==4 && kind_of(0x17u)==CRT_KINDS && kind_of(0x59u)==CRT_KINDS);
+    /* the table: seven rows, as documented (Prometheus 159/160 first; the pit fight's two last, pc_mapmaker_pitboss.inc) */
+    CHECK(CRT_KINDS==7u);
+    CHECK(SK8==0 && SD7==1 && GHOST==2 && SECB==3 && MUT==4 && PIT==5 && RAG==6 &&
+          kind_of(0x17u)==CRT_KINDS && kind_of(0x59u)==CRT_KINDS && kind_of(0x28u)==CRT_KINDS);
     CHECK(kind_of(0xAAu)==CRT_KINDS && kind_of(0xA9u)==CRT_KINDS);           /* the Arcade twins stay stock */
     CHECK(crt_kinds[SK8].lo==0x10000004u && crt_kinds[SK8].hi==0 && crt_kinds[SK8].look==CRT_NO_LOOK && crt_kinds[SK8].row==159u);
     CHECK(crt_kinds[SD7].lo==0x10000004u && crt_kinds[SD7].hi==0 && crt_kinds[SD7].look==CRT_NO_LOOK && crt_kinds[SD7].row==160u);
@@ -201,6 +204,8 @@ int main(void)
     CHECK(crt_kinds[GHOST].lo==0x50000000u && crt_kinds[GHOST].hi==0 && crt_kinds[GHOST].look==0x17u);
     CHECK(crt_kinds[SECB].lo==0x10000000u && crt_kinds[SECB].hi==0x4000u && crt_kinds[SECB].look==CRT_NO_LOOK);
     CHECK(crt_kinds[MUT].lo==0x10000000u && crt_kinds[MUT].hi==0x8000u && crt_kinds[MUT].look==0x59u);
+    CHECK(crt_kinds[PIT].lo==0x10000000u && crt_kinds[PIT].hi==0x20000u && crt_kinds[PIT].look==0x28u && crt_kinds[PIT].pak==crt_kinds[RAG].pak);
+    CHECK(crt_kinds[RAG].lo==0x10000000u && crt_kinds[RAG].hi==0x200000u && crt_kinds[RAG].look==CRT_NO_LOOK);
 
     /* ---- switch off: every hook is the original, nothing else --------- */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);

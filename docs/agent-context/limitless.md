@@ -313,8 +313,8 @@ each local player. Play code already takes the character from the config.
 Campaign story, Arcade Custom, challenges, System Link (modes 11..13):
 unchanged. The gate stays 0 if the hooks do not run, so `story` must not be
 switched off by `TSFP_MAPMAKER_AREA_OFF`. Tests:
-`tests/mapmaker/test_mapmaker_story_character.py`; notes `docs/mapmaker/mapmaker-story-character.md`.
-Story assets: `docs/mapmaker/mapmaker-story-assets.md`.
+`tests/mapmaker/test_mapmaker_story_character.py`; notes mapmaker-story-character.md.
+Story assets/creatures: mapmaker-story-assets.md, limitless-bosses.md.
 
 Story AI groups (`src/interface/pc_mapmaker_aitemplates.inc`, `docs/mapmaker/mapmaker-aitemplates.md`,
 `TSFP_MAPMAKER_LIMITS=1`): the Story AI edit screen (`sub_0031CB90`, list path
@@ -486,7 +486,7 @@ Ported bosses, own areas (2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42
 0x281 from prop6.pak, mapmaker-tank.md). Wrappers, restart: each doc. ORDER puts them
 after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
-`rbs_extra` table in realbosses.inc (159/160 Prometheus); `storyprops`: drum/gun (mem-pak textures, lift env); `vehicles`: tank/truck (cat. 35 = pool 4); bigdraw adds 0x5F2/0x5E8. Tank WRAPs
+`rbs_extra` table in realbosses.inc (159/160 Prometheus, 164/165 pit); `storyprops`: drum/gun (mem-pak tex, lift); `vehicles`: tank/truck (cat. 35 = pool 4); bigdraw adds 0x5F2/0x5E8. Tank WRAPs
 `sub_0015E7C0` -> `_tank_request` (level-init models), `sub_000A2740` -> `_draw`
 (log), `sub_00228B50` -> `_mine` (.55 TNT); shown at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
