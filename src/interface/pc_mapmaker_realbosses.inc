@@ -169,7 +169,10 @@
  *    and walker instance (late ones too) keeps its Level heap blocks (the
  *    restart frees only heap 0) and record, and sets the blocks up again as
  *    its level init did (zeroed, the level's statics, the stock init's
- *    non-allocating rest); its per-fight counters are cleared.
+ *    non-allocating rest); its per-fight counters are cleared. The restart
+ *    also unmaps every anim flagged 0x4000 (sub_0005FC60 -> sub_0005C2F0),
+ *    all of lv1_6's and lv1_3's: this map's are noted before the original
+ *    and mapped again after it (rbs_anims_note / rbs_anims_again).
  *  - princess (sub_0029FE00(entity)): for that boss in scene 100, the mansion
  *    variant (a direct call: the callee pops the caller's return address,
  *    exactly the lifted tail jump).
@@ -1038,14 +1041,98 @@ static int rbs_walk_again(RbsWalk *w)
  * (about 52 KB a skeleton, 190 KB a walker) and never got the old ones back.
  * One whose blocks are not usable, and any after it, are dropped (bot
  * behaviour, or a late instance at its AI start). The boss pointers go to the
- * first instance's blocks; the log budget starts afresh. */
+ * first instance's blocks; the log budget starts afresh. Before the original
+ * this map's mansion boss anims are noted and after it mapped again (below:
+ * the restart unmaps them; the .40-.43 symptom was this, not the blocks). */
+/* The mansion anims after a restart (user report, v0.4.0-mapmaker.43: four
+ * giant skeletons "glitching out after restarting"; m40b/m42/m43b.err: no
+ * throw after any restart, the run before threw within seconds). CONFIRMED
+ * (decode and US XBE data, test_restart_drops_the_mansion_anims): the
+ * restart's sub_0005FC60 (call 0x001CDD6A) tail-jumps to sub_0005C2F0, which
+ * stops every entity animation whose slot word (0x007DE660 + slot*8, +4) has
+ * 0x4000, then unmaps every loaded anim with that flag ([[0x007E3954] +
+ * slot*4] = 0, id map [0x007E03C0 + id*2] = 0xFFFF) and puts the next slot
+ * [0x006D77F8] back to the level's mark [0x006D77FC]. Every kept lv1_6
+ * (princess_*: 0x5800/0x1005800) and lv1_3 (trophy monster: 0x5800) entry
+ * has the flag; lv81's and lv14's have not (the walker and the split Crowes
+ * fight on after a restart). Nothing on the restart branch registers them
+ * again (sub_001CA2F0 runs only while [0x006D781C] is 0, a full level load),
+ * so sub_0005F460 found no princess_start, the entrance check
+ * sub_00059DB0(entity, 0x19C) never answered and the restarted skeleton
+ * stayed in its entrance, never throwing. The anim data stays: the pak this
+ * area mounts (sub_0005A130 -> sub_000622D0(path, 1, 1)) is a Level heap
+ * buffer, which the restart keeps. So the ids of this map's bosses (set and
+ * pak mounted) that were mapped to a loaded, flagged anim before the original
+ * get the same slot and anim again after it, when the restart left that slot
+ * empty and the id free, and the slot is below the next free slot (no later
+ * registration takes it). Other 0x4000 anims stay stock. */
+#define RBS_ANIM_MAP 0x007E03C0u        /* int16 slot per id, 0xFFFF free */
+#define RBS_ANIM_PTRS 0x007E3954u       /* -> anim pointer per slot (0x007E2AA4) */
+#define RBS_ANIM_WORDS 0x007DE660u      /* two slot words per slot; +4 holds the flag */
+#define RBS_ANIM_NEXT 0x006D77F8u       /* next free slot */
+#define RBS_ANIM_SLOTS 940u
+#define RBS_ANIM_DROPPED 0x4000u        /* unmapped by the restart (sub_0005C2F0, 0x0005C3E2) */
+#define RBS_ANIM_FREE 0xFFFFu
+static const struct { uint16_t first, n; uint32_t boss; } rbs_anim_runs[]={
+    {0x127u,8u,RBS_ID},                 /* lv1_3: mattackheadbutt .. mcharge */
+    {0x19Cu,11u,RBS_SKEL_ID},           /* lv1_6: princess_start .. princess_raise_react_end */
+    {0x1A9u,1u,RBS_SKEL_ID},            /* lv1_6: princess_eyeoverwrite */
+};
+#define RBS_ANIM_KEEP 20u
+static struct { uint16_t id, slot; uint32_t ptr; } rbs_anims[RBS_ANIM_KEEP];
+static unsigned rbs_anim_n;
+static void rbs_anims_note(void)
+{
+    uint32_t ptrs,slot,ptr,id;
+    unsigned r,i;
+    int trophy=-2,skel=-2,has;
+    rbs_anim_n=0;
+    if(!rbs_play() || rbs.optout || !MAPMAKER_PTR_OK(ptrs=WORD_AT(RBS_ANIM_PTRS),RBS_ANIM_SLOTS*4u)) return;
+    for(r=0;r<sizeof rbs_anim_runs/sizeof rbs_anim_runs[0];r++) {
+        if(rbs_anim_runs[r].boss==RBS_ID) {
+            if(trophy==-2) trophy=rbs_map_has(RBS_ID)!=0 && rbs_pak_mounted();
+            has=trophy;
+        } else {
+            if(skel==-2) skel=rbs_map_has(RBS_SKEL_ID)!=0 && rbs_skel_pak_mounted();
+            has=skel;
+        }
+        for(i=0;has && i<rbs_anim_runs[r].n && rbs_anim_n<RBS_ANIM_KEEP;i++) {
+            id=rbs_anim_runs[r].first+i;
+            if((slot=RBS_H(RBS_ANIM_MAP+id*2u))>=RBS_ANIM_SLOTS || !(ptr=WORD_AT(ptrs+slot*4u)) ||
+               !(WORD_AT(RBS_ANIM_WORDS+slot*8u+4u)&RBS_ANIM_DROPPED)) continue;
+            rbs_anims[rbs_anim_n].id=(uint16_t)id;rbs_anims[rbs_anim_n].slot=(uint16_t)slot;rbs_anims[rbs_anim_n].ptr=ptr;
+            rbs_anim_n++;
+        }
+    }
+}
+/* After the original: the noted ids mapped again; *missed: noted, not mapped. */
+static unsigned rbs_anims_again(unsigned *missed)
+{
+    uint32_t ptrs=WORD_AT(RBS_ANIM_PTRS),next=WORD_AT(RBS_ANIM_NEXT),slot,id;
+    unsigned k,n=0;
+    *missed=0;
+    for(k=0;k<rbs_anim_n;k++) {
+        id=rbs_anims[k].id;slot=rbs_anims[k].slot;
+        if(!MAPMAKER_PTR_OK(ptrs,RBS_ANIM_SLOTS*4u) || RBS_H(RBS_ANIM_MAP+id*2u)!=RBS_ANIM_FREE ||
+           WORD_AT(ptrs+slot*4u) || slot>=next) { (*missed)++;continue; }
+        RBS_H(RBS_ANIM_MAP+id*2u)=(uint16_t)slot;
+        WORD_AT(ptrs+slot*4u)=rbs_anims[k].ptr;
+        n++;
+    }
+    rbs_anim_n=0;
+    return n;
+}
 void pc_mapmaker_realbosses_restart(void (*original)(void))
 {
-    unsigned k,n,skels=0,walks=0;
+    unsigned k,n,skels=0,walks=0,anims,missed;
     uint32_t rec,st,pt;
+    rbs_anims_note();                                  /* before the original unmaps them */
     original();
     if(!rbs_on()) return;
     rbs.logged=0;
+    anims=rbs_anims_again(&missed);
+    if(anims || missed)
+        rbs_log("level restart: mansion boss anims mapped again (the restart unmaps every 0x4000 anim) (mapped, not mapped)",anims,missed);
     rbs_skelf.extras=rbs_skelf.events=rbs_skelf.deaths=0;
     rbs_walkf.extras=rbs_walkf.events=rbs_walkf.seen=0;
     if(WORD_AT(RBS_SCENE)!=100u || (!rbs_skelf.n && !rbs_walkf.n)) return;
@@ -1171,9 +1258,10 @@ void pc_mapmaker_realbosses_face(void (*original)(void))
 void pc_mapmaker_realbosses_message(void (*original)(void))
 {
     uint32_t ent;
-    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(20) || !rbs_skel_of(ent=WORD_AT(g_esp+4u))) { original();return; }
-    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH && rbs_skelf.deaths++<4u)
-        rbs_log("giant skeleton killed: the mansion death (state 6, animation 0x1A6)",ent,RBS_MSG_DEATH);
+    RbsSkel *k;
+    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(20) || !(k=rbs_skel_of(ent=WORD_AT(g_esp+4u)))) { original();return; }
+    if(WORD_AT(g_esp+8u)==RBS_MSG_DEATH && rbs_skelf.deaths++<4u)   /* each hit after the last is message 2 again */
+        rbs_log("giant skeleton killed: the mansion death (state 6, animation 0x1A6) (entity, skeleton)",ent,(uint32_t)(k-rbs_skels)+1u);
     sub_00286D30();
 }
 
