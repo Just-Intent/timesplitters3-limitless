@@ -264,6 +264,7 @@ int main(void)
     add_items(pieces+0x190u,0x00507000u,53,24);        /* turret type 27 full (24/24) */
     add_items(pieces+0x1E0u,0x00508000u,55,2);
     add_items(pieces+0x230u,0x00509000u,10,1);         /* 1 teleporter */
+    set_category(43,35);add_items(pieces+0x320u,0x0050C000u,43,2);   /* 2 vehicles (pool of 4) */
     add_items(pieces+0x280u,0x0050A000u,0,2);          /* start points: no category row, not items */
     set_category(90,8);                                /* bytes past the 80-entry catalogue */
     add_items(pieces+0x2D0u,0x0050B000u,90,1);         /* past the catalogue: ignored */
@@ -349,13 +350,13 @@ int main(void)
     CHECK(originals==0 && g_esp==STACK+4u && font_now==7u && WORD_AT(0x007E7260u)==0x55u);
     CHECK(measures==1u+2u*MAPMAKER_TABLE_ROWS);
     {
-        /* Placed counts: 90 tiles; items 30+3+7+150+4+24+2+1 (ids > 9; 1 id-90 item too) + 5 free;
+        /* Placed counts: 90 tiles; items 30+3+7+150+4+24+2+1+2 (ids > 9; 1 id-90 item too) + 5 free;
          * pads 900, cover 810, links 90*20 + 90*12/2 (half the side slots); memory placed estimate / 1024 rounded up. */
-        uint32_t items=30u+3u+7u+150u+4u+24u+2u+1u+1u+5u;
+        uint32_t items=30u+3u+7u+150u+4u+24u+2u+1u+2u+1u+5u;
         uint32_t kb=(mapmaker_placed_memory(pieces)+1023u)/1024u;
-        static const char *titles[15]={"Tiles","Items","Objects","Pickups","Pads","Cover","Links","Groups",
-                                      "Memory","Story AI","Logic","Movers","Props","Turrets","Teleports"};
-        char want[15][32],text[64];
+        static const char *titles[16]={"Tiles","Items","Objects","Pickups","Pads","Cover","Links","Groups",
+                                      "Memory","Story AI","Logic","Movers","Props","Turrets","Teleports","Vehicles"};
+        char want[16][32],text[64];
         snprintf(want[0],32," 90/1023");
         snprintf(want[1],32," %u/500",(unsigned)items);
         snprintf(want[2],32," %u/2047",(unsigned)(90u+items+128u));
@@ -371,8 +372,9 @@ int main(void)
         snprintf(want[12],32," 4/160");
         snprintf(want[13],32," 26/72");
         snprintf(want[14],32," 1/40");
+        snprintf(want[15],32," 2/4");
         CHECK(drawn("- Resources")==0 && draws[0].colour==MAPMAKER_TABLE_FULL);
-        for(i=0;i<15;i++) {
+        for(i=0;i<16;i++) {
             wrap(text,sizeof text,titles[i]);
             CHECK(1u+2u*i<ndraws && !strcmp(draws[1u+2u*i].text,text));
             wrap(text,sizeof text,want[i]);
@@ -380,7 +382,7 @@ int main(void)
             if(2u+2u*i<ndraws && strcmp(draws[2u+2u*i].text,text))
                 fprintf(stderr,"row %u: '%s' want '%s'\n",i,draws[2u+2u*i].text+4,want[i]);
         }
-        check_columns(15,measure_h+MAPMAKER_TABLE_LEAD);
+        check_columns(16,measure_h+MAPMAKER_TABLE_LEAD);
         CHECK(draws[0].x==22.f+MAPMAKER_TABLE_PAD && draws[0].y==36.f+MAPMAKER_TABLE_PAD);
         CHECK(rect[2]<200 && rect[3]<260);                       /* compact and above the floor buttons */
         /* The same numbers as the check: the meter fraction is the fullest of the capped rows. */
@@ -396,12 +398,12 @@ int main(void)
         /* The game's measure fails: estimated widths, still one column. */
         measure_k=0.f;
         draw();
-        check_columns(15,measure_h+MAPMAKER_TABLE_LEAD);
+        check_columns(16,measure_h+MAPMAKER_TABLE_LEAD);
         measure_k=5.f;
         /* A taller glyph: the pitch follows it. */
         measure_h=14.f;
         draw();
-        check_columns(15,14.f+MAPMAKER_TABLE_LEAD);
+        check_columns(16,14.f+MAPMAKER_TABLE_LEAD);
         measure_h=0.f;                                            /* no height: the default pitch */
         draw();
         CHECK(fabsf(draws[1].y-draws[0].y-MAPMAKER_TABLE_LINE)<1e-3f);

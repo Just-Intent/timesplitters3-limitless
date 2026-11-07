@@ -72,6 +72,7 @@ are not in the launcher.
 | Movable objects, props and markers | 20 each | 160 each |
 | Turrets | 8 per type | 24 per type |
 | Teleporters | 2 per colour | 8 per colour |
+| Vehicles | 4 | 4 (the game has room for 4; earlier builds allowed 8 and could crash on the 5th) |
 | Story AI | 50 | 511 |
 | Characters alive at once (MapMaker Story, local play) | 32, with about 20 AI | 64 (63 AI with one player) |
 | Bots per MapMaker Arcade match (local play) | 10 (16 characters) | 20 (24 characters) |
@@ -307,6 +308,21 @@ with the map and kept by .tsmap export. In the editor they still look like a
 drum and a MapMaker gun. The original game (or this one without the switch)
 plays them as plain drums and guns. *Automated tests only.* Details:
 [story props](mapmaker-storyprops.md).
+
+### Story vehicles: the Machine Wars tank and the castle truck (`LIMITS`)
+
+Select a placed **vehicle** (Objects) and open its options (as for a
+pickup): **Vehicle** offers **Future tank (Machine Wars)** with its main
+and AA guns, **Castle truck + Vickers gun** (the Scotland the Brave truck
+with a gunner seat) and **Castle truck**, besides the theme's own buggy or
+jeep. Get in and drive them as in the story. Up to 4 vehicles per map in
+all (the game has room for 4; the resource panel's **Vehicles** row counts
+them). The tank cannot be destroyed, like the buggies. The choice is saved
+with the map and kept by .tsmap export; in the editor every vehicle still
+looks like the theme buggy, and the original game (or this one without the
+switch) plays them as theme vehicles. A map with a tank reads about 1.4 MB
+more, with a truck about 0.9 MB. *Automated tests only.* Details:
+[story vehicles](mapmaker-vehicles.md).
 
 ### Story creatures: ghosts, SecuriDroids and mutants (`LIMITS`)
 

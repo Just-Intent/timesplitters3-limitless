@@ -185,7 +185,9 @@ static const struct { uint32_t address, stock, raised; } mapmaker_categories[]={
     {0x00524E3Cu,20u,160u},  /* 25 mover (object) */
     {0x00524E54u,20u,160u},  /* 26 props (objects) */
     {0x00524EE4u,20u,160u},  /* 32 marker */
-    {0x00524F2Cu,4u,8u},     /* 35 */
+    /* 35 vehicles: not raised. The vehicle pool is 4 blocks (sub_001806B0:
+     * 0x25C0 = 4 x 0x970 and 4 free pointers), popped by sub_00182A20 with no
+     * bound check, so a 5th vehicle wrote past it (pc_mapmaker_vehicles.inc). */
     {0x00524F44u,4u,8u},     /* 36 */
 };
 static void mapmaker_categories_apply(void)

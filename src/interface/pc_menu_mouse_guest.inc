@@ -84,6 +84,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_matchbots.inc"
 #include "pc_mapmaker_weaponset.inc"
 #include "pc_mapmaker_storyprops.inc"
+#include "pc_mapmaker_vehicles.inc"
 #include "pc_mapmaker_creatures.inc"
 #include "pc_mapmaker_tilesets.inc"
 #include "pc_mapmaker_restable.inc"
@@ -1065,6 +1066,15 @@ void pc_mapmaker_storyprops_mount(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_preload_model(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_model(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_gun_type(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_load(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_category(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_build(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_textures(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_preload_model(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_def(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_create(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_anims(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_request(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_create(void (*original)(void)) { original(); }
