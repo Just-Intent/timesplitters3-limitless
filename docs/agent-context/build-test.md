@@ -123,8 +123,8 @@ remain separate checks.
 callback mutations. Fast results and finite fallback results are bit-exact;
 fallback arithmetic destinations allow quiet-NaN payload variation (also seen
 with fast entry disabled). Rejected inputs leave all bits/FP flags unchanged.
-Public fixtures/mutations run on both hosts; US-body tests need the private XBE.
-Camera/mothership/spawn/rigid fixtures include the shared helper.
+Public fixtures/mutations: both hosts (retry WinError 4551); US bodies need the XBE.
+Camera/mothership/spawn/rigid fixtures use the shared helper.
 
 Crash capture/heartbeat and bounded Windows sharing retries: `test_crash_capture.py`.
 Darwin: `test_native_crash.py`. Both hosts run shared UI identity/failure/ZIP tests.
