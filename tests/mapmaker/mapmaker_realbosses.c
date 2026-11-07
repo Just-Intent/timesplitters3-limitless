@@ -67,6 +67,13 @@ void sub_0005F460(void) { g_ecx=18; }
 void sub_00287860(void) { g_ecx=19; }
 void sub_00297690(void) { g_ecx=20; }
 void sub_002BD480(void) { g_ecx=21; }
+void sub_000C3C50(void) { g_ecx=22; }
+/* The floor finder sub_000C3C50(point, up, radius): the highest floor at
+ * most up over the point (room > 0, height in [0x004DCB00]); the stock also
+ * writes [0x004DCAFC] and [0x00733088]. No floor map: none. */
+static float skel_floors[2];            /* two floors at every x, z */
+static int skel_floor_map;
+static unsigned nfinder;
 /* the stock skeleton / walker resets: the boss pointer and particle block (walker: effect block) each saw */
 static unsigned nskel_reset, nwalk_reset, ngrid;
 static uint32_t grid_args[8][4];
@@ -114,6 +121,19 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     va_start(a,n);
     for(i=0;i<n && i<12;i++) x[i]=va_arg(a,uint32_t);
     va_end(a);
+    if(f==sub_000C3C50) {
+        float p[3],y=-1.0e9f;
+        int j;
+        nfinder++;
+        if(x[1]!=0x3FA00000u || x[2]!=0x3DCCCCCDu || x[0]<g_esp || x[0]+12u>ESP0) { fprintf(stderr,"floor finder arguments\n");exit(4); }
+        memcpy(p,(const void *)((uintptr_t)x[0]+g_xbox_mem_offset),12);
+        WORD_AT(0x004DCAFCu)=0xDEADu;WORD_AT(0x00733088u)=0xBEEFu;
+        if(!skel_floor_map) return 0;
+        for(j=0;j<2;j++) if(skel_floors[j]<=p[1]+1.25f && skel_floors[j]>y) y=skel_floors[j];
+        if(y<-1.0e8f) return 0;
+        memcpy((void *)((uintptr_t)0x004DCB00u+g_xbox_mem_offset),&y,4);
+        return 3u;
+    }
     if(f==sub_00079D60) {
         if(nrows<12) {
             rows[nrows].text=x[0];rows[nrows].id=x[1];rows[nrows].flags=x[2];rows[nrows].cb=x[4];
@@ -690,6 +710,7 @@ int main(void)
         set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(3),0,0,1);
         CHECK(seen_class[0]==0 && seen_class[1]==0x20000u && rbs_skel.record==REC(3));   /* before the original */
+        CHECK(rbs_skel.pad_set==1 && rbs_skel.pad==FLOAT_AT(ENT(3)+0x68u));             /* its placed height */
         alloc_ok=0;                                    /* a second one, no memory for its own state: a bot */
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(4),0,0,1);         /* a second one */
         CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && rbs_skel.record==REC(3) && rbs_skelf.extras==1);
@@ -790,6 +811,7 @@ int main(void)
         {
             uint32_t st=SKST,t=SKST+0x4164u+12u;
             float hx=1.0f,hy=-8.5f,hz=2.0f,dy;
+            rbs_skel.pad_set=0;                                              /* the first-frame fallback */
             aim_hand=0x00601000u;FLOAT_AT(aim_hand)=hx;FLOAT_AT(aim_hand+4u)=hy;FLOAT_AT(aim_hand+8u)=hz;
             WORD_AT(st+0x4158u)=1u;FLOAT_AT(t)=hx;FLOAT_AT(t+4u)=-7.5f;FLOAT_AT(t+8u)=hz+10.0f;
             WORD_AT(A(3)+0x9DCu)=2u;WORD_AT(st+0x4160u)=0;
@@ -810,6 +832,65 @@ int main(void)
             WORD_AT(st+0x4160u)=0;FLOAT_AT(t+4u)=-7.5f;
             CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,1);
             CHECK(rbs_skel.aimed==2u && near(FLOAT_AT(st+0x413Cu+0x10u),-3.5f/rbs_sqrt(3.5f*3.5f+100.0f)));
+            CHECK(rbs_skel.ground_set==-1 && rbs_skel.ground==-12.5f);   /* no floor map: the spawn height */
+            WORD_AT(st+0x4158u)=0;WORD_AT(st+0x4160u)=2u;WORD_AT(A(3)+0x9DCu)=8u;
+        }
+        /* v0.4.0-mapmaker.42 ("they don't hit me if I stand in place on the
+         * same floor"): its first-frame height -9.49 under the floor it fights
+         * on (0.5; another floor at -20): the reference is the floor above,
+         * same-floor targets keep the stock aim */
+        {
+            uint32_t st=SKST,t=SKST+0x4164u+12u;
+            float hx=1.0f,hy=1.2f,hz=2.0f,dx,dy,dz,y;
+            unsigned n;
+            aim_hand=0x00601000u;FLOAT_AT(aim_hand)=hx;FLOAT_AT(aim_hand+4u)=hy;FLOAT_AT(aim_hand+8u)=hz;
+            FLOAT_AT(ENT(3)+0x64u)=hx;FLOAT_AT(ENT(3)+0x6Cu)=hz;
+            rbs_skel.floor=-9.49f;rbs_skel.ground_set=0;rbs_skel.aimed=0;rbs_skel.pad_set=0;
+            skel_floor_map=1;skel_floors[0]=0.5f;skel_floors[1]=-20.0f;nfinder=0;
+            WORD_AT(0x004DCB00u)=0x1111u;WORD_AT(0x004DCAFCu)=0x2222u;WORD_AT(0x00733088u)=0x3333u;
+            WORD_AT(st+0x4158u)=1u;FLOAT_AT(t)=hx;FLOAT_AT(t+4u)=0.5f;FLOAT_AT(t+8u)=hz+10.0f;
+            WORD_AT(A(3)+0x9DCu)=2u;WORD_AT(st+0x4160u)=0;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            CHECK(rbs_skel.ground_set==2 && near(rbs_skel.ground,0.5f) && nfinder>=2u);
+            CHECK(WORD_AT(0x004DCB00u)==0x1111u && WORD_AT(0x004DCAFCu)==0x2222u && WORD_AT(0x00733088u)==0x3333u);
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-0.7f/rbs_sqrt(0.49f+100.0f)) && rbs_skel.aimed==0);   /* stock */
+            /* a little over that floor (a step, a jump): still stock; the floor is found once */
+            FLOAT_AT(t+4u)=2.7f;WORD_AT(st+0x4160u)=0;n=nfinder;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),1.5f/rbs_sqrt(2.25f+100.0f)) && rbs_skel.aimed==0 && nfinder==n);
+            /* the floor above (5.5), close (3 ahead) from a low hand: raised; the
+             * line is over its feet and under its head where it stands */
+            FLOAT_AT(t+4u)=5.5f;FLOAT_AT(t+8u)=hz+3.0f;WORD_AT(st+0x4160u)=0;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            dx=FLOAT_AT(st+0x413Cu+0xCu);dy=FLOAT_AT(st+0x413Cu+0x10u);dz=FLOAT_AT(st+0x413Cu+0x14u);
+            y=hy+dy/rbs_sqrt(dx*dx+dz*dz)*3.0f;
+            CHECK(rbs_skel.aimed==1 && y>=5.5f && y<=7.5f);
+            /* ... and from a hand high over its floor (11.2): straight at its body */
+            hy=11.2f;FLOAT_AT(aim_hand+4u)=hy;WORD_AT(st+0x4160u)=0;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            dx=FLOAT_AT(st+0x413Cu+0xCu);dy=FLOAT_AT(st+0x413Cu+0x10u);dz=FLOAT_AT(st+0x413Cu+0x14u);
+            y=hy+dy/rbs_sqrt(dx*dx+dz*dz)*3.0f;
+            CHECK(rbs_skel.aimed==2 && near(y,7.0f));
+            /* its spawn on its own floor (-9.49 over -9.5) under an upper floor
+             * (0.5): its own floor counts; the floor above is a floor up */
+            rbs_skel.ground_set=0;skel_floors[1]=-9.5f;hy=-8.0f;FLOAT_AT(aim_hand+4u)=hy;
+            FLOAT_AT(t+4u)=-9.5f;FLOAT_AT(t+8u)=hz+10.0f;WORD_AT(st+0x4160u)=0;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            CHECK(rbs_skel.ground_set==1 && near(rbs_skel.ground,-9.5f) && rbs_skel.aimed==2);
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-1.5f/rbs_sqrt(2.25f+100.0f)));
+            FLOAT_AT(t+4u)=0.5f;WORD_AT(st+0x4160u)=0;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            CHECK(rbs_skel.aimed==3);
+            /* m42.err: placed on the 0.5 floor (AI start 0.51), its first
+             * fight frame 5 lower (-4.49) over a floor at -4.5: the placed
+             * height counts, the player on 0.5 gets the stock aim */
+            rbs_skel.floor=-4.49f;rbs_skel.pad=0.51f;rbs_skel.pad_set=1;rbs_skel.ground_set=0;
+            skel_floors[0]=0.5f;skel_floors[1]=-4.5f;hy=1.2f;FLOAT_AT(aim_hand+4u)=hy;
+            FLOAT_AT(t+4u)=0.5f;FLOAT_AT(t+8u)=hz+10.0f;WORD_AT(st+0x4160u)=0;n=rbs_skel.aimed;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            CHECK(rbs_skel.ground_set==1 && near(rbs_skel.ground,0.5f) && rbs_skel.aimed==n);
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-0.7f/rbs_sqrt(0.49f+100.0f)));
+            rbs_skel.floor=-12.5f;rbs_skel.ground_set=0;rbs_skel.pad_set=0;skel_floor_map=0;
             WORD_AT(st+0x4158u)=0;WORD_AT(st+0x4160u)=2u;WORD_AT(A(3)+0x9DCu)=8u;
         }
         /* event: its death marker is dropped */
@@ -1333,7 +1414,7 @@ int main(void)
             WORD_AT(0x0078B0E0u)=0xE0000060u;                            /* the outside statics differ from the level's */
             memcpy(live,(void *)((uintptr_t)0x0078B080u+g_xbox_mem_offset),sizeof live);
             rbs_walks[0].armed=1u;rbs_walks[1].roars=1u;rbs_walks[1].woken=1u;rbs_skels[2].floor_set=1;rbs_skels[1].throws=5u;
-            rbs_skels[3].floor_set=1;rbs_skels[3].aimed=3u;rbs_walks[1].actor=A(14);
+            rbs_skels[3].floor_set=1;rbs_skels[3].aimed=3u;rbs_skels[3].ground_set=2;rbs_walks[1].actor=A(14);
             for(q=0;q<4u;q++) {                                           /* the last run in every block */
                 WORD_AT(SKST_K(q)+0x100u)=0xDEAD0000u+q;WORD_AT(SKST_K(q)+0x4C78u)=0xDEAD0010u+q;
                 WORD_AT(SKPT_K(q)+0x40u)=0xBEEF0000u+q;WORD_AT(SKPT_K(q)+0x7CFCu)=0xBEEF0010u+q;
@@ -1363,7 +1444,7 @@ int main(void)
             CHECK(fx_is(live) && WORD_AT(0x0078B1ECu)==SKST_K(0) && WORD_AT(0x0078B1E8u)==WKST_K(0));
             CHECK(!rbs_skelf.cur && !rbs_walkf.cur && !mapmaker_fx_holder);
             CHECK(!rbs_walks[0].armed && !rbs_walks[1].roars && !rbs_walks[1].woken && !rbs_skels[2].floor_set && !rbs_skels[1].throws);
-            CHECK(!rbs_skels[3].floor_set && !rbs_skels[3].aimed && !rbs_walks[1].actor && rbs.logged<99u);
+            CHECK(!rbs_skels[3].floor_set && !rbs_skels[3].aimed && !rbs_skels[3].ground_set && !rbs_walks[1].actor && rbs.logged<99u);
             for(q=10;q<16u;q++) CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(q),0,0,1);   /* started again */
             CHECK(rbs_skelf.n==4u && rbs_walkf.n==2u && nalloc==a0 && nwalk_alloc==b0);   /* no fifth */
             CHECK(rbs_skels[3].record==REC(15) && rbs_walks[1].record==REC(14) && rbs_walks[1].actor==A(14));
