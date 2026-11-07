@@ -78,7 +78,7 @@ MUTATIONS = {
     'fx-split-screen': ('    if(RBT_B(RBT_MODE)==10u && (int32_t)WORD_AT(RBT_PLAYERS)>1) return;', ''),
     'reset-missing': ('    guest_call(sub_00292550,0);\n', ''),
     'reset-any-scene': ('    if(!rbt_lvl.blocks || WORD_AT(RBT_SCENE)!=100u || !rbt_on()) return;', '    if(!rbt_lvl.blocks || !rbt_on()) return;'),
-    'reset-keeps-removed': ('        rbt_inst[k].removed=0;\n    }', '    }'),
+    'reset-keeps-removed': ('        rbt_inst[k].removed=0;\n        rbt_walk[k].hold_ok=0;', '        rbt_walk[k].hold_ok=0;'),
     'hud-own-bar': ('    WORD_AT(player+RBT_FOCUS)=0;                     /* never the stock bar', '    (void)0;                     /* never the stock bar'),
     'hud-keeps-cleared': ('    original();\n    WORD_AT(player+RBT_FOCUS)=focus;\n}', '    original();\n}'),
     'hud-any-robot': ('    if(k==rbt_lvl.n) { original();return; }\n    WORD_AT(player+RBT_FOCUS)=0;', '    WORD_AT(player+RBT_FOCUS)=0;'),
@@ -91,8 +91,8 @@ MUTATIONS = {
     'class-beyond-blocks': ('    else if(k==rbt_lvl.n && rbt_lvl.n>=rbt_lvl.blocks) {', '    else if(k==rbt_lvl.n && rbt_lvl.n>=RBT_MAX) {'),
     'class-one-robot': ('    else if(k==rbt_lvl.n && rbt_lvl.n>=rbt_lvl.blocks) {', '    else if(k==rbt_lvl.n && rbt_lvl.n>=1u) {'),
     'class-restart-new-slot': ('    for(k=0;k<rbt_lvl.n && rbt_inst[k].record!=rec;k++) {}\n    if(rbt.optout)', '    k=rbt_lvl.n;\n    if(rbt.optout)'),
-    'class-stale-statics': ('        memset(rbt_inst[k].statics,0,sizeof rbt_inst[k].statics);\n        rbt_log("giant robot gets', '        rbt_log("giant robot gets'),
-    'swap-none': ('    rbt_swapped(original,WORD_AT(g_esp+4u));\n}\n/* WRAP sub_00294520', '    original();\n}\n/* WRAP sub_00294520'),
+    'class-stale-statics': ('        memset(rbt_inst[k].statics,0,sizeof rbt_inst[k].statics);\n        rbt_walk[k].hold_ok=0;                         /* (re)spawned', '        rbt_walk[k].hold_ok=0;                         /* (re)spawned'),
+    'swap-none': ('    rbt_swapped(original,ent);\n}\n/* WRAP sub_00294520', '    original();\n}\n/* WRAP sub_00294520'),
     'swap-no-message': ('    rbt_swapped(original,WORD_AT(g_esp+4u));\n}\n/* WRAP sub_002926B0', '    original();\n}\n/* WRAP sub_002926B0'),
     'swap-no-callback': ('    rbt_swapped(original,WORD_AT(g_esp+4u));\n}\n/* WRAP sub_002936C0', '    original();\n}\n/* WRAP sub_002936C0'),
     'swap-no-damage': ('    rbt_swapped(original,WORD_AT(r));', '    original();'),
@@ -129,8 +129,8 @@ MUTATIONS = {
     'goal-no-slack': ('#define RBT_FIT_SLACK 0.25f', '#define RBT_FIT_SLACK 0.0f'),
     'goal-height-fixed': ('    return rbt_sane(h) && h>=1.0f && h<=40.0f?h:RBT_HEIGHT;', '    return RBT_HEIGHT;'),
     'goal-height-box-centre': ('rbt_getf(ent+RBT_ENT_BOX_Y)+rbt_getf(ent+RBT_ENT_BOX_H);', 'rbt_getf(ent+RBT_ENT_BOX_Y);'),
-    'goal-farthest-portal': ('        if(best<0.0f || d<best) { best=d;open=hi-lo; }', '        if(best<0.0f || d>best) { best=d;open=hi-lo; }'),
-    'goal-portal-any-rooms': ("        if(!((WORD_AT(pt)==(uint32_t)ra && WORD_AT(pt+4u)==(uint32_t)rb) || (WORD_AT(pt)==(uint32_t)rb && WORD_AT(pt+4u)==(uint32_t)ra))) continue;\n", ''),
+    'goal-farthest-portal': ('if(best<0.0f || d<best-0.01f || (d<=best+0.01f && p.lo<best_lo))', 'if(best<0.0f || d>best+0.01f || (d>=best-0.01f && p.lo<best_lo))'),
+    'goal-portal-any-rooms': ("        if(!((p.r0==ra && p.r1==rb) || (p.r0==rb && p.r1==ra))) continue;\n        d=", '        d='),
     'goal-no-substitute': ('        goal=rbt_walk[k].goal_sub;\n', ''),
     'goal-substitute-farthest': ('if(rbt_sane(d) && (bd<0.0f || d<bd)) { bd=d;best=p; }', 'if(rbt_sane(d) && (bd<0.0f || d>bd)) { bd=d;best=p; }'),
     'goal-no-steer': ('    if(!rbt_walk[k].blocked || goal==at) return goal;', '    return goal;'),
@@ -139,6 +139,27 @@ MUTATIONS = {
     'goal-no-tell': ('        rbt_tell(k);\n', ''),
     'goal-no-rebuild': ('    if(!rbt_walk[k].built || (rbt_walk[k].from!=at && !rbt_walk[k].reach[at])) {', '    if(!rbt_walk[k].built) {'),
     'goal-nav-kept': ('    rbt_nav_free();\n    memset(rbt_walk,0,sizeof rbt_walk);\n', '    memset(rbt_walk,0,sizeof rbt_walk);\n'),
+    # v0.4.0-mapmaker.44: stacked one-floor portals and the hold
+    'stack-none': ('    while(pmax<=RBT_PORTAL_MAX && n<=RBT_STACK_MAX) {', '    while(0 && n<=RBT_STACK_MAX) {'),
+    'stack-slab-ignored': ('            if(rbt_joined(c.r0,a) && rbt_joined(c.r1,b)) {', '            if(1) {'),
+    'stack-any-plane': (' || !rbt_coplanar(&p,&c)) continue;', ') continue;'),
+    'stack-gap-jumped': ('            if(c.lo>top+RBT_STACK_GAP || c.lo<top-RBT_STACK_GAP || !rbt_coplanar', '            if(!rbt_coplanar'),
+    'stack-floor-closed': ('    if(p.hi-p.lo<RBT_WALL_MIN) return RBT_OPEN;\n', ''),
+    'stack-joined-other': ('    if(x==y) return 1;\n', ''),
+    'stack-joined-by-door': (' && q.hi-q.lo<RBT_WALL_MIN && ((q.r0==x', ' && ((q.r0==x'),
+    'stack-plane-span': ('    return over>=0.1f && over>=0.5f*', '    return over>=-1.0e9f || over>=0.5f*'),
+    'stack-highest-portal': ('(d<=best+0.01f && p.lo<best_lo)', '(d<=best+0.01f && p.lo>best_lo)'),
+    'hold-none': ('    if((k=rbt_find(ent))>=0) rbt_hold((unsigned)k,ent);\n', ''),
+    'hold-after-ai': ('    if((k=rbt_find(ent))>=0) rbt_hold((unsigned)k,ent);\n    rbt_swapped(original,ent);', '    rbt_swapped(original,ent);\n    if((k=rbt_find(ent))>=0) rbt_hold((unsigned)k,ent);'),
+    'hold-room-kept': ('            WORD_AT(ent+RBT_ENT_ROOM)=rbt_walk[k].hold_room;\n', ''),
+    'hold-pos-kept': ('            memcpy((void *)((uintptr_t)(ent+RBT_ENT_POS)+g_xbox_mem_offset),rbt_walk[k].hold,sizeof rbt_walk[k].hold);\n', ''),
+    'hold-teleport': ('        if(d<=RBT_HOLD_JUMP*RBT_HOLD_JUMP &&\n', '        if(\n'),
+    'hold-removed': ('    if(rbt_inst[k].removed || !rbt_room_ok(room)) return;', '    if(!rbt_room_ok(room)) return;'),
+    'hold-no-room-check': ('    if(rbt_inst[k].removed || !rbt_room_ok(room)) return;', '    if(rbt_inst[k].removed) return;'),
+    'hold-restart-kept': ('        rbt_walk[k].hold_ok=0;                         /* back at its spawn point */\n', ''),
+    'hold-respawn-kept': ('        rbt_walk[k].hold_ok=0;                         /* (re)spawned: no previous position */\n', ''),
+    'hold-follows': ('            return;\n        }\n    }\n    rbt_walk[k].hold_ok=1;', '        }\n    }\n    rbt_walk[k].hold_ok=1;'),
+    'hold-no-slack': ('<rbt_walk[k].height-RBT_FIT_SLACK) {\n            memcpy', '<rbt_walk[k].height+1.0f) {\n            memcpy'),
     'goal-unused-links': ('        if(!(WORD_AT(l)&RBT_LINK_USED) || (a=WORD_AT(l+4u))>=np || (b=WORD_AT(l+8u))>=np || a==b) continue;\n        o=', '        if((a=WORD_AT(l+4u))>=np || (b=WORD_AT(l+8u))>=np || a==b) continue;\n        o='),
 }
 
@@ -492,4 +513,25 @@ def test_walk_goal_and_pad_graph():
     for k in ('RBT_RET_GOAL 0x00293D27u', 'RBT_PADS 0x00715F2Cu', 'RBT_LINKS 0x00715F30u', 'RBT_LINK_COUNT 0x007B6660u',
               'RBT_PAD_COUNT 0x007B6664u', 'RBT_ROOM_RECS 0x00708788u', 'RBT_PORTALS 0x0070878Cu', 'RBT_AI_GOAL 0x684u',
               'RBT_AI_PAD 0x678u', 'RBT_ENT_BOX_Y 0x1ACu', 'RBT_ENT_BOX_H 0x1C4u'):
+        assert '#define ' + k in inc, k
+
+
+def test_root_motion_move_before_handler():
+    """v0.4.0-mapmaker.44: the robot is moved by its animation's root motion in
+    the dispatcher just before its handler, not by its pads: sub_0015F0D0
+    reads the model's root delta, stores the position and sets the room +0x34
+    again from it; the attack states keep the walk cycle playing."""
+    a = by_address()
+    # sub_0027D590, class 0x80000: sub_0015F0D0(entity) at 0x0027DE12, then the handler at 0x0027DE18
+    assert target(a[0x0027DE12]) == 0x0015F0D0 and target(a[0x0027DE18]) == 0x00293730
+    # sub_0015F0D0: root delta [entity+4]+0xFC.., position stores, the room set again (sub_0015AB80)
+    assert mem(a[0x0015F134])[0][4] == 4 and mem(a[0x0015F137])[0][4] == 0xFC
+    assert [mem(a[s])[0][4] for s in (0x0015F861, 0x0015F86C, 0x0015F871)] == [0x64, 0x68, 0x6C]
+    assert target(a[0x0015F850]) == 0x000D9230 and target(a[0x0015F889]) == 0x0015AB80
+    assert mem(a[0x0015ACC6])[0][4] == 0x34 and mem(a[0x0015AE36])[0][4] == 0x34
+    # the walk cycle 0x808 in the walk and attack states (sub_0005F460)
+    for push, site in ((0x00293A8C, 0x00293A95), (0x00293D94, 0x00293D9A), (0x00293EB7, 0x00293EC2), (0x00293FA3, 0x00293FA9)):
+        assert ('imm', 0x808) in a[push].ops and target(a[site]) == 0x0005F460
+    inc = INC.read_text(encoding='utf-8')
+    for k in ('RBT_ENT_POS 0x64u', 'RBT_ENT_ROOM 0x34u'):
         assert '#define ' + k in inc, k

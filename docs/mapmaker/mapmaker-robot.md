@@ -1,7 +1,7 @@
 # MapMaker real story boss: the far-future giant robot (story mission 10)
 
 Status: implemented in `src/interface/pc_mapmaker_robot.inc` (area `robot`),
-fixture-tested (`tests/mapmaker/test_mapmaker_robot.py`: 98 mutations, plus
+fixture-tested (`tests/mapmaker/test_mapmaker_robot.py`: 137 mutations, plus
 decode and US XBE data checks of every site below). Wired in mapmaker-recon;
 **up to four robots per map**, each with its own state (see
 [Several robots](#several-robots)): the four new wrappers for that are not
@@ -95,7 +95,7 @@ forward from its spawn point). 2-5 walk and attacks (projectiles through
 | `sub_001C8540` | `pc_mapmaker_robot_anims` | after the original: when the map's custom set (index 0x11; slots 1-10 in map-info chunk 0x00C77668, 11-20 in the sets chunk 0x00C776F5) holds 0x42, or the container cannot be read, and lv14.pak is not mounted (`sub_00062260`; the split Crowe area may already have mounted it) and two of the 30 mount slots stay free: `sub_0005A130(lv14.pak)`, the stock per-level anim pak call (whole file into the level heap, unmounted with the level) |
 | `sub_0025F720` | `pc_mapmaker_robot_level` | before the original: `[0x0078B0D0]` = 0 (in scene 100 it can only be an earlier level's dangling block). After: forget the previous level's robots; for such a map, when no particle block exists yet (the realbosses skeleton/walker make one), `sub_002A62C0` (32 KB); then four state blocks: each time `[0x0078B1DC]` = 0 and `sub_00292630` (a fresh 76-byte block, set by `sub_00292550`), kept while the pointer is usable. Outside any robot `[0x0078B1DC]` holds the first block |
 | `sub_0015B830` | `pc_mapmaker_robot_ai_start` | before the original: pool entry with character 0x42 (or entity model 0x5F2), lv14.pak mounted and this level's state in place: record +0/+4 = 0/0x80000, and the robot gets the next free state block (its statics start at 0). Beyond the blocks made (four) a robot keeps the MapMaker class (logged). The same record again (restart) keeps its block |
-| `sub_00293730` | `pc_mapmaker_robot_handler` | the robot's AI (dispatcher 0x0027DE18, entity arg 1): runs with that robot's globals (see Several robots) |
+| `sub_00293730` | `pc_mapmaker_robot_handler` | the robot's AI (dispatcher 0x0027DE18, entity arg 1): runs with that robot's globals (see Several robots); before it, the hold (.44) puts back a robot that walked through an opening lower than it |
 | `sub_00294520` | `pc_mapmaker_robot_message` | its messages (0x0027D447, entity arg 1): same |
 | `sub_002926B0` | `pc_mapmaker_robot_callback` | the slot-2 callback its door entry installs (0x002938EE, entity arg 1): same |
 | `sub_002936C0` | `pc_mapmaker_robot_damage` | its damage callback (0x00293923, hit record arg 1, entity at +0): same |
@@ -213,6 +213,75 @@ and a three-floor opening 15 between two rooms; every hop is checked to be a
 link that fits; the door as short a way as the hall; no tall way round: it
 waits at the door; a one-floor robot passes), mutations `goal-steer-whole-leg`,
 `goal-steer-any-link`, `goal-no-tell`.
+
+### Stacked floors and the hold (v0.4.0-mapmaker.44)
+
+User report: the robot (14.5 units tall) still walks through openings one
+floor (5 units) tall; a multi-floor open area built from stacked tiles should
+let it through only where at least three stacked floors are open. The .43 log
+(`logs/m43.err`): `opening 5.00 -> closed` for **every** inter-tile link, `reaches
+9 of 234 pads`, `cannot fit to the player's pad`, yet the robots stood on pads
+far outside their sets afterwards (robot 0 pads 81 then 54, robot 2 pads 101,
+38, 53).
+
+Two causes:
+
+1. **Openings measured per portal** (CONFIRMED by the log): every MapMaker
+   tile side is its own portal of one floor, so a tall open area is a column of
+   one-floor portals between different rooms, and no opening ever measured more
+   than 5. Fix: `rbt_stacked` combines the portals stacked above the doorway
+   portal: a portal whose bottom is within 0.3 of the current top, whose
+   vertices lie within 0.3 of the doorway's vertical plane, sharing at least
+   half of the shorter span, and whose rooms are the rooms above the current
+   ones on each side (the same room, or joined to it by a floor portal, less
+   than 1 unit tall: an open floor) raises the opening; up to 8 floors. A floor slab between two doors
+   (no floor portal between the rooms above each other) ends the column. A portal
+   less than 1 unit tall (an open floor or ceiling) is no doorway: open. Of
+   several portals over one spot between the same two rooms, the lowest is
+   the doorway. Each portal's result is cached per level.
+2. **The robot is not moved by its pads** (CONFIRMED in the decode,
+   `test_root_motion_move_before_handler`): the dispatcher calls
+   `sub_0015F0D0(entity)` at 0x0027DE12, just before the handler
+   (0x0027DE18). It takes the current animation's root motion (model
+   `[entity+4]` +0xFC.., 0x0015F137), turns it by the facing, moves the
+   entity with the collision move `sub_000D9230` (0x0015F850), stores
+   +0x64/+0x68/+0x6C (0x0015F861..0x0015F871) and sets its room +0x34 again
+   from the position (`sub_0015AB80`, 0x0015F889; stores 0x0015ACC6,
+   0x0015AE36). States 2-5 all keep the walk cycle 0x808 playing (0x00293A95,
+   0x00293D9A, 0x00293EC2, 0x00293FA9), and the attack states 3-5 are chosen
+   by straight-line distance to the player (squared 350/164/64/400 at
+   0x002939E9..0x00293A3C) and call no walk goal, so the robot walks on
+   wherever it faces. The pad it stands on (+0x678) is only snapped to its
+   position afterwards (`sub_00159E50`), which is why the log showed pads
+   outside its set. INFERRED: the exact crossings were such attack-state walks
+   (or the turn toward the target in `sub_0015CD00`) near a door.
+
+   Fix, the **hold** (`rbt_hold`, in `pc_mapmaker_robot_handler` before the
+   original, no new wrapper): each frame, when the robot's room +0x34 differs
+   from the previous frame's and the opening between the two rooms (the
+   stacked opening of their portal nearest the move's midpoint) is lower than
+   the robot's height - 0.25, its previous position and room are written back,
+   so its AI and the rest of the frame see it on its own side. A move of more
+   than 6 units in one frame (teleport), an unknown room or two rooms joined by
+   no portal are kept; the restart reset and its AI start (respawn) forget the
+   previous position; a removed robot is not held.
+
+Logs: the first line gains `d doorways with open floors stacked above`;
+`giant robot k held in room a: the opening to room b is o, lower than it (h)`
+at most 4 times per robot and level.
+
+INFERRED (playtest): that MapMaker's open floors between stacked tiles are
+portals (the room test), that writing the position and room back has no other
+stale state (the stock move writes the same fields), and that holding at the
+doorway looks acceptable (the robot keeps walking into the doorway and is put
+back each frame while it faces it). Not covered: an opening inside one room.
+
+Tests: `stacked_floors()` (three open floors pass; one, two, slabs between,
+a missing middle door, doors elsewhere on the wall or on another wall do not;
+one tall room on both sides or on one side; slabs on the other side do not) and `hold()` (held at a one-floor doorway, the AI sees
+the restored position; kept: teleports, no room, after the restart reset or a
+respawn, removed robots, other entities, mission 10, three open floors, a
+one-floor robot), mutations `stack-*` and `hold-*`.
 
 ## Several robots
 
@@ -350,3 +419,8 @@ guide for MapMaker areas) and regenerate the wrapper patch.
    beyond a door (`reaches n of m pads from pad p` repeats only with the same
    n and a pad of its own hall), and the level's first lines list each portal
    link `closed` (one floor) or `open` (three floors).
+9. v0.4.0-mapmaker.44: a hall of three stacked tiles open on all floors next
+   to a one-floor door: the robot walks through the three-floor opening and
+   never through the door, even while attacking a player behind it (log:
+   `doorways with open floors stacked above` > 0, `held in room a` near the
+   door). With a floor slab between the stacked tiles it passes neither.
