@@ -36,7 +36,7 @@
  * The editor's item node pool is 5300 (config/guest-code-patches/items.json):
  * 500 items, their clipboard copies and up to 81 start points fit twice over.
  * In play items are Level-heap arrays by count (sub_00240590) and about one
- * engine object each (pool 1023, pc_mapmaker_objects.inc; the editor keeps
+ * engine object each (pool 2047, pc_mapmaker_objects.inc; the editor keeps
  * pieces + items + a 128-slot reserve within it, MAPMAKER_LIMIT_OBJECTS).
  *
  * Cover pads stay at the stock 1024: the map adds about 60 more when it loads
@@ -100,28 +100,29 @@
 #define MAPMAKER_LIMIT_GROUPS 1024
 /* Pieces (2026-11-07, was 511; 255 before 2026-11-02): one visibility room
  * each, so = MAPMAKER_ROOMS_MAX (rooms.json real rooms 1..0x3FF). Each piece is
- * also one engine object, so the objects cap (pieces + items + 128 <= 1023)
- * binds first: 895 pieces without items, 511 pieces with 384 items. The
- * piece cap itself is reached only once the object pool grows past its
- * 1024-handle encoding (slot << 22). The editor piece pool is 2048 nodes
+ * also one engine object; since 2026-11-07 handles are slot << 21
+ * (config/guest-code-patches/handles.json) and the pool holds 2047, so
+ * 1023 pieces + 500 items + 128 = 1651 fit and the objects cap no longer
+ * binds before pieces or items (it did at 895 - items with the 1023-slot
+ * pool of the slot << 22 encoding). The editor piece pool is 2048 nodes
  * (items.json), so a copy of every placed piece still fits. Heavy tiles stop
  * on links (521), pads (549) or the memory estimate (386 at scale 8). */
 #define MAPMAKER_LIMIT_PIECES 1023u
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
 /* Engine objects (2026-11-02): in play each piece (room) and about each item
- * takes one slot of the engine object pool (pc_mapmaker_objects.inc, 1023
- * slots, taken without a bound check; 462 used at 236 pieces + 200 items),
- * characters up to 64 more. The editor refuses placement past the pool, so
- * 511 pieces leave 384 items; 395 pieces keep the 500 items; 895 pieces
- * leave none.
+ * takes one slot of the engine object pool (pc_mapmaker_objects.inc, 2047
+ * slots since 2026-11-07, 1023 before; taken without a bound check; 462 used
+ * at 236 pieces + 200 items), characters up to 64 more. The editor refuses
+ * placement past the pool; with 2047 slots the piece (1023) and item (500)
+ * caps are reached first (1651 objects), so tiles no longer take items away.
  * The reserve (2026-11-03, v0.4.0-mapmaker.37: 459 pieces + about 500 items
  * filled all 1023 slots in play and shot barrels did nothing) is 64
  * characters plus 64 for what explodes and breaks: sub_000AB590 refuses a
  * flag-8 object (debris, fragments) unless 5 slots stay free (sub_000A4C70),
  * flag-8 props live in a 30-block ring (sub_000AC940) and broken props keep
  * up to 20 debris pieces (0x00732688). */
-#define MAPMAKER_LIMIT_OBJECTS 1023u  /* = MAPMAKER_OBJECTS_POOL */
+#define MAPMAKER_LIMIT_OBJECTS 2047u  /* = MAPMAKER_OBJECTS_POOL */
 #define MAPMAKER_OBJECTS_CHARACTERS 64u /* characters in MapMaker story play */
 #define MAPMAKER_OBJECTS_EFFECTS 64u    /* >= 30 ring + 20 debris + 5 refusal margin */
 #define MAPMAKER_OBJECTS_RESERVE (MAPMAKER_OBJECTS_CHARACTERS+MAPMAKER_OBJECTS_EFFECTS)

@@ -25,8 +25,13 @@ MUTATIONS = {
     'register-slot0-stock': ('cap=MAPMAKER_OBJECTS_LIST0_CAP;', 'cap=112u;'),
     'register-removal-guarded': ('if(flag && (int32_t)WORD_AT(count)', 'if((int32_t)WORD_AT(count)'),
     'register-listed-ignored': (' &&\n       !mapmaker_objects_listed(base,cap,obj)', ''),
-    'pool-stock': ('#define MAPMAKER_OBJECTS_POOL 1023u', '#define MAPMAKER_OBJECTS_POOL 550u'),
-    'pool-round3': ('#define MAPMAKER_OBJECTS_POOL 1023u', '#define MAPMAKER_OBJECTS_POOL 1000u'),
+    'pool-stock': ('#define MAPMAKER_OBJECTS_POOL 2047u', '#define MAPMAKER_OBJECTS_POOL 550u'),
+    'pool-round3': ('#define MAPMAKER_OBJECTS_POOL 2047u', '#define MAPMAKER_OBJECTS_POOL 1000u'),
+    'pool-slot22': ('#define MAPMAKER_OBJECTS_POOL 2047u', '#define MAPMAKER_OBJECTS_POOL 1023u'),
+    # Handles slot << 21 (handles.json): 2048 would let slot 2047 form -1; << 22 holds 1024.
+    'pool-minus-one': ('#define MAPMAKER_OBJECTS_POOL 2047u', '#define MAPMAKER_OBJECTS_POOL 2048u'),
+    'handle-shift-stock': ('#define MAPMAKER_OBJECTS_HANDLE_SHIFT 21u', '#define MAPMAKER_OBJECTS_HANDLE_SHIFT 22u'),
+    'list0-old-place': ('#define MAPMAKER_OBJECTS_LIST0 0x008AE000u', '#define MAPMAKER_OBJECTS_LIST0 0x008AD000u'),
     'pool-story': ('return mapmaker_limits.pools && (mapmaker_objects_scene(100u) || mapmaker_objects_scene(102u));',
                    'return mapmaker_limits.pools;'),
     'pool-play-only': ('(mapmaker_objects_scene(100u) || mapmaker_objects_scene(102u))', 'mapmaker_objects_scene(100u)'),
@@ -66,13 +71,14 @@ MUTATIONS = {
     # The placed-pickup table: the `cmp ah,n` test needs a multiple of 256, above the 500 items.
     'pickups-stock': ('#define MAPMAKER_OBJECTS_PICKUPS 768u', '#define MAPMAKER_OBJECTS_PICKUPS 120u'),
     'pickups-below-items': ('#define MAPMAKER_OBJECTS_PICKUPS 768u', '#define MAPMAKER_OBJECTS_PICKUPS 256u'),
-    # Prop blocks: two per pool slot, within the 8 KB table.
-    'propblocks-stock': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 60u'),
-    'propblocks-pool-only': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 1024u'),
-    'propblocks-past-table': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 4096u'),
+    # Prop blocks: two per pool slot, within the 16 KB table.
+    'propblocks-stock': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 4096u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 60u'),
+    'propblocks-pool-only': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 4096u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 2048u'),
+    'propblocks-past-table': ('#define MAPMAKER_OBJECTS_PROP_BLOCKS 4096u', '#define MAPMAKER_OBJECTS_PROP_BLOCKS 8192u'),
     # Physics bodies (sub_0016C430): one kind-1 body per pool slot in MapMaker play.
-    'physics-stock': ('#define MAPMAKER_OBJECTS_PHYSICS 1024u', '#define MAPMAKER_OBJECTS_PHYSICS 100u'),
-    'physics-below-pool': ('#define MAPMAKER_OBJECTS_PHYSICS 1024u', '#define MAPMAKER_OBJECTS_PHYSICS 1000u'),
+    'physics-stock': ('#define MAPMAKER_OBJECTS_PHYSICS 2048u', '#define MAPMAKER_OBJECTS_PHYSICS 100u'),
+    'physics-below-pool': ('#define MAPMAKER_OBJECTS_PHYSICS 2048u', '#define MAPMAKER_OBJECTS_PHYSICS 2000u'),
+    'physics-old-pool': ('#define MAPMAKER_OBJECTS_PHYSICS 2048u', '#define MAPMAKER_OBJECTS_PHYSICS 1024u'),
     'physics-any-scene': ('if(!mapmaker_limits.pools || !mapmaker_objects_scene(100u)) { original(); return; }',
                           'if(!mapmaker_limits.pools) { original(); return; }'),
     'physics-pools-off-ignored': ('if(!mapmaker_limits.pools || !mapmaker_objects_scene(100u))', 'if(!mapmaker_objects_scene(100u))'),
@@ -186,7 +192,14 @@ def test_table_matches_policy():
     assert entries['obj-bucket-bound']['new_hex'] == '3d' + (_define('MAPMAKER_OBJECTS_BUCKET_BYTES') // 4 - 3).to_bytes(4, 'little').hex()
     assert entries['obj-tag-entries-cap']['new_hex'] == '81fa' + _define('MAPMAKER_OBJECTS_TAGS_CAP').to_bytes(4, 'little').hex()
     assert entries['obj-list0-clear']['new_hex'] == 'b9' + _define('MAPMAKER_OBJECTS_LIST0_CAP').to_bytes(4, 'little').hex()
-    assert _define('MAPMAKER_OBJECTS_POOL') < 1024        # slot = handle >> 22
+    # Handles are slot << shift | serial (handles.json): the pool stays below 2^(32 - shift)
+    # so no slot forms -1, the encode uses that shift and the serial wraps at 2^shift.
+    shift = _define('MAPMAKER_OBJECTS_HANDLE_SHIFT')
+    assert shift == 21 and _define('MAPMAKER_OBJECTS_POOL') == (1 << (32 - shift)) - 1
+    handles = {e['id']: e for e in json.loads((ROOT / 'config/guest-code-patches/handles.json').read_text(encoding='utf-8'))['patches']}
+    assert handles['handle-encode-shift']['new_hex'] == 'c1e1%02x' % shift
+    assert handles['handle-serial-wrap']['new_hex'] == 'a9' + ((0xFFFFFFFF << shift) & 0xFFFFFFFF).to_bytes(4, 'little').hex()
+    assert all(e['new_hex'] == e['original_hex'][:-2] + '%02x' % shift for k, e in handles.items() if k.startswith('handle-decode-'))
     # The perception array holds 64 characters (actors area) then one entry per slot-9 list entry.
     per = 0x400 + 0x10 * _define('MAPMAKER_OBJECTS_LIST9_CAP')
     for pid in ('obj-perception-clear', 'obj-perception-stride', 'obj-perception-alloc'):

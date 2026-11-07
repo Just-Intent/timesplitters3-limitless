@@ -44,7 +44,7 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
 - Tests: `mapmaker_limits.c` (1024 allowed, 1025 refused, 767 for 511
   pieces), mutations `groups-*`.
 
-## Engine objects (2026-11-02)
+## Engine objects (2026-11-02; 2047 since 2026-11-07, see "Engine object handles 2047")
 
 - `pc_mapmaker_objects.inc`: `MAPMAKER_OBJECTS_POOL` and the slot-8/slot-0
   list caps 1000 -> 1023 (handle serial 1..0x3FFFFF, so slots 0..1022 never
@@ -224,6 +224,58 @@ play, every load; no MapMaker line before it.
   line once AI fill the pool, no `engine objects full`; kill AI and watch new
   ones spawn; shoot barrels with many AI alive.
 
+## Engine object handles 2047 (2026-11-07, static analysis and fixtures only)
+
+Handles were `slot << 22 | serial`, so the pool ended at 1024 slots and the
+objects cap (pieces + items + 128) bound before the 1023-piece cap. Now:
+
+- `config/guest-code-patches/handles.json` (every scene; written by
+  `tools/analysis/object-handles.py`, `--check` compares): the encode
+  0x000A69BE `shl ecx,0x16` -> 0x15, the serial wrap 0x000A69C4 `test
+  eax,0xFFC00000` -> 0xFFE00000 (serial 1..0x1FFFFF), and all 167 decodes
+  `shr r,0x16; imul r,r,0x2E8` -> `shr r,0x15` (one byte each). Handles are
+  `slot << 21 | serial`; slots 0..2046 never form -1 (2047 would).
+- `pc_mapmaker_objects.inc`: `MAPMAKER_OBJECTS_POOL` 2047 (object and twin
+  pools in scene 100/102), `MAPMAKER_OBJECTS_HANDLE_SHIFT` 21 (compile check:
+  pool < 2^(32-21)), slot-8/slot-0 lists 2047 (`objects.json`: 0x008AC000 and
+  0x008AE000, 0x1FFC each, slot-0 clear 2047 dwords), prop blocks 4096 (16 KB,
+  every scene), room buckets 0x14D00 B (4x stock, bound 0x533D, every scene),
+  physics bodies P = 2048 (scene 100). `MAPMAKER_LIMIT_OBJECTS` 2047: 1023
+  pieces + 500 items + 128 = 1651 fit, so tiles no longer take items away.
+  The AI headroom (72) and the create guard read the pool size, unchanged.
+- `src/input/pc_mounted.h` (host-side vehicle gun lookup) decodes `>> 21`;
+  its fixtures patch the XBE with `handles.json` before translating.
+- Wire and saves (CONFIRMED in code): System Link names objects by the +0x230
+  network id, a player byte (+0x150) or a character index (`sub_00359400`;
+  receiver `sub_00359390`); none of the 21 senders (22 calls of
+  `sub_00353990`) stores a handle, and the five handle decodes in
+  0x00351000..0x0035E000 read local tables. The fork's own network code uses
+  content keys (`pc_story_world.inc`) or local identity only. Saves and map
+  files hold no handles (the serial restarts at 1 with every pool reset,
+  0x000A5B62). So stock System Link peers are unaffected and the change is
+  not gated; scenes other than 100/102 keep 550 slots (20 in scene 101).
+- Ruled out (`test_mapmaker_handles_classified.py`): other `shr/sar 0x16`
+  (12: vector unpacks, flag bits, MD5) and `shl 0x16` (colour, MD5) sites, the
+  9 `imul 0x2E8` uses fed by counts, no division by the stride anywhere, the
+  serial written only by the encode and the reset, the 2512-bit visibility
+  set (`sub_000A0130`) above 2047.
+- Level heap (scenes 100/102 unless noted): object pool +762 KB (2047 x
+  0x2E8 = 1.52 MB), twin +512 KB (1 MB), physics +572 KB (1.2 MB, scene 100),
+  buckets +42 KB and prop blocks +8 KB in every scene: about 1.9 MB more on a
+  MapMaker map, 50 KB on story levels. Not measured in play.
+- Tests: `test_mapmaker_handles_classified.py` (7: table = scan, mutation of a
+  missing/extra row, reviewed sites, encode/serial writers, wire, host
+  decoder), `mapmaker_objects.c`/`test_mapmaker_objects.py` (2047 pools,
+  lists, 4096 blocks, P 2048, create guard at 2046/2047; `pool-slot22`,
+  `pool-minus-one`, `handle-shift-stock`, `list0-old-place`,
+  `physics-old-pool` mutations), `mapmaker_limits.c` (1023 + 896 = 2047,
+  every piece count keeps 500 items), `mapmaker_restable.c` (`Objects
+  n/2047`), `test_mounted_mouse.py`; `check-tables.py`.
+- Play check: a map of 1023 pieces + 500 items loads and plays (stderr: no
+  `engine objects full`); System Link between two builds and against a stock
+  build on a stock map; a story level with vehicles (mounted guns use the
+  host decoder); shoot barrels on a large map.
+
 ## Play memory and the memory estimate (2026-11-02)
 
 - `pc_mapmaker_memory.inc` nav block: 6 MB (`MAPMAKER_NAV_BYTES`) from the
@@ -248,10 +300,9 @@ play, every load; no MapMaker line before it.
 ## Tiles 511 -> 1023 (2026-11-07, static analysis and fixtures only)
 
 `MAPMAKER_LIMIT_PIECES` and `MAPMAKER_ROOMS_MAX` are 1023 (rooms stage 12 in
-[rooms](limitless-rooms.md)). Each piece is one engine object, so the objects
-cap (pieces + items + 128 <= 1023) binds first: 895 pieces without items,
-600 with 295, 511 with 384. The piece cap itself becomes reachable only when
-the pool grows past the 1024-handle encoding. Old maps load unchanged; stock
+[rooms](limitless-rooms.md)). Each piece is one engine object; with the
+2047-slot pool (handles slot << 21, below) 1023 pieces + 500 items fit, so
+row 1 no longer binds (it did at 895 - items). Old maps load unchanged; stock
 behaviour (limits off, story levels) keeps every editor limit; the rooms
 tables run in every scene as before.
 
@@ -259,7 +310,7 @@ What binds past 511, ranked (for 1023 pieces; heaviest tile 14 pads, 46 links):
 
 | # | cap | where | now | 1023 pieces need | cost / status |
 | --- | --- | --- | --- | --- | --- |
-| 1 | engine object handles | pool `[0x0072F5E8]`, handle slot << 22 (167 `shr 0x16` decodes) | 1023 | 1023 + items + 128 | binds at 895 - items. Next: slot << 21 (2047 slots): every decode/encode, serial mask 0x3FFFFF, lists 0xFFC, twin pool; +1.5 MB pool, +1 MB twins (Level heap) |
+| 1 | engine object handles | pool `[0x0072F5E8]`, handle slot << 21 (`handles.json`, 167 decodes) | 1023 -> **2047** | 1023 + items + 128 | done: 1651 at the piece and item caps; +1.9 MB Level heap |
 | 2 | pad groups | `[0x00762CB8]`, matrix `sub_00275F70` (N+1) x N x 4 in the 6 MB nav block | 1024 | ~1,535 (1.5/piece) | binds ~680 pieces; 1,536 groups = 9.4 MB matrix and 2.4 M route searches at load |
 | 3 | links (int16 A* indices) | `MAPMAKER_POOL_LINKS` 32,512 | 32,256 | 47 K heavy | 521 heavy, 1,024 at <= 15 links; hard int16 limit |
 | 4 | regular pads (ids <= 0x2328) | `pads.json` thresholds | 7,680 | 14 K heavy | 549 heavy |
@@ -287,7 +338,7 @@ functions, the count only set/dec/inc), `mapmaker_restable.c` (Tiles 1023 row
 red, collapsed `Objects 1156/1023`), `mapmaker_validate.c` (1024 kept, 1025
 hidden).
 
-Save/load delay (decoded, not measured): `sub_002FC470` (piece variant)
+Save/load delay (decoded; fixed 2026-11-07, see "Save/load delay" below): `sub_002FC470` (piece variant)
 first calls `sub_002FC3D0`, which walks the whole placed list (loop
 0x002FC3F5..0x002FC41C, maximum z + height), so each call is O(pieces).
 The writer's pad-id helper `sub_00331E50` (once per item, Story AI point and
@@ -296,10 +347,29 @@ for each (0x00331EC2..0x00331EF6), and `sub_002FC680` per piece calls it
 ~30 times: about (items + points) x n^2 / 2 list steps, ~50 M at 511 pieces
 + 384 items, 4x at 1023. A save compiles twice (`sub_00312DF0` 0x00312E05,
 then the undo shadow `sub_00336640`), a load once, every edit once
-(`sub_00337600` 0x003376BA). Cheap fix (not done): memoize `sub_002FC3D0`
-while `sub_003006C0`/`sub_00301A90` run (the placed list does not change
-inside them), or prefix-sum the pad counts for `sub_00331E50` once per
-compile.
+(`sub_00337600` 0x003376BA).
+
+## Save/load delay: the piece top remembered (2026-11-07)
+
+- `pc_mapmaker_editor.inc`: new `WRAP sub_002FC3D0 -> pc_mapmaker_editor_top`
+  and `WRAP sub_003006C0 -> pc_mapmaker_editor_compile`; the existing
+  `pc_mapmaker_editor_load` (`sub_00301A90`) also opens the scope. Inside a
+  compile or load (nesting counted) the first call walks and later calls
+  return the same eax/ecx/edx while editor, flag `+0x21C`, head `[0x0078400C]`
+  and count `[0x00784000]` are unchanged (the original writes no memory;
+  `sub_00307EF0` appends and counts, `sub_00308480` unlinks and counts down,
+  so the loader's appends recompute). Outside the scope (3D view, placement,
+  pieces moving) always the original. `TSFP_MAPMAKER_SAVE_MEMO=0` turns it
+  off. stderr per scope with 1000+ calls (first 4): `[mapmaker] save
+  compile|load: piece top remembered (n walks, m remembered), t ms`.
+- Effect: a compile is (items + points) x pieces mask calls; the walk per call
+  goes away. Fixture: 65,629 calls on 1023 pieces take 7 walks (6,145 list
+  steps) instead of 67 M steps. Not measured in the game: compare the stderr
+  `ms` with `TSFP_MAPMAKER_SAVE_MEMO=0` on the same map.
+- Tests: `mapmaker_editor.c` `test_top_memo` (equal eax/ecx/edx on every call
+  through appends, flag, unlink, unlink + append at the same count, nested
+  load in a compile, switch off; esp), 10 `top-*` mutations in
+  `test_mapmaker_editor.py`.
 
 Play check (user): see [rooms](limitless-rooms.md) stage 12.
 

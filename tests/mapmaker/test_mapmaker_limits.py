@@ -30,7 +30,7 @@ MUTATIONS = {
     'links-held-ignored': ('mapmaker_link_cost(p)+mapmaker_link_cost(h)>MAPMAKER_LIMIT_LINKS',
                            'mapmaker_link_cost(p)>MAPMAKER_LIMIT_LINKS'),
     'no-held-pieces': ('p->pieces+h->pieces>MAPMAKER_LIMIT_PIECES', 'p->pieces>MAPMAKER_LIMIT_PIECES'),
-    # Engine objects: pieces + items + 64 characters + 64 effects within the 1023-slot pool.
+    # Engine objects: pieces + items + 64 characters + 64 effects within the 2047-slot pool (slot << 21).
     'objects-unchecked': ('    if(mapmaker_objects_needed(p->pieces+h->pieces,sub)>MAPMAKER_LIMIT_OBJECTS) over|=MAPMAKER_CAP_OBJECTS;\n', ''),
     'objects-no-reserve': ('    return pieces+sub+MAPMAKER_OBJECTS_RESERVE;', '    return pieces+sub;'),
     # The reserve keeps 64 slots for explosions and debris on top of the characters.
@@ -38,7 +38,8 @@ MUTATIONS = {
                                 '#define MAPMAKER_OBJECTS_RESERVE (MAPMAKER_OBJECTS_CHARACTERS)'),
     'objects-effects-32': ('#define MAPMAKER_OBJECTS_EFFECTS 64u ', '#define MAPMAKER_OBJECTS_EFFECTS 32u '),
     'objects-placed-only': ('mapmaker_objects_needed(p->pieces+h->pieces,sub)', 'mapmaker_objects_needed(p->pieces,sub)'),
-    'objects-stock-pool': ('#define MAPMAKER_LIMIT_OBJECTS 1023u', '#define MAPMAKER_LIMIT_OBJECTS 1000u'),
+    'objects-stock-pool': ('#define MAPMAKER_LIMIT_OBJECTS 2047u', '#define MAPMAKER_LIMIT_OBJECTS 1000u'),
+    'objects-slot22-pool': ('#define MAPMAKER_LIMIT_OBJECTS 2047u', '#define MAPMAKER_LIMIT_OBJECTS 1023u'),
     # Pad groups 1024: 511 pieces at the measured 1.5 groups each fit.
     'groups-round3': ('#define MAPMAKER_LIMIT_GROUPS 1024\n', '#define MAPMAKER_LIMIT_GROUPS 600\n'),
     'groups-unbounded': ('#define MAPMAKER_LIMIT_GROUPS 1024\n', '#define MAPMAKER_LIMIT_GROUPS 2048\n'),
@@ -122,10 +123,10 @@ def reasons_ok(stderr):
     memory = ('[MAPMAKER] placement refused: memory estimate 2052407 of 2048000 at scale 8 '
               '(TSFP_MAPMAKER_ARENA_MB raises it);')
     # memory: refused two frames running, logged once
-    objects = '[MAPMAKER] placement refused: engine objects 1024 of 1023 (pieces + items + 128 reserved);'
-    both = ('[MAPMAKER] placement refused: pieces 1024 of 1023; '
-            'engine objects 1152 of 1023 (pieces + items + 128 reserved);')
-    return objects in lines and both in lines and lines.count(memory) == 1
+    pieces = '[MAPMAKER] placement refused: pieces 1024 of 1023;'
+    both = ('[MAPMAKER] placement refused: pieces 1920 of 1023; '
+            'engine objects 2048 of 2047 (pieces + items + 128 reserved);')
+    return pieces in lines and both in lines and lines.count(memory) == 1
 
 
 def test_stage_a_patch():

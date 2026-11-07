@@ -49,6 +49,11 @@
  *    appends chunks to the arrays with no bound. Chunks past an array's
  *    capacity (and kind-1 ops past 8) are hidden from the loader (tag 0,
  *    which its switch skips) and restored afterwards.
+ *  - pc_mapmaker_editor_compile (WRAP sub_003006C0) and the loader above
+ *    scope pc_mapmaker_editor_top (WRAP sub_002FC3D0): inside a compile or
+ *    load the top of the placed pieces is remembered instead of walking the
+ *    whole list for every piece, item and point (save/load delay on large
+ *    maps); same result and registers, recomputed when the list changes.
  *  - pc_mapmaker_editor_sai_point (WRAP sub_00332330, loader call only):
  *    Story AI points save their piece as one byte, so on maps of more than
  *    256 pieces a point on piece 256+ decoded on the wrong piece, vanished
@@ -79,6 +84,10 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#ifndef MAPMAKER_GUEST_RET
+#define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
+#endif
 
 #define MAPMAKER_EDITOR_SIZE 0x74C00u           /* 0x58390 + 511 x 0xE4, rounded up */
 #define MAPMAKER_EDITOR_SAI 0x58390u            /* 511 x 0xE4 (round 3; was +0x11950, 255) */
@@ -195,7 +204,8 @@ static void mapmaker_hide_run(uint32_t first,uint32_t limit_end,const MapMakerCa
 
 /* ---- editor map loader ------------------------------------------------ */
 int pc_mapmaker_validate_editor_load(uint32_t container,void (*original)(void)); /* pc_mapmaker_validate.inc */
-void pc_mapmaker_editor_load(void (*original)(void))
+static void mapmaker_top_scope(int enter,const char *what);   /* below */
+static void mapmaker_editor_load_run(void (*original)(void))
 {
     uint32_t container=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u;
     if(!container || !guest_writable(container,8) || WORD_AT(container)!=0x00C77667u) {
@@ -205,6 +215,91 @@ void pc_mapmaker_editor_load(void (*original)(void))
     if(!pc_mapmaker_validate_editor_load(container,original)) return; /* refused the stock way */
     mapmaker_hide_run(container+8u,container+MAPMAKER_CONTAINER_LIMIT,mapmaker_editor_caps,
                       MAPMAKER_EDITOR_CAPS,original);
+}
+void pc_mapmaker_editor_load(void (*original)(void))
+{
+    mapmaker_top_scope(1,"load");
+    mapmaker_editor_load_run(original);
+    mapmaker_top_scope(0,"load");
+}
+
+/* ---- save/load delay: the top of the placed pieces -------------------- */
+/* sub_002FC3D0() walks the whole placed list [0x0078400C] (+0x40 links) for
+ * the highest piece top: start -2, or 4 when editor+0x21C is set (then no
+ * walk); per piece (int)(catalogue height [0x0052952C + type x 0x140] - 1 +
+ * z +8). Its callers sub_002FC470 (every piece's connection mask) and
+ * sub_002FC680 call it once per call, and the compile sub_003006C0 asks for
+ * those masks per piece, per item / Story AI point / logic reference
+ * (sub_00331E50 walks the pieces before its target) and per piece again, so a
+ * save or load took about (items + points) x pieces^2 / 2 list steps: ~50 M
+ * at 511 pieces + 384 items. Inside a compile or an editor load (the
+ * loader above; pieces are appended there, sub_00307EF0) the result only
+ * changes when the editor, its flag, the list head or the piece count
+ * [0x00784000] does (sub_00307EF0 appends and counts, sub_00308480 unlinks
+ * and counts down; neither runs a move). So within that scope the first
+ * call walks and later calls with the same key return the same eax, ecx and
+ * edx (the original's only outputs; it writes no memory). Outside the scope
+ * (the editor's 3D view and placement, where pieces move) every call runs the
+ * original. TSFP_MAPMAKER_SAVE_MEMO=0 turns it off. */
+#define MAPMAKER_TOP_PIECES 0x0078400Cu
+#define MAPMAKER_TOP_COUNT 0x00784000u
+#define MAPMAKER_TOP_FLAG 0x21Cu
+static struct {
+    unsigned depth,hits,walks,logged;
+    int valid,off;
+    uint32_t editor,flag,head,count,eax,ecx,edx;
+    clock_t start;
+} mapmaker_top_memo;
+static void mapmaker_top_scope(int enter,const char *what)
+{
+    if(enter) {
+        if(!mapmaker_top_memo.depth++) {
+            const char *v=getenv("TSFP_MAPMAKER_SAVE_MEMO");
+            mapmaker_top_memo.off=v && v[0]=='0';
+            mapmaker_top_memo.valid=0;mapmaker_top_memo.hits=mapmaker_top_memo.walks=0;
+            mapmaker_top_memo.start=clock();
+        }
+        return;
+    }
+    if(!mapmaker_top_memo.depth || --mapmaker_top_memo.depth) return;
+    mapmaker_top_memo.valid=0;
+    if(mapmaker_top_memo.walks+mapmaker_top_memo.hits>=1000u && mapmaker_top_memo.logged++<4u) {
+        fprintf(stderr,"[mapmaker] %s: piece top %s (%u walks, %u remembered), %.0f ms\n",what,
+                mapmaker_top_memo.off?"walked every time (TSFP_MAPMAKER_SAVE_MEMO=0)":"remembered",
+                mapmaker_top_memo.walks,mapmaker_top_memo.hits,
+                (double)(clock()-mapmaker_top_memo.start)*1000.0/CLOCKS_PER_SEC);
+        fflush(stderr);
+    }
+}
+void pc_mapmaker_editor_compile(void (*original)(void))
+{
+    mapmaker_top_scope(1,"save compile");
+    original();
+    mapmaker_top_scope(0,"save compile");
+}
+void pc_mapmaker_editor_top(void (*original)(void))
+{
+    uint32_t editor,flag,head,count;
+    if(!mapmaker_top_memo.depth) { original();return; }
+    editor=WORD_AT(0x007844A8u);
+    if(mapmaker_top_memo.off || !MAPMAKER_PTR_OK(editor+MAPMAKER_TOP_FLAG,4)) {
+        mapmaker_top_memo.valid=0;mapmaker_top_memo.walks++;
+        original();
+        return;
+    }
+    flag=WORD_AT(editor+MAPMAKER_TOP_FLAG);head=WORD_AT(MAPMAKER_TOP_PIECES);count=WORD_AT(MAPMAKER_TOP_COUNT);
+    if(mapmaker_top_memo.valid && mapmaker_top_memo.editor==editor && mapmaker_top_memo.flag==flag &&
+       mapmaker_top_memo.head==head && mapmaker_top_memo.count==count) {
+        g_eax=mapmaker_top_memo.eax;g_ecx=mapmaker_top_memo.ecx;g_edx=mapmaker_top_memo.edx;
+        mapmaker_top_memo.hits++;
+        MAPMAKER_GUEST_RET();
+        return;
+    }
+    original();
+    mapmaker_top_memo.walks++;
+    mapmaker_top_memo.editor=editor;mapmaker_top_memo.flag=flag;mapmaker_top_memo.head=head;
+    mapmaker_top_memo.count=count;mapmaker_top_memo.eax=g_eax;mapmaker_top_memo.ecx=g_ecx;
+    mapmaker_top_memo.edx=g_edx;mapmaker_top_memo.valid=1;
 }
 
 /* ---- Story AI points on pieces past 255 (editor loader) --------------- */

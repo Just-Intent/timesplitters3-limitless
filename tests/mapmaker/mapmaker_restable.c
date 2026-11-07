@@ -353,7 +353,7 @@ int main(void)
         char want[15][32],text[64];
         snprintf(want[0],32," 90/1023");
         snprintf(want[1],32," %u/500",(unsigned)items);
-        snprintf(want[2],32," %u/1023",(unsigned)(90u+items+128u));
+        snprintf(want[2],32," %u/2047",(unsigned)(90u+items+128u));
         snprintf(want[3],32," 40/768");            /* weapons + keycards + health */
         snprintf(want[4],32," 900/7680");
         snprintf(want[5],32," 810/9984");
@@ -479,18 +479,19 @@ int main(void)
     WORD_AT(0x00529404u+0x280u)=9;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     /* Pieces: 1023 placed + 1 held refused (template links 0 so only the
-     * pieces and the engine objects pass), the row at 1023/1023 red. */
+     * pieces pass; the 2047-slot object pool keeps room), the row at
+     * 1023/1023 red, objects 1156/2047 (1023 + 5 free objects + 128) not. */
     WORD_AT(0x00529408u+0x280u)=0;
     WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,1023);
     pc_display_mapmaker_limits(fake_limits);
-    CHECK(mapmaker_limits_view.over==(MAPMAKER_CAP_PIECES|MAPMAKER_CAP_OBJECTS));
+    CHECK(mapmaker_limits_view.over==MAPMAKER_CAP_PIECES);
     draw();
     CHECK(colour_of(" 1023/1023")==MAPMAKER_TABLE_FULL);
-    CHECK(colour_of(" 1156/1023")==MAPMAKER_TABLE_FULL);          /* 1023 + 5 free objects + 128 */
-    /* Collapsed, the fullest row by ratio among the red ones: objects 1156/1023 over tiles 1023/1023. */
+    CHECK(colour_of(" 1156/2047")==MAPMAKER_TABLE_OK);
+    /* Collapsed: the only red row. */
     mapmaker_table.expanded=0;
     draw();
-    CHECK(drawn("+ Fullest: Objects 1156/1023")==0 && draws[0].colour==MAPMAKER_TABLE_FULL);
+    CHECK(drawn("+ Fullest: Tiles 1023/1023")==0 && draws[0].colour==MAPMAKER_TABLE_FULL);
     mapmaker_table.expanded=1;
     WORD_AT(0x00529408u+0x280u)=20;
     /* Engine objects: pieces + items + 128 reserved (64 characters, 64 for effects), as the check. */
@@ -499,13 +500,13 @@ int main(void)
     WORD_AT(ED+0x2f7c)=0;
     pc_display_mapmaker_limits(fake_limits);
     draw();
-    CHECK(drawn(" 968/1023")>=0);
+    CHECK(drawn(" 968/2047")>=0);
     CHECK(colour_of(" 500/500")==MAPMAKER_TABLE_FULL);
-    CHECK(colour_of(" 968/1023")==MAPMAKER_TABLE_NEAR);
+    CHECK(colour_of(" 968/2047")==MAPMAKER_TABLE_OK);
     /* Collapsed with no red row: the fullest amber row by ratio, items 92% over
-     * groups 90.8% and objects 90.7% (listed before items would win a tie). */
+     * groups 90.8% (objects 45%). */
     mapmaker_table.expanded=0;
-    WORD_AT(ED+0x306c)=460u<<16;                                  /* items 460/500, objects 928/1023 */
+    WORD_AT(ED+0x306c)=460u<<16;                                  /* items 460/500, objects 928/2047 */
     WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,340);
     WORD_AT(0x00762CB8u)=930;                                     /* groups 930/1024 */
     pc_display_mapmaker_limits(fake_limits);
@@ -516,7 +517,7 @@ int main(void)
     pc_display_mapmaker_limits(fake_limits);
     draw();
     CHECK(drawn("+ Fullest: Groups 950/1024")==0);
-    WORD_AT(ED+0x306c)=420u<<16;WORD_AT(0x00762CB8u)=930;        /* items 84%, objects 86.8% (ok) */
+    WORD_AT(ED+0x306c)=420u<<16;WORD_AT(0x00762CB8u)=930;        /* items 84%, objects 43% (ok) */
     pc_display_mapmaker_limits(fake_limits);
     draw();
     CHECK(drawn("+ Fullest: Groups 930/1024")==0);

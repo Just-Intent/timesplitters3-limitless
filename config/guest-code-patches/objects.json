@@ -144,7 +144,7 @@
       "old": "0x007161C8",
       "size": "0xC8",
       "new": "0x008AC000",
-      "new_size": "0xFFC",
+      "new_size": "0x1FFC",
       "sites": {
         "0x000A4CF0": "offset",
         "0x000A5D81": "offset",
@@ -163,15 +163,15 @@
         "0x000A5CB1": "keep"
       },
       "data_ok": [],
-      "reason": "sub_000A5CE0 slot-8 list (count [0x007B4FA8]) 50 -> 1023 entries (the engine object pool); 0x00716290 is a separate list head"
+      "reason": "sub_000A5CE0 slot-8 list (count [0x007B4FA8]) 50 -> 2047 entries (the engine object pool, handles slot << 21: handles.json); 0x00716290 is a separate list head"
     },
     {
       "id": "obj-list0-relocate",
       "kind": "relocate",
       "old": "0x007B4FC0",
       "size": "0x1BC",
-      "new": "0x008AD000",
-      "new_size": "0xFFC",
+      "new": "0x008AE000",
+      "new_size": "0x1FFC",
       "sites": {
         "0x000A0EC0": "offset",
         "0x000A5B4E": "offset",
@@ -187,7 +187,7 @@
         "0x000A71A5": "offset"
       },
       "data_ok": [],
-      "reason": "sub_000A5CE0 slot-0 list (count [0x007B6258]) 112 -> 1023 entries (the engine object pool); declared 4 bytes short: 0x007B5180 after it is the per-id drawn flag table that rooms.json relocates"
+      "reason": "sub_000A5CE0 slot-0 list (count [0x007B6258]) 112 -> 2047 entries (the engine object pool, handles slot << 21: handles.json); declared 4 bytes short: 0x007B5180 after it is the per-id drawn flag table that rooms.json relocates"
     },
     {
       "id": "obj-list0-clear",
@@ -195,8 +195,8 @@
       "function": "0x000A5AF0",
       "address": "0x000A5B49",
       "original_hex": "b970000000",
-      "new_hex": "b9ff030000",
-      "reason": "clear the relocated slot-0 list: 112 -> 1023 dwords"
+      "new_hex": "b9ff070000",
+      "reason": "clear the relocated slot-0 list: 112 -> 2047 dwords"
     },
     {
       "id": "obj-bucket-bytes",
@@ -204,8 +204,8 @@
       "function": "0x000A5C00",
       "address": "0x000A5C44",
       "original_hex": "6840530000",
-      "new_hex": "6880a60000",
-      "reason": "room bucket buffer [0x00715FB4] 0x5340 -> 0xA680 B (Level heap, every scene)"
+      "new_hex": "68004d0100",
+      "reason": "room bucket buffer [0x00715FB4] 0x5340 -> 0x14D00 B (Level heap, every scene; 4x stock for the 2047-slot pool)"
     },
     {
       "id": "obj-bucket-bound",
@@ -213,8 +213,8 @@
       "function": "0x0009E430",
       "address": "0x0009E46B",
       "original_hex": "3dcd140000",
-      "new_hex": "3d9d290000",
-      "reason": "room bucket bound 0x14CD -> 0x299D dwords (buffer/4 - 3, as stock)"
+      "new_hex": "3d3d530000",
+      "reason": "room bucket bound 0x14CD -> 0x533D dwords (buffer/4 - 3, as stock)"
     },
     {
       "id": "obj-tag-links-relocate",
@@ -336,8 +336,8 @@
       "function": "0x000A92A0",
       "address": "0x000A92C0",
       "original_hex": "68f0000000",
-      "new_hex": "6800200000",
-      "reason": "class-0x80 prop block pointers [0x0072F728] 60 -> 2048 x 4 B (Level heap, every scene): sub_000AC940 indexes it with the never-bounded count [0x007327A8] of placed (non-flag-8) props, so prop 61 read past the table and took a foreign pointer as its 0x160-byte block (release sub_000A92F0 then freed garbage effect handles)"
+      "new_hex": "6800400000",
+      "reason": "class-0x80 prop block pointers [0x0072F728] 60 -> 4096 x 4 B (Level heap, every scene; two per slot of the 2047-slot pool): sub_000AC940 indexes it with the never-bounded count [0x007327A8] of placed (non-flag-8) props, so prop 61 read past the table and took a foreign pointer as its 0x160-byte block (release sub_000A92F0 then freed garbage effect handles)"
     },
     {
       "id": "obj-propblocks-clear",
@@ -345,8 +345,8 @@
       "function": "0x000A92A0",
       "address": "0x000A92DA",
       "original_hex": "b93c000000",
-      "new_hex": "b900080000",
-      "reason": "prop block pointer clear: 2048 dwords (rep stosd)"
+      "new_hex": "b900100000",
+      "reason": "prop block pointer clear: 4096 dwords (rep stosd)"
     }
   ]
 }

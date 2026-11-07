@@ -34,7 +34,8 @@ static inline int pc_vehicle_gun(uintptr_t p,ptrdiff_t offset,PcGuestRegion *reg
     table=pc_mounted_read(0x0072f5e8,offset,4,region);
     if(!extra || !table)return 0;
     handle=*(const uint32_t*)(extra+0xc08);table_address=*(const uint32_t*)table;
-    uint64_t address=(uint64_t)table_address+(uint64_t)(handle>>22)*0x2e8;
+    /* Limitless: handles are slot << 21 (config/guest-code-patches/handles.json). */
+    uint64_t address=(uint64_t)table_address+(uint64_t)(handle>>21)*0x2e8;
     if(!handle || !table_address || address>UINT32_MAX)return 0;
     vehicle=pc_mounted_read((uint32_t)address,offset,0x80,region);
     if(!vehicle || *(const uint32_t*)(vehicle+0x2c)!=handle)return 0;
