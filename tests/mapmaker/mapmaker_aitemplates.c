@@ -652,6 +652,10 @@ int main(void)
         }
         nseen=0;HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[0]);    /* once only */
         CHECK(nseen==0);
+        /* all killed, nobody spotted (gone from the list): no sighting trigger */
+        WORD_AT(0x0074C37Cu)=1u;WORD_AT(t+0x14u)=R+1u;WORD_AT(t+0x18u)=3u;nseen=0;
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(g_eax==0 && WORD_AT(t+0x18u)==3u && nseen==0);
         /* spotted: boss classes never set state 4; far away nothing, near: all four */
         make_level(8,g4,0xFu);
         for(k=0;k<4;k++) ents[k]=make_actor(k,k,1);
@@ -718,8 +722,8 @@ int main(void)
         HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[3]);
         CHECK(nseen==0);
         /* a stock-class AI removed without an event (a placeholder, a respawn): none */
-        nseen=0;FLOAT_AT(ents[1]+0x1CCu)=0.0f;
-        HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[1]);
+        ents[5]=make_actor(5,5,0);nseen=0;FLOAT_AT(ents[5]+0x1CCu)=0.0f;
+        HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[5]);
         CHECK(nseen==0);
         /* an unplaced member (no spawn record) never blocks the group */
         make_level(8,g4,0x7u);
@@ -751,6 +755,11 @@ int main(void)
         CHECK(nseen==1 && seen[0]==R+7u);
         FLOAT_AT(ents[5]+0x1CCu)=0.0f;nseen=0;
         HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[5]);          /* a loose boss: its own killed */
+        CHECK(nseen==1 && seen[0]==R+6u);
+        /* a boss-class AI that died the stock way (event first): its removal adds none */
+        ents[5]=make_actor(5,5,1);list_actors(ents,8);FLOAT_AT(ents[5]+0x1CCu)=0.0f;nseen=0;
+        HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[5]);
+        HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[5]);
         CHECK(nseen==1 && seen[0]==R+6u);
         /* spotted, mixed: group 3 stock; one member killed first does not block */
         WORD_AT(t+0x14u)=R+4u;WORD_AT(t+0x18u)=3u;now=200u;WORD_AT(0x007DE318u)=now;
