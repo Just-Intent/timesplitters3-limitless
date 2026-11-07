@@ -12,7 +12,7 @@ Guest storage: [allocation](independent.md#guest-allocation-ownership), [threads
 
 Image/state/ABI: [image](independent.md#native-image-loading), [execution](independent.md#guest-state-and-abi-reports).
 
-Procedural wind: [ownership/time scopes](native-wind.md); MM chain/memory: [limitless](limitless.md). Boss/door/aim/anim/restart heap/view/sand: same
+Procedural wind: [ownership/time scopes](native-wind.md); MM chain/memory: [limitless](limitless.md). Boss/doors/hold/aim/anim/restart heap/view/sand: same
 
 Local completed aim/animation diagnostics: [scope and limits](native-local-trace.md).
 

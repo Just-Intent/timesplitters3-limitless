@@ -107,7 +107,8 @@ static void inner(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,u
 /* The robot's code: records the state pointer and statics it sees, counts its
  * statics up (1, 2, 3), and may reach another robot's code or fire event 2. */
 static uint32_t seen_state, seen_stat[3], seen_after[4];
-static uint32_t nest_ent, inner_state, inner_stat[3];
+static uint32_t nest_ent, inner_state, inner_stat[3], seen_room;
+static float seen_x;
 static int dies_now;
 static void fake_inner(void)
 {
@@ -121,6 +122,7 @@ static void fake_robot(void)
     int i;
     originals++;
     seen_state=WORD_AT(0x0078B1DCu);
+    seen_x=FLOAT_AT(WORD_AT(g_esp+4u)+0x64u);seen_room=WORD_AT(WORD_AT(g_esp+4u)+0x34u);   /* where the AI finds it */
     for(i=0;i<3;i++) { seen_stat[i]=WORD_AT(STAT+(uint32_t)i*4u);WORD_AT(STAT+(uint32_t)i*4u)+=(uint32_t)i+1u; }
     if(nest_ent) {
         inner(pc_mapmaker_robot_message,fake_inner,0x0029400Au,nest_ent,7u,__LINE__);
@@ -409,6 +411,179 @@ static void one_floor_door(void)
     SETF(ENT(3)+0x1ACu,2.0f);SETF(ENT(3)+0x1C4u,2.0f);
     goal_at(0,3,1,__LINE__);
     CHECK(seen_goal==3u);
+}
+/* v0.4.0-mapmaker.44 report: "still walks through openings only one floor
+ * tall" (every MapMaker tile side is a portal of one floor, 5.00 in the
+ * user's .43 log). Two columns of three stacked one-floor tiles: rooms 1/3/5
+ * (x 0..5) and 2/4/6 (x 5..10), joined at x = 5 by one portal per floor
+ * ('floors' of them: bottom 0..5, then 5..10, 10..15, or only the top one
+ * when floors < 0), each column's floors open between its rooms unless
+ * 'slab'. 'plane': the upper portals lie elsewhere (1: z 20..30 of that wall,
+ * 2: across the room). 'same': the upper portals join rooms 1-2 too (one tall
+ * room each side; 2: on the left only). Pads 0, 1 in room 1, 2, 3 in room 2; links 0-1, 1-2 (the
+ * doorway), 2-3. */
+static uint32_t sp_rooms[16][2], sp_n;
+static void wall_y(uint32_t id,uint32_t ra,uint32_t rb,float x0,float z0,float x1,float z1,float bottom,float top)
+{
+    uint32_t pt=MPORT+id*0x100u;
+    portal(id,ra,rb,x0,z0,x1,z1,top);
+    SETF(pt+0x1Cu,bottom);SETF(pt+0x40u,bottom);
+    sp_rooms[id][0]=ra;sp_rooms[id][1]=rb;if(id+1u>sp_n) sp_n=id+1u;
+}
+static void floor_at(uint32_t id,uint32_t ra,uint32_t rb,float x0,float x1,float y)
+{
+    uint32_t pt=MPORT+id*0x100u;
+    portal(id,ra,rb,x0,0.0f,x1,10.0f,y);
+    SETF(pt+0x1Cu,y);SETF(pt+0x40u,y);
+    SETF(pt+0x2Cu,10.0f);SETF(pt+0x38u,0.0f);                 /* a rectangle at height y */
+    sp_rooms[id][0]=ra;sp_rooms[id][1]=rb;if(id+1u>sp_n) sp_n=id+1u;
+}
+static void stacked_map(int floors,int slab,int plane,int same)
+{
+    static const float xz[4][2]={{0,5},{2,5},{8,5},{10,5}};
+    static const int16_t rooms[4]={1,1,2,2};
+    static const uint32_t links[3][2]={{0,1},{1,2},{2,3}};
+    uint32_t k,r,i,n;
+    memset((void *)((uintptr_t)MPADS+g_xbox_mem_offset),0,0x10000u);
+    memset(sp_rooms,0,sizeof sp_rooms);sp_n=0;
+    WORD_AT(0x00715F2Cu)=MPADS;WORD_AT(0x007B6664u)=4u;
+    for(k=0;k<4u;k++) {
+        uint32_t pd=MPADS+k*0x20u;
+        WORD_AT(pd)=0x3E9u+k;BYTE_AT(pd+4u)=1u;HALF_AT(pd+0xAu)=(uint16_t)rooms[k];
+        SETF(pd+0xCu,xz[k][0]);SETF(pd+0x10u,0.0f);SETF(pd+0x14u,xz[k][1]);
+    }
+    WORD_AT(0x00715F30u)=MLINKS;WORD_AT(0x007B6660u)=3u;
+    for(k=0;k<3u;k++) { WORD_AT(MLINKS+k*0x14u)=0x10010u;WORD_AT(MLINKS+k*0x14u+4u)=links[k][0];WORD_AT(MLINKS+k*0x14u+8u)=links[k][1]; }
+    WORD_AT(0x007B975Cu)=6u;WORD_AT(0x00708788u)=MRECS;WORD_AT(0x0070878Cu)=MPTRS;
+    for(k=0;k<16u;k++) WORD_AT(MPTRS+k*4u)=0;
+    wall_y(0,1,2,5.0f,0.0f,5.0f,10.0f,0.0f,5.0f);
+    for(k=1;k<=2u;k++) {
+        uint32_t a=same?1u:1u+2u*k,b=same==1?2u:2u+2u*k;
+        if(!(floors<0 ? k==2u : (int)k<floors)) continue;
+        if(plane==1) wall_y(k,a,b,5.0f,20.0f,5.0f,30.0f,5.0f*(float)k,5.0f*(float)k+5.0f);
+        else if(plane==2) wall_y(k,a,b,0.0f,10.0f,5.0f,10.0f,5.0f*(float)k,5.0f*(float)k+5.0f);
+        else wall_y(k,a,b,5.0f,0.0f,5.0f,10.0f,5.0f*(float)k,5.0f*(float)k+5.0f);
+    }
+    if(!slab) {
+        if(!same) { floor_at(3,1,3,0.0f,5.0f,5.0f);floor_at(5,3,5,0.0f,5.0f,10.0f); }
+        floor_at(4,2,4,5.0f,10.0f,5.0f);floor_at(6,4,6,5.0f,10.0f,10.0f);
+    }
+    WORD_AT(0x007B9754u)=6u;
+    for(r=1;r<=6u;r++) {
+        WORD_AT(MRECS+r*0xB4u+4u)=MLISTS+r*0x40u;
+        for(i=sp_n,n=0;i-->0;) if(WORD_AT(MPTRS+i*4u) && (sp_rooms[i][0]==r || sp_rooms[i][1]==r)) WORD_AT(MLISTS+r*0x40u+4u+4u*n++)=i;
+        WORD_AT(MLISTS+r*0x40u)=n;
+    }
+}
+static void stacked_level(int floors,int slab,int plane,int same)
+{
+    stacked_map(floors,slab,plane,same);
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,8.01f);SETF(ENT(3)+0x1C4u,6.5f);       /* 14.51, the user's log */
+}
+static void stacked_floors(void)
+{
+    /* three open floors: 15, the robot fits through, every link stock */
+    stacked_level(3,0,0,0);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==3u && rbt_walk[0].reached==4u && !rbt_walk[0].blocked && link_open(1,2)==15.0f && rbt_nav.stacked==1u);
+    CHECK(rbt_stacked(3)==RBT_OPEN && rbt_stacked(0)==15.0f);  /* a floor portal is no doorway; cached */
+    /* one floor (the .43 log): 5, closed; it waits at the doorway */
+    stacked_level(1,0,0,0);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==1u && rbt_walk[0].reached==2u && link_open(1,2)==5.0f);
+    /* two floors: 10, still lower than it */
+    stacked_level(2,0,0,0);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==1u && link_open(1,2)==10.0f);
+    /* three doors, but floor slabs between them (no open floor) */
+    stacked_level(3,1,0,0);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==1u && link_open(1,2)==5.0f && !rbt_nav.stacked);
+    /* the floor above it closed (no second door), the third open: no gap jumped */
+    stacked_level(-1,0,0,0);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==1u && link_open(1,2)==5.0f);
+    /* the upper openings elsewhere on that wall, or on another wall */
+    stacked_level(3,0,1,0);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==1u && link_open(1,2)==5.0f);
+    stacked_level(3,0,2,0);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==1u && link_open(1,2)==5.0f);
+    /* one tall room on each side, a portal per floor between the same rooms */
+    stacked_level(3,1,0,1);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==3u && link_open(1,2)==15.0f);
+    stacked_level(3,0,0,2);                                   /* one tall room on one side only */
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==3u && link_open(1,2)==15.0f);
+    stacked_level(3,1,0,2);                                   /* ... and slabs on the other: closed */
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==1u && link_open(1,2)==5.0f);
+    stacked_level(-1,1,0,1);                                  /* a wall between its doors: no gap jumped */
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==1u && link_open(1,2)==5.0f);
+}
+/* The robot moved by its animation (sub_0015F0D0) through the one-floor
+ * doorway: put back before its AI runs; through three open floors: kept. */
+static void place(uint32_t ent,float x,uint32_t room) { SETF(ent+0x64u,x);SETF(ent+0x68u,0.0f);SETF(ent+0x6Cu,5.0f);WORD_AT(ent+0x34u)=room; }
+static void tick(uint32_t ent,int line) { call(pc_mapmaker_robot_handler,fake_robot,0x0027DE1Du,ent,0,0,1,line); }
+/* in room 1 at x 3, wherever it was (a jump there first) */
+static void in_room1(int line) { place(ENT(3),-20.0f,1u);tick(ENT(3),line);place(ENT(3),3.0f,1u);tick(ENT(3),line); }
+static void hold(void)
+{
+    nest_ent=0;dies_now=0;
+    stacked_level(1,0,0,0);
+    place(ENT(3),2.0f,1u);tick(ENT(3),__LINE__);
+    place(ENT(3),3.0f,1u);tick(ENT(3),__LINE__);
+    CHECK(seen_x==3.0f && FLOAT_AT(ENT(3)+0x64u)==3.0f);       /* inside its room: free */
+    place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==3.0f && FLOAT_AT(ENT(3)+0x6Cu)==5.0f && WORD_AT(ENT(3)+0x34u)==1u);
+    CHECK(seen_x==3.0f && seen_room==1u && rbt_walk[0].holds==1u);   /* its AI sees it back */
+    place(ENT(3),7.0f,2u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==3.0f && rbt_walk[0].holds==2u);
+    place(ENT(3),40.0f,2u);tick(ENT(3),__LINE__);              /* a teleport: kept */
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==40.0f && WORD_AT(ENT(3)+0x34u)==2u);
+    place(ENT(3),3.0f,0u);tick(ENT(3),__LINE__);               /* no room: left alone */
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==3.0f && rbt_walk[0].hold_room==2u);
+    /* the restart puts it back at its spawn: no previous position */
+    in_room1(__LINE__);
+    CALL(pc_mapmaker_robot_reset,fake,0x0015E7B6u,0,0,0,1);
+    place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f);
+    /* respawned (the same record again): likewise */
+    in_room1(__LINE__);
+    call(pc_mapmaker_robot_ai_start,fake_ai,0x0015F981u,A(3),0,0,1,__LINE__);
+    place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f);
+    /* removed: not held; another entity, mission 10: untouched */
+    in_room1(__LINE__);
+    rbt_inst[0].removed=1;
+    place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f);
+    rbt_inst[0].removed=0;
+    actor(9,0x0C,0x400,9);
+    place(ENT(9),3.0f,1u);tick(ENT(9),__LINE__);
+    place(ENT(9),6.0f,2u);tick(ENT(9),__LINE__);
+    CHECK(FLOAT_AT(ENT(9)+0x64u)==6.0f);
+    stacked_level(1,0,0,0);
+    place(ENT(3),3.0f,1u);tick(ENT(3),__LINE__);
+    WORD_AT(0x0079094Cu)=14u;
+    place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f);
+    play_scene();
+    /* three open floors: through */
+    stacked_level(3,0,0,0);
+    place(ENT(3),3.0f,1u);tick(ENT(3),__LINE__);
+    place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f && rbt_walk[0].hold_room==2u && !rbt_walk[0].holds);
+    /* a robot of one floor: through the one-floor doorway */
+    stacked_level(1,0,0,0);
+    SETF(ENT(3)+0x1ACu,2.0f);SETF(ENT(3)+0x1C4u,2.0f);
+    place(ENT(3),3.0f,1u);tick(ENT(3),__LINE__);
+    place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f);
 }
 static void statics(uint32_t a,uint32_t b,uint32_t c) { WORD_AT(STAT)=a;WORD_AT(STAT+4u)=b;WORD_AT(STAT+8u)=c; }
 #define STATICS_ARE(a,b,c) (WORD_AT(STAT)==(a) && WORD_AT(STAT+4u)==(b) && WORD_AT(STAT+8u)==(c))
@@ -716,6 +891,8 @@ int main(void)
 
     low_door();
     one_floor_door();
+    stacked_floors();
+    hold();
 
     if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }
     printf("mapmaker robot ok\n");
