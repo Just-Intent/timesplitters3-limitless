@@ -142,13 +142,16 @@ play out`, `split Crowe defeated: removed (frames, live particles)`,
 `split Crowe N fight state A -> B: cell r,c, player cell r,c, target r,c at
 (x, z), direction d, beam b, at (x, z), eggs skipped n (m blocking)`, the
 same with `still: state` every 600 calls, `walk blocked; ended where it
-stands, the cells ahead blocked` / `walk too long; ...`, and `split Crowe N
-arena: n of 35 cells in no room at its height, d over a drop or ledge, g gaps
-between cells (blocked)`; once per boss
-`player outside a split Crowe's arena: its nearest cell stands in` and
-(should not appear) `start cell is in no room: arena cells not checked` or
-`start cell has no floor at its height: floor probe not used`. The
-budget of the other lines (24) is per level.
+stands, the cells ahead blocked` / `walk too long; ...` / `ledge ahead;
+walk ended where it stands` / `no room ahead; walk ended where it stands`,
+`split Crowe N reference floor F (...)`, and `split Crowe N arena: n of 35
+cells in no room at its height (blocked while others are free)`; at each
+change `split Crowe N at cell r,c, player cell r,c: the cells in no room
+leave it no walk; not blocked (the walk looks ahead)` / `... cells in no room
+blocked again` (8 per boss); once per boss `player outside a split Crowe's
+arena: its nearest cell stands in` and (should not appear) `start cell is in
+no room: arena cells not checked`. The budget of the other lines (24) is per
+level.
 
 ## Risks (INFERRED, need a playtest)
 
@@ -539,10 +542,62 @@ reference floor: no height check (logged). New line per Crowe:
 `split Crowe N reference floor F (spawn height Y, under the spawn | found
 above the spawn)` or `reference floor none (...)`. Tests:
 `reference_floor()` (spawn -9.49 under a 0.5 floor with a lower one at -20
-and a drop: the drop blocks, nothing else; seams missed by the finder: no
-gap, nothing blocked; a spawn 0.01 over its floor whose plane gives the
-floor below; no answer under a cell: not blocked), mutations `ref-*`,
-`gap-at-seam`, `gap-one-sample`, `ledge-no-lift`, `ledge-unseen-blocks`.
+and a drop; a spawn 0.01 over its floor whose plane gives the floor below;
+no answer ahead), mutations `ref-*`, `ledge-no-lift`.
+
+### No walk at all (the v0.4.0-mapmaker.43 playtest)
+
+User report: the split Crowes no longer move at all (they walked in .35,
+sometimes into walls or off ledges). Log `m43b.err` (.43): reference floor
+0.50 for every Crowe (right), `5 of 35 cells in no room at its height, 15
+over a drop or ledge` (15/5, 7/7), cells over `a floor at -4.50` blocked, and
+each fight looping `4 -> 5 -> 10 -> 4` with direction -1, never `5 -> 9`.
+
+Cause (CONFIRMED, decode of `sub_002A9E60` 0x002A9E60..0x002AA1F0 and the
+log): state 5's picker takes, with its last argument 0, the first cell of
+the 5 x 5 window round the player's cell (rows p-2..p+2, all five when that
+leaves the grid; columns p-2..p+2, 0..4 below it, 2..6 past it) that is in
+line with the boss (same row or column), not next to it or on it, not type
+1 (+0x20) and not blocked (+0x24). With none it tries up to 25 random
+cells of the window, free but not in line: a cell in line, the boss's own
+included, gives direction -1 (0x002AA0C3..0x002AA1C2: the move is along the
+smaller offset), so state 10 drops the egg there and goes back to 4: the
+log's targets 2,3 / 2,4 / 2,5 with direction -1. The mission 10 arena (5 x 7
+cells about 6 x 8 units) is larger than many maps and MapMaker floors are 5
+apart, so in a map with two floors most cells are over the lower floor and
+the .41-.43 floor probe blocked them (and their shadows): no candidate left.
+
+Fix (no new wrapper):
+- **No static ledge blocking**: `crw_rooms` keeps only the room query (cells
+  in no room at the boss's height) and the reference floor; no floor probe
+  per cell or between cells (no gaps).
+- **Not starved**: `pc_mapmaker_crowe_cells` blocks the off cells and their
+  shadows only while `crw_pickable` (the picker's window and rules above)
+  still finds a cell; otherwise only the eggs and stopped walks block, for
+  that lookup (logged at each change, 8 per boss). When those alone leave
+  nothing the off cells stay blocked too (unblocking would not help).
+- **The walk looks ahead** (`crw_ahead`, every state 9 call): the room query
+  2 units ahead in its direction (+0x1D24: 0 z+, 1 x-, 2 z-, 3 x+) at the
+  room query's height (only when the start cell's query was trusted), then
+  the floor finder there from the reference floor (only with one): no room,
+  or a floor more than 2 below the reference, ends the walk where it stands
+  as a stalled walk does (`crw_stop`: walk-to-stand anim, the walk's next
+  state, the cells ahead blocked for 1800 calls), so the next pick goes
+  another way. No floor answer is not a ledge (tile seams, .42); a floor
+  higher or a small step is not one either (walls: the stall rule). Both
+  probes sit on the guest stack below esp; the finder's three globals are
+  put back.
+- INFERRED: the probe sees only the line ahead of the boss's centre; a
+  ledge beside its path, or a hole narrower than the probe's step between
+  two frames, is not seen. Not playtested.
+
+Tests: `ledges()` (no cell blocked over the lower floor; the walk on until
+2 ahead is 5 lower, in each direction; a raised block, a step, no answer
+and the lower floor's side not ledges; rooms ending ahead; no reference
+floor: no floor probe; untrusted start: no room probe; the m43b layout
+blocked while 0,4/4,4/2,6 are free; every pickable cell off: none blocked;
+eggs/walls still block; walls alone starving: off cells kept), mutations
+`ahead-*`, `starve-*`, `pick-*`.
 
 ## Restart from the pause menu
 
@@ -676,8 +731,11 @@ needs none of it):
    Crowe's arena` when you are away, `walk blocked; ended where it stands`
    instead of `put on its target`; after one, the next walk goes another way
    (`5 -> 6` with another direction).
-9. v0.4.0-mapmaker.40 ledges: a Split Crowe on a raised platform or a
-   balcony over a lower floor (same tile and a tile below), with a narrow
-   gap in the floor near it; it never walks off the edge or across the gap.
-   `arena: n of 35 cells in no room at its height, d over a drop or ledge, g
-   gaps between cells` once per Crowe, d > 0 near the edge.
+9. v0.4.0-mapmaker.40/.43 ledges: a Split Crowe on a raised platform or a
+   balcony over a lower floor (same tile and a tile below) and one on a big
+   flat floor of a map with two floors. Both walk (`fight state 5 -> 9`
+   within a few seconds of the fight starting); the one on the balcony stops
+   at its edge (`ledge ahead; walk ended where it stands`) and walks another
+   way next, never off the edge. Report any walk that still leaves a floor
+   or drops through a hole (the probe looks 2 units ahead along its
+   direction only).
