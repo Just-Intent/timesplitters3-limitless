@@ -245,9 +245,9 @@ int main(void)
     m=def();m.tileset=3;m.flags=0x80000000u;level(&m);              /* play: marker left as it is */
     m=def();m.title=0xE0;level(&m);
     CHECK(tag_hidden(chunk_of[0])==1 && tag_hidden(chunk_of[1])==1); /* header and its pieces */
-    m=def();m.header_pieces=513;m.pieces=513;m.items=0;level(&m);
+    m=def();m.header_pieces=1025;m.pieces=1025;m.items=0;level(&m);
     CHECK(tag_hidden(chunk_of[0])==1 && tag_hidden(chunk_of[1])==1 && tag_hidden(chunk_of[2])==0);
-    m=def();m.header_pieces=512;m.pieces=512;m.items=0;level(&m);
+    m=def();m.header_pieces=1024;m.pieces=1024;m.items=0;level(&m);
     CHECK(hidden_seen==1);
     m=def();m.bad_tile=45;level(&m);
     CHECK(tag_hidden(chunk_of[0])==0 && tag_hidden(chunk_of[1])==1 && hidden_seen==2);

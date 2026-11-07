@@ -48,7 +48,7 @@
 
 #define OPENVIEW_SCENE 0x0079094Cu
 #define OPENVIEW_PLAY 100u
-#define OPENVIEW_VIEW 0x007B0CC0u        /* current view (0xFFC struct, 0x3000 apart with its shadow) */
+#define OPENVIEW_VIEW 0x007B0CC0u        /* current view (0xFFC struct, 0x5000 apart with its shadow) */
 #define OPENVIEW_ROOM_COUNT 0x007B975Cu  /* rooms 1..n */
 #define OPENVIEW_PORTAL_COUNT 0x007B9754u /* portal ids 0..n (sub_00088430 0x000884E4) */
 #define OPENVIEW_RECORDS 0x00708788u     /* room r: + r*0xB4, +4 -> {count, ids} */
