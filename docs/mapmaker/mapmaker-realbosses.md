@@ -2,7 +2,7 @@
 
 Status: implemented in `src/interface/pc_mapmaker_realbosses.inc` (area
 `realbosses`), fixture-tested (`tests/mapmaker/test_mapmaker_realbosses.py`:
-130 mutations, plus decode and US XBE data checks of every site below). The
+about 150 mutations, plus decode and US XBE data checks of every site below). The
 creature was played in v0.4.0-mapmaker.5 (user: working), the giant skeleton
 in v0.4.0-mapmaker.13 (user: working; its death fix is in .15); the Crow
 walker ([below](#the-crow-walker-story-mission-13)) is not played yet. No guest-code table entry. Switch: `TSFP_MAPMAKER_LIMITS=1`;
@@ -33,6 +33,36 @@ holder itself needs nothing: it holds no instance between calls. Fixture
 case (three skeletons, two walkers, one late each), `restart-*` mutations.
 Playtest: restart a map with skeletons and walkers after a fight: each rises
 and fights again, walkers deploy their guns again.
+
+**Superseded after v0.4.0-mapmaker.40: the restart frees the level heap.**
+User report (.40): four giant skeletons "not spawning correctly and kind of
+flickering in and out" after a story restart; `m40b.err` shows the restart
+line `(0x4, 0x0)`, three floor/fire lines and then no throw for about 16000
+frames (the run before threw within seconds). CONFIRMED (decode and US XBE
+jump table 0x0003E810): the restart's first call `sub_0003E740(3)`
+(0x001CDD62) reaches 0x0003E7C7 -> `sub_0003E240`, which sets the level
+heap's top `[0x006B8388]` back to its base `[0x006B8380]`. Every
+`sub_0003DFA0(n, 1)` block (the skeleton state 0x4C7C, its particle block
+0x7D00, the walker's blocks) is free again and reused by what the restart
+allocates next; the split Crowe area already forgot its blocks for this
+reason. The "kept blocks" restart above ran the stock reset on that freed
+memory and fought on it.
+
+Fix (`pc_mapmaker_realbosses_restart`, after the original, scene 100): every
+instance, late ones included (at most 4 each), is cleared except its spawn
+record and gets new blocks as at level init (`rbs_skel_alloc` /
+`rbs_walk_alloc`: from the level's statics `rbs_fx_base`, stock
+`sub_00287E00` / `sub_002976F0`, which end with the stock resets). A holder
+left on one of our copies is dropped first (`mapmaker_fx_forget`); the boss
+pointers go to the first instance's new blocks; an instance that gets no
+memory and those after it are dropped (bot behaviour, or a late instance at
+its AI start). The old blocks are never written. Late allocation
+(`rbs_skel_more` / `rbs_walk_more`) uses the same helpers. Log: `level
+restart: giant skeleton and Crow walker blocks made again`. Fixture: four
+skeletons (the fourth late) and two walkers restarted with new addresses,
+the old blocks untouched, records found again without a fifth, the fourth
+fighting on its new blocks, an allocation failure, mission 5 and the switch
+off; mutations `restart-*`, `alloc-live-statics`. Unplayed.
 
 User report (2026-10-31): the trophy monster from story mission 5 is much
 bigger than the Arcade trophy monster and was not selectable. It is a
@@ -286,6 +316,30 @@ A MapMaker floor is at another height, so the boss stood at height 0.
 | `sub_0029FE00` princess | on the boss's first fight frame, notes its spawn height (+0x68), logged once per level (`giant skeleton floor height`) |
 | `sub_002895A0` -> `pc_mapmaker_realbosses_face` | return 0x0029D075 only, the boss in scene 100: height = the noted spawn height before the original |
 | `sub_00287E20` throw (fire) | a throw whose origin or direction (state +0x413C, six floats) is not finite or lies beyond +-100000 is skipped (phase 2, logged); every throw (first 8 per level) logs its origin, direction and the boss height |
+
+### Throwing at a player a floor up (after v0.4.0-mapmaker.40)
+
+User report (.40): the skeleton could not aim at a player one floor above it.
+CONFIRMED (decode): the stock aim (0x00287F02..0x00287FB0, phase 0 once the
+throw animation passes 0.45) is the unit vector from the hand (the shot origin
++0x413C) to target point state +0x4164 + i*12 (i = +0x4158), which
+`sub_00289290` fills with the player's feet (entity +0x68) plus a horizontal
+lead; the action choice `sub_00286F30` and facing `sub_002895A0` use no
+height (the picker's height difference `[0x0078B1E0]` is written, never
+read). The throw origins in `m40b.err` range from y -10.1 to 5.9 with the boss
+at -9.5, so from a low hand the straight line to the feet of a player about 5
+units up starts below that floor and meets its edge or underside. INFERRED
+(not measured in game): that is the miss; projectile gravity was not traced.
+
+Fix (`rbs_skel_aim`, right after the spoofed aim when the phase became 1):
+for a target more than `RBS_SKEL_UP` (2) over the boss's noted floor, the aim
+point is raised by `RBS_SKEL_BODY` (1.5, its body), and the upward component
+is held at `RBS_SKEL_PITCH` (0.866, about 60 degrees), still a unit vector;
+the origin, lead and targets on the boss's floor are the stock ones. Logged
+(4 per skeleton per level): `giant skeleton N aims at a target a floor up`.
+Fixture: a target 5 up and 10 ahead from a hand below its floor, a steep
+overhead target (clamped), the boss's own floor (unchanged), phase kept;
+mutations `aim-*`. Unplayed.
 
 INFERRED: the stretching came from the same mismatch (the body drawn at height
 0 while parts follow the spawn floor). The freeze is not explained yet: if it

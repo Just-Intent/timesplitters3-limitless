@@ -954,15 +954,12 @@ not end that wait. This test-only fix changes no transport or runtime behavior.
 
 Original request lifetime/callback prerequisites: [contracts and ABI boundary](request-lifetime.md).
 
-
 Stage0222: [original driver-call composition and opaque stack payload](driver-call.md).
-
 
 Driver fault controls must compile under Clang/Werror before runtime rejection:
 target expected-pointer weakening retains the expected operand; separate wrong
 rollback location/pointer controls retain put. See test_io_target/test_io_call;
 unused-mutant compiler errors are fixture failures, never passing fault evidence.
-
 
 Stage0223: [private request construction and completion delivery](transfer-completion.md).
 
@@ -1004,7 +1001,6 @@ error; native calendar source and the accepted game binary do not change.
 
 [Strings](kernel-strings.md), [RTL](kernel-rtl.md), [formatting](guest-printf.md), [numbers](guest-numbers.md).
 
-
 Crash evidence CI now selects `tests/diagnostics/test_guest_capture.py` beside
 existing crash tests on both hosts. It compiles the shared bounded-memory writer
 against synthetic addresses; Windows fatal-helper tests assert model history is
@@ -1031,4 +1027,4 @@ MM caps/props/body:limitless-caps
 Markers: test_ui_layout.py; test_patch_updates.py checks 2290/2291 after migration.
 
 Mech input+log: test_mounted_mouse.py [scope](mounted-mouse.md#battle-mech-mouse-425)
-MM boss/anims/sand/rooms:limitless
+MM boss/aim/anims/sand/rooms:limitless

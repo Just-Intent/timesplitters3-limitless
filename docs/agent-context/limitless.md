@@ -408,7 +408,7 @@ free) when the map's custom set holds 0x15, before `sub_001CA2F0` registers
 anim names; `sub_0015B830` sets spawn record class 0/0x80 (`sub_00280FA0`)
 for a+0x48 == 0x15 / model 0x5BE when the pak is mounted; `sub_0014CC80`
 (INSIDE bosses) hides the stock bar when that AI has the Boss flag (+0x29),
-so one bar per actor. Floating meter (user report, mapmaker.5): stock
+so one bar per actor. Floating meter: stock
 `sub_0014D1F0` draws `sub_0013A400` (only caller 0x0014D25F, ret 0x0014D264)
 over every AI-list actor whose entity has a +0x268 damage record, in scene
 100 story only (0x0014D21C/0x0014D225; mission 5 is scene 1); the deerbeast
@@ -418,7 +418,7 @@ bosses (char 0x15 / model 0x5BE) unless their Story AI chose the Sub-boss
 bar (then the stock meter shows and the stock bar is hidden too). No save byte; the handler cannot reach
 `sub_002274C0` (decode call graph). `tests/mapmaker/test_mapmaker_realbosses.py`.
 Only the creature itself played (v0.4.0-mapmaker.5); the meter fix is not built.
-Boss Off = no health (user, 2026-10-31): `pc_mapmaker_realbosses_hud` clears
+Boss Off = no health: `pc_mapmaker_realbosses_hud` clears
 the focus for the stock call for every noted real boss (Boss flag or not);
 Boss bar = bosses' bar, Sub-boss = meter, Off = nothing.
 Giant skeleton (mansion boss, id 0x28, model 0x5E9, picker row 151 "Giant
@@ -475,7 +475,8 @@ Not built or played.
 Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
-aim and logs throws. Freeze after a throw: unexplained (no hang report).
+aim and logs throws. Freeze after a throw: unexplained.
+mapmaker.40: _restart reallocates (restart frees level heap); bs_skel_aim aims a floor up.
 Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, room-checked cells: mapmaker-crowe.md), `tank`
 (`pc_mapmaker_tank.inc`: guard robot id 0x12 placeholder -> castle tank prop
