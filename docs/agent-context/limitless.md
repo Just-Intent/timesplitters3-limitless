@@ -489,7 +489,7 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Boss areas/skies/open air/set slots: [boss notes](limitless-bosses.md); [.tsmap](map-transfer.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
-draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; music gain: custom-music.md.
+draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; music gain/ticks: custom-music.md.
 Pak mount table, restart heap (heap 0; bosses reuse): [boss notes](limitless-bosses.md).
 `tests/mapmaker/test_mapmaker_paktable.py`.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
@@ -904,7 +904,7 @@ branch removes that record after its tests pass. Adding a new executed build
 test requires listing it in the compile-only skipped list;
 `tests/repository/test_compile_only_build.py` fails otherwise (static checks on every
 host, PowerShell checks on Windows). A compile-only build is never a passing
-build and is not sealed for System Link or packaging.
+build nor sealed for System Link or packaging.
 
 ### Local test release folder
 

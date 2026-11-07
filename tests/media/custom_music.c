@@ -100,6 +100,17 @@ static void write_text(const char *path, const char *text)
     if (f) { fputs(text, f); fclose(f); }
 }
 
+static int read_text(const char *path, char *out, size_t bytes)
+{
+    FILE *f = fopen(path, "rb");
+    size_t n;
+    if (!f) return 0;
+    n = fread(out, 1, bytes - 1, f);
+    fclose(f);
+    out[n] = 0;
+    return 1;
+}
+
 /* One track start at the given slider gain: the voice level and the first
  * submission's first sample and peak. */
 static void play_once(const char *name, float gain, uint64_t now)
@@ -296,6 +307,7 @@ int main(int argc, char **argv)
     /* the player's trim gain_db= in the same file */
     {
         int present = 9;
+        char text[256];
         int16_t s[6] = {32767, -32768, 16384, 8000, 0, -100};
         CHECK(pc_music_gain_load(&present) == 0 && present == 0);              /* absent: 0 */
         snprintf(ini, sizeof ini, "%s/pc-music.ini", argv[2]);
@@ -342,6 +354,39 @@ int main(int argc, char **argv)
         CHECK(s[2] > 26000 && s[2] <= s[0] && s[3] > 24000 && s[3] < s[2] && s[4] == 0 && s[5] < -390 && s[5] > -410);
         pc_music_boost(s + 4, 2, 0);                                            /* 0 dB: untouched */
         CHECK(s[4] == 0);
+
+        /* Music slider ticks past 16: slider_extra= beside arcade= and gain_db= */
+        write_text(ini, "TSFP_MUSIC_V1\narcade=a8.wav\ngain_db=-3\n");
+        pc_music_extra_live = -1;
+        CHECK(pc_music_slider_extra() == 0);
+        CHECK(pc_music_slider_extra_set(4) && pc_music_slider_extra() == 4);
+        CHECK(read_text(ini, text, sizeof text) && !strcmp(text, "TSFP_MUSIC_V1\narcade=a8.wav\ngain_db=-3.00\nslider_extra=4\n"));
+        CHECK(pc_music_arcade_save("B16.wav"));                                 /* an Arcade choice keeps it */
+        CHECK(read_text(ini, text, sizeof text) && !strcmp(text, "TSFP_MUSIC_V1\narcade=B16.wav\ngain_db=-3.00\nslider_extra=4\n"));
+        pc_music_extra_live = -1;
+        CHECK(pc_music_slider_extra() == 4);                                    /* read back */
+        /* the full slider: -3 dB + 4 x 1.5 dB = +3 dB on the samples */
+        play_once("B16.wav", 1.0f, 1100);
+        CHECK(last_volume == 0 && first_sample[0] >= 1405 && first_sample[0] <= 1418);
+        /* below the full slider the ticks count for nothing */
+        play_once("B16.wav", 0.5f, 1200);
+        CHECK(last_volume == -902 && first_sample[0] == 1000);
+        /* trim and ticks together stop at +12 dB */
+        write_text(ini, "TSFP_MUSIC_V1\narcade=\ngain_db=12\nslider_extra=8\n");
+        pc_music_extra_live = -1;
+        play_once("B16.wav", 1.0f, 1300);
+        CHECK(last_volume == 0 && first_sample[0] >= 3975 && first_sample[0] <= 3990);
+        write_text(ini, "TSFP_MUSIC_V1\nslider_extra=99\n");
+        pc_music_extra_live = -1;
+        CHECK(pc_music_slider_extra() == PC_MUSIC_SLIDER_EXTRA_MAX);
+        write_text(ini, "TSFP_MUSIC_V1\nslider_extra=-2\n");
+        pc_music_extra_live = -1;
+        CHECK(pc_music_slider_extra() == 0);
+        write_text(ini, "TSFP_MUSIC_V1\nslider_extra=5x\n");                  /* not a plain number */
+        pc_music_extra_live = -1;
+        CHECK(pc_music_slider_extra() == 0);
+        CHECK(pc_music_slider_extra_set(99) && pc_music_slider_extra() == PC_MUSIC_SLIDER_EXTRA_MAX);
+        CHECK(pc_music_slider_extra_set(0) && pc_music_slider_extra() == 0);
         write_text(ini, "TSFP_MUSIC_V1\narcade=\n");
     }
 

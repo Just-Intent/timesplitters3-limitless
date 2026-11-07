@@ -38,6 +38,14 @@
  * 0x00535858 50..80; the player's sub_00028180 gives 2000 log10(x/100), and
  * the stream's XDK headroom takes 600 more (hle_dsound_stream_adjust). */
 #define PC_MUSIC_STOCK_HEADROOM 600
+/* Music slider ticks past the stock 16 (2026-11-07, "turn it up louder"). The
+ * guest word [0x005236BC] and the profile keep 0..16; slider_extra= in
+ * pc-music.ini (0..8) holds the ticks past 16 and counts only at the full
+ * stock slider (gain 1): each adds 1.5 dB to imported music on top of gain_db=,
+ * the sum capped at PC_MUSIC_GAIN_MAX. Stock music stays at its tick 16 level. */
+#define PC_MUSIC_SLIDER_STOCK 16
+#define PC_MUSIC_SLIDER_EXTRA_MAX 8
+#define PC_MUSIC_SLIDER_EXTRA_STEP 150
 
 typedef struct PcMusicList {
     unsigned count;
@@ -115,6 +123,12 @@ int pc_music_arcade_save(const char *name);
  * clamped; 0 when absent or unreadable. *present (optional) says whether the
  * file held a readable gain_db= line. Read at each track start. */
 int32_t pc_music_gain_load(int *present);
+/* Ticks past 16 on the Music slider (0..PC_MUSIC_SLIDER_EXTRA_MAX): slider_extra=
+ * read from pc-music.ini on the first call, then the live value. set clamps,
+ * keeps it and rewrites the file (arcade= and gain_db= kept) when it changes;
+ * 1 when the file holds it. Call both on the game thread. */
+int pc_music_slider_extra(void);
+int pc_music_slider_extra_set(int ticks);
 /* Raises s16 samples by `boost` hundredths of a dB (> 0), soft-clipping above
  * PC_MUSIC_KNEE so nothing wraps or clips hard. */
 void pc_music_boost(int16_t *pcm, size_t samples, int32_t boost);
@@ -402,6 +416,7 @@ typedef struct PcMusicPlayer {
     int32_t trim, boost;               /* gain_db= at the start; the part above 0 dB now */
     int paused, pending_frames;
     int told_first, told_paused, told_level; /* one diagnostic line each per track */
+    int told_extra;                    /* the slider ticks past 16 last logged */
     const char *why;                   /* why the step ended the track */
     unsigned out_channels;
     PcMusicWatch watch;
@@ -412,6 +427,7 @@ typedef struct PcMusicPlayer {
 
 static PcMusicPlayer *pc_music_player;
 static volatile int pc_music_run;
+static volatile int pc_music_extra_live = -1; /* slider ticks past 16; -1 until read */
 
 #ifdef PC_CUSTOM_MUSIC_TEST
 int pc_music_test_submit(const uint8_t *pcm, uint32_t bytes, uint32_t rate, uint32_t channels, int32_t volume);
@@ -470,9 +486,11 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
     if (PC_MUSIC_DISCONTINUITY()) { p->submitted_frames = 0; p->base_ms = now; }
     {
         int32_t slider = paused ? -10000 : pc_music_db(gain * PC_MUSIC_LEVEL), volume = slider;
+        int extra = gain >= 1.0f && pc_music_extra_live > 0 ? pc_music_extra_live : 0;
         p->boost = 0;
         if (slider > -10000) {         /* a silent slider stays silent whatever the trim */
-            volume = slider + p->trim;
+            volume = slider + p->trim + extra * PC_MUSIC_SLIDER_EXTRA_STEP;
+            if (volume > PC_MUSIC_GAIN_MAX) volume = PC_MUSIC_GAIN_MAX;
             if (volume > 0) { p->boost = volume; volume = 0; }
             if (volume < -10000) volume = -10000;
         }
@@ -488,6 +506,13 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
             else
                 fprintf(stderr, "[music] player: level: the Music slider is at 0 (silent; gain_db %+.2f not applied)\n",
                         p->trim / 100.0);
+            fflush(stderr);
+        }
+        if (!paused && extra != p->told_extra) {   /* changes only when the player moves the slider */
+            p->told_extra = extra;
+            fprintf(stderr, "[music] player: Music slider 16 + %d ticks: %+.2f dB more = voice %d, samples %+.2f dB "
+                    "(stock music stays at its tick 16 level)\n",
+                    extra, extra * PC_MUSIC_SLIDER_EXTRA_STEP / 100.0, (int)volume, p->boost / 100.0);
             fflush(stderr);
         }
     }
@@ -690,6 +715,7 @@ int pc_music_start(const char *name, PcMusicWatch watch, void *context)
     p->context = context;
     p->volume = 1;                     /* not a level pc_music_db returns: the first step sets it */
     p->trim = pc_music_gain_load(NULL);
+    (void)pc_music_slider_extra();     /* read here, never on the player thread */
     p->out_channels = p->info.channels >= 2 ? 2u : 1u;
     p->base_ms = pc_music_now_ms();
     pc_music_player = p;
@@ -763,20 +789,36 @@ int32_t pc_music_gain_load(int *present)
     return (int32_t)lrint(db);
 }
 
-int pc_music_arcade_save(const char *name)
+/* slider_extra= 0..PC_MUSIC_SLIDER_EXTRA_MAX (clamped); 0 when absent or junk. */
+static int pc_music_extra_load(int *present)
+{
+    char v[PC_MUSIC_NAME_MAX + 16], *end;
+    long ticks;
+    if (present) *present = 0;
+    if (!pc_music_ini_value("slider_extra=", v, sizeof v)) return 0;
+    ticks = strtol(v, &end, 10);
+    while (*end == ' ' || *end == '\t') end++;
+    if (end == v || *end) return 0;
+    if (present) *present = 1;
+    return ticks < 0 ? 0 : ticks > PC_MUSIC_SLIDER_EXTRA_MAX ? PC_MUSIC_SLIDER_EXTRA_MAX : (int)ticks;
+}
+
+/* Rewrites pc-music.ini: arcade= `name`, the file's gain_db=, and slider_extra=
+ * `extra` (or the file's own when extra < 0). */
+static int pc_music_ini_save(const char *name, int extra)
 {
     char path[4096], temporary[4096 + 8];
     FILE *file;
-    int ok, has_trim;
+    int ok, has_trim, has_extra = 1;
     int32_t trim;
-    if (!name) name = "";
-    if (*name && !pc_music_name_ok(name)) return 0;
     if (!pc_music_ini(path, sizeof path)) return 0;
     trim = pc_music_gain_load(&has_trim);  /* the player's gain_db= survives an Arcade choice */
+    if (extra < 0) extra = pc_music_extra_load(&has_extra);
     snprintf(temporary, sizeof temporary, "%s.tmp", path);
     if (!(file = fopen(temporary, "wb"))) return 0;
     ok = fprintf(file, "TSFP_MUSIC_V1\narcade=%s\n", name) > 0;
     if (ok && has_trim) ok = fprintf(file, "gain_db=%.2f\n", trim / 100.0) > 0;
+    if (ok && has_extra) ok = fprintf(file, "slider_extra=%d\n", extra) > 0;
     if (fflush(file)) ok = 0;
     if (fclose(file)) ok = 0;
 #ifdef _WIN32
@@ -787,6 +829,30 @@ int pc_music_arcade_save(const char *name)
     if (!ok) remove(temporary);
 #endif
     return ok;
+}
+
+int pc_music_arcade_save(const char *name)
+{
+    if (!name) name = "";
+    if (*name && !pc_music_name_ok(name)) return 0;
+    return pc_music_ini_save(name, -1);
+}
+
+int pc_music_slider_extra(void)
+{
+    if (pc_music_extra_live < 0) pc_music_extra_live = pc_music_extra_load(NULL);
+    return pc_music_extra_live;
+}
+
+int pc_music_slider_extra_set(int ticks)
+{
+    char name[PC_MUSIC_NAME_MAX];
+    if (ticks < 0) ticks = 0;
+    if (ticks > PC_MUSIC_SLIDER_EXTRA_MAX) ticks = PC_MUSIC_SLIDER_EXTRA_MAX;
+    if (ticks == pc_music_slider_extra()) return 1;
+    pc_music_extra_live = ticks;
+    pc_music_arcade_load(name, sizeof name);   /* "" when absent */
+    return pc_music_ini_save(name, ticks);
 }
 #endif /* PC_CUSTOM_MUSIC_IMPLEMENTATION */
 #endif /* PC_CUSTOM_MUSIC_H */
