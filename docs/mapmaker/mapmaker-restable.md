@@ -39,7 +39,7 @@ held passes the cap, and the row is then red.
 
 | Row (full name) | Used | Max | Source of both numbers |
 | --- | --- | --- | --- |
-| Tiles | placed pieces | 511 | `MAPMAKER_LIMIT_PIECES`, `mapmaker_limits_over` |
+| Tiles | placed pieces | 1023 (engine objects bind first: 895 without items) | `MAPMAKER_LIMIT_PIECES`, `mapmaker_limits_over` |
 | Items | items (ids above 9) on placed pieces + free-standing objects (`editor+0x306E`) | 500 | `MAPMAKER_LIMIT_SUB` |
 | Objects (Engine objects) | pieces + items + 128 reserved | 1023 | `mapmaker_objects_needed`, `MAPMAKER_LIMIT_OBJECTS` |
 | Pickups | placed items in categories 8-13, 19-21, 31 (weapons, ammo, keycards, health, armour, power-ups, special pickups) | 768 | play-time pickup records (`MAPMAKER_OBJECTS_PICKUPS`); not an editor cap, the 500 items keep it below |

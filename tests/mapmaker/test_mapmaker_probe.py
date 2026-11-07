@@ -43,7 +43,7 @@ MUTATIONS = {
     'nodes-no-model-cap': ('if(mapmaker_probe_nodes.models==MAPMAKER_PROBE_NODE_MODELS || ', 'if(mapmaker_probe_nodes.models>MAPMAKER_PROBE_NODE_MODELS+100u || '),
     'nodes-hidden-inverted': ('!m?"always":(m&mask)?"drawn":"hidden"', '!m?"always":(m&mask)?"hidden":"drawn"'),
     'nodes-writes-guest': ('mapmaker_probe_nodes.lines++;\n        mapmaker_probe_write(', 'mapmaker_probe_nodes.lines++;WORD_AT(node+0x5Cu)&=~0x02000000u;\n        mapmaker_probe_write('),
-    'rooms-relocated-table-ignored':('#define MAPMAKER_PROBE_ROOM_COUNTS 0x008C7000u', '#define MAPMAKER_PROBE_ROOM_COUNTS 0x007B54E0u'),
+    'rooms-relocated-table-ignored':('#define MAPMAKER_PROBE_ROOM_COUNTS 0x008CC000u', '#define MAPMAKER_PROBE_ROOM_COUNTS 0x007B54E0u'),
 }
 
 
