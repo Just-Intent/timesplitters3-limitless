@@ -1,16 +1,143 @@
-# MapMaker Disco variant tileset: texture survey and plan
+# MapMaker Disco variant tileset
 
-Step 1 (offline survey) of the first custom MapMaker tileset: a **Disco
-variant** that keeps an existing tileset's geometry, pads and connection points
-and shows the Disco arcade map's own textures, read at runtime from the
-player's game data. No artwork is made or shipped. A map stores its base
-tileset (header word `+0xA`, unchanged) plus a variant marker, so a stock game
-or a peer without the variant plays it as the base tileset.
+The first custom MapMaker tileset: a **Disco variant** of Virtual that keeps
+Virtual's geometry, pads and connection points and shows the Disco arcade
+map's own textures, read at runtime from the player's game data. No artwork is
+made or shipped. A map stores its base tileset (header word `+0xA` = 5,
+Virtual, unchanged) plus a variant marker, so a stock game, an older build or
+a peer without the variant plays it as plain Virtual.
 
-Survey only: no game code was changed or run. US XBE 45410066, game data read
-in place. CONFIRMED = read in the paks/XBE; INFERRED = deduced (visual roles,
-fit). This document holds identifiers, keys and dimensions only; decoded images
-stay in the ignored `private/tileset-survey/` folder.
+Status: **implemented** (`src/interface/pc_mapmaker_disco.inc`, marker in
+`pc_mapmaker_sky.inc`, defaults in `pc_mapmaker_skymusic.inc`, menu row in
+`pc_mapmaker_tilesets.inc`); asset-free fixture, decoder/XBE checks and the pak
+audit pass. Not yet seen in a running game (see "User test" below).
+
+## How to use
+
+With `TSFP_MAPMAKER_LIMITS=1` (the Limitless default), open **Map Settings**
+in the MapMaker editor: the tileset list has **Disco** right after Virtual.
+Pick it and close the menu; the editor reloads the tiles with the Disco
+textures. Save and play as usual. Leave **Music** and **Sky** on
+*Recommended* (-1) to get the Disco track (jukebox index 26, music id 0xBA)
+and the Dark sky (record 59); any other choice wins. Lighting is Virtual's.
+Picking Virtual again (or any other tileset) switches back.
+
+Needs the player's own `pak/arcademem/l_56_arm.pak` (part of the game data).
+Without it, or when one of the Disco textures is missing from it, the map shows
+plain Virtual textures for those surfaces and logs why.
+
+## Implementation (CONFIRMED in the XBE/decoder; fixture-tested)
+
+- **Marker**: info chunk flag `+0x244` bit 31 (`MAPMAKER_VARIANT_FLAG`). Proof
+  (`tests/mapmaker/test_mapmaker_disco.py::test_variant_bit_free_decoded`):
+  every stock access to the info chunk's `+0x244..+0x247` (all functions using
+  tag `0xC77668`, plus the editor loader's chunk switch) tests bits 0..17 only
+  (`sub_00301A90` loop 1..14 and bits 0/15/16/17, `sub_002FDA20` masks
+  2..0x4000, `sub_002BE750` bit 15, `sub_0023F390` bit 17); the rebuild
+  `sub_003006C0` starts the dword at 0 and ORs only bits 0..17. The fork uses
+  18 (Clouds), 19..23 (sky), 24..28 (music), 29..30 (weather). The marker
+  means nothing without base Virtual: every reader requires header tileset 5,
+  and the editor validator clears it on another tileset (not refused).
+- **Editor state**: editor `+0x204` (the Map Settings tileset list; stock
+  readers: only the menu close `sub_002FC0A0` and the reset's compare right
+  after writing 3) holds 6 for the Disco row.
+- **Menu**: `pc_mapmaker_tilesets_menu_row` (WRAP `sub_00071800`) appends
+  "Disco" (value 6, label in guest heap) after the stock Virtual row, before
+  "Abstract".
+- **Save/load/export**: the rebuild hook (`pc_mapmaker_skymusic_compile`)
+  sets bit 31 when `+0x204` is 6 and the rebuilt header tileset is 5, else
+  clears it; the load hook gives `+0x204` = 6 back for a Disco map. The
+  container, its size tier, resource table and limits are unchanged; map
+  transfer (`.tsmap`) copies the body bytes, so the marker travels with it.
+- **Alias**: WRAP `sub_0008E3E0 -> pc_mapmaker_disco_textures` (cdecl list,
+  file), the first call on a model's texture list on every MapMaker route
+  (load pass `sub_00096220` 0x0009628F before the queue `sub_000637E0`;
+  creation `sub_00096330` 0x00096354; 0x00089E3F; 0x00098005). While the
+  variant is live, a fresh row (word 0 = word 1) with an aliased Virtual id
+  gets the Disco id in both words; registered rows (word 0 = loaded row) and
+  ids missing from the mounted pak are kept. Pairs: e871cc->7dde70,
+  25ae6e->0d9139, 294554->7b0662, 79b187->3c2652, 666443->f05b7c; b2a030,
+  5a89bc, d7e9c7, 939772 keep Virtual's. No other pak MapMaker reads lists or
+  holds a Virtual id, so only tileset6 models change (tiles and the props that
+  share these textures).
+- **Play** (scene 100): the map start (`pc_mapmaker_skymusic_level`, before
+  the load pass reads the tileset's models) mounts `pak/arcademem/l_56_arm.pak`
+  index-only (`smx_mount`, 8 slots kept free) once per level, then looks up
+  each Disco texture's CRC-32 name in the slot's index (mount table
+  `0x00907000`, `+8` count, `+0x10` index). It also gives a map whose sky is
+  -1 record 59 while the original runs; the music hook plays 0xBA for a map
+  whose index is -1 (an extra or imported track wins).
+- **Editor** (scene 102): WRAP `sub_002FC0A0 -> pc_mapmaker_disco_menu_close`
+  hands the original 5 for the Disco row, puts 6 back, and sets the stock
+  reload flags (`+0x238 |= 0x12`) when only the look changed (Virtual <->
+  Disco). WRAP `sub_00338180 -> pc_mapmaker_disco_stream` (tileset stream
+  start, callers 0x002FC265, 0x00311FD5): for tileset 5 with the Disco row it
+  mounts the pak first; when the Virtual stream set is already current but was
+  loaded for the other look, it unloads it the stock way (`sub_00061D80`, -5 =
+  busy: nothing forced) and marks the set not current (`[0x007DE314]` = -1),
+  so the original reads it again and the models' lists pass the alias.
+
+## WRAP lines
+
+```
+WRAP sub_0008E3E0 -> pc_mapmaker_disco_textures     (new; area 'tilesets')
+WRAP sub_002FC0A0 -> pc_mapmaker_disco_menu_close   (new; area 'tilesets')
+WRAP sub_00338180 -> pc_mapmaker_disco_stream       (new; area 'tilesets')
+```
+
+None of the three is wrapped by another area or an upstream patch. The code
+lives in the skymusic translation unit (`pc_mapmaker_skymusic.inc` includes
+`pc_mapmaker_disco.inc` at its end) because it uses `smx_mount`; the menu row,
+compile, load, music, map start and frame parts reuse existing hooks.
+
+## Log lines
+
+One line per level in play, from `[mapmaker] disco:`:
+
+- `variant active (Virtual + Disco): l_56_arm.pak mounted, 5 of 5 texture ids aliased`
+- first weather frame: `N texture list rows rewritten in M model lists this level (5 ids live)`;
+  0 rows adds `no Virtual list was rewritten: tile textures were registered before the mount`
+- fallbacks: `pak/arcademem/l_56_arm.pak not mounted; plain Virtual textures kept`,
+  `textures/<id>.xbt missing from l_56_arm.pak; Virtual <id> kept`,
+  `variant marked but its textures are missing: playing plain Virtual (0 of 5 ids aliased)`
+- editor: `editor: Virtual <-> Disco switch, tile models reload (...)`,
+  `editor: Disco look on: l_56_arm.pak mounted, 5 of 5 texture ids aliased (reload 0|1)`,
+  `editor: tileset stream still loading; look kept until the next switch`,
+  `editor: Disco textures missing; the editor shows plain Virtual`
+- skymusic lines: `map start: Disco default sky (record, map's) (59, -1)`,
+  `music: Disco default track (jukebox index, id) (26, 186)`
+- validator: `variant marker without its base tileset Virtual (tileset N); cleared`
+
+## User test
+
+1. Editor: new map, Map Settings -> tileset **Disco**, close. Expect the tiles
+   to reload with starry/gold/plush/leather/tiger textures and the
+   `editor: Disco look on` line. Place a few rooms, a door and a window.
+2. Switch to Virtual and back to Disco: each switch reloads the tiles
+   (`Virtual <-> Disco switch` line); Virtual's look must come back exactly.
+3. Save, leave the editor, reload the map: Map Settings shows Disco and the
+   Disco look; then play it (Recommended music/sky): the `variant active`
+   and `rows rewritten` lines, Disco music, a dark sky; walk all tile types.
+4. Check door frames/windows (props sharing the aliased textures), tint and
+   brightness of the Disco textures, and the glow masks kept from Virtual.
+5. Export the map (.tsmap) and import it; it must still be Disco. Optional:
+   play it on a build without this change: plain Virtual.
+
+## Unverified
+
+- In-game look (tint, brightness, which faces get which texture), the editor
+  stream reload on a switch, and timing of the play mount before the tile
+  models register (the frame log line says if it was too late).
+- Mac: shared guest-side code only (no host adapter, no backlog entry needed);
+  the fixture is portable C, but no Mac host run or in-game Mac check yet.
+
+## Survey (step 1)
+
+Survey of the textures; no game code was changed or run for it. US XBE
+45410066, game data read in place. CONFIRMED = read in the paks/XBE; INFERRED
+= deduced (visual roles, fit). This document holds identifiers, keys and
+dimensions only; decoded images stay in the ignored `private/tileset-survey/`
+folder.
 
 Reproduce (writes PNGs, contact sheets and `survey.json` under `private/`):
 
@@ -74,7 +201,12 @@ Side finding (CONFIRMED in the paks, play effect INFERRED): Abstract's 29 tile
 models list 87 textures that exist **only** in `arcademem/l_102m.pak`, not in
 `tileset1.pak` or `l_102.pak`. `pc_mapmaker_tilesets.inc` mounts `l_102.pak`
 for an Abstract map in play; unless `l_102m.pak` is also resident there, its
-tiles would load untextured. Worth a check before relying on Abstract.
+tiles would load untextured. Checked (CONFIRMED in code): scenes 100..102 mount
+only their own memory pak (`sub_00062610(scene, 1)` at 0x0006289E, so play
+mounts `l_100m.pak`), so Abstract tiles had no textures in play. Fixed: the
+Abstract play hook also mounts `arcademem/l_102m.pak` index-only (its names
+shared with `l_100m` (24) and `gun.pak` (31) are byte-identical); see
+`mapmaker-tilesets.md`. Not yet seen in game.
 
 ### Virtual tile textures (CONFIRMED usage, INFERRED role)
 
@@ -146,7 +278,10 @@ moulding (2:1).
 - **Local-only result**: the variant needs the player's own `l_56_arm.pak`;
   if it is missing the map must fall back to plain Virtual (logged).
 
-## Implementation plan
+## Implementation plan (survey; done as described above)
+
+The guest route was taken (no host pak reader); the marker is info flag bit 31,
+the alias hook is `sub_0008E3E0` (the first pass over a list on every route).
 
 1. **Variant marker** in the map header: choose a verified-free bit/field
    (decoder-checked like the roof's `+0x26`, info-flag pattern as the sky

@@ -15,7 +15,8 @@
  *   chunk         field                         bound      why (CONFIRMED)
  *   walk          sizes, end tag 0xC7766A       inside the 512 KB container; the loader's walk has no bound
  *   0x68 header   tileset word +0xA             < 7        catalogue 0x00524F64 + (id*7 + tileset)*0x1C
- *                 variant flag +0x244 bit 31    base 5     Disco variant only on Virtual; else cleared (not refused)
+ *                 variant flag +0x244 bit 31    base 5     editor: Disco variant only on Virtual, else cleared (not
+ *                                                          refused); play ignores it without its base (pc_mapmaker_sky.inc)
  *                 word count byte +0x42         <= 17      editor +0x1190C dwords up to the stock end +0x11950
  *                 piece count dword +4          <= 1024    editor: piece buffer sub_0003DFA0(0x1000) @0x00301BCA, piece pool 0x400
  *                                               <= 512     level: sub_00240C50 frame array [esp+i*8+0xA0] = frame+0x90
@@ -177,7 +178,7 @@ static const char *mapmaker_validate_chunk(MapMakerValidate *v,uint32_t tag,uint
         uint32_t cap=editor?MAPMAKER_VALIDATE_EDITOR_PIECES:MAPMAKER_VALIDATE_LEVEL_PIECES;
         v->header=1;v->pieces=pieces;
         if(mapmaker_validate_u16(d+0xAu)>=MAPMAKER_VALIDATE_TILESETS) { v->value=mapmaker_validate_u16(d+0xAu);return "tileset"; }
-        if(sz>=MAPMAKER_VALIDATE_FLAGS+4u && (WORD_AT(d+MAPMAKER_VALIDATE_FLAGS)&MAPMAKER_VALIDATE_VARIANT) &&
+        if(editor && sz>=MAPMAKER_VALIDATE_FLAGS+4u && (WORD_AT(d+MAPMAKER_VALIDATE_FLAGS)&MAPMAKER_VALIDATE_VARIANT) &&
            mapmaker_validate_u16(d+0xAu)!=MAPMAKER_VALIDATE_VARIANT_BASE) {
             /* A tileset variant only with its base (Disco: Virtual): harmless, cleared. */
             WORD_AT(d+MAPMAKER_VALIDATE_FLAGS)&=~MAPMAKER_VALIDATE_VARIANT;

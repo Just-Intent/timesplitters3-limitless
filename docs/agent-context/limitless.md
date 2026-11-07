@@ -720,22 +720,21 @@ Link, story type, monkey sub-mode 0x13 and ordinary Arcade maps stay stock.
 Contract and WRAP lines: `docs/mapmaker/mapmaker-matchbots.md`; tests
 `tests/mapmaker/test_mapmaker_matchbots.py`, `..._matchbots_classified.py`.
 
-### MapMaker Abstract tileset (area `tilesets`)
+### MapMaker Abstract and Disco tilesets (area `tilesets`)
 
-`src/interface/pc_mapmaker_tilesets.inc` re-enables the hidden tileset index 0
-(table `0x0052CF38`, the editor's preview set: tiles/pads only in
-`pak/arcade/l_102.pak`, textures and item models in `tileset1.pak`). WRAP
-`sub_00071800` (return 0x0031354A, value 5, `LIMITS`, scene 102) appends the
-Map Settings row "Abstract" (value 0). WRAP `sub_00338170` (only caller
-0x000628ED in `sub_00062790`) mounts `l_102.pak` with `sub_000622D0(path, 1,
-1)` before an Abstract map's tileset pak, ungated; when impossible (< 8 free
-mount slots, open failure) the map plays as Lab (argument, header +0xA,
-`[0x00784020]`). `mapmaker_container_over_chunks` counts header tileset 0 as
-past stock, so such maps save in the 64 KB tier (stock and System Link refuse
-them). Contract, asset audit and WRAP lines: `docs/mapmaker/mapmaker-tilesets.md`;
-tests `tests/mapmaker/test_mapmaker_tilesets.py` and the container fixture's
-tileset-0 tier. Its tile textures are only in `l_102m.pak`. Disco variant
-plan: `docs/mapmaker/mapmaker-disco-variant.md`.
+`src/interface/pc_mapmaker_tilesets.inc` re-enables hidden index 0 (table
+`0x0052CF38`; tiles/pads only in `pak/arcade/l_102.pak`, tile textures only in
+`arcademem/l_102m.pak`). WRAP `sub_00071800` (return 0x0031354A, value 5,
+`LIMITS`, scene 102) appends rows "Disco" (6) and "Abstract" (0). WRAP
+`sub_00338170` (caller 0x000628ED) mounts `l_102.pak` whole, then `l_102m.pak`
+index-only, before an Abstract map's tileset pak, ungated; without `l_102.pak`
+it plays as Lab. Tileset 0 saves in the 64 KB tier. Disco
+(`pc_mapmaker_disco.inc`, skymusic TU): header stays Virtual 5 plus info flag
+bit 31 (decoder-proven free), editor +0x204 = 6; WRAPs `sub_0008E3E0` (alias
+5 Virtual ids in fresh texture lists), `sub_002FC0A0` (row to base, reload on
+a switch), `sub_00338180` (editor stream reload); map start mounts
+`arcademem/l_56_arm.pak`. Docs `mapmaker-tilesets.md`, `mapmaker-disco-variant.md`
+(`docs/mapmaker/`); tests `test_mapmaker_tilesets.py`, `test_mapmaker_disco.py`.
 
 ### Guest memory extension block
 
