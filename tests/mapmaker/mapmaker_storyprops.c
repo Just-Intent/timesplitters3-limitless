@@ -302,6 +302,7 @@ static void resources(int cell_read,int gun_read,uint8_t deferred)
     WORD_AT(0x00530000u)=0x10u;
     WORD_AT(0x00530010u)=WORD_AT(0x00530014u)=0x2A6ABDu;WORD_AT(0x00530020u)=WORD_AT(0x00530024u)=0x450CF9u;
     WORD_AT(0x00530030u)=WORD_AT(0x00530034u)=0x123456u;WORD_AT(0x00530040u)=0xFFFFFFFFu;
+    WORD_AT(0x00530050u)=1u;FLOAT_AT(0x00530058u)=-0.001f;FLOAT_AT(0x00530064u)=0.736f;   /* bounds block */
     WORD_AT(0x00531000u)=0x20u;WORD_AT(0x00531020u)=WORD_AT(0x00531024u)=0x91B0F7u;WORD_AT(0x00531030u)=0xFFFFFFFFu;
 }
 static void play_tests(void)
@@ -334,10 +335,18 @@ static void play_tests(void)
     g_esi=rec_at[1][0];fake_answer=0x8A0u;
     CALL(pc_mapmaker_storyprops_preload_model,fake_answer_fn,0x0023F5DBu,0,0);CHECK(g_eax==0xE6u);
     CALL(pc_mapmaker_storyprops_preload_model,fake_answer_fn,0x0023F5D0u,0,0);CHECK(g_eax==0x8A0u);   /* other caller */
-    /* fill: power cell model, raised by its half height (record +0x14 = ebp + 0x14) */
+    /* fill: power cell model at the drum's height (record +0x14 = ebp + 0x14), one height log */
     g_esi=rec_at[0][0];fake_answer=0x8B1u;g_ebp=0x00560000u;FLOAT_AT(g_ebp+0x14u)=1.0f;
     CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(g_eax==0x53Du);
-    CHECK(FLOAT_AT(g_ebp+0x14u)>1.736f && FLOAT_AT(g_ebp+0x14u)<1.738f);
+    CHECK(FLOAT_AT(g_ebp+0x14u)==1.0f && sp_lv.lift_logged);
+    /* the playtest override, read once: a valid value lifts, a bad one is ignored */
+    set_env("TSFP_MAPMAKER_POWERCELL_LIFT","0.25");sp.lift_read=0;sp_lv.lift_logged=0;FLOAT_AT(g_ebp+0x14u)=1.0f;
+    CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);
+    CHECK(FLOAT_AT(g_ebp+0x14u)>1.249f && FLOAT_AT(g_ebp+0x14u)<1.251f);
+    set_env("TSFP_MAPMAKER_POWERCELL_LIFT","9");sp.lift_read=0;FLOAT_AT(g_ebp+0x14u)=1.0f;
+    CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(FLOAT_AT(g_ebp+0x14u)==1.0f);
+    set_env("TSFP_MAPMAKER_POWERCELL_LIFT",NULL);sp.lift_read=0;
+    g_esi=rec_at[0][0];
     FLOAT_AT(g_ebp+0x14u)=1.0f;g_esi=rec_at[0][1];          /* a plain drum keeps its height */
     CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(g_eax==0x8B1u && FLOAT_AT(g_ebp+0x14u)==1.0f);
     g_esi=rec_at[0][0];

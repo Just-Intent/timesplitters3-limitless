@@ -127,7 +127,7 @@ gun 0xE6 (gun type 7) chosen in item options (drum: heap descriptor via a
 0x00318A8C), saved in item record byte +0xC (stock-unused for these ids) and
 node +0x30 ('SP'), applied by the play fill (`sub_002F7790`, `sub_0033DD80`,
 preload `sub_0006C090`), paks l_64_ch / l_26_st + memory paks l_64_chm / l_26_stm (textures only
-there; .55 fix: WRAP sub_00063900 registers via sub_00096220; cell +0.737 y). 10 WRAPs:
+there; .55 fix: WRAP sub_00063900 registers via sub_00096220; .57 floated: cell at drum height, `TSFP_MAPMAKER_POWERCELL_LIFT`). 10 WRAPs:
 mapmaker-storyprops.md. `test_mapmaker_storyprops.py`. Unplayed.
 
 Tank TNT (.55, CONFIRMED, `test_tnt_on_the_stunned_tank`): a sticky explosive
