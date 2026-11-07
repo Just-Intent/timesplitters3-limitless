@@ -142,6 +142,7 @@ void sub_000A6F90(void) {}
 void sub_000EFBD0(void) {} void sub_0028D6D0(void) {} void sub_0028D710(void) {}
 void sub_00292550(void) {} void sub_00292630(void) {} void sub_002A62C0(void) {} void sub_0028D0C0(void) {}
 void sub_000A5E40(void) {} void sub_000631C0(void) {}  /* tank: model request at level init */
+void sub_00256040(void) {}  /* tank: the castle's explosive-on-the-stunned-tank damage */
 void sub_00096330(void) {}  /* mothership: texture registration */
 void sub_002F7920(void) {}  /* sets: spawn mode mask of an editor item */
 void sub_0003E0B0(void) {} void sub_00165760(void) {}  /* objects: physics body pools */

@@ -128,3 +128,10 @@ gun 0xE6 (gun type 7) chosen in item options (drum: heap descriptor via a
 node +0x30 ('SP'), applied by the play fill (`sub_002F7790`, `sub_0033DD80`,
 preload `sub_0006C090`), paks l_64_ch / l_26_st index-only. 9 WRAPs:
 mapmaker-storyprops.md. `test_mapmaker_storyprops.py`. Unplayed.
+
+Tank TNT (.55, CONFIRMED, `test_tnt_on_the_stunned_tank`): a sticky explosive
+going off (`sub_000F0430`) calls `sub_00228B50` (story mode, 0x000F049A), which
+runs the castle's `sub_001E4030` -> `sub_00256040(tank, explosive)` only in
+scene 4 ('KNAT' tag): state 9, explosive +0x158 on the tank, part +0x15C in
+15..17, health -10.1. New WRAP sub_00228B50 -> `pc_mapmaker_tank_mine` makes
+that call for our tanks with their statics (mapmaker-tank.md). Unplayed.

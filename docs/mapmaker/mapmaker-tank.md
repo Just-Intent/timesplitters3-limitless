@@ -1,10 +1,60 @@
 # MapMaker castle tank (story mission 2 boss)
 
 Status: implemented in `src/interface/pc_mapmaker_tank.inc` (area `tank`),
-fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 191 mutations, plus
+fixture-tested (`tests/mapmaker/test_mapmaker_tank.py`: 206 mutations, plus
 decode, US XBE data and game-pak checks of every site below). Wired in
 v0.4.0-mapmaker.20 with the wrappers [below](#wrappers-for-the-integrator).
 No guest-code table entry of its own, no new save bytes.
+
+## TNT on the stunned tank (fixed after v0.4.0-mapmaker.55)
+
+Report (.55): "TNT didn't damage the castle tank when temporarily immobilized
+from its weak point like it is supposed to." **Proven in the decode** (test
+`test_tnt_on_the_stunned_tank`): the tank's own damage callback never takes
+TNT. It accepts only damage types 8 and 0xC (record +0x14, 0x00255FDD); a
+heavy hit of those stuns it (state 9, "Tank exposed", `sub_00255EF0`). TNT
+(projectile type 0x13) explodes with type 4 (`sub_000F0430`, 0x000F043D).
+The castle's TNT damage is a separate level hook:
+
+- `sub_000F0430` (a sticky explosive going off; callers 0x000F08AE,
+  0x000F398D, 0x000F3AD0 (the TNT update `sub_000F39A0`), 0x000F48F5) makes
+  the explosion and decal, then, only in story mode (`[0x007DE455]` == 10),
+  calls `sub_00228B50(explosive)` (0x000F049A, its only caller) before it
+  frees the explosive (`sub_000DC550`, 0x000F04A3).
+- `sub_00228B50` tail-jumps to the castle's `sub_001E4030` only when
+  `[0x0079094C]` == 4 (the castle level). In MapMaker (scene 100) it returns:
+  the missing piece.
+- `sub_001E4030`: when the object the explosive is stuck to (+0x158) is the
+  tagged 'KNAT' object, `sub_00256040(that object, explosive)` (0x001E4059,
+  its only caller; our tanks have no tag).
+- `sub_00256040`: only in state 9, and only with the explosive on the tank's
+  model parts 15..17 (+0x15C; stored by `sub_000F39A0` at 0x000F3D89, -1 on
+  an object without flag 0x200000, which the tank has: first update flags
+  0x700879 in m28.err): health -= 10.1 (8.1 when `[0x007DE457]` is 2,
+  0x0049F13C / 0x0049F138), the death `sub_00255E70` at 0 or below, then
+  `sub_00251BA0` (two effect explosions at the tank).
+
+Fix: new **mine** `WRAP sub_00228B50 -> pc_mapmaker_tank_mine`. When the
+explosive is stuck to one of this level's tanks (scene 100, story mode,
+`TSFP_MAPMAKER_LIMITS`), the hook makes the castle's call
+`sub_00256040(tank, explosive)` with that tank's statics swapped in, then
+runs the original (which does nothing outside scene 4). Stock still decides:
+stunned, parts 15..17, the same damage, the same death (our wreck hook parks
+it). Any sticky explosive that reaches `sub_000F0430` counts, as in the
+castle. Each tank of several is hurt only by the charges on itself; the
+castle and every other object are unchanged. Logs, once per tank and level:
+`[mapmaker] tank N: TNT damage applied: explosive on the stunned tank (part
+P), health a -> b, state s -> t`, and, when a charge on it did nothing,
+`... explosive on the tank went off, no TNT damage: stock needs the stunned
+state 9 and parts 15-17 (state s, part P)`.
+Fixture: tank 2 stunned takes two charges (-10.1 each) with its own statics,
+tank 1 (state 3) and a charge with no part take none, the killing charge
+leaves tank 2 in state 10, a charge during tank 1's frame, other objects,
+scene 4, non-story mode and the switch off run stock only. Mutations `mine-*`.
+Playtest: stun a tank with its weak point, stick TNT on it (which model parts
+15-17 are is not decoded) and set it off within the 12 s; its bar drops.
+If it says "no TNT damage" with state 9, the part number shows where it
+stuck (only 15-17 count, as in story).
 
 ## Restart from the pause menu (fixed after v0.4.0-mapmaker.31)
 
@@ -181,9 +231,10 @@ code runs inside another's, e.g. a shell from tank 2 damaging tank 1):
 - the spawn: the init (`sub_002560C0` -> `sub_00251AA0`) resets the statics
   and the XBE tables; the result is copied to the new tank and both are put
   back as they were.
-- Not needed: `sub_00256040` (called only by the castle's `sub_001E4030` for
-  its tagged 'KNAT' object) and `sub_002533E0` (castle script
-  `sub_001E77E0`).
+- the explosive-on-the-tank call `sub_00256040`: stock only from the castle's
+  `sub_001E4030` ('KNAT' object); for our tanks the **mine** hook calls it
+  with the tank's state (after .55, above).
+- Not needed: `sub_002533E0` (castle script `sub_001E77E0`).
 
 The other hooks (wake, area, target, state, gun, wreck) run inside an entry
 and act on the active tank: its own castle frame offset d, spawn, wake,
@@ -481,6 +532,7 @@ unchanged when the switch is off or outside scene 100.
 | `WRAP sub_00253840 -> pc_mapmaker_tank_slot7` | tank callback slot 7 (cdecl object, arg) | **new for several tanks** |
 | `WRAP sub_00253D60 -> pc_mapmaker_tank_slot2` | tank callback slot 2 (cdecl object) | **new for several tanks** |
 | `WRAP sub_00255FD0 -> pc_mapmaker_tank_damage` | tank damage callback (cdecl damage record) | **new for several tanks** |
+| `WRAP sub_00228B50 -> pc_mapmaker_tank_mine` | castle explosive hook (cdecl explosive), only from 0x000F049A | **new after .55**; works before the original |
 | `WRAP sub_00251800 -> pc_mapmaker_tank_bar` | boss bar state-9 timer (no args, returns on the x87 stack) | **new for several tanks**; the hook only swaps memory around the original |
 | `WRAP sub_000A2740 -> pc_mapmaker_tank_draw` | prop draw (cdecl prop, view), hot | **new after v0.4.0-mapmaker.27**; log only, before the original; no tank this level: one compare |
 | `WRAP sub_00255390 -> pc_mapmaker_tank_state` | state entry (eax = tank) | new; must see the guest `g_eax` at entry |
@@ -493,11 +545,11 @@ After .28 no wrapper changed: the bar names use `pc_mapmaker_bosses.inc`
 before this area as for Khallos' `bos_bar_proxy`.
 
 Guest functions called: `sub_00062260` (is a pak mounted), `sub_000622D0`
-(mount), `sub_000A5E40` (request a model), `sub_000631C0` (find a model's
+(mount), `sub_00256040` (explosive on a stunned tank, after .55), `sub_000A5E40` (request a model), `sub_000631C0` (find a model's
 request), `sub_000A6F90` (create the tank), `sub_0015DDA0` (remove the
 placeholder AI). Host: `xbox_HeapAlloc` (labels, 32-byte argument buffer, the 4 x 0x224-byte tank tables,
 the 4 x 32-byte bar names, once per session). The area stubs (`tests/mapmaker/mapmaker_area_stubs.h`)
-need `sub_000622D0`, `sub_000A6F90`, `sub_000A5E40` and `sub_000631C0` when
+need `sub_000622D0`, `sub_000A6F90`, `sub_000A5E40`, `sub_000631C0` and `sub_00256040` when
 the include chain links this area (`sub_00062260` and `sub_0015DDA0` are
 already there).
 
@@ -543,7 +595,9 @@ Also for the integrator: the editor picker row (above), and the
    ("Castle Tank" when unnamed). The game keeps running; if it stops, the
    last `fight state` line names the state.
 3. Explosives hurt it; a heavy hit shows "Tank exposed" for 12 s
-   (log `level event dropped`); map logic markers are unaffected.
+   (log `level event dropped`); map logic markers are unaffected. While it
+   is exposed, TNT stuck on it (parts 15-17) takes 10.1 health per charge
+   (log `TNT damage applied`, after .55).
 4. Destroy it: wreck and flying turret appear, the tank vanishes
    (log `destroyed`).
 5. Three and four named tanks (after .28): every one is a tank (log `tank 3:
