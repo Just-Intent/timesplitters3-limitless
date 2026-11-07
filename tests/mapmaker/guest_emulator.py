@@ -95,6 +95,8 @@ class Emu:
         return a & 0xFFFFFFFF
 
     def reg_get(self, name):
+        if name in self.HIGH8:
+            return self.r[self.HIGH8[name]] >> 8 & 0xFF
         if name in self.LOW8:
             return self.r[self.LOW8[name]] & 0xFF
         if name in self.HIGH8:
@@ -104,7 +106,10 @@ class Emu:
         return self.r[name]
 
     def reg_put(self, name, v):
-        if name in self.LOW8:
+        if name in self.HIGH8:
+            f = self.HIGH8[name]
+            self.r[f] = (self.r[f] & 0xFFFF00FF) | (v & 0xFF) << 8
+        elif name in self.LOW8:
             f = self.LOW8[name]
             self.r[f] = (self.r[f] & 0xFFFFFF00) | (v & 0xFF)
         elif name in self.HIGH8:
@@ -263,6 +268,30 @@ class Emu:
                 self.flags_logic(r, w)
                 if m != 'test':
                     self.put(i, 0, r)
+            elif m == 'sar':
+                a, n = self.val(i, 0), self.val(i, 1) & 31
+                sa = a - (1 << 32) if a & 0x80000000 else a
+                r = (sa >> n) & 0xFFFFFFFF
+                self.flags_logic(r)
+                self.put(i, 0, r)
+            elif m == 'neg':
+                a = self.val(i, 0)
+                r = (-a) & 0xFFFFFFFF
+                self.flags_sub(0, a, r, w)
+                self.cf = a != 0
+                self.put(i, 0, r)
+            elif m == 'sbb':
+                a, b = self.val(i, 0), self.val(i, 1)
+                r = (a - b - int(self.cf)) & 0xFFFFFFFF
+                self.flags_sub(a, (b + int(self.cf)) & 0xFFFFFFFF, r, w)
+                self.put(i, 0, r)
+            elif m == 'movzx':
+                self.put(i, 0, self.val(i, 1))
+            elif m == 'imul' and len(i.operands) == 2:
+                a, b = self.val(i, 0), self.val(i, 1)
+                sa = a - (1 << 32) if a & 0x80000000 else a
+                sb = b - (1 << 32) if b & 0x80000000 else b
+                self.put(i, 0, sa * sb)
             elif m == 'imul':
                 a, b = self.val(i, 1), self.val(i, 2)
                 sa = a - (1 << 32) if a & 0x80000000 else a

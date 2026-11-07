@@ -1,796 +1,1210 @@
 {
   "patches": [
     {
-      "id": "pads-layoutb-0009a444",
+      "id": "pads-layoutc-0009a444",
       "kind": "code",
       "function": "0x0009A420",
       "address": "0x0009A444",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009a45b",
+      "id": "pads-layoutc-0009a45b",
       "kind": "code",
       "function": "0x0009A420",
       "address": "0x0009A45B",
       "original_hex": "3d40240000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x2440: scene-100 cover range end 0x2440 (1280) -> 0x4740 (10240)"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x2440: scene-100 cover range end 0x2440 (1280) -> 0x7800 (14336)"
     },
     {
-      "id": "pads-layoutb-0009a462",
+      "id": "pads-layoutc-0009a462",
       "kind": "code",
       "function": "0x0009A420",
       "address": "0x0009A462",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009a469",
+      "id": "pads-layoutc-0009a469",
       "kind": "code",
       "function": "0x0009A420",
       "address": "0x0009A469",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0009a470",
+      "id": "pads-layoutc-0009a470",
       "kind": "code",
       "function": "0x0009A420",
       "address": "0x0009A470",
       "original_hex": "8db062dfffff",
-      "new_hex": "8db0c0b8ffff",
-      "reason": "lea esi, [eax - 0x209e]: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "8db00088ffff",
+      "reason": "lea esi, [eax - 0x209e]: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-0009a4cc",
+      "id": "pads-layoutc-0009a4cc",
       "kind": "code",
       "function": "0x0009A4C0",
       "address": "0x0009A4CC",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009a4d3",
+      "id": "pads-layoutc-0009a4d3",
       "kind": "code",
       "function": "0x0009A4C0",
       "address": "0x0009A4D3",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0009a4e7",
+      "id": "pads-layoutc-0009a4e7",
       "kind": "code",
       "function": "0x0009A4C0",
       "address": "0x0009A4E7",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009a53c",
+      "id": "pads-layoutc-0009a53c",
       "kind": "code",
       "function": "0x0009A510",
       "address": "0x0009A53C",
       "original_hex": "059e200000",
-      "new_hex": "0540470000",
-      "reason": "add eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "0500780000",
+      "reason": "add eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009c57a",
+      "id": "pads-layoutc-0009c57a",
       "kind": "code",
       "function": "0x0009C570",
       "address": "0x0009C57A",
       "original_hex": "2d9e200000",
-      "new_hex": "2d40470000",
-      "reason": "sub eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "2d00780000",
+      "reason": "sub eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009d488",
+      "id": "pads-layoutc-0009d488",
       "kind": "code",
       "function": "0x0009D3B0",
       "address": "0x0009D488",
       "original_hex": "8d879e200000",
-      "new_hex": "8d8740470000",
-      "reason": "lea eax, [edi + 0x209e]: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "8d8700780000",
+      "reason": "lea eax, [edi + 0x209e]: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009d606",
+      "id": "pads-layoutc-0009d606",
       "kind": "code",
       "function": "0x0009D5E0",
       "address": "0x0009D606",
       "original_hex": "81f99e200000",
-      "new_hex": "81f940470000",
-      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81f900780000",
+      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009d612",
+      "id": "pads-layoutc-0009d612",
       "kind": "code",
       "function": "0x0009D5E0",
       "address": "0x0009D612",
       "original_hex": "81f99e200000",
-      "new_hex": "81f940470000",
-      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81f900780000",
+      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009d61a",
+      "id": "pads-layoutc-0009d61a",
       "kind": "code",
       "function": "0x0009D5E0",
       "address": "0x0009D61A",
       "original_hex": "81f9b2200000",
-      "new_hex": "81f954470000",
-      "reason": "cmp ecx, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "81f914780000",
+      "reason": "cmp ecx, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0009d62a",
+      "id": "pads-layoutc-0009d62a",
       "kind": "code",
       "function": "0x0009D5E0",
       "address": "0x0009D62A",
       "original_hex": "81fa9e200000",
-      "new_hex": "81fa40470000",
-      "reason": "cmp edx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81fa00780000",
+      "reason": "cmp edx, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009d636",
+      "id": "pads-layoutc-0009d636",
       "kind": "code",
       "function": "0x0009D5E0",
       "address": "0x0009D636",
       "original_hex": "81fa9e200000",
-      "new_hex": "81fa40470000",
-      "reason": "cmp edx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81fa00780000",
+      "reason": "cmp edx, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0009d63e",
+      "id": "pads-layoutc-0009d63e",
       "kind": "code",
       "function": "0x0009D5E0",
       "address": "0x0009D63E",
       "original_hex": "81fab2200000",
-      "new_hex": "81fa54470000",
-      "reason": "cmp edx, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "81fa14780000",
+      "reason": "cmp edx, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-000bdcec",
+      "id": "pads-layoutc-000bdcec",
       "kind": "code",
       "function": "0x000BDC90",
       "address": "0x000BDCEC",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-000bdcf3",
+      "id": "pads-layoutc-000bdcf3",
       "kind": "code",
       "function": "0x000BDC90",
       "address": "0x000BDCF3",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-000bdd17",
+      "id": "pads-layoutc-000bdd17",
       "kind": "code",
       "function": "0x000BDC90",
       "address": "0x000BDD17",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-000bdd1e",
+      "id": "pads-layoutc-000bdd1e",
       "kind": "code",
       "function": "0x000BDC90",
       "address": "0x000BDD1E",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-000bf4ba",
+      "id": "pads-layoutc-000bf4ba",
       "kind": "code",
       "function": "0x000BF360",
       "address": "0x000BF4BA",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-000bf4c1",
+      "id": "pads-layoutc-000bf4c1",
       "kind": "code",
       "function": "0x000BF360",
       "address": "0x000BF4C1",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-000bf4ce",
+      "id": "pads-layoutc-000bf4ce",
       "kind": "code",
       "function": "0x000BF360",
       "address": "0x000BF4CE",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-000bf4d5",
+      "id": "pads-layoutc-000bf4d5",
       "kind": "code",
       "function": "0x000BF360",
       "address": "0x000BF4D5",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-00159719",
+      "id": "pads-layoutc-00159719",
       "kind": "code",
       "function": "0x001596F0",
       "address": "0x00159719",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-00159720",
+      "id": "pads-layoutc-00159720",
       "kind": "code",
       "function": "0x001596F0",
       "address": "0x00159720",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0015972b",
+      "id": "pads-layoutc-0015972b",
       "kind": "code",
       "function": "0x001596F0",
       "address": "0x0015972B",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-00159762",
+      "id": "pads-layoutc-00159762",
       "kind": "code",
       "function": "0x001596F0",
       "address": "0x00159762",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0015977c",
+      "id": "pads-layoutc-0015977c",
       "kind": "code",
       "function": "0x001596F0",
       "address": "0x0015977C",
       "original_hex": "0562dfffff",
-      "new_hex": "05c0b8ffff",
-      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "050088ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-0015d525",
+      "id": "pads-layoutc-0015d525",
       "kind": "code",
       "function": "0x0015D500",
       "address": "0x0015D525",
       "original_hex": "81ff9e200000",
-      "new_hex": "81ff40470000",
-      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81ff00780000",
+      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0015d52f",
+      "id": "pads-layoutc-0015d52f",
       "kind": "code",
       "function": "0x0015D500",
       "address": "0x0015D52F",
       "original_hex": "81ff9e200000",
-      "new_hex": "81ff40470000",
-      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81ff00780000",
+      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0015d537",
+      "id": "pads-layoutc-0015d537",
       "kind": "code",
       "function": "0x0015D500",
       "address": "0x0015D537",
       "original_hex": "81ffb2200000",
-      "new_hex": "81ff54470000",
-      "reason": "cmp edi, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "81ff14780000",
+      "reason": "cmp edi, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0015e4bd",
+      "id": "pads-layoutc-0015e4bd",
       "kind": "code",
       "function": "0x0015E450",
       "address": "0x0015E4BD",
       "original_hex": "81fa9e200000",
-      "new_hex": "81fa40470000",
-      "reason": "cmp edx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81fa00780000",
+      "reason": "cmp edx, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-00160be2",
+      "id": "pads-layoutc-00160be2",
       "kind": "code",
       "function": "0x00160BD0",
       "address": "0x00160BE2",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-001fcedc",
+      "id": "pads-layoutc-001fcedc",
       "kind": "code",
       "function": "0x001FCE90",
       "address": "0x001FCEDC",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-001fcef0",
+      "id": "pads-layoutc-001fcef0",
       "kind": "code",
       "function": "0x001FCE90",
       "address": "0x001FCEF0",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-001fcef7",
+      "id": "pads-layoutc-001fcef7",
       "kind": "code",
       "function": "0x001FCE90",
       "address": "0x001FCEF7",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-001fcefe",
+      "id": "pads-layoutc-001fcefe",
       "kind": "code",
       "function": "0x001FCE90",
       "address": "0x001FCEFE",
       "original_hex": "0562dfffff",
-      "new_hex": "05c0b8ffff",
-      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "050088ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-002329e6",
+      "id": "pads-layoutc-002329e6",
       "kind": "code",
       "function": "0x00232270",
       "address": "0x002329E6",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-00232a00",
+      "id": "pads-layoutc-00232a00",
       "kind": "code",
       "function": "0x00232270",
       "address": "0x00232A00",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-00232a07",
+      "id": "pads-layoutc-00232a07",
       "kind": "code",
       "function": "0x00232270",
       "address": "0x00232A07",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-00232a14",
+      "id": "pads-layoutc-00232a14",
       "kind": "code",
       "function": "0x00232270",
       "address": "0x00232A14",
       "original_hex": "0562dfffff",
-      "new_hex": "05c0b8ffff",
-      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "050088ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-00274418",
+      "id": "pads-layoutc-00274418",
       "kind": "code",
       "function": "0x00274400",
       "address": "0x00274418",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0027441f",
+      "id": "pads-layoutc-0027441f",
       "kind": "code",
       "function": "0x00274400",
       "address": "0x0027441F",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-00274426",
+      "id": "pads-layoutc-00274426",
       "kind": "code",
       "function": "0x00274400",
       "address": "0x00274426",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-00274471",
+      "id": "pads-layoutc-00274471",
       "kind": "code",
       "function": "0x00274450",
       "address": "0x00274471",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-00274478",
+      "id": "pads-layoutc-00274478",
       "kind": "code",
       "function": "0x00274450",
       "address": "0x00274478",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0027447f",
+      "id": "pads-layoutc-0027447f",
       "kind": "code",
       "function": "0x00274450",
       "address": "0x0027447F",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0027c3c7",
+      "id": "pads-layoutc-0027c3c7",
       "kind": "code",
       "function": "0x0027C3A0",
       "address": "0x0027C3C7",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-002b0348",
+      "id": "pads-layoutc-002b0348",
       "kind": "code",
       "function": "0x002B0320",
       "address": "0x002B0348",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-002b0353",
+      "id": "pads-layoutc-002b0353",
       "kind": "code",
       "function": "0x002B0320",
       "address": "0x002B0353",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-002b0435",
+      "id": "pads-layoutc-002b0435",
       "kind": "code",
       "function": "0x002B0320",
       "address": "0x002B0435",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-002b0440",
+      "id": "pads-layoutc-002b0440",
       "kind": "code",
       "function": "0x002B0320",
       "address": "0x002B0440",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-002b0456",
+      "id": "pads-layoutc-002b0456",
       "kind": "code",
       "function": "0x002B0320",
       "address": "0x002B0456",
       "original_hex": "f6841144ecfbff01",
-      "new_hex": "f684110418f7ff01",
+      "new_hex": "f684110400f1ff01",
       "reason": "test byte ptr [ecx + edx - 0x413bc], 1: folded runtime[h-base].flags (+4): -0x413BC -> -0x8E7FC"
     },
     {
-      "id": "pads-layoutb-002b5a0e",
+      "id": "pads-layoutc-002b5a0e",
       "kind": "code",
       "function": "0x002B55D0",
       "address": "0x002B5A0E",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-003394ba",
+      "id": "pads-layoutc-003394ba",
       "kind": "code",
       "function": "0x00339480",
       "address": "0x003394BA",
       "original_hex": "81f99e200000",
-      "new_hex": "81f940470000",
-      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81f900780000",
+      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-003394d0",
+      "id": "pads-layoutc-003394d0",
       "kind": "code",
       "function": "0x00339480",
       "address": "0x003394D0",
       "original_hex": "81f99e200000",
-      "new_hex": "81f940470000",
-      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81f900780000",
+      "reason": "cmp ecx, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-003394d8",
+      "id": "pads-layoutc-003394d8",
       "kind": "code",
       "function": "0x00339480",
       "address": "0x003394D8",
       "original_hex": "81f9b2200000",
-      "new_hex": "81f954470000",
-      "reason": "cmp ecx, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "81f914780000",
+      "reason": "cmp ecx, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-003394e0",
+      "id": "pads-layoutc-003394e0",
       "kind": "code",
       "function": "0x00339480",
       "address": "0x003394E0",
       "original_hex": "81c162dfffff",
-      "new_hex": "81c1c0b8ffff",
-      "reason": "add ecx, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "81c10088ffff",
+      "reason": "add ecx, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-0033b7ef",
+      "id": "pads-layoutc-0033b7ef",
       "kind": "code",
       "function": "0x0033B750",
       "address": "0x0033B7EF",
       "original_hex": "817c94149e200000",
-      "new_hex": "817c941440470000",
-      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "817c941400780000",
+      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033b825",
+      "id": "pads-layoutc-0033b825",
       "kind": "code",
       "function": "0x0033B750",
       "address": "0x0033B825",
       "original_hex": "817c94149e200000",
-      "new_hex": "817c941440470000",
-      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "817c941400780000",
+      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033b838",
+      "id": "pads-layoutc-0033b838",
       "kind": "code",
       "function": "0x0033B750",
       "address": "0x0033B838",
       "original_hex": "817c9414b2200000",
-      "new_hex": "817c941454470000",
-      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "817c941414780000",
+      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0033b855",
+      "id": "pads-layoutc-0033b855",
       "kind": "code",
       "function": "0x0033B750",
       "address": "0x0033B855",
       "original_hex": "81e99e200000",
-      "new_hex": "81e940470000",
-      "reason": "sub ecx, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81e900780000",
+      "reason": "sub ecx, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033b964",
+      "id": "pads-layoutc-0033b964",
       "kind": "code",
       "function": "0x0033B940",
       "address": "0x0033B964",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033b97f",
+      "id": "pads-layoutc-0033b97f",
       "kind": "code",
       "function": "0x0033B940",
       "address": "0x0033B97F",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033b986",
+      "id": "pads-layoutc-0033b986",
       "kind": "code",
       "function": "0x0033B940",
       "address": "0x0033B986",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0033b993",
+      "id": "pads-layoutc-0033b993",
       "kind": "code",
       "function": "0x0033B940",
       "address": "0x0033B993",
       "original_hex": "0562dfffff",
-      "new_hex": "05c0b8ffff",
-      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "050088ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-0033bbdf",
+      "id": "pads-layoutc-0033bbdf",
       "kind": "code",
       "function": "0x0033B940",
       "address": "0x0033BBDF",
       "original_hex": "81ff9e200000",
-      "new_hex": "81ff40470000",
-      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81ff00780000",
+      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033bbfe",
+      "id": "pads-layoutc-0033bbfe",
       "kind": "code",
       "function": "0x0033B940",
       "address": "0x0033BBFE",
       "original_hex": "81ff9e200000",
-      "new_hex": "81ff40470000",
-      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "81ff00780000",
+      "reason": "cmp edi, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033bc06",
+      "id": "pads-layoutc-0033bc06",
       "kind": "code",
       "function": "0x0033B940",
       "address": "0x0033BC06",
       "original_hex": "81ffb2200000",
-      "new_hex": "81ff54470000",
-      "reason": "cmp edi, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "81ff14780000",
+      "reason": "cmp edi, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0033bc13",
+      "id": "pads-layoutc-0033bc13",
       "kind": "code",
       "function": "0x0033B940",
       "address": "0x0033BC13",
       "original_hex": "81c762dfffff",
-      "new_hex": "81c7c0b8ffff",
-      "reason": "add edi, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "81c70088ffff",
+      "reason": "add edi, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-0033bc7a",
+      "id": "pads-layoutc-0033bc7a",
       "kind": "code",
       "function": "0x0033BC50",
       "address": "0x0033BC7A",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033bc8e",
+      "id": "pads-layoutc-0033bc8e",
       "kind": "code",
       "function": "0x0033BC50",
       "address": "0x0033BC8E",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033bc95",
+      "id": "pads-layoutc-0033bc95",
       "kind": "code",
       "function": "0x0033BC50",
       "address": "0x0033BC95",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0033bc9c",
+      "id": "pads-layoutc-0033bc9c",
       "kind": "code",
       "function": "0x0033BC50",
       "address": "0x0033BC9C",
       "original_hex": "0562dfffff",
-      "new_hex": "05c0b8ffff",
-      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "050088ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-0033be0b",
+      "id": "pads-layoutc-0033be0b",
       "kind": "code",
       "function": "0x0033BDC0",
       "address": "0x0033BE0B",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033be25",
+      "id": "pads-layoutc-0033be25",
       "kind": "code",
       "function": "0x0033BDC0",
       "address": "0x0033BE25",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033be2c",
+      "id": "pads-layoutc-0033be2c",
       "kind": "code",
       "function": "0x0033BDC0",
       "address": "0x0033BE2C",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0033be39",
+      "id": "pads-layoutc-0033be39",
       "kind": "code",
       "function": "0x0033BDC0",
       "address": "0x0033BE39",
       "original_hex": "0562dfffff",
-      "new_hex": "05c0b8ffff",
-      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "050088ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-0033bec5",
+      "id": "pads-layoutc-0033bec5",
       "kind": "code",
       "function": "0x0033BDC0",
       "address": "0x0033BEC5",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033bedf",
+      "id": "pads-layoutc-0033bedf",
       "kind": "code",
       "function": "0x0033BDC0",
       "address": "0x0033BEDF",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033bee6",
+      "id": "pads-layoutc-0033bee6",
       "kind": "code",
       "function": "0x0033BDC0",
       "address": "0x0033BEE6",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0033bef3",
+      "id": "pads-layoutc-0033bef3",
       "kind": "code",
       "function": "0x0033BDC0",
       "address": "0x0033BEF3",
       "original_hex": "0562dfffff",
-      "new_hex": "05c0b8ffff",
-      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "050088ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
     },
     {
-      "id": "pads-layoutb-0033efbc",
+      "id": "pads-layoutc-0033efbc",
       "kind": "code",
       "function": "0x0033EF90",
       "address": "0x0033EFBC",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033efda",
+      "id": "pads-layoutc-0033efda",
       "kind": "code",
       "function": "0x0033EF90",
       "address": "0x0033EFDA",
       "original_hex": "3d9e200000",
-      "new_hex": "3d40470000",
-      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x4740, above a 10240-entry cover range"
+      "new_hex": "3d00780000",
+      "reason": "cmp eax, 0x209e: runtime pad handle base 0x209E -> 0x7800, above a 14336-entry cover range above 16384 regular handles"
     },
     {
-      "id": "pads-layoutb-0033efe1",
+      "id": "pads-layoutc-0033efe1",
       "kind": "code",
       "function": "0x0033EF90",
       "address": "0x0033EFE1",
       "original_hex": "3db2200000",
-      "new_hex": "3d54470000",
-      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x4754"
+      "new_hex": "3d14780000",
+      "reason": "cmp eax, 0x20b2: runtime handle end 0x20B2 -> 0x7814"
     },
     {
-      "id": "pads-layoutb-0033efee",
+      "id": "pads-layoutc-0033efee",
       "kind": "code",
       "function": "0x0033EF90",
       "address": "0x0033EFEE",
       "original_hex": "0562dfffff",
-      "new_hex": "05c0b8ffff",
-      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x4740"
+      "new_hex": "050088ffff",
+      "reason": "add eax, 0xffffdf62: runtime handle -> index: -0x209E -> -0x7800"
+    },
+    {
+      "id": "pads-coverbase-0009a40b",
+      "kind": "code",
+      "function": "0x0009A3C0",
+      "address": "0x0009A40B",
+      "original_hex": "05401f0000",
+      "new_hex": "0500400000",
+      "reason": "add eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); add eax,0x1F40: cover index -> handle (sub_0009A3C0)"
+    },
+    {
+      "id": "pads-coverbase-0009a43d",
+      "kind": "code",
+      "function": "0x0009A420",
+      "address": "0x0009A43D",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_0009A420 decoder)"
+    },
+    {
+      "id": "pads-coverbase-0009a454",
+      "kind": "code",
+      "function": "0x0009A420",
+      "address": "0x0009A454",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_0009A420)"
+    },
+    {
+      "id": "pads-coverbase-0009a49b",
+      "kind": "code",
+      "function": "0x0009A420",
+      "address": "0x0009A49B",
+      "original_hex": "8db0c0e0ffff",
+      "new_hex": "8db000c0ffff",
+      "reason": "lea esi, [eax - 0x1f40]: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); lea esi,[eax-0x1F40]: cover handle -> index (sub_0009A420)"
+    },
+    {
+      "id": "pads-coverbase-0009a4e0",
+      "kind": "code",
+      "function": "0x0009A4C0",
+      "address": "0x0009A4E0",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_0009A4C0 decoder)"
+    },
+    {
+      "id": "pads-coverbase-0009a4f4",
+      "kind": "code",
+      "function": "0x0009A4C0",
+      "address": "0x0009A4F4",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_0009A4C0)"
+    },
+    {
+      "id": "pads-coverbase-0009a553",
+      "kind": "code",
+      "function": "0x0009A510",
+      "address": "0x0009A553",
+      "original_hex": "05401f0000",
+      "new_hex": "0500400000",
+      "reason": "add eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); add eax,0x1F40: cover index -> handle (sub_0009A510)"
+    },
+    {
+      "id": "pads-coverbase-0009cce7",
+      "kind": "code",
+      "function": "0x0009CCA0",
+      "address": "0x0009CCE7",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_0009CCA0)"
+    },
+    {
+      "id": "pads-coverbase-0009d26e",
+      "kind": "code",
+      "function": "0x0009CE00",
+      "address": "0x0009D26E",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (nav loader sub_0009CE00)"
+    },
+    {
+      "id": "pads-coverbase-0009d37e",
+      "kind": "code",
+      "function": "0x0009CE00",
+      "address": "0x0009D37E",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_0009CE00)"
+    },
+    {
+      "id": "pads-coverbase-0009d474",
+      "kind": "code",
+      "function": "0x0009D3B0",
+      "address": "0x0009D474",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_0009D3B0)"
+    },
+    {
+      "id": "pads-coverbase-0009d5fe",
+      "kind": "code",
+      "function": "0x0009D5E0",
+      "address": "0x0009D5FE",
+      "original_hex": "81f9401f0000",
+      "new_hex": "81f900400000",
+      "reason": "cmp ecx, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp ecx,0x1F40: handle >= cover base (sub_0009D5E0, jl)"
+    },
+    {
+      "id": "pads-coverbase-0009d622",
+      "kind": "code",
+      "function": "0x0009D5E0",
+      "address": "0x0009D622",
+      "original_hex": "81fa401f0000",
+      "new_hex": "81fa00400000",
+      "reason": "cmp edx, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp edx,0x1F40: handle >= cover base (sub_0009D5E0, jl)"
+    },
+    {
+      "id": "pads-coverbase-00159712",
+      "kind": "code",
+      "function": "0x001596F0",
+      "address": "0x00159712",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_001596F0)"
+    },
+    {
+      "id": "pads-coverbase-0015975b",
+      "kind": "code",
+      "function": "0x001596F0",
+      "address": "0x0015975B",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_001596F0)"
+    },
+    {
+      "id": "pads-coverbase-0015976f",
+      "kind": "code",
+      "function": "0x001596F0",
+      "address": "0x0015976F",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_001596F0)"
+    },
+    {
+      "id": "pads-coverbase-0015d51a",
+      "kind": "code",
+      "function": "0x0015D500",
+      "address": "0x0015D51A",
+      "original_hex": "81ff401f0000",
+      "new_hex": "81ff00400000",
+      "reason": "cmp edi, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp edi,0x1F40: handle >= cover base (sub_0015D500, jl)"
+    },
+    {
+      "id": "pads-coverbase-0015e4b5",
+      "kind": "code",
+      "function": "0x0015E450",
+      "address": "0x0015E4B5",
+      "original_hex": "81fa401f0000",
+      "new_hex": "81fa00400000",
+      "reason": "cmp edx, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp edx,0x1F40: handle >= cover base (AI +0x684 handle, sub_0015E450)"
+    },
+    {
+      "id": "pads-coverbase-00160bd4",
+      "kind": "code",
+      "function": "0x00160BD0",
+      "address": "0x00160BD4",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_00160BD0)"
+    },
+    {
+      "id": "pads-coverbase-001fced5",
+      "kind": "code",
+      "function": "0x001FCE90",
+      "address": "0x001FCED5",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_001FCE90)"
+    },
+    {
+      "id": "pads-coverbase-001fcee3",
+      "kind": "code",
+      "function": "0x001FCE90",
+      "address": "0x001FCEE3",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_001FCE90)"
+    },
+    {
+      "id": "pads-coverbase-002329df",
+      "kind": "code",
+      "function": "0x00232270",
+      "address": "0x002329DF",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_00232270)"
+    },
+    {
+      "id": "pads-coverbase-002329f3",
+      "kind": "code",
+      "function": "0x00232270",
+      "address": "0x002329F3",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_00232270)"
+    },
+    {
+      "id": "pads-coverbase-00274411",
+      "kind": "code",
+      "function": "0x00274400",
+      "address": "0x00274411",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_00274400)"
+    },
+    {
+      "id": "pads-coverbase-0027446a",
+      "kind": "code",
+      "function": "0x00274450",
+      "address": "0x0027446A",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_00274450)"
+    },
+    {
+      "id": "pads-coverbase-0027c3bb",
+      "kind": "code",
+      "function": "0x0027C3A0",
+      "address": "0x0027C3BB",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_0027C3A0)"
+    },
+    {
+      "id": "pads-coverbase-002b5a03",
+      "kind": "code",
+      "function": "0x002B55D0",
+      "address": "0x002B5A03",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_002B55D0)"
+    },
+    {
+      "id": "pads-coverbase-002b5a22",
+      "kind": "code",
+      "function": "0x002B55D0",
+      "address": "0x002B5A22",
+      "original_hex": "0fbf94080818fcff",
+      "new_hex": "0fbf94080800f8ff",
+      "reason": "movsx edx, word ptr [eax + ecx - 0x3e7f8]: cover pad handle base folded cover[h - 0x1F40].owner (x32, +8) -> base 0x4000 (regular handles 0..0x3FFF); movsx edx,[eax+ecx-0x3E7F8]: folded cover[h-0x1F40] (x32, +8), cover base kept"
+    },
+    {
+      "id": "pads-coverbase-002b5a86",
+      "kind": "code",
+      "function": "0x002B55D0",
+      "address": "0x002B5A86",
+      "original_hex": "0fbf84110818fcff",
+      "new_hex": "0fbf84110800f8ff",
+      "reason": "movsx eax, word ptr [ecx + edx - 0x3e7f8]: cover pad handle base folded cover[h - 0x1F40].owner (x32, +8) -> base 0x4000 (regular handles 0..0x3FFF); movsx eax,[ecx+edx-0x3E7F8]: folded cover[h-0x1F40] (x32, +8), cover base kept"
+    },
+    {
+      "id": "pads-coverbase-003394b2",
+      "kind": "code",
+      "function": "0x00339480",
+      "address": "0x003394B2",
+      "original_hex": "81f9401f0000",
+      "new_hex": "81f900400000",
+      "reason": "cmp ecx, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp ecx,0x1F40: handle >= cover base (sub_00339480)"
+    },
+    {
+      "id": "pads-coverbase-003394c2",
+      "kind": "code",
+      "function": "0x00339480",
+      "address": "0x003394C2",
+      "original_hex": "81c1c0e0ffff",
+      "new_hex": "81c100c0ffff",
+      "reason": "add ecx, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add ecx,-0x1F40: cover handle -> index (sub_00339480)"
+    },
+    {
+      "id": "pads-coverbase-0033b7dc",
+      "kind": "code",
+      "function": "0x0033B750",
+      "address": "0x0033B7DC",
+      "original_hex": "817c9414401f0000",
+      "new_hex": "817c941400400000",
+      "reason": "cmp dword ptr [esp + edx*4 + 0x14], 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp [esp+edx*4+0x14],0x1F40: handle >= cover base (sub_0033B750)"
+    },
+    {
+      "id": "pads-coverbase-0033b80b",
+      "kind": "code",
+      "function": "0x0033B750",
+      "address": "0x0033B80B",
+      "original_hex": "81ea401f0000",
+      "new_hex": "81ea00400000",
+      "reason": "sub edx, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); sub edx,0x1F40: cover handle -> index (sub_0033B750)"
+    },
+    {
+      "id": "pads-coverbase-0033b95d",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033B95D",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_0033B940)"
+    },
+    {
+      "id": "pads-coverbase-0033b971",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033B971",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_0033B940)"
+    },
+    {
+      "id": "pads-coverbase-0033bbd7",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033BBD7",
+      "original_hex": "81ff401f0000",
+      "new_hex": "81ff00400000",
+      "reason": "cmp edi, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp edi,0x1F40: handle >= cover base (sub_0033B940)"
+    },
+    {
+      "id": "pads-coverbase-0033bbed",
+      "kind": "code",
+      "function": "0x0033B940",
+      "address": "0x0033BBED",
+      "original_hex": "81c7c0e0ffff",
+      "new_hex": "81c700c0ffff",
+      "reason": "add edi, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add edi,-0x1F40: cover handle -> index (sub_0033B940)"
+    },
+    {
+      "id": "pads-coverbase-0033bc73",
+      "kind": "code",
+      "function": "0x0033BC50",
+      "address": "0x0033BC73",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_0033BC50)"
+    },
+    {
+      "id": "pads-coverbase-0033bc81",
+      "kind": "code",
+      "function": "0x0033BC50",
+      "address": "0x0033BC81",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_0033BC50)"
+    },
+    {
+      "id": "pads-coverbase-0033be04",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BE04",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_0033BDC0)"
+    },
+    {
+      "id": "pads-coverbase-0033be18",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BE18",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_0033BDC0)"
+    },
+    {
+      "id": "pads-coverbase-0033bebe",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BEBE",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_0033BDC0)"
+    },
+    {
+      "id": "pads-coverbase-0033bed2",
+      "kind": "code",
+      "function": "0x0033BDC0",
+      "address": "0x0033BED2",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_0033BDC0)"
+    },
+    {
+      "id": "pads-coverbase-0033efb5",
+      "kind": "code",
+      "function": "0x0033EF90",
+      "address": "0x0033EFB5",
+      "original_hex": "3d401f0000",
+      "new_hex": "3d00400000",
+      "reason": "cmp eax, 0x1f40: cover pad handle base 0x1F40 -> 0x4000 (regular handles 0..0x3FFF); cmp eax,0x1F40: handle >= cover base (sub_0033EF90)"
+    },
+    {
+      "id": "pads-coverbase-0033efc9",
+      "kind": "code",
+      "function": "0x0033EF90",
+      "address": "0x0033EFC9",
+      "original_hex": "05c0e0ffff",
+      "new_hex": "0500c0ffff",
+      "reason": "add eax, 0xffffe0c0: cover pad handle base -0x1F40 -> -0x4000 (regular handles 0..0x3FFF); add eax,-0x1F40: cover handle -> index (sub_0033EF90)"
+    },
+    {
+      "id": "pads-regid-0009a37e",
+      "kind": "code",
+      "function": "0x0009A330",
+      "address": "0x0009A37E",
+      "original_hex": "81f929230000",
+      "new_hex": "81f9e97b0000",
+      "reason": "cmp ecx, 0x2329 (jge invalid) in the pad validity test: a regular pad id is valid up to the last high regular id (0x7BE8; regular pads 8000.. take ids 0x5B29.. above the cover ids)"
     },
     {
       "id": "pads-idthreshold-0023f300",

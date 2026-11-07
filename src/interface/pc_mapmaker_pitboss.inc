@@ -213,7 +213,10 @@ static const float pit_pad_xyz[PIT_PADS_N][4]={
  * ragbugs' dives read them through sub_0009A420(index), which sends 0x1F40..
  * 0x243F (scene 100) to the cover pool and returns 0 for a pad its check
  * sub_0009A330 refuses: the .66/.68 heap block's index was past 0x1F40, so the
- * dives had no target and the ragbugs hung in phase 4 (m68.err "4 4 4"). */
+ * dives had no target and the ragbugs hung in phase 4 (m68.err "4 4 4").
+ * Since Layout C (pc_mapmaker_pads.inc, 2026-11-07) the pool is 16,384 and
+ * the cover base 0x4000, so the tail (16,384 - 13 x (n + 1)) still decodes
+ * as regular pads; the map's own pads keep the pool's front. */
 #ifdef MAPMAKER_POOL_PADS
 #define PIT_PAD_POOL MAPMAKER_POOL_PADS
 #else
@@ -436,7 +439,7 @@ static void pit_pads(PitInst *k)
     uint32_t base=WORD_AT(PIT_PAD_TABLE),idx,p,i;
     unsigned n=(unsigned)(k-pit_lv.k);
     if(n>=PIT_MAX || !base) return;
-    idx=PIT_PAD_POOL-PIT_PADS_N*(n+1u);                 /* the pool's tail: below 0x1F40, so sub_0009A420 reads the pad table */
+    idx=PIT_PAD_POOL-PIT_PADS_N*(n+1u);                 /* the pool's tail: below the cover base, so sub_0009A420 reads the pad table */
     if(WORD_AT(PIT_PAD_COUNT)>idx || !MAPMAKER_PTR_OK(base+idx*0x20u,PIT_PADS_N*0x20u)) {
         if(!k->pads_full++) pit_log("pad pool too full for the rim pads: the fire and dives keep stock targets (pads, first free)",WORD_AT(PIT_PAD_COUNT),idx);
         return;

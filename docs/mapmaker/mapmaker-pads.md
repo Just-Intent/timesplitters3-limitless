@@ -9,27 +9,41 @@ in the disassembly at the given address; INFERRED = reasoning, not observed.
 
 | Item | Stock | Now | Where |
 | --- | --- | --- | --- |
-| Cover handle range | 350 (1280 in scene 100, overlapping runtime handles) | 10,240 in every scene | `config/guest-code-patches/pads.json` (88 rewrites) |
-| Runtime pad handles | 0x209E..0x20B1 | 0x4740..0x4753 | same |
-| Scene-100 cover pool | 1280 x 32 B | 10,496 x 32 B (range + 256 guard) | `MAPMAKER_POOL_COVER`, `pc_display_mapmaker_pools` |
-| Editor cover limit (opt-in) | 1024 | 9,984 (range - 256, the stock spare) | `MAPMAKER_LIMIT_COVER` |
+| Cover handle range | 350 (1280 in scene 100, overlapping runtime handles) | 14,336 at 0x4000 in every scene (Layout C, 2026-11-07; 10,240 at 0x1F40 in Layout B) | `config/guest-code-patches/pads.json` (88 runtime + 45 cover-base rewrites) |
+| Runtime pad handles | 0x209E..0x20B1 | 0x7800..0x7813 (Layout B: 0x4740) | same |
+| Scene-100 cover pool | 1280 x 32 B | 14,592 x 32 B (range + 256 guard) | `MAPMAKER_POOL_COVER`, `pc_display_mapmaker_pools` |
+| Editor cover limit (opt-in) | 1024 | 14,080 (range - 256, the stock spare; 9,984 before) | `MAPMAKER_LIMIT_COVER` |
 | Link pool (scene 100) | 4400 x 20 B (editor 4400) | 32,512 x 20 B, fixed (int16 A* indices); editor: template links + half the side slots <= 32,256 (2026-11-07; 16 per piece from 2026-11-02; was 16,336 / 12,000); stitcher stops at the pool | `MAPMAKER_POOL_LINKS`, `pc_display_mapmaker_pools`, `pc_mapmaker_pads_stitch` |
 | Group A* node pool | 1000 nodes .bss 0x0070E178, no bound | 8192 nodes at 0x008E0000, bounded | `pads.json` relocation + `pc_mapmaker_pads_group_node` |
 | Pad A* node pool | 1000 nodes .bss 0x00712058, no bound | 1000 nodes, bounded | `pc_mapmaker_pads_pad_node` |
 | Start-point cover top-up | unbounded | refused past the cover capacity (scene 100) | `pc_mapmaker_pads_cover_topup` |
 | Pad id threshold (13 compares) | id > 8000 is cover | id > 9000 (0x2328) is cover | `pads.json` `pads-idthreshold-*` (2026-11-02) |
-| Regular pads (scene 100) | pool 2400, editor 2400 | pool 8000 (the regular handle range), editor 7,680 | `MAPMAKER_POOL_PADS`, `MAPMAKER_LIMIT_PADS` |
+| Regular pads (scene 100) | pool 2400, editor 2400 | pool 16,384 (handles 0..0x3FFF), editor 16,128 (8000 / 7,680 before 2026-11-07) | `MAPMAKER_POOL_PADS`, `MAPMAKER_LIMIT_PADS` |
+| Pad ids past 8000 | none | regular pads 8000.. take 0x5B29.. (above the cover ids) | `pc_mapmaker_pads.inc` hooks, `pads-regid-0009a37e` |
+| Pad groups | 300 | 2047; distances computed on first use above 1024 | `MAPMAKER_LIMIT_GROUPS`, `pc_mapmaker_pads_group_matrix` |
 
-Unchanged on purpose: pad ids (regular 0x3E9 + i, cover 0x2329 + i,
-runtime -2), so saved maps and story files read the same; the cover handle
-base 0x1F40; the regular handle range (index < 0x1F40). Regular pads were
-4800 in the editor until 2026-11-02 (now 7,680, below).
+Unchanged on purpose: every existing pad id (regular 0x3E9 + i below 8000,
+cover 0x2329 + i, runtime -2), so saved maps and story files read the same.
+The cover handle base moved 0x1F40 -> 0x4000 on 2026-11-07 ("Layout C"
+below); before that it was kept.
 
 ## Wrappers for the integrator
 
     WRAP sub_0009B090 -> pc_mapmaker_pads_group_node
     WRAP sub_0009B730 -> pc_mapmaker_pads_pad_node
     WRAP sub_0023F9D0 -> pc_mapmaker_pads_cover_topup
+    WRAP sub_0009DC70 -> pc_mapmaker_pads_stitch
+    WRAP sub_0009B540 -> pc_mapmaker_pads_group_route      (pc_mapmaker_astar.inc)
+    # 2026-11-07, Layout C (need regeneration; all area "pads"):
+    WRAP sub_0009A3C0 -> pc_mapmaker_pads_cover_lookup
+    WRAP sub_0009CCA0 -> pc_mapmaker_pads_pointer
+    WRAP sub_0009D3B0 -> pc_mapmaker_pads_runtime_new
+    WRAP sub_0009A7A0 -> pc_mapmaker_pads_tile_load
+    WRAP sub_00332490 -> pc_mapmaker_pads_editor_id
+    WRAP sub_002FA150 -> pc_mapmaker_pads_editor_groups
+    WRAP sub_00334B20 -> pc_mapmaker_pads_editor_item_pads
+    WRAP sub_00275F70 -> pc_mapmaker_pads_group_matrix
+    WRAP sub_00275F40 -> pc_mapmaker_pads_group_distance
 
 `src/interface/pc_mapmaker_pads.inc` must be included after `pc_mapmaker_limits.inc`
 (it uses `mapmaker_limits`, `mapmaker_limits_read`, `MAPMAKER_LIMIT_COVER`
@@ -291,3 +305,104 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
 ## Decoder classification (2026-10-30)
 
 `tests/mapmaker/test_mapmaker_pads_classified.py` decodes all game code with the lifter's decoder (the listing scan above misses elided long instructions) and requires every 0x209D/0x209E/0x20B1/0x20B2/0x243F/0x2440/0x1F40 constant (any sign) and every negative displacement within 0x40 of a handle base x 2..64 to be in pads.json or reviewed: 88 rewritten (all of them in the table), `0x002B0363` kept, 59 cover-base/id-threshold 0x1F40 sites, 7 unrelated 0x1F40 fields. No missed site.
+
+## Layout C: 16,384 regular pads, ids past 8000 (2026-11-07)
+
+Static analysis, decoder and emulator checks only; not built or played.
+
+Handles: regular = index 0..0x3FFF, cover = 0x4000 + index (14,336),
+runtime = 0x7800 + slot. `pads.json` re-values the 88 runtime sites
+(`pads-layoutc-*`: 0x209E/0x4740 -> 0x7800, 0x20B2 -> 0x7814, -base,
+folded `-0x413BC` -> `-0xEFFFC`) and rewrites the 45 cover-base sites
+(`pads-coverbase-*`: 27 `cmp`/`add` 0x1F40, 16 `-0x1F40`, the two folded
+`cover[h].owner` reads `-0x3E7F8` -> `-0x7FFF8`). `0x003BC6EC cmp
+eax,0x1F40` is a network port compare (`sub_003BC6D0`), not a handle: it
+was mislabelled as cover base and stays. All handles stay below 0x7FFF.
+
+Ids: regular index i < 8000 keeps 0x3E9 + i; cover j keeps 0x2329 + j;
+regular i >= 8000 takes 0x5B29 + (i - 8000) (the "high" ids, at most
+0x7BE8, above the 14,336 cover ids). One-sided tests ("id >= 0x2329 is
+cover", the 13 "id > 0x2328 take the owner") meet high ids, so each place
+that reads ids is covered (inventory: `test_mapmaker_padids_classified.py`,
+19 `0x2329` sites, 26 `0x3E9` sites):
+
+- `sub_0009A3C0` (cover id -> handle; reached by `sub_0009CC40`,
+  `sub_0006C1E0`, `sub_0009CCA0`, `sub_0009D3B0`, story `sub_0009CE00`): a
+  high id answers its regular handle with `sub_0009CC40`'s search,
+  step for step (`mapmaker_pads_search`).
+- `sub_0009CCA0` (id -> pad): high ids give the regular pad; to the 13
+  threshold callers (return addresses `0x0023F30D` ... `0x003395A4`, each
+  followed by `movsx reg,[eax+8]`) a scratch pad below the guest stack
+  whose owner word is the id itself; to `sub_0033B100` (`0x0033B179`, which
+  subtracts 0x3E9) a scratch owner 0x3E9 + index when a cover pad's owner is
+  high.
+- `sub_0009D3B0` (runtime pad): fixes `+0x18` for a high owner after the
+  call. `sub_0009A330`: `pads-regid-0009a37e` (`cmp ecx,0x2329` -> 0x7BE9).
+- `sub_0009A7A0` (tile loader) numbers 0x3E9 + index and owners likewise
+  and reads owners back by `- 0x3E9` inside the call; the hook renumbers
+  pads 8000.. and this tile's cover owners after it (low word of `+8`).
+- Stitcher (`sub_0009DC70`, id - 0x3E9): high ids become 0x3E9 + index
+  first (fits the u16). Start-point top-up (`0x0023FA20` filters ids
+  >= 0x2329): high seed ids are replaced by aliases 0x80000000 + k for the
+  call (resolved by the pointer hook) and restored.
+- Host code: the teleporter pairing (`pc_mapmaker_objects.inc`) read pad
+  ids `> 0x1F40` as cover (wrong for regular pads 7000..7999 too); now the
+  cover range 0x2329..0x5B28. `pc_mapmaker_bugfix.inc` runtime base 0x7800.
+- Editor: `sub_00332490` returns the high id; `sub_002FA150` (group count)
+  and `sub_00334B20` (item pads as base + local) run on 0x3E9 + index in a
+  scope, and `sub_00334B20`'s list is mapped afterwards outside it.
+
+Map files: a map with at most 8000 regular pads is written byte for byte as
+before (no id changes), so it loads in every build and, within its size,
+in the stock game. Maps with more get high ids: older Limitless builds
+(.66 and before, pool 8000) would overflow their regular pool loading them
+(do not open them there), and the stock game cannot open maps of that size
+(500+ tiles, well past its 32 KB file). No version flag is written: the
+container version 0x12D is checked strictly by callers that crash on a
+refusal (`logs/limits/container.md`). Saved Story AI points are cover ids
+and decode as before.
+
+Memory: pools 2.36 MB in the nav block (was 1.59 MB): regular 512 KB, AI
+data 704 KB, cover 467 KB, links 650 KB. The pit skeleton's rim pads
+(`pc_mapmaker_pitboss.inc`) use the pool's tail (16,384 - 13 x (n + 1)).
+
+## Group distances above 1024 groups (2026-11-07)
+
+`sub_00275F70` (modes 2/3 only, from `sub_00158BA0`) builds an
+(N+1) x N x 4 B matrix with N x N route searches (`sub_001596F0`, group A*
+plus a pad A* step): 4.2 MB and about 1 M searches at 1024 groups, 16.8 MB
+and 4.2 M at 2047. Above 1024 groups (scene 100, pools on)
+`pc_mapmaker_pads_group_matrix` keeps the link flags, the mask
+`[0x004D9788]` and the door flag `[0x00715F50]` as they are at load and
+leaves `[0x0078B2D8]` at 0; `pc_mapmaker_pads_group_distance` (reader
+`sub_00275F40`, 5 callers in bot AI) computes an entry on its first read:
+the same `sub_0009C550` first pads, route struct, zeroed `[0x00715F44]`/
+`[0x00715F48]`, `sub_001596F0` and `B + A` (or `[0x00475D5C]` for no route),
+with the load-time flags put back for the search and the globals it writes
+restored; cached per row in host memory, pushed on the x87 stack. The
+character argument is 0 (it selects only which AI struct the search writes
+to: `+0x684` for cover destinations, never a group's first pad, and
+`+0x28 |= 0x200` when the route starts at a pad listed in `[0x007B65E0]`,
+whose count has no writer in the decode). Difference from stock: that flag
+is no longer set on `[[0x007B0C48]+0x14]`'s AI at load. Up to 1024 groups,
+`TSFP_MAPMAKER_GROUP_MATRIX=dense`, other scenes or pools off: the original
+(`=lazy` forces the lazy path). stderr: `[mapmaker] pads: N pad groups:
+distances computed on first use ...`, then every 4096 entries a summary.
+
+The group A* node pool stays 8192 (`pc_mapmaker_astar.inc`): searches that
+explore more than 8192 links (unreachable targets on the biggest maps) are
+cut short and report no route.
+
+Tests: `tests/mapmaker/mapmaker_pads.c` (ids, search, hooks, tiles, editor
+scopes, alias, stitch, lazy matrix; their mutations in
+`test_mapmaker_pads.py`), `test_mapmaker_padids.py` (emulator: the guest
+search vs C on 10 pool sizes; stock vs Layout C decoders on a story-sized
+map in scenes 53/100; Layout C on the largest pools; the original
+`sub_00275F70` vs the lazy reader with a link changed after load; 4
+mutations caught), `test_mapmaker_padids_classified.py`,
+`test_mapmaker_pads_classified.py` (every handle constant: 88 + 45 + 13).
+
+Test in play: a full grid of tile 12 or 26 (1023 x 9 = 9,207 pads) with
+bots in each mode, and a mode 2/3 match on a map of more than 1024 groups
+(stderr line above): bots should move between tiles past index 8000
+(probe the pad count), shoot, take cover; save, reload, play again.
