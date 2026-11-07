@@ -434,9 +434,9 @@ start had no frame for 60 s; play lagged near many enemies.
   per-link (open/closed) and per-group (open) counts skip walks that would
   find nothing. `TSFP_MAPMAKER_ASTAR=0` original, 2 walks every list; stderr
   `[mapmaker] group routes: ...` (first two, then every 4096th).
-- Tests: `test_mapmaker_portals.py` (29 C mutations; grid vs every pair, 24
+- Tests: `test_mapmaker_portals.py` (28 C mutations; grid vs every pair, 24
   recorded maps, hand maps), `test_mapmaker_astar.py` (22 mutations; counts vs
-  walks, 12 recorded graphs, chain/doors/mask/bound); both run the original
+  walks, 12 recorded graphs, chain/ties/doors/mask/bound); both run the original
   XBE code in `tests/mapmaker/guest_emulator.py` (portal passes 0x0008ADDD..
   0x0008BA61 with rooms.json operands; A* 0x0009B090..0x0009B629 with the
   pads.json pool relocation) and require identical guest memory (4 maps / 4
