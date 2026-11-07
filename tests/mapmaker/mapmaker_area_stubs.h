@@ -146,6 +146,7 @@ void sub_000A5E40(void) {} void sub_000631C0(void) {}  /* tank: model request at
 void sub_00256040(void) {}  /* tank: the castle's explosive-on-the-stunned-tank damage */
 void sub_00096330(void) {}  /* mothership: texture registration */
 void sub_00096220(void) {}  /* storyprops: load-pass texture registration */
+void sub_000B3B20(void) {}  /* vehicles: gun template preload */
 void sub_002F7920(void) {}  /* sets: spawn mode mask of an editor item */
 void sub_0003E0B0(void) {} void sub_00165760(void) {}  /* objects: physics body pools */
 void sub_0033E560(void) {}  /* aitemplates: the AI death event */

@@ -130,6 +130,19 @@ preload `sub_0006C090`), paks l_64_ch / l_26_st + memory paks l_64_chm / l_26_st
 there; .55 fix: WRAP sub_00063900 registers via sub_00096220; .57 floated: cell at drum height, `TSFP_MAPMAKER_POWERCELL_LIFT`). 10 WRAPs:
 mapmaker-storyprops.md. `test_mapmaker_storyprops.py`. Unplayed.
 
+Story vehicles (wave 3, area `vehicles`, `pc_mapmaker_vehicles.inc`, after
+storyprops): MapMaker vehicle 0x2B options (heap descriptor on a category 35
+copy, node +0x30 'VH', record byte +0xC) choose the Machine Wars tank (def 2,
+model 0xB, gun templates 1/2) or the castle truck (def 0, model 7, Vickers
+template 0 or none). WRAP `sub_0033DDA0` sets the def at the preload
+(0x0023F637, plus `sub_000B3B20` per template) and def+model at the fill
+(0x00241D39, only when every created model was read: `sub_000B3B80` has no
+null test); WRAP `sub_00182A20` (0x0006E949, also the restart) writes the
+story record fields +0x28..+0x34. Stream paks lv5/prop1, lv4/prop3 mounted
+index-only (textures inside). Category 35 is no longer raised (4-block pool
+`sub_001806B0`, unchecked pop); restable row Vehicles. 9 WRAPs:
+mapmaker-vehicles.md. `test_mapmaker_vehicles.py`. Unplayed.
+
 Tank TNT (.55, CONFIRMED, `test_tnt_on_the_stunned_tank`): a sticky explosive
 going off (`sub_000F0430`) calls `sub_00228B50` (story mode, 0x000F049A), which
 runs the castle's `sub_001E4030` -> `sub_00256040(tank, explosive)` only in
