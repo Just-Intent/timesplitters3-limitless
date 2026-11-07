@@ -486,7 +486,7 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 `sub_0015E7C0` -> `_tank_request` (level-init models), `sub_000A2740` -> `_draw`
 (log); shown (+0x28 bit 0) at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
-Boss areas, skies, open air, set slots: [boss notes](limitless-bosses.md). Anim slots
+Bosses (.40 robot doors, Crowe ledges), skies, open air, set slots: [boss notes](limitless-bosses.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
 draw (.32: grain/haze alpha WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md.
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
