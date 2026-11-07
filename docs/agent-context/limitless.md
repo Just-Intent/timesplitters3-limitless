@@ -310,10 +310,11 @@ unless `TSFP_MAPMAKER_LIMITS=1`, then 0, so MapMaker Story uses the Arcade
 roster of player 0's unlocked characters, starts on the profile's last
 choice, stores the choice and writes it (and the variant) to the config for
 each local player. Play code already takes the character from the config.
-Campaign story, Arcade Custom, challenges and System Link (modes 11..13) are
+Campaign story, Arcade Custom, challenges, System Link (modes 11..13):
 unchanged. The gate stays 0 if the hooks do not run, so `story` must not be
 switched off by `TSFP_MAPMAKER_AREA_OFF`. Tests:
 `tests/mapmaker/test_mapmaker_story_character.py`; notes `docs/mapmaker/mapmaker-story-character.md`.
+Story asset inventory: `docs/mapmaker/mapmaker-story-assets.md`.
 
 Story AI groups (`src/interface/pc_mapmaker_aitemplates.inc`, `docs/mapmaker/mapmaker-aitemplates.md`,
 `TSFP_MAPMAKER_LIMITS=1`): the Story AI edit screen (`sub_0031CB90`, list path
