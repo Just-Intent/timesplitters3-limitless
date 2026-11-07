@@ -773,6 +773,10 @@ Without the new wrapper, frustum culls count as "later" (summary says so).
 
 ## Drawn through the camera's room
 
+After .62 the pit skeleton's satellites (bottle 0x24A, rack 0x246, bandage
+0x24B, ragbug 0x6CB) ride along in a second pass and get the whole viewport
+in bigdraw ([pit skeleton](mapmaker-pitboss.md)).
+
 User report (.46 log `m46.err`): every hidden pass of every skeleton was
 "listed rooms visible but not reached by their prop lists" (e.g. 10 listed,
 9 visible, `sub_000A2430` never called), never frustum, planes or an empty

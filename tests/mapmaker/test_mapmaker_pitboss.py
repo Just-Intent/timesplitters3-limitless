@@ -65,6 +65,11 @@ MUTATIONS = {
     'bug-any-owner': ('        if(b<0 || d<best) { b=(int)k;best=d; }', '        if(b<0) { b=(int)k;best=d; }'),
     'flock-refilled': ('        } else if(!WORD_AT(s) && b->filled) b->ent=0;', '        } else if(!WORD_AT(s) && b->filled) WORD_AT(s)=b->ent;'),
     'flock-flag-kept': ('            WORD_AT(b->ent+0x28u)&=0xFFFFFFFEu;\n', ''),
+    'release-never': ('    if(k->released || !k->bugs) return;', '    if(1) return;'),
+    'release-once-only-one': ('    guest_call(sub_0028A0A0,1,ent);guest_call(sub_0028A0A0,1,ent);', '    guest_call(sub_0028A0A0,1,ent);'),
+    'release-no-arena': ('    pit_move(k,saved);\n    guest_call(sub_0028A0A0', '    (void)saved;\n    guest_call(sub_0028A0A0'),
+    'release-every-frame': ('    k->released=1;\n', ''),
+    'release-before-fight': ('if(st>=PIT_FIGHT && st<PIT_DEATH) pit_release(k,ent);', 'pit_release(k,ent);'),
     'restart-props-kept': ('            if(o) { guest_call(sub_000A9070,1,o);WORD_AT(pit_lv.k[k].state+f[i])=0u; }', '            (void)o;'),
     'restart-anims-lost': ('        PIT_H(PIT_ANIM_MAP+id*2u)=(uint16_t)slot;\n', ''),
     'restart-any-anim': ('                   !(WORD_AT(PIT_ANIM_WORDS+slot*8u+4u)&PIT_ANIM_DROPPED)) continue;', '                   0) continue;'),
@@ -113,6 +118,10 @@ def test_mapmaker_pitboss(tmp_path, mutation):
         assert 'pit skeleton killed: its level event dropped' in err
         assert 'level restart: pit skeleton blocks set up again, props deleted, lv17_4 anims mapped again (blocks, anims) (0x2, 0xB)' in err
         assert 'ragbug without a pit skeleton this level' in err
+        assert '[mapmaker] pitboss: prop model 0x249: not loaded, file read, textures left to its creation' in err
+        assert '[mapmaker] pitboss: prop model 0x24B: not loaded, file read, textures registered by the load pass' in err
+        assert 'pit skeleton 1: gas bottle 0x24A made (object 0x452000, model 0x24A, 0 listed rooms, first 0) at (12.12, 0.00, 0.00)' in err
+        assert 'pit skeleton 1: flock complete, 2 ragbugs released together (0 left parked, 0 still joining)' in err
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 
@@ -207,6 +216,11 @@ def test_fight_states_and_sites():
     # the rack timer and its stages; the hostage-eating request (state 12) only from sub_0028B780 stage 4
     assert 0x423C in [op[4] for op in a[0x0029E566].ops if op[0] == 'mem']
     assert a[0x0028BA03].text.endswith('ebx') and 0xC in imms(a[0x0028B9A1])
+    # the flock launch the area calls twice at the fight's start: state 10's call, the boss entity as its only
+    # argument ([esp + 0x20] after 4 pushes and 0xC), up to 3 parked slots (+0x24 == 0) per call, +0x24 = 1
+    assert calls(a[0x0029F647], 0x0028A0A0) and a[0x0029F646].text.endswith('esi')
+    assert 'esp + 0x20' in a[0x0028A0CF].text and 3 in imms(a[0x0028A0B7]) and 0x4A54 in [op[4] for op in a[0x0028A0C0].ops if op[0] == 'mem']
+    assert 0x4A54 in [op[4] for op in a[0x0028A23D].ops if op[0] == 'mem'] and a[0x0028A23D].text.endswith('ebp')
     # the boss's own spawn records: class 0x20000 and 0x200000 reach these handlers
     assert calls(a[0x0027DDD3], 0x0029FE00) and calls(a[0x0027DEDE], 0x0028B610)
     gen = [i for i in decoded() if i.function == 0x0029FE00]
