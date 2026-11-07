@@ -152,14 +152,14 @@ repair (skips without foreground focus). `pc_debug_game.py` uses center bounds.
 <!-- packet:end -->
 
 SDL tests (`tools/build/build-native-mac.py --test`) cover the two-slot E/Space
-cap, requested capture, release and frame-applied mouse disable. They preserve
-bindings; physical input remains unverified.
+cap, requested capture, release and frame-applied mouse disable. Bindings kept;
+physical input unverified.
 
 CI: `runtime-patches.yml` scopes runtime/launcher/Linux/issue/texture jobs.
 Only `PR validation` is required; `ci-pr-gate.py` fails closed. Launcher builds
 run once; standalone checks are manual-only. Worker uses this gate. Plan tests
 scope/gate/worker; host suites unchanged. Native Windows45m/Mac30m; upgrades30m.
-MapMaker restart/skelvis/bossroom fixtures run in the `-bosses` selection.
+MapMaker restart/skelvis/bossroom fixtures run in the `-bosses` selection; Disco: `test_mapmaker_disco.py`.
 
 `test_push_gather.py`: full original-reference gathering, fresh bytes, failures,
 guard pages, large buffers and32-bit wrapping. Both native CI hosts run it.
@@ -243,7 +243,7 @@ presence semantics, decoding/reporting, and repeated-lookup/executor mutations.
 `test_window_theme.py`: menu drawing, mnemonics, inserted/reordered rows (#333).
 
 [Audio tests](audio-buffers.md): rates/gain/drain/bursts, Release/recovery stress, exits,
-beta ON/OFF. RHI tests cover WM_QUIT/HostExit cleanup. [Jingle/imported music](custom-music.md).
+beta ON/OFF. RHI tests cover WM_QUIT/HostExit cleanup. [Jingle/imported music, gain, slider ticks](custom-music.md).
 
 `test_controller_profile.py`: devices/maps/disconnect and SDL virtual input;
 physical pads/Mac gameplay remain unverified.
@@ -668,9 +668,8 @@ patches until full-stack migration; fresh stacks apply all patches.
 `test_text_read_scope.py` covers scoped queries, nesting, fresh writes and
 mutations; Windows prompt fixtures verify actual page protections and ABI.
 
-The PR #285 CI index check also caught three pre-existing Windows patch files
-with residual CRLF bytes despite their LF attributes. They were normalized to
-the exact committed Git blobs and the index refreshed. Patch record hashes
+PR #285's CI index check caught three Windows patch files with residual CRLF
+bytes despite LF attributes; they were normalized to the committed blobs. Patch record hashes
 identify actual bytes: refresh from canonical attribute-compliant files, keeping
 the explicitly binary watermark patch unchanged. Local index success alone
 does not prove a fresh checkout has the same patch bytes.
@@ -683,8 +682,9 @@ clean command reads stdin without a destination filename: an existing pointer
 filename can supply the wrong size and truncate the streamed DDS. Exact pointer
 hash/size comparison remains mandatory. `tests/textures/test_build_textures.py` covers
 first export and updating an existing pointer with a DDS larger than 1 KiB.
-`test_texture_release.py` checks format/hash/privacy and package limits.
-No game launch is required for this export-only change.
+Use `tests/textures/test_texture_release.py` for format/hash/privacy and package limits;
+no game launch. `tools/textures/tileset-survey.py` (read-only) lists
+model texture ids; PNGs go only to `private/`.
 
 ## Original character icon policy
 

@@ -10327,6 +10327,10 @@ and Windows/Linux host acceptance remain unverified.
   MP3 (branch `music-mp3`, uncommitted to main): `src/interface/pc_music_codec.c`,
   `patches/media/2160-custom-music-codec.patch`; launcher import `MusicLibrary.cs`,
   `SavesPage.cs`, `Launcher.cs`, `macos/NativeWindow.cs`.
+  Music slider ticks past 16 (branch `music-slider`, uncommitted to main):
+  `src/interface/pc_menu_sliders.inc`, `pc_display_menu.c` lookup 0x002C3720,
+  `pc_custom_music.h` `slider_extra=`; shared, compiled under
+  `TSFP_NATIVE_DISPLAY` like the other menu sliders, so no Mac adapter.
 - **PC validation:** Fixture tests only ([STATUS](STATUS.md#imported-music-for-mapmaker-and-arcade-2026-11-03-not-built-or-played)); no game run.
 - **Existing Mac support:** Shared code; POSIX `dirent`/`pthread` paths and the
   SDL slot count are in place; the Mac launcher exports `TSFP_MUSIC_DIR`.
@@ -10339,5 +10343,6 @@ and Windows/Linux host acceptance remain unverified.
 - **Mac acceptance checks:** Native build; `tests/media/test_custom_music.py`
   and the stub case of `tests/media/test_music_codec.py` on macOS; launcher
   NativeTests (music cases); import/remove from the Mac launcher; play a map
-  and an Arcade level with an imported track.
+  and an Arcade level with an imported track; `tests/input/test_menu_mouse.py`
+  and the `-fsyntax-only` menu compile; Music past 16 in the pause menu.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.

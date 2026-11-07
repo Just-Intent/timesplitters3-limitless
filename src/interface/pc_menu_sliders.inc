@@ -1,6 +1,6 @@
 /* US 45410066 custom menu sliders. Share capture, hit testing and drag
  * ownership, while each setting retains its original draft/commit behavior. */
-extern void sub_00045C60(void),sub_00021780(void);
+extern void sub_00045C60(void),sub_00021780(void),sub_00074720(void),sub_00071A60(void);
 typedef struct MenuSliderTrack {
     uint32_t menu,descriptor,item,id,player;
     float x,y,w,h;
@@ -29,12 +29,80 @@ static void menu_slider_capture(unsigned kind,uint32_t menu,uint32_t item,
     t->time=GetTickCount64();
 }
 
+/* Music slider ticks past 16 (pc_custom_music.h): the guest word and the
+ * profile (+0x120, sub_002C39B0/sub_002C3AC0) keep 0..16; the ticks past 16
+ * are pc_music_slider_extra(), counted only while the word is 16. Both audio
+ * layouts (descriptor 0x0052377C, opened by Settings 0x002CBE1A and the pause
+ * menu 0x002EC215) share this bar, tick and the mouse drag below. */
+#define MENU_MUSIC_WORD 0x005236BCu
+#define MENU_MUSIC_TICKS (PC_MUSIC_SLIDER_STOCK+PC_MUSIC_SLIDER_EXTRA_MAX)
+static unsigned menu_music_position(void)
+{
+    uint32_t value=WORD_AT(MENU_MUSIC_WORD);
+    if(value<PC_MUSIC_SLIDER_STOCK) return value;
+    return PC_MUSIC_SLIDER_STOCK+(unsigned)pc_music_slider_extra();
+}
+static void menu_music_click(void)
+{
+    if(WORD_AT(0x007BA16Cu) && guest_writable(WORD_AT(0x007BA178u),12))
+        guest_call(sub_00021780,1,WORD_AT(WORD_AT(0x007BA178u)+8));
+}
+/* A position 0..MENU_MUSIC_TICKS: the guest word never exceeds 16. */
+static void menu_music_set(unsigned position)
+{
+    unsigned value=position<PC_MUSIC_SLIDER_STOCK?position:PC_MUSIC_SLIDER_STOCK;
+    unsigned extra=position>PC_MUSIC_SLIDER_STOCK?position-PC_MUSIC_SLIDER_STOCK:0;
+    if(extra>PC_MUSIC_SLIDER_EXTRA_MAX) extra=PC_MUSIC_SLIDER_EXTRA_MAX;
+    if(menu_music_position()==value+extra) return;
+    if(WORD_AT(MENU_MUSIC_WORD)!=value) {WORD_AT(MENU_MUSIC_WORD)=value;guest_call(sub_00045C60,0);}
+    pc_music_slider_extra_set((int)extra);
+    menu_music_click();
+}
+/* sub_002C3720, the audio menu's tick (reached through pc_display_menu_lookup).
+ * It steps the focused Music item (id 1, enabled) by menu+0xC4 0x40000 Left /
+ * 0x80000 Right, Left first, clamped 0..16, then calls sub_00045C60 and the
+ * click sub_00021780. Past 16 the original sees 16: Right there adds a tick;
+ * Left takes one away and the 15 the original stored goes back to 16. */
+void pc_display_menu_audio_tick(void (*original)(void))
+{
+    uint32_t menu=WORD_AT(g_esp+4),input=0,before=WORD_AT(MENU_MUSIC_WORD),after;
+    int music=0,extra=pc_music_slider_extra();
+    if(guest_writable(menu,0x23c)) input=WORD_AT(menu+0xc4)&0xC0000u;
+    if(input && guest_call(sub_00074720,1,menu)) {
+        uint32_t item=guest_call(sub_00071A60,1,menu);
+        music=guest_writable(item,0x2c) && WORD_AT(item+0x14)==1 && !(WORD_AT(item+0x28)&1u);
+    }
+    original();
+    after=WORD_AT(MENU_MUSIC_WORD);
+    if(music && before==PC_MUSIC_SLIDER_STOCK) {
+        if(input&0x40000u) {
+            if(extra>0) {
+                WORD_AT(MENU_MUSIC_WORD)=PC_MUSIC_SLIDER_STOCK;
+                if(after!=PC_MUSIC_SLIDER_STOCK) guest_call(sub_00045C60,0);
+                pc_music_slider_extra_set(extra-1);
+            }
+        } else if(after==PC_MUSIC_SLIDER_STOCK && extra<PC_MUSIC_SLIDER_EXTRA_MAX) {
+            pc_music_slider_extra_set(extra+1);
+            menu_music_click();
+        }
+    }
+    if(before<PC_MUSIC_SLIDER_STOCK && after==PC_MUSIC_SLIDER_STOCK && extra) pc_music_slider_extra_set(0);
+}
+
+/* The bar painter sub_000814B0 takes (fraction, x, y, width, height, ...); the
+ * audio painters call it at 0x002C35F4 / 0x002C3704 with the word x 1/16.
+ * The Music bar gets position / MENU_MUSIC_TICKS: same rectangle, finer steps. */
+static uint32_t menu_slider_audio_id;
+
 /* Audio painters use these exact integer offsets in both menu layouts. */
 void pc_display_menu_audio_draw(void (*original)(void),int compact)
 {
     uint32_t menu=WORD_AT(g_esp+4),item=WORD_AT(g_esp+8),rect=WORD_AT(g_esp+12);
+    uint32_t previous_id=menu_slider_audio_id;
+    menu_slider_audio_id=0;
     if(guest_writable(item,0x10c) && guest_writable(rect,16)) {
         uint32_t id=WORD_AT(item+0x14);
+        menu_slider_audio_id=id;
         if(id==1 || id==3) {
             float left=FLOAT_AT(rect),top=FLOAT_AT(rect+4);
             float right=FLOAT_AT(rect+8),bottom=FLOAT_AT(rect+12);
@@ -48,6 +116,7 @@ void pc_display_menu_audio_draw(void (*original)(void),int compact)
         }
     }
     original();
+    menu_slider_audio_id=previous_id;
 }
 
 /* Sensitivity width depends on translated label/font metrics. Capture its
@@ -65,6 +134,8 @@ void pc_display_menu_sensitivity_draw(void (*original)(void))
 void pc_display_menu_slider_bar(void (*original)(void))
 {
     mapmaker_probe_bar(); /* read-only; inert unless TSFP_MAPMAKER_PROBE */
+    if(menu_slider_audio_id==1 && (WORD_AT(g_esp)==0x002C35F9u || WORD_AT(g_esp)==0x002C3709u))
+        FLOAT_AT(g_esp+4)=(float)menu_music_position()/(float)MENU_MUSIC_TICKS;
     if(menu_slider_draw_menu && WORD_AT(g_esp)==0x002EA3E0u &&
        guest_writable(menu_slider_draw_item,0x10c) &&
        WORD_AT(menu_slider_draw_item+0x14)==9 && WORD_AT(0x007BA9E0u)<4)
@@ -100,14 +171,14 @@ static void menu_slider_set(const MenuSliderTrack *track,unsigned kind,float x)
                 g_esp=sp;
             }
         }
+    } else if(kind==MENU_MUSIC) {
+        menu_music_set(pc_menu_slider_value(x,track->x,track->w,MENU_MUSIC_TICKS));
     } else {
         unsigned value=pc_menu_slider_value(x,track->x,track->w,16);
-        uint32_t volume=kind==MENU_MUSIC?0x005236BCu:0x005236C0u;
+        uint32_t volume=0x005236C0u;
         if(WORD_AT(volume)!=value) {
             WORD_AT(volume)=value;
-            if(kind==MENU_MUSIC) guest_call(sub_00045C60,0);
-            if(WORD_AT(0x007BA16Cu) && guest_writable(WORD_AT(0x007BA178u),12))
-                guest_call(sub_00021780,1,WORD_AT(WORD_AT(0x007BA178u)+8));
+            menu_music_click();
         }
     }
 }

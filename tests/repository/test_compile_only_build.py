@@ -137,6 +137,9 @@ try {{
     Write-CompileOnlyReport -Root {quote(ROOT)} -Executable {quote(tmp_path / 'missing.exe')} -Record {quote(tmp_path / 'x.json')} -Skipped @('one.exe')
     throw 'Missing executable was accepted'
 }} catch {{ if ($_.Exception.Message -notmatch 'did not produce') {{ throw }} }}
+# Windows PowerShell -Command reports 1 after any caught exception; a real
+# failure above has already thrown, so reaching here is success.
+exit 0
 """
     result = powershell(script)
     assert result.returncode == 0, result.stdout + result.stderr

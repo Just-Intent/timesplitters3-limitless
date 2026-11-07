@@ -707,6 +707,7 @@ void pc_display_menu_team_draw(void (*original)(void)) { original(); }
 void pc_display_menu_team_tick(void (*original)(void)) { original(); }
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction) { (void)direction;original(); }
 void pc_display_menu_audio_draw(void (*original)(void),int compact) { (void)compact;original(); }
+void pc_display_menu_audio_tick(void (*original)(void)) { original(); }
 void pc_display_menu_sensitivity_draw(void (*original)(void)) { original(); }
 void pc_display_menu_slider_bar(void (*original)(void)) { original(); }
 void pc_display_mapmaker_meter(void (*original)(void)) { original(); }
@@ -1049,6 +1050,9 @@ void pc_mapmaker_weaponset_label(void (*original)(void)) { original(); }
 void pc_mapmaker_bigdraw_rect(void (*original)(void)) { original(); }
 void pc_mapmaker_skelvis_frustum(void (*original)(void)) { original(); }
 void pc_mapmaker_tilesets_menu_row(void (*original)(void)) { original(); }
+void pc_mapmaker_disco_textures(void (*original)(void)) { original(); }
+void pc_mapmaker_disco_menu_close(void (*original)(void)) { original(); }
+void pc_mapmaker_disco_stream(void (*original)(void)) { original(); }
 void pc_mapmaker_tilesets_play_pak(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }

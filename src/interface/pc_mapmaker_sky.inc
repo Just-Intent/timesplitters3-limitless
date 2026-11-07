@@ -85,6 +85,29 @@ static const struct mapmaker_sky_extra {
 };
 #define MAPMAKER_SKY_EXTRA_COUNT ((uint32_t)(sizeof mapmaker_sky_extras/sizeof mapmaker_sky_extras[0]))
 
+/* Tileset variant marker (docs/mapmaker/mapmaker-disco-variant.md): info
+ * flag bit 31 (0x80000000), the last free bit of +0x244 (stock readers test
+ * bits 0..17 only: sub_00301A90 0x00301CF6 loop 1..14 (sub_00311910 = 15),
+ * 0x00301D06 bit 0, 0x00301D20 bit 15, 0x00301D38 bit 16, 0x00301D52 bit 17;
+ * sub_002FDA20 masks 0x2..0x4000; sub_002BE750 bit 15; sub_0023F390 bit 17;
+ * the rebuild sub_003006C0 writes the dword from bits 0..17 only; the fork
+ * uses 18..30). Set = the map is the Disco variant of its base tileset
+ * Virtual (header word +0xA stays 5), so a stock game or an older build
+ * plays it as plain Virtual. Without base Virtual the marker means nothing.
+ * Defaults when the map's own choice is -1: sky 59 (Dark), music id 0xBA
+ * (jukebox index 26, Disco); lighting stays Virtual's. */
+#define MAPMAKER_VARIANT_FLAG 0x80000000u
+#define MAPMAKER_VARIANT_BASE 5u                 /* Virtual (table index 5) */
+#define MAPMAKER_VARIANT_SKY 59                  /* Dark */
+#define MAPMAKER_VARIANT_MUSIC 0xBAu             /* music/ts3_disco44fx.xbm, jukebox index 26 */
+#define MAPMAKER_VARIANT_ROW 6u                  /* editor +0x204 value of the Map Settings Disco row */
+#define MAPMAKER_VARIANT_ED_TILESET 0x204u       /* editor: tileset list value (read by sub_002FC0A0 only) */
+static int mapmaker_variant_disco(uint32_t info)
+{
+    return info && (WORD_AT(info+0x244u)&MAPMAKER_VARIANT_FLAG) &&
+           (WORD_AT(info+0x08u)>>16)==MAPMAKER_VARIANT_BASE;
+}
+
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 extern void sub_00079D60(void),sub_0007D4F0(void),sub_00078560(void);
 
@@ -212,7 +235,7 @@ static uint32_t mapmaker_sky_extra_of(uint32_t info)
 }
 
 /* The map's effective sky: an extra sky, else info +0x10 if not negative,
- * else the tileset's. */
+ * else the Disco variant's (Dark), else the tileset's. */
 static int mapmaker_sky_index(uint32_t info)
 {
     int sky=(int16_t)(WORD_AT(info+0x10u)&0xFFFFu);
@@ -220,6 +243,7 @@ static int mapmaker_sky_index(uint32_t info)
     uint32_t extra=mapmaker_sky_extra_of(info);
     if(extra) return mapmaker_sky_extras[extra-1u].sky;
     if(sky>=0) return sky;
+    if(mapmaker_variant_disco(info)) return MAPMAKER_VARIANT_SKY;
     if(tileset>=6u) return -1;
     return (int)(WORD_AT(MAPMAKER_SKY_TILESETS+tileset*0x58u)>>16&0xFFu);
 }

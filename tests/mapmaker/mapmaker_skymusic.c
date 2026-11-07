@@ -35,6 +35,7 @@ void sub_000717D0(void) { g_ecx=10; }
 void sub_00071940(void) { g_ecx=11; }
 void sub_00069640(void) { g_ecx=12; }
 void sub_00045A70(void) { g_ecx=13; }
+void sub_00061D80(void) { g_ecx=14; }  /* disco: editor stream unload (tests/mapmaker/mapmaker_disco.c) */
 /* host audio output (pc_custom_music.h): never reached without a music folder */
 int recomp_audio_output_submit(uint32_t s,const uint8_t *p,uint32_t b,uint32_t r,uint32_t c,uint32_t bits,int32_t v) { (void)s;(void)p;(void)b;(void)r;(void)c;(void)bits;(void)v;return 0; }
 int recomp_audio_output_position(uint32_t s,uint64_t *p,uint32_t *q) { (void)s;(void)p;(void)q;return 0; }

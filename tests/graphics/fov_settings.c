@@ -149,7 +149,7 @@ MOUSE_STUB(sub_002C4310)
 MOUSE_STUB(sub_001922D0)
 MOUSE_STUB(sub_002E49F0) MOUSE_STUB(sub_002E4A30)
 /* Audio-slider preview calls are covered by menu_mouse.c, not this fixture. */
-MOUSE_STUB(sub_00045C60)
+MOUSE_STUB(sub_00045C60) MOUSE_STUB(sub_00074720) MOUSE_STUB(sub_00071A60)
 static unsigned video_sounds,highlight_sounds;
 void sub_00021780(void){uint32_t sound=WORD_AT(g_esp+4);CHECK(sound==0x1234u || sound==0x4321u);if(sound==0x4321u)highlight_sounds++;else video_sounds++;g_esp+=4;}
 MOUSE_STUB(sub_00045390) MOUSE_STUB(sub_00045820)
@@ -310,7 +310,7 @@ void sub_00078980(void) {
 STUB(sub_0007D480) STUB(sub_000717D0)
 void sub_00075430(void) { WORD_AT(WORD_AT(g_esp+4)+0xc8)=WORD_AT(g_esp+8);g_esp+=4; }
 STUB(sub_0003D7B0) STUB(sub_001CD120) STUB(sub_00069720) STUB(sub_00071CF0)
-STUB(sub_002C3E20) STUB(sub_002D9390) STUB(sub_00072510) STUB(sub_00022FF0) STUB(sub_0001C5D0) STUB(sub_00019650) STUB(sub_00019D70)
+STUB(sub_002C3E20) STUB(sub_002C3720) STUB(sub_002D9390) STUB(sub_00072510) STUB(sub_00022FF0) STUB(sub_0001C5D0) STUB(sub_00019650) STUB(sub_00019D70)
 static unsigned highlight_rects,highlight_fallback;
 static int highlight_bottom;
 void sub_0001EFB0(void) {

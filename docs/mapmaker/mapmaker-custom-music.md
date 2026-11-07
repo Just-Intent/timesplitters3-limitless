@@ -48,6 +48,28 @@ not read: convert them to WAV or MP3 first.
   Complete, Game Over) are the game's own; when one starts, your track stops.
 - It follows the Music volume slider (full slider = the file's own level),
   pauses with the game's music and stops when you leave the level.
+- **Volume:** at the same slider position an imported track is already
+  played 8 to 12 dB higher than the game's level music (the game's music
+  plays at 50-80% of the slider, minus 6 dB of console headroom). If it still
+  sounds quiet, add `gain_db=6` (any number from -12 to 12, in dB) on its own
+  line in `pc-music.ini` (beside the display settings, after the
+  `TSFP_MUSIC_V1` line). Positive values above what the voice can give are
+  applied to the sound itself with a soft limiter, so a loud track bends
+  rather than crackles. It takes effect when the next track starts; the
+  Arcade choice keeps the line. The log's `[music] player: level ...` line
+  shows the level used and the stock range at that slider.
+- **Louder than full (2026-11-07):** the Music bar in Audio Options (the
+  Settings menu and the pause menu share it) now has 24 steps instead of 16.
+  Steps 0-16 are the game's own; the bar just fills in smaller steps (the
+  old full volume is two thirds of the way along). Each step past 16 adds
+  1.5 dB to imported music, up to +12 dB at the end, on top of `gain_db=`
+  (the two together stop at +12 dB). Arrows and mouse drag both work, and
+  the change is heard at once. The game's own music does not get louder past
+  step 16. The extra steps are saved as `slider_extra=` (0-8) in
+  `pc-music.ini`; the profile itself still stores 16, so the stock game and
+  older builds read it normally. They count only while the profile's slider
+  is full: a profile saved lower shows its own value, and reaching 16 again
+  starts from 16. The log shows `[music] player: Music slider 16 + N ticks`.
 - If the music is switched off in the options, nothing plays.
 - **Fallbacks:** a map whose file is missing plays the tileset's music (the
   log says `[music] map's imported track is missing`). An Arcade choice whose
@@ -96,7 +118,10 @@ The Saves page has an **Imported music** section on Windows and macOS:
 2. MapMaker with `TSFP_MAPMAKER_LIMITS=1`: open Map Settings > Music, confirm
    both `Imported:` rows, pick one, save, reload the map: the row is kept.
 3. Play the map: your track plays and loops; pause (silent), resume, change
-   the Music slider; finish the match: the jingle replaces it.
+   the Music slider; finish the match: the jingle replaces it. In the pause
+   menu's Audio Options move Music past the old full point (arrows, then a
+   mouse drag): the track gets louder each step, the bar stays in its box at
+   4:3, 16:9 and 21:9, and `pc-music.ini` gains `slider_extra=`.
 4. Rename the file and replay: tileset music and the log line above.
 5. Arcade: choose an imported row, start a level, check the music; reopen
    setup: the row is still selected; pick a stock row: stock music again.

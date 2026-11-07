@@ -15,6 +15,8 @@
  *   chunk         field                         bound      why (CONFIRMED)
  *   walk          sizes, end tag 0xC7766A       inside the 512 KB container; the loader's walk has no bound
  *   0x68 header   tileset word +0xA             < 7        catalogue 0x00524F64 + (id*7 + tileset)*0x1C
+ *                 variant flag +0x244 bit 31    base 5     editor: Disco variant only on Virtual, else cleared (not
+ *                                                          refused); play ignores it without its base (pc_mapmaker_sky.inc)
  *                 word count byte +0x42         <= 17      editor +0x1190C dwords up to the stock end +0x11950
  *                 piece count dword +4          <= 1024    editor: piece buffer sub_0003DFA0(0x1000) @0x00301BCA, piece pool 0x400
  *                                               <= 512     level: sub_00240C50 frame array [esp+i*8+0xA0] = frame+0x90
@@ -66,6 +68,9 @@
 #define MAPMAKER_VALIDATE_TILES 45u             /* rows 0..44 of 0x00529400 (+0x110 = type+1) */
 #define MAPMAKER_VALIDATE_ITEMS 80u             /* 0x0024069B cmp eax,0x4F / ja */
 #define MAPMAKER_VALIDATE_TILESETS 7u
+#define MAPMAKER_VALIDATE_FLAGS 0x244u          /* info flags (pc_mapmaker_sky.inc) */
+#define MAPMAKER_VALIDATE_VARIANT 0x80000000u   /* MAPMAKER_VARIANT_FLAG: Disco */
+#define MAPMAKER_VALIDATE_VARIANT_BASE 5u       /* its base tileset, Virtual */
 #define MAPMAKER_VALIDATE_HEADER_WORDS 17u
 #define MAPMAKER_VALIDATE_EDITOR_PIECES 1024u
 #define MAPMAKER_VALIDATE_LEVEL_PIECES 512u     /* (0x1090-0x90)/8: level.json frame (stock 0x1030: 500) */
@@ -173,6 +178,15 @@ static const char *mapmaker_validate_chunk(MapMakerValidate *v,uint32_t tag,uint
         uint32_t cap=editor?MAPMAKER_VALIDATE_EDITOR_PIECES:MAPMAKER_VALIDATE_LEVEL_PIECES;
         v->header=1;v->pieces=pieces;
         if(mapmaker_validate_u16(d+0xAu)>=MAPMAKER_VALIDATE_TILESETS) { v->value=mapmaker_validate_u16(d+0xAu);return "tileset"; }
+        if(editor && sz>=MAPMAKER_VALIDATE_FLAGS+4u && (WORD_AT(d+MAPMAKER_VALIDATE_FLAGS)&MAPMAKER_VALIDATE_VARIANT) &&
+           mapmaker_validate_u16(d+0xAu)!=MAPMAKER_VALIDATE_VARIANT_BASE) {
+            /* A tileset variant only with its base (Disco: Virtual): harmless, cleared. */
+            WORD_AT(d+MAPMAKER_VALIDATE_FLAGS)&=~MAPMAKER_VALIDATE_VARIANT;
+            if(mapmaker_validate_refused++<4u) {
+                fprintf(stderr,"[mapmaker] disco: variant marker without its base tileset Virtual (tileset %u); cleared\n",mapmaker_validate_u16(d+0xAu));
+                fflush(stderr);
+            }
+        }
         if(pieces>(int32_t)cap) { v->value=(uint32_t)pieces;return "header piece count"; }
         if(editor && MAPMAKER_VALIDATE_B(d+0x42u)>MAPMAKER_VALIDATE_HEADER_WORDS) { v->value=MAPMAKER_VALIDATE_B(d+0x42u);return "header word count"; }
         if(!editor && !mapmaker_validate_nul(d+0x162u,MAPMAKER_VALIDATE_TITLE)) { v->value=0;return "header string"; }

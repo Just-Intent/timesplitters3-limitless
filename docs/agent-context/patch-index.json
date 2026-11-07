@@ -2115,9 +2115,17 @@
       ]
     },
     {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-story-chain.patch",
+      "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-story-chain.patch",
+      "sha256": "0f790e306ec4150a3f4da03d159de44c9e3eab2a1c774c79b4cb8333da8d53f6",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
       "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch",
       "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch",
-      "sha256": "6203e58ee9a0b4061e2503d9dd896ea133970dfb788ac079106f610eba77135c",
+      "sha256": "c2fb1a37368468820d987ff78d47006614ba052ce61c56c79c307e3cc232f58b",
       "targets": [
         "titles/futureperfect/src/recomp_manual.c"
       ]

@@ -77,6 +77,9 @@ void pc_display_menu_mouse_input(void (*original)(void));
 void pc_display_menu_mouse_footer(void (*original)(void));
 void pc_display_menu_mouse_dispatch(void (*original)(void));
 void pc_display_menu_audio_draw(void (*original)(void),int compact);
+/* Audio menu tick sub_002C3720 (descriptor 0x0052377C): Music ticks past 16.
+ * Reached through pc_display_menu_lookup, not a WRAP. */
+void pc_display_menu_audio_tick(void (*original)(void));
 void pc_display_menu_sensitivity_draw(void (*original)(void));
 void pc_display_menu_slider_bar(void (*original)(void));
 void pc_display_mapmaker_meter(void (*original)(void));
@@ -422,6 +425,9 @@ void pc_mapmaker_weaponset_label(void (*original)(void));
 void pc_mapmaker_bigdraw_rect(void (*original)(void));
 void pc_mapmaker_skelvis_frustum(void (*original)(void));
 void pc_mapmaker_tilesets_menu_row(void (*original)(void));
+void pc_mapmaker_disco_textures(void (*original)(void));
+void pc_mapmaker_disco_menu_close(void (*original)(void));
+void pc_mapmaker_disco_stream(void (*original)(void));
 void pc_mapmaker_tilesets_play_pak(void (*original)(void));
 void pc_mapmaker_memory_heap_alloc(void (*original)(void));
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void));

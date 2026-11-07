@@ -945,6 +945,17 @@ Request allocation/ownership through0218: [contracts](kernel-objects.md#original
 
 Profile early-access hooks: [continuation](runtime-continuation.md#profile-early-access-hooks).
 
+## Upstream-defined MapMaker wrappers
+
+When an upstream patch already defines `void sub_X(void)` in `recomp_manual.c`
+(story NPC 2250/2260: `sub_000DAC30`, `sub_0015F8C0`), the fork's generator
+emits `*-mapmaker-meter-story-chain.patch` (sorts just before
+`-meter-wrappers`), renaming upstream's definition to `sub_X_upstream`; the
+innermost MapMaker layer calls it instead of `sub_X_gen`. Upstream's body keeps
+its `TSFP_PC_CONTROLS` gate and `_gen` fallback, so every config links. Any
+chained function still defined once our block is removed is detected
+automatically. `test_fresh_checkout_and_repeated_build` checks uniqueness.
+
 ## Native Online integration (2026-10-30)
 
 `network/2140-native-online.patch` follows the historical 2090 layout migration
@@ -977,7 +988,7 @@ the first outline draw's projected midpoint. Shared PcUiWorldAnchor retains that
 anchor for labels and resets at placement boundaries; viewport/scissor share it.
 Both common backends and legacy GL consume the helper. Original world projection,
 visibility and objective logic remain guest-owned (Refs #338).
-MapMaker wrapper/table notes (incl. tilesets, multi-boss areas, set slot masks, tile caps, open-air view, 16 floors, sandstorm haze, camera frame, nav block, physics bodies, set screens, tile roof menu, skies/music, open air, skeleton frustum log, object create guard, music restart): [limitless](limitless.md).
+MapMaker wrapper/table notes (incl. tilesets, multi-boss areas, set slot masks, tile caps, open-air view, 16 floors, sandstorm haze, camera frame, nav block, physics bodies, set screens, tile roof menu, skies/music, open air, skeleton frustum log, object create guard, music restart, Disco variant): [limitless](limitless.md).
 
 ## Languages
 
