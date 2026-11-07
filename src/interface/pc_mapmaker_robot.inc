@@ -73,8 +73,10 @@
  *    +0x1AC + +0x1C4, 6.0 when unusable). A player pad outside the set is
  *    replaced by the reachable pad nearest to it (the robot waits at the
  *    opening and fights from there); when its set has blocked links, the goal
- *    is steered along a path of passable links one room at a time, so the
- *    stock route cannot take a low door instead of the tall opening.
+ *    is the next pad along a path of passable links, one link at a time
+ *    (v0.4.0-mapmaker.42 "still walked through a one-floor opening": a goal
+ *    farther away let the stock route, sub_001596F0, cut through a low door
+ *    even within the robot's own room).
  *    Rooms that are unknown, or joined by no portal (teleporters), stay
  *    passable (stock).
  *  - music (sub_000462B0(track)): its death sets the music track to 0 every
@@ -183,6 +185,7 @@
 #define RBT_ENT_BOX_H 0x1C4u
 #define RBT_HEIGHT 6.0f                 /* INFERRED: used when the box is not usable */
 #define RBT_FIT_SLACK 0.25f             /* an opening this much lower than the robot still lets it through */
+#define RBT_TELL_MAX 32u                /* portal decision lines per level */
 #define RBT_OPEN 1.0e9f                 /* a link inside one room, or not across a portal */
 #define RBT_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBT_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -201,7 +204,7 @@ static struct { uint32_t state, record, actor, statics[RBT_STATICS_N]; int remov
  * links (CSR) and the opening each link crosses. Per robot: its height,
  * the pads it can reach, the substitute for an unreachable goal and the
  * hop distances to its goal. */
-static struct { uint32_t pads, links; unsigned npads, nlinks, built, crossings; uint32_t *off, *adj; float *open; } rbt_nav;
+static struct { uint32_t pads, links; unsigned npads, nlinks, built, crossings, told; uint32_t *off, *adj; float *open; } rbt_nav;
 static struct {
     float height;
     uint32_t from, goal_for, goal_sub, dist_for;
@@ -376,16 +379,37 @@ static float rbt_height(uint32_t ent)
     float h=rbt_getf(ent+RBT_ENT_BOX_Y)+rbt_getf(ent+RBT_ENT_BOX_H);
     return rbt_sane(h) && h>=1.0f && h<=40.0f?h:RBT_HEIGHT;
 }
+/* Once per level: the height used and the decision for each link crossing
+ * a portal (at most RBT_TELL_MAX lines). */
+static void rbt_tell(unsigned k)
+{
+    uint32_t p,e;
+    unsigned n=0;
+    float need=rbt_walk[k].height-RBT_FIT_SLACK;
+    if(rbt_nav.told) return;
+    rbt_nav.told=1;
+    fprintf(stderr,"[mapmaker] robot: giant robot height %.2f (entity box top; openings of at least %.2f let it through), %u links cross a portal\n",
+            (double)rbt_walk[k].height,(double)need,rbt_nav.crossings);
+    for(p=0;p<rbt_nav.npads;p++)
+        for(e=rbt_nav.off[p];e<rbt_nav.off[p+1u];e++) {
+            if(rbt_nav.adj[e]<=p || rbt_nav.open[e]>=RBT_OPEN) continue;
+            if(n++>=RBT_TELL_MAX) continue;
+            fprintf(stderr,"[mapmaker] robot: link pad %u (room %d) - pad %u (room %d): opening %.2f -> %s\n",(unsigned)p,(int)rbt_room(p),
+                    (unsigned)rbt_nav.adj[e],(int)rbt_room(rbt_nav.adj[e]),(double)rbt_nav.open[e],rbt_nav.open[e]<need?"closed":"open");
+        }
+    if(n>RBT_TELL_MAX) fprintf(stderr,"[mapmaker] robot: %u more portal links not listed\n",n-RBT_TELL_MAX);
+    fflush(stderr);
+}
 /* The goal robot k walks to instead of pad 'goal' (the same pad when it may). */
 static uint32_t rbt_goal_for(unsigned k,uint32_t ent,uint32_t at,uint32_t goal)
 {
     uint32_t np=rbt_nav.npads,p,best,e;
-    int room;
     float gx,gy,gz,bd=-1.0f;
     if(!rbt_walk[k].height) rbt_walk[k].height=rbt_height(ent);
     if(!rbt_walk[k].built || (rbt_walk[k].from!=at && !rbt_walk[k].reach[at])) {
         rbt_walk[k].built=1;rbt_walk[k].from=at;rbt_walk[k].dist_ok=0;rbt_walk[k].goal_for=0xFFFFFFFFu;
         rbt_walk[k].reached=rbt_bfs(k,at,0);
+        rbt_tell(k);
         if(rbt_walk[k].logged++<4u) {
             fprintf(stderr,"[mapmaker] robot: giant robot %u (height %.2f) reaches %u of %u pads from pad %u; %u links through openings lower than it blocked (%u room crossings)\n",
                     k,(double)rbt_walk[k].height,rbt_walk[k].reached,np,(unsigned)at,rbt_walk[k].blocked/2u+rbt_walk[k].blocked%2u,rbt_nav.crossings);
@@ -408,17 +432,13 @@ static uint32_t rbt_goal_for(unsigned k,uint32_t ent,uint32_t at,uint32_t goal)
     }
     if(!rbt_walk[k].blocked || goal==at) return goal;  /* every link fits: the stock route is fine */
     if(!rbt_walk[k].dist_ok || rbt_walk[k].dist_for!=goal) { rbt_bfs(k,goal,1);rbt_walk[k].dist_ok=1;rbt_walk[k].dist_for=goal; }
-    if(rbt_walk[k].dist[at]==0xFFFFu) return goal;
-    room=rbt_room(at);
-    for(p=at;rbt_walk[k].dist[p];) {                   /* along the path until it leaves the robot's room */
-        uint32_t next=p;
-        for(e=rbt_nav.off[p];e<rbt_nav.off[p+1u];e++)
-            if(rbt_nav.open[e]>=rbt_walk[k].height-RBT_FIT_SLACK && rbt_walk[k].dist[rbt_nav.adj[e]]+1u==rbt_walk[k].dist[p]) { next=rbt_nav.adj[e];break; }
-        if(next==p) return goal;
-        if(rbt_room(next)!=room) return p==at?next:p;  /* the last pad before the opening, then across it */
-        p=next;
-    }
-    return goal;
+    if(rbt_walk[k].dist[at]==0xFFFFu) return at;      /* no way it fits: it stays */
+    /* One link at a time: the stock route to any farther pad (sub_001596F0,
+     * group then pad A* over every link, recomputed each frame) may cut
+     * through an opening lower than the robot, even inside one room. */
+    for(e=rbt_nav.off[at];e<rbt_nav.off[at+1u];e++)
+        if(rbt_nav.open[e]>=rbt_walk[k].height-RBT_FIT_SLACK && rbt_walk[k].dist[rbt_nav.adj[e]]+1u==rbt_walk[k].dist[at]) return rbt_nav.adj[e];
+    return at;
 }
 
 /* WRAP sub_0025F720 (story level init, no args): one state block per robot. */
@@ -559,7 +579,7 @@ void pc_mapmaker_robot_goal(void (*original)(void))
        (at=WORD_AT(a+RBT_AI_PAD))>=rbt_nav.npads || goal>=rbt_nav.npads) { original();return; }
     to=rbt_goal_for((unsigned)k,ent,at,goal);
     if(to==goal) { original();return; }
-    if(rbt_walk[k].steers++<4u && rbt_walk[k].reach[goal]) rbt_log("giant robot steered to the opening it fits through (goal, next pad)",goal,to);
+    if(rbt_walk[k].steers++<4u && rbt_walk[k].reach[goal]) rbt_log("giant robot steps one link it fits through toward its goal (goal, next pad)",goal,to);
     WORD_AT(sp+8u)=to;WORD_AT(a+RBT_AI_GOAL)=to;
     original();
     WORD_AT(sp+8u)=goal;

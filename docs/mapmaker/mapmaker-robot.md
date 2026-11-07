@@ -146,24 +146,26 @@ round exists. Chosen: **its own reachable pad set, with steering**
   the robot walks to the opening and stays there, attacking by its stock
   distance rules.
 - When the set has blocked links, the goal is steered: hop distances to the
-  goal over passable links, and the robot gets the last pad of its own room
-  on that path, then the first pad across the opening, one room at a time.
-  Within a room the stock route is used (INFERRED: it stays in the room).
+  goal over passable links, and the robot gets the next pad on that path,
+  one link at a time (it stays where it is when no passable link leads on).
 - The replaced goal is written to the call's argument and to actor +0x684
   (so the stock goal compare in `sub_0015D500` sees one goal, and the
   handler's arrival test re-picks the player's pad on arrival); the argument
   slot is put back after.
 
-Logs (`[mapmaker] robot:`): `giant robot k (height h) reaches n of m pads
-from pad p; b links through openings lower than it blocked (c room
-crossings)` at most 4 times per robot and level, `cannot fit to the
-player's pad: it waits at the nearest pad it reaches` and `steered to the
-opening it fits through` (budgeted).
+Logs (`[mapmaker] robot:`): once per level `giant robot height h (entity
+box top; openings of at least h-0.25 let it through), c links cross a
+portal`, then `link pad a (room r) - pad b (room s): opening o -> closed|open`
+for up to 32 of them; `giant robot k (height h) reaches n of m pads from pad
+p; b links through openings lower than it blocked (c room crossings)` at most
+4 times per robot and level, `cannot fit to the player's pad: it waits at the
+nearest pad it reaches` and `steps one link it fits through toward its goal`
+(budgeted).
 
 INFERRED (playtest): that MapMaker portals are the doorway's shape (if a
 tile side is one portal, a robot taller than a floor passes no side of a
 one-floor tile, and one shorter passes every side); the robot's box height;
-that pad steps look smooth. Tests: `low_door()` in
+that pad steps look smooth (one link at a time since .42). Tests: `low_door()` in
 `tests/mapmaker/mapmaker_robot.c` (a robot facing a low door with and
 without a tall way round, a door as tall as it, the box fallback and a small
 robot, an unknown room, other callers and entities), the `goal-*`
@@ -179,6 +181,38 @@ Save format: unchanged. The robot is a stock custom-set member (word id 0x42,
 variant -1). A stock game or an older build spawns id 0x42 with the stock
 MapMaker class on the robot model (INFERRED: the human-rig animations, as the
 other real bosses' stage 1).
+
+### Still through a one-floor opening (v0.4.0-mapmaker.42)
+
+User report: "Robots still walked through a one-floor opening." The user's
+.41 log (`logs/m42.err`) shows the height and the blocking were right:
+height 14.51 (the box half size is the model radius, 6.5 in
+`chrs/FF2GiantRobot.xbr` +0x30, against 1.0 for human models: CONFIRMED from
+chr.pak), 6 links closed, 9 of 234 pads reached from pad 101. Yet the robot
+later stood on pad 38 and others outside its set, and each pad it stands on
+(actor +0x678) is advanced by `sub_0015D500` to the route's next pad
+(0x0015D84F) after `sub_0015A180` arrives, so it left the set over a closed
+link.
+
+Cause (CONFIRMED in code, the exact hop INFERRED from the log): .41 steered
+only the end of each leg (the last pad of the robot's room, the substitute
+pad). The stock route to that pad, `sub_001596F0` (group path
+`sub_0009B540`, then pad path `sub_0009BAE0`, recomputed every walk frame
+because the handler clears +0x9A8/+0x9AC), runs over every link, so a leg
+inside the robot's room, or to a substitute pad, could cut through the
+one-floor door.
+
+Fix: the goal is always the next pad on the robot's own passable path, a
+direct link it fits through, so the stock route has only that link to take.
+INFERRED: the stock route to an adjacent pad is the direct link (shortest).
+Not covered: an opening inside one room (no portal between two rooms) still
+counts as open.
+
+Tests: `one_floor_door()` (the real height 8.01 + 6.5, a one-floor door 4.5
+and a three-floor opening 15 between two rooms; every hop is checked to be a
+link that fits; the door as short a way as the hall; no tall way round: it
+waits at the door; a one-floor robot passes), mutations `goal-steer-whole-leg`,
+`goal-steer-any-link`, `goal-no-tell`.
 
 ## Several robots
 
@@ -310,4 +344,9 @@ guide for MapMaker areas) and regenerate the wrapper patch.
    air) with only a normal door to the player's room: it walks to the door
    and attacks from there, never through it (log: `reaches n of m pads`,
    `cannot fit to the player's pad`). Add a tall opening elsewhere: it walks
-   round through that (`steered to the opening it fits through`).
+   round through that (`steps one link it fits through toward its goal`).
+8. v0.4.0-mapmaker.42: the same hall with one-floor doors on several sides
+   and the player moving behind them for a minute: the robot never stands
+   beyond a door (`reaches n of m pads from pad p` repeats only with the same
+   n and a pad of its own hall), and the level's first lines list each portal
+   link `closed` (one floor) or `open` (three floors).
