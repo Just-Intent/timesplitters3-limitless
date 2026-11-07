@@ -30,7 +30,7 @@ jobs:
     needs: build
     if: >-
       needs.build.outputs.publish == 'true' &&
-      github.repository == 'JustinDent/timesplitters3-limitless' &&
+      github.repository == 'Just-Intent/timesplitters3-limitless' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -431,7 +431,7 @@ PRs; its mocked creation fixture checks this explanation alongside the uploaded 
 
 Fork home (2026-10-31): the issue chooser links, the bug form's "existing
 reports" link, README, CONTRIBUTING and SECURITY now point at
-`JustinDent/timesplitters3-limitless`. The launcher's own Ideas/issue URLs,
+`Just-Intent/timesplitters3-limitless`. The launcher's own Ideas/issue URLs,
 release repository constant and repository-gated workflows are unchanged by
 that docs change. The fork currently has Issues and Discussions disabled, so
 these links work only after they are enabled on GitHub.
@@ -646,7 +646,7 @@ notes payload/range through the existing release test route. No host adapters ch
 
 ## Release repository and test-only local source
 
-`ReleaseClient.Repository` is `JustinDent/timesplitters3-limitless`: game and
+`ReleaseClient.Repository` is `Just-Intent/timesplitters3-limitless`: game and
 launcher release checks, self-update, news, known issues, texture manifest,
 Support/issue/Ideas links and `ValidateDownloadUrl` all follow it.
 `ReleaseClient.UpstreamRepository` (`TheDoffman/timesplitters-future-perfect-pc`)
@@ -863,5 +863,5 @@ game packaging deferred to the maintainer's Mac at the matching tag revision.
 
 The Windows sidebar version label reads `TS3 LIMITLESS  /  MAPMAKER FORK  /  LAUNCHER v<version>`
 (`Launcher.cs` and its `Launcher.xaml` default). Releases and updates come only from
-`ReleaseClient.Repository` (`JustinDent/timesplitters3-limitless`); `UpstreamRepository`
+`ReleaseClient.Repository` (`Just-Intent/timesplitters3-limitless`); `UpstreamRepository`
 is credit only. The native Mac window has no matching label.

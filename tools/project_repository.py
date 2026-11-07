@@ -7,7 +7,7 @@ tools/ci/compatibility-worker.py is installed as a standalone copy, so it keeps
 its own matching constant.
 """
 
-REPOSITORY = 'JustinDent/timesplitters3-limitless'
+REPOSITORY = 'Just-Intent/timesplitters3-limitless'
 UPSTREAM_REPOSITORY = 'TheDoffman/timesplitters-future-perfect-pc'
 URL = 'https://github.com/' + REPOSITORY
 ISSUES_URL = URL + '/issues'

@@ -8,12 +8,12 @@ Please follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Pick the right place
 
-- **Something broken?** Search [existing issues](https://github.com/JustinDent/timesplitters3-limitless/issues),
-  then use [Report a problem](https://github.com/JustinDent/timesplitters3-limitless/issues/new?template=01-bug-report.yml).
+- **Something broken?** Search [existing issues](https://github.com/Just-Intent/timesplitters3-limitless/issues),
+  then use [Report a problem](https://github.com/Just-Intent/timesplitters3-limitless/issues/new?template=01-bug-report.yml).
   Enter your installed game version, launcher version and platform, then explain
   what happened and how to reproduce it. Screenshots and relevant logs help.
-- **An improvement?** Check [existing Ideas](https://github.com/JustinDent/timesplitters3-limitless/discussions/categories/ideas), then [start an Ideas discussion](https://github.com/JustinDent/timesplitters3-limitless/discussions/new?category=ideas). Share one suggestion per discussion.
-- **Questions or an idea to talk through?** Use [Discussions](https://github.com/JustinDent/timesplitters3-limitless/discussions).
+- **An improvement?** Check [existing Ideas](https://github.com/Just-Intent/timesplitters3-limitless/discussions/categories/ideas), then [start an Ideas discussion](https://github.com/Just-Intent/timesplitters3-limitless/discussions/new?category=ideas). Share one suggestion per discussion.
+- **Questions or an idea to talk through?** Use [Discussions](https://github.com/Just-Intent/timesplitters3-limitless/discussions).
 - **A security vulnerability?** Follow [SECURITY.md](SECURITY.md) and report it privately.
 
 Remove personal information, tokens and private join codes from screenshots

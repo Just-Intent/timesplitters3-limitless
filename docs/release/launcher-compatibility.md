@@ -281,7 +281,7 @@ Windows (`python tools/release/make-local-release.py [--build-root <checkout>]
 **Preview** channel. Set `TSFP_LAUNCHER_RELEASE_SOURCE` to that folder (or drag
 `TimeSplitters Launcher.exe` onto the `.cmd`) before starting the launcher; the
 status line then shows `TEST ONLY: local release source`. Unset it to return to
-GitHub. The launcher's release repository is `JustinDent/timesplitters3-limitless`
+GitHub. The launcher's release repository is `Just-Intent/timesplitters3-limitless`
 (`ReleaseClient.Repository`, `tools/project_repository.py`). The asset-free
 regressions cover the local source; a real fresh install still needs a manual
 run on the target PC.

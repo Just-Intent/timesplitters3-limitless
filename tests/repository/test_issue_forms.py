@@ -237,7 +237,7 @@ class VersionTests(unittest.TestCase):
                 shutil.copyfile(ROOT / name, root / name)
             path = root / relative
             before = path.read_bytes()
-            self.assertIn('url: https://github.com/JustinDent/timesplitters3-limitless/discussions/new?category=ideas', path.read_text())
+            self.assertIn('url: https://github.com/Just-Intent/timesplitters3-limitless/discussions/new?category=ideas', path.read_text())
             self.assertFalse((ROOT / '.github/ISSUE_TEMPLATE/02-enhancement.yml').exists())
             forms.refresh_versions(root, [release('v3.0.0'), release('launcher-v4.0.0')])
             self.assertEqual(path.read_bytes(), before)

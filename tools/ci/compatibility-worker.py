@@ -43,8 +43,8 @@ import threading
 
 
 # Standalone installed copy: keep in sync with tools/project_repository.py.
-REPO = 'JustinDent/timesplitters3-limitless'
-OWNER = 'JustinDent'
+REPO = 'Just-Intent/timesplitters3-limitless'
+OWNER = 'Just-Intent'
 REMOTE = 'https://github.com/' + REPO + '.git'
 LABEL = 'com.timesplitters.compatibility-worker'
 WORKFLOWS = {'.github/workflows/runtime-patches.yml'}
@@ -491,9 +491,9 @@ class Worker:
             index.unlink()  # Controller-owned index, never a user's checkout.
         env = clean_env()
         env.update(GIT_INDEX_FILE=str(index), GIT_AUTHOR_NAME='TSFP compatibility worker',
-                   GIT_AUTHOR_EMAIL='346791974+JustinDent@users.noreply.github.com',
+                   GIT_AUTHOR_EMAIL='346791974+Just-Intent@users.noreply.github.com',
                    GIT_COMMITTER_NAME='TSFP compatibility worker',
-                   GIT_COMMITTER_EMAIL='346791974+JustinDent@users.noreply.github.com')
+                   GIT_COMMITTER_EMAIL='346791974+Just-Intent@users.noreply.github.com')
         self.git('read-tree', sha(head), env=env)
         for name, value in sorted(changes.items()):
             if value is None:

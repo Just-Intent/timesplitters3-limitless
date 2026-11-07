@@ -295,7 +295,7 @@ need matching builds and game content. Online includes its own Python/Tk runtime
 Supported default.xbe SHA-256:
 3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc
 
-Source and issues: https://github.com/JustinDent/timesplitters3-limitless
+Source and issues: https://github.com/Just-Intent/timesplitters3-limitless
 Based on: https://github.com/TheDoffman/timesplitters-future-perfect-pc
 Exact native build and packaging provenance: BUILD.json and Support/Launcher.
 Source and third-party notices: Source and Licenses.

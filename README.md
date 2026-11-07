@@ -11,10 +11,10 @@ A MapMaker-focused fork of the TimeSplitters: Future Perfect PC port
 
 MapMaker limits raised many times over · New MapMaker tools · PC mouse and control fixes · Bug fixes
 
-<a href="https://github.com/JustinDent/timesplitters3-limitless/releases/latest/download/TimeSplitters-Launcher-windows-x64.zip"><img src="docs/assets/download-windows-launcher.svg" alt="Windows launcher downloads for this fork (no fork release published yet)" width="280" height="52"></a>
-<a href="https://github.com/JustinDent/timesplitters3-limitless/releases/latest/download/TimeSplitters-Launcher-macos-arm64.zip"><img src="docs/assets/download-mac-launcher.svg" alt="Mac launcher downloads for this fork (no fork release published yet)" width="280" height="52"></a>
+<a href="https://github.com/Just-Intent/timesplitters3-limitless/releases/latest/download/TimeSplitters-Launcher-windows-x64.zip"><img src="docs/assets/download-windows-launcher.svg" alt="Windows launcher downloads for this fork (no fork release published yet)" width="280" height="52"></a>
+<a href="https://github.com/Just-Intent/timesplitters3-limitless/releases/latest/download/TimeSplitters-Launcher-macos-arm64.zip"><img src="docs/assets/download-mac-launcher.svg" alt="Mac launcher downloads for this fork (no fork release published yet)" width="280" height="52"></a>
 
-<sub><strong>No release of this fork has been published yet.</strong> Build from source for now · <a href="https://github.com/JustinDent/timesplitters3-limitless/releases">Fork releases</a></sub>
+<sub><strong>No release of this fork has been published yet.</strong> Build from source for now · <a href="https://github.com/Just-Intent/timesplitters3-limitless/releases">Fork releases</a></sub>
 
 **[MapMaker Limitless](#mapmaker-limitless)** · [Player guide](docs/mapmaker/mapmaker-limitless.md) · [Build from source](docs/development/building.md) · [Install & play](#start-playing) · [Credits](#credits)
 
@@ -68,7 +68,7 @@ This fork adds:
   listed there too. The rest have automated fixture tests only; the
   [MapMaker Limitless table](#mapmaker-limitless) marks each one.
 - No fork release has been published. The download buttons point to this
-  fork's [releases page](https://github.com/JustinDent/timesplitters3-limitless/releases),
+  fork's [releases page](https://github.com/Just-Intent/timesplitters3-limitless/releases),
   which stays empty until a release is made.
 - Not yet tested with the fork's changes: System Link, splitscreen, native Mac
   and most story levels.
@@ -143,7 +143,7 @@ test programs, `tsfp.ps1 -Action Build -CompileOnly`).
 
 The launcher steps below are inherited from the original PC port. Launcher
 downloads from this fork will appear on the
-[fork releases page](https://github.com/JustinDent/timesplitters3-limitless/releases)
+[fork releases page](https://github.com/Just-Intent/timesplitters3-limitless/releases)
 once published; until then the launcher cannot install a Limitless game runtime.
 
 The original port's launcher steps (Windows, Mac and Linux use the same steps):
@@ -297,12 +297,12 @@ Native Mac/Linux validation is pending; see [validation](docs/project/STATUS.md)
 | [Crash reports](docs/players/windows-crash-logger.md) | [Repository map for agents](docs/agent-context/README.md) |
 | [MapMaker Limitless](docs/mapmaker/mapmaker-limitless.md) | [Fork architecture](docs/development/architecture.md) |
 
-**[Report a bug](https://github.com/JustinDent/timesplitters3-limitless/issues/new?template=01-bug-report.yml)**
+**[Report a bug](https://github.com/Just-Intent/timesplitters3-limitless/issues/new?template=01-bug-report.yml)**
 with your installed versions, platform and steps to reproduce. The launcher's
 **Diagnostics** page provides local reports and logs; nothing uploads automatically.
 Keep personal saves and game data private.
 
-Suggest improvements in **[Ideas](https://github.com/JustinDent/timesplitters3-limitless/discussions/categories/ideas)**.
+Suggest improvements in **[Ideas](https://github.com/Just-Intent/timesplitters3-limitless/discussions/categories/ideas)**.
 To contribute, read the [contributing guide](CONTRIBUTING.md),
 [project rules](AGENTS.md) and [code of conduct](CODE_OF_CONDUCT.md).
 Report security vulnerabilities privately using the [security policy](SECURITY.md).
@@ -317,7 +317,7 @@ Report security vulnerabilities privately using the [security policy](SECURITY.m
   and documentation. TimeSplitters 3 Limitless is a fork of that project.
 - **Recompilation toolkit:** [nemonicicon/ts3FPrecomp](https://github.com/nemonicicon/ts3FPrecomp)
   and its contributors.
-- **This fork:** [JustinDent/timesplitters3-limitless](https://github.com/JustinDent/timesplitters3-limitless)
+- **This fork:** [Just-Intent/timesplitters3-limitless](https://github.com/Just-Intent/timesplitters3-limitless)
   adds the MapMaker capacity raise, MapMaker features, control and bug fixes
   described [above](#mapmaker-limitless).
 
