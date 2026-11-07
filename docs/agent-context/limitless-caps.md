@@ -274,6 +274,7 @@ What binds past 511, ranked (for 1023 pieces; heaviest tile 14 pads, 46 links):
 | 13 | container / undo | 512 KB, tiers to 0x7FFE0 | | 1023 x 248 B (type 41) = 254 KB + items | fits |
 | 14 | loader piece table, Story AI piece byte | `sub_00301A90` 1024 pointers; retries +256/+512/+768 | 1024 | | fits |
 | 15 | pickups 768, physics bodies 1024, prop blocks 2048 | objects area | | follow items/objects, not tiles | fit within the object pool |
+| 16 | room AABB tree staging | `sub_00086FC0` in `sub_0003D6E0(3)` (12 KB of a 16 KB pool) | 438 -> **1023** (C staging `0x00911000`) | 1023 x 0x1C | done 2026-11-07: past 585 it overwrote the heap handle `[0x007EB4B4]` (room 602; the 676-tile load crash). [rooms](limitless-rooms.md) stage 13 |
 
 New table entries: `items.json` `mm-piece-pool-bytes/-loop/-last/-count`
 (2048 nodes); `level.json` re-valued (frame 0x2090, arguments +0x1060);

@@ -3,14 +3,15 @@
  * past the old ~209-room stack frame; the compile guard drops only pieces that
  * would pass the room or portal limit, with the limit tied to the room-model
  * slots; prop slots for room models 0x9D0..0x907+MAX are synthesized in scene 100
- * only, from room 200's slot, without disturbing existing slots. */
+ * only, from room 200's slot, without disturbing existing slots; the room tree
+ * stages its 0x1C records outside the 12 KB scratch block past 438 rooms. */
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00900000/4], g_eax, g_esp;
+static uint32_t memory[0x00920000/4], g_eax, g_esp;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
@@ -20,6 +21,11 @@ static uint8_t *u8(uint32_t a) { return (uint8_t *)((uintptr_t)a+g_xbox_mem_offs
 
 void sub_00157440(void) {}
 void sub_0003DFA0(void) {}
+static volatile int stub_157970; /* a body of its own: identical empty stubs may be folded */
+void sub_00157970(void) { stub_157970++; }
+/* Fake tree builder: records its arguments and checks each staged record
+ * against the room records while the staging is live. */
+static uint32_t build_calls,build_args[5],build_bad,build_n;
 /* word draw buckets: tests/mapmaker/mapmaker_rooms_buckets.c */
 void sub_0001A010(void) {} void sub_000A79B0(void) {} void sub_003442B0(void) {}
 void sub_00086AE0(void) {} void sub_00344350(void) {} void sub_00087720(void) {}
@@ -47,6 +53,15 @@ static uint32_t guest_call(void (*f)(void),int n,...)
             count++;
         }
         set16(list,(uint16_t)count);
+    } else if(f==sub_00157970 && n==5) {
+        uint32_t rec,recs=WORD_AT(0x00708788u),k;
+        for(i=0;i<5;i++) build_args[i]=va_arg(a,uint32_t);
+        build_calls++;build_n=build_args[3];
+        for(i=0;i<(int)build_n;i++) {
+            rec=build_args[2]+(uint32_t)i*0x1Cu;
+            if(u16(rec)!=(uint32_t)i+1u || u16(rec+2u)!=0) build_bad++;
+            for(k=0;k<6;k++) if(WORD_AT(rec+4u+4u*k)!=WORD_AT(recs+((uint32_t)i+1u)*0xB4u+0x10u+4u*k)) build_bad++;
+        }
     } else if(f==sub_0003DFA0 && n==2) {
         alloc_size=va_arg(a,uint32_t);(void)va_arg(a,uint32_t);
         r=heap_next;heap_next+=(alloc_size+15u)&~15u;allocs++;
@@ -67,6 +82,16 @@ static void fake_original(void) { originals++; g_esp+=4u; } /* pops like a real 
 #define STACK 0x00100000u
 #define RECORDS 0x00200000u
 #define OUT 0x00180000u
+/* sub_00086FC0 with count rooms: 1 when the original ran */
+static int tree(int32_t count)
+{
+    originals=0;build_calls=0;build_bad=0;
+    WORD_AT(0x007B975Cu)=(uint32_t)count;
+    WORD_AT(STACK)=0x12345678u;g_esp=STACK;
+    pc_mapmaker_rooms_tree(fake_original);
+    CHECK(g_esp==STACK+4u);
+    return originals;
+}
 static uint32_t query(uint32_t box,uint32_t max)
 {
     g_esp=STACK;WORD_AT(STACK)=0x12345678u;WORD_AT(STACK+4)=box;WORD_AT(STACK+8)=OUT;WORD_AT(STACK+12)=max;
@@ -328,6 +353,25 @@ int main(void)
     CHECK(originals==0 && query_args[4]==MAPMAKER_ROOMS_QUERY_BUFFER+MAPMAKER_ROOMS_QUERY_BYTES);
     CHECK(mapmaker_rooms.query_depth==1);
     mapmaker_rooms.query_depth=0;
+
+    /* ---- room tree (sub_00086FC0) ---- */
+    for(r=0;r<=1024;r++) for(i=0;i<6;i++) WORD_AT(RECORDS+r*0xB4u+0x10u+4u*i)=0x42800000u+r*8u+i; /* boxes */
+    memset((char *)memory+MAPMAKER_ROOMS_TREE_STAGING,0xCD,MAPMAKER_ROOMS_TREE_BYTES+0x100u);
+    CHECK(tree(0)==1 && tree(1)==1 && tree(438)==1 && build_calls==0);   /* fits sub_0003D6E0(3): the original */
+    CHECK(tree(439)==0 && build_calls==1 && build_n==439 && build_bad==0);
+    CHECK(tree(676)==0 && build_calls==1 && build_n==676 && build_bad==0);  /* the crash map */
+    CHECK(tree(1023)==0 && build_calls==1 && build_n==1023 && build_bad==0);
+    CHECK(build_args[0]==0x00702E00u && build_args[2]==MAPMAKER_ROOMS_TREE_STAGING && build_args[4]==0x00086120u);
+    CHECK(WORD_AT(build_args[1])==1023u && WORD_AT(build_args[1]+4u)==4u && WORD_AT(build_args[1]+8u)==6u);
+    /* records and parameters stay in the staging block, out of the scratch pool and its neighbours */
+    CHECK(build_args[1]>=MAPMAKER_ROOMS_TREE_STAGING+1023u*0x1Cu &&
+          build_args[1]+12u<=MAPMAKER_ROOMS_TREE_STAGING+MAPMAKER_ROOMS_TREE_BYTES);
+    CHECK(MAPMAKER_ROOMS_TREE_STAGING>=0x008A0000u && MAPMAKER_ROOMS_TREE_STAGING+MAPMAKER_ROOMS_TREE_BYTES<=0x00920000u);
+    CHECK(*u8(MAPMAKER_ROOMS_TREE_STAGING+MAPMAKER_ROOMS_TREE_BYTES)==0xCDu);
+    CHECK(tree(1024)==0 && build_n==1023 && mapmaker_rooms_tree_clipped==1);  /* never past the block */
+    CHECK(*u8(MAPMAKER_ROOMS_TREE_STAGING+MAPMAKER_ROOMS_TREE_BYTES)==0xCDu);
+    CHECK(tree(-1)==1);
+    memset((char *)memory+RECORDS,0,1025u*0xB4u);
 
     /* ---- compile guard ---- */
     room_models(0x907u+1023u,1100u);                     /* every room model has a slot */

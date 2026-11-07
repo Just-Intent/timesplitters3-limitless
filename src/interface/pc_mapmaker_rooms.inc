@@ -12,6 +12,7 @@
  * file is the C half:
  *
  *   WRAP sub_00087310 -> pc_mapmaker_rooms_query
+ *   WRAP sub_00086FC0 -> pc_mapmaker_rooms_tree         (replaces the body past 438 rooms)
  *   WRAP sub_0008A780 -> pc_mapmaker_rooms_compile
  *   WRAP sub_00083F80 -> pc_mapmaker_rooms_piece
  *   WRAP sub_00085030 -> pc_mapmaker_rooms_piece
@@ -31,6 +32,14 @@
  * here with the same tree walk, callback and result, collecting into a static
  * guest buffer of 1023 words (the callback de-duplicates, so it holds at most
  * one word per room).
+ *
+ * Room tree (sub_00086FC0, every level load): the original stages one 0x1C
+ * record per room in the scratch block sub_0003D6E0(3) (3 x 4 KB pages of the
+ * 16 KB pool at 0x007E72E0: 438 rooms; past 585 the records ran out of the
+ * pool into the XDK globals, and at 602 over the process heap handle
+ * [0x007EB4B4], crashing the next allocation). Past 438 rooms the same
+ * records go to a static guest block (MAPMAKER_ROOMS_TREE_STAGING) and the
+ * same builder call follows; up to 438 rooms the original runs.
  *
  * Compile guard (sub_0008A780, MapMaker map play only): sub_00083F80 and
  * sub_00085030 build one entry per piece (+0x14 rooms, +0x18 portals). Totals
@@ -146,6 +155,42 @@ void pc_mapmaker_rooms_query(void (*original)(void))
     mapmaker_rooms.query_depth--;
     g_eax=found;
     MAPMAKER_GUEST_RET();                    /* sub_00087310 ends in a plain ret */
+}
+
+/* ---- sub_00086FC0 (no arguments, plain ret): the room AABB tree --------- */
+#define MAPMAKER_ROOMS_TREE 0x00702E00u           /* tree header (nodes, leaf lists, bounds) */
+#define MAPMAKER_ROOMS_TREE_STAGING 0x00911000u   /* 0x1C per room (rooms 1..n), then the builder's {n,4,6} */
+#define MAPMAKER_ROOMS_TREE_BYTES 0x7000u
+#define MAPMAKER_ROOMS_TREE_RECORD 0x1Cu          /* word room, 6 floats: room record +0x10..+0x24 (box) */
+#define MAPMAKER_ROOMS_TREE_PARAMS (MAPMAKER_ROOMS_TREE_STAGING+MAPMAKER_ROOMS_TREE_BYTES-0x10u)
+#define MAPMAKER_ROOMS_TREE_SCRATCH 438u          /* sub_0003D6E0(3): 0x3000 / 0x1C rooms */
+#define MAPMAKER_ROOMS_TREE_CALLBACK 0x00086120u  /* the builder's allocation callback */
+#if MAPMAKER_ROOMS_MAX*0x1Cu > MAPMAKER_ROOMS_TREE_BYTES-0x10u
+#error room tree staging block too small for MAPMAKER_ROOMS_MAX
+#endif
+extern void sub_00157970(void);
+static unsigned long long mapmaker_rooms_tree_staged,mapmaker_rooms_tree_clipped;
+void pc_mapmaker_rooms_tree(void (*original)(void))
+{
+    int32_t count=(int32_t)WORD_AT(0x007B975Cu);
+    uint32_t n,r,k,records=WORD_AT(0x00708788u);   /* room records, 0xB4 each */
+    if(count<=(int32_t)MAPMAKER_ROOMS_TREE_SCRATCH) { original(); return; }   /* fits the stock block */
+    n=(uint32_t)count;
+    if(n>MAPMAKER_ROOMS_MAX) { n=MAPMAKER_ROOMS_MAX;mapmaker_rooms_tree_clipped++; }  /* the compile guard keeps n <= MAX */
+    memset(mapmaker_rooms_host(MAPMAKER_ROOMS_TREE_STAGING),0,n*MAPMAKER_ROOMS_TREE_RECORD);
+    for(r=1;r<=n;r++) {
+        uint32_t rec=MAPMAKER_ROOMS_TREE_STAGING+(r-1u)*MAPMAKER_ROOMS_TREE_RECORD;
+        mapmaker_rooms_set_u16(rec,(uint16_t)r);
+        for(k=0;k<6u;k++) WORD_AT(rec+4u+4u*k)=WORD_AT(records+r*0xB4u+0x10u+4u*k);
+    }
+    WORD_AT(MAPMAKER_ROOMS_TREE_PARAMS)=n;                  /* stock [esp+0x10]: the room count */
+    WORD_AT(MAPMAKER_ROOMS_TREE_PARAMS+4u)=4u;
+    WORD_AT(MAPMAKER_ROOMS_TREE_PARAMS+8u)=6u;
+    mapmaker_rooms_tree_staged++;
+    /* the original: sub_00157970(tree, params, records, n, callback); the staging is not kept */
+    guest_call(sub_00157970,5,MAPMAKER_ROOMS_TREE,MAPMAKER_ROOMS_TREE_PARAMS,MAPMAKER_ROOMS_TREE_STAGING,n,
+               MAPMAKER_ROOMS_TREE_CALLBACK);
+    MAPMAKER_GUEST_RET();
 }
 
 /* ---- MapMaker compile: count rooms and portals per piece --------------- */
@@ -522,6 +567,10 @@ void pc_mapmaker_rooms_bucket_draw(void (*original)(void))
     uint32_t b=g_eax,ret=WORD_AT(g_esp),done=0,n,i;
     const mapmaker_rooms_depths *c;
     if(!mapmaker_rooms_bk.depth || b>=MAPMAKER_ROOMS_DEPTHS) {   /* not reached from sub_00086C40 */
+        if(mapmaker_rooms_bk.depth) {        /* a walk 80+ deep: the C lists skipped those rooms; stock read */
+            MAPMAKER_GUEST_RET();            /* its count byte past 0x702DB0+0x4F (the tree header) */
+            return;
+        }
         if(b<MAPMAKER_ROOMS_DEPTHS) *(uint8_t *)mapmaker_rooms_host(MAPMAKER_ROOMS_BUCKET_COUNTS+b)=0;
         original();
         return;

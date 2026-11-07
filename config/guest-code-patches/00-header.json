@@ -4,7 +4,7 @@
   "extension": {
     "va": "0x008A0000",
     "size": "0x00080000",
-    "note": "Reserved by titles/futureperfect/src/main.c (TSFP_GUEST_EXTENSION_VA/SIZE). Areas: 0x008A0000 objects, 0x008B0000 logic/tags, 0x008C0000 rooms (to 0x008D2180: tables, model table, query buffers; 0x008D4000-0x008DBFFF boss camera lists; 0x008DC000-0x008DF08F rooms light heads; map and free gaps in docs/mapmaker/mapmaker-rooms.md, checked by test_extension_map_rooms_sub_range), 0x008E0000-0x008FFFFF pads group A* pool, 0x00900000 upward actors, story character, grid, sets, matchbots, weaponset, pak table (0x00907000-0x009076FF), 0x00908000-0x00910093 rooms (front-end view, light colour). There is no general spare block: check every table before placing a new one."
+    "note": "Reserved by titles/futureperfect/src/main.c (TSFP_GUEST_EXTENSION_VA/SIZE). Areas: 0x008A0000 objects, 0x008B0000 logic/tags, 0x008C0000 rooms (to 0x008D2180: tables, model table, query buffers; 0x008D4000-0x008DBFFF boss camera lists; 0x008DC000-0x008DF08F rooms light heads; map and free gaps in docs/mapmaker/mapmaker-rooms.md, checked by test_extension_map_rooms_sub_range), 0x008E0000-0x008FFFFF pads group A* pool, 0x00900000 upward actors, story character, grid, sets, matchbots, weaponset, pak table (0x00907000-0x009076FF), 0x00908000-0x00917FFF rooms (front-end view, light colour, room tree staging 0x00911000). There is no general spare block: check every table before placing a new one."
   },
   "patches": []
 }
