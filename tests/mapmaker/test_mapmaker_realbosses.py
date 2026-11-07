@@ -1085,9 +1085,11 @@ def test_prometheus_rows_data():
     assert text(0x62) == text(0xAA) == 0xDF8 and text(0x36) == text(0xA9) == 0xDDC
     model = lambda c: struct.unpack('<I', rd(0x0053A3CC + c * 0x30 + 4, 4))[0]
     assert (model(0x62), model(0x36)) == (0x633, 0x5F8)
-    src = INC.read_text(encoding='utf-8')
-    assert '{159u,0x62u,0x52420062u,0xAAu,"Prometheus SK/8"}' in src
-    assert '{160u,0x36u,0x52420036u,0xA9u,"Prometheus SD/7"}' in src
+    # since the robots' story class (pc_mapmaker_creatures.def), rows 159/160 come from the creature table
+    table = (ROOT / 'src/interface/pc_mapmaker_creatures.def').read_text(encoding='utf-8')
+    assert 'MAPMAKER_CREATURE(159u,0x62u,0xFFu,0xAAu,"Prometheus SK/8",' in table
+    assert 'MAPMAKER_CREATURE(160u,0x36u,0xFFu,0xA9u,"Prometheus SD/7",' in table
+    assert '{row,id,0x52420000u|(id),preview,label},' in INC.read_text(encoding='utf-8')   # text 0x52420062 / 0x52420036
     for other in ('pc_mapmaker_tank.inc', 'pc_mapmaker_mothership.inc', 'pc_mapmaker_robot.inc', 'pc_mapmaker_crowe.inc'):
         body = (ROOT / 'src/interface' / other).read_text(encoding='utf-8')
         assert '0x62u' not in body and '0x36u' not in body, other

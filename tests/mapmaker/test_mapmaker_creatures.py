@@ -57,6 +57,11 @@ DEF_MUTATIONS = {
     'mutant-class': ('"Mutant (Story)",0x10000000u,0x00008000u', '"Mutant (Story)",0x10000000u,0x00004000u'),
     'mutant-look': ('MAPMAKER_CREATURE(163u,0x30u,0x59u,', 'MAPMAKER_CREATURE(163u,0x30u,0xFFu,'),
     'ghost-pak': ('0x0049D968u,"lv17"', '0x0049DA84u,"lv17"'),
+    'sk8-bot-class': ('"Prometheus SK/8",0x10000004u', '"Prometheus SK/8",0x11000000u'),
+    'sd7-bot-class': ('"Prometheus SD/7",0x10000004u', '"Prometheus SD/7",0x01000000u'),
+    'sk8-row-moved': ('MAPMAKER_CREATURE(159u,0x62u', 'MAPMAKER_CREATURE(166u,0x62u'),
+    'animrb-partial': ('"Prometheus SK/8",0x10000004u,0x00000000u,0x0047E65Cu,"animrb",0x0048F240u,0x15u,0u,21u,0)',
+                       '"Prometheus SK/8",0x10000004u,0x00000000u,0x0047E65Cu,"animrb",0x0048F240u,0x15u,1u,10u,0)'),
 }
 
 
@@ -129,9 +134,10 @@ def rows():
 
 def test_rows_and_wiring():
     r = rows()
-    assert [x['label'] for x in r] == ['Catacomb Ghost', 'SecuriDroid XP', 'Mutant (Story)']
+    assert [x['label'] for x in r][:5] == ['Prometheus SK/8', 'Prometheus SD/7', 'Catacomb Ghost', 'SecuriDroid XP', 'Mutant (Story)']
     assert all(len(x['label']) <= 15 for x in r)                     # rbs_extra label[16]
-    assert [x['row'] for x in r] == [161, 162, 163]                  # after realbosses' 150..160
+    assert [x['row'] for x in r][:5] == [159, 160, 161, 162, 163]    # 159/160 kept from wave 1, after realbosses' 150..158
+    assert len({x['row'] for x in r}) == len(r)
     assert len({x['id'] for x in r}) == len(r) and all(x['level'] == '0' for x in r)
     rb = (ROOT / 'src/interface/pc_mapmaker_realbosses.inc').read_text(encoding='utf-8')
     ans = (ROOT / 'src/interface/pc_mapmaker_animslots.inc').read_text(encoding='utf-8')
@@ -143,7 +149,7 @@ def test_rows_and_wiring():
     for m in re.finditer(r'\{(\d+)u,0x([0-9A-F]+)u,0x52420', rb):         # existing synthetic rows and ids
         assert int(m.group(1)) not in {x['row'] for x in r} and int(m.group(2), 16) not in {x['id'] for x in r}
     assert {0x15, 0x28, 0x64}.isdisjoint({x['id'] for x in r})
-    assert '{table,count,{{first,n},{0,0},{0,0}},pak_name},' in ans
+    assert '{((first)==0u && (n)==(count))?0u:(table),count,{{first,n},{0,0},{0,0}},pak_name},' in ans
     guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
     header = (ROOT / 'src/interface/pc_display_menu.h').read_text(encoding='utf-8')
     assert '#include "pc_mapmaker_creatures.inc"' in guest
@@ -196,12 +202,20 @@ def entry(rd, table, k):
     return cstr(rd, struct.unpack_from('<I', e, 0)[0]), struct.unpack_from('<H', e, 0x10)[0], struct.unpack_from('<I', e, 0xC)[0]
 
 
-HANDLERS = {   # row label -> (dispatch call site in sub_0027D590, handler, message handler or None)
+HANDLERS = {   # row label -> (dispatch call site in sub_0027D590 / sub_0027F8E0, handler, message handler or None)
+    'Prometheus SK/8': (0x0027FAA0, 0x00283730, 0x00283F80),
+    'Prometheus SD/7': (0x0027FAA0, 0x00283730, 0x00283F80),
     'Catacomb Ghost': (0x0027D958, 0x002BA300, 0x002BA100),
     'SecuriDroid XP': (0x0027DD06, 0x0026B7A0, 0x0026B5E0),
     'Mutant (Story)': (0x0027DDB2, 0x00264A10, None),
 }
+ANIMRB = ['botshock', 'bigbotsattackidle', 'bigbotsfirestill', 'bigbotsadvtostand', 'bigbotsadvfire', 'bigbotsstandtoadv',
+          'bigbotdeath', 'bigbotdeath2', 'bigbotrocket', 'bigbotrocketadv', 'bigbotrocketadvfire', 'fastbotsadv',
+          'fastbotsadvfire', 'fastbotsadvtostand', 'fastbotsattackidle', 'fastbotsawake', 'fastbotsfirestill',
+          'fastbotsstandtoadv', 'fastbotsstrafelft', 'fastbotsstraferht', 'fastbotshitreact']
 KEPT = {   # label -> anim names of the kept entries
+    'Prometheus SK/8': ANIMRB,
+    'Prometheus SD/7': ANIMRB,
     'Catacomb Ghost': ['ghostidle', 'ghosttrap', 'ghostattack', 'ghostdeath'],
     'SecuriDroid XP': ['minimovefor', 'minimoveforslow', 'minitostillslow', 'minifrmstillslow', 'minirotlft', 'minirotrht',
                        'mini180', 'minifire', 'ministill', 'minifirefor', 'minideath'],
@@ -217,7 +231,10 @@ def test_registration_tables_and_paks():
     by_pak = {p: (t, n) for _, p, t, n in regs}
     for x in rows():
         path = cstr(rd, x['pak'])
-        assert path == 'pak/stream/%s/anim/%s.pak' % (re.match(r'lv\d+', x['name']).group(0), x['name']), path
+        if x['name'] == 'animrb':
+            assert path == 'pak/anim/animrb.pak' and x['first'] == 0 and x['n'] == x['count'], path   # every level's pak, whole
+        else:
+            assert path == 'pak/stream/%s/anim/%s.pak' % (re.match(r'lv\d+', x['name']).group(0), x['name']), path
         assert by_pak[path] == (x['table'], x['count']), path
         kept = [entry(rd, x['table'], x['first'] + i) for i in range(x['n'])]
         assert [k[0] for k in kept] == KEPT[x['label']]
@@ -255,6 +272,9 @@ def test_classes_reach_their_handlers():
     assert 0x11000000 in imms(a[0x002421A7]) and 0 in imms(a[0x002421AD])
     for x in rows():
         site, handler, _ = HANDLERS[x['label']]
+        if x['hi'] == 0 and x['lo'] & 0x1FFF:              # the small classes: sub_0027F8E0 (see the robot test)
+            assert a[site].call and target(a[site]) == handler and a[site].function == 0x0027F8E0
+            continue
         assert a[site].call and target(a[site]) == handler and a[site].function == 0x0027D590
         value = x['hi'] or x['lo'] & ~0x10000000           # one bit set in one half, the other half 0
         assert bin(value).count('1') == 1 and (x['lo'] & ~0x10000000 == 0 or x['hi'] == 0)
@@ -342,7 +362,7 @@ def test_carriers_and_looks():
     for x in rows():
         assert x['id'] not in arcade, x['label']
         assert x['preview'] in arcade, x['label']
-    assert not sets[0x2F] and not sets[0x30] and sets[0x4D] == {3}
+    assert not sets[0x2F] and not sets[0x30] and sets[0x4D] == {3} and sets[0x62] == {10} and sets[0x36] == {7}
     assert (model(0x2F, 4), model(0x2F, 8)) == (0x619, -1) and (model(0x30, 4), model(0x30, 8)) == (0x619, -1)
     assert (model(0x17, 4), model(0x17, 8)) == (0x5C8, 0x5C9) and (model(0x59, 4), model(0x59, 8)) == (0x613, 0x614)
     assert model(0x4D, 4) == 0x607 and r['SecuriDroid XP']['look'] == 0xFF
@@ -407,3 +427,75 @@ def test_story_levels_spawn_these_classes():
     for recs in mutants.values():
         for lo, hi, slot in recs:
             assert (lo, hi) == (r['Mutant (Story)']['lo'], r['Mutant (Story)']['hi']) and member(4, slot) == 0x59
+
+
+# ---- the Prometheus robots (v0.4.0-mapmaker.58 report: SK/8 loops its rocket pose, fires nothing) ----
+
+def test_robot_class_4_path():
+    """Story mode: an AI class with lo & 0x1FFF goes to sub_0027F8E0 (sub_0027FE30, 0x0027FE56), whose jump table
+    (bytes 0x0027FE04, targets 0x0027FDE8) sends class 4 to 0x0027F9C4; a robot (sub_000D6DD0 at 0x0027FA37) with a
+    target runs sub_00283730 (0x0027FAA0); in scene 100 (0x0027FA43) one with no built-in weapon (+0x94), no +0x2BC
+    and no usable weapon (sub_0027D510) the unarmed attack sub_0027E4E0 (0x0027FA86). Class 4 messages:
+    sub_0027CEF0 sends a robot to sub_00283F80 (0x0027D05C)."""
+    rd = xbe()
+    a = by_address()
+    assert 0x1FFF in imms(a[0x0027FE56]) and target(a[0x0027FE68]) == 0x0027F8E0
+    bt, tb = rd(0x0027FE04, 0x20), struct.unpack('<7I', rd(0x0027FDE8, 28))
+    assert tb[bt[4 - 1]] == 0x0027F9C4
+    assert target(a[0x0027FA37]) == 0x000D6DD0 and target(a[0x0027FAA0]) == 0x00283730
+    assert 0x64 in imms(a[0x0027FA43]) and a[0x0027FA4C].ops[1][4] == 0x94 and a[0x0027FA56].ops[1][4] == 0x2BC
+    assert target(a[0x0027FA61]) == 0x0027D510 and target(a[0x0027FA86]) == 0x0027E4E0
+    assert target(a[0x0027D040]) == 0x000D6DD0 and target(a[0x0027D05C]) == 0x00283F80
+    for rid in (0x62, 0x36):
+        assert rd(0x000D6E00 + rid - 0x12, 1)[0] == 0                      # in the robot list
+
+
+def test_bot_class_never_reaches_the_robot_code():
+    """The root cause: MapMaker's class 0x01000000 runs sub_0026EFC0 (0x0027D8B6); nothing it reaches through
+    callees with at most six callers calls the robot list or the robot handler, so the robot never fires its
+    built-in weapon."""
+    a = by_address()
+    assert 0x1000000 in imms(a[0x0027D854]) and target(a[0x0027D8B6]) == 0x0026EFC0
+    seen, body = reach([0x0026EFC0], max_callers=6)
+    for f in seen:
+        for i in body[f]:
+            if i.call:
+                assert target(i) not in (0x000D6DD0, 0x00283730, 0x0027E4E0, 0x0027F8E0), (hex(f), hex(i.address))
+
+
+def test_rocket_robot_built_in_weapon():
+    """The AI start gives 0x62 the built-in weapon 0x43 (+0x94, 0x0015B927, its ammo from weapon 0x43's record)
+    when the spawn record has no weapon list (+0x18 -1, 0x0015B87C); MapMaker writes -1 there (0x00242155)."""
+    a = by_address()
+    assert a[0x0015B878].ops[1][4] == 0x18
+    assert 0x62 in imms(a[0x0015B921]) and 0x43 in imms(a[0x0015B927]) and a[0x0015B927].ops[0][4] == 0x94
+    assert a[0x00242155].ops[0][4] == 0x18 and a[0x00242155].function == 0x00240C50
+
+
+def test_animrb_mounted_in_every_mapmaker_level():
+    """animrb.pak ("pak/anim/animrb.pak", 0x0047E65C) is registered whole by sub_001CA2F0 (0x001CB133..0x001CB151)
+    whenever it is mounted; the robot handler reads only animrb's anim ids (table 0x00520840)."""
+    from test_mapmaker_animslots import registrations
+    rd, regs = registrations()
+    assert cstr(rd, 0x0047E65C) == 'pak/anim/animrb.pak'
+    assert ('pak/anim/animrb.pak', 0x0048F240, 0x15) in [(p, t, n) for _, p, t, n in regs]
+    a = by_address()
+    assert 0x0047E65C in imms(a[0x001CB133])
+    ids = {struct.unpack_from('<I', rd(0x00520840 + k * 4, 4))[0] for k in range(16)} - {0xFFFFFFFF}
+    animrb = {struct.unpack_from('<H', rd(0x0048F240 + k * 0x18 + 0x10, 2))[0] for k in range(0x15)}
+    assert ids and ids <= animrb
+
+
+def test_story_robots_spawn_class_4():
+    """Mission 9 (scene 5, set 10) spawns 0x62 and mission 10 (scene 14, set 7) 0x36 with 0:0x10000004 and no
+    weapon (+0x14 -1), e.g. SB06/PR01/GB04 and DW03/TC03."""
+    rd = xbe()
+    story = _private() / 'game/pak/story'
+    if not (story / 'l_5_st.pak').is_file():
+        pytest.skip('needs the story paks')
+    member = lambda s, k: struct.unpack_from('<h', rd(0x0053D2D0 + s * 0xA4 + 4 + k * 8, 2))[0]
+    for pak, setno, rid, tags in (('l_5_st.pak', 10, 0x62, ['SB06', 'PR01', 'GB04']), ('l_14_st.pak', 7, 0x36, ['DW03', 'TC03'])):
+        recs = story_records(story / pak, tags)
+        assert len(recs) == len(tags), pak
+        for r in recs.values():
+            assert all((lo, hi) == (0x10000004, 0) and member(setno, slot) == rid for lo, hi, slot in r), (pak, r)

@@ -18,11 +18,29 @@
  *  pak_name  its short name for the logs and the anim slot budget
  *  table, count  the pak's registration table in sub_001CA2F0
  *  first, n  the table entries the creature's handlers play (kept); the rest
- *            of the story level's cast is left out
+ *            of the story level's cast is left out. first 0 and n == count:
+ *            the whole table (a pak every MapMaker level registers, such as
+ *            animrb.pak): no anim slot budget row, nothing left out
  *  level     optional per-level state hook (void fn(unsigned kind), 0 none),
  *            called at the level's anim mount when the set holds the id
  * CONFIRMED rows: tests/mapmaker/test_mapmaker_creatures.py (US XBE data,
  * decode, story level spawn records). */
+/* Machine Wars "Prometheus" robots (rows 159/160 since wave 1, then editor
+ * rows only; their numbers are kept). Mission 9 (scene 5, set 10) spawns the
+ * rocket robot 0x62 (SB06/PR01/GB04.., 21 records) and mission 10 (scene 14,
+ * set 7) the guard robot 0x36 (BBB2/DW03/TC03.., 11 records) with the story
+ * class 0:0x10000004 and no weapon. Class 4 runs sub_0027F8E0 case 4: the robot
+ * list sub_000D6DD0 sends a robot with a target to sub_00283730 (robot moves
+ * and fire from animrb.pak's anim table 0x00520840; messages sub_00283F80);
+ * in scene 100 an unarmed robot (built-in weapon +0x94 0, no weapon) gets the
+ * unarmed attack sub_0027E4E0. The AI start gives 0x62 its built-in rocket
+ * weapon 0x43 (+0x94, 0x0015B927) when the record has no weapon list
+ * (+0x18 -1, as MapMaker writes). MapMaker's bot class 0x01000000
+ * (sub_0026EFC0) never reaches the robot code: the rocket robot looped its
+ * fire pose and fired nothing (v0.4.0-mapmaker.58 report). animrb.pak is
+ * mounted and registered by every MapMaker level (whole table). */
+MAPMAKER_CREATURE(159u,0x62u,0xFFu,0xAAu,"Prometheus SK/8",0x10000004u,0x00000000u,0x0047E65Cu,"animrb",0x0048F240u,0x15u,0u,21u,0)
+MAPMAKER_CREATURE(160u,0x36u,0xFFu,0xA9u,"Prometheus SD/7",0x10000004u,0x00000000u,0x0047E65Cu,"animrb",0x0048F240u,0x15u,0u,21u,0)
 /* Mission 6 ghosts: the catacombs' GHT1..GHT7 records are zombies 0x17, 0x18,
  * 0x23, 0x2A with class 0:0x50000000 -> sub_002BA300 (no level state);
  * ghostidle/trap/attack/death 0x249..0x24C. Carrier 0x2F (soldiermodel_talk
