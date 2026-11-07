@@ -1,7 +1,7 @@
 # Effects buffering under load
 
 `patches/media/0055-dsound-busy-buffer-recovery.patch` extends shared runtime
-`src/hle/hle_dsound.c`; see [runtime](runtime.md) for the buffering contract.
+`src/hle/hle_dsound.c`; the buffering contract is documented below.
 It is independent of native-high-refresh timing and of the music stream path.
 
 `tests/media/test_audio_timing.py` compiles `audio_buffer_load.c` against the
@@ -27,8 +27,7 @@ slot indefinitely. The normal DoWork walk now releases the host voice and
 clears all slot state, including for buffers that are not playing.
 Valid playing, stopped and paused buffers retain their slots. A full pool of
 valid buffers still refuses another allocation; this is not voice stealing.
-Guest Release is not newly intercepted, so a freed object whose settings stay
-indistinguishable from a valid buffer remains outside this correction.
+Patch 2300 additionally intercepts final guest Release, as described below.
 
 The existing `test_audio_timing.py` CI route compiles `audio_buffer_lifecycle.c`.
 It checks four complete 256-slot allocation/invalidation rounds and successful
@@ -116,3 +115,184 @@ backup is shared under the output lock and copied only for active filtering.
 checking recovery, ordinary PCM preservation and explicit-reset cleanup.
 These deterministic adapter checks do not establish audible whole-game or
 physical Mac acceptance.
+
+## Runtime contracts
+
+Effects buffering: `media/0055-dsound-busy-buffer-recovery.patch` extends the
+shared `hle_dsound.c` pump. Its default 40 ms lead grows to the
+observed active service interval plus 10 ms, capped at 90 ms; patch2305 shares
+that measured headroom across fresh effect slots. Explicit
+`RECOMP_DSOUND_LEAD_MS` values stay fixed, including legacy zero. Play still
+submits immediately; pause/stop resets prevent learning inactive intervals.
+After a >100 ms output-model interval, stale data is skipped only up to now,
+then the future lead is submitted in the same call. Refused submissions keep
+the output cursor unchanged; expired one-shots stay expired. Guest clocks,
+stream/music policy and host audio adapters are unchanged. The existing audio
+timing CI suite now exercises 64 voices under delayed service and recovery.
+
+`media/0056-dsound-invalid-buffer-retirement.patch` makes every unusable-buffer
+exit in `model_for_known` retire an existing slot/host voice, including null
+settings holders and invalid rate/alignment. DirectSoundDoWork therefore reclaims
+invalid stopped buffers as well as playing ones. Valid stopped/paused buffers
+are retained; no live voice is evicted to admit another sound. See
+[audio lifecycle tests](audio-buffers.md). Guest Release remains unchanged.
+
+`media/0057-dsound-format-and-tail-recovery.patch` includes rate/alignment in
+buffer identity, retains raw source size while clocking complete frames, and
+preserves stream packet boundaries for rate-only SetFormat. Exact unheard PCM
+and ADPCM suffixes survive voice resets/pause; encoding layout changes keep the
+previous policy. See [format regression coverage](audio-buffers.md).
+
+`media/0058-audio-device-recovery.patch` adds one-second XAudio engine/voice
+retries and a shared per-slot discontinuity signal for streams and movies.
+Their wall-clock fallback skips elapsed audio and establishes a fresh playback
+origin after reconnecting. Explicit reset clears the signal; mute/shutdown
+remain terminal. See [device recovery and tests](audio-buffers.md).
+
+## Final buffer Release and dropout diagnostics
+
+`media/2300-dsound-release-diagnostics.patch` preserves the original
+`CDirectSoundBuffer_Release` and retires the matching host slot only when its
+returned reference count is zero. The object argument maps to interface +1C.
+The supported US constructor 00408028 installs vtable 004A1CE0, whose +8 method
+is 00406FF0. Public IDirectSoundBuffer_Release 00406AA0 subtracts 1C and calls
+that method. Its 0040688A helper decrements object+4 and invokes destruction
+only on zero; these inspected bytes justify the added extra symbol. Generation
+preserves the original body and derives the thunk's four argument bytes from
+its ret instruction. No guest destructor, refcount, callback or memory is
+replaced. Failed/nonfinal releases retain the model; unmodelled objects still
+call the original. A generation identity prevents reentrant slot/address reuse
+from being retired by the outer Release. The shared HLE covers both hosts and
+never consults Enhanced Audio.
+
+The five-second DSOUND health report now shows occupied slots, failed pool
+allocations, release calls/retirements, refused PCM submissions and starvation
+episodes. A dry queue remains one episode across repeated refused retries;
+accepted PCM permits counting the next episode. Invalid-slot retirement remains
+a separate fallback. Refusal counts describe attempts, not sounds proven lost.
+`RecompAudioEngineStats` retains lifetime counts for queue-full, invalid PCM,
+output unavailable, voice retry waits, allocation failures, voice/device
+failures, output-open attempts and successes. XAudio/SDL snapshots retain them
+across reset, recovery and shutdown, including when hardware statistics are
+unavailable. SDL still has no hardware playback-position/glitch measurement;
+its adapter-owned failures exclude migrations handled internally by SDL.
+
+Existing CI routes `test_audio_timing.py` and `test_audio_device_recovery.py`
+cover nonfinal/error/final Release, playing/paused/stopped slots, still-valid
+freed settings, four complete 256-slot reuse rounds, reentrant replacement,
+unmodelled objects, continued PCM output, starvation episode counting and
+failure-category snapshots on both adapters. These fixtures do not prove
+long-session gameplay or physical headset switching/listening.
+
+## Exit reporting and combined lifecycle stress
+
+Patch 2301 registers normal-exit reports when HLE/output first initializes.
+The HLE report snapshots only host-owned counters and occupancy under its lock;
+it does not read guest settings, which may already have been freed. Both
+adapters register their idempotent shutdown and emit the same final lifetime
+failure/recovery fields, even after failed initialization or deliberate mute.
+Explicit shutdown followed by process exit prints once. This complements the
+five-second report for short sessions; abrupt termination/crashes cannot be
+promised an exit summary. Patch 2302 makes the Windows RHI WM_QUIT path use
+standard exit rather than ExitProcess. Patch 2303 also changes xbox_HostExit,
+the actual shadow_wndproc WM_CLOSE target, to run these handlers while retaining
+its feedback/profile flushes. The native SDL path already uses standard exit.
+
+`audio_lifecycle_stress.c` links the actual shared buffer HLE/model to each
+complete XAudio/SDL adapter. Only host APIs and guest services are doubled. The fake pthread header is
+scoped to the SDL driver; the XAudio C++ driver needs native libc++ pthreads.
+Each Enhanced Audio on/off case performs 32 eight-buffer scene teardowns,
+combining actual Play/Pause/Resume/Release calls, output loss/refusal, release
+while recovery is pending, surviving-voice recovery and same-address reuse.
+It checks all host voices retire, no released sound resurrects, paused state
+and DSP/routing/discontinuity state clear, and final summaries appear without
+calling the periodic reporter. Existing recovery cases additionally cover
+failed-start/muted exit and repeated explicit shutdown. The real RHI host
+fixture posts WM_QUIT; a separate test compiles the real xbox_HostExit body
+and checks diagnostics and exit handlers. These
+are controlled lifecycle checks, not a real level transition or listening test.
+
+## One-shot completion follows queued output
+
+`media/2304-dsound-buffer-completion.patch` extends GetStatus after natural
+wall-clock completion of a non-looping buffer. If that buffer has accepted
+PCM and its host voice still has queued buffers, status remains PLAYING.
+This prevents a status-driven Stop/reuse from discarding the last samples
+after an underrun. The guest cursor clock, lead, stale-data policy and explicit
+Stop/Release semantics are unchanged. Explicit reset clears `fed`; paused
+buffers retain PAUSED; unavailable output retains wall-clock completion.
+XAudio supplies queue depth. Patch2306 adds an explicit SDL finite-tail drain
+without claiming a device cursor. Physical listening remains a separate check.
+
+`test_audio_timing.py::test_buffer_audible_completion` executes the real pump
+and GetStatus with a 100ms PCM one-shot and a 60ms service interval. The initial
+40ms queue runs dry for 20ms; all 9600 source bytes are submitted but the last
+20ms remains queued at guest completion. Status now waits for that tail, then
+finishes. Stop/reset, pause and device-unavailable controls retain their status.
+
+## Fresh effects inherit busy-service headroom
+
+`media/2305-dsound-burst-headroom.patch` shares observed active effects service
+headroom across buffer lifetimes under the existing HLE lock. Previously each
+fresh slot started at 40ms even after other voices had learned 70-90ms was
+needed. Repeated short effects could therefore suffer their own initial
+underrun before adapting. The shared value only grows from an active, fed
+buffer's service gap, remains capped at 90ms, and never overrides explicit
+fixed/zero lead. Play still submits immediately. Guest clocks, sound priority,
+slot capacity, stream buffering and explicit stops are unchanged. No audio
+thread or host adapter change is introduced. The higher learned lead persists
+for the process, including across scenes; queued SDL routing changes can take
+up to that bounded lead to reach playback.
+
+The existing `test_effects_under_load` route adds `burst`: an active voice
+learns a 60ms service interval, then eight rounds replace 63 simultaneous
+non-looping voices. Each fresh voice must start with 70ms of PCM, retain its
+own queue, and avoid another underrun at the next 60ms service. This regression
+fails before patch2305. Existing fixed/zero, steady, long-hitch, refused-output,
+finite-tail and expiry cases retain their previous behavior.
+
+## FPS validation and remaining runtime limits
+
+The load fixture additionally runs 64 independent voices at millisecond-
+quantized 60/120/144/180/240 service cadences, with repeated 37ms delays. It
+requires zero steady-service underruns, bounded queues, and no recurring
+starvation after the first delayed service teaches the lead. These CPU/device-
+double tests cover requested cadences independently of physical render speed.
+They do not establish audible whole-game acceptance.
+
+The 2026-11-03 Windows ten-bot Hotel matrix exercised all four current presets
+and the legacy diagnostic144 rate. Windowed60/120/180/240 had no increase in
+combat underruns; windowed144 added8. Verified fullscreen/VRR repeats added0
+at180,12 at240,0 at144. All runs had zero effects submission refusals and zero
+slot-exhaustion failures. The live machine did not sustain180/240 rendering;
+see STATUS for measured present rates. Additional counter events remain
+unexplained and must not be called fixed or attributed to long render hitches:
+the profiled render gaps did not exceed90ms in these residual cases. Counter
+events alone do not establish audible loss. Native Mac/network listening and
+other scenes remain separate acceptance work.
+
+## SDL finite-tail drain (review correction)
+
+The original completion change incorrectly assumed SDL's position stub exposed
+queue depth. Patch2306 introduces `recomp_audio_output_tail_pending(slot,finish)`
+in the shared output contract and uses it for natural one-shot completion.
+XAudio delegates to its existing queue snapshot. SDL retains position()==0,
+so streams and movies still use their existing wall-clock fallback. Its new
+drain operation checks both queued input and available converted output;
+once the producer has accepted the entire tail, it flushes the resampling
+remainder once. Successful new input/reset clears the flush marker. Ordinary
+chunks, looping sounds, pause and explicit Stop do not flush through this path.
+Query/flush failure retires only that voice and uses existing retry/discontinuity
+handling; absent/reset/shutdown output reports no pending tail.
+
+The complete shared HLE/model is now linked to each complete XAudio/SDL adapter
+in a tail regression, with only host APIs doubled. A late natural completion
+must retain PLAYING across pending input and converted output, then finish on
+drain. The SDL case fails before2306 and passes afterward. Direct SDL tests
+also verify no invented device cursor, one flush, reset/reuse, unavailable
+output, query/flush failures and preservation of unrelated voices. These tests
+are in the existing dual-host `test_audio_device_recovery.py` CI selection.
+
+API semantics: [SDL queued input](https://wiki.libsdl.org/SDL3/SDL_GetAudioStreamQueued),
+[available output](https://wiki.libsdl.org/SDL3/SDL_GetAudioStreamAvailable),
+[end-of-input flush](https://wiki.libsdl.org/SDL3/SDL_FlushAudioStream).

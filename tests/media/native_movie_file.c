@@ -29,6 +29,14 @@ static void sleep_ms(DWORD ms) { assert(ms==1);sleeps++;host_counter+=host_frequ
 #define Sleep sleep_ms
 #endif
 #define TSFP_PC_CONTROLS 1
+#ifndef _WIN32
+#define TSFP_RHI_RENDERER 1
+#endif
+static double movie_test_speed=1.;
+static int movie_scale_audio=1;
+#define PC_MOVIE_AUDIO_SPEED() (movie_scale_audio?movie_test_speed:1.)
+#define PC_MOVIE_SPEED() movie_test_speed
+#define PC_MOVIE_ACTIVE(active) ((void)(active))
 #include "hle/hle_xmv_play.c"
 
 static char host_path[2048];
@@ -46,8 +54,13 @@ static int compare_intervals(const void *a,const void *b)
 static uint64_t hash_bytes(uint64_t hash,const uint8_t *p,size_t n)
 { for(size_t i=0;i<n;i++)hash=(hash^p[i])*1099511628211ull;return hash; }
 int xbox_EnvSwitch(const char *name,int fallback) { return fallback; }
+#ifdef _WIN32
 BOOL xbox_translate_path(const char *path,WCHAR *out,DWORD count)
 { assert(!strcmp(path,"d:\\xmv\\eag_e.xmv"));return MultiByteToWideChar(CP_UTF8,0,host_path,-1,out,count)!=0; }
+#else
+BOOL xbox_translate_path(const char *path,char *out,DWORD count)
+{ assert(!strcmp(path,"d:\\xmv\\eag_e.xmv"));return snprintf(out,count,"%s",host_path)<(int)count; }
+#endif
 void hle_d3d8_movie_surface(uint32_t data,uint32_t format) { assert(!data && !format); }
 void d3d8_movie_clear(void) {}
 void d3d8_movie_set_frame(const uint8_t *pixels,uint32_t w,uint32_t h,int fill,unsigned l,unsigned r)
@@ -55,12 +68,26 @@ void d3d8_movie_set_frame(const uint8_t *pixels,uint32_t w,uint32_t h,int fill,u
 static int host_discontinuity, refuse_audio;
 static uint8_t first_pcm;
 int recomp_audio_output_take_discontinuity(uint32_t slot) { int v=host_discontinuity; host_discontinuity=0; return v; }
+static float movie_audio_speed=1.f;
+void recomp_audio_output_movie_speed(float ratio) {assert(ratio>=.05f && ratio<=4.f);movie_audio_speed=ratio;}
 void recomp_audio_output_reset_voice(uint32_t slot) { assert(slot==RECOMP_AUDIO_SLOT_MOVIE); }
 int recomp_audio_output_submit(uint32_t slot,const uint8_t *pcm,uint32_t n,uint32_t rate,uint32_t channels,uint32_t bits,int32_t volume)
 { assert(slot==RECOMP_AUDIO_SLOT_MOVIE && rate && channels && bits==16); if(refuse_audio)return 0; first_pcm=pcm[0]; audio_hash=hash_bytes(audio_hash,pcm,n);audio_bytes+=n;return 1; }
 int recomp_audio_output_position(uint32_t slot,uint64_t *played,uint32_t *queued)
 { assert(slot==RECOMP_AUDIO_SLOT_MOVIE);*played=audio_bytes;*queued=0;return 1; }
 #ifndef LIVE_HOST_CLOCK
+static void test_speed_changes(void) {
+    movie m={0};g_qpf.QuadPart=host_frequency;pc_movie_speed_reset(&m.speed_clock,0);
+    host_counter=host_frequency;movie_test_speed=.5;assert(movie_clock(&m)==500);
+    host_counter+=host_frequency;movie_test_speed=2.;assert(movie_clock(&m)==2500);
+    host_counter+=host_frequency;movie_test_speed=1.;assert(movie_clock(&m)==3500);
+    feed_audio(&m);assert(movie_audio_speed==1.f);
+    movie_test_speed=2.;feed_audio(&m);assert(movie_audio_speed==2.f);
+    movie_scale_audio=0;feed_audio(&m);assert(movie_audio_speed==1.f);
+    host_counter+=host_frequency;assert(movie_clock(&m)==5500);
+    movie_scale_audio=1;feed_audio(&m);assert(movie_audio_speed==2.f);
+    host_counter=0;movie_test_speed=1.;
+}
 static void test_audio_recovery(void) {
     movie m = {0}; uint8_t pcm[9600];
     m.rate=48000; m.channels=1; m.pcm=pcm; m.pcm_len=sizeof pcm;
@@ -78,7 +105,7 @@ static void test_audio_recovery(void) {
 #endif
 int main(int argc,char **argv) {
 #ifndef LIVE_HOST_CLOCK
-    test_audio_recovery();
+    test_speed_changes();test_audio_recovery();
 #endif
     assert(argc==3 && strlen(argv[1])<sizeof host_path);strcpy(host_path,argv[1]);
     setting=strcmp(argv[2],"original")?argv[2]:NULL;

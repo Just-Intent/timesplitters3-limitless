@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include "platform/xbox_winnt.h"
 #include <assert.h>
 #include <stddef.h>
@@ -10,6 +11,8 @@ static uint8_t memory[0x800000];
 static ptrdiff_t g_xbox_mem_offset;
 static uint32_t g_esp;
 static uint32_t g_eax;
+/* Numeric Uplink gates read the live hand register only at their audited sites. */
+static uint32_t g_ebp;
 void sub_000C54A0(void) { assert(!"unexpected walk collision in clock fixture"); }
 void sub_000C4700(void) { assert(!"unexpected walk sweep in clock fixture"); }
 #if defined(_MSC_VER)
@@ -55,6 +58,10 @@ static void original(void) {
     original_calls++;g_esp+=4;
     if(original_game_delta>=0.f)FLOAT(0x4E794C)=original_game_delta;
 }
+#include "pc_developer.h"
+void pc_developer_get(PcDeveloperState *out) {*out=(PcDeveloperState){0,0,0,0,1.,0};}
+void pc_developer_publish(int play,int story,int network) {(void)play;(void)story;(void)network;}
+void pc_developer_guest_frame(void) {}
 #include "../src/gameplay/pc_native_timing_guest.inc"
 /* Match the production manual TU: the clock include precedes ESI's definition. */
 RECOMP_MANUAL_TLS uint32_t g_esi;
@@ -339,6 +346,27 @@ static void tree_phase_clock(void)
 }
 int main(void)
 {
+    /* Exercise the actual production macro composition at both timing modes. */
+#ifdef _WIN32
+    _putenv_s("TSFP_GAME_LANGUAGE","fr");
+#else
+    setenv("TSFP_GAME_LANGUAGE","fr",1);
+#endif
+    for(unsigned native=0;native<2;native++) {
+        g_tsfp_native_timing_active=native;WORD(0x74cf60)=1;
+        assert(RECOMP_LOAD_GLOBAL_U32(0x70360,0x74cf60,WORD(0x74cf60))==0);
+        assert(WORD(0x74cf60)==1);
+        assert(RECOMP_LOAD_GLOBAL_U32(0x37000,0x74cf60,1)==1);
+        assert(RECOMP_STORE_GLOBAL_U32(0x3c308,0x4c0454,0)==1);
+        assert(RECOMP_STORE_GLOBAL_U32(0x704e0,0x4c0454,0)==0);
+    }
+#ifdef _WIN32
+    _putenv_s("TSFP_GAME_LANGUAGE","");
+#else
+    unsetenv("TSFP_GAME_LANGUAGE");
+#endif
+    assert(RECOMP_LOAD_GLOBAL_U32(0x70360,0x74cf60,1)==1);
+    g_tsfp_native_timing_active=0;
     g_xbox_mem_offset=(ptrdiff_t)(uintptr_t)memory;
     /* Asset-free scope/pause contract for the fractional level callback gates. */
     const uint32_t callback_sites[]={0x222b60,0x21af90,0x224170,0x164e00};

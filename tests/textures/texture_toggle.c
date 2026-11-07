@@ -28,6 +28,9 @@ static unsigned rebinds;
 static struct {void *image;} *g_cur_rt;
 static void rebind_stage_srvs(void *image) {(void)image;rebinds++;}
 #include "texture_binding_sync.inc"
+/* Texture presentation has no active Developer Tools overlay. */
+static struct { unsigned swap_width,swap_height; } g_device_state;
+static void d3d8_overlay_draw_developer(unsigned width,unsigned height) {(void)width;(void)height;}
 static unsigned frame_completions, host_presents;
 static BOOL g_skip_guest_present;
 static UINT g_present_interval=1;
@@ -36,6 +39,8 @@ static DWORD g_d3d_settransform_count,g_d3d_setrs_count,g_d3d_settexture_count;
 static void follow_vrr(void) {}
 static void two_d_tag_frame(void) {}
 static void present_scene(void) {}
+/* This texture-only fixture has no alternate HUD targets. */
+static void native_hud_restore(void) {}
 static void d3d8_display_frame_done(void) {}
 void rhi_pump_events(void) {}
 int32_t rhi_present_kind(uint32_t interval,uint32_t kind)

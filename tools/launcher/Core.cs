@@ -27,8 +27,12 @@ namespace TimeSplitters.Launcher
         public static void Require(bool value, string message) { if (!value) throw new InvalidDataException(message); }
         public static string Hash(string path)
         {
-            using (var input = File.OpenRead(path)) using (var sha = SHA256.Create())
-                return BitConverter.ToString(sha.ComputeHash(input)).Replace("-", "").ToLowerInvariant();
+            string hash = null;
+            AntivirusErrors.At(path, () => {
+                using (var input = File.OpenRead(path)) using (var sha = SHA256.Create())
+                    hash = BitConverter.ToString(sha.ComputeHash(input)).Replace("-", "").ToLowerInvariant();
+            });
+            return hash;
         }
         public static void Name(string name)
         {
@@ -45,6 +49,9 @@ namespace TimeSplitters.Launcher
             Name(name);
             if (TextureFile(name)) return true;
             if (RootFiles.Contains(name) || name == LauncherPlatform.GameBinary || name == LauncherPlatform.LaunchScript || LauncherFile(name)) return true;
+#if LINUX
+            if (name.StartsWith("Bin/",StringComparison.Ordinal) && Regex.IsMatch(name.Substring(4), @"^[A-Za-z0-9_.+-]+\.so(?:\.[0-9]+)*$")) return true;
+#endif
 #if MACOS
             if (name.StartsWith("Bin/",StringComparison.Ordinal) && name.EndsWith(".dylib",StringComparison.Ordinal)) return true;
 #endif
@@ -89,8 +96,31 @@ namespace TimeSplitters.Launcher
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string tmp = path + ".new";
             File.WriteAllText(tmp, text, new System.Text.UTF8Encoding(false));
-            if (File.Exists(path)) File.Replace(tmp, path, null);
+            if (File.Exists(path)) AtomicReplace(tmp, path);
             else File.Move(tmp, path);
+        }
+        internal static void AtomicReplace(string temporary, string path)
+        {
+            AtomicReplace(temporary,path,null);
+        }
+        internal static void AtomicReplace(string temporary, string path, string backup)
+        {
+            AtomicReplace(temporary, path, (source, target) => File.Replace(source, target, backup), Thread.Sleep);
+        }
+        internal static void AtomicReplace(string temporary, string path, Action<string,string> replace, Action<int> wait)
+        {
+            // Windows scanners can briefly deny delete sharing. Error1175 keeps
+            // both original names;1176/1177 can change them and must not retry.
+            for (int attempt=0; ; attempt++) {
+                try { replace(temporary,path); return; }
+                catch (IOException error) {
+                    int code=error.HResult & 0xffff;
+                    if(Environment.OSVersion.Platform!=PlatformID.Win32NT || attempt>=20 ||
+                       (code!=32 && code!=33 && code!=1175) ||
+                       !File.Exists(temporary) || !File.Exists(path)) throw;
+                    wait(50);
+                }
+            }
         }
         public static void RemoveOwned(string root, string relative)
         {
@@ -128,7 +158,7 @@ namespace TimeSplitters.Launcher
         }
         public static void CheckSpace(string root, long bytes)
         {
-            Require(new DriveInfo(Path.GetPathRoot(Path.GetFullPath(root))).AvailableFreeSpace > bytes,
+            Require(TsfpDiskSpace.Available(root) > bytes,
                 "There is not enough free space for the download, extracted files and recovery copy.");
         }
 
@@ -200,11 +230,13 @@ namespace TimeSplitters.Launcher
                     token.ThrowIfCancellationRequested();
                     string output = PathIn(destination, pair.Item2);
                     Directory.CreateDirectory(Path.GetDirectoryName(output));
-                    using (var input = pair.Item1.Open()) using (var file = new FileStream(output, FileMode.CreateNew, FileAccess.Write)) {
-                        var buffer = new byte[65536]; int read;
-                        while ((read = input.Read(buffer,0,buffer.Length)) > 0) { token.ThrowIfCancellationRequested(); file.Write(buffer,0,read); }
-                    }
-                    if (pair.Item2 != "BUILD.json") Require(Hash(output).Equals(expected[pair.Item2], StringComparison.OrdinalIgnoreCase), "Package file checksum mismatch: " + pair.Item2);
+                    AntivirusErrors.At(output, () => {
+                        using (var input = pair.Item1.Open()) using (var file = new FileStream(output, FileMode.CreateNew, FileAccess.Write)) {
+                            var buffer = new byte[65536]; int read;
+                            while ((read = input.Read(buffer,0,buffer.Length)) > 0) { token.ThrowIfCancellationRequested(); file.Write(buffer,0,read); }
+                        }
+                        if (pair.Item2 != "BUILD.json") Require(Hash(output).Equals(expected[pair.Item2], StringComparison.OrdinalIgnoreCase), "Package file checksum mismatch: " + pair.Item2);
+                    });
                     changes.Add(new Change { Name = pair.Item2, Source = output });
                 }
                 return changes;
@@ -297,7 +329,7 @@ namespace TimeSplitters.Launcher
                     {
                         string backup = PathIn(transaction, "files/" + change.Name);
                         Directory.CreateDirectory(Path.GetDirectoryName(backup));
-                        File.Copy(target, backup, false);
+                        AntivirusErrors.Copy(target, backup, false);
                     }
                     journal.Add(new Original { Name = change.Name, Existed = exists, RetiredTextureHash = change.RetiredTextureHash });
                 }

@@ -1,10 +1,9 @@
 --- a/titles/futureperfect/CMakeLists.txt
 +++ b/titles/futureperfect/CMakeLists.txt
-@@ -322,3 +322,17 @@
-     target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/generated")
-     target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3 "-framework Cocoa")
+@@ -286,6 +286,20 @@
+     target_link_libraries(tsfp_pc_display_test PRIVATE user32)
  endif()
-+
+
 +# Imported music's MP3 adapter (src/interface/pc_music_codec.c): FFmpeg's
 +# libavcodec loaded at run time, so only the headers are needed here, from the
 +# same package as the XMV movies (src/video, XBOXRECOMP_FFMPEG_DIR). Without
@@ -18,3 +17,7 @@
 +            PC_MUSIC_HAVE_FFMPEG PC_MUSIC_FFMPEG_BIN="${XBOXRECOMP_FFMPEG_DIR}/bin")
 +    endif()
 +endif()
++
+ if(APPLE AND TSFP_NATIVE_DIR)
+     # Keep debug symbols, but remove interpreter-style lifted-code overhead.
+     # Protected MMIO is decoded by the scalar ARM64 fault handler.

@@ -57,7 +57,9 @@ void sub_003C85D4(void) {}
 void sub_0001EFB0(void) {}
 void sub_0003FA10(void) {}
 #endif
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it (upstream sync) */
 void sub_00041E30(void) {}
+#endif
 /* aitemplates */
 void sub_0031BE70(void) {}
 void sub_00079D60(void) {}
@@ -97,7 +99,10 @@ void sub_002BFFD0(void) {}
 void sub_000D7780(void) {}
 void sub_002C0310(void) {}
 /* sets: the 20-row slot pane builder replays the stock builder's calls */
-void sub_00071BE0(void) {} void sub_002C1830(void) {} void sub_00078320(void) {}
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it (upstream sync) */
+void sub_00071BE0(void) {}
+#endif
+void sub_002C1830(void) {} void sub_00078320(void) {}
 void sub_000792B0(void) {} void sub_00078380(void) {} void sub_00077140(void) {}
 void sub_00077360(void) {}
 /* matchbots (pc_mapmaker_matchbots.inc: profile, slot portrait, availability) */
@@ -130,7 +135,10 @@ void sub_002FB230(void) {}
 void sub_00071B10(void) {} void sub_00071C50(void) {}
 #endif
 /* robot, crowe, tank (pc_mapmaker_robot.inc, pc_mapmaker_crowe.inc, pc_mapmaker_tank.inc) */
-void sub_000A6F90(void) {} void sub_000EFBD0(void) {} void sub_0028D6D0(void) {} void sub_0028D710(void) {}
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it (upstream sync) */
+void sub_000A6F90(void) {}
+#endif
+void sub_000EFBD0(void) {} void sub_0028D6D0(void) {} void sub_0028D710(void) {}
 void sub_00292550(void) {} void sub_00292630(void) {} void sub_002A62C0(void) {} void sub_0028D0C0(void) {}
 void sub_000A5E40(void) {} void sub_000631C0(void) {}  /* tank: model request at level init */
 void sub_00096330(void) {}  /* mothership: texture registration */
@@ -156,7 +164,11 @@ int pc_music_codec_rewind(struct PcMusicCodec *d) { (void)d;return 0; }
 void pc_music_codec_close(struct PcMusicCodec *d) { (void)d; }
 int recomp_audio_output_take_discontinuity(uint32_t slot) { (void)slot;return 0; }
 /* khallos, worm (pc_mapmaker_khallos.inc, pc_mapmaker_worm.inc) */
-void sub_0009A420(void) {} void sub_000A9070(void) {} void sub_0010E2A0(void) {} void sub_001D1E80(void) {}
+void sub_0009A420(void) {}
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it (upstream sync) */
+void sub_000A9070(void) {}
+#endif
+void sub_0010E2A0(void) {} void sub_001D1E80(void) {}
 void sub_0010E730(void) {}  /* khallos: the jet emitter's position */
 void sub_001D2350(void) {} void sub_001DA990(void) {} void sub_001DAAB0(void) {} void sub_00378400(void) {} void sub_0005B980(void) {}
 /* tilesets (pc_mapmaker_tilesets.inc: pak mount) */

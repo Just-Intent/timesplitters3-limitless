@@ -1,6 +1,12 @@
 #include "rhi_backend.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 #ifdef _WIN32
 /* Host contract does not create a graphics device. */
 const RhiBackend rhi_d3d11_backend = {0};
@@ -11,6 +17,11 @@ static int bitmap(void *context,const char *text,unsigned char *pixels,uint32_t 
 {
     assert(context==&pumps && text && pixels && w==32 && h==28);
     ++bitmap_calls; *used=bitmap_width; pixels[0]=255; return accept;
+}
+static int styled_calls;
+static int styled(void *context,const char *text,unsigned char *pixels,uint32_t w,uint32_t h,uint32_t *used,uint32_t px,uint32_t weight) {
+    assert(context==&pumps&&text&&pixels&&w==32&&h==28&&px==13&&weight==600);
+    styled_calls++;*used=bitmap_width;return accept;
 }
 static uint32_t requested_width = 1920, requested_height = 1080;
 static void pump(void *context) { assert(context == &pumps); ++pumps; }
@@ -26,10 +37,22 @@ static int present_calls;
 static int32_t present(uint32_t interval) {
     assert(interval==0);present_calls++;return present_result;
 }
-int main(void)
+#ifdef _WIN32
+static void final_health(void) { puts("PASS: normal window close runs exit handlers"); }
+#endif
+int main(int argc, char **argv)
 {
+    (void)argc; (void)argv;
+#ifdef _WIN32
+    if (argc == 2 && !strcmp(argv[1], "quit")) {
+        assert(!atexit(final_health));
+        PostQuitMessage(0);
+        rhi_pump_events();
+        abort();
+    }
+#endif
     uint32_t width = 3, height = 7;
-    RhiHost host = {.context=&pumps,.pump_events=pump,.drawable_size=size,.text_bitmap=bitmap};
+    RhiHost host = {.context=&pumps,.pump_events=pump,.drawable_size=size,.text_bitmap=bitmap,.text_bitmap_styled=styled};
     rhi_set_host(&host);
     host.pump_events = NULL; /* registration owns a copy */
     rhi_pump_events(); assert(pumps == 1);
@@ -50,6 +73,9 @@ int main(void)
     assert(!rhi_text_bitmap(NULL,pixels,32,28,&used));
     assert(!rhi_text_bitmap("sample",pixels,0,28,&used));
     assert(bitmap_calls==3);
+    bitmap_width=12;assert(rhi_text_bitmap_styled("sample",pixels,32,28,&used,13,600)&&used==12);
+    accept=0;assert(!rhi_text_bitmap_styled("sample",pixels,32,28,&used,13,600)&&used==12);accept=1;
+    assert(!rhi_text_bitmap_styled("sample",pixels,32,28,&used,0,600));assert(styled_calls==2);
     rhi_set_host(NULL);
     assert(!rhi_drawable_size(NULL, &width, &height));
     assert(width == 1920 && height == 1080);

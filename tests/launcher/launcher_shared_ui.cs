@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 using TimeSplitters.Launcher;
-#if MACOS
+#if MACOS || LINUX
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -24,7 +24,7 @@ public static class LauncherSharedUiChecks
     static void Click(Button button){button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));}
     static IEnumerable<Element> All(Element root)
     {
-#if MACOS
+#if MACOS || LINUX
         return root.GetLogicalDescendants().OfType<Element>();
 #else
         return LogicalTreeHelper.GetChildren(root).OfType<Element>().SelectMany(c=>new[]{c}.Concat(All(c)));
@@ -33,7 +33,7 @@ public static class LauncherSharedUiChecks
     static T Find<T>(Element root,string name) where T:Element { return All(root).OfType<T>().Single(c=>c.Name==name); }
     public static int Run()
     {
-#if MACOS
+#if MACOS || LINUX
         return RunCore();
 #else
         Exception failure=null;var thread=new System.Threading.Thread(()=>{try{RunCore();}catch(Exception e){failure=e;}});
@@ -43,7 +43,7 @@ public static class LauncherSharedUiChecks
     }
     static string Tip(Button button)
     {
-#if MACOS
+#if MACOS || LINUX
         return Convert.ToString(ToolTip.GetTip(button));
 #else
         return Convert.ToString(button.ToolTip);
@@ -51,7 +51,7 @@ public static class LauncherSharedUiChecks
     }
     static string TestBase()
     {
-#if MACOS
+#if MACOS || LINUX
         // macOS's /var temp alias is a symlink; production intentionally rejects it.
         return Path.GetFullPath(".");
 #else
@@ -68,6 +68,67 @@ public static class LauncherSharedUiChecks
     {
         string root=Path.Combine(TestBase(),"tsfp-shared-ui-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         try {
+            Test("antivirus error codes respect the host and preserve unrelated IO failures",()=>{
+                var native=new System.ComponentModel.Win32Exception(225,"localized detection");
+                var io=new IOException("localized detection",unchecked((int)0x800700e2));
+#if MACOS || LINUX
+                Need(AntivirusErrors.Code(native)==0 && AntivirusErrors.Code(io)==0,"Windows detection codes leaked into a native host");
+#else
+                Need(AntivirusErrors.Code(native)==225 && AntivirusErrors.Code(io)==226,"Windows detection codes were lost");
+#endif
+                var denied=new UnauthorizedAccessException("access denied");
+                try { AntivirusErrors.At("fixture",()=>{throw denied;}); }
+                catch(Exception actual) { Need(ReferenceEquals(actual,denied),"Unrelated access failure was replaced"); }
+                Need(RecoveryInfo.From(denied,false).Title!="Antivirus blocked a file","Permissions were diagnosed as antivirus");
+            });
+#if MACOS || LINUX
+            Test("launcher fits small and scaled desktop work areas",()=>{
+                foreach(var desktop in new[]{new Size(1280,800),new Size(1024,640),new Size(853,533),new Size(1920,1080)}) {
+                    var client=NativeApplication.LauncherClientArea(desktop);
+                    Need(client.Width+32<=desktop.Width&&client.Height+64<=desktop.Height,"Window exceeds desktop work area");
+                    var layout=NativeApplication.LauncherLayoutArea(client);
+                    Need(layout.Width>=999.9&&layout.Height>=719.9,"Layout fell below supported content size");
+                    Need(Math.Abs(layout.Width/layout.Height-client.Width/client.Height)<0.001,"Layout would clip instead of scaling uniformly");
+                }
+            });
+#endif
+#if LINUX
+            Test("launcher windows retain embedded icons",()=>{
+                using(var resource=typeof(NativeApplication).Assembly.GetManifestResourceStream("launcher.ico")) {
+                    if(resource==null) { Need(Environment.GetEnvironmentVariable("TSFP_TEST_REQUIRE_ICON")!="1","Required launcher icon was not embedded"); Console.WriteLine("Developer build without optional icon artwork."); return; }
+                }
+                foreach(var window in new Window[]{new NativeStartup(root,Array.Empty<string>()),
+                    new NativeWindow(root,new[]{"--render-preview"}),new NativeLocationWindow(Array.Empty<string>())}) {
+                    Need(window.Icon!=null,"Launcher window has no application icon");
+                    using(var bytes=new MemoryStream()){window.Icon.Save(bytes);Need(bytes.Length>0,"Empty window icon");}
+                    window.Close();
+                }
+            });
+#endif
+            Test("graphics controls persist across shared launcher hosts",()=>{
+                string install=Path.Combine(root,"graphics-controls");Directory.CreateDirectory(install);
+                foreach(int aa in new[]{2,1,0}) {
+                    bool enabled=aa!=0;
+                    var page=new SettingsPage(new ResourceDictionary(),install,true);page.SelectTab(1);
+                    Find<ComboBox>(page.View,"MultisampleAntialiasing").SelectedItem=enabled?"8x":"Off";
+                    Find<ComboBox>(page.View,"PostAntiAliasing").SelectedIndex=aa;
+                    Find<ComboBox>(page.View,"Supersampling").SelectedItem=enabled?"200%":"100% (Off)";
+                    Find<ComboBox>(page.View,"AnisotropicFiltering").SelectedItem=enabled?"16":"1";
+                    Find<CheckBox>(page.View,"AmbientOcclusion").IsChecked=enabled;
+                    Find<CheckBox>(page.View,"ShaderCache").IsChecked=enabled;
+                    Find<CheckBox>(page.View,"FpsPingCounter").IsChecked=enabled;
+                    Need(Find<Button>(page.View,"ClearShaderCache").IsEnabled,"Cache clear is unavailable");
+                    Click(Find<Button>(page.View,"SettingsSaveButton"));
+                    var saved=GameSettings.Load(install,null);
+                    Need(saved.Msaa==(enabled?8:1) && saved.PostAntiAliasing==aa && saved.Smaa==(aa==2) && saved.EdgeSmoothing==(aa==1?1:0) && saved.Anisotropy==(enabled?16:1),"Graphics selection not saved");
+                    Need(saved.Supersampling==(enabled?3:0),"Supersampling not saved");
+                    Need(saved.AmbientOcclusion==(enabled?1:0) && saved.ShaderCache==enabled && saved.ShowCounter==enabled,"Graphics toggles not saved");
+                    var reopened=new SettingsPage(new ResourceDictionary(),install,true);reopened.SelectTab(1);
+                    Need(Convert.ToString(Find<ComboBox>(reopened.View,"MultisampleAntialiasing").SelectedItem)==(enabled?"8x":"Off"),"MSAA choice not restored");
+                    Need(Convert.ToString(Find<ComboBox>(reopened.View,"Supersampling").SelectedItem)==(enabled?"200%":"100% (Off)"),"Supersampling choice not restored");
+                    Need(Find<CheckBox>(reopened.View,"AmbientOcclusion").IsChecked==enabled && Find<CheckBox>(reopened.View,"FpsPingCounter").IsChecked==enabled,"Toggles not restored");
+                }
+            });
             SaveBackupChecks.Run(root,Test);
             MapTransferChecks.Run(root,Test);
             Test("save manager lists MapMaker maps and only exports valid ones",()=>{
@@ -102,6 +163,55 @@ public static class LauncherSharedUiChecks
                 Click(Find<Button>(page.View,"CancelMusicRemove"));Need(recycled==null && File.Exists(Path.Combine(MusicLibrary.Folder(folder),"Boss.mp3")),"Cancelled removal changed music");
                 var preview=new SavesPage(folder,true);Need(Find<ComboBox>(preview.View,"MusicChoices").Items.Count==0,"Preview listed real music");
                 Click(preview.ImportMusic);Need(Find<TextBlock>(preview.View,"SaveManagerStatus").Text.Contains("Preview"),"Preview import not explained");
+            });
+            Test("complete language packs save, cancel, launch and restore English",()=>{
+                string folder=Path.Combine(root,"languages");Directory.CreateDirectory(folder);
+                File.WriteAllText(Path.Combine(folder,"BUILD.json"),"{\"language_packs\":true}");
+                string pak=Core.PathIn(folder,"Data/pak");Directory.CreateDirectory(pak);
+                foreach(string suffix in new[]{"e","f","g","i","s"})File.WriteAllText(Path.Combine(pak,"sounds_"+suffix+".pak"),"P5CK fixture "+suffix);
+                var before=Directory.GetFiles(pak).ToDictionary(f=>f,File.ReadAllBytes);
+                var page=new SettingsPage(new ResourceDictionary(),folder,true);page.SelectTab(3);
+                var picker=Find<ComboBox>(page.View,"LanguagePack");var save=Find<Button>(page.View,"SettingsSaveButton");
+                Need(picker.Items.Count==5 && picker.SelectedIndex==0,"Language default or choices differ");
+                picker.SelectedIndex=1;Click(Find<Button>(page.View,"SettingsCancelButton"));
+                Need(!File.Exists(Core.PathIn(folder,LauncherPlatform.Settings(folder)[0])),"Cancelled language was saved");
+                foreach(int i in new[]{1,2,3,4,0}) {
+                    picker.SelectedIndex=i;Click(save);
+                    Need(!save.IsEnabled,"Language draft remains dirty");
+                    Need(GameSettings.Load(folder,null).LanguagePack==GameSettings.LanguagePacks[i],"Language did not round trip");
+                    var info=GameSettings.StartInfo(folder);
+                    Need(info.EnvironmentVariables["TSFP_GAME_LANGUAGE"]==GameSettings.LanguagePacks[i],"Launch lost selected language");
+                    picker.SelectedIndex=(i+1)%5;Need(save.IsEnabled,"Language edit did not enable Save");
+                    picker.SelectedIndex=i;Need(!save.IsEnabled,"Reverted language remains dirty");
+                }
+                var reopened=new SettingsPage(new ResourceDictionary(),folder,true);
+                Need(Find<ComboBox>(reopened.View,"LanguagePack").SelectedIndex==0,"Return to English was not retained");
+                foreach(var entry in before)Need(File.ReadAllBytes(entry.Key).SequenceEqual(entry.Value),"Language selection changed original pack bytes");
+            });
+            Test("language launch rejects missing packs and unsupported game versions",()=>{
+                string folder=Path.Combine(root,"language-errors");Directory.CreateDirectory(folder);
+                var model=GameSettings.Load(folder,null);model.LanguagePack="fr";model.Save();
+                bool rejected=false;try{GameSettings.StartInfo(folder);}catch(Exception e){rejected=e.Message.Contains("missing");}
+                Need(rejected,"Missing French archive was silently ignored");
+                string pak=Core.PathIn(folder,"Data/pak/sounds_f.pak");Directory.CreateDirectory(Path.GetDirectoryName(pak));File.WriteAllText(pak,"invalid");
+                rejected=false;try{GameSettings.StartInfo(folder);}catch(Exception e){rejected=e.Message.Contains("invalid");}
+                Need(rejected && File.ReadAllText(pak)=="invalid","Invalid pack was accepted or modified");
+                File.WriteAllText(pak,"P5CK fixture");File.WriteAllText(Core.PathIn(folder,"BUILD.json"),"{\"version\":\"v0.4.0\",\"auto_display_resolution\":true}");
+                Need(GameSettings.Load(folder,null).LanguagePack=="fr","Older release erased saved choice");
+                rejected=false;try{GameSettings.StartInfo(folder);}catch(Exception e){rejected=e.Message.Contains("Update the game");}
+                Need(rejected,"Old game silently ignored language choice");
+                model=GameSettings.Load(folder,null);model.LanguagePack="en";model.Save();
+                Need(GameSettings.StartInfo(folder).EnvironmentVariables["TSFP_GAME_LANGUAGE"]=="en","English failed on an older game");
+            });
+            Test("language preferences retain concurrent edits and reject unknown codes",()=>{
+                string folder=Path.Combine(root,"language-conflict");Directory.CreateDirectory(folder);
+                var model=GameSettings.Load(folder,null);model.Save();var concurrent=GameSettings.Load(folder,null);concurrent.LanguagePack="de";concurrent.Save();
+                model.LanguagePack="es";bool rejected=false;try{model.Save();}catch{rejected=true;}
+                Need(rejected && GameSettings.Load(folder,null).LanguagePack=="de","Concurrent language was overwritten");
+                string file=Core.PathIn(folder,LauncherPlatform.Settings(folder)[0]);
+                string bad=File.ReadAllText(file).Replace("\"de\"","\"../fr\"");File.WriteAllText(file,bad);
+                rejected=false;try{GameSettings.Load(folder,null);}catch{rejected=true;}
+                Need(rejected && File.ReadAllText(file)==bad,"Invalid language was accepted or rewritten");
             });
             Test("save manager lists dated restore points and requires restore confirmation",()=>{
                 string folder=Path.Combine(root,"saves-page");Directory.CreateDirectory(folder);
@@ -168,7 +278,34 @@ public static class LauncherSharedUiChecks
                 Need(releases.Any(r=>r.Tag=="v0.6.0-preview.99"&&r.Channel=="legacy"),"Historical preview was relabeled Beta");
                 Need(!GameChannels.Choices(releases,"beta").Any(c=>c.Id=="legacy"),"Legacy versions must stay in history, outside testing tracks");
                 Need(GameChannels.Select(releases,"withdrawn")==null,"Missing experiment must not substitute Stable");
+                Need(GameChannels.Select(releases,"legacy").Channel=="legacy","Exact legacy selection was redirected to Beta");
                 Need(GameChannels.Choices(releases,"withdrawn").Any(c=>c.Id=="withdrawn"),"Unavailable selected channel was lost");
+            });
+            Test("Story co-op beta joins its existing track while retaining exact tag metadata",()=>{
+                var record=ChannelRecord("v0.5.0-story-coop-beta.1",true);
+                var metadata=new Dictionary<string,object>{{"schema",1},{"channel","story-coop-beta"},{"name","Story Co-op Beta Preview"},{"source_commit",new string('a',40)},{"minimum_launcher","1.3.0"}};
+                record["body"]="<!-- tsfp-release "+Json.Encode(metadata)+" -->\nBeta notes";
+                var releases=ReleaseClient.GameVersions(Json.Encode(new[]{record,ChannelRecord("v0.4.0-story-coop.1",true),ChannelRecord("v0.5.0-beta.1",true),ChannelRecord("v0.6.0-other-beta.1",true)})).Releases;
+                var selected=GameChannels.Select(releases,"story-coop");
+                Need(selected.Tag=="v0.5.0-story-coop-beta.1"&&selected.Channel=="story-coop"&&selected.ChannelName=="Story Co-op Preview","Beta was split from the existing Story track");
+                Need(GameChannels.Select(releases,"story-coop-beta")==selected,"Saved beta track did not resolve to Story co-op");
+                var choices=GameChannels.Choices(releases,"story-coop-beta");
+                Need(choices.Count(c=>c.Id=="story-coop")==1&&!choices.Any(c=>c.Id=="story-coop-beta"),"Duplicate Story tracks were offered");
+                Need(GameChannels.Select(releases,"beta").Tag=="v0.5.0-beta.1"&&GameChannels.Select(releases,"other-beta").Tag=="v0.6.0-other-beta.1","Unrelated beta tracks were merged");
+                Need(GameChannels.FromTag(selected.Tag)=="story-coop"&&!GameChannels.CanInstall(selected,selected.Tag),"Installed beta identity was lost");
+                metadata["channel"]="story-coop";record["body"]="<!-- tsfp-release "+Json.Encode(metadata)+" -->";
+                Need(ReleaseClient.GameVersions(Json.Encode(new[]{record})).Releases.Length==0,"Alias accepted metadata that did not match its immutable tag");
+            });
+            Test("Story beta preferences migrate without writing on read or losing unrelated settings",()=>{
+                string folder=Path.Combine(root,"story-beta-channels");Directory.CreateDirectory(folder);
+                string path=Core.PathIn(folder,".launcher/preferences.json");
+                Core.Write(path,Json.Encode(new {game_channel="story-coop-beta",game_preview_track="story-coop-beta",launcher_preview=true,custom="keep"}));
+                string original=File.ReadAllText(path);
+                Need(GameChannels.Read(folder)=="story-coop"&&GameChannels.ReadPreviewTrack(folder)=="story-coop"&&File.ReadAllText(path)==original,"Reading beta preferences changed the file or lost its track");
+                GameChannels.Save(folder,"story-coop-beta");var prefs=Json.Object(File.ReadAllText(path));
+                Need(Json.String(prefs,"game_channel")=="story-coop"&&Json.String(prefs,"game_preview_track")=="story-coop"&&Json.String(prefs,"custom")=="keep"&&SelfUpdate.PreviewChannel(folder),"Migrating Story beta lost preferences");
+                GameChannels.Save(folder,"stable","story-coop-beta");
+                Need(GameChannels.Read(folder)=="stable"&&GameChannels.ReadPreviewTrack(folder)=="story-coop","Stable lost the remembered Story track");
             });
             Test("game preview preferences migrate without enrolling launcher previews or losing unrelated preferences",()=>{
                 string folder=Path.Combine(root,"channels");Directory.CreateDirectory(folder);
@@ -313,6 +450,25 @@ public static class LauncherSharedUiChecks
                 Click(Find<Button>(page.View,"SettingsSaveButton"));var saved=GameSettings.Load(shared,null);
                 Need(saved.VerticalFov==70 && saved.PresentationFps==0 && saved.RefreshRate==0 && saved.Interpolation==1 && saved.FrameCap=="60","Retired timing settings survived migration");
             });
+            Test("Developer Tools opt-in saves with an inline warning and configured shortcut",()=>{
+                string folder=Path.Combine(root,"developer-tools");Directory.CreateDirectory(folder);
+                var model=GameSettings.Load(folder,null);model.Assign(34,0,114,true);model.Save();
+                var page=new SettingsPage(new ResourceDictionary(),folder,true);page.SelectTab(3);
+                var toggle=Find<CheckBox>(page.View,"DeveloperToolsEnabled");
+                var save=Find<Button>(page.View,"SettingsSaveButton");
+                Click(save);Need(toggle.IsChecked==false && !save.IsEnabled,"Tools must default OFF with a clean saved draft");
+                var warning=Find<TextBlock>(page.View,"DeveloperToolsWarning");
+                var section=All(page.View).OfType<StackPanel>().Single(p=>p.Children.Contains(toggle));
+                Need(section.Children.Contains(warning)&&warning.Text.Contains("Use with caution."),"Warning must be inline beside the setting before opt-in");
+                Need(Find<TextBlock>(page.View,"DeveloperToolsShortcut").Text.Contains("Press F3 to open"),"Inline shortcut ignores configured binding");
+                toggle.IsChecked=true;
+                Need(!All(page.View).OfType<Button>().Any(b=>String.Equals(b.Content,"Continue")),"Developer Tools still opens a warning prompt");
+                Need(toggle.IsEnabled&&save.IsEnabled,"Inline opt-in must leave settings available and enable Save");Click(save);
+                Need(GameSettings.Load(folder,null).DeveloperToolsEnabled && !save.IsEnabled,"Tools ON not saved");
+                toggle.IsChecked=false;Need(save.IsEnabled,"Tools OFF did not enable Save");Click(save);
+                var saved=GameSettings.Load(folder,null);
+                Need(!saved.DeveloperToolsEnabled && GameSettings.KeyCode(saved.Binding(34)[0])==114,"Tools OFF lost shortcut");
+            });
             Test("beta audio opt-in, draft state and game-menu synchronization",()=>{
                 string folder=Path.Combine(root,"enhanced-audio");Directory.CreateDirectory(folder);
                 string sidecar=Path.Combine(folder,"Settings/pc-audio.ini");
@@ -440,7 +596,7 @@ public static class LauncherSharedUiChecks
                 string folder=Path.Combine(root,"capture-health");Directory.CreateDirectory(folder);
                 Need(CrashReports.CaptureHealth(folder).Contains("Game not installed"),"Missing game claimed support");
                 string game=Core.PathIn(folder,LauncherPlatform.GamePath(folder));Directory.CreateDirectory(Path.GetDirectoryName(game));File.WriteAllText(game,"fixture");
-#if !MACOS
+#if !MACOS && !LINUX
                 Need(CrashReports.CaptureHealth(folder).Contains("helper missing"),"Missing helper claimed support");
                 File.WriteAllText(Path.Combine(Path.GetDirectoryName(game),"tsfp_crash_helper.exe"),"fixture");
 #endif

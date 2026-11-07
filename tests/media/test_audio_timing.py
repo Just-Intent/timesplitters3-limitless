@@ -42,7 +42,7 @@ def buffer_test(tmp_path_factory):
     return compile_audio('buffer', tmp_path_factory)
 
 
-@pytest.mark.parametrize('scenario', ['underrun', 'process', 'flush', 'fallback',
+@pytest.mark.parametrize('scenario', ['underrun', 'speed', 'process', 'flush', 'fallback',
                                      'snapshot', 'pause', 'completion', 'lost-device', 'bad-data',
                                      'diagnostics', 'adpcm', 'release-reuse', 'flush-ex', 'flush-ex-async', 'format-pcm', 'format-adpcm',
                                      'format-paused', 'frequency', 'recover-device', 'recover-early'])
@@ -66,13 +66,20 @@ def test_stream_headroom(buffer_test):
     assert 'PASS:' in result.stdout
 
 
+def test_buffer_audible_completion(buffer_test):
+    result = subprocess.run([str(buffer_test), 'completion'], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'PASS: completion' in result.stdout
+
+
 @pytest.fixture(scope='module')
 def load_test(tmp_path_factory):
     return compile_audio('load', tmp_path_factory)
 
 
 @pytest.mark.parametrize('scenario', ['steady', 'busy', 'stall', 'stall-refused',
-                                     'tail', 'expired', 'fixed', 'legacy'])
+                                     'tail', 'expired', 'fixed', 'legacy', 'burst',
+                                     'fps-60', 'fps-120', 'fps-144', 'fps-180', 'fps-240'])
 def test_effects_under_load(load_test, scenario):
     env = dict(os.environ)
     if scenario in ('fixed', 'legacy'):
@@ -90,12 +97,16 @@ def lifecycle_test(tmp_path_factory):
 
 @pytest.mark.parametrize('scenario', ['null-buffer', 'null-voice', 'bad-pointer',
                                      'bad-rate', 'high-rate', 'bad-align', 'empty-size',
-                                     'reuse', 'retain-valid', 'active-invalid'])
+                                     'reuse', 'retain-valid', 'active-invalid', 'release-stopped', 'release-active',
+                                     'release-paused', 'release-reentrant', 'starvation-diagnostics'])
 def test_buffer_slot_lifecycle(lifecycle_test, scenario):
     result = subprocess.run([str(lifecycle_test), scenario], capture_output=True,
                             text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr
     assert f'PASS: {scenario}' in result.stdout
+    if scenario == 'starvation-diagnostics':
+        assert 'submit_refused=5 starvation_episodes=2' in result.stderr
+        assert 'occupied=1/256 pool_full=0' in result.stderr
 
 
 @pytest.fixture(scope='module')

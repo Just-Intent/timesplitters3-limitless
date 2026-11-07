@@ -3,11 +3,18 @@
 #include <stdint.h>
 #include "pc_reload_input.h"
 
+/* Menu navigation uses the same WASD aliases on every input host. */
+static inline unsigned pc_input_menu_alias(unsigned key) {
+    return key==0x25?'A':key==0x27?'D':key==0x26?'W':key==0x28?'S':0;
+}
+
 typedef struct PcInput {
     unsigned char keys[256];
     PcReloadInput reload;
     int focused, captured;
     int terminal_active, terminal_blocked;
+    int cockpit_active, cockpit_blocked;
+    uint64_t cockpit_at;
     double dx, dy;
     uint64_t motion_at;
     int wheel_queue, wheel_key;
@@ -15,6 +22,22 @@ typedef struct PcInput {
     int mech_status; /* last Battle Mech mouse outcome, PC_MECH_* in pc_mounted.h */
 } PcInput;
 
+/* The final Machine Wars cockpit uses held secondary fire for its minigun.
+ * Do not inherit an already-held aim button when entering the seat. */
+static inline void pc_input_cockpit_context(PcInput *s,int active,uint64_t now)
+{
+    if(active && !s->cockpit_active)s->cockpit_blocked=!!s->keys[2];
+    if(!s->keys[2])s->cockpit_blocked=0;
+    s->cockpit_active=active;s->cockpit_at=now;
+}
+static inline void pc_input_cockpit_fire(PcInput *s,int active,uint64_t now,int *secondary)
+{
+    if(!s->keys[2])s->cockpit_blocked=0;
+    if(!active){s->cockpit_blocked=!!s->keys[2];return;}
+    if(s->focused && s->captured && s->cockpit_active &&
+       now-s->cockpit_at<=100 && !s->cockpit_blocked && s->keys[2])
+        *secondary=255;
+}
 void pc_input_focus(PcInput *s, int focused);
 void pc_input_capture(PcInput *s, int captured);
 void pc_input_key(PcInput *s, unsigned key, int down);

@@ -20,8 +20,10 @@
 #include <SDL3/SDL.h>
 #include "input_sdl.h"
 #include "renderer_host_sdl.h"
+#include "window_startup_sdl.h"
 #include "rhi.h"
 #include "graphics/combiner_constants.h"
+#include "graphics/native_hud.h"
 static PcCombinerConstants native_float_constants;
 #include "graphics/present_metrics.h"
 #include "settings_macos.h"
@@ -29,6 +31,7 @@ static PcCombinerConstants native_float_constants;
 #include "pc_ui_layout.h"
 #include "pc_menu_sampling.h"
 #include "pc_debug.h"
+#include "graphics_preferences_gl.inc"
 #ifdef __APPLE__
 #define GL_SILENCE_DEPRECATION
 #include <OpenGL/gl3.h>
@@ -941,10 +944,13 @@ static void update_mvp(DWORD fvf)
     glUniform2f(glGetUniformLocation(g.prog,"u_size"),native_target_width,native_target_height);
 }
 
+#include "pc_developer.h"
+static int native_developer_hud_hidden;
 static HRESULT __stdcall dev_DrawPrimitiveUP(IDirect3DDevice8 *s, D3DPRIMITIVETYPE pt,
                                               UINT prim_count, const void *verts, UINT stride)
 { NATIVE_GL_SCOPE;
     (void)s;
+    if(native_developer_hud_hidden)return D3D_OK;
     if (!verts || prim_count == 0 || stride == 0) return D3D_OK;
     UINT vcount = 0;
     GLenum mode = gl_prim(pt, prim_count, &vcount);
@@ -986,6 +992,7 @@ static HRESULT __stdcall dev_DrawIndexedPrimitiveUP(IDirect3DDevice8 *s, D3DPRIM
         const void *verts, UINT stride)
 { NATIVE_GL_SCOPE;
     (void)s; (void)min_vi;
+    if(native_developer_hud_hidden)return D3D_OK;
     if (!verts || !idx || prim_count == 0) return D3D_OK;
     UINT icount = 0;
     GLenum mode = gl_prim(pt, prim_count, &icount);
@@ -1301,7 +1308,7 @@ static HRESULT __stdcall d3d_CreateDevice(IDirect3D8 *s, UINT adapter, DWORD dev
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
     g.window = SDL_CreateWindow(g_window_title, g.backbuf_w, g.backbuf_h,
-                                SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY);
+                                tsfp_native_window_flags(SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY));
     if (!g.window) {
         fprintf(stderr, "[d3d8_gl] SDL_CreateWindow failed: %s\n", SDL_GetError());
         return D3DERR_INVALIDCALL;
@@ -1431,6 +1438,10 @@ void xbox_D3D8SetWideFrames(BOOL wide) { (void)wide; }
 /* The shared HLE records these tags during interpolation too. */
 void xbox_D3D8SetTwoDPlacement(int placement, uint32_t tag)
 {
+    if(tsfp_native_hud_hint(placement,tag)) {
+        native_developer_hud_hidden=placement==TSFP_NATIVE_HUD_BEGIN && !pc_developer_hud_visible();
+        return;
+    }
     native_placement=placement;native_placement_tag=tag;
     pc_ui_world_begin(&native_world_anchor,placement,tag);
 }
