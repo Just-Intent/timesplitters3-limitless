@@ -476,7 +476,8 @@ Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained.
-mapmaker.40: _restart reallocates (restart frees level heap); bs_skel_aim aims a floor up.
+mapmaker.40: _restart reallocates (restart frees level heap); 
+bs_skel_aim aims a floor up.
 Robot doors (.44): stacked one-floor portals combine; `rbt_hold` undoes root-motion walks through low ones (mapmaker-robot.md).
 Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, walk stops at ledges: mapmaker-crowe.md), `tank`
@@ -490,8 +491,8 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Boss areas/skies/open air/set slots: [boss notes](limitless-bosses.md); [.tsmap](map-transfer.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
-draw (.32: grain/haze alpha WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md.
-Pak mount table, restart heap (heap 0 only; bosses reuse their blocks): [boss notes](limitless-bosses.md).
+draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; MP3: custom-music.md.
+Pak mount table, restart heap (heap 0; bosses reuse blocks): [boss notes](limitless-bosses.md).
 `tests/mapmaker/test_mapmaker_paktable.py`.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
 of `sub_0029CE00` (+0x3E88 == 1, `sub_002A7F30`). Walker missing: log-only
