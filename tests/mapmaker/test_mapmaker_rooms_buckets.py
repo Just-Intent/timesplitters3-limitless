@@ -37,6 +37,7 @@ MUTATIONS = {
     'viewport-order': ('WORD_AT(vp),WORD_AT(vp+0x14u),WORD_AT(vp+4u),WORD_AT(vp+0x18u)', 'WORD_AT(vp),WORD_AT(vp+4u),WORD_AT(vp+0x14u),WORD_AT(vp+0x18u)'),
     'scissor-flag-kept': ('    if(!WORD_AT(view+0x214u)) WORD_AT(0x006B7ACCu)=0;\n', ''),
     'sorted-flag-ignored': ('+r*0xB4u+0xB2u)&8u) {', '+r*0xB4u+0xB2u)&0u) {'),
+    'deep-walk-stock-reader': ('        if(mapmaker_rooms_bk.depth) {        /* a walk 80+ deep', '        if(0) {        /* a walk 80+ deep'),
     'reader-outside-stale': ('        if(b<MAPMAKER_ROOMS_DEPTHS) *(uint8_t *)mapmaker_rooms_host(MAPMAKER_ROOMS_BUCKET_COUNTS+b)=0;\n', ''),
     'list-ascending-depth': ('        for(b=deepest;b>=0;b--)\n', '        for(b=0;b<=deepest;b++)\n'),
     'list-x-limit': ('if((int32_t)x0>=right || x1<=x0) continue;', 'if((int32_t)x0>right || x1<=x0) continue;'),
