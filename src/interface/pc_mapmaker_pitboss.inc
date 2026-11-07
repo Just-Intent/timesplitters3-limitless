@@ -129,6 +129,9 @@
 #define PIT_ST_BANDAGE 0x4BDCu          /* bandage 0x24B */
 #define PIT_ST_FLOCK 0x4A30u            /* 6 x 0x44: +0 ragbug entity */
 #define PIT_FLOCK_STRIDE 0x44u
+#define PIT_FLOCK_ACTIVE 0x24u           /* slot +0x24: launched (sub_0028A0A0 sets 1) */
+#define PIT_FIGHT 6u                    /* fight states 6..13: the rack is up, the fight proper */
+#define PIT_RELEASE_WAIT 300u           /* frames a release waits for ragbugs still joining */
 #define PIT_ST_PADS 0x4BF0u             /* 13 pad indices (sub_0009CC40 of 0x4B5..0x4C1) */
 #define PIT_PADS_N 13u
 #define PIT_PAD_TABLE 0x00715F2Cu       /* -> pads, 0x20 each (+0 id, +4 1, +8 0x1A, +0xC x/y/z, +0x18 yaw) */
@@ -158,6 +161,7 @@
 #define PIT_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define PIT_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
+extern void sub_0028A0A0(void);
 extern void sub_0029E0A0(void),sub_0028C560(void),sub_00287E00(void),sub_00287860(void),sub_0015DDA0(void),
     sub_00059DD0(void),sub_000A9070(void),sub_000622D0(void),sub_00062260(void),sub_000A5E40(void),
     sub_000631C0(void),sub_00096220(void);
@@ -203,7 +207,9 @@ static const char *const pit_paks[2]={"pak/story/l_17_st.pak","pak/storymem/l_17
 typedef struct {
     uint32_t state, parts, record, ent, pads;
     float dx, dy, dz;
-    int placed, started, ready;
+    int placed, started, ready, released;
+    uint32_t props[4];                  /* the props last seen (bottle, collision, rack, bandage): logged when made */
+    unsigned no_bottle, waited;
     uint8_t boss;
     unsigned bugs, moves, last;
     MapmakerFx fx;
@@ -560,8 +566,13 @@ void pc_mapmaker_pitboss_textures(void (*original)(void))
     if(pit_play() && pit_lv.want && pit_lv.pak_mounted[0] && !pit_lv.textured) {
         pit_lv.textured=1;
         for(i=0;i<PIT_MODELS;i++) {
-            uint32_t e=pit_resource(pit_models[i]),path,r;
-            if(!e || !(r=pit_request(path=WORD_AT(e+0x10u))) || !WORD_AT(r+0x10u) || !(PIT_B(r+2u)&0x10u)) continue;
+            uint32_t e=pit_resource(pit_models[i]),path=0,r=0;
+            if(e) r=pit_request(path=WORD_AT(e+0x10u));
+            fprintf(stderr,"[mapmaker] pitboss: prop model 0x%X: %s, %s, %s\n",(unsigned)pit_models[i],
+                    !e?"no resource row":WORD_AT(e+4u)?"loaded":"not loaded",!r?"no request":WORD_AT(r+0x10u)?"file read":"file not read",
+                    !r?"-":(PIT_B(r+2u)&0x10u)?"textures left to its creation":"textures registered by the load pass");
+            fflush(stderr);
+            if(!e || !r || !WORD_AT(r+0x10u) || !(PIT_B(r+2u)&0x10u)) continue;
             guest_call(sub_00096220,1,path);
             PIT_B(r+2u)&=(uint8_t)~0x10u;
             n++;
@@ -649,6 +660,8 @@ static void pit_remove(uint32_t ent,const char *why)
     guest_call(sub_0015DDA0,1,ent);
 }
 
+static void pit_props(PitInst *k);
+static void pit_release(PitInst *k,uint32_t ent);
 /* WRAP sub_0029FE00 (cdecl entity; class 0x20000): the pit fight for a pit
  * skeleton, with its block, statics and arena swapped in. The lifted fight
  * pops the caller's return address, as the stock tail jump. */
@@ -679,7 +692,60 @@ void pc_mapmaker_pitboss_princess(void (*original)(void))
         if(st && st!=k->last && k->moves++<24u) pit_log("pit skeleton fight state (skeleton, state)",(uint32_t)(k-pit_lv.k)+1u,st);
         k->last=st;
         if(st) pit_pads(k);                               /* after state 0 looked the pads up */
+        pit_props(k);
+        if(st>=PIT_FIGHT && st<PIT_DEATH) pit_release(k,ent);
     }
+}
+
+/* Each prop the fight makes, logged once when it appears (playtest .62: the
+ * gas bottle was not seen): object, its listed rooms (+0x30, +0x38: none = in
+ * no room, drawn only with the boss through pc_mapmaker_bossroom.inc) and
+ * position; once if the fight runs on without a bottle. */
+static void pit_props(PitInst *k)
+{
+    static const uint32_t f[4]={PIT_ST_BOTTLE,PIT_ST_COLL,PIT_ST_RACK,PIT_ST_BANDAGE};
+    static const char *const what[4]={"gas bottle 0x24A","collision 0x249","rack 0x246","eye bandage 0x24B"};
+    unsigned i,n=(unsigned)(k-pit_lv.k)+1u;
+    for(i=0;i<4u;i++) {
+        uint32_t o=WORD_AT(k->state+f[i]);
+        if(o==k->props[i]) continue;
+        k->props[i]=o;
+        if(!o || !MAPMAKER_PTR_OK(o,0x100u)) continue;
+        fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: %s made (object 0x%X, model 0x%X, %d listed rooms, first %u) at (%.2f, %.2f, %.2f)\n",
+                n,what[i],(unsigned)o,(unsigned)PIT_H(o+0x94u),(int)*(int8_t *)((uintptr_t)(o+0x30u)+g_xbox_mem_offset),
+                (unsigned)WORD_AT(o+0x38u),(double)pit_getf(o+0x64u),(double)pit_getf(o+0x68u),(double)pit_getf(o+0x6Cu));
+        fflush(stderr);
+    }
+    if(!k->props[0] && k->last>=PIT_FIGHT && k->last<PIT_DEATH && k->no_bottle++==120u)
+        pit_log("pit skeleton fights without its gas bottle (skeleton, state)",n,k->last);
+}
+/* The flock all at once (playtest .62: the ragbugs "seemed to appear randomly
+ * around the pit skeleton one at a time"): the stock launch sub_0028A0A0
+ * (state 10) puts up to 3 parked bugs on the flight circle per call. Once the
+ * fight proper runs (state 6+) and every placed ragbug has joined a flock (or
+ * 5 s passed), it is called twice with this instance's block and arena, so
+ * all its ragbugs (6 at most) leave the park together. Once per fight. */
+static void pit_release(PitInst *k,uint32_t ent)
+{
+    unsigned i,waiting=0,parked=0,flying=0;
+    PitSave s;
+    float saved[PIT_REBASE_N];
+    if(k->released || !k->bugs) return;
+    for(i=0;i<pit_lv.nbugs;i++) if(pit_lv.bug[i].owner<0 && pit_lv.bug[i].record) waiting++;
+    if(waiting && k->waited++<PIT_RELEASE_WAIT) return;
+    k->released=1;
+    pit_in(k,&s);
+    pit_move(k,saved);
+    guest_call(sub_0028A0A0,1,ent);guest_call(sub_0028A0A0,1,ent);
+    pit_back(saved);pit_out(&s);
+    for(i=0;i<PIT_BUGS;i++) {
+        uint32_t sl=k->state+PIT_ST_FLOCK+i*PIT_FLOCK_STRIDE;
+        if(!WORD_AT(sl)) continue;
+        if(WORD_AT(sl+PIT_FLOCK_ACTIVE)) flying++; else parked++;
+    }
+    fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: flock complete, %u ragbugs released together (%u left parked, %u still joining)\n",
+            (unsigned)(k-pit_lv.k)+1u,flying,parked,waiting);
+    fflush(stderr);
 }
 
 /* WRAP sub_0028D0A0 (cdecl entity, message, a, b): stock sends every scene

@@ -62,6 +62,11 @@
 #define BIGDRAW_WALKER 0x637u            /* chrs/walkercrow */
 #define BIGDRAW_ROBOT 0x5F2u             /* chrs/FF2GiantRobot */
 #define BIGDRAW_CROWE 0x5E8u             /* chrs/splittercrow */
+/* the pit skeleton's satellites (pc_mapmaker_pitboss.inc), any type: they hang or fly high over its tile */
+#define BIGDRAW_PIT_BOTTLE 0x24Au        /* catacombs/gas_bottle, at its mouth */
+#define BIGDRAW_PIT_RACK 0x246u          /* catacombs/torturerackNoRope */
+#define BIGDRAW_PIT_BANDAGE 0x24Bu       /* catacombs/eyebandage */
+#define BIGDRAW_RAGBUG 0x6CBu            /* chrs/ragbug */
 #define BIGDRAW_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
 static struct { unsigned long long widened, unseen; unsigned logged; } mapmaker_bigdraw;
@@ -85,7 +90,8 @@ void pc_mapmaker_bigdraw_rect(void (*original)(void))
     mapmaker_skelvis_rect(prop);   /* pc_mapmaker_skelvis.inc (log only), the stock rectangle */
 #endif
     model=BIGDRAW_H(prop+BIGDRAW_MODEL);
-    if((model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY && model!=BIGDRAW_WALKER &&
+    if(model==BIGDRAW_PIT_BOTTLE || model==BIGDRAW_PIT_RACK || model==BIGDRAW_PIT_BANDAGE || model==BIGDRAW_RAGBUG) {}
+    else if((model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY && model!=BIGDRAW_WALKER &&
         model!=BIGDRAW_ROBOT && model!=BIGDRAW_CROWE) || WORD_AT(prop+BIGDRAW_TYPE)!=BIGDRAW_CHARACTER) return;
     mapmaker_limits_read();
     if(!mapmaker_limits.limits || WORD_AT(BIGDRAW_SCENE)!=BIGDRAW_PLAY) return;

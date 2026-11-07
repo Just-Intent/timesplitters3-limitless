@@ -175,6 +175,27 @@ int main(void)
     CHECK(WORD_AT(0x008CD040u+CAM*4u)==POOL+CAM*32u);
     PHASE("phase bad");
 
+    /* The pit skeleton's satellites: its gas bottle at its mouth (in no room),
+     * a ragbug over a reached room, its rack over an unreached one. With the
+     * skeleton reached the bottle and the ragbug ride along; the rack stays;
+     * with the skeleton unreached the bottle stays out too. */
+    {
+        uint32_t bottle,bug,rack;
+        WORD_AT(0x00715FB4u)=POOL+0x20000u;WORD_AT(0x0072F298u)=100u;WORD_AT(0x007B4FACu)=31u;
+        bottle=prop(28,1u,0x24Au,0,0,0);bug=prop(29,8u,0x6CBu,1,3,0);rack=prop(30,1u,0x246u,1,9,0);
+        r3_ids[0]=human;relink(3,1,r3_ids);relink(CAM,2,cam_ids);
+        mapmaker_bossroom_view(VIEW0);
+        CHECK(listed_in(CAM,skel) && listed_in(CAM,bottle) && listed_in(CAM,bug) && !listed_in(CAM,rack));
+        CHECK(bsr.satellites==2u && WORD_AT(0x008CC000u+CAM*4u)==5u);
+        relink(CAM,2,cam_ids);depth(VIEW0,3,-1);
+        *(uint16_t *)((uintptr_t)(trophy+0x94u)+g_xbox_mem_offset)=0x634u;   /* no boss reached this view */
+        mapmaker_bossroom_view(VIEW0);
+        CHECK(!listed_in(CAM,skel) && !listed_in(CAM,bottle) && !listed_in(CAM,bug));
+        *(uint16_t *)((uintptr_t)(trophy+0x94u)+g_xbox_mem_offset)=0x5BEu;
+        depth(VIEW0,3,2);WORD_AT(0x007B4FACu)=30u;
+    }
+    PHASE("phase satellites");
+
     if(failures)return 1;
     puts("mapmaker bossroom ok");
     return 0;

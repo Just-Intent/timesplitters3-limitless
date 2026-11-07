@@ -1,6 +1,6 @@
 # MapMaker pit skeleton: the mission 6 pit fight and its ragbugs
 
-Status 2026-11-07 (story assets wave 3, items 7 and 8 of the
+Status 2026-11-07, playtest fix after .62 below (story assets wave 3, items 7 and 8 of the
 [inventory](mapmaker-story-assets.md)): implemented in
 `src/interface/pc_mapmaker_pitboss.inc` (area `pitboss`) plus two rows in
 `src/interface/pc_mapmaker_creatures.def`, fixture-tested
@@ -108,7 +108,55 @@ skeleton N placed at (x, y, z): the catacombs arena moved by (dx, dy, dz)`,
 its level event dropped`, `level restart: pit skeleton blocks set up again
 ...`, and every removal (`... removed`) or refusal.
 
-## Wrappers for the integrator
+## Playtest .62: no bottle, ragbugs one at a time (fixed after .62)
+
+User report (.62): "Bomb didn't appear in pit skeleton mouth like it's
+supposed to, which is supposed to be its weak spot. Ragbugs didn't appear
+immediately when they should have spawned, but seemed to appear randomly
+around the pit skeleton one at a time." `m62.err`: mounts, requests, the
+placement (arena moved by (164.80, 100.79, 354.71)), three ragbugs joining
+and the fight cycling states 1, 6, 4, 10, 5, 7, 11; no line about the props;
+`textures registered (models) (0x0, ...)`; skelvis: the skeleton itself
+"hidden (listed rooms visible but not reached by their prop lists)" until
+`bossroom` linked it through the camera room.
+
+Cause (INFERRED from the log and the stock code; the new lines decide):
+- **Drawing.** A MapMaker tile is one room one floor high. The bottle hangs
+  at the skeleton's mouth (bone 0x29, about 10 up), the rack 22.5 up, the
+  bandage on its eye, the ragbugs fly the circle above the pit: their boxes
+  list no room or one above the reached rooms, so no drawn room's prop list
+  holds them. The skeleton had the same gap (fixed after .45/.46 by
+  `pc_mapmaker_bossroom.inc` and `pc_mapmaker_bigdraw.inc`), which covered only
+  the giant boss models. The fight states show the props were made (state 6
+  needs the rack; the fight never stalled), so the bottle existed but was
+  never drawn; a ragbug showed only while its dive crossed a reached room
+  ("one at a time"). Whether the stock hit test also needs a room for the
+  bottle was not traced.
+- **Release.** The stock launch `sub_0028A0A0` runs only in state 10 (after
+  the first roar), up to 3 parked bugs per call; the bugs wait 2.2 under the
+  pit floor (the park point) until then.
+- `textures registered (0x0)`: the four models' requests had no deferred
+  mark (the load pass registers them, or they were not read): the new
+  per-model lines say which.
+
+Fix:
+- `pc_mapmaker_bossroom.inc`: a second pass adds the pit satellites (models
+  0x24A bottle, 0x246 rack, 0x24B bandage, 0x6CB ragbug, any type) to the
+  camera room's list when one of their listed rooms is reached, or when they
+  list none and a giant boss was reached this view. `pc_mapmaker_bigdraw.inc`:
+  the same models get the whole viewport as their scissor (the collision prop
+  0x249 stays stock). Fixture cases and mutations in both tests.
+- Release: once the fight proper runs (state 6..13) and every placed ragbug
+  has joined (or after 300 frames), `sub_0028A0A0(boss)` is called twice
+  with the instance's block and arena: all its ragbugs (up to 6) leave the
+  park together, once per fight (the stock state-10 launches follow).
+- Logs: `prop model 0x..: loaded/not loaded, file read/not read, textures
+  ...` per model at the texture queue; `pit skeleton N: gas bottle 0x24A made
+  (object, model, listed rooms, first room) at (x, y, z)` (and the
+  collision, rack, bandage) when each appears; `pit skeleton fights without
+  its gas bottle` once; `pit skeleton N: flock complete, M ragbugs released
+  together (parked, still joining)`; bossroom lines for the satellites.
+
 
 ```
 WRAP sub_00062790 -> pc_mapmaker_pitboss_mount        (chain with storyprops/mothership/tank/khallos mounts; after the original)

@@ -29,6 +29,8 @@ EXPECTED = '\n'.join([
 # Each mutation breaks one contract the fixture must detect.
 MUTATIONS = {
     'any-model': ('if((model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY && model!=BIGDRAW_WALKER &&\n        model!=BIGDRAW_ROBOT && model!=BIGDRAW_CROWE) || ', 'if('),
+    'pit-satellites-left-out': ('if(model==BIGDRAW_PIT_BOTTLE || model==BIGDRAW_PIT_RACK || model==BIGDRAW_PIT_BANDAGE || model==BIGDRAW_RAGBUG) {}\n    else ', ''),
+    'ragbug-left-out': (' || model==BIGDRAW_RAGBUG) {}', ') {}'),
     'walker-left-out': (' && model!=BIGDRAW_WALKER &&', ' &&'),
     'robot-left-out': ('\n        model!=BIGDRAW_ROBOT && model!=BIGDRAW_CROWE) || ', '\n        model!=BIGDRAW_CROWE) || '),
     'crowe-left-out': ('model!=BIGDRAW_ROBOT && model!=BIGDRAW_CROWE) || ', 'model!=BIGDRAW_ROBOT) || '),

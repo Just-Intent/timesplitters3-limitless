@@ -122,6 +122,11 @@ int main(void)
     call(skel);CHECK(whole(skel));                  /* logged once */
     call(human);CHECK(stock(human));                /* a normal character */
     call(object);CHECK(stock(object));              /* the model on a non-character prop */
+    {   /* the pit skeleton's satellites, any type: gas bottle, rack, bandage props and the ragbug */
+        uint32_t bottle=prop(7,1u,0x24Au),rack=prop(8,1u,0x246u),band=prop(9,1u,0x24Bu),bug=prop(10,8u,0x6CBu),coll=prop(11,1u,0x249u);
+        call(bottle);CHECK(whole(bottle));call(rack);CHECK(whole(rack));call(band);CHECK(whole(band));call(bug);CHECK(whole(bug));
+        call(coll);CHECK(stock(coll));               /* the invisible collision prop: stock */
+    }
     fflush(stderr);puts("phase play");fflush(stdout);
 
     /* Other scenes: mission 5 (1), the catacombs (17), the editor (102). */
