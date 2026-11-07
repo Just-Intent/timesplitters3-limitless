@@ -15,7 +15,7 @@ meter back with the limits on.
   first, then amber, then the highest used/max; the first listed on a tie),
   in that row's colour.
 - **Expanded**: a `- Resources` header (in the worst row's colour) and the
-  15 rows below it, short titles on the left and `used/max` right-aligned in
+  16 rows below it, short titles on the left and `used/max` right-aligned in
   one column, so the numbers line up.
 - **Toggle**: click the panel (left mouse button, or move the pointer onto it
   with the stick and press A), or press the **I key**. The state is kept for
@@ -54,6 +54,7 @@ held passes the cap, and the row is then red.
 | Props | category 26 | 160 | per-category check |
 | Turrets | categories 27-29 added up | 3 x 24 | per-category check; red when any one type is full |
 | Teleports (Teleporters) | categories 14-18 added up | 5 x 8 | per-category check; red when any one colour is full |
+| Vehicles | category 35 (stock and [story vehicles](mapmaker-vehicles.md)) | 4 | per-category check; the vehicle pool |
 
 The first nine rows read `mapmaker_limits_view`, written by the same
 `sub_002FA720` wrapper (`pc_display_mapmaker_limits`) that makes the placement
@@ -103,8 +104,8 @@ Every value starts with a space: `\vs` reads every digit that follows it
 draw), so `\vs60227/500` would ask for scale 60227. Right-aligned, the space
 only widens the measured text.
 
-Size: collapsed about 140 x 18 units; expanded about 130 x 190 (16 lines),
-from y 36 to about 226, in the upper half and left of the toolbar.
+Size: collapsed about 140 x 18 units; expanded about 130 x 200 (17 lines),
+from y 36 to about 238, in the upper half and left of the toolbar.
 
 Layout: guest units, so on a wide output it stays in the editor HUD's centred
 4:3 box ([widescreen](mapmaker-widescreen.md)) at 4:3 proportions; the fixture

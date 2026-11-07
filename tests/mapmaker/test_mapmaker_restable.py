@@ -42,6 +42,8 @@ MUTATIONS = {
                               'if(!MAPMAKER_PTR_OK(row,4)) continue;'),
     'category-stock-max': (TABLE, 'uint32_t a=MAPMAKER_TABLE_CATEGORIES+i*24u+4u;', 'uint32_t a=MAPMAKER_TABLE_CATEGORIES+i*24u;'),
     'group-not-full': (TABLE, '        if(c->count[cats[i]]>=c->max[cats[i]]) full=1;\n', ''),
+    'vehicles-wrong-category': (TABLE, 'static const unsigned mapmaker_table_vehicles[]={35u};',
+                                'static const unsigned mapmaker_table_vehicles[]={34u};'),
     'turrets-two-types': (TABLE, 'rows[n++]=mapmaker_table_group("Turrets",c,mapmaker_table_turrets,3);',
                           'rows[n++]=mapmaker_table_group("Turrets",c,mapmaker_table_turrets,2);'),
     'story-ai-stock': (TABLE, 'MAPMAKER_TABLE_ROW("Story AI",story_ai,MAPMAKER_EDITOR_SAI_LIMIT,0u);',

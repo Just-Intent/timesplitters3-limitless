@@ -457,6 +457,7 @@ int main(void)
     CHECK(WORD_AT(0x00524D34u)==8 && WORD_AT(0x00524D4Cu)==8 && WORD_AT(0x00524D64u)==8 &&
           WORD_AT(0x00524D7Cu)==8 && WORD_AT(0x00524D94u)==8);          /* teleporters x4 */
     CHECK(WORD_AT(0x00524EFCu)==132);                                  /* cover props x2 */
+    CHECK(WORD_AT(0x00524F2Cu)==4);                                    /* vehicles: the pool of 4 */
 
     set_env("TSFP_MAPMAKER_POOLS","0");set_env("TSFP_MAPMAKER_LIMITS","1"); /* limits need the pools */
     stock_categories();
