@@ -1017,4 +1017,4 @@ MM caps/props/body:limitless-caps
 Markers: test_ui_layout.py; test_patch_updates.py checks 2290/2291 after migration.
 
 Mech input+log: test_mounted_mouse.py [scope](mounted-mouse.md#battle-mech-mouse-425)
-MM boss/aim/anims/sand/rooms:limitless
+MM boss/door/aim/anims/sand/rooms:limitless
