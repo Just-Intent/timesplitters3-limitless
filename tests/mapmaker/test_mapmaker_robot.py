@@ -165,6 +165,8 @@ MUTATIONS = {
     'hold-eye-height': ('#define RBT_HOLD_KNEE 1.0f', '#define RBT_HOLD_KNEE 6.0f'),
     'cross-no-polygon': ('        if(!rbt_in_wall(w,q)) continue;                /* through the wall beside it */\n', ''),
     'cross-same-side': ('        da=w->nx*a[0]+w->ny*a[1]+w->nz*a[2]-w->d;\n        db=w->nx*b[0]+w->ny*b[1]+w->nz*b[2]-w->d;\n        if((da>0.0f)==(db>0.0f)) continue;', '        da=w->nx*a[0]+w->ny*a[1]+w->nz*a[2]-w->d;\n        db=w->nx*b[0]+w->ny*b[1]+w->nz*b[2]-w->d;\n        if(0) continue;'),
+    'summary-repeats': ('    if(key==rbt_walk[k].sum_at || rbt_walk[k].sums>=RBT_SUM_MAX) return;', '    if(rbt_walk[k].sums>=RBT_SUM_MAX) return;'),
+    'summary-no-lag': ('    if(pr>0 && (uint32_t)pr!=room) rbt_walk[k].lag++;', '    if(0) rbt_walk[k].lag++;'),
     'cross-unstacked': ('        o=rbt_stacked(w->id);\n', '        o=w->y1-w->y0;\n'),
 }
 

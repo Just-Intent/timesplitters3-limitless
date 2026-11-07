@@ -212,6 +212,8 @@
 #define RBT_EYE_MODEL 0x10u             /* [entity+4] +0x10 -> +0x34: the eye height sub_0015AB80 adds (+0.65) */
 #define RBT_EYE_OFF 0x34u
 #define RBT_EYE_ADD 0.65f               /* [0x0047CFE0] */
+#define RBT_SUM_FRAMES 600u            /* a summary line per robot this often (handler frames) when anything changed */
+#define RBT_SUM_MAX 40u                 /* ... at most this many per robot and level */
 #define RBT_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBT_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -234,7 +236,7 @@ static struct { uint32_t pads, links; unsigned npads, nlinks, built, crossings, 
 static struct {
     float height, hold[3];
     uint32_t from, goal_for, goal_sub, dist_for, hold_room;
-    unsigned blocked, reached, subs, steers, logged, holds, passes, eye_told;
+    unsigned blocked, reached, subs, steers, logged, holds, passes, eye_told, frames, lag, sums, sum_at;
     int built, dist_ok, hold_ok;
     uint8_t reach[RBT_PAD_MAX];
     uint16_t dist[RBT_PAD_MAX];
@@ -723,6 +725,25 @@ static void rbt_eye_tell(unsigned k,uint32_t ent)
             k,(double)rbt_walk[k].height,(double)(rbt_sane(eye)?eye:-1.0f),(double)RBT_HOLD_KNEE);
     fflush(stderr);
 }
+/* Every RBT_SUM_FRAMES frames, when holds, passes or lag frames changed: the
+ * counts so far and where it is (its room against its pad's room: the .45
+ * eye lag shows as lag frames). */
+static void rbt_summary(unsigned k,uint32_t ent,const float pos[3],uint32_t room)
+{
+    uint32_t a=WORD_AT(ent+RBT_ENT_AI),pad=0xFFFFFFFFu;
+    int pr=-1;
+    unsigned key;
+    if(MAPMAKER_PTR_OK(a,RBT_ACTOR) && (pad=WORD_AT(a+RBT_AI_PAD))<WORD_AT(RBT_PAD_COUNT) && pad<RBT_PAD_MAX &&
+       MAPMAKER_PTR_OK(WORD_AT(RBT_PADS),(pad+1u)*RBT_PAD_SIZE)) pr=rbt_room(pad);
+    if(pr>0 && (uint32_t)pr!=room) rbt_walk[k].lag++;
+    if(++rbt_walk[k].frames%RBT_SUM_FRAMES) return;
+    key=rbt_walk[k].holds+rbt_walk[k].passes+rbt_walk[k].lag;      /* each only grows: unchanged sum, nothing new */
+    if(key==rbt_walk[k].sum_at || rbt_walk[k].sums>=RBT_SUM_MAX) return;
+    rbt_walk[k].sum_at=key;rbt_walk[k].sums++;
+    fprintf(stderr,"[mapmaker] robot: giant robot %u after %u frames: %u holds, %u passes, %u frames its pad's room was not its room; at (%.2f, %.2f, %.2f) room %u, pad %d (room %d)\n",
+            k,rbt_walk[k].frames,rbt_walk[k].holds,rbt_walk[k].passes,rbt_walk[k].lag,(double)pos[0],(double)pos[1],(double)pos[2],(unsigned)room,(int)pad,pr);
+    fflush(stderr);
+}
 static void rbt_hold(unsigned k,uint32_t ent)
 {
     uint32_t room=WORD_AT(ent+RBT_ENT_ROOM),i,a;
@@ -732,6 +753,7 @@ static void rbt_hold(unsigned k,uint32_t ent)
     if(rbt_inst[k].removed) return;                    /* removed: left alone */
     if(!rbt_walk[k].height) rbt_walk[k].height=rbt_height(ent);
     if(!rbt_walk[k].eye_told) { rbt_walk[k].eye_told=1;rbt_eye_tell(k,ent); }
+    rbt_summary(k,ent,pos,room);
     if(rbt_walk[k].hold_ok) {
         for(i=0;i<3u;i++) { from[i]=rbt_walk[k].hold[i];to[i]=pos[i];d+=(pos[i]-from[i])*(pos[i]-from[i]); }
         from[1]+=RBT_HOLD_KNEE;to[1]+=RBT_HOLD_KNEE;

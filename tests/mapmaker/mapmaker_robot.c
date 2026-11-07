@@ -533,6 +533,7 @@ static void tick(uint32_t ent,int line) { call(pc_mapmaker_robot_handler,fake_ro
 static void in_room1(int line) { place(ENT(3),-20.0f,1u);tick(ENT(3),line);place(ENT(3),3.0f,1u);tick(ENT(3),line); }
 static void hold(void)
 {
+    int i;
     nest_ent=0;dies_now=0;
     stacked_level(1,0,0,0);
     place(ENT(3),2.0f,1u);tick(ENT(3),__LINE__);
@@ -620,6 +621,14 @@ static void hold(void)
     CHECK(FLOAT_AT(ENT(3)+0x64u)==7.0f && !rbt_walk[0].holds);
     place(ENT(3),9.0f,1u);tick(ENT(3),__LINE__);
     CHECK(FLOAT_AT(ENT(3)+0x64u)==7.0f && rbt_walk[0].holds==1u);
+    /* the summary: every 600 frames when a count changed; its pad in room 2 while its room reads 1 is lag */
+    stacked_level(1,0,0,0);
+    WORD_AT(A(3)+0x678u)=2u;
+    for(i=0;i<600;i++) { place(ENT(3),3.0f,1u);tick(ENT(3),__LINE__); }
+    CHECK(rbt_walk[0].lag==600u && rbt_walk[0].sums==1u);
+    WORD_AT(A(3)+0x678u)=0u;
+    for(i=0;i<600;i++) { place(ENT(3),3.0f,1u);tick(ENT(3),__LINE__); }
+    CHECK(rbt_walk[0].lag==600u && rbt_walk[0].sums==1u && rbt_walk[0].frames==1200u);
 }
 static void statics(uint32_t a,uint32_t b,uint32_t c) { WORD_AT(STAT)=a;WORD_AT(STAT+4u)=b;WORD_AT(STAT+8u)=c; }
 #define STATICS_ARE(a,b,c) (WORD_AT(STAT)==(a) && WORD_AT(STAT+4u)==(b) && WORD_AT(STAT+8u)==(c))
