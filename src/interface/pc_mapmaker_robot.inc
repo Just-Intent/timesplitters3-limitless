@@ -321,7 +321,7 @@ typedef struct { uint32_t r0, r1, pt; unsigned nv; float lo, hi, cx, cz, ax, az,
 static int rbt_portal(uint32_t id,rbt_portal_t *p)
 {
     uint32_t portals=WORD_AT(RBT_PORTALS),pmax=WORD_AT(RBT_PORTAL_COUNT),v,w;
-    float far=-1.0f;
+    float widest=-1.0f;
     if(id>pmax || !MAPMAKER_PTR_OK(portals,(pmax+1u)*4u) || !MAPMAKER_PTR_OK(p->pt=WORD_AT(portals+id*4u),0x18u)) return 0;
     p->r0=WORD_AT(p->pt);p->r1=WORD_AT(p->pt+4u);p->nv=RBT_H(p->pt+0x14u);
     if(!p->nv || p->nv>RBT_PORTAL_VERTS || !MAPMAKER_PTR_OK(p->pt+0x18u,p->nv*0xCu)) return 0;
@@ -334,10 +334,10 @@ static int rbt_portal(uint32_t id,rbt_portal_t *p)
         p->cx+=x;p->cz+=z;
         for(w=0;w<v;w++) {
             float dx=x-rbt_getf(p->pt+0x18u+w*0xCu),dz=z-rbt_getf(p->pt+0x20u+w*0xCu);
-            if(dx*dx+dz*dz>far) { far=dx*dx+dz*dz;p->ax=rbt_getf(p->pt+0x18u+w*0xCu);p->az=rbt_getf(p->pt+0x20u+w*0xCu);p->bx=x;p->bz=z; }
+            if(dx*dx+dz*dz>widest) { widest=dx*dx+dz*dz;p->ax=rbt_getf(p->pt+0x18u+w*0xCu);p->az=rbt_getf(p->pt+0x20u+w*0xCu);p->bx=x;p->bz=z; }
         }
     }
-    if(far<0.0f) { p->ax=p->bx=p->cx;p->az=p->bz=p->cz; }
+    if(widest<0.0f) { p->ax=p->bx=p->cx;p->az=p->bz=p->cz; }
     p->cx/=(float)p->nv;p->cz/=(float)p->nv;
     return 1;
 }
