@@ -386,7 +386,8 @@ def test_upgrade_existing_mac_stack_with_networking(checkout, tmp_path):
                                   '1060-pc-network-bot-bounds.patch',
                                   '1070-pc-network-bot-authority.patch',
                                   '1080-pc-network-bot-presentation.patch',
-                                  '1110-pc-network-bot-capacity.patch') and not patch.name.endswith(tuple('-'+name+'.patch' for name in STORY_PATCHES)):
+                                  '1110-pc-network-bot-capacity.patch') and not patch.name.endswith(tuple('-'+name+'.patch' for name in STORY_PATCHES)) \
+                and not patch.name.endswith('-mapmaker-meter-story-chain.patch'):  # renames the story patches' wrappers, so it needs them
             shutil.copyfile(patch, old_patches / patch.name)
     # The trace depends on network wrapper context; like the network patches,
     # it belongs to the full migration, not the historical Mac-only fixture.

@@ -1,4 +1,4 @@
-## Upstream sync to v0.5.3+ (`db029630`) (2026-11-07, not built or played)
+## Upstream sync to v0.5.3+ (`db029630`) (2026-11-07, built, not played)
 
 Branch `upstream-sync-2` from fork `main`/`mapmaker-recon` `8ba2dc43` merges
 TheDoffman `main` `db029630` (game v0.5.3 plus later fixes, launcher 1.5.2;
@@ -17,11 +17,14 @@ Checks: full stack applies to a fresh prepared runtime (168 files);
 `check-tables.py` verified; `repo-context.py check --base 8ba2dc43` current;
 launcher `build-launcher.ps1 -Test` passed; repository, compiler/input/media/
 launcher fixtures and MapMaker fixed cases passed except as noted.
-Known blocker: the generated `*-mapmaker-meter-wrappers.patch` still defines
-`sub_000DAC30` and `sub_0015F8C0`, which upstream `2250/2260` story-NPC patches
-now also wrap, so the game will not link until the wrapper patch is
-regenerated (`test_fresh_checkout_and_repeated_build` reports the duplicates).
-Not run: game build, gameplay, Mac/Linux builds, MapMaker mutation sweeps.
+Resolved: the `*-mapmaker-meter-story-chain.patch` (generated with the wrapper
+patch) renames upstream's `sub_000DAC30`/`sub_0015F8C0` wrappers to
+`*_upstream`, and the MapMaker chain calls them. After merging recon `bb9f6a47`
+(build .52), a compile-only Windows build linked (`e9ea6768...`), launcher
+`-Test` passed, and the MapMaker, music, Disco, menu and repository suites
+passed (Smart App Control blocks rerun); the historical Mac-network upgrade
+fixture skips the story-chain patch with the story patches.
+Not run: gameplay, Mac/Linux builds, full MapMaker mutation sweeps.
 
 ## MapMaker Disco tileset variant and Abstract tile textures (2026-11-07, not built or played)
 
