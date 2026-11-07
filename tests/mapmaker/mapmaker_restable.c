@@ -243,6 +243,11 @@ int main(void)
     WORD_AT(TYPEA)=1;WORD_AT(TYPEB)=2;
     WORD_AT(0x00529400u+0x140u)=10;WORD_AT(0x00529404u+0x140u)=9;WORD_AT(0x00529408u+0x140u)=20;WORD_AT(0x00529410u+0x140u)=10000;
     WORD_AT(0x00529400u+0x280u)=2;WORD_AT(0x00529404u+0x280u)=9;WORD_AT(0x00529408u+0x280u)=20;WORD_AT(0x00529410u+0x280u)=1000;
+    {   /* tile 1: one 3-slot connection point per side (catalogue count row + 0x14, entries row + 0x18) */
+        unsigned k;
+        WORD_AT(0x00529414u+0x140u)=4u;
+        for(k=0;k<4;k++) { unsigned char *e=(unsigned char *)memory+0x00529418u+0x140u+k*6u; e[0]=(unsigned char)(k+1u);e[4]=3; }
+    }
     pieces=make_list(0x00400000u,TYPEA,90);
     WORD_AT(0x0078400Cu)=pieces;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
@@ -345,7 +350,7 @@ int main(void)
     CHECK(measures==1u+2u*MAPMAKER_TABLE_ROWS);
     {
         /* Placed counts: 90 tiles; items 30+3+7+150+4+24+2+1 (ids > 9; 1 id-90 item too) + 5 free;
-         * pads 900, cover 810, links 90*20 + 16*90; memory placed estimate / 1024 rounded up. */
+         * pads 900, cover 810, links 90*20 + 90*12/2 (half the side slots); memory placed estimate / 1024 rounded up. */
         uint32_t items=30u+3u+7u+150u+4u+24u+2u+1u+1u+5u;
         uint32_t kb=(mapmaker_placed_memory(pieces)+1023u)/1024u;
         static const char *titles[15]={"Tiles","Items","Objects","Pickups","Pads","Cover","Links","Groups",
@@ -357,7 +362,7 @@ int main(void)
         snprintf(want[3],32," 40/768");            /* weapons + keycards + health */
         snprintf(want[4],32," 900/7680");
         snprintf(want[5],32," 810/9984");
-        snprintf(want[6],32," 3240/32256");
+        snprintf(want[6],32," 2340/32256");
         snprintf(want[7],32," 700/1024");
         snprintf(want[8],32," %u/2000 KB",(unsigned)kb);
         snprintf(want[9],32," 37/511");
