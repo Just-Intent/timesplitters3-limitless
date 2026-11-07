@@ -251,6 +251,64 @@ static void fake_pick_skel(void)
 }
 static uint32_t seen_scene;
 static void fake_scene(void) { originals++;seen_scene=WORD_AT(0x0079094Cu);g_esp+=4u; }
+/* The anim slot table (sub_00057F30) and the restart's anim drop
+ * (sub_001CDD60 -> sub_0005FC60 -> sub_0005C2F0): every loaded anim whose
+ * slot word +4 has 0x4000 unmapped (pointer 0, id map 0xFFFF), the next slot
+ * back to the level's mark. restart_take: a slot another registration fills
+ * after the drop. */
+#define AMAP 0x007E03C0u
+#define APTRS 0x007E2AA4u
+#define AWORDS 0x007DE660u
+#define ANEXT 0x006D77F8u
+#define AMARK 0x140u
+#define ADATA(id) (0x00B00000u+(uint32_t)(id)*0x10u)
+static uint32_t restart_take;
+static void fake_restart(void)
+{
+    uint32_t id,slot;
+    originals++;
+    for(id=0;id<0xC03u;id++) {
+        slot=HALF_AT(AMAP+id*2u);
+        if(slot>=940u || !WORD_AT(APTRS+slot*4u) || !(WORD_AT(AWORDS+slot*8u+4u)&0x4000u)) continue;
+        WORD_AT(APTRS+slot*4u)=0;HALF_AT(AMAP+id*2u)=0xFFFFu;
+    }
+    WORD_AT(ANEXT)=AMARK;
+    if(restart_take) WORD_AT(APTRS+restart_take*4u)=0xCAFE0000u;
+    g_esp+=4u;
+}
+static void anim_reg(uint32_t id,uint32_t slot,uint32_t flags)
+{
+    HALF_AT(AMAP+id*2u)=(uint16_t)slot;WORD_AT(APTRS+slot*4u)=ADATA(id);WORD_AT(AWORDS+slot*8u+4u)=flags;
+}
+static int anim_is(uint32_t id,uint32_t slot) { return HALF_AT(AMAP+id*2u)==slot && WORD_AT(APTRS+slot*4u)==ADATA(id); }
+static int anim_gone(uint32_t id) { return HALF_AT(AMAP+id*2u)==0xFFFFu; }
+static void anims_mansion(void)                 /* as the level load registered them (lv1_6, lv1_3, others) */
+{
+    uint32_t q;
+    for(q=0;q<11u;q++) anim_reg(0x19Cu+q,0x100u+q,q==9u?0x5800u:0x1005800u);   /* princess_start .. raise_react_end */
+    anim_reg(0x1A9u,0x10Bu,0x5800u);                                         /* princess_eyeoverwrite */
+    anim_reg(0x16Au,0x10Cu,0x4000u);                                         /* jbeverybodyout: no boss's */
+    for(q=0;q<8u;q++) anim_reg(0x127u+q,0x110u+q,0x5800u);                  /* the trophy monster's */
+    anim_reg(0x80Eu,0x118u,0x1081800u);                                      /* splitcrowewalk: no 0x4000 */
+}
+static int anims_skel(void)
+{
+    uint32_t q;
+    for(q=0;q<11u;q++) if(!anim_is(0x19Cu+q,0x100u+q)) return 0;
+    return anim_is(0x1A9u,0x10Bu);
+}
+static int anims_trophy(void)
+{
+    uint32_t q;
+    for(q=0;q<8u;q++) if(!anim_is(0x127u+q,0x110u+q)) return 0;
+    return 1;
+}
+static int anims_trophy_gone(void)
+{
+    uint32_t q;
+    for(q=0;q<8u;q++) if(!anim_gone(0x127u+q)) return 0;
+    return 1;
+}
 /* the stock aim (0x00287F02..0x00287FC5): origin = the hand point, direction =
  * the unit vector to target point [state +0x4158] at state +0x4164, phase 1 */
 static uint32_t aim_hand;
@@ -1424,7 +1482,15 @@ int main(void)
             FXW(rbs_skels[1].fx,0x0078B0CCu)=0x99u;                      /* last run's particle count */
             (void)mapmaker_fx_enter(&rbs_skels[1].fx);                    /* a call that never came back */
             rbs.logged=99u;
-            CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
+            /* the level load's anim slots: the restart unmaps every 0x4000 one (all
+             * of lv1_6's and lv1_3's; user report .43, "glitching out after
+             * restarting": no princess_start, the entrance never ended) */
+            memset((void *)((uintptr_t)AMAP+g_xbox_mem_offset),0xFF,0xC03u*2u);
+            WORD_AT(0x007E3954u)=APTRS;WORD_AT(ANEXT)=0x150u;
+            anims_mansion();pak_mounted=1;                                 /* lv1_3 mounted, the trophy monster not in this set */
+            CALL(pc_mapmaker_realbosses_restart,fake_restart,0x0003D4E6u,0,0,0,1);
+            CHECK(anims_skel() && WORD_AT(ANEXT)==AMARK);                 /* the skeleton's again: same slots, same data */
+            CHECK(anim_gone(0x16Au) && anims_trophy_gone() && anim_is(0x80Eu,0x118u));   /* the rest stock */
             CHECK(nalloc==a0 && nwalk_alloc==b0 && rbs_skelf.n==4u && rbs_walkf.n==2u);   /* no Level heap used */
             CHECK(nskel_reset==s0+4u && nwalk_reset==w0+2u && ngrid==g0+2u);
             for(q=0;q<4u;q++) {
@@ -1454,28 +1520,57 @@ int main(void)
             CHECK(nprincess==q+1u && princess_state==SKST_K(3) && princess_parts==SKPT_K(3));
             CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(11),0,0,0);
             CHECK(princess_state==SKST_K(1) && princess_parts==SKPT_K(1) && WORD_AT(0x0078B1ECu)==SKST_K(0));
-            CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);   /* a second restart: the same blocks again */
+            CALL(pc_mapmaker_realbosses_restart,fake_restart,0x0003D4E6u,0,0,0,1);   /* a second restart: the same blocks again */
             CHECK(nalloc==a0 && nwalk_alloc==b0 && rbs_skelf.n==4u && rbs_walkf.n==2u && rbs_skels[3].state==SKST_K(3) && rbs_walks[1].state==WKST_K(1));
+            CHECK(anims_skel() && anims_trophy_gone() && anim_is(0x80Eu,0x118u));      /* and the anims again */
+            for(q=0;q<4u;q++) CHECK(rbs_skels[q].record==REC(q<3u?10u+q:15u) && !rbs_skels[q].floor_set);
+            CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(12),0,0,0);   /* each fights on its own blocks */
+            CHECK(princess_state==SKST_K(2) && princess_parts==SKPT_K(2) && rbs_skels[2].floor_set);
+            CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(15),0,0,0);
+            CHECK(princess_state==SKST_K(3) && princess_parts==SKPT_K(3) && WORD_AT(0x0078B1ECu)==SKST_K(0));
+            restart_take=0x101u;                                          /* princess_low_idle1's slot filled after the drop */
+            anim_reg(0x1A0u,0x150u,0x1005800u);                           /* headbite at the mark or past it: a later one may take it */
             rbs_skels[1].parts=0x100u;                                    /* not a usable block: it and the rest dropped */
-            CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
+            CALL(pc_mapmaker_realbosses_restart,fake_restart,0x0003D4E6u,0,0,0,1);
+            CHECK(anim_gone(0x19Du) && WORD_AT(APTRS+0x101u*4u)==0xCAFE0000u && anim_gone(0x1A0u));   /* left alone */
+            CHECK(anim_is(0x19Cu,0x100u) && anim_is(0x1A6u,0x10Au) && anim_is(0x1A9u,0x10Bu));
+            restart_take=0;
             CHECK(rbs_skelf.n==1u && rbs_skels[0].state==SKST_K(0) && rbs_skels[0].record==REC(10) && WORD_AT(0x0078B1ECu)==SKST_K(0));
             CHECK(!rbs_skels[1].record && !rbs_skels[1].state && !rbs_skels[3].record && !rbs_skels[3].state && rbs_walkf.n==2u);
             FXW(rbs_walks[0].fx,0x0078B08Cu)=0x1234u;                    /* an effect count of neither size: dropped */
             rbs_skels[0].state=0x100u;
-            CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
+            {   /* the trophy monster in the set too: its anims as well, with no boss state left */
+                static const uint16_t all3[]={0x15,0x28,0x64};
+                container(0x11,all3,3,none7,7);
+                WORD_AT(APTRS+0x101u*4u)=0;anims_mansion();
+                CALL(pc_mapmaker_realbosses_restart,fake_restart,0x0003D4E6u,0,0,0,1);
+                CHECK(anims_skel() && anims_trophy() && anim_gone(0x16Au));
+                pak_mounted=0;anims_mansion();                            /* lv1_3 not mounted: not this area's */
+                CALL(pc_mapmaker_realbosses_restart,fake_restart,0x0003D4E6u,0,0,0,1);
+                CHECK(anims_skel() && anims_trophy_gone());
+                container(0x11,both,3,none7,7);
+            }
             CHECK(!rbs_skelf.n && !rbs_walkf.n && !rbs_skels[0].record && !WORD_AT(0x0078B1ECu) && !WORD_AT(0x0078B1E8u));
             CHECK(nalloc==a0 && nwalk_alloc==b0);
             CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
             for(q=10;q<15u;q++) CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(q),0,0,1);
             a0=nalloc;s0=nskel_reset;
             WORD_AT(0x0079094Cu)=1u;                                       /* mission 5 resets its own */
-            CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
+            anims_mansion();
+            CALL(pc_mapmaker_realbosses_restart,fake_restart,0x0003D4E6u,0,0,0,1);
             CHECK(nalloc==a0 && nskel_reset==s0 && rbs_skels[0].state==SKST);
+            CHECK(anim_gone(0x19Cu) && anim_gone(0x1A9u));                 /* and its anims stay stock */
             WORD_AT(0x0079094Cu)=100u;
             set_env("TSFP_MAPMAKER_LIMITS",NULL);
-            CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);   /* off: the original only */
-            CHECK(nalloc==a0 && nskel_reset==s0 && rbs_skels[0].state==SKST);
+            anims_mansion();
+            CALL(pc_mapmaker_realbosses_restart,fake_restart,0x0003D4E6u,0,0,0,1);   /* off: the original only */
+            CHECK(nalloc==a0 && nskel_reset==s0 && rbs_skels[0].state==SKST && anim_gone(0x19Cu));
             set_env("TSFP_MAPMAKER_LIMITS","1");
+            set_env("TSFP_MAPMAKER_REAL_BOSS","0");rbs.read=0;
+            anims_mansion();
+            CALL(pc_mapmaker_realbosses_restart,fake_restart,0x0003D4E6u,0,0,0,1);   /* the bosses switched off: stock */
+            CHECK(anim_gone(0x19Cu));
+            set_env("TSFP_MAPMAKER_REAL_BOSS",NULL);rbs.read=0;rbs.optout=0;
         }
         {   /* placed through a set slot 11-20 (sets chunk) */
             static const uint16_t x2[]={0x30,0x28};

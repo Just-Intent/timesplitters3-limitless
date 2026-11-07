@@ -194,8 +194,8 @@ MUTATIONS = {
     'skel-boss-any-scene': ('    for(k=0;k<rbs_skelf.n && (!rbs_skels[k].record || rbs_skels[k].record!=rec);k++) {}\n    if(k==rbs_skelf.n || WORD_AT(RBS_SCENE)!=100u || !rbs_on()) return 0;',
                             '    for(k=0;k<rbs_skelf.n && (!rbs_skels[k].record || rbs_skels[k].record!=rec);k++) {}\n    if(k==rbs_skelf.n || !rbs_on()) return 0;'),
     'skel-boss-stale-state': ('    if(!rbs_skelf.n || !rbs_skel_ours()) return 0;', '    if(!rbs_skelf.n) return 0;'),
-    'skel-message-any': ('    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(20) || !rbs_skel_of(ent=WORD_AT(g_esp+4u))) { original();return; }',
-                         '    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(20) || !(ent=WORD_AT(g_esp+4u))) { original();return; }'),
+    'skel-message-any': ('    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(20) || !(k=rbs_skel_of(ent=WORD_AT(g_esp+4u)))) { original();return; }',
+                         '    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(20) || !(ent=WORD_AT(g_esp+4u)) || ((k=rbs_skels),0)) { original();return; }'),
     'skel-event-any-scene': ('|| WORD_AT(RBS_SCENE)!=100u || !rbs_on()) { original();return; }\n    if(rbs_skelf.events', '|| !rbs_on()) { original();return; }\n    if(rbs_skelf.events'),
     # the Crow walker (rewritten for several per map)
     'walk-level-any-map': ('    if((has=rbs_map_has(RBS_WALK_ID))!=0) {\n        n=rbs_count', '    if((has=1)!=0) {\n        n=rbs_count'),
@@ -314,6 +314,21 @@ MUTATIONS = {
     'aim-not-normalised': ('    d[0]/=len;d[1]/=len;d[2]/=len;h/=len;', '    h/=len;'),
     'restart-when-off': ('    original();\n    if(!rbs_on()) return;\n    rbs.logged=0;', '    original();\n    rbs.logged=0;'),
     'restart-keeps-log': ('    if(!rbs_on()) return;\n    rbs.logged=0;\n', '    if(!rbs_on()) return;\n'),
+    # the restart unmaps the mansion anims (flag 0x4000; v0.4.0-mapmaker.43)
+    'anims-not-noted': ('    rbs_anims_note();                                  /* before the original unmaps them */\n', ''),
+    'anims-noted-after': ('    rbs_anims_note();                                  /* before the original unmaps them */\n    original();\n',
+                          '    original();\n    rbs_anims_note();\n'),
+    'anims-not-again': ('    anims=rbs_anims_again(&missed);\n', '    anims=0;missed=0;\n'),
+    'anims-other-data': ('        WORD_AT(ptrs+slot*4u)=rbs_anims[k].ptr;\n', '        WORD_AT(ptrs+slot*4u)=1u;\n'),
+    'anims-slot-taken': ('           WORD_AT(ptrs+slot*4u) || slot>=next) { (*missed)++;continue; }', '           slot>=next) { (*missed)++;continue; }'),
+    'anims-past-next': ('           WORD_AT(ptrs+slot*4u) || slot>=next) { (*missed)++;continue; }', '           WORD_AT(ptrs+slot*4u)) { (*missed)++;continue; }'),
+    'anims-eye-missing': ('    {0x1A9u,1u,RBS_SKEL_ID},            /* lv1_6: princess_eyeoverwrite */\n', ''),
+    'anims-skel-short': ('    {0x19Cu,11u,RBS_SKEL_ID},', '    {0x19Cu,10u,RBS_SKEL_ID},'),
+    'anims-trophy-any-map': ('            if(trophy==-2) trophy=rbs_map_has(RBS_ID)!=0 && rbs_pak_mounted();', '            if(trophy==-2) trophy=1;'),
+    'anims-trophy-unmounted': ('trophy=rbs_map_has(RBS_ID)!=0 && rbs_pak_mounted();', 'trophy=rbs_map_has(RBS_ID)!=0;'),
+    'anims-trophy-missing': ('    {0x127u,8u,RBS_ID},                 /* lv1_3: mattackheadbutt .. mcharge */\n', ''),
+    'anims-any-scene': ('    if(!rbs_play() || rbs.optout || !MAPMAKER_PTR_OK(ptrs=', '    if(!rbs_on() || rbs.optout || !MAPMAKER_PTR_OK(ptrs='),
+    'anims-optout': ('    if(!rbs_play() || rbs.optout || !MAPMAKER_PTR_OK(ptrs=', '    if(!rbs_play() || !MAPMAKER_PTR_OK(ptrs='),
 }
 
 
@@ -986,6 +1001,45 @@ def test_several_per_map_entries():
         assert not any(r & users.get(v, set()) for v in fx | {0x0078B1EC, 0x0078B1E8})
     # damage records: +0 the hit entity (0x002896E0 skeleton, 0x00298A5E walker)
     assert mem(a[0x002896E0])[0][4] == 0 and mem(a[0x00298A5E])[0][4] == 0
+
+
+def test_restart_drops_the_mansion_anims():
+    """v0.4.0-mapmaker.43 ("skeletons glitching out after restarting"): the
+    restart's sub_0005FC60 (call 0x001CDD6A) tail-jumps to sub_0005C2F0, which
+    unmaps every loaded anim whose slot word +4 has 0x4000 (pointer 0, id map
+    0xFFFF) and rewinds the next slot to the level's mark. Every anim this area
+    keeps from lv1_6 and lv1_3 has the flag; the walker's (lv81) and the split
+    Crowe's (lv14) have not. Registration (sub_001CA2F0) runs only while
+    [0x006D781C] is 0 (cleared by the full level load, sub_0005A120). The pak
+    this area mounts is a Level heap buffer: sub_0005A130 -> sub_000622D0(path,
+    1, 1) -> sub_0003E0B0(0x80, size, 1)."""
+    a = by_address()
+    assert a[0x001CDD6A].function == 0x001CDD60 and target(a[0x001CDD6A]) == 0x0005FC60
+    assert a[0x0005FC8A].mnemonic == 'jmp' and target(a[0x0005FC8A]) == 0x0005C2F0
+    assert mem(a[0x0005FC60])[0][4] == 0x006D77FC and mem(a[0x0005FC77])[0][4] == 0x006D77F8
+    assert ('imm', 0x007E03C0) in a[0x0005C3BF].ops and mem(a[0x0005C3DB])[0][4] == 0x007DE664
+    assert ('imm', 0x4000) in a[0x0005C3E2].ops and a[0x0005C3EC].mnemonic == 'je'
+    assert mem(a[0x0005C3EE])[0][1:3] == ('edi', 'edx') and ('imm', 0) in a[0x0005C3EE].ops
+    assert ('imm', 0xFFFF) in a[0x0005C3F5].ops and mem(a[0x0005C3CC])[0][4] == 0x007E3954
+    assert mem(a[0x0005C405])[0][4] == 0x006D77FC and mem(a[0x0005C412])[0][4] == 0x006D77F8
+    assert mem(a[0x0005C550])[0][4] == 0x006D781C and target(a[0x0005C558]) == 0x001CA2F0
+    assert mem(a[0x0005A120])[0][4] == 0x006D781C and target(a[0x001CDB99]) == 0x0005A120
+    assert target(a[0x0005A139]) == 0x000622D0 and ('imm', 1) in a[0x0005A134].ops and ('imm', 1) in a[0x0005A136].ops
+    assert target(a[0x00062333]) == 0x0003E0B0 and ('imm', 0x80) in a[0x0006232E].ops
+    rd = xbe_reader()
+
+    def flags(va, n):
+        out = {}
+        for k in range(n):
+            e = rd(va + k * 0x18, 0x18)
+            out[struct.unpack_from('<H', e, 0x10)[0]] = struct.unpack_from('<I', e, 0xC)[0]
+        return out
+    lv1_6, lv1_3 = flags(0x0048C738, 0x12), flags(0x0048C1B0, 0x10)
+    lv81, lv14 = flags(0x00484F68, 0x14), flags(0x0047E938, 0x29)
+    assert all(lv1_6[i] & 0x4000 for i in [*range(0x19C, 0x1A7), 0x1A9])
+    assert all(lv1_3[i] & 0x4000 for i in range(0x127, 0x12F))
+    assert not any(lv81[i] & 0x4000 for i in range(0x6EE, 0x6FD))
+    assert not any(lv14[i] & 0x4000 for i in range(0x80E, 0x817))
 
 
 def test_restart_resets_only_the_mission_bosses():

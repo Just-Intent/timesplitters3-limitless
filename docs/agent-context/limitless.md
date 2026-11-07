@@ -476,7 +476,7 @@ Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained.
-mapmaker.40: _restart reallocates (restart frees level heap); bs_skel_aim aims a floor up.
+Restart (.43): `_restart` remaps lv1_3/lv1_6 anims (flag 0x4000); see limitless-bosses.md.
 Robot doors (.42): `pc_mapmaker_robot_goal` gives the stock route one passable link at a time (mapmaker-robot.md).
 Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, room-checked cells: mapmaker-crowe.md), `tank`
