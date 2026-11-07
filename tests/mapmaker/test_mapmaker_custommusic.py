@@ -47,13 +47,22 @@ MUTATIONS = {
     'play-map-other-scene': ('        else if(scene!=100u) why="not a MapMaker play scene; stock music";\n', ''),
     'arcade-over-link': ('    if(ret==CMU_RET_ARCADE) arcade=WORD_AT(CMU_ARCADE_INDEX)==0u;', '    if(ret==CMU_RET_ARCADE) arcade=1;'),
     'arcade-in-story': ("WORD_AT(CMU_SETUP_LINK) && cmu_byte(CMU_MODE)[0]!=0x0Au ?", 'WORD_AT(CMU_SETUP_LINK) ?'),
-    'watch-scene': ('    if(WORD_AT(CMU_SCENE)!=cmu.scene) return 0;\n', ''),
+    'watch-scene': ('    if(scene!=cmu.scene) {', '    if(0) {'),
     'watch-pause': ('    *paused=WORD_AT(CMU_PAUSE)!=0;', '    *paused=0;'),
     'watch-pause-player-state': ('#define CMU_PAUSE 0x006D5EB8u', '#define CMU_PAUSE 0x0064BDC0u'),
     'watch-slider': ('    *gain=(float)(slider>CMU_SLIDER_MAX?CMU_SLIDER_MAX:slider)/(float)CMU_SLIDER_MAX;', '    *gain=1.0f;'),
-    'channel-zero-stops': ('    if(MAPMAKER_PTR_OK(g_esp,8u) && WORD_AT(g_esp+4u)!=0u && pc_music_playing()) {',
-                           '    if(MAPMAKER_PTR_OK(g_esp,8u) && pc_music_playing()) {'),
-    'channel-ignored': ('        pc_music_stop();\n        cmu_log("jingle channel', '        cmu_log("jingle channel'),
+    'channel-zero-stops': ('    if(MAPMAKER_PTR_OK(g_esp,0x14u) && WORD_AT(g_esp+4u)!=0u && pc_music_playing()) {',
+                           '    if(MAPMAKER_PTR_OK(g_esp,0x14u) && pc_music_playing()) {'),
+    'channel-ignored': ('            cmu.jingle_ticks=0;cmu.jingle=1;\n', ''),
+    'jingle-ends-track': ('            cmu.jingle_ticks=0;cmu.jingle=1;\n', '            pc_music_stop();\n'),
+    'jingle-end-of-match-kept': ('        if(from==CMU_RET_JINGLE_A || from==CMU_RET_JINGLE_B) {', '        if(0) {'),
+    'jingle-never-resumes': ('           (WORD_AT(CMU_PLAYER_STATE)==CMU_PLAYING && cmu.jingle_ticks<CMU_JINGLE_MAX_TICKS)) *paused=1;',
+                             '           cmu.jingle_ticks<CMU_JINGLE_MAX_TICKS) *paused=1;'),
+    'jingle-not-held': ('        if(cmu.jingle_ticks<CMU_JINGLE_MIN_TICKS ||\n           (WORD_AT', '        if(0 &&\n           (WORD_AT'),
+    'watch-scene-instant': ('#define CMU_AWAY_TICKS 100u', '#define CMU_AWAY_TICKS 1u'),
+    'watch-scene-plays-away': ('        *paused=1;\n        return 1;\n    }\n    if(cmu.away) {', '        return 1;\n    }\n    if(cmu.away) {'),
+    'restart-ignored': ('    if(cmu_play(cmu.level,100u)) cmu_log("level restart', '    if(0) cmu_log("level restart'),
+    'restart-stock-level': ('    cmu.level[0]=0;                          /* until this level picks one */\n', ''),
     'arcade-rows-any-caller': ('WORD_AT(g_esp)==CMU_RET_ARCADE_ROWS && g_ebx==0u', 'g_ebx==0u'),
     'arcade-rows-no-loop': ('WORD_AT(g_esp)==CMU_RET_ARCADE_ROWS && g_ebx==0u', 'WORD_AT(g_esp)==CMU_RET_ARCADE_ROWS'),
     'arcade-store-stock-kept': ('        WORD_AT(CMU_ARCADE_SHOWN)=0;WORD_AT(CMU_ARCADE_INDEX)=0;\n', ''),
@@ -124,7 +133,14 @@ def log_ok(stderr):
             "play: the map's imported track replaces the setup's stock choice" in stderr and
             'play: not a MapMaker play scene' in stderr and
             'player: first submission accepted' in stderr and
-            'player: stopped: the game ended it' in stderr and
+            'player: stopped: the watch ended it' in stderr and
+            'watch: the scene word was 0 for 20 player steps; track kept' in stderr and
+            'watch: the scene word left the play scene 100 for 83' in stderr and
+            'watch: jingle over after' in stderr and
+            'jingle channel: imported track held until it ends' in stderr and
+            'end-of-match jingle: imported track ended' in stderr and
+            'level restart: imported track started again: beta_song.wav' in stderr and
+            'play: new level music: imported track ended' in stderr and
             "player: held before its first sound: the game's music is paused" in stderr)
 
 
