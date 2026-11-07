@@ -771,6 +771,46 @@ reached, empty rectangle, frustum (0x000A24AA), view planes (0x000A2515, flag
 then `60 lines this level, quiet now`. Distance is to player 1, not the camera.
 Without the new wrapper, frustum culls count as "later" (summary says so).
 
+## Drawn through the camera's room
+
+User report (.46 log `m46.err`): every hidden pass of every skeleton was
+"listed rooms visible but not reached by their prop lists" (e.g. 10 listed,
+9 visible, `sub_000A2430` never called), never frustum, planes or an empty
+rectangle; skeletons were drawn while the camera's room was in their list and
+hidden while it was not (skeleton 3, whose 2-6 rooms never held it: hidden
+1137 of 1200 passes). Area `rooms`, `src/interface/pc_mapmaker_bossroom.inc`
+(called first by `pc_mapmaker_rooms_buckets`, the `sub_00086C40` body; no new
+WRAP), `tests/mapmaker/test_mapmaker_bossroom.py` (fixture, 21 mutations,
+decode checks). Not built or played.
+
+Mechanism (CONFIRMED decode): a prop is reached only through drawn rooms'
+prop lists (count `[0x008C7000+4r]`, list `[0x008C7CC0+4r]`; readers
+`sub_00086480`/`sub_000865E0` -> `sub_000A79B0`, `sub_000A2900`). Each frame
+`sub_0009E4B0` (0x001CE368/0x001CE38B, before the views) lays the lists out in
+the bucket pool `[0x00715FB4]` by last frame's capacities and appends every
+non-room prop (index `[0x007B975C]..[0x007B4FAC]`) to each room of its +0x38
+list with `sub_0009E430`; past the pool bound (0x0009E46B, 0x299D) a prop is
+not linked to that room, but the raised capacity (`0x008C5840`) stays, so
+later appends to that room run past its chunk. Props with some flags are not
+linked at all (0x0009E531..0x0009E55B). Which of these drops the bosses is
+INFERRED (the log did not read the lists); the `bossroom:` line now says.
+
+Fix: per view, a giant boss (character; 0x5E9, 0x5BE/0x5BF, 0x637, 0x5F2,
+0x5E8) with a listed room reached by the portal walk (depth >= 0) that is not
+in the camera room's list is appended to a copy of that list in the view
+slot's own buffer (`0x008D4000` + slot*0x1000, 1024 entries; free extension
+memory, `boss camera lists` in `test_mapmaker_rooms.py`); the pool and other
+rooms' chunks are never written, and the next relink lays every room out
+again. The camera room (depth 0, whole viewport) then runs the stock cull and
+draw; the rectangle is still the union of the boss's own rooms (widened by
+bigdraw), so a boss with no visible room stays culled. Skipped (counted): no
+real camera room (global 0x20C), a capacity or count past 1024.
+Scene 100, `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_BOSSROOM=0` turns it off.
+Log (32 lines a level): `bossroom: boss prop 0x.. (model 0x..) drawn through
+camera room C: linked to K of its V reached listed rooms (N listed), bucket
+pool U of 10653 used`, on the first add and whenever "linked to 0" changes
+(K = 0: missing from those rooms' lists; U near 10653: the pool bound).
+
 ## Save format and stock games
 
 Unchanged: a stock custom-set member (word id 0x15, sbyte variant -1). No

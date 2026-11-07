@@ -342,6 +342,7 @@ ROOMS_BLOCKS = {
     'front-end view': (0x008CD000, 0x3000, ['rooms-reloc-v-0x749890']),
     'light heads': (0x008D0000, 3 * 0x20C * 4, ['rooms-reloc-l1-head', 'rooms-reloc-l1-rest']),
     'light colour': (0x008D18A0, 0x20C * 12 + 4, ['rooms-reloc-l2-0x7ac880']),
+    'boss camera lists': (0x008D4000, 0x8000, []),                # pc_mapmaker_bossroom.inc, 8 view slots
 }
 
 
