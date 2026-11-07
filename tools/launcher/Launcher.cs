@@ -100,6 +100,18 @@ namespace TimeSplitters.Launcher
 
     public sealed class LauncherWindow
     {
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
+        struct FileOperation { public IntPtr Window; public uint Function; public string From, To; public ushort Flags; public bool Aborted; public IntPtr Mappings; public string Title; }
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern int SHFileOperationW(ref FileOperation operation);
+        // Windows removal adapter for imported music: the Recycle Bin, without prompts.
+        static void RecycleFile(string path)
+        {
+            // FO_DELETE with FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT.
+            var operation=new FileOperation {Function=3,From=Path.GetFullPath(path)+"\0\0",Flags=0x0040|0x0010|0x0400|0x0004};
+            int result=SHFileOperationW(ref operation);
+            if(result!=0 || operation.Aborted)throw new IOException("Windows could not move "+Path.GetFileName(path)+" to the Recycle Bin (error "+result+").");
+        }
         public readonly Window Window;
         readonly string root;
         readonly bool previewMode;
@@ -375,6 +387,8 @@ namespace TimeSplitters.Launcher
                 savesPage.PickSaveFolder=()=>{using(var picker=new System.Windows.Forms.FolderBrowserDialog {Description="Choose an empty folder or an existing TimeSplitters save folder."})return Task.FromResult(picker.ShowDialog()==System.Windows.Forms.DialogResult.OK?picker.SelectedPath:null);};
                 savesPage.PickMapExportFile=name=>{var picker=new Microsoft.Win32.SaveFileDialog {Title="Export MapMaker map",FileName=name,DefaultExt=MapTransfer.Extension,Filter="TimeSplitters map (*.tsmap)|*.tsmap",OverwritePrompt=true,AddExtension=true};return Task.FromResult(picker.ShowDialog(Window)==true?picker.FileName:null);};
                 savesPage.PickMapImportFile=()=>{var picker=new Microsoft.Win32.OpenFileDialog {Title="Import MapMaker map",Filter="TimeSplitters map (*.tsmap)|*.tsmap",CheckFileExists=true,Multiselect=false};return Task.FromResult(picker.ShowDialog(Window)==true?picker.FileName:null);};
+                savesPage.PickMusicFiles=()=>{var picker=new Microsoft.Win32.OpenFileDialog {Title="Import music",Filter="Music (*.wav;*.mp3)|"+MusicLibrary.PickerPatterns,CheckFileExists=true,Multiselect=true};return Task.FromResult(picker.ShowDialog(Window)==true?picker.FileNames:null);};
+                savesPage.RecycleMusic=RecycleFile;
                 savesPage.BusyChanged+=value=>{busy=value;Refresh();};
                 Find<ContentControl>("SavesHost").Content=savesPage.View;
             }
