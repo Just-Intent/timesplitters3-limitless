@@ -256,7 +256,21 @@ int main(int argc,char **argv)
     WORD_AT(0x0079094Cu)=0x53u;pc_music_pump(30);                            /* back to the menus */
     CHECK(!pc_music_playing());
     WORD_AT(0x0079094Cu)=100u;
-    CHECK(music(0x00045FBCu,7u)==7u && !pc_music_playing());               /* the setup's choice wins */
+    /* a setup's stock Arcade choice (eax 7): the map's own imported track still plays */
+    CHECK(music(0x00045FBCu,7u)==0u && pc_music_playing());
+    setH(INFO(C)+0x0E,4);                                                    /* the map's own stock row */
+    CHECK(music(0x00045FBCu,4u)==4u && !pc_music_playing());
+    setH(INFO(C)+0x0E,-1);
+    WORD_AT(0x0079094Cu)=101u;                                               /* not the play scene */
+    CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0xFFFFFFFFu && !pc_music_playing());
+    WORD_AT(0x0079094Cu)=100u;
+    /* every list build logs; a play decision after many of them is still logged */
+    WORD_AT(0x0079094Cu)=102u;
+    for(k=0;k<60;k++) hook(pc_mapmaker_skymusic_rows,plain_original,0x00313768u,ED+0x210u,0,0,0x55u);
+    WORD_AT(0x0079094Cu)=100u;
+    make_container(C,-1);
+    CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0xFFFFFFFFu && !pc_music_playing());   /* logs "names no imported track" */
+    make_container(C,-1);put_chunk(C,"beta_song.wav");
     CHECK(music(0x00045F2Cu,0xFFFFFFFFu)==0xFFFFFFFFu && !pc_music_playing());   /* another caller */
     music_off=1;
     CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0xFFFFFFFFu && !pc_music_playing());
@@ -292,6 +306,12 @@ int main(int argc,char **argv)
     WORD_AT(0x0079094Cu)=100u;WORD_AT(0x00761404u)=1u;*((uint8_t *)memory+0x007DE455u)=0;
     make_container(C,-1);
     CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0u && pc_music_playing());
+    /* the Arcade choice's file is gone: the map's own track plays instead */
+    pc_music_arcade_save("gone.wav");cmu.arcade_loaded=0;
+    make_container(C,-1);put_chunk(C,"Alpha.wav");
+    CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0u && pc_music_playing() && !strcmp(pc_music_error(),""));
+    pc_music_arcade_save("beta_song.wav");cmu.arcade_loaded=0;
+    make_container(C,-1);
     CHECK(music(0x00045F2Cu,0xFFFFFFFFu)==0xFFFFFFFFu && !pc_music_playing());   /* the story caller */
     *((uint8_t *)memory+0x007DE455u)=0x0Au;                                  /* story: no Arcade choice */
     CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0xFFFFFFFFu && !pc_music_playing());
