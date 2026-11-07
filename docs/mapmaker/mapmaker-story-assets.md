@@ -61,7 +61,7 @@ Mission numbers follow the story table `0x004D1AC0`: 1 intro (scene 2),
 |---|---|---|---|---|---|---|---|---|
 | 1 | Hidden weapons: TNT 0x2F, time grenade 0x29, uplink 0x38, variant twins | all in gun.pak and `pak/anim/gun/*` | normal projectiles (TNT = mine update `sub_000F39A0`) | weapon list holds every id 1..0x45; these are hidden by unlock type 0 | yes | **cheap** | AI use of TNT; twin semantics | **wave 1: 0x29, 0x2F, 0x38 in the editor list** (fixture only); twins out |
 | 1b | Story-only "weapons" 0x3C..0x3F (binoculars, whiskey, JB camera, zombie limb) | story paks only | script props | none | - | hard | name text, story ammo types | - |
-| 2 | Mission 1 big exploding barrel = power cell 0x53D | 34,412 B; l_2_st / l_64_ch (mounted by the mothership port) | init 20 case 12, damage `sub_00218650`, explosion 0x2F | none (barrel is 0x0A) | yes | **cheap** | stand-in record at obj+0x2D8; resource 0xCFB | **wave 1: drum Type option, area storyprops** (fixture only) |
+| 2 | Mission 1 big exploding barrel = power cell 0x53D | 34,412 B; l_2_st / l_64_ch (mounted by the mothership port) | init 20 case 12, damage `sub_00218650`, explosion 0x2F | none (barrel is 0x0A) | yes | **cheap** | stand-in record at obj+0x2D8; resource 0xCFB | **wave 1: drum Type option, area storyprops** (played .55; textures + height fixed after) |
 | 3 | Mission 5 wraith (black ghost) | prop 0x1DA/0x242 11,996 B in **gun.pak**; anim 0x13E in lv60.pak (816 B) | global wraith system `sub_0024ABA0`, tag 'WRTH' | none | **no** (one global) | medium-hard | scene gate, rooms, spirit table coordinates | - |
 | 3b | Mission 5 worms | 0x2C | - | **ported** (worm area) | yes | done | - | - |
 | 4 | Cut-out targets + scoring | 0xF1..0xFA, 3,652 B each; l_63/64/65/78_ch | challenge kinds 3..5, `sub_0022E7E0`, table `[0x0075CC8C]` | none | <= 75 | medium-hard | what else `[0x7DE470]` switches | - |
@@ -81,7 +81,7 @@ Mission numbers follow the story table `0x004D1AC0`: 1 intro (scene 2),
 | 18 | Machine Wars "Prometheus" robots = PROMETHEUS SK/8 rocket robot 0x62 (SD/7 guard robots 0x12/0x36/0x75) | chr.pak; anims `animrb.pak` (already mounted in scene 100) | robot list `sub_000D6DD0`, per id, no class | 0xA9/0xAA roster twins already placeable | yes | **cheap** | picker rows only | **wave 1: picker rows 159/160** (fixture only) |
 | 19 | Machine Wars tank = driveable future tank, vehicle def 2 | 0xB/0xC/0xD + gibs, stream/lv5/prop1.pak (2.6 MB) | stock vehicle system, builder `sub_00181D40` | vehicles exist (cat. 35, max 4); not our boss tank | yes (4 vehicles) | **medium** | scene-5 gate in `sub_00174120`; templates +0x30/+0x34 | - |
 | 20 | Scotland the Brave truck = vehicle def 0 | model 7 + Vickers turret 0xE, stream/lv4/prop3.pak (1.36 MB) | builder `sub_00180BA0` | vehicles exist | yes (4 vehicles) | **medium** | seat anims 0x78..0x83 location | - |
-| 21 | Mission 1 big turrets = 0xE6 prisonfixedgun | 88,716 B, l_2_st / l_26_st | generic class-0x200 turret, gun type 7 | turret categories 27-29 (cat. 29 same system) | yes | **cheap** | gun type 7 effects, flag 0x10000 | **wave 1: fixed gun Model option, area storyprops** (fixture only) |
+| 21 | Mission 1 big turrets = 0xE6 prisonfixedgun | 88,716 B, l_2_st / l_26_st | generic class-0x200 turret, gun type 7 | turret categories 27-29 (cat. 29 same system) | yes | **cheap** | gun type 7 effects, flag 0x10000 | **wave 1: fixed gun Model option, area storyprops** (played .55; textures fixed after) |
 
 ## Per-item notes
 

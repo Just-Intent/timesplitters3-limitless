@@ -429,6 +429,7 @@ void pc_mapmaker_storyprops_category(void (*original)(void));
 void pc_mapmaker_storyprops_build(void (*original)(void));
 void pc_mapmaker_storyprops_turret_options(void (*original)(void));
 void pc_mapmaker_storyprops_mount(void (*original)(void));
+void pc_mapmaker_storyprops_textures(void (*original)(void));
 void pc_mapmaker_storyprops_preload_model(void (*original)(void));
 void pc_mapmaker_storyprops_model(void (*original)(void));
 void pc_mapmaker_storyprops_gun_type(void (*original)(void));

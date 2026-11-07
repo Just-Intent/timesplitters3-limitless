@@ -486,7 +486,7 @@ Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robo
 0x281 from prop6.pak, mapmaker-tank.md). Wrappers, restart: each doc. ORDER puts them
 after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
-`rbs_extra` table in realbosses.inc (159/160 Prometheus); area `storyprops`: drum/gun variants; bigdraw adds 0x5F2/0x5E8. Tank WRAPs
+`rbs_extra` table in realbosses.inc (159/160 Prometheus); `storyprops`: drum/gun variants (+mem-pak textures); bigdraw adds 0x5F2/0x5E8. Tank WRAPs
 `sub_0015E7C0` -> `_tank_request` (level-init models), `sub_000A2740` -> `_draw`
 (log); shown (+0x28 bit 0) at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).

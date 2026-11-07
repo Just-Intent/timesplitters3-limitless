@@ -39,12 +39,21 @@
  *  - mount (sub_00062790): the paks the map's variants need, kept open;
  *  - preload (sub_0006C090 at 0x0023F5DB): the variant's model is requested
  *    instead of the stock one (sub_00257150 adds resource 0xCFB for 0x53D);
+ *  - textures (sub_00063900, the texture queue's load, 0x0003D5E5: after the
+ *    load pass 0x0003D5AD, before the fill 0x0003D64A): a variant model the
+ *    load pass left to its creation (request +2 & 0x10; scene 100 never
+ *    registers it there, 0x00096556) is registered the load pass's way,
+ *    sub_00096220(path), which queues its "textures/%06x.xbt" files. Those
+ *    files are only in the story levels' MEMORY paks (fix after .55: the
+ *    model paks hold none), so challengemem/l_64_chm.pak (power cell) and
+ *    storymem/l_26_stm.pak (prison gun) are mounted index-only beside them;
  *  - fill (sub_002F7790 at 0x00241787 prop / 0x002419C4 turret): the record
- *    gets the variant model once it is read (textures registered once per
- *    level, as the mothership: scene 100 skips it at creation, 0x00096556);
- *    else the stock model (logged);
+ *    gets the variant model once it is read, else the stock model (logged);
+ *    a power cell's record is raised by its model's half height: 0x53D is
+ *    drawn centred on its origin (bounds block after its texture list: centre
+ *    y -0.001, half height 0.736), the drum stands on its origin (.55: sunk);
  *  - gun type (sub_0033DD80 at 0x00241AA6): 7 for a swapped turret.
- * Requires WORD_AT, guest_call, g_eax, g_esi, g_esp, g_xbox_mem_offset,
+ * Requires WORD_AT, guest_call, g_eax, g_ebp, g_esi, g_esp, g_xbox_mem_offset,
  * xbox_HeapAlloc, pc_mapmaker_limits.inc (and MAPMAKER_* from the areas). */
 #include <stdio.h>
 #include <string.h>
@@ -80,6 +89,13 @@
 #define SP_CELL_MODEL 0x53Du
 #define SP_PRISON_MODEL 0xE6u
 #define SP_PRISON_GUN_TYPE 7u
+#define SP_CELL_LIFT 0.737f              /* 0x53D bounds: half height 0.7364 - centre y (-0.00098) */
+#define SP_REC_Y 0x14u                   /* prop record: position y (the fill's +0x14, 0x0024176B) */
+#define SP_PAKTABLE 0x00907000u          /* mount table (paktable.json): 64 x 0x1C, +8 count, +0x10 index */
+#define SP_SLOT 0x1Cu
+#define SP_SLOTS 64u
+#define SP_INDEX_MAX 0x4000u
+#define SP_TEX_MAX 64u
 #define SP_CAT_RET1 0x003051B5u          /* sub_003050xx: options button, category +8 test */
 #define SP_CAT_RET2 0x003051D7u          /* ... and the descriptor pushed to sub_002FB230 */
 #define SP_TURRET_OPT_RET 0x00318A8Cu    /* sub_003188C0: after the weapon choice's sub_000783D0 */
@@ -108,13 +124,14 @@
 extern void sub_00075B70(void),sub_00071B10(void),sub_00071C50(void),sub_00079DE0(void),sub_0007D4A0(void),
     sub_00071800(void),sub_00078590(void),sub_000783D0(void),sub_00079D60(void),sub_00075E70(void),
     sub_00077320(void),sub_0003D7B0(void),sub_00333700(void),sub_002FDF50(void),
-    sub_000622D0(void),sub_00062260(void),sub_000631C0(void),sub_00096330(void);
+    sub_000622D0(void),sub_00062260(void),sub_000631C0(void),sub_00096220(void);
 
 /* The two variants: kind 0 drum -> power cell, kind 1 fixed gun -> prison gun. */
 #define SP_KINDS 2u
-static const struct { uint32_t model; const char *pak; const char *what; } sp_kind[SP_KINDS]={
-    {SP_CELL_MODEL,"pak/challenge/l_64_ch.pak","power cell"},
-    {SP_PRISON_MODEL,"pak/story/l_26_st.pak","prison gun"},
+/* pak: the model; tex: its textures (only in the matching memory pak). */
+static const struct { uint32_t model; const char *pak, *tex; const char *what; } sp_kind[SP_KINDS]={
+    {SP_CELL_MODEL,"pak/challenge/l_64_ch.pak","pak/challengemem/l_64_chm.pak","power cell"},
+    {SP_PRISON_MODEL,"pak/story/l_26_st.pak","pak/storymem/l_26_stm.pak","prison gun"},
 };
 static int sp_kind_of(uint32_t id)
 {
@@ -127,13 +144,13 @@ static const char sp_texts[6][SP_TEXT_BYTES]={"Type","Explosive drum","Power cel
                                               "Model","MapMaker gun","Prison gun (mission 1)"};
 
 static struct {
-    uint32_t desc, cat, texts, paks[SP_KINDS];
+    uint32_t desc, cat, texts, paks[SP_KINDS*2u];   /* model pak k, texture pak SP_KINDS + k */
     unsigned logged, failed;
 } sp;
 /* This level (cleared by every level's pak mount). */
 static struct {
     unsigned want[SP_KINDS];             /* variant items in the map */
-    int textured[SP_KINDS];
+    int textured[SP_KINDS];              /* textures registered this level */
     unsigned swapped[SP_KINDS], refused[SP_KINDS];
     uint32_t gun_item;                   /* the turret item whose model was just swapped */
 } sp_lv;
@@ -384,18 +401,22 @@ static void sp_want(uint32_t item,uint32_t piece,void *ctx)
     (void)piece;(void)ctx;
     if(k>=0 && SP_B(item+SP_REC_VAR)==1u) sp_lv.want[k]++;
 }
-static uint32_t sp_pak(unsigned k)
+/* Guest copy of pak path j (0..1 model paks, 2..3 texture paks). */
+static const char *sp_path_text(unsigned j) { return j<SP_KINDS?sp_kind[j].pak:sp_kind[j-SP_KINDS].tex; }
+static uint32_t sp_pak(unsigned j)
 {
-    if(!sp.paks[k]) {
-        size_t n=strlen(sp_kind[k].pak)+1u;
+    if(!sp.paks[j]) {
+        const char *s=sp_path_text(j);
+        size_t n=strlen(s)+1u;
         uint32_t p=xbox_HeapAlloc((uint32_t)n,4u);
-        if(!p || !MAPMAKER_PTR_OK(p,n)) { sp_log("no memory for a pak path",k,0);return 0; }
-        memcpy((void *)((uintptr_t)p+g_xbox_mem_offset),sp_kind[k].pak,n);
-        sp.paks[k]=p;
+        if(!p || !MAPMAKER_PTR_OK(p,n)) { sp_log("no memory for a pak path",j,0);return 0; }
+        memcpy((void *)((uintptr_t)p+g_xbox_mem_offset),s,n);
+        sp.paks[j]=p;
     }
-    return sp.paks[k];
+    return sp.paks[j];
 }
-static int sp_mounted(unsigned k) { return sp.paks[k] && (int32_t)guest_call(sub_00062260,1,sp.paks[k])!=-1; }
+static int32_t sp_slot(unsigned j) { return sp.paks[j]?(int32_t)guest_call(sub_00062260,1,sp.paks[j]):-1; }
+static int sp_mounted(unsigned k) { return sp_slot(k)!=-1; }
 static uint32_t sp_resource(uint32_t model)
 {
     int16_t i;
@@ -423,41 +444,99 @@ static int sp_ready(unsigned k)
     r=sp_request(WORD_AT(e+0x10u));
     return r && WORD_AT(r+0x10u)!=0;
 }
-/* Once per level: the textures scene 100 leaves unregistered at creation. */
-static void sp_textures(unsigned k)
+/* CRC-32 (zlib) of a pak entry name, as the game hashes it (sub_00150530). */
+static uint32_t sp_crc(const char *s)
 {
-    uint32_t e,r,file;
-    if(sp_lv.textured[k]) return;
+    uint32_t c=0xFFFFFFFFu;
+    int k;
+    for(;*s;s++) {
+        c^=(uint8_t)*s;
+        for(k=0;k<8;k++) c=c&1u?(c>>1)^0xEDB88320u:c>>1;
+    }
+    return ~c;
+}
+/* 1 when mount slot s lists textures/<id>.xbt. */
+static int sp_slot_has(int32_t s,uint32_t id)
+{
+    char name[24];
+    uint32_t base,n,index,i,crc;
+    if(s<0 || (uint32_t)s>=SP_SLOTS) return 0;
+    base=SP_PAKTABLE+(uint32_t)s*SP_SLOT;
+    n=WORD_AT(base+8u);index=WORD_AT(base+0x10u);
+    if(!n || n>SP_INDEX_MAX || !MAPMAKER_PTR_OK(index,n*16u)) return 0;
+    snprintf(name,sizeof name,"textures/%06x.xbt",(unsigned)(id&0xFFFFFFu));
+    crc=sp_crc(name);
+    for(i=0;i<n;i++) if(WORD_AT(index+i*16u)==crc) return 1;
+    return 0;
+}
+/* Once per level, before the texture queue loads: register a deferred
+ * variant model the load pass's way and log which of its textures the
+ * mounted texture pak holds. */
+static void sp_register(unsigned k)
+{
+    uint32_t e,path,r,file,list,i,found=0,total=0,missing[4]={0,0,0,0};
+    int32_t slot;
+    if(sp_lv.textured[k] || !sp_ready(k)) return;
     sp_lv.textured[k]=1;
-    if(!(e=sp_resource(sp_kind[k].model)) || !(r=sp_request(WORD_AT(e+0x10u))) || !(file=WORD_AT(r+0x10u)) ||
+    if(!(e=sp_resource(sp_kind[k].model)) || !(r=sp_request(path=WORD_AT(e+0x10u))) || !(file=WORD_AT(r+0x10u)) ||
        !MAPMAKER_PTR_OK(file,0x10u)) { sp_log("variant model file not read: textures not registered",sp_kind[k].model,0);return; }
+    slot=sp_slot(SP_KINDS+k);
+    list=file+WORD_AT(file);
+    for(i=0;i<SP_TEX_MAX && MAPMAKER_PTR_OK(list+i*16u,16u) && WORD_AT(list+i*16u)!=0xFFFFFFFFu;i++) {
+        uint32_t id=WORD_AT(list+i*16u+4u);           /* word 1 keeps the id after registration */
+        total++;
+        if(sp_slot_has(slot,id)) found++;
+        else if(total-found<=4u) missing[total-found-1u]=id&0xFFFFFFu;
+    }
+    fprintf(stderr,"[mapmaker] storyprops: %s 0x%X textures: %u of %u in %s%s (missing %06X %06X %06X %06X)\n",
+            sp_kind[k].what,(unsigned)sp_kind[k].model,(unsigned)found,(unsigned)total,sp_kind[k].tex,
+            slot<0?" (not mounted)":"",(unsigned)missing[0],(unsigned)missing[1],(unsigned)missing[2],(unsigned)missing[3]);
+    fflush(stderr);
     if(!(SP_B(r+2u)&0x10u)) { sp_log("variant model textures registered by the load pass",sp_kind[k].model,SP_B(r+2u));return; }
-    guest_call(sub_00096330,2,file,1u);
-    sp_log("registered the variant model's textures (scene 100 skips it at creation)",sp_kind[k].model,file);
+    guest_call(sub_00096220,1,path);
+    SP_B(r+2u)&=(uint8_t)~0x10u;                       /* registered: no creation-time pass */
+    sp_log("registered the variant model's textures before the texture queue loads (model, file)",sp_kind[k].model,file);
 }
 
 /* WRAP sub_00062790 (the level's pak mounts, no args): after the original,
- * the paks this map's variants need, kept open (index only). */
+ * the paks this map's variants need (model and texture pak), index only. */
 void pc_mapmaker_storyprops_mount(void (*original)(void))
 {
-    unsigned k;
+    unsigned k,j;
     if(WORD_AT(SP_MOUNT_SKIP)) { original();return; }
     original();
     memset(&sp_lv,0,sizeof sp_lv);
     if(!sp_play()) return;
     if(!sp_items(WORD_AT(SP_CONTAINER),sp_want,0)) return;
-    for(k=0;k<SP_KINDS;k++) {
+    for(j=0;j<2u*SP_KINDS;j++) {
         uint32_t mounted;
-        if(!sp_lv.want[k] || !sp_pak(k) || sp_mounted(k)) continue;
+        k=j%SP_KINDS;
+        if(!sp_lv.want[k] || !sp_pak(j) || sp_slot(j)!=-1) continue;
+        if(j>=SP_KINDS && !sp_mounted(k)) continue;     /* no model, no textures */
         if((mounted=WORD_AT(SP_MOUNTS))+SP_MOUNT_KEEP>SP_MOUNT_MAX) {
-            sp_log(k?"pak mount table full: prison guns stay MapMaker guns":"pak mount table full: power cells stay drums",mounted,SP_MOUNT_MAX);
+            sp_log(k?"pak mount table full: prison guns stay MapMaker guns (pak)":"pak mount table full: power cells stay drums (pak)",
+                   mounted,j);
             continue;
         }
-        if((int32_t)guest_call(sub_000622D0,3,sp.paks[k],0u,1u)<0) sp_log(k?"l_26_st.pak did not mount: prison guns stay MapMaker guns":
-                                                                          "l_64_ch.pak did not mount: power cells stay drums",mounted,0);
-        else sp_log(k?"mounted l_26_st.pak for the prison guns (table, guns)":"mounted l_64_ch.pak for the power cells (table, cells)",
-                    mounted+1u,sp_lv.want[k]);
+        if((int32_t)guest_call(sub_000622D0,3,sp.paks[j],0u,1u)<0) {
+            fprintf(stderr,"[mapmaker] storyprops: %s did not mount: %s\n",sp_path_text(j),
+                    j<SP_KINDS?(k?"prison guns stay MapMaker guns":"power cells stay drums"):"the variant has no textures");
+            fflush(stderr);
+        } else {
+            fprintf(stderr,"[mapmaker] storyprops: mounted %s for the %ss (table %u, items %u)\n",sp_path_text(j),sp_kind[k].what,
+                    (unsigned)mounted+1u,sp_lv.want[k]);
+            fflush(stderr);
+        }
     }
+}
+
+/* WRAP sub_00063900 (the texture queue's load, no args; only 0x0003D5E5):
+ * before it, the variant models' textures are queued. */
+void pc_mapmaker_storyprops_textures(void (*original)(void))
+{
+    unsigned k;
+    if(sp_play()) for(k=0;k<SP_KINDS;k++) if(sp_lv.want[k]) sp_register(k);
+    original();
 }
 
 /* WRAP sub_0006C090 (cdecl catalogue entry, theme -> model): at the MapMaker
@@ -493,9 +572,9 @@ void pc_mapmaker_storyprops_model(void (*original)(void))
                                            "power cell model not read this level: it stays a drum",sp_kind[k].model,g_eax);
         return;
     }
-    sp_textures((unsigned)k);
     g_eax=sp_kind[k].model;
     if(k==1) sp_lv.gun_item=g_esi;
+    else if(MAPMAKER_PTR_OK(g_ebp,0x60u)) SP_F(g_ebp+SP_REC_Y)+=SP_CELL_LIFT;   /* stands on the floor like the drum */
     if(sp_lv.swapped[k]++<4u) sp_log(k?"fixed gun placed as the mission 1 prison gun":"drum placed as the mission 1 power cell",
                                      g_esi,sp_lv.swapped[k]);
 }
