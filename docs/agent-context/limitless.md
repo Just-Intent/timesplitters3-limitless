@@ -102,7 +102,7 @@ the model draws inside them through two further wrappers,
 `pc_mapmaker_probe_prop_draw` (`sub_0008F950`, every model draw, inert outside
 a window); it reads the per-room prop tables at their `rooms.json` locations
 (`0x008C7000`/`0x008C7C00`). Once per run per geometry model and node table
-it also dumps the model's node tree (`[inst+4]` header, 0xC8-byte nodes
+it dumps the model's node tree (`[inst+4]` header, 0xC8-byte nodes
 before it; type `+0x48`, child `+0x4B`, sibling `+0x4C`, mask `+0x5C`), capped
 at 96 nodes per model, 256 models and 8192 lines. See `docs/mapmaker/mapmaker-sky.md`.
 
@@ -185,10 +185,10 @@ table `config/guest-code-patches/<area>.json`, C policy
 the "capacity area stubs" markers in `pc_menu_mouse_guest.inc`. Fixtures that
 compile the whole include chain take link stubs from
 `tests/mapmaker/mapmaker_area_stubs.h`. Areas: `pads` (cover handle range 10,240,
-runtime pad handles 0x4740.., bounded A*/stitch, pad/link/object/memory caps: [caps](limitless-caps.md), group A* pool relocated to
-0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
+runtime pad handles 0x4740.., bounded A*/stitch, group route A* in C `pc_mapmaker_astar.inc`, caps and
+big-map speed: [caps](limitless-caps.md), A* pool 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
-`objects` (2047 `handles.json`, 768 pickups, 4096 props, 2048 bodies, pool guard: [caps](limitless-caps.md)), `editor`, `rooms` (1023, `level.json` frame, word buckets, stride 0x5000, tree: [rooms](limitless-rooms.md)) and `actors` (64 characters / 63 AI
+`objects` (2047 `handles.json`, 768 pickups, 4096 props, 2048 bodies, pool guard: [caps](limitless-caps.md)), `editor`, `rooms` (1023, `level.json` frame, word buckets, stride 0x5000, tree: [rooms](limitless-rooms.md), portal passes in C `pc_mapmaker_portals.inc`) and `actors` (64 characters / 63 AI
 in a local MapMaker story map instead of 20, 72 object slots kept free; live list moved to
 0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
 `actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;
@@ -207,7 +207,7 @@ guard above the top level; `TSFP_MAPMAKER_OVERLAP=1` overlapping tiles and
 the per-frame valid bit editor `+0x25C`&4 that the item-under-cursor test at
 0x003070B4 otherwise leaves clear = red X; pickups, props and teleporters
 (categories 14-18) share with each other and with Story AI points, several
-Story AI share a cell: `sub_00334770` also hides other AIs' points from its
+Story AI share a cell: `sub_00334770` hides other AIs' points from its
 refusal 0x0033484F..0x00334893, and `sub_002F8B40` at return 0x0030723F
 answers -1 while a Story AI is held, which the valid bit 0x003072B4 and the
 drop 0x00305238 require; starts, flags, turrets, movers and markers are never
@@ -423,7 +423,7 @@ Boss Off = no health: `pc_mapmaker_realbosses_hud` clears
 the focus for the stock call for every noted real boss (Boss flag or not);
 Boss bar = bosses' bar, Sub-boss = meter, Off = nothing.
 Giant skeleton (mansion boss, id 0x28, model 0x5E9, picker row 151 "Giant
-Skeleton", preview Arcade id 0xA6): `sub_001C8540` also mounts lv1_6.pak
+Skeleton", preview Arcade id 0xA6): `sub_001C8540` mounts lv1_6.pak
 (0x0049D6FC); WRAP `sub_0025F720` -> `pc_mapmaker_realbosses_level` calls the
 stock `sub_00287E00` ([0x0078B1EC] 0x4C7C + [0x0078B0D0] 0x7D00, level heap;
 stock only scenes 1/17) after clearing both pointers; ai_start gives one spawn
@@ -494,7 +494,7 @@ Boss areas/skies/open air/set slots/pak table/restart heap: [boss notes](limitle
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
 draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; music gain/ticks: custom-music.md.
 Pak table test: `tests/mapmaker/test_mapmaker_paktable.py`.
-Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
+Skeleton fire (mapmaker.17): `_fx` draws the scene-1 particle branch
 of `sub_0029CE00` (+0x3E88 == 1, `sub_002A7F30`). Walker missing: log-only
 WRAP `sub_000DAC30` -> `pc_mapmaker_realbosses_create`, AI-start log; per-level
 log budget and a walker heartbeat in `_fx` (mapmaker.21).
@@ -751,14 +751,14 @@ lands elsewhere, because relocated tables in the generated code point into it:
 Windows through `patches/platform/*-guest-memory-extension.patch` (runtime
 `titles/futureperfect/src/main.c`), native Mac in `src/native/main.c`. Before
 main's independent image loader this was a runtime patch to
-`src/kernel/xbox_memory_layout.c`. Operand entries may also redirect a
+`src/kernel/xbox_memory_layout.c`. Operand entries may redirect a
 read to a C-written value there: `grid.json` points eight MapMaker editor
 constant reads at the 16-byte settings block 0x00903600
 (`src/interface/pc_mapmaker_grid.h`), written by the grid hooks before the editor runs.
 With `TSFP_MAPMAKER_STACK_ITEMS=1` the grid hook on `sub_003348C0` (return
-0x003070A7) also sets placement-valid bit 4 of editor `+0x25C` when an allowed
+0x003070A7) sets placement-valid bit 4 of editor `+0x25C` when an allowed
 pickup is held over a cell that already has an item, so the stock drop path runs.
-The sky area also wraps the editor neighbour-mask builders (`sub_002FC680`,
+The sky area wraps the editor neighbour-mask builders (`sub_002FC680`,
 `sub_002FC470`), piece creation (`sub_00307FD0`) and the tile palette menu
 (`sub_00316B50`, `sub_000792B0`, `sub_00316920`, `sub_00316500`), piece
 move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`), text
@@ -786,13 +786,13 @@ outermost, MapMaker inside, original innermost.
 `aitemplates-pool.json` raises the editor menu-item pool (0x00070DC3, 0x398 to 0xC00).
 The characters area wraps `sub_001CD980` (unlock test, MapMaker picker return only) and `sub_000D7780` (log-only preload).
 The memory area wraps the Level-heap allocators `sub_0003DFA0`/`sub_0003E0B0` (overrun log) and arena setup `sub_00023930` (`TSFP_MAPMAKER_ARENA_MB`).
-Bosses also wraps `sub_00078590` (Story AI health rows, return 0x0031CFD7) for the levels above Tough Guy.
+Bosses wraps `sub_00078590` (Story AI health rows, return 0x0031CFD7) for the levels above Tough Guy.
 The sets area (20-slot custom character set) wraps the set screen, store, play copy and preload and adds layers to compile/load/reset and `sub_00078590`.
 Realbosses (giant trophy monster) wraps the picker, text, model request, anim mount `sub_001C8540` and AI start `sub_0015B830`; its HUD layer sits inside bosses.
-Realbosses also wraps `sub_0013A400` (Story overhead meter; skipped only for the real trophy monster at return 0x0014D264).
-Sets also wraps `sub_002D2C70` (match start; editor Test map bots from slots 1-10), chained with the story character hook.
-Sky also wraps piece move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`) to carry open-roof marks, and text `sub_0003D7B0` (+realbosses).
-Bosses also wraps `sub_0014D1F0` (HUD per viewport) to draw Sub-boss overhead meters via `sub_0013A400` before the stock loop.
+Realbosses wraps `sub_0013A400` (Story overhead meter; skipped only for the real trophy monster at return 0x0014D264).
+Sets wraps `sub_002D2C70` (match start; editor Test map bots from slots 1-10), chained with the story character hook.
+Sky wraps piece move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`) to carry open-roof marks, and text `sub_0003D7B0` (+realbosses).
+Bosses wraps `sub_0014D1F0` (HUD per viewport) to draw Sub-boss overhead meters via `sub_0013A400` before the stock loop.
 `matchbots.json` moves the 26 live per-actor reads to a 64-entry mirror at 0x00904000 and the rank table to 0x00904100 (every scene); the matchbots area fills them.
 The weaponset area (20 slots; list shows hidden 0x29/0x2F/0x38: `sub_001CD9D0`) wraps the play set `sub_0006BD30`, pickup slot/veto/spawn and weapon set screen functions, and chains compile/load/reset, `sub_0003D7B0` and `sub_00078590`; roof wraps the label format `sub_00151030` and caption `sub_0032D9F0`.
 Realbosses adds the giant skeleton: story level init `sub_0025F720`, `sub_0029FE00` variant, `sub_002875F0` emerge, `sub_00287E20` throw and level events `sub_002274C0` (death event dropped).
@@ -812,7 +812,7 @@ personal environment cannot enable it. Asset-free coverage:
 four mutations and patch shape) and `tests/repository/test_testing_profile.py`.
 Fixture success is not evidence of in-game meter behaviour.
 Probe flags are 1..255 (64 = AI pool counts, 128 = room prop draws, both in
-scene 100). `tests/mapmaker/test_mapmaker_sky.py` (MapMaker clouds) also checks the
+scene 100). `tests/mapmaker/test_mapmaker_sky.py` (MapMaker clouds) checks the
 stock sky data against the local XBE and skips that check without it.
 `tests/mapmaker/test_mapmaker_skymask.py` (fixture `tests/mapmaker/mapmaker_skymask.c`, dev
 switch `TSFP_MAPMAKER_ROOM_MASK_CLEAR`) compares the exact stderr text and
@@ -832,7 +832,7 @@ and `tests/input/test_scope_wheel.py` (mouse-wheel scope zoom; compiles
 `tests/input/scope_wheel.c` against `src/input/pc_scope_wheel.h`, ten mutations must fail). Fixtures that
 include `pc_display_menu.c` or `pc_menu_mouse_guest.inc` (`menu_mouse.c`,
 `fov_settings.c`) need a `sub_0003DFA0` stub for the stage A allocator.
-`tests/input/test_menu_mouse.py` also covers the MapMaker map browser click
+`tests/input/test_menu_mouse.py` covers the MapMaker map browser click
 (`map_browser_tests`; mutation `late-map-confirm` removes the input-hook click)
 and the briefing click (`briefing_tests`; mutation `late-briefing-confirm`).
 `tests/mapmaker/test_mapmaker_grid.py` covers stacked items with the per-frame valid
@@ -858,7 +858,7 @@ native CI list; `menu_mouse.c` and `fov_settings.c` include
 `tests/mapmaker/mapmaker_area_stubs.h` for the game functions those areas call. The
 `test_menu_mouse.py` mutation `footer-only-character-confirm` checks that a
 character-screen click off the footer confirms the previewed character.
-`tests/mapmaker/test_mapmaker_actors.py` also checks that every generated operand entry
+`tests/mapmaker/test_mapmaker_actors.py` checks that every generated operand entry
 in `actors-list.json` keeps its offset in the moved table, and that the
 perception slice in `objects.json` matches the actors and objects constants;
 its enemy-picker case compares the two-pass `sub_0027BA40` hook against a
