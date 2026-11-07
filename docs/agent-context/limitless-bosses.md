@@ -188,3 +188,7 @@ After .66 (bottle at the feet, shots did nothing): the boss's pose is computed
 before each fight frame (`sub_000A1B80`, view bit cleared: bones were stale
 off screen) and roomless props take the boss's rooms; hit, trace and ragbug
 phase lines (mapmaker-pitboss.md).
+After .68 (camera broken): that pose call is gone (it posed the view slot 0
+camera); the bottle is held 11 up, 2.5 ahead of the boss; the hull hits
+count a quarter; the rim pads live in the pad pool's tail (dives need index
+< 0x1F40, sub_0009A420).
