@@ -400,7 +400,7 @@
 extern void sub_00079D60(void),sub_00071630(void),sub_00071C70(void),sub_0005A130(void),sub_00062260(void);
 extern void sub_00287E00(void),sub_0029CEF0(void),sub_00286D30(void),sub_00059DB0(void),sub_000EA9C0(void),sub_0010EB90(void);
 extern void sub_002976F0(void),sub_0015DDA0(void),sub_0029CCB0(void),sub_00019D70(void),sub_002A7F30(void),sub_0005F460(void);
-extern void sub_00287860(void),sub_00297690(void),sub_002BD480(void);
+extern void sub_00287860(void),sub_00297690(void),sub_002BD480(void),sub_000C3C50(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
@@ -421,8 +421,8 @@ typedef char rbs_fx_is_the_shared_window[(RBS_FX==MAPMAKER_FX && RBS_FX_SIZE==MA
 typedef struct {
     uint32_t state, parts, record;
     unsigned throws, skipped, fire, aimed;
-    float floor;
-    int floor_set;
+    float floor, ground;                /* spawn height (its body's height); the real floor under it */
+    int floor_set, ground_set;          /* ground_set: 1 under the spawn, 2 above it, -1 none found (the spawn height) */
     MapmakerFx fx;
 } RbsSkel;
 typedef struct {
@@ -1199,24 +1199,73 @@ void pc_mapmaker_realbosses_risen(void (*original)(void))
  * its edge or underside. For a target more than RBS_SKEL_UP over the boss's
  * own floor, the aim point is raised by RBS_SKEL_BODY (its body, not its
  * feet) and the climb is held to RBS_SKEL_PITCH (about 60 degrees). Targets
- * on the boss's floor keep the stock aim. */
+ * on the boss's floor keep the stock aim.
+ *
+ * v0.4.0-mapmaker.42 ("they don't hit me if I stand in place on the same
+ * floor"): "over the boss's floor" is measured from its real floor, the
+ * floor finder sub_000C3C50(point, 1.25, 0.1) under the boss (as the pad
+ * snap 0x0009AFD4 and the split Crowe's ledge probe ask it), found once per
+ * fight at its first aim: from its noted spawn height, then, when no floor
+ * is within a step there, climbing one search height at a time up to 11.25
+ * over it (a first-frame height under the floor, as rising from the ground).
+ * None found: the spawn height. A target is a floor up only more than
+ * RBS_SKEL_UP (half a 5-unit floor) over that floor. */
 #define RBS_SKEL_TARGET 0x4164u        /* state: target points, 12 bytes each */
 #define RBS_SKEL_TARGET_I 0x4158u      /* state: which one (0/1) */
-#define RBS_SKEL_UP 2.0f               /* a target this far over the boss's floor is a floor up */
+#define RBS_SKEL_UP 2.5f               /* a target this far over the boss's real floor is a floor up */
+#define RBS_FINDER_UP 0x3FA00000u      /* 1.25: the floor finder's search height, as the pad snap */
+#define RBS_FINDER_R 0x3DCCCCCDu       /* 0.1: its radius */
+#define RBS_FLOOR_Y 0x004DCB00u        /* the finder's floor height; it also writes the two below */
+#define RBS_FLOOR_KEEP1 0x004DCAFCu
+#define RBS_FLOOR_KEEP2 0x00733088u
+#define RBS_RISE 1.25f                 /* the search climbs one search height at a time ... */
+#define RBS_RISE_N 9u                  /* ... up to 11.25 over the spawn height */
+#define RBS_STEP 1.0f                  /* a floor this near the spawn height is the boss's own */
+static int rbs_floor_y(uint32_t pt,float x,float y,float z,float *f)
+{
+    rbs_setf(pt,x);rbs_setf(pt+4u,y);rbs_setf(pt+8u,z);
+    if((int32_t)guest_call(sub_000C3C50,3,pt,RBS_FINDER_UP,RBS_FINDER_R)<=0) return 0;
+    *f=rbs_getf(RBS_FLOOR_Y);
+    return rbs_sane(*f);
+}
+static void rbs_skel_ground(RbsSkel *k,uint32_t ent)
+{
+    uint32_t sp=g_esp,pt,keep[3];
+    float x=rbs_getf(ent+RBS_ENT_Y-4u),z=rbs_getf(ent+RBS_ENT_Y+4u),f=k->floor,d;
+    unsigned i,steps=0;
+    int found=0;
+    k->ground=k->floor;k->ground_set=-1;
+    if(rbs_sane(x) && rbs_sane(z) && MAPMAKER_STACK_OK(0x100) && g_esp>=0x00010200u) {
+        pt=(g_esp-0x20u)&~0xFu;                        /* the probe point, below esp */
+        g_esp=pt;
+        keep[0]=WORD_AT(RBS_FLOOR_Y);keep[1]=WORD_AT(RBS_FLOOR_KEEP1);keep[2]=WORD_AT(RBS_FLOOR_KEEP2);
+        if(rbs_floor_y(pt,x,k->floor,z,&f) && (d=f-k->floor,d<=RBS_STEP && d>=-RBS_STEP)) found=1;
+        else for(i=1;i<=RBS_RISE_N && !found;i++)
+            if(rbs_floor_y(pt,x,k->floor+(float)i*RBS_RISE,z,&f) && f>k->floor+RBS_STEP) { found=1;steps=i; }
+        WORD_AT(RBS_FLOOR_Y)=keep[0];WORD_AT(RBS_FLOOR_KEEP1)=keep[1];WORD_AT(RBS_FLOOR_KEEP2)=keep[2];
+        g_esp=sp;
+    }
+    if(found) { k->ground=f;k->ground_set=steps?2:1; }
+    fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u reference floor %.2f (spawn height %.2f, %s)\n",
+            (unsigned)(k-rbs_skels)+1u,(double)k->ground,(double)k->floor,
+            !found?"no floor found: the spawn height":steps?"found above the spawn":"under the spawn");
+    fflush(stderr);
+}
 #define RBS_SKEL_BODY 1.5f             /* aim this far over its feet */
 #define RBS_SKEL_PITCH 0.866f          /* most upward component of the unit aim */
-static void rbs_skel_aim(RbsSkel *k,uint32_t st)
+static void rbs_skel_aim(RbsSkel *k,uint32_t st,uint32_t ent)
 {
     uint32_t shot=st+RBS_SKEL_SHOT,i=WORD_AT(st+RBS_SKEL_TARGET_I),t;
     float o[3],d[3],h,len;
     unsigned j;
     if(!k->floor_set || i>1u) return;
+    if(!k->ground_set) rbs_skel_ground(k,ent);
     t=st+RBS_SKEL_TARGET+i*12u;
     for(j=0;j<3u;j++) {
         o[j]=rbs_getf(shot+j*4u);d[j]=rbs_getf(t+j*4u);
         if(!rbs_sane(o[j]) || !rbs_sane(d[j])) return;
     }
-    if(!(d[1]-k->floor>RBS_SKEL_UP)) return;           /* the boss's floor: stock aim */
+    if(!(d[1]-k->ground>RBS_SKEL_UP)) return;          /* the boss's floor: stock aim */
     d[0]-=o[0];d[1]+=RBS_SKEL_BODY-o[1];d[2]-=o[2];
     h=rbs_sqrt((d[0]*d[0]+d[2]*d[2]));
     len=rbs_sqrt((h*h+d[1]*d[1]));
@@ -1230,7 +1279,7 @@ static void rbs_skel_aim(RbsSkel *k,uint32_t st)
     for(j=0;j<3u;j++) rbs_setf(shot+0xCu+j*4u,d[j]);
     if(k->aimed++<4u) {
         fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u aims at a target a floor up (%.1f over its floor %.1f): dir (%.2f, %.2f, %.2f)\n",
-                (unsigned)(k-rbs_skels)+1u,(double)(rbs_getf(t+4u)-k->floor),(double)k->floor,(double)d[0],(double)d[1],(double)d[2]);
+                (unsigned)(k-rbs_skels)+1u,(double)(rbs_getf(t+4u)-k->ground),(double)k->ground,(double)d[0],(double)d[1],(double)d[2]);
         fflush(stderr);
     }
 }
@@ -1251,7 +1300,7 @@ void pc_mapmaker_realbosses_throw(void (*original)(void))
         original();
         WORD_AT(RBS_SCENE)=100u;
         rbs_skel_out(k,&s);
-        if(WORD_AT(st+RBS_SKEL_PHASE)==1u) rbs_skel_aim(k,st);   /* aimed this frame */
+        if(WORD_AT(st+RBS_SKEL_PHASE)==1u) rbs_skel_aim(k,st,ent);   /* aimed this frame */
         return;
     }
     if(phase==1) {                                     /* fire, in the real scene */
