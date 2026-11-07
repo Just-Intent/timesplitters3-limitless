@@ -20,15 +20,24 @@ MUTATIONS = {
     'pools-ignore-nav': ('uint32_t p=mapmaker_pool_source?mapmaker_pool_source(bytes):0u;', 'uint32_t p=0u;'),
     'pools-no-fallback': ('    if(!p) p=guest_call(sub_0003DFA0,2,bytes,1u);', '    if(0) p=guest_call(sub_0003DFA0,2,bytes,1u);'),
     'link-pool-editor-limit': ('mapmaker_pool(MAPMAKER_POOL_LINKS*20u)', 'mapmaker_pool(MAPMAKER_LIMIT_LINKS*20u)'),
-    # Links: the pool stays within int16 A* indices; 511 of the heaviest tile (46
-    # links + 16 stitch links each) fit the editor limit.
+    # Links: the pool stays within int16 A* indices; template links plus half
+    # the side connection slots (one link per facing slot pair) fit 32,256.
     'links-pool-stock-raise': ('#define MAPMAKER_POOL_LINKS 32512u', '#define MAPMAKER_POOL_LINKS 16336u'),
     'links-past-int16': ('#define MAPMAKER_POOL_LINKS 32512u', '#define MAPMAKER_POOL_LINKS 32768u'),
-    'links-no-stitch': ('    return t->cost[2]+MAPMAKER_LINK_STITCH*t->pieces;', '    return t->cost[2];'),
+    'links-no-stitch': ('    return p->cost[2]+h->cost[2]+(p->slots+h->slots+1u)/2u;', '    return p->cost[2]+h->cost[2];'),
+    'links-flat-16': ('    return p->cost[2]+h->cost[2]+(p->slots+h->slots+1u)/2u;',
+                      '    return p->cost[2]+h->cost[2]+16u*(p->pieces+h->pieces);'),
+    'links-both-sides': ('(p->slots+h->slots+1u)/2u', '(p->slots+h->slots)'),
+    'links-round-down': ('(p->slots+h->slots+1u)/2u', '(p->slots+h->slots)/2u'),
+    'links-held-slots-ignored': ('(p->slots+h->slots+1u)/2u', '(p->slots+1u)/2u'),
+    'links-updown-slots': ("if((e&0xFFu)>=1u && (e&0xFFu)<=4u) slots+=slot;", "if((e&0xFFu)>=1u && (e&0xFFu)<=6u) slots+=slot;"),
+    'links-catalogue-offset': ('n=WORD_AT(row+0x14u);', 'n=WORD_AT(row+0x44u);'),
+    'links-slots-unclamped': ('return slots<MAPMAKER_LINK_SLOTS_MAX?slots:MAPMAKER_LINK_SLOTS_MAX;', 'return slots;'),
+    'links-count-unchecked': ('if(n>40u || !MAPMAKER_PTR_OK', 'if(!MAPMAKER_PTR_OK'),
     'links-no-slack': ('#define MAPMAKER_LIMIT_LINKS (MAPMAKER_POOL_LINKS-MAPMAKER_LINK_SLACK)',
                        '#define MAPMAKER_LIMIT_LINKS MAPMAKER_POOL_LINKS'),
-    'links-held-ignored': ('mapmaker_link_cost(p)+mapmaker_link_cost(h)>MAPMAKER_LIMIT_LINKS',
-                           'mapmaker_link_cost(p)>MAPMAKER_LIMIT_LINKS'),
+    'links-held-ignored': ('if(mapmaker_link_total(p,h)>MAPMAKER_LIMIT_LINKS)',
+                           'if(mapmaker_link_cost(p)>MAPMAKER_LIMIT_LINKS)'),
     'no-held-pieces': ('p->pieces+h->pieces>MAPMAKER_LIMIT_PIECES', 'p->pieces>MAPMAKER_LIMIT_PIECES'),
     # Engine objects: pieces + items + 64 characters + 64 effects within the 2047-slot pool (slot << 21).
     'objects-unchecked': ('    if(mapmaker_objects_needed(p->pieces+h->pieces,sub)>MAPMAKER_LIMIT_OBJECTS) over|=MAPMAKER_CAP_OBJECTS;\n', ''),

@@ -37,7 +37,16 @@ MUTATIONS = {
     'topup-range-cap-without-pools': ('capacity=mapmaker_limits.pools?MAPMAKER_PADS_COVER_RANGE:MAPMAKER_PADS_STOCK_COVER;',
                                       'capacity=MAPMAKER_PADS_COVER_RANGE;'),
     'topup-wraps': ('if(count>capacity || add>capacity-count) {', 'if(add>capacity-count) {'),
-    'cover-range-short': ('#define MAPMAKER_PADS_COVER_RANGE 10240u', '#define MAPMAKER_PADS_COVER_RANGE 9984u'),
+    # Stitcher: cut the table only where the next link would pass the pool.
+    'stitch-unguarded': ('        WORD_AT(0x007B677Cu)=i;\n', ''),
+    'stitch-counts-inactive': ('        if(!ok) continue;\n', ''),
+    'stitch-off-by-one': ('        if(added==room) break;', '        if(added+1u>=room) break;'),
+    'stitch-any-scene': ("    if(WORD_AT(0x0079094Cu)!=100u) { original(); return; }\n    mapmaker_limits_read();\n    if(!mapmaker_limits.pools)",
+                         "    mapmaker_limits_read();\n    if(!mapmaker_limits.pools)"),
+    'stitch-without-pools': ('    if(!mapmaker_limits.pools) { original(); return; }\n    n=', '    n='),
+    'stitch-editor-limit': ('room=links<MAPMAKER_POOL_LINKS?MAPMAKER_POOL_LINKS-links:0u;',
+                            'room=links<MAPMAKER_LIMIT_LINKS?MAPMAKER_LIMIT_LINKS-links:0u;'),
+    'cover-range-short':('#define MAPMAKER_PADS_COVER_RANGE 10240u', '#define MAPMAKER_PADS_COVER_RANGE 9984u'),
     # Regular pad ids past the stock threshold need the pads-idthreshold rewrites (compile-time check).
     'id-threshold-stock': ('#define MAPMAKER_PADS_ID_THRESHOLD 0x2328u', '#define MAPMAKER_PADS_ID_THRESHOLD 0x1F40u'),
     'id-threshold-overlaps-cover': ('#define MAPMAKER_PADS_ID_THRESHOLD 0x2328u', '#define MAPMAKER_PADS_ID_THRESHOLD 0x2329u'),
