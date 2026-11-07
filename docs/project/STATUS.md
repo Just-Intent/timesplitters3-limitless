@@ -13,6 +13,17 @@ short by WinError 4551 / endpoint protection (rerun pending). Launcher
 `-Test` result: see the commit report. Unverified: game build/run, Mac build
 (MP3 is WAV-only there until an FFmpeg adapter, MAC-133), Mac launcher.
 
+Loudness after .50 "still quiet" (2026-11-07, branch `music-loud` from
+`8ba2dc43`; Windows 11 x64, MSVC fixtures; not built or played): at slider
+11/16 stock level music reached XAudio2 at -11.35 dB (m48/m50 `level -1135`)
+and the imported track at -3.25 dB on the same master; offline, 60 s of stock
+packets from `musicts.pak` measured -16.3 LUFS and the user's MP3 -9.9 LUFS
+(ffmpeg ebur128), so the import was already ~14.5 LU louder. Added the
+`gain_db=` trim in `pc-music.ini` (+ soft-clipped sample boost) and a level
+log line; default unchanged. `test_custom_music.py` fixed + 43 mutations and
+`test_mapmaker_custommusic.py` / `test_music_codec.py` passed (WinError 4551
+reruns). Unverified: the game build and what the player hears.
+
 ## MapMaker Story AI points past piece 255 restored on editor reload (2026-11-06, not built or played)
 
 v0.4.0-mapmaker.39/.40: on maps of more than 256 pieces, Story AIs placed on

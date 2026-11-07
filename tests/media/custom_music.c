@@ -21,12 +21,21 @@ static unsigned submits, refuse_next, resets, volumes;
 static uint32_t refused_bytes, retried_bytes;
 static int32_t last_volume = 12345, submit_volume;
 static int16_t first_sample[2];
+static int first_peak;                 /* largest |sample| of the first submission */
 static uint32_t last_rate, last_channels;
 int pc_music_test_submit(const uint8_t *pcm, uint32_t bytes, uint32_t rate, uint32_t channels, int32_t volume)
 {
     if (refuse_next) { refuse_next--; refused_bytes = bytes; return 0; }
     if (refused_bytes && !retried_bytes) retried_bytes = bytes;
-    if (!submits) memcpy(first_sample, pcm, sizeof first_sample);
+    if (!submits) {
+        uint32_t k;
+        memcpy(first_sample, pcm, sizeof first_sample);
+        first_peak = 0;
+        for (k = 0; k + 1 < bytes; k += 2) {
+            int16_t s; memcpy(&s, pcm + k, 2);
+            if (abs(s) > first_peak) first_peak = abs(s);
+        }
+    }
     submits++; submitted_bytes += bytes; last_rate = rate; last_channels = channels; submit_volume = volume;
     return 1;
 }
@@ -83,6 +92,25 @@ static void set_env(const char *name, const char *value)
 #else
     setenv(name, value, 1);
 #endif
+}
+
+static void write_text(const char *path, const char *text)
+{
+    FILE *f = fopen(path, "wb");
+    if (f) { fputs(text, f); fclose(f); }
+}
+
+/* One track start at the given slider gain: the voice level and the first
+ * submission's first sample and peak. */
+static void play_once(const char *name, float gain, uint64_t now)
+{
+    pc_music_stop();
+    submits = 0; submitted_bytes = played_bytes = 0; first_peak = -1;
+    watch_gain = gain;
+    CHECK(pc_music_start(name, watch, NULL));
+    pc_music_pump(now);
+    pc_music_stop();
+    watch_gain = 1.0f;
 }
 
 static int parse(const char *dir, const char *name, PcWavInfo *info)
@@ -264,6 +292,58 @@ int main(int argc, char **argv)
     CHECK(pc_music_arcade_load(name, sizeof name) && !strcmp(name, "B16.wav"));
     CHECK(pc_music_arcade_save("") && !pc_music_arcade_load(name, sizeof name) && !name[0]);
     CHECK(pc_music_dir(name, 4) == 0);
+
+    /* the player's trim gain_db= in the same file */
+    {
+        int present = 9;
+        int16_t s[6] = {32767, -32768, 16384, 8000, 0, -100};
+        CHECK(pc_music_gain_load(&present) == 0 && present == 0);              /* absent: 0 */
+        snprintf(ini, sizeof ini, "%s/pc-music.ini", argv[2]);
+        write_text(ini, "TSFP_MUSIC_V1\ngain_db=6\narcade=a8.wav\n");             /* any order */
+        CHECK(pc_music_gain_load(&present) == 600 && present == 1);
+        CHECK(pc_music_arcade_load(name, sizeof name) && !strcmp(name, "a8.wav"));
+        CHECK(pc_music_arcade_save("B16.wav") && pc_music_gain_load(&present) == 600 && present == 1);  /* kept */
+        CHECK(pc_music_arcade_load(name, sizeof name) && !strcmp(name, "B16.wav"));
+        write_text(ini, "TSFP_MUSIC_V1\narcade=\ngain_db=99\n");
+        CHECK(pc_music_gain_load(NULL) == PC_MUSIC_GAIN_MAX);                     /* clamped to +12 */
+        write_text(ini, "TSFP_MUSIC_V1\ngain_db=-40.5\n");
+        CHECK(pc_music_gain_load(NULL) == PC_MUSIC_GAIN_MIN);
+        write_text(ini, "TSFP_MUSIC_V1\ngain_db=3.25 \n");
+        CHECK(pc_music_gain_load(NULL) == 325);
+        write_text(ini, "TSFP_MUSIC_V1\ngain_db=loud\n");
+        CHECK(pc_music_gain_load(&present) == 0 && present == 0);
+        write_text(ini, "TSFP_MUSIC_V1\ngain_db=6dB\n");                        /* not a plain number */
+        CHECK(pc_music_gain_load(&present) == 0 && present == 0);
+        write_text(ini, "OTHER\ngain_db=6\n");
+        CHECK(pc_music_gain_load(NULL) == 0);
+
+        /* +6 dB at the full slider: the voice stays at 0 dB, the samples rise */
+        write_text(ini, "TSFP_MUSIC_V1\narcade=\ngain_db=6\n");
+        play_once("B16.wav", 1.0f, 600);
+        CHECK(last_volume == 0 && submit_volume == 0);
+        CHECK(first_sample[0] >= 1990 && first_sample[0] <= 2000 && first_sample[1] <= -1990 && first_sample[1] >= -2000);
+        codec_available = 1;                                                    /* the decoder's chunks too */
+        play_once("z_fake.mp3", 1.0f, 700);
+        CHECK(first_peak >= 1985 && first_peak <= 1995);                          /* 999 x 2 */
+        codec_available = 0;
+        /* half the slider (-6.02 dB) + 6 dB: all of it on the voice */
+        play_once("B16.wav", 0.5f, 800);
+        CHECK(last_volume == -2 && first_sample[0] == 1000);
+        /* a silent slider stays silent */
+        play_once("B16.wav", 0.0f, 900);
+        CHECK(last_volume == -10000);
+        /* a cut: on the voice, samples untouched */
+        write_text(ini, "TSFP_MUSIC_V1\narcade=\ngain_db=-6\n");
+        play_once("B16.wav", 1.0f, 1000);
+        CHECK(last_volume == -600 && first_sample[0] == 1000);
+        /* the soft clip: no wrap, no hard clip, order kept */
+        pc_music_boost(s, 6, PC_MUSIC_GAIN_MAX);
+        CHECK(s[0] > 30000 && s[0] <= 32767 && s[1] < -30000 && s[1] >= -32767);
+        CHECK(s[2] > 26000 && s[2] <= s[0] && s[3] > 24000 && s[3] < s[2] && s[4] == 0 && s[5] < -390 && s[5] > -410);
+        pc_music_boost(s + 4, 2, 0);                                            /* 0 dB: untouched */
+        CHECK(s[4] == 0);
+        write_text(ini, "TSFP_MUSIC_V1\narcade=\n");
+    }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("custom music ok\n");
