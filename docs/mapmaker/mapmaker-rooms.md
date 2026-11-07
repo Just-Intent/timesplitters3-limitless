@@ -101,7 +101,7 @@ immediates, plus negative forms and `lea` displacements); the room ones are:
 
 `0x008CB800..0x008CC800`: two 0x800-byte buffers of the room query.
 `0x008CC800..0x008CCC40`: per-id drawn flag `0x007B5180` (stage 2 of the
-255 raise, below). Free: `0x008CCC40..0x008CD000` and `0x008D4000..0x008DFFFF`.
+255 raise, below). Free: `0x008CCC40..0x008CD000` and `0x008DC000..0x008DFFFF` (`0x008D4000..` boss camera lists, bossroom).
 
 Notes on how the relocations are declared (each verified by the full scan):
 
@@ -535,7 +535,7 @@ The `rooms` area can no longer be switched off by `TSFP_MAPMAKER_AREA_OFF`
 
 Free in the rooms sub-range: `0x008C91D0..0x008C9200`, `0x008C9E94..0x008CA000`,
 `0x008CB410..0x008CB440`, `0x008CB4C0..0x008CB800`, `0x008CCC40..0x008CD000`;
-`0x008D4000..0x008DFFFF` (no reference in tracked code); `0x008E0000..` is
+`0x008DC000..0x008DFFFF` (`0x008D4000..0x008DBFFF`: boss camera lists, `pc_mapmaker_bossroom.inc`); `0x008E0000..` is
 the pads A* group pool and `0x00900000..` actors and later areas.
 
 Stage 5 (`MAPMAKER_LIMIT_PIECES` and `MAPMAKER_ROOMS_MAX` 241 -> 255, gated as

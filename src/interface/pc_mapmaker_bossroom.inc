@@ -34,7 +34,7 @@
  * whose rooms is reached by this view's portal walk (depth >= 0) and that is
  * not already in the camera room's prop list, append it to that list. The
  * camera room's list is first copied to a buffer of its own per view slot
- * (BSR_BUFFER, free extension memory 0x008D4000..0x008DC000, 1024 entries
+ * (BSR_BUFFER, free extension memory 0x008D4000..0x008DBFFF, 1024 entries
  * each), so the pool and the other rooms' chunks are never written; the next
  * sub_0009E4B0 lays every room out again. The camera room's draw then runs the
  * stock cull and draw for the boss: its rectangle is still the union of its
