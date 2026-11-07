@@ -670,6 +670,7 @@ void pc_mapmaker_container_compiled_size(void (*original)(void)) { original(); }
 void pc_mapmaker_container_find(void (*original)(void)) { original(); }
 void pc_mapmaker_container_net_send(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_turret_create(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_create(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_turret_init(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_list_add(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_register(void (*original)(void)) { original(); }
@@ -679,7 +680,6 @@ void pc_mapmaker_objects_teleporters(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_tag(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_physics(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_prop_break(void (*original)(void)) { original(); }
-void pc_mapmaker_objects_create(void (*original)(void)) { original(); }
 void pc_mapmaker_editor_sai_add(void (*original)(void)) { original(); }
 void pc_mapmaker_editor_load(void (*original)(void)) { original(); }
 void pc_mapmaker_editor_level_load(void (*original)(void)) { original(); }
