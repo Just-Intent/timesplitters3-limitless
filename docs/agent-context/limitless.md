@@ -326,7 +326,7 @@ logic) and Story AI chunk word +0x32 (0x4000 format marker, 0x8000 group logic;
 stock-zero, stock games load members as independent AIs). Unlink/delete of a
 leader promotes its first copy. Old template-format maps (plain link to an
 "All X" entry) are converted at editor load. In scene 100 logic on a leader
-with group logic (or an unconverted old template) means "any member"
+with group logic (or an unconverted old template) means "all members"
 (`sub_0033E560`, `sub_00163780`, `sub_0033E620`, `sub_00339600`). A separate
 logic-picker entry was rejected: Story AI ids are R + index + 1 and the object
 ids start at R + count (0x0031DA9B). Compile/load/level-start hooks chain

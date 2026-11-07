@@ -2,7 +2,8 @@
 against fake guest memory, with mutation cases: duplicate / leader-group rows
 and actions, numbered copy names, the group-logic toggle, propagation of shared
 settings, promotion on unlink/delete, the saved link (chunk +0x32, including
-the old template format) and "whole group" logic in play."""
+the old template format) and "whole group" logic in play (all members
+killed / spotted, including ported boss-class AIs)."""
 import os
 from pathlib import Path
 import subprocess
@@ -83,8 +84,7 @@ MUTATIONS = {
     'migrate-leader-linked': ('            if(lead[l-1u]!=(int16_t)k) value=', '            if(1) value='),
     'level-chained': ('|| !present[t] || (word_of[t]&AIT_SAVE_LINK)) {', '|| !present[t]) {'),
     'level-group-always': ('        if(w&AIT_SAVE_NEW) ait_level.group[t]=', '        if(0) ait_level.group[t]='),
-    'level-old-no-group': ('        else ait_level.group[t]=1;                /* old template: "any copy" */', '        else (void)0;'),
-    'level-active-always': ('    ait_level.active=groups!=0;', '    ait_level.active=1;(void)groups;'),
+    'level-old-no-group': ('        else ait_level.group[t]=1;                /* old template: the group of its copies */', '        else (void)0;'),
     'play-any-scene': ("static int ait_play(void) { return ait_level.active && WORD_AT(AIT_SCENE)==100u && mapmaker_limits.limits; }",
                        "static int ait_play(void) { return ait_level.active && mapmaker_limits.limits; }"),
     'play-leader-no-group': ('(t=ait_level.template_of[i])<0 || !ait_level.group[t]) return -1;', '(t=ait_level.template_of[i])<0) return -1;'),
@@ -94,10 +94,33 @@ MUTATIONS = {
     'remove-no-group': ('>=AIT_LEVEL_SLOTS || !ait_level.group[t]) return;\n    for', '>=AIT_LEVEL_SLOTS) return;\n    for'),
     'gate-own-only': ('    g_eax=guest_call(original,1,ait_play_id((uint32_t)t));', '    (void)t;'),
     'gate-lost-eax': ('    original();\n    r=g_eax;\n    if(!r ||', '    original();\n    r=1u;\n    if(!r ||'),
-    'alert-no-group': ('>=AIT_LEVEL_SLOTS || !ait_level.group[t]) {', '>=AIT_LEVEL_SLOTS) {'),
-    'alert-no-stop': ('!r && !(state!=7u && WORD_AT(trigger+0x18u)==7u);k++)', '!r;k++)'),
-    'alert-no-restore': ('        r=guest_call(original,1,trigger);\n        WORD_AT(trigger+0x14u)=id;', '        r=guest_call(original,1,trigger);'),
-    'alert-lost-result': ('    }\n    g_eax=r;\n}', '    }\n}'),
+    # whole-group killed / spotted (all members) and boss-class AIs
+    'kill-any-member': ('    if(ait_run.fired[t] || !ait_all((uint32_t)t,1,0)) return;', '    if(ait_run.fired[t]) return;'),
+    'kill-leader-own': ('    else MAPMAKER_GUEST_RET();                   /* the leader', '    else original();                   /* the leader'),
+    'kill-twice': ('    ait_run.fired[t]=1;\n    WORD_AT(record+8u)', '    WORD_AT(record+8u)'),
+    'event-no-killed': ('    ait_run.killed[i]=1;\n', ''),
+    'removed-no-event': ('            guest_call(sub_0033E560,1,ent);\n            for', '            for'),
+    'removed-any-class': ('ait_play_index(WORD_AT(rec+8u))<AIT_LEVEL_SLOTS && ait_boss_record(rec)) {', 'ait_play_index(WORD_AT(rec+8u))<AIT_LEVEL_SLOTS) {'),
+    'removed-full-health': ('        else if(ait_getf(ent+AIT_ENT_HEALTH)<ait_getf(ent+AIT_ENT_MAX)) {', '        else {'),
+    'removed-no-dedupe': ('        if(k<AIT_SEEN) ait_run.seen[k]=0;             /* its event came already */\n        else if', '        if(0) (void)0;\n        else if'),
+    'removed-no-original': ('    }\n    original();\n}\n\n/* sub_00163780', '    }\n}\n\n/* sub_00163780'),
+    'removed-any-scene': ('    if(ait_play() && ait_actor(ent,&a,&rec) && WORD_AT(a)==ent &&', '    if(ait_actor(ent,&a,&rec) && WORD_AT(a)==ent &&'),
+    'placed-ignored': ('    return !ait_run.any_placed || ait_run.placed[k];', '    return 1;'),
+    'spot-any-member': ('        if(sight) { if(ait_run.spotted[k]) spotted++; else if(!ait_run.killed[k]) return 0; }',
+                        '        if(sight) { if(ait_run.spotted[k]) return 1; }'),
+    'spot-killed-blocks': ('spotted++; else if(!ait_run.killed[k]) return 0; }', 'spotted++; else return 0; }'),
+    'spot-none-needed': ('    return members && (!sight || spotted);', '    return members!=0;'),
+    'spot-boss-never': ('    if(!ait_boss_record(rec)) return 0;\n    hp=', '    return 0;\n    hp='),
+    'spot-no-hurt': ('    if(hp<max) return 1;', '    (void)hp;(void)max;'),
+    'spot-no-range': ('    return ait_player_near(ent);\n}', '    return 0&&ait_player_near(ent);\n}'),
+    'spot-range-wide': ('#define AIT_SPOT_RANGE 30.0f', '#define AIT_SPOT_RANGE 3000.0f'),
+    'spot-mode-ignored': ('(WORD_AT(AIT_MODE)&0xFFu)==10u?WORD_AT(a+0x10u):WORD_AT(a+0x18u)', 'WORD_AT(a+0x18u)'),
+    'spot-no-latch': ('        if(!ait_run.spotted[k] && ait_spots(a,ent,rec)) {', '        ait_run.spotted[k]=0;\n        if(ait_spots(a,ent,rec)) {'),
+    'alert-boss-stock': ('    if(!group && !boss) { original();return; }', '    if(!group) { original();return; }'),
+    'alert-group-stock': ('    if(!group && !boss) { original();return; }', '    if(!boss) { original();return; }'),
+    'alert-no-delay': ('    if(state!=7u) { WORD_AT(trigger+0x18u)=7u;WORD_AT(trigger+0x1Cu)=now+WORD_AT(AIT_DELAY);return; }\n', ''),
+    'alert-no-wait': ('    if(state==7u && (int32_t)WORD_AT(trigger+0x1Cu)>=(int32_t)now) return;\n', ''),
+    'alert-no-ret': ('    MAPMAKER_GUEST_RET();\n    g_eax=0;\n    state=', '    g_eax=0;\n    state='),
     'id-off-by-one': ('static uint32_t ait_play_id(uint32_t index) { return WORD_AT(AIT_SAI_BASE)+index+1u; }',
                       'static uint32_t ait_play_id(uint32_t index) { return WORD_AT(AIT_SAI_BASE)+index; }'),
 }

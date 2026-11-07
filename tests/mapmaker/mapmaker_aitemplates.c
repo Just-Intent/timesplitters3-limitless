@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x800000/4], g_eax, g_ecx, g_edx, g_esp;
+static uint32_t memory[0x1000000/4], g_eax, g_ecx, g_edx, g_esp;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -188,6 +188,52 @@ static void fake_alert(void)                     /* sub_00339600 state machine *
     if(!(id-R<16u && found[id-R])) return;
     if(WORD_AT(t+0x18u)!=7u) { WORD_AT(t+0x18u)=7u;WORD_AT(t+0x1Cu)=now+5u;return; }
     WORD_AT(t+0x18u)=3u;WORD_AT(t+0x1Cu)=0;g_eax=1;
+}
+
+/* the wrapped death event, as the removal hook calls it */
+void sub_0033E560(void) { pc_mapmaker_aitemplates_event(fake_event); }
+
+#define CONT2 0x00480000u
+#define DESC 0x00490000u
+#define PLAYER_A 0x004A0000u
+#define PLAYER_E 0x004A1000u
+static void put16(uint32_t a,uint32_t v) { *(uint16_t *)((uintptr_t)a+g_xbox_mem_offset)=(uint16_t)v; }
+static void set_pos(uint32_t ent,float x) { FLOAT_AT(ent+0x64u)=x;FLOAT_AT(ent+0x68u)=0.0f;FLOAT_AT(ent+0x6Cu)=0.0f; }
+/* a played map: n Story AI chunks with these link words; placed = spawn records */
+static void make_level(unsigned n,const uint32_t *words,uint32_t placed)
+{
+    uint32_t p=CONT2+8u,k,r=0;
+    memset((void *)((uintptr_t)CONT2+g_xbox_mem_offset),0,0x1000);
+    WORD_AT(CONT2)=0x00C77667u;
+    for(k=0;k<n;k++) {
+        WORD_AT(p)=0x00C7766Cu;WORD_AT(p+4u)=0x40u;
+        put16(p+8u+0x22u,k);put16(p+8u+0x32u,words[k]);
+        p+=0x48u;
+    }
+    WORD_AT(p)=0x00C7766Au;WORD_AT(p+4u)=0;
+    WORD_AT(0x00784014u)=CONT2;
+    WORD_AT(0x0074C36Cu)=DESC;WORD_AT(DESC+0x74u)=DESC+0x100u;
+    for(k=0;k<n;k++) if(placed>>k&1u) { WORD_AT(DESC+0x100u+r*0x98u+8u)=R+k+1u;r++; }
+    WORD_AT(DESC+0x78u)=r;
+    HOOK(pc_mapmaker_aitemplates_level,fake_plain,0);
+}
+/* entity slot for Story AI index; boss: the record carries a boss class */
+static uint32_t make_actor(uint32_t slot,uint32_t index,int boss)
+{
+    uint32_t ent=0x00410000u+slot*0x1000u,a=ent+0x400u,rec=ent+0x800u;
+    memset((void *)((uintptr_t)ent+g_xbox_mem_offset),0,0x1000);
+    WORD_AT(ent+0x7Cu)=a;WORD_AT(a)=ent;WORD_AT(a+0xBF0u)=rec;
+    WORD_AT(rec)=boss?0u:0x11000000u;WORD_AT(rec+4u)=boss?0x20000u:0u;WORD_AT(rec+8u)=R+index+1u;
+    WORD_AT(a+0x10u)=WORD_AT(rec);WORD_AT(a+0x14u)=WORD_AT(rec+4u);
+    FLOAT_AT(ent+0x1CCu)=100.0f;FLOAT_AT(ent+0x1D8u)=100.0f;
+    set_pos(ent,0.0f);
+    return ent;
+}
+static void list_actors(const uint32_t *ents,unsigned n)
+{
+    unsigned k;
+    for(k=0;k<n;k++) WORD_AT(0x00900100u+4u*(1u+k))=WORD_AT(ents[k]+0x7Cu);
+    WORD_AT(0x0074C37Cu)=1u+n;
 }
 
 static void make_ai(uint32_t i,uint32_t type,uint32_t weapon,uint32_t points,const char *name)
@@ -555,36 +601,6 @@ int main(void)
           ait_level.template_of[7]==6);
     CHECK(ait_level.group[0] && ait_level.group[3] && !ait_level.group[1] && !ait_level.group[5] && !ait_level.group[6]);
 
-    /* event: a copy's event is delivered again as the leader's */
-    {
-        uint32_t actor=ACTORS,a=ACTORS+0x100u,rec=ACTORS+0x2000u;
-        WORD_AT(actor+0x7Cu)=a;WORD_AT(a+0xBF0u)=rec;
-        WORD_AT(rec+8u)=R+3u;nseen=0;                             /* index 2 */
-        HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
-        CHECK(nseen==2 && seen[0]==R+3u && seen[1]==R+1u && WORD_AT(rec+8u)==R+3u);
-        WORD_AT(rec+8u)=R+5u;nseen=0;                             /* index 4 -> leader 3 */
-        HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
-        CHECK(nseen==2 && seen[1]==R+4u && WORD_AT(rec+8u)==R+5u);
-        WORD_AT(rec+8u)=R+4u;nseen=0;                             /* the leader's own actor */
-        HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
-        CHECK(nseen==1);
-        WORD_AT(rec+8u)=R+6u;nseen=0;                             /* not linked */
-        HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
-        CHECK(nseen==1);
-        WORD_AT(rec+8u)=R+8u;nseen=0;                             /* a copy, leader without group logic */
-        HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
-        CHECK(nseen==1);
-        WORD_AT(rec+8u)=500u;nseen=0;                             /* an object id */
-        HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
-        CHECK(nseen==1);
-        WORD_AT(0x0079094Cu)=4u;WORD_AT(rec+8u)=R+3u;nseen=0;     /* a story level */
-        HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
-        CHECK(nseen==1);
-        WORD_AT(0x0079094Cu)=100u;
-        WORD_AT(actor+0x7Cu)=0;nseen=0;
-        HOOK(pc_mapmaker_aitemplates_event,fake_event,actor);
-        CHECK(nseen==1);
-    }
     /* remove (action 2) on the leader id: every copy too */
     nseen=0;HOOK(pc_mapmaker_aitemplates_remove,fake_remove,R+1u);
     CHECK(nseen==3 && seen[0]==R+1u && seen[1]==R+2u && seen[2]==R+3u);
@@ -611,31 +627,179 @@ int main(void)
     gate_open[8]=1;gate_open[7]=0;nseen=0;                        /* no group logic */
     HOOK(pc_mapmaker_aitemplates_spawn_gate,fake_gate,R+8u);
     CHECK(g_eax==1 && nseen==1);
-    /* trigger 0x14 on the leader: any copy */
+    /* ---- whole-group triggers: killed / spotted, stock and boss-class AIs ---- */
     {
-        uint32_t t=ACTORS+0x3000u;
-        memset(found,0,sizeof found);now=100u;
+        uint32_t t=ACTORS+0x3000u,k,ents[8];
+        static const uint32_t g4[8]={0xC000u,0x4001u,0x4001u,0x4001u,0,0,0,0};      /* 0 leads 1..3 */
+        static const uint32_t gb[8]={0xC000u,0x4001u,0,0xC000u,0x4004u,0,0x4000u,0x4007u};
+        WORD_AT(0x007DE455u)=10u;WORD_AT(0x004E8CECu)=5u;now=100u;WORD_AT(0x007DE318u)=now;
+        WORD_AT(0x00790950u)=1u;WORD_AT(0x00900100u)=PLAYER_A;WORD_AT(PLAYER_A)=PLAYER_E;
+        set_pos(PLAYER_E,1000.0f);
+
+        /* the user's case: four giant skeletons (boss class), leader with group logic */
+        make_level(8,g4,0xFu);
+        for(k=0;k<4;k++) ents[k]=make_actor(k,k,1);
+        list_actors(ents,4);
+        CHECK(ait_level.active && ait_level.group[0] && ait_level.template_of[3]==0);
+        /* killed: each fight removes its AI (sub_0015DDA0) without the death event */
+        for(k=0;k<4;k++) {
+            FLOAT_AT(ents[k]+0x1CCu)=0.0f;nseen=0;orig_calls=0;
+            HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[k]);
+            CHECK(orig_calls==1);
+            if(k==0) CHECK(nseen==0);                                  /* the leader's id waits */
+            else if(k<3) CHECK(nseen==1 && seen[0]==R+1u+k);           /* a copy's own logic */
+            else CHECK(nseen==2 && seen[0]==R+4u && seen[1]==R+1u && WORD_AT(ents[3]+0x800u+8u)==R+4u);
+        }
+        nseen=0;HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[0]);    /* once only */
+        CHECK(nseen==0);
+        /* all killed, nobody spotted (gone from the list): no sighting trigger */
+        WORD_AT(0x0074C37Cu)=1u;WORD_AT(t+0x14u)=R+1u;WORD_AT(t+0x18u)=3u;nseen=0;
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(g_eax==0 && WORD_AT(t+0x18u)==3u && nseen==0);
+        /* spotted: boss classes never set state 4; far away nothing, near: all four */
+        make_level(8,g4,0xFu);
+        for(k=0;k<4;k++) ents[k]=make_actor(k,k,1);
+        list_actors(ents,4);
         WORD_AT(t+0x14u)=R+1u;WORD_AT(t+0x18u)=3u;WORD_AT(t+0x1Cu)=0;nseen=0;
         HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
-        CHECK(g_eax==0 && nseen==3 && seen[1]==R+2u && seen[2]==R+3u && WORD_AT(t+0x14u)==R+1u && WORD_AT(t+0x18u)==3u);
-        found[3]=1;nseen=0;                                       /* copy 2 seen: delay starts */
+        CHECK(g_eax==0 && nseen==0 && WORD_AT(t+0x18u)==3u);
+        set_pos(PLAYER_E,10.0f);                                       /* near 0..2 only */
+        set_pos(ents[3],500.0f);
         HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
-        CHECK(g_eax==0 && nseen==3 && WORD_AT(t+0x18u)==7u && WORD_AT(t+0x14u)==R+1u);
-        now=103u;nseen=0;                                         /* still waiting */
+        CHECK(g_eax==0 && WORD_AT(t+0x18u)==3u && ait_run.spotted[0] && ait_run.spotted[2] && !ait_run.spotted[3]);
+        FLOAT_AT(ents[3]+0x1CCu)=50.0f;                                /* the fourth is shot from afar */
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(g_eax==0 && WORD_AT(t+0x18u)==7u && WORD_AT(t+0x1Cu)==now+5u && nseen==0);
+        set_pos(PLAYER_E,1000.0f);                                     /* gone again: latched */
+        now=103u;WORD_AT(0x007DE318u)=now;
         HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
         CHECK(g_eax==0 && WORD_AT(t+0x18u)==7u);
-        now=110u;nseen=0;                                         /* delay over: fires */
+        now=110u;WORD_AT(0x007DE318u)=now;
         HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
-        CHECK(g_eax==1 && nseen==3 && WORD_AT(t+0x18u)==3u && WORD_AT(t+0x14u)==R+1u);
-        found[2]=1;found[3]=0;WORD_AT(t+0x18u)=3u;nseen=0;        /* first copy: stops there */
+        CHECK(g_eax==1 && WORD_AT(t+0x18u)==3u && WORD_AT(t+0x1Cu)==0 && nseen==0);
+
+        /* ordinary AIs: four stock members, spotted = state class bit 4 (+0x10, story) */
+        make_level(8,g4,0xFu);now=100u;WORD_AT(0x007DE318u)=now;
+        for(k=0;k<4;k++) ents[k]=make_actor(k,k,0);
+        list_actors(ents,4);
+        WORD_AT(t+0x18u)=3u;
+        for(k=0;k<3;k++) WORD_AT(ents[k]+0x400u+0x10u)|=4u;
+        set_pos(PLAYER_E,1.0f);                                        /* nearness is no sighting for them */
         HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
-        CHECK(nseen==2 && WORD_AT(t+0x18u)==7u);
-        WORD_AT(t+0x14u)=R+2u;WORD_AT(t+0x18u)=3u;found[2]=0;nseen=0; /* a copy's own trigger */
+        CHECK(g_eax==0 && WORD_AT(t+0x18u)==3u && !ait_run.spotted[3]);
+        WORD_AT(ents[3]+0x400u+0x18u)|=4u;                             /* +0x18 is not story mode's */
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(WORD_AT(t+0x18u)==3u);
+        WORD_AT(ents[3]+0x400u+0x10u)|=4u;
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(g_eax==0 && WORD_AT(t+0x18u)==7u);
+        now=106u;WORD_AT(0x007DE318u)=now;
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(g_eax==1 && WORD_AT(t+0x18u)==3u);
+        /* other modes read +0x18 */
+        make_level(8,g4,0xFu);WORD_AT(0x007DE455u)=9u;
+        for(k=0;k<4;k++) { ents[k]=make_actor(k,k,0);WORD_AT(ents[k]+0x400u+0x18u)=4u; }
+        list_actors(ents,4);WORD_AT(t+0x18u)=3u;
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(WORD_AT(t+0x18u)==7u);
+        WORD_AT(0x007DE455u)=10u;
+        /* killed, stock: the stock death event per member; the leader's id waits for all four */
+        make_level(8,g4,0xFu);
+        for(k=0;k<4;k++) ents[k]=make_actor(k,k,0);
+        list_actors(ents,4);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[0]);
+        CHECK(nseen==0);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[2]);
+        CHECK(nseen==1 && seen[0]==R+3u);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[2]);   /* a respawner dies again */
+        CHECK(nseen==1);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[1]);
+        CHECK(nseen==1);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[3]);
+        CHECK(nseen==2 && seen[0]==R+4u && seen[1]==R+1u && WORD_AT(ents[3]+0x800u+8u)==R+4u);
+        /* the stock death then removes it: no second event */
+        nseen=0;FLOAT_AT(ents[3]+0x1CCu)=0.0f;
+        HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[3]);
+        CHECK(nseen==0);
+        /* a stock-class AI removed without an event (a placeholder, a respawn): none */
+        ents[5]=make_actor(5,5,0);nseen=0;FLOAT_AT(ents[5]+0x1CCu)=0.0f;
+        HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[5]);
+        CHECK(nseen==0);
+        /* an unplaced member (no spawn record) never blocks the group */
+        make_level(8,g4,0x7u);
+        for(k=0;k<3;k++) ents[k]=make_actor(k,k,0);
+        list_actors(ents,3);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[0]);
+        HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[1]);
+        HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[2]);
+        CHECK(nseen==3 && seen[2]==R+1u);
+
+        /* mixed: groups 0 (+1, boss copy) and 3 (+4), loose 2 and 5, 6 leads 7 without group logic */
+        make_level(8,gb,0xFFu);
+        for(k=0;k<8;k++) ents[k]=make_actor(k,k,k==1u||k==5u);
+        list_actors(ents,8);
+        CHECK(ait_level.group[0] && ait_level.group[3] && !ait_level.group[6] && ait_level.template_of[7]==6);
+        /* a full-health boss removed (a placeholder or restart) is no death */
+        nseen=0;HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[1]);
+        CHECK(nseen==0 && !ait_run.killed[1]);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[0]);    /* stock leader dies */
+        CHECK(nseen==0);
+        FLOAT_AT(ents[1]+0x1CCu)=-3.0f;nseen=0;
+        HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[1]);          /* boss copy's fight ends */
+        CHECK(nseen==2 && seen[0]==R+2u && seen[1]==R+1u);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[2]);    /* loose AI: stock */
+        CHECK(nseen==1 && seen[0]==R+3u);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[7]);    /* copy, no group logic */
+        CHECK(nseen==1 && seen[0]==R+8u);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[6]);
+        CHECK(nseen==1 && seen[0]==R+7u);
+        FLOAT_AT(ents[5]+0x1CCu)=0.0f;nseen=0;
+        HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[5]);          /* a loose boss: its own killed */
+        CHECK(nseen==1 && seen[0]==R+6u);
+        /* a boss-class AI that died the stock way (event first): its removal adds none */
+        ents[5]=make_actor(5,5,1);list_actors(ents,8);FLOAT_AT(ents[5]+0x1CCu)=0.0f;nseen=0;
+        HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[5]);
+        HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[5]);
+        CHECK(nseen==1 && seen[0]==R+6u);
+        /* spotted, mixed: group 3 stock; one member killed first does not block */
+        WORD_AT(t+0x14u)=R+4u;WORD_AT(t+0x18u)=3u;now=200u;WORD_AT(0x007DE318u)=now;
+        set_pos(PLAYER_E,1000.0f);
+        nseen=0;HOOK(pc_mapmaker_aitemplates_event,fake_event,ents[3]);
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(g_eax==0 && WORD_AT(t+0x18u)==3u);                       /* nobody has spotted */
+        WORD_AT(ents[4]+0x400u+0x10u)|=4u;
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(WORD_AT(t+0x18u)==7u);
+        /* a copy's own trigger and a group-less leader's stay stock */
+        WORD_AT(t+0x14u)=R+5u;WORD_AT(t+0x18u)=3u;nseen=0;
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(nseen==1 && seen[0]==R+5u);
+        WORD_AT(t+0x14u)=R+7u;nseen=0;
         HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
         CHECK(nseen==1);
-        WORD_AT(t+0x14u)=R+7u;WORD_AT(t+0x18u)=3u;nseen=0;        /* leader without group logic */
+        /* a boss copy's own trigger is ours (its class never spots) */
+        make_level(8,gb,0xFFu);
+        for(k=0;k<8;k++) ents[k]=make_actor(k,k,k==1u);
+        list_actors(ents,8);
+        WORD_AT(t+0x14u)=R+2u;WORD_AT(t+0x18u)=3u;nseen=0;set_pos(PLAYER_E,2.0f);
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(nseen==0 && g_eax==0 && WORD_AT(t+0x18u)==7u);
+        /* group 0 = stock leader + boss copy: the boss is near, the leader must spot too */
+        WORD_AT(t+0x14u)=R+1u;WORD_AT(t+0x18u)=3u;
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(WORD_AT(t+0x18u)==3u);
+        WORD_AT(ents[0]+0x400u+0x10u)|=4u;
+        HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
+        CHECK(WORD_AT(t+0x18u)==7u);
+        /* outside scene 100 everything is stock */
+        WORD_AT(0x0079094Cu)=4u;nseen=0;WORD_AT(t+0x18u)=3u;
         HOOK(pc_mapmaker_aitemplates_alert,fake_alert,t);
         CHECK(nseen==1);
+        nseen=0;FLOAT_AT(ents[1]+0x1CCu)=0.0f;
+        HOOK(pc_mapmaker_aitemplates_removed,fake_plain,ents[1]);
+        CHECK(nseen==0);
+        WORD_AT(0x0079094Cu)=100u;
+        WORD_AT(0x00784014u)=CONT;WORD_AT(0x00790950u)=0;WORD_AT(0x0074C37Cu)=0;
     }
     /* an old-format map played without re-saving: the template means any copy */
     set_saved_link(6,0);set_saved_link(7,7u);
@@ -643,10 +807,10 @@ int main(void)
     CHECK(ait_level.group[6] && ait_level.template_of[7]==6 && ait_level.group[0]);
     nseen=0;HOOK(pc_mapmaker_aitemplates_remove,fake_remove,R+7u);
     CHECK(nseen==2 && seen[1]==R+8u);
-    /* no group logic anywhere: nothing active */
+    /* no group logic anywhere: no group, still active (boss deaths and sightings) */
     set_saved_link(0,0x4000u);set_saved_link(3,0x4000u);set_saved_link(7,0x4007u);
     HOOK(pc_mapmaker_aitemplates_level,fake_plain,0);
-    CHECK(!ait_level.active && ait_level.template_of[1]==0);
+    CHECK(ait_level.active && ait_level.template_of[1]==0 && !ait_level.group[0] && !ait_level.group[3]);
     /* limits off at level start: no table */
     set_saved_link(0,0xC000u);
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
