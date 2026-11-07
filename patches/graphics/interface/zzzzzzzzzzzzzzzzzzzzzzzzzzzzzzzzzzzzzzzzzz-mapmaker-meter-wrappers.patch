@@ -1,12 +1,111 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4402 @@
+@@ -1911,6 +1911,4501 @@
      sub_002FA720_gen();
  #endif
  }
 +
 +/* MapMaker capacity areas (src/pc_mapmaker_<area>.inc, research/capacity-raise-plan.md).
 + * Each hook acts only in MapMaker contexts and otherwise runs the original. */
++extern void sub_0009A3C0_gen(void);
++void sub_0009A3C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_cover_lookup")) pc_mapmaker_pads_cover_lookup(sub_0009A3C0_gen);
++    else sub_0009A3C0_gen();
++#else
++    sub_0009A3C0_gen();
++#endif
++}
++
++extern void sub_0009CCA0_gen(void);
++void sub_0009CCA0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_pointer")) pc_mapmaker_pads_pointer(sub_0009CCA0_gen);
++    else sub_0009CCA0_gen();
++#else
++    sub_0009CCA0_gen();
++#endif
++}
++
++extern void sub_0009D3B0_gen(void);
++void sub_0009D3B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_runtime_new")) pc_mapmaker_pads_runtime_new(sub_0009D3B0_gen);
++    else sub_0009D3B0_gen();
++#else
++    sub_0009D3B0_gen();
++#endif
++}
++
++extern void sub_0009A7A0_gen(void);
++void sub_0009A7A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_tile_load")) pc_mapmaker_pads_tile_load(sub_0009A7A0_gen);
++    else sub_0009A7A0_gen();
++#else
++    sub_0009A7A0_gen();
++#endif
++}
++
++extern void sub_00332490_gen(void);
++void sub_00332490(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_editor_id")) pc_mapmaker_pads_editor_id(sub_00332490_gen);
++    else sub_00332490_gen();
++#else
++    sub_00332490_gen();
++#endif
++}
++
++extern void sub_002FA150_gen(void);
++void sub_002FA150(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_editor_groups")) pc_mapmaker_pads_editor_groups(sub_002FA150_gen);
++    else sub_002FA150_gen();
++#else
++    sub_002FA150_gen();
++#endif
++}
++
++extern void sub_00334B20_gen(void);
++void sub_00334B20(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_editor_item_pads")) pc_mapmaker_pads_editor_item_pads(sub_00334B20_gen);
++    else sub_00334B20_gen();
++#else
++    sub_00334B20_gen();
++#endif
++}
++
++extern void sub_00275F70_gen(void);
++void sub_00275F70(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_group_matrix")) pc_mapmaker_pads_group_matrix(sub_00275F70_gen);
++    else sub_00275F70_gen();
++#else
++    sub_00275F70_gen();
++#endif
++}
++
++extern void sub_00275F40_gen(void);
++void sub_00275F40(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_group_distance")) pc_mapmaker_pads_group_distance(sub_00275F40_gen);
++    else sub_00275F40_gen();
++#else
++    sub_00275F40_gen();
++#endif
++}
++
 +extern void sub_0009B540_gen(void);
 +void sub_0009B540(void)
 +{
