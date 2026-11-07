@@ -52,6 +52,11 @@ not read: convert them to WAV or MP3 first.
   file is missing plays the level's music. A stock or older build loads such
   a map with the tileset's music; the map is not moved to the larger save
   tier.
+- **Which music wins:** an imported Arcade choice first, then the map's own
+  imported track, which also replaces a stock Arcade music pick made in the
+  play setup. A map whose Music row is a stock track plays that track.
+- **Log:** every decision is logged as `[music] play: ...` or
+  `[music] map: imported track`; a track that does not start says why.
 - **System Link:** your track plays only on your machine. Other players hear
   the level's music (the game sends "level music" for an imported choice).
 - The Arcade choice applies only while the game's own choice is "level
