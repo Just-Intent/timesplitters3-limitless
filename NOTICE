@@ -54,7 +54,7 @@ original game data, generated game code or personal saves belong in this repo.
 
 Source and build instructions
 -----------------------------
-https://github.com/JustinDent/timesplitters3-limitless
+https://github.com/Just-Intent/timesplitters3-limitless
 Based on https://github.com/TheDoffman/timesplitters-future-perfect-pc
 See README.md, docs/building.md and docs/windows-launcher.md. When distributing
 GPL-covered binaries, provide the corresponding source and build instructions

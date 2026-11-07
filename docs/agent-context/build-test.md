@@ -504,7 +504,7 @@ when a covered system changes without its documentation update.
 | Settings/input/menu | Affected `tests/input/` suites and native C fixtures | Relevant native target, bounded isolated acceptance |
 | Renderer/shader/resources | Shared source contracts, `tests/graphics/test_renderer_host.py`, `tests/graphics/test_rhi_menu_sampling.py` | Windows WARP / Mac `tools/testing/test-rhi-mac.py`; scoped scene evidence |
 | Launcher | `python tools/ci/launcher-compatibility.py --local` | Host build/lifecycle and affected `tests/launcher/` fixtures |
-| Issue automation | `tests/repository/test_issue_forms.py`, `tests/repository/test_issue_resolution.py` | Read-only fixtures, workflow checks; no posting for tests |
+| Issue automation | `tests/repository/test_issue_forms.py`, `tests/repository/test_issue_resolution.py` | Read-only fixtures; owner Just-Intent (2026-11-07); no posting |
 
 Enhancement routing uses the Ideas contact link in the issue chooser. The existing
 `test_issue_forms.py` refresh fixture verifies that release updates preserve that

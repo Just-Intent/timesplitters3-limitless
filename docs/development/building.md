@@ -16,7 +16,7 @@ For a fresh checkout, install Git with Git LFS, Visual Studio 2022 with its C++ 
 Windows SDK, and Python 3.12+, then run:
 
 ```powershell
-git clone https://github.com/JustinDent/timesplitters3-limitless.git
+git clone https://github.com/Just-Intent/timesplitters3-limitless.git
 cd timesplitters3-limitless
 .\setup.ps1 -Python 'C:\path\to\python.exe' -Iso 'C:\path\to\TimeSplitters - Future Perfect (USA).xiso.iso'
 ```

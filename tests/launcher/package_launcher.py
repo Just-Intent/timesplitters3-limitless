@@ -193,7 +193,7 @@ class LauncherPackaging(unittest.TestCase):
                 self.assertEqual(manifest['preview']['skipped_checks'], ['tsfp_pc_network_test.exe'])
                 readme = archive.read(prefix + 'README.txt').decode()
                 self.assertTrue(readme.startswith('TEST-ONLY LOCAL PREVIEW'))
-                self.assertIn('https://github.com/JustinDent/timesplitters3-limitless/issues', readme)
+                self.assertIn('https://github.com/Just-Intent/timesplitters3-limitless/issues', readme)
                 self.assertFalse(any('/Data/' in name or '/Saves/' in name for name in archive.namelist()))
             exe.write_bytes(b'different executable')
             with mock.patch.object(package, 'ROOT', root), \

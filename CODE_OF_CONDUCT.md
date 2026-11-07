@@ -18,7 +18,7 @@ Use the content's **... → Report content** menu. Choose **Report to repository
 admins** if available, or report abuse to GitHub Support. GitHub explains the
 options in its [reporting guide](https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam).
 For a public concern that is safe to raise openly, you can also mention
-the fork maintainer, **@JustinDent**, in the relevant thread. Do not repeat abusive content or post
+the fork maintainer, **@Just-Intent**, in the relevant thread. Do not repeat abusive content or post
 private details publicly. Reports sent to GitHub Support are handled by GitHub.
 
 ## Moderation

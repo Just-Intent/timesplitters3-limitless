@@ -186,7 +186,7 @@ namespace TimeSplitters.Launcher
     {
         // Releases, update checks, self-update, news and issue links follow this
         // fork. UpstreamRepository is credit/attribution only, never a release source.
-        public const string Repository = "JustinDent/timesplitters3-limitless";
+        public const string Repository = "Just-Intent/timesplitters3-limitless";
         public const string UpstreamRepository = "TheDoffman/timesplitters-future-perfect-pc";
         public const string ReleasesPage = "https://github.com/" + Repository + "/releases";
         public const string DiscordInvite = "https://discord.gg/hFkfcCUm56";

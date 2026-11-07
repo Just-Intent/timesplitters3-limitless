@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Suggest an improvement (Ideas)
-    url: https://github.com/JustinDent/timesplitters3-limitless/discussions/new?category=ideas
+    url: https://github.com/Just-Intent/timesplitters3-limitless/discussions/new?category=ideas
     about: Share one feature idea or enhancement per discussion in the Ideas category.
   - name: Setup and troubleshooting guides
-    url: https://github.com/JustinDent/timesplitters3-limitless/blob/main/README.md#guides--support
+    url: https://github.com/Just-Intent/timesplitters3-limitless/blob/main/README.md#guides--support
     about: Check the launcher, controls, multiplayer, Mac, and build guides before reporting a problem.
