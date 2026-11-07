@@ -50,3 +50,8 @@ each bar drawn or skipped once per entity and reason (story AI bosses: bar
 of ..) plus a map-start count. The chair's jet emitter, made at the train
 start, is moved to the chair at creation and each waiting frame
 (sub_0010E730); no new WRAP ([area doc](../mapmaker/mapmaker-khallos.md)).
+
+Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
+anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
+(30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear
+0x0006275B -> 0x1C0 dwords; areas use MOUNT_MAX 64 / KEEP 8.
