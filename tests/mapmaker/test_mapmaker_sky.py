@@ -24,7 +24,7 @@ MUTATIONS = {
                           '    old=WORD_AT(MAPMAKER_SKY_LEVEL+0x10u);\n    original();\n    WORD_AT(MAPMAKER_SKY_LEVEL+0x10u)=old;\n}'),
     'wrong-template': ('#define MAPMAKER_SKY_TEMPLATE 5', '#define MAPMAKER_SKY_TEMPLATE 4'),
     'any-sky-patched': ('    if(sky<MAPMAKER_SKY_FIRST || sky>MAPMAKER_SKY_LAST) {', '    if(sky<0) {'),
-    'tileset-default-ignored': ('    if(sky>=0) return sky;\n    if(tileset>=6u) return -1;', '    return sky;\n    if(tileset>=6u) return -1;'),
+    'tileset-default-ignored': ('    if(sky>=0) return sky;\n    if(mapmaker_variant_disco(info))', '    return sky;\n    if(mapmaker_variant_disco(info))'),
     'flag-is-stock-bit': ('#define MAPMAKER_SKY_FLAG_CLOUDS 0x00040000u', '#define MAPMAKER_SKY_FLAG_CLOUDS 0x00020000u'),
     'read-after-rebuild': ('    clouds=mapmaker_sky_clouds_now(container);\n    original();',
                            '    original();\n    clouds=mapmaker_sky_clouds_now(container);'),

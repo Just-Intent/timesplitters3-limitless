@@ -93,11 +93,11 @@ adapters; live gameplay remains unverified.
 <!-- packet:end -->
 
 SDL tests (`tools/build/build-native-mac.py --test`) cover the two-slot E/Space
-cap, requested capture, release and frame-applied mouse disable. They preserve
-bindings; physical input remains unverified.
+cap, requested capture, release and frame-applied mouse disable. Bindings kept;
+physical input unverified.
 
 CI: `runtime-patches.yml` selects work (restart/skelvis/bossroom: -bosses); `ci-pr-gate.py` needs both hosts.
-Native jobs allow 45 minutes on Windows and 30 on Mac; patch upgrades allow 30.
+Native jobs: 45 min on Windows, 30 on Mac; patch upgrades 30. Disco: `test_mapmaker_disco.py`.
 Required check names remain.
 `test_ci_pr_gate.py` rejects missing/failed/skipped results;
 `test_ci_runtime_scope.py` checks wiring. Issue jobs select their sources.
