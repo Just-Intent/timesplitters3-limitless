@@ -27,7 +27,7 @@ static volatile uint32_t stub_ran;
 STUB(sub_0003DFA0,1) STUB(sub_00075B70,2) STUB(sub_00071B10,3) STUB(sub_00071C50,4) STUB(sub_00079DE0,5)
 STUB(sub_0007D4A0,6) STUB(sub_00071800,7) STUB(sub_00078590,8) STUB(sub_000783D0,9) STUB(sub_00079D60,10)
 STUB(sub_00075E70,11) STUB(sub_00077320,12) STUB(sub_0003D7B0,13) STUB(sub_00333700,14) STUB(sub_002FDF50,15)
-STUB(sub_000622D0,16) STUB(sub_00062260,17) STUB(sub_000631C0,18) STUB(sub_00096220,19) STUB(sub_000B3B20,20)
+STUB(sub_000622D0,16) STUB(sub_00062260,17) STUB(sub_000631C0,18) STUB(sub_00096220,19) STUB(sub_000B3B20,20) STUB(sub_000810C0,21)
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -54,6 +54,7 @@ static uint32_t xbox_HeapAlloc(uint32_t size,uint32_t align)
 }
 /* recorded calls */
 static uint32_t options[16][2],binds[8],mounts[8],textured[16],templates[16];
+static unsigned nhud,hud_id;
 static unsigned noptions,nbinds,nchoices,nends,ndone,nframe,nmounts,ntextured,ntemplates,originals;
 static uint32_t mounted_paths[8];
 static unsigned nmounted;
@@ -110,6 +111,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     else if(f==sub_000631C0) r=x[0]>=PATHS && x[0]<PATHS+NMODELS*0x100u?REQS+(x[0]-PATHS):0u;
     else if(f==sub_00096220) { if(ntextured<16u) textured[ntextured]=x[0]; ntextured++; }
     else if(f==sub_000B3B20) { if(ntemplates<16u) templates[ntemplates]=x[0]; ntemplates++; }
+    else if(f==sub_000810C0) { nhud++;hud_id=x[0];WORD_AT(0x004D2D50u+x[0]*0x18u+0x10u)=1u; }
     return r;
 }
 #include "pc_mapmaker_budget.inc"
@@ -140,12 +142,18 @@ static void fake_answer_fn(void) { originals++;g_eax=fake_answer;g_esp+=4u; }
 /* the create: the builder reads the record's +0x28..+0x34 */
 static uint32_t seen_rec[4];
 #define BLOCK 0x00580000u
+#define GUN0 0x00581000u
+#define GUN1 0x00581100u
 static uint32_t def_flags=0x17u;                    /* the builder copies def +0xA8 to block +0x58 */
 static void fake_create(void)
 {
     uint32_t obj=WORD_AT(g_esp+4u),rec=WORD_AT(g_esp+8u);
     originals++;
     WORD_AT(obj+0x7Cu)=BLOCK;WORD_AT(BLOCK+0x58u)=def_flags;WORD_AT(BLOCK+0x140u)=2u;
+    /* the builder: block +0x50 = the def, two guns with the templates' pitch limits */
+    WORD_AT(BLOCK+0x50u)=0x004E8658u;WORD_AT(BLOCK+0x164u)=2u;
+    WORD_AT(BLOCK+0x144u)=GUN0;WORD_AT(BLOCK+0x154u)=GUN1;
+    FLOAT_AT(GUN0+0x34u)=0.0f;FLOAT_AT(GUN0+0x38u)=0.001f;FLOAT_AT(GUN1+0x34u)=-45.0f;FLOAT_AT(GUN1+0x38u)=0.0f;
     seen_rec[0]=WORD_AT(rec+0x28u);seen_rec[1]=WORD_AT(rec+0x2Cu);seen_rec[2]=WORD_AT(rec+0x30u);seen_rec[3]=WORD_AT(rec+0x34u);
     g_esp+=4u;
 }
@@ -355,10 +363,11 @@ static void play_tests(void)
     for(i=0;i<16u;i++) { char name[32];snprintf(name,sizeof name,"textures/%06x.xbt",0x100000u+i);pak_tex_crc[pak_tex_n++]=crc_name(name); }
     pak_tex_n=15u;                                          /* one texture of the last model missing */
     CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);
-    CHECK(originals==1u && nmounts==2u && vh_lv.want[1]==1u && vh_lv.want[2]==1u && vh_lv.want[3]==1u && vh_lv.want[0]==1u);
+    CHECK(originals==1u && nmounts==3u && vh_lv.want[1]==1u && vh_lv.want[2]==1u && vh_lv.want[3]==1u && vh_lv.want[0]==1u);
     CHECK(!strcmp((const char *)((uintptr_t)mounts[0]+g_xbox_mem_offset),"pak/stream/lv5/prop1.pak"));
     CHECK(!strcmp((const char *)((uintptr_t)mounts[1]+g_xbox_mem_offset),"pak/stream/lv4/prop3.pak"));
-    CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==2u);
+    CHECK(!strcmp((const char *)((uintptr_t)mounts[2]+g_xbox_mem_offset),"pak/story/l_5_st.pak"));
+    CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==3u);
     /* the texture queue's load: the tank, its two guns, the truck and the Vickers, once */
     ntextured=0;originals=0;
     CALL(pc_mapmaker_vehicles_textures,fake_plain,0x0003D5EAu,0,0);
@@ -380,6 +389,8 @@ static void play_tests(void)
     ntemplates=0;fake_answer=5u;
     g_esi=rec_at[0][0];CALL(pc_mapmaker_vehicles_def,fake_answer_fn,0x0023F637u,0x2Bu,0);CHECK(g_eax==2u);
     CHECK(ntemplates==2u && templates[0]==0x004E8300u+0x8Cu && templates[1]==0x004E8300u+2u*0x8Cu);
+    CHECK(nhud==1u && hud_id==0x125u && vh_lv.reticle_logged);    /* the tank reticle, once */
+    CALL(pc_mapmaker_vehicles_def,fake_answer_fn,0x0023F637u,0x2Bu,0);CHECK(nhud==1u);ntemplates=2u;
     g_esi=rec_at[1][0];CALL(pc_mapmaker_vehicles_def,fake_answer_fn,0x0023F637u,0x2Bu,0);CHECK(g_eax==0u);
     CHECK(ntemplates==3u && templates[2]==0x004E8300u);
     g_esi=rec_at[1][1];CALL(pc_mapmaker_vehicles_def,fake_answer_fn,0x0023F637u,0x2Bu,0);CHECK(g_eax==0u && ntemplates==3u);
@@ -402,12 +413,25 @@ static void play_tests(void)
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC);
     CHECK(originals==1u && seen_rec[0]==4u && seen_rec[1]==4u && seen_rec[2]==1u && seen_rec[3]==2u);
     CHECK(WORD_AT(BLOCK+0x58u)==0x07u && vh_lv.entry_logged);   /* the tank opens to players, tracked bit kept */
+    /* its camera: a def copy whose preset index reaches a copy of preset 2 with the MapMaker distance/height */
+    {
+        uint32_t d=WORD_AT(BLOCK+0x50u),p;
+        CHECK(d && d!=0x004E8658u && d==vh.tank_def);
+        CHECK(!memcmp((char *)memory+d,(char *)memory+0x004E8658u,0xACu) && !memcmp((char *)memory+d+0xB0u,(char *)memory+0x004E8658u+0xB0u,0x28u));
+        p=0x004DD420u+(WORD_AT(d+0xACu)<<5);
+        CHECK(p==vh.tank_preset && near(FLOAT_AT(p),10.0f) && near(FLOAT_AT(p+4u),3.0f));
+        CHECK(!memcmp((char *)memory+p+8u,(char *)memory+0x004DD460u+8u,0x18u));
+        CHECK(WORD_AT(0x004E8658u+0xACu)==2u && near(FLOAT_AT(0x004DD460u),15.0f));     /* the story def and preset */
+        CHECK(near(FLOAT_AT(GUN0+0x34u),-10.0f) && near(FLOAT_AT(GUN0+0x38u),20.0f));
+        CHECK(near(FLOAT_AT(GUN1+0x34u),-45.0f) && near(FLOAT_AT(GUN1+0x38u),15.0f) && vh_lv.view_logged);
+    }
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC+0x40u);
     CHECK(seen_rec[0]==0u && seen_rec[1]==1u && seen_rec[2]==0xFFFFFFFFu && seen_rec[3]==0x77u);
     CHECK(WORD_AT(BLOCK+0x58u)==0x17u);                         /* other vehicles keep their flags */
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC+0x80u);
     CHECK(seen_rec[0]==0u && seen_rec[1]==1u && seen_rec[2]==0u && seen_rec[3]==0xFFFFFFFFu);
     CHECK(WORD_AT(BLOCK+0x58u)==0x17u);
+    CHECK(WORD_AT(BLOCK+0x50u)==0x004E8658u && near(FLOAT_AT(GUN0+0x38u),0.001f));   /* not a tank: stock */
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC+0xC0u);
     CHECK(seen_rec[0]==0u && seen_rec[1]==1u && seen_rec[2]==0xFFFFFFFFu && seen_rec[3]==0xFFFFFFFFu);
     WORD_AT(VREC+0x30u)=0xFFFFFFFFu;
@@ -487,7 +511,7 @@ static void play_tests(void)
     container(map,2);nmounts=nmounted=0;
     WORD_AT(0x006D7880u)=57u;CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==0u);
     WORD_AT(0x006D7880u)=40u;mount_fails=1;
-    CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==2u && nmounted==0u);
+    CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==3u && nmounted==0u);
     g_esi=rec_at[0][0];fake_answer=0x894u;
     CALL(pc_mapmaker_vehicles_preload_model,fake_answer_fn,0x0023F5DBu,0,0);CHECK(g_eax==0x894u);
     g_ebp=VREC;fill_record(VREC,0x894u,5u);fake_answer=5u;
@@ -503,7 +527,21 @@ static void play_tests(void)
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==0u);
     WORD_AT(0x0079094Cu)=100u;
-    CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==2u);
+    CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==3u);
+    /* the camera override: valid values replace the MapMaker distance and height, others are ignored */
+    set_env("TSFP_MAPMAKER_TANK_CAMERA","6,2");vh.tank_def=0;vh.cam_read=0;vh_lv.view_logged=0;
+    WORD_AT(BLOCK+0x50u)=0x004E8658u;WORD_AT(BLOCK+0x164u)=2u;vh_tank_view(BLOCK);
+    CHECK(near(FLOAT_AT(vh.tank_preset),6.0f) && near(FLOAT_AT(vh.tank_preset+4u),2.0f));
+    set_env("TSFP_MAPMAKER_TANK_CAMERA","6");vh.tank_def=0;vh.cam_read=0;
+    WORD_AT(BLOCK+0x50u)=0x004E8658u;vh_tank_view(BLOCK);
+    CHECK(near(FLOAT_AT(vh.tank_preset),10.0f) && near(FLOAT_AT(vh.tank_preset+4u),3.0f));
+    set_env("TSFP_MAPMAKER_TANK_CAMERA",NULL);
+    /* the reticle is not requested without its pak */
+    {
+        unsigned before=nhud,keep=nmounted;
+        WORD_AT(0x004D2D50u+0x125u*0x18u+0x10u)=0;nmounted=0;vh_lv.reticle_logged=0;
+        vh_reticle();CHECK(nhud==before && vh_lv.reticle_logged);nmounted=keep;
+    }
     /* outside play the hooks run the original only */
     WORD_AT(0x0079094Cu)=102u;ntextured=0;originals=0;
     CALL(pc_mapmaker_vehicles_textures,fake_plain,0x0003D5EAu,0,0);CHECK(ntextured==0u && originals==1u);
@@ -517,6 +555,13 @@ int main(void)
     g_xbox_mem_offset=(uintptr_t)memory;
     g_esp=ESP0;
     WORD_AT(0x007844A8u)=EDITOR;
+    {   /* def 2 (0xD8 bytes, camera preset +0xAC = 2) and the five chase camera presets */
+        unsigned k;
+        for(k=0;k<0xD8u;k+=4u) WORD_AT(0x004E8658u+k)=0x1000u+k;
+        WORD_AT(0x004E8658u+0xACu)=2u;
+        for(k=0;k<5u*8u;k++) FLOAT_AT(0x004DD420u+k*4u)=(float)k+0.5f;
+        FLOAT_AT(0x004DD460u)=15.0f;FLOAT_AT(0x004DD464u)=4.6f;
+    }
     set_env("TSFP_MAPMAKER_POOLS",NULL);
     set_env("TSFP_MAPMAKER_LIMITS","1");
     WORD_AT(0x0079094Cu)=102u;

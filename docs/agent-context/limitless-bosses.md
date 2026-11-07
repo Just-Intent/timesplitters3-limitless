@@ -145,7 +145,11 @@ mapmaker-vehicles.md. `test_mapmaker_vehicles.py`. .61: all sank (record y
 at the pad, models below their origin: truck -0.935, tank -2.365; the fill
 hook now lifts by that + 0.01, `TSFP_MAPMAKER_TANK_LIFT`/`_TRUCK_LIFT`) and
 the tank refused players (block +0x58 bit 0x10 from def +0xA8, tested at
-0x0017A27E/D1E8/DAFB/ECD6; the create hook clears it). Fix unplayed.
+0x0017A27E/D1E8/DAFB/ECD6; the create hook clears it). .63 fixes: reticle
+`tank_half` (HUD 0x125, group 0x200 = scene 5 only) requested via
+`sub_000810C0` with `l_5_st` mounted index-only; gun data +0x34/+0x38
+pitch -10..20 / -45..15; chase camera via a def copy (+0x50) whose +0xAC
+indexes a heap preset (10, 3; `TSFP_MAPMAKER_TANK_CAMERA`). Unplayed.
 
 Tank TNT (.55, CONFIRMED, `test_tnt_on_the_stunned_tank`): a sticky explosive
 going off (`sub_000F0430`) calls `sub_00228B50` (story mode, 0x000F049A), which

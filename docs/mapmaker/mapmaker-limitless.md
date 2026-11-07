@@ -323,7 +323,7 @@ them). The tank cannot be destroyed, like the buggies. The choice is saved
 with the map and kept by .tsmap export; in the editor every vehicle still
 looks like the theme buggy, and the original game (or this one without the
 switch) plays them as theme vehicles. A map with a tank reads about 1.4 MB
-more, with a truck about 0.9 MB. *Played in .61 (trucks drove, the Vickers gun worked); sinking vehicles and the closed tank fixed after, not played since.* Details:
+more, with a truck about 0.9 MB. *Played in .63: all three on the floor, trucks and tank drive and fire; the tank reticle, its downward aim and a closer driver camera fixed after, not played since. In rooms one floor high the tank is taller than the room, so use two-floor rooms or open-sky tiles for it.* Details:
 [story vehicles](mapmaker-vehicles.md).
 
 ### Story creatures: ghosts, SecuriDroids and mutants (`LIMITS`)
