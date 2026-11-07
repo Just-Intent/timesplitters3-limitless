@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x1000000/4],g_esp,g_eax;
+static uint32_t memory[0x2000000/4],g_esp,g_eax;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -29,7 +29,7 @@ int xbox_ContiguousFree(uint32_t address)
     return 1;
 }
 
-/* Runtime heap: one 6 MB block above the fixture's image addresses, or none. */
+/* Runtime heap: one 16 MB block above the fixture's image addresses, or none. */
 static int heap_full;
 static uint32_t heap_allocs,heap_last_size;
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment)
@@ -212,19 +212,25 @@ int main(int argc,char **argv)
         p=call_matrix(MAPMAKER_NAV_MATRIX_RET,4096u,0u,&ran);
         CHECK(ran==1 && heap_allocs==0);
         /* The matrix at 1024 groups: from the block, zeroed, Level heap untouched. */
-        memset((char *)memory+0x00800000u,0xCD,0x00600000u);
+        memset((char *)memory+0x00800000u,0xCD,MAPMAKER_NAV_BYTES);
         WORD_AT(MAPMAKER_MEMORY_SHARED_FREE)=3000000u;free_before=3000000u;
         p=call_matrix(MAPMAKER_NAV_MATRIX_RET,1025u*1024u*4u,1u,&ran);
         read_log();
         CHECK(ran==0 && p==0x00800000u && heap_allocs==1 && heap_last_size==MAPMAKER_NAV_BYTES);
         CHECK(WORD_AT(p)==0 && WORD_AT(p+1025u*1024u*4u-4u)==0 && WORD_AT(MAPMAKER_MEMORY_SHARED_FREE)==free_before);
         CHECK(strstr(log_text,"[mapmaker] map start memory: level heap free 3000000")!=NULL && count("map start memory")==1);
-        CHECK(strstr(log_text,"[mapmaker] nav: group matrix of 1024 groups, 4198400 bytes, in the nav block (nav block 4198400 of 6291456 used)")!=NULL);
+        CHECK(strstr(log_text,"[mapmaker] nav: group matrix of 1024 groups, 4198400 bytes, in the nav block (nav block 4198400 of 16777216 used)")!=NULL);
         /* The pool source the limits area uses: 16-aligned after it. */
         q=mapmaker_nav_alloc(100u);
         CHECK(q==0x00800000u+4198400u && mapmaker_nav.used==4198400u+112u);
-        CHECK(mapmaker_nav_alloc(0x00600000u)==0 && mapmaker_nav.fallbacks==1);   /* too big: Level heap */
-        p=call_matrix(MAPMAKER_NAV_MATRIX_RET,0x00300000u,1u,&ran);                 /* no room: original */
+        /* Object pool and physics bodies (pc_mapmaker_objects.inc): aligned as asked. */
+        CHECK(mapmaker_objects_source==mapmaker_nav_objects);
+        q=mapmaker_objects_source(0x100u,0x40u);
+        CHECK(q==0x00800000u+4198400u+128u && mapmaker_nav.used==4198400u+128u+0x100u);
+        q=mapmaker_objects_source(0x10u,3u);                                         /* not a power of two: 16 */
+        CHECK(q==0x00800000u+4198400u+128u+0x100u);
+        CHECK(mapmaker_nav_alloc(0x00C00000u)==0 && mapmaker_nav.fallbacks==1);   /* too big: Level heap */
+        p=call_matrix(MAPMAKER_NAV_MATRIX_RET,0x00C00000u,1u,&ran);                 /* no room: original */
         read_log();
         CHECK(ran==1 && p==0x00400000u && strstr(log_text,"in the Level heap")!=NULL);
         CHECK(count("map start memory")==1);                                        /* once per map */
@@ -243,7 +249,7 @@ int main(int argc,char **argv)
         call_reset();
         p=call_matrix(MAPMAKER_NAV_MATRIX_RET,4096u,1u,&ran);
         read_log();
-        CHECK(ran==1 && count("the runtime heap cannot give 6291456 bytes")==1);
+        CHECK(ran==1 && count("the runtime heap cannot give 16777216 bytes")==1);
         CHECK(mapmaker_nav_alloc(64u)==0 && heap_allocs==2);                         /* tried once */
         heap_full=0;
         /* The aligned allocator is never redirected. */

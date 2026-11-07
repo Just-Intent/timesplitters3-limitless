@@ -98,7 +98,12 @@ static void mapmaker_memory_check(uint32_t caller,uint32_t size,uint32_t heap,in
  *  - the pools of pc_display_mapmaker_pools (pc_mapmaker_limits.inc, through
  *    mapmaker_pool_source),
  *  - the matrix sub_00275F70 asks for at 0x00275F90 (return 0x00275F95,
- *    (groups + 1) x groups x 4 B, heap 1; the caller zeroes it, so do we).
+ *    (groups + 1) x groups x 4 B, heap 1; the caller zeroes it, so do we),
+ *  - the engine object pool (2047 x 0x2E8) and the physics body arrays of
+ *    scene 100 (pc_mapmaker_objects.inc, through mapmaker_objects_source;
+ *    TSFP_MAPMAKER_NAV_OBJECTS=0 keeps them in the Level heap): CPU-only, and
+ *    with them in the Level heap the 853-piece HugeMap ran it 1,056 bytes
+ *    short at level start (logs/m59.err), overlapping heap 0 (2026-11-07).
  * Nothing else: Level-heap data the GPU or the APU reads must stay in the
  * contiguous window (guest code may form physical addresses from it; see the
  * container note in pc_mapmaker_container.inc).
@@ -118,10 +123,14 @@ static void mapmaker_memory_check(uint32_t caller,uint32_t size,uint32_t heap,in
 #ifndef MAPMAKER_GUEST_RET
 #define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
 #endif
-#define MAPMAKER_NAV_BYTES 0x00600000u        /* pools 1.59 MB + matrix 4.2 MB at 1024 groups */
+#define MAPMAKER_NAV_BYTES 0x01000000u        /* objects 1.52 + bodies 1.2 + pools 1.59 MB + matrix 9.4 MB at 1535 groups */
 #define MAPMAKER_NAV_MATRIX_RET 0x00275F95u   /* sub_00275F70: call sub_0003DFA0 at 0x00275F90 */
 #define MAPMAKER_NAV_GROUPS 0x007B666Cu       /* group count in play, read by sub_00275F70 */
 #define MAPMAKER_NAV_SCENE 100u
+/* Where pc_mapmaker_objects.inc takes the scene-100 object pool and physics
+ * bodies first (0 = the Level heap); set by the Level heap reset hook. */
+#define MAPMAKER_OBJECTS_SOURCE 1
+static uint32_t (*mapmaker_objects_source)(uint32_t bytes,uint32_t align);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 static struct {
     int initialized, off, tried, reported;
@@ -161,10 +170,11 @@ static void mapmaker_nav_report(void)
     fputc('\n',stderr);
     fflush(stderr);
 }
-/* bytes from the block, zeroed and 16-aligned as the Level heap's, or 0. */
-static uint32_t mapmaker_nav_alloc(uint32_t bytes)
+/* bytes from the block, zeroed and aligned (16 as the Level heap's, or a
+ * power of two up to 4096, as sub_0003E0B0's), or 0. */
+static uint32_t mapmaker_nav_take(uint32_t bytes,uint32_t align)
 {
-    uint32_t need=(bytes+15u)&~15u,p;
+    uint32_t need=(bytes+15u)&~15u,p,skip;
     mapmaker_nav_read();
     if(mapmaker_nav.off || !mapmaker_nav.resets || WORD_AT(MAPMAKER_MEMORY_SCENE)!=MAPMAKER_NAV_SCENE || !bytes) return 0;
     if(!mapmaker_nav.tried) {
@@ -178,15 +188,28 @@ static uint32_t mapmaker_nav_alloc(uint32_t bytes)
         }
     }
     if(!mapmaker_nav.reported) { mapmaker_nav.reported=1;mapmaker_nav_report(); }
-    if(!mapmaker_nav.base || need<bytes || need>mapmaker_nav.size-mapmaker_nav.used) {
+    if(align<16u || align>4096u || (align&(align-1u))) align=16u;
+    skip=mapmaker_nav.base?((0u-(mapmaker_nav.base+mapmaker_nav.used))&(align-1u)):0u;
+    if(!mapmaker_nav.base || need<bytes || skip>mapmaker_nav.size-mapmaker_nav.used ||
+       need>mapmaker_nav.size-mapmaker_nav.used-skip) {
         mapmaker_nav.fallbacks++;
         return 0;
     }
+    mapmaker_nav.used+=skip;
     p=mapmaker_nav.base+mapmaker_nav.used;
     mapmaker_nav.used+=need;
     if(mapmaker_nav.used>mapmaker_nav.peak) mapmaker_nav.peak=mapmaker_nav.used;
     memset((void *)((uintptr_t)p+g_xbox_mem_offset),0,need);
     return p;
+}
+static uint32_t mapmaker_nav_alloc(uint32_t bytes) { return mapmaker_nav_take(bytes,16u); }
+/* The object pool and physics bodies (scene 100) from the block, unless
+ * TSFP_MAPMAKER_NAV_OBJECTS=0; 0 = use the Level heap. */
+static uint32_t mapmaker_nav_objects(uint32_t bytes,uint32_t align)
+{
+    static int off=-1;
+    if(off<0) { const char *v=getenv("TSFP_MAPMAKER_NAV_OBJECTS");off=v && v[0]=='0' && !v[1]; }
+    return off?0u:mapmaker_nav_take(bytes,align);
 }
 /* WRAP sub_0003E650 (Level heap reset, cdecl, plain ret). */
 void pc_mapmaker_memory_level_reset(void (*original)(void))
@@ -197,6 +220,7 @@ void pc_mapmaker_memory_level_reset(void (*original)(void))
 #ifdef MAPMAKER_POOL_SOURCE
     mapmaker_pool_source=mapmaker_nav_alloc;   /* pc_mapmaker_limits.inc pools */
 #endif
+    mapmaker_objects_source=mapmaker_nav_objects;   /* pc_mapmaker_objects.inc: pool and bodies */
 }
 /* The group distance matrix (sub_00275F70) from the nav block. */
 static int mapmaker_nav_matrix(uint32_t caller,uint32_t size,uint32_t heap)

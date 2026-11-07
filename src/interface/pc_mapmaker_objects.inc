@@ -219,6 +219,19 @@ static int mapmaker_objects_pool_on(void)
     mapmaker_limits_read();
     return mapmaker_limits.pools && (mapmaker_objects_scene(100u) || mapmaker_objects_scene(102u));
 }
+extern void sub_0003E0B0(void);
+/* Level heap allocation (sub_0003DFA0 for align 16, else sub_0003E0B0), or in
+ * scene 100 the nav block first (pc_mapmaker_memory.inc). */
+static uint32_t mapmaker_objects_take(uint32_t bytes,uint32_t align)
+{
+#ifdef MAPMAKER_OBJECTS_SOURCE
+    if(mapmaker_objects_source && WORD_AT(0x0079094Cu)==100u) {
+        uint32_t p=mapmaker_objects_source(bytes,align);
+        if(p) return p;
+    }
+#endif
+    return align==16u?guest_call(sub_0003DFA0,2,bytes,1u):guest_call(sub_0003E0B0,3,align,bytes,1u);
+}
 static void mapmaker_objects_clear(uint32_t a,uint32_t bytes)
 {
     if(guest_writable(a,bytes)) memset((void *)((uintptr_t)a+g_xbox_mem_offset),0,bytes);
@@ -235,7 +248,7 @@ void pc_mapmaker_objects_pool(void (*original)(void))
     if(callback && callback!=0x00242BA0u) { original(); return; }
     save_registers(&r);
     WORD_AT(0x0072F5E4u)=MAPMAKER_OBJECTS_POOL;
-    WORD_AT(0x0072F5E8u)=guest_call(sub_0003DFA0,2,(MAPMAKER_OBJECTS_POOL*0x2E8u+15u)&~15u,1u);
+    WORD_AT(0x0072F5E8u)=mapmaker_objects_take((MAPMAKER_OBJECTS_POOL*0x2E8u+15u)&~15u,16u);   /* nav block in scene 100 */
     WORD_AT(0x0072F5ECu)=guest_call(sub_0003DFA0,2,0x190u,1u);
     WORD_AT(0x00715FB4u)=guest_call(sub_0003DFA0,2,MAPMAKER_OBJECTS_BUCKET_BYTES,1u);
     /* The per-room-id prop tables the original clears here were relocated by
@@ -367,12 +380,12 @@ void pc_mapmaker_objects_physics(void (*original)(void))
     if(!mapmaker_limits.pools || !mapmaker_objects_scene(100u)) { original(); return; }
     save_registers(&r);
     MAPMAKER_OBJECTS_HALF_AT(0x0074C49Cu)=(uint16_t)n;
-    WORD_AT(0x0074C458u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)<<9,1u);
-    WORD_AT(0x0074C480u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*4u,1u);
-    WORD_AT(0x0074C46Cu)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*4u,1u);
-    WORD_AT(0x0074C48Cu)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)<<5,1u);
-    WORD_AT(0x0074C494u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*4u,1u);
-    WORD_AT(0x0074C488u)=guest_call(sub_0003E0B0,3,0x40u,(n+0x60u)*2u,1u);
+    WORD_AT(0x0074C458u)=mapmaker_objects_take((n+0x60u)<<9,0x40u);
+    WORD_AT(0x0074C480u)=mapmaker_objects_take((n+0x60u)*4u,0x40u);
+    WORD_AT(0x0074C46Cu)=mapmaker_objects_take((n+0x60u)*4u,0x40u);
+    WORD_AT(0x0074C48Cu)=mapmaker_objects_take((n+0x60u)<<5,0x40u);
+    WORD_AT(0x0074C494u)=mapmaker_objects_take((n+0x60u)*4u,0x40u);
+    WORD_AT(0x0074C488u)=mapmaker_objects_take((n+0x60u)*2u,0x40u);
     WORD_AT(0x0074C464u)=guest_call(sub_0003DFA0,2,0x2E80u,1u);   /* 0x5D x 0x80, not per body */
     WORD_AT(0x0074C498u)=guest_call(sub_0003DFA0,2,0xBAu,1u);
     WORD_AT(0x0074C478u)=guest_call(sub_0003DFA0,2,0x6D60u,1u);
