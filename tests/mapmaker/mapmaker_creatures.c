@@ -26,6 +26,7 @@ void sub_0005A130(void) { g_ecx=2; }
 void sub_00062260(void) { g_ecx=3; }
 void sub_000A5E40(void) { g_ecx=4; }
 void sub_000631C0(void) { g_ecx=5; }
+void sub_0015E120(void) { g_ecx=6; }
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -40,7 +41,8 @@ static int failures;
 
 static uint32_t mounted_paths[8],requests[16];
 static unsigned nmounted,nmounts,nrequests,originals;
-static int mount_fails,models_read;
+static int mount_fails,models_read,sight=1;
+static unsigned sight_calls;
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -59,6 +61,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         if(!mount_fails) { if(nmounted<8u) mounted_paths[nmounted++]=x[0]; WORD_AT(0x006D7880u)++;r=1u; }
     } else if(f==sub_000A5E40) { CHECK(n==1);if(nrequests<16u) requests[nrequests]=x[0]; nrequests++; }
     else if(f==sub_000631C0) r=models_read?REQ_READ:REQ_NONE;
+    else if(f==sub_0015E120) { CHECK(n==2 && x[1]==0u);sight_calls++;r=(uint32_t)sight; }
     return r;
 }
 #include "pc_mapmaker_budget.inc"
@@ -86,6 +89,36 @@ static uint32_t call_hook(void (*hook)(void (*)(void)),void (*orig)(void),uint32
 }
 #define CALL(h,o,ret,a0,a1) call_hook(h,o,ret,a0,a1,__LINE__)
 static void fake_plain(void) { originals++;g_esp+=4u; }
+/* the robot weapon path: sub_002B8F90 -> sub_001BB5C0 -> sub_00088C60 (return 0x001BC420) */
+static int fire_now,muzzle_hit;
+static unsigned weapon_calls;
+static void fake_ray(void) { g_eax=(uint32_t)muzzle_hit;g_esp+=4u; }
+static void fake_fire(void)
+{
+    uint32_t sp=g_esp;
+    int keep=muzzle_hit;
+    muzzle_hit=1;                                       /* another ray in the fire code: not the muzzle test */
+    g_esp-=4u;WORD_AT(g_esp)=0x001BB9A0u;
+    pc_mapmaker_creatures_robot_muzzle(fake_ray);
+    CHECK(g_esp==sp);
+    muzzle_hit=keep;
+    g_esp-=4u;WORD_AT(g_esp)=0x001BC420u;
+    pc_mapmaker_creatures_robot_muzzle(fake_ray);
+    CHECK(g_esp==sp);
+    g_esp+=4u;
+}
+static void fake_weapon(void)
+{
+    uint32_t sp=g_esp,ent=WORD_AT(g_esp+4u);
+    weapon_calls++;
+    if(fire_now) {
+        g_esp-=12u;WORD_AT(g_esp)=0x002B984Bu+5u;WORD_AT(g_esp+4u)=ent;WORD_AT(g_esp+8u)=0;
+        pc_mapmaker_creatures_robot_fire(fake_fire);
+        CHECK(g_esp==sp-8u);
+        g_esp=sp;
+    }
+    g_esp+=4u;
+}
 /* sub_000DAC30: the character table models the call saw */
 static uint32_t seen_model[2];
 static void fake_create(void)
@@ -363,6 +396,48 @@ int main(void)
     CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
     CHECK(seen_class[0]==0x11000000u);
     nmounted=3;
+
+    /* ---- Prometheus fire log: a fire pose that launches or not ---------- */
+    {
+        uint32_t ent=0x00560000u,ctl=0x00561000u,ai=actor(13,0x62u);
+        static const uint16_t set[]={0x0C,0x62};
+        map(0x11u,set,2u);
+        mounted_paths[nmounted++]=0x0047E65Cu;
+        crt_rb.n=1u;crt_rb.r[0].ai=0x1234u;                                  /* the last level's robot */
+        CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);         /* level start: log state reset */
+        WORD_AT(ent+0x7Cu)=ai;WORD_AT(ent+4u)=ctl;
+        HALF_AT(0x007E03C0u+0x9A7u*2u)=50u;WORD_AT(0x007DE664u+50u*8u)=0x00181C00u;   /* bigbotrocketadvfire: a fire pose */
+        HALF_AT(0x007E03C0u+0x9A2u*2u)=51u;WORD_AT(0x007DE664u+51u*8u)=0x00081800u;   /* bigbotsstandtoadv: not */
+        WORD_AT(ai+0x94u)=0x43u;FLOAT_AT(ai+0xAF4u)=250.0f;
+        /* pose 1: no sight, the weapon code never fires */
+        WORD_AT(ctl+0xD4u)=0x9A7u;sight=0;sight_calls=0;fire_now=0;
+        for(k=0;k<5u;k++) CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        CHECK(sight_calls==5u && weapon_calls==5u);
+        WORD_AT(ctl+0xD4u)=0x9A2u;
+        CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);   /* the pose ends: logged */
+        /* pose 2: sight, one fire call, the muzzle ray hits */
+        WORD_AT(ctl+0xD4u)=0x9A7u;sight=1;FLOAT_AT(ai+0xAF4u)=64.0f;fire_now=1;muzzle_hit=1;
+        CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        fire_now=0;
+        WORD_AT(ctl+0xD4u)=0x9A2u;CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        /* pose 3: launched */
+        WORD_AT(ctl+0xD4u)=0x9A7u;fire_now=1;muzzle_hit=0;FLOAT_AT(ai+0xAF4u)=30.0f;
+        CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        WORD_AT(ctl+0xD4u)=0x9A2u;fire_now=0;CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        CHECK(crt_rb.n==1u && crt_rb.r[0].launched==1u && crt_rb.r[0].declined==2u);
+        /* not a class-4 robot row (a ghost): untouched, no sight test */
+        {
+            uint32_t other=actor(14,0x2Fu),e2=0x00562000u;
+            unsigned before=sight_calls;
+            WORD_AT(e2+0x7Cu)=other;WORD_AT(e2+4u)=ctl;WORD_AT(ctl+0xD4u)=0x9A7u;
+            CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,e2,0);
+            CHECK(sight_calls==before && crt_rb.n==1u);
+        }
+        /* the muzzle hook elsewhere: only the original */
+        CALL(pc_mapmaker_creatures_robot_muzzle,fake_ray,0x001DCCC6u,0,0);
+        CHECK(crt_rb.r[0].hits==0u);
+        nmounted--;
+    }
 
     /* ---- opt out --------------------------------------------------------- */
     set_env("TSFP_MAPMAKER_CREATURES","0");

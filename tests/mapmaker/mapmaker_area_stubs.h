@@ -10,6 +10,7 @@
 void sub_000827B0(void) {} void sub_000827F0(void) {} void sub_0035E960(void) {}
 void sub_00025280(void) {} void sub_00336600(void) {}
 void sub_00061D80(void) {}  /* disco: editor stream unload */
+void sub_0015E120(void) {}  /* creatures: robot fire log, the weapon code's sight test */
 uint32_t xbox_ContiguousAlloc(uint32_t size, uint32_t alignment) { (void)size; (void)alignment; return 0; }
 /* memory, probe (host allocation counters) */
 int xbox_ContiguousFree(uint32_t address) { (void)address; return 0; }
