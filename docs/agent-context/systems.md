@@ -12,7 +12,7 @@ Guest storage: [allocation](independent.md#guest-allocation-ownership), [threads
 
 Image/state/ABI: [image](independent.md#native-image-loading), [execution](independent.md#guest-state-and-abi-reports).
 
-Procedural wind: [ownership/time scopes](native-wind.md); MapMaker chain/memory: [limitless](limitless.md). Boss/anim/restart/view/sand: same
+Procedural wind: [ownership/time scopes](native-wind.md); MapMaker chain/memory: [limitless](limitless.md). Boss/aim/anim/restart/view/sand: same
 
 Local completed aim/animation diagnostics: [scope and limits](native-local-trace.md).
 
@@ -130,7 +130,6 @@ Fire presses use the shared key-edge path and a
 Fire pulses; later presses can interrupt. Context resets discard pulses.
 Pad input stays separate.
 
-
 `pc_model_transform_guest.inc` implements the US151E80 affine point fast path.
 It checks disjoint/wrap-safe buffers and magnitudes at most2^33, then uses local
 binary32 intermediates with explicit rounding, preserving final GPR/SSE state.
@@ -154,7 +153,6 @@ not a reconstructed call stack or guaranteed checkpoint/load-event history.
 heartbeat JSON. Each helper atomically replaces `capture-health.json` every two
 seconds in its safe report directory. No valid token means no health file.
 Windows packet schema is now3; a mismatched older helper cannot claim readiness.
-
 
 Windows `pc_menu_theme.h` snapshots each native menu item's caption, tab-separated
 shortcut and separator type before owner drawing. Command IDs stay untouched;
@@ -929,9 +927,7 @@ Statistics: D2CB7 scopes D1FD0 to carried ticks. Time totals keep Original
 cadence; distance stays per-frame. D2079 blocks paused stale ticks.
 Impact sparks: see [native spark timing](native-impact-sparks.md).
 
-
 [Devices](kernel-devices.md).
-
 
 Project-owned I/O contracts: [sharing](kernel-sharing.md),
 [request lifetime](request-lifetime.md), [driver calls](driver-call.md),
