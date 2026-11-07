@@ -184,3 +184,7 @@ skips char 0x31. 11 NEW WRAPs + 11 chains: mapmaker-pitboss.md.
 After .62 (no bottle, ragbugs one at a time): bossroom/bigdraw also draw the
 pit satellites (0x24A/0x246/0x24B/0x6CB) high over their tile; the flock is
 launched together at state 6 (`sub_0028A0A0` x2); prop/flock log lines.
+After .66 (bottle at the feet, shots did nothing): the boss's pose is computed
+before each fight frame (`sub_000A1B80`, view bit cleared: bones were stale
+off screen) and roomless props take the boss's rooms; hit, trace and ragbug
+phase lines (mapmaker-pitboss.md).
