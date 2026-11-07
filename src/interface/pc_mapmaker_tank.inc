@@ -27,7 +27,8 @@
  *    player 1's focus) and the spawn itself (the init resets the statics and
  *    the XBE tables: both are restored afterwards). The castle's own callers
  *    (sub_001E4030 -> sub_00256040 for its 'KNAT' object, the scripts
- *    sub_001E77E0 and sub_002532D0) only run in the castle level.
+ *    sub_001E77E0 and sub_002532D0) only run in the castle level; for ours
+ *    the mine hook below makes the sub_00256040 call itself.
  * After every entry the statics hold exactly what they held before, so no
  * other code (another boss's swap included) sees a tank's copy.
  *
@@ -136,6 +137,19 @@
  *    again). Without it the restarted placeholders, in the same pool
  *    entries with the same spawn records, were "started again" and stayed
  *    guard robots (as Khallos' chairs in v0.4.0-mapmaker.31).
+ *  - mine (sub_00228B50, cdecl explosive; only call 0x000F049A in
+ *    sub_000F0430, a sticky explosive going off, after its explosion and only
+ *    in story mode): stock tail-jumps to the castle's sub_001E4030 only in
+ *    scene 4; that finds its tank by the tag 'KNAT' and calls
+ *    sub_00256040(tank, explosive): in state 9 (stunned by the weak-point
+ *    hit), with the explosive stuck (+0x158) on the tank's parts 15..17
+ *    (+0x15C), health -= 10.1 (8.1 on difficulty 2), the death at 0, then
+ *    sub_00251BA0. TNT's own explosion (type 4) is not one of the damage
+ *    types 8/0xC the damage callback takes, so in a map TNT never hurt the
+ *    tank (.55 report). For an explosive stuck to one of our tanks: the same
+ *    sub_00256040 call with that tank's statics, before the original.
+ *    Logged once per tank when it hurts, and once when it did not (state,
+ *    part).
  * Diagnostics (v0.4.0-mapmaker.25: no tank and no line after the model
  * request): the character create sub_000DAC30 (id at [esp+4], pool slot at
  * [esp+12]) logs each castle tank placeholder character and what came back;
@@ -257,6 +271,9 @@
 #define TNK_RET_BAR_TEXT 0x0014CD42u
 #define TNK_TIMER_TEXT 0x1635u
 #define TNK_RET_TIMER_TEXT 0x0014CD83u
+#define TNK_MINE_ON 0x158u              /* sticky explosive: the object it is stuck to (sub_000F39A0 0x000F3D6D) */
+#define TNK_MINE_PART 0x15Cu            /* ... its model part, -1: none (0x000F3D89..0x000F3E17) */
+#define TNK_STUNNED 9u                   /* sub_00256040 hurts only in this state */
 #define TNK_LABEL "Castle Tank"
 #define TNK_TIMER_LABEL "Tank exposed"
 #define TNK_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -269,7 +286,7 @@
 static const uint32_t tnk_models[3]={TNK_MODEL,TNK_TURRET,TNK_WRECK};
 
 extern void sub_00062260(void),sub_000622D0(void),sub_000A6F90(void),sub_0015DDA0(void);
-extern void sub_000A5E40(void),sub_000631C0(void);
+extern void sub_000A5E40(void),sub_000631C0(void),sub_00256040(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
 /* Kept for the session: settings, labels, bar names and the spawn argument buffer. */
@@ -281,6 +298,7 @@ struct tnk_one {
     float d[3], spawn[3];
     unsigned wakes, misses, aims;        /* misses: points outside in this search */
     unsigned updates, drawn, waited;     /* first update, draw and sleeping wake test logged */
+    unsigned tnt_hurt, tnt_not;          /* explosive on it: damage line, no-damage line logged */
     uint32_t seen_state;                 /* last fight state logged */
     uint32_t cannon[3];                  /* the cannon aim point last set here */
     uint32_t block[TNK_BLOCK_WORDS], sounds[TNK_SOUNDS_WORDS];
@@ -795,6 +813,37 @@ void pc_mapmaker_tank_damage(void (*original)(void))
     uint32_t r;
     if(!MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(r=WORD_AT(g_esp+4u),4u)) { original();return; }
     tnk_run(original,WORD_AT(r));
+}
+
+/* WRAP sub_00228B50 (cdecl explosive, from sub_000F0430 0x000F049A after its
+ * explosion, story mode only; stock: the castle's sub_001E4030 in scene 4):
+ * an explosive stuck to one of our tanks gets the castle's call
+ * sub_00256040(tank, explosive) with that tank's statics. Stock decides
+ * (stunned, parts 15..17); the original follows (it does nothing in 100). */
+void pc_mapmaker_tank_mine(void (*original)(void))
+{
+    uint32_t x,obj,st,part,st2;
+    unsigned k,p;
+    float h0,h1;
+    if(!tnk_lv.n || !MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(x=WORD_AT(g_esp+4u),TNK_MINE_PART+4u) ||
+       !(k=tnk_find(obj=WORD_AT(x+TNK_MINE_ON))) || !tnk_play()) { original();return; }
+    p=tnk_enter(k);
+    st=WORD_AT(TNK_STATE);part=WORD_AT(x+TNK_MINE_PART);h0=tnk_getf(obj+TNK_ENT_HEALTH);
+    guest_call(sub_00256040,2,obj,x);
+    h1=tnk_getf(obj+TNK_ENT_HEALTH);st2=WORD_AT(TNK_STATE);
+    if(h1<h0) {
+        if(!TK.tnt_hurt++) {
+            fprintf(stderr,"[mapmaker] tank %u: TNT damage applied: explosive on the stunned tank (part %d), health %.1f -> %.1f, state %u -> %u\n",
+                    k,(int)part,(double)h0,(double)h1,(unsigned)st,(unsigned)st2);
+            fflush(stderr);
+        }
+    } else if(!TK.tnt_not++) {
+        fprintf(stderr,"[mapmaker] tank %u: explosive on the tank went off, no TNT damage: stock needs the stunned state %u and parts 15-17 (state %u, part %d)\n",
+                k,TNK_STUNNED,(unsigned)st,(int)part);
+        fflush(stderr);
+    }
+    tnk_leave(k,p);
+    original();
 }
 
 /* WRAP sub_00251800 (no args -> the state-9 timer bar, x87): the boss bar
