@@ -367,7 +367,7 @@ A MapMaker floor is at another height, so the boss stood at height 0.
 
 ### Throwing at a player a floor up (after v0.4.0-mapmaker.40)
 
-User report (.40): the skeleton could not aim at a player one floor above it.
+User report (.40): no aim at a player a floor up.
 CONFIRMED (decode): the stock aim (0x00287F02..0x00287FB0, phase 0 once the
 throw animation passes 0.45) is the unit vector from the hand (the shot origin
 +0x413C) to target point state +0x4164 + i*12 (i = +0x4158), which
@@ -376,18 +376,15 @@ lead; the action choice `sub_00286F30` and facing `sub_002895A0` use no
 height (the picker's height difference `[0x0078B1E0]` is written, never
 read). The throw origins in `m40b.err` range from y -10.1 to 5.9 with the boss
 at -9.5, so from a low hand the straight line to the feet of a player about 5
-units up starts below that floor and meets its edge or underside. INFERRED
-(not measured in game): that is the miss; projectile gravity was not traced.
+units up starts below that floor and meets its edge or underside. INFERRED:
+that is the miss (gravity untraced).
 
-Fix (`rbs_skel_aim`, right after the spoofed aim when the phase became 1):
-for a target more than `RBS_SKEL_UP` (2) over the boss's noted floor, the aim
-point is raised by `RBS_SKEL_BODY` (1.5, its body), and the upward component
-is held at `RBS_SKEL_PITCH` (0.866, about 60 degrees), still a unit vector;
-the origin, lead and targets on the boss's floor are the stock ones. Logged
-(4 per skeleton per level): `giant skeleton N aims at a target a floor up`.
-Fixture: a target 5 up and 10 ahead from a hand below its floor, a steep
-overhead target (clamped), the boss's own floor (unchanged), phase kept;
-mutations `aim-*`. Unplayed.
+Fix (`rbs_skel_aim`, after the spoofed aim once the phase is 1): a target
+more than `RBS_SKEL_UP` over the boss's floor gets the aim point raised by
+`RBS_SKEL_BODY` (1.5) and the upward component held at `RBS_SKEL_PITCH`
+(0.866), a unit vector; origin and lead stock. Logged (4 per skeleton per
+level): `aims at a target a floor up`. Fixture: 5 up from a low hand, steep
+overhead (clamped), own floor, phase kept; mutations `aim-*`.
 
 ### Same-floor throws (the v0.4.0-mapmaker.42 playtest)
 
@@ -396,11 +393,8 @@ me if I stand in place on the same floor." CONFIRMED (log `m42.err`, .41
 code): all four noted `floor height -4.49` on their first fight frame with
 the player on the 0.5 floor, and every throw logged `aims at a target a
 floor up (5.0 over its floor -4.5)`: the noted height is not the placed
-floor, so same-floor throws went at the body (1.5 over the feet). The
-first-frame height was the map's lowest floor in both logs (-9.49 in
-`m40b.err`, floors -2..; -4.49 here, floors -1..). Why it is lower than the
-placement is not traced (INFERRED: it sinks between its AI start and the
-fight); the body is still held at that noted height (`_face`, unchanged).
+floor, so same-floor throws went at the body (1.5 over the feet).
+INFERRED then, disproved by `m43b.err`: that it sank below its placement.
 
 Fix: `_ai_start` notes the entity height after the original (`giant
 skeleton N placed at height Y (AI start)`). `rbs_skel_ground` (once per
@@ -412,13 +406,26 @@ climbing 1.25 at a time up to 11.25 for a floor above it; none: the noted
 height. Only a target more than `RBS_SKEL_UP` (now 2.5, half a floor) over
 that floor gets the raised aim; the body height (`_face`) is unchanged.
 Logged once per fight: `giant skeleton N reference floor F (spawn height
-Y, ...)`. Tests: first-frame -9.49 under a 0.5 floor (feet and 2.2 up:
-stock; 5 up and 3 ahead: raised, the line passes between its feet and head
-from a low hand and through its body from a high one), its own floor under
-an upper one, the m42 case (placed 0.51, first frame -4.49 over a -4.5
-floor: stock aim at 0.5); mutations `aim-ref-spawn`, `aim-up-2`, `ground-*`,
-`pad-not-noted`. Playtest: the skeleton's body may stand on the lower floor
-(its noted height); report where it is drawn.
+Y, ...)`. Tests: first-frame -9.49 under a 0.5 floor, its own floor under
+an upper one, placed 0.51 over a -4.49 first frame; mutations `aim-ref-spawn`,
+`aim-up-2`, `ground-*`, `pad-not-noted`.
+
+### Same-floor throws again (the v0.4.0-mapmaker.44 playtest)
+
+"Skeletons can't hit me on floor one still." `m43b.err`: all placed at
+-4.49 (AI start; floors -1..12), reference -4.50: right. CONFIRMED (decode
+0x0029CFA4..0x0029D050, logs): the origin is a model bone point (row 0x29
++0xAC, `sub_00151E80` x2), mostly 10.7 over its feet (6.2 over -4.5; 1.2 over
+-9.5 in `m40b.err`), not a stock height; the target y is the player's +0x68
+(0x002893A7). So a line to the feet of a player on its floor crosses the
+floor above (its floor + 5); INFERRED: it hits that underside unless the
+player is in the opening round the boss. The throw is the only damage path.
+
+Fix (`rbs_skel_low`): target within `RBS_SKEL_UP` of its floor, hand over
+`RBS_SKEL_HAND` (4): origin y = floor + 4, stock unit aim from there; logged
+(4): `aims at a target on its floor`. Others unchanged. Tests: m43b case
+(-4.5, jump: lowered; 0.5: raised; low hand, floor below: stock; fire);
+mutations `hand-*`. Unplayed.
 
 INFERRED: the stretching came from the same mismatch (the body drawn at height
 0 while parts follow the spawn floor). The freeze is not explained yet: if it
