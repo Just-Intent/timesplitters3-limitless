@@ -11,6 +11,8 @@ has been built or played; fixtures only.
 |---|---|---|
 | Host folder, WAV reader, player thread, `pc-music.ini` | `src/interface/pc_custom_music.h` | header-only; `PC_CUSTOM_MUSIC_IMPLEMENTATION` in `pc_mapmaker_custommusic.inc` (one TU: `pc_display_menu.c`) |
 | MapMaker/Arcade glue (`cmu_*`, 4 wrappers) | `src/interface/pc_mapmaker_custommusic.inc` | included by `pc_mapmaker_skymusic.inc`; rows/compile/load/music hooks there call it |
+| MP3 decoder adapter `pc_music_codec_*` | `src/interface/pc_music_codec.c` | own TU (title CMake, `patches/media/2160-custom-music-codec.patch`, pinned last in `apply-patches.py`); FFmpeg headers only where `XBOXRECOMP_FFMPEG_DIR` has them, else a stub |
+| Launcher import/list/remove | `tools/launcher/MusicLibrary.cs`, Saves page section in `SavesPage.cs` | pickers + recycle adapters: `Launcher.cs` (WPF dialog, `SHFileOperationW` Recycle Bin), `macos/NativeWindow.cs` (Avalonia picker, `~/.Trash`) |
 | Output slot 273 `RECOMP_AUDIO_SLOT_MUSIC` | `patches/media/0059-custom-music-voice.patch` (XAudio2 voice count 273 -> 274), `src/native/audio_sdl.c` (`SLOT_COUNT`) | runtime header gains the define |
 | Folder routing | `TSFP_MUSIC_DIR`: `tools/launcher/GameSettings.cs` (`LauncherPlatform.Music`: `Music`, Mac checkout `private/music`), `tools/play-native-mac.py`; game default `private/music` | `Music` is a protected install-root name (`Core.cs`) |
 
@@ -30,8 +32,15 @@ Existing wrappers reused: `sub_00078590` (rows), `sub_003006C0` (compile),
 ## Contracts
 
 - Formats: RIFF/WAVE PCM 8/16/24/32 int, 32/64 float, extensible, 1..8 ch
-  (front pair), 8..192 kHz -> s16 mono/stereo. No codec dependency (FFmpeg
-  is Windows-only and video-only here). List entries keep their index for
+  (front pair), 8..192 kHz -> s16 mono/stereo, read in the header. `.mp3`
+  (`PC_MUSIC_KIND_CODEC`) goes to `pc_music_codec_open(FILE*)` (owns the
+  stream), listed only while `pc_music_codec_available()`. The adapter
+  dlopens avutil/swresample/avcodec like `xmv_decode.c` (beside the exe,
+  `RECOMP_FFMPEG_DIR` = launcher `Bin`, `PC_MUSIC_FFMPEG_BIN`); no
+  libavformat: skips ID3v2 (+footer), `av_parser_parse2` (MP3) through a
+  16 KiB buffer, first frame within 1 MiB, rate change = error, any sample
+  format -> s16 front pair. Loop = `pc_music_codec_rewind`; a track that
+  yields nothing after a rewind ends. No new packaged DLL. List entries keep their index for
   the process; editor values `0x100 + index`, Arcade rows `58 + offer`.
 - Map: chunk `0x00C776F7` size 0x44 {word 1, byte length, 0, name[64]} before
   the terminator; stock fallback -1 stays; **not** over-stock (stock builds
@@ -43,8 +52,12 @@ Existing wrappers reused: `sub_00078590` (rows), `sub_003006C0` (compile),
 
 ## Tests
 
-`tests/media/test_custom_music.py` (host, 26 mutations, WAVs written by the
-test) and `tests/mapmaker/test_mapmaker_custommusic.py` (glue through the
+`tests/media/test_custom_music.py` (host, 33 mutations, WAVs and fake
+`FAKE` .mp3 decoder input written by the test), `tests/media/test_music_codec.py`
+(stub build always; real FFmpeg build where the pinned package is unpacked,
+MP3s made by its `ffmpeg.exe` with libmp3lame, 9 mutations; skipped in CI and
+on non-Windows), launcher `tests/launcher/launcher_music.cs` + a Saves page
+case in `launcher_shared_ui.cs` and `tests/mapmaker/test_mapmaker_custommusic.py` (glue through the
 skymusic hooks, 36 mutations, XBE facts when the private XBE exists);
 `tests/mapmaker/mapmaker_skymusic.c` gained output stubs. Both are in
 `runtime-patches.yml`. WinError 4551 on a fixture is the host's application
@@ -52,7 +65,8 @@ control: rerun.
 
 ## Unverified
 
-Any game run; the Arcade menu's own use of item 0xE values past 57 (only the
+Any game run (MP3 decode was only exercised by the fixture); the Arcade menu's own use of item 0xE values past 57 (only the
 two known readers were checked); whether the stock player keeps channel 0
 state consistent when id 0 plays; Mac build of the thread/`dirent` paths;
-launcher C# build. Launcher import button: pending.
+Mac launcher build (Avalonia picker, Trash move); Mac MP3 needs an FFmpeg
+adapter (MAC-133). FFmpeg log lines (`Header missing`) may reach stderr on junk.

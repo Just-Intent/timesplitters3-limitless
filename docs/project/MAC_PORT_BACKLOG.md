@@ -8216,7 +8216,7 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
 ### MAC-133 — Imported music (MapMaker and Arcade)
 
 - **Status:** Awaiting validation
-- **PC behavior:** WAV files in the music folder (`TSFP_MUSIC_DIR`; `Music`
+- **PC behavior:** WAV and MP3 files in the music folder (`TSFP_MUSIC_DIR`; `Music`
   in an install, `private/music` in a checkout) are offered as
   `Imported:` rows in MapMaker's Map Settings music list and in Arcade's
   music choice, and play on host output slot 273 in place of the level music.
@@ -8224,10 +8224,20 @@ arrows,4:3/16:9/ultrawide and split-screen. Mac build/gameplay unverified here.
   `src/interface/pc_custom_music.h`, `src/interface/pc_mapmaker_custommusic.inc`,
   `patches/media/0059-custom-music-voice.patch`, `src/native/audio_sdl.c`,
   launcher `GameSettings.cs`/`LauncherPlatform.cs`/`Core.cs`, `tools/play-native-mac.py`.
+  MP3 (branch `music-mp3`, uncommitted to main): `src/interface/pc_music_codec.c`,
+  `patches/media/2160-custom-music-codec.patch`; launcher import `MusicLibrary.cs`,
+  `SavesPage.cs`, `Launcher.cs`, `macos/NativeWindow.cs`.
 - **PC validation:** Fixture tests only ([STATUS](STATUS.md#imported-music-for-mapmaker-and-arcade-2026-11-03-not-built-or-played)); no game run.
 - **Existing Mac support:** Shared code; POSIX `dirent`/`pthread` paths and the
   SDL slot count are in place; the Mac launcher exports `TSFP_MUSIC_DIR`.
-- **Mac adaptation needed:** None identified beyond compiling the POSIX paths.
+- **Mac adaptation needed:** MP3: the native Mac build has no FFmpeg headers
+  or libraries (as for movies, MAC-009), so `pc_music_codec.c` builds as its
+  stub and only WAV is listed. Needed: an FFmpeg (or other) decoder for the
+  same `pc_music_codec_*` adapter (the dlopen path already names `.dylib`
+  files), packaged in the Mac game. Launcher: Avalonia multi-select picker
+  and `~/.Trash` move are written but not built on a Mac.
 - **Mac acceptance checks:** Native build; `tests/media/test_custom_music.py`
-  on macOS; play a map and an Arcade level with an imported track.
+  and the stub case of `tests/media/test_music_codec.py` on macOS; launcher
+  NativeTests (music cases); import/remove from the Mac launcher; play a map
+  and an Arcade level with an imported track.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
