@@ -90,7 +90,7 @@ void sub_0029CCB0(void) {}
 void sub_002A7F30(void) {}  /* realbosses: skeleton fire */
 void sub_0005F460(void) {}  /* realbosses: the Crow walker's roar */
 void sub_00287860(void) {} void sub_00297690(void) {} void sub_002BD480(void) {}  /* realbosses: the stock skeleton/walker resets at a restart, the walker grid */
-void sub_0029E0A0(void) {} void sub_0028C560(void) {} void sub_00059DD0(void) {} void sub_0028A0A0(void) {}  /* pitboss: the pit fight, its message handler, anim finished, the flock launch */
+void sub_0029E0A0(void) {} void sub_0028C560(void) {} void sub_00059DD0(void) {} void sub_0028A0A0(void) {} void sub_000A1B80(void) {}  /* pitboss: the pit fight, its message handler, anim finished, the flock launch, the pose */
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it */
 void sub_00019D70(void) {}
 #endif

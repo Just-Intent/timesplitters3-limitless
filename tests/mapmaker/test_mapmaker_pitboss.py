@@ -54,7 +54,7 @@ MUTATIONS = {
                       '    if(!(k=pit_of(ent))) { original();return; }'),
     'message-no-swap': ('    pit_in(k,&s);\n    sub_0028C560();\n    pit_out(&s);', '    (void)s;(void)k;\n    sub_0028C560();'),
     'callback-owner-ignored': ('    k=pit_owner(obj);\n', '    k=0;(void)obj;\n'),
-    'callback-damage-record': ('    pit_run(original,r && MAPMAKER_PTR_OK(r,4u)?WORD_AT(r):0u);', '    pit_run(original,r);'),
+    'callback-damage-record': ('o=r && MAPMAKER_PTR_OK(r,0x2Cu)?WORD_AT(r):0u;', 'o=r;'),
     'logic-any-site': ('((ret=WORD_AT(g_esp))!=PIT_RET_NMME0 && ret!=PIT_RET_NMME1)', '((ret=WORD_AT(g_esp))==0u)'),
     'logic-always-1': ('g_eax=ret==PIT_RET_NMME0?0u:', 'g_eax=1u||ret==PIT_RET_NMME0?1u:'),
     'logic-outside-fight': ('    if(!k || !MAPMAKER_STACK_OK(8) || ((ret', '    if(!MAPMAKER_STACK_OK(8) || ((ret'),
@@ -70,6 +70,10 @@ MUTATIONS = {
     'release-no-arena': ('    pit_move(k,saved);\n    guest_call(sub_0028A0A0', '    (void)saved;\n    guest_call(sub_0028A0A0'),
     'release-every-frame': ('    k->released=1;\n', ''),
     'release-before-fight': ('if(st>=PIT_FIGHT && st<PIT_DEATH) pit_release(k,ent);', 'pit_release(k,ent);'),
+    'pose-skipped': ('    pit_pose(k,ent);\n    pit_in(k,&s);', '    pit_in(k,&s);'),
+    'pose-bit-kept': ('    PIT_H(ent+PIT_POSED)&=(uint16_t)~(1u<<(WORD_AT(view+0x214u)&15u));\n', ''),
+    'rooms-not-given': ('        pit_props_rooms(k,ent);\n', ''),
+    'rooms-no-room-id': ('        WORD_AT(o+0x34u)=WORD_AT(ent+0x38u);\n', ''),
     'restart-props-kept': ('            if(o) { guest_call(sub_000A9070,1,o);WORD_AT(pit_lv.k[k].state+f[i])=0u; }', '            (void)o;'),
     'restart-anims-lost': ('        PIT_H(PIT_ANIM_MAP+id*2u)=(uint16_t)slot;\n', ''),
     'restart-any-anim': ('                   !(WORD_AT(PIT_ANIM_WORDS+slot*8u+4u)&PIT_ANIM_DROPPED)) continue;', '                   0) continue;'),
@@ -122,6 +126,10 @@ def test_mapmaker_pitboss(tmp_path, mutation):
         assert '[mapmaker] pitboss: prop model 0x24B: not loaded, file read, textures registered by the load pass' in err
         assert 'pit skeleton 1: gas bottle 0x24A made (object 0x452000, model 0x24A, 0 listed rooms, first 0) at (12.12, 0.00, 0.00)' in err
         assert 'pit skeleton 1: flock complete, 2 ragbugs released together (0 left parked, 0 still joining)' in err
+        assert 'pit skeleton pose computed before its fight each frame (skeleton, view slot) (0x1, 0x3)' in err
+        assert 'pit skeleton 1: gas bottle hit (type 0x21, kind 0x0, amount 1.00): health 8.00 -> 5.33' in err
+        assert 'pit skeleton 1: ragbug 0 phase 1 at (3.00, 2.00, -5.00), boss state 6' in err
+        assert 'pit skeleton 1 trace: state 1, boss (4.00, 2.00, -6.00) rooms 0, bottle 0x0, health 0.00, ragbug phases -1 -1 -1 -1 -1 -1' in err
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 
@@ -221,6 +229,13 @@ def test_fight_states_and_sites():
     assert calls(a[0x0029F647], 0x0028A0A0) and a[0x0029F646].text.endswith('esi')
     assert 'esp + 0x20' in a[0x0028A0CF].text and 3 in imms(a[0x0028A0B7]) and 0x4A54 in [op[4] for op in a[0x0028A0C0].ops if op[0] == 'mem']
     assert 0x4A54 in [op[4] for op in a[0x0028A23D].ops if op[0] == 'mem'] and a[0x0028A23D].text.endswith('ebp')
+    # the pose: sub_0008F6B0 (the prop draw) computes it with sub_000A1B80(prop) only when the prop's word +0x14
+    # lacks the view slot's bit (0x0008F6F7..0x0008F700); sub_000A1B80 sets that bit (0x000A1BC5); stock
+    # sub_0018F8E0 calls it before reading bones (0x0018F90B); the damage code calls the object's +0x19C (0x000BB638)
+    assert calls(a[0x0008F700], 0x000A1B80) and 0x14 in [op[4] for op in a[0x0008F6F7].ops if op[0] == 'mem']
+    assert 0x214 in [op[4] for op in a[0x0008F6EA].ops if op[0] == 'mem'] and a[0x000A1BC5].mnemonic == 'mov' and 0x14 in [op[4] for op in a[0x000A1BC5].ops if op[0] == 'mem']
+    assert calls(a[0x0018F90B], 0x000A1B80) and 0x19C in [op[4] for op in a[0x000BB62D].ops if op[0] == 'mem']
+    assert a[0x000BB638].call and 0x19C in [op[4] for op in a[0x0009E728].ops if op[0] == 'mem']
     # the boss's own spawn records: class 0x20000 and 0x200000 reach these handlers
     assert calls(a[0x0027DDD3], 0x0029FE00) and calls(a[0x0027DEDE], 0x0028B610)
     gen = [i for i in decoded() if i.function == 0x0029FE00]
