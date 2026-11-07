@@ -184,3 +184,79 @@ def test_guest_loops_catch(tmp_path, mutation):
     """The comparison is sharp: a changed C pass no longer matches the guest loops."""
     equal, _ = _guest_vs_c(tmp_path, 17, 4, mutation)
     assert not equal, mutation
+
+
+# ------------------------------------------------- ray step (sub_00088430) --
+
+RAY = ROOT / 'src/interface/pc_mapmaker_roomray.inc'
+
+
+def _ray_overrides():
+    out = {}
+    for p in table():
+        if p['kind'] == 'operand' and p['function'] == '0x00088430':
+            out[int(p['address'], 16)] = (p['operand'], int(p['value'], 16))
+    return out
+
+
+def _guest_rays(tmp_path, seed, tiles, count, mutation=None):
+    """(matching steps, steps, steps that crossed): the original sub_00088430 against the C step."""
+    xbe_path = _private() / 'game/default.xbe'
+    if not xbe_path.is_file():
+        pytest.skip('needs the private XBE')
+    pytest.importorskip('capstone')
+    pytest.importorskip('numpy')
+    xbe = Xbe(xbe_path.read_bytes())
+    if mutation:
+        old, new = RAY_MUTATIONS[mutation]
+        text = RAY.read_text(encoding='utf-8')
+        assert old in text, mutation
+        (tmp_path / RAY.name).write_text(text.replace(old, new, 1), encoding='utf-8')
+    exe = build(tmp_path, 'fixed')
+    pre = tmp_path / 'raypre.bin'
+    result = subprocess.run([str(exe), 'raydump', str(seed), str(tiles), str(pre), str(count)],
+                            capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+    rows = [[int(v) for v in line.split()] for line in result.stdout.splitlines() if line.strip()]
+    mem = bytearray(pre.read_bytes())
+    for a in (0x47D394, 0x47D390, 0x475D5C):
+        assert bytes(mem[a:a + 4]) == xbe.read(a, 4), hex(a)
+    ov = _ray_overrides()
+    assert ov == {0x00088455: (1, 0x3FF)}
+    emu = Emu(mem, [(0x00088430, xbe.read(0x00088430, 0x000888A0 - 0x00088430))], ov)
+    same = crossed = 0
+    for row in rows:
+        room, frm, seg = row[0:3]
+        struct.pack_into('<3I', mem, 0x00870000, *row[3:6])
+        struct.pack_into('<3I', mem, 0x00870010, *row[6:9])
+        struct.pack_into('<12I', mem, 0x00870020, *[0xA5A50000 + k for k in range(12)])
+        esp = 0x00860000 - 0x20
+        struct.pack_into('<8I', mem, esp, 0xDEAD0000, 0x00870000, 0x00870010, room, frm, seg, 0x00870020, 0x00870030)
+        emu.r['esp'] = esp
+        emu.run(0x00088430, 0xDEAD0000, 200_000)
+        got = [emu.r['eax'], *struct.unpack_from('<8I', mem, 0x00870020)]
+        same += got == row[9:18]
+        crossed += row[9] != room
+    return same, len(rows), crossed
+
+
+RAY_MUTATIONS = {
+    'ray-no-polygon': ('                if(s>zero) { outside=1;break; }', '                (void)s;'),
+    'ray-axes-swapped': ('        if(k_low>nx) { eb=1;ea=2; }', '        if(k_low>nx) { eb=2;ea=1; }'),
+    'ray-segment-ignored': ('        if(!segment) {\n            float an', '        if(0) {\n            float an'),
+    'ray-from-ignored': ('        if(other==from) continue;\n', ''),
+    'ray-rest-always': ('    if(rest_out && !segment && MAPMAKER_PTR_OK(rest_out,12u)) {', '    if(rest_out && MAPMAKER_PTR_OK(rest_out,12u)) {'),
+}
+
+
+@pytest.mark.parametrize('seed,tiles', [(4242, 6), (17, 4), (99, 8)])
+def test_guest_ray_steps_match(tmp_path, seed, tiles):
+    same, total, crossed = _guest_rays(tmp_path, seed, tiles, 400)
+    assert same == total, f'{total - same} of {total} ray steps differ'
+    assert crossed > 20
+
+
+@pytest.mark.parametrize('mutation', list(RAY_MUTATIONS))
+def test_guest_ray_steps_catch(tmp_path, mutation):
+    same, total, _ = _guest_rays(tmp_path, 4242, 6, 400, mutation)
+    assert same < total, mutation
