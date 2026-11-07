@@ -9,7 +9,8 @@ played on either platform. Agent notes:
 
 ## Using it
 
-1. Put WAV files in the music folder:
+1. Import WAV or MP3 files with the launcher (Saves page > **Imported
+   music** > **Import music...**), or copy them into the music folder:
    - installed game: `Music` beside `Saves` and `Settings` (the launcher sets
      `TSFP_MUSIC_DIR`);
    - source checkout: `private/music` (ignored by Git; also the game's
@@ -21,26 +22,23 @@ played on either platform. Agent notes:
    58 stock rows. The choice is remembered in `pc-music.ini` beside the
    display settings.
 
-Up to 64 tracks are listed (file names up to 63 bytes, ending in `.wav`).
-Names show without `.wav`, with `_` as spaces; non-ASCII letters show as `?`.
+Up to 64 tracks are listed (file names up to 63 bytes, ending in `.wav` or
+`.mp3`). Names show without the extension, with `_` as spaces; non-ASCII
+letters show as `?`.
 
 ## Formats
 
-WAV only: PCM 8, 16, 24 or 32-bit, or 32/64-bit float (WAVE_FORMAT_EXTENSIBLE
-too), 8,000 to 192,000 Hz. Mono and stereo play as they are; surround files
-play their front left/right pair. The file is streamed from disk and loops.
+- **WAV:** PCM 8, 16, 24 or 32-bit, or 32/64-bit float (WAVE_FORMAT_EXTENSIBLE
+  too), 8,000 to 192,000 Hz. Read by the shared code itself on every host.
+- **MP3:** MPEG audio files (ID3 tags are skipped), decoded with the FFmpeg
+  libraries the Windows game already ships for movies (`avcodec`, `avutil`,
+  `swresample` in `Bin`). MP3 rows appear only when those libraries load; the
+  native Mac build has no FFmpeg yet, so it offers WAV only (MAC-133). A sample
+  rate change inside one file ends the track.
 
-Why WAV: it needs no decoder, so the same shared code reads it on Windows
-and macOS. The runtime's FFmpeg is loaded only for movies on Windows and has
-no container reader; MP3/OGG/FLAC would need a new decoder on both hosts.
-Convert other files first, for example with the FFmpeg that ships in the
-game's `Bin` folder on Windows:
-
-```
-Bin\ffmpeg.exe -i song.mp3 -ar 44100 -ac 2 Music\song.wav
-```
-
-(If your build has no `ffmpeg.exe`, any audio editor that exports WAV works.)
+Mono and stereo play as they are; surround WAVs play their front left/right
+pair. Files are streamed from disk and loop. OGG, FLAC and other formats are
+not read: convert them to WAV or MP3 first.
 
 ## What to expect
 
@@ -69,13 +67,21 @@ stays -1 (tileset). Every stock chunk walker skips an unknown tag by its size
 
 ## Importing from the launcher
 
-Pending. Planned: a Music page action that copies chosen `.wav` files into
-the music folder (and, on Windows, converts other formats with the bundled
-FFmpeg), never touching saves or settings. Until then copy files by hand.
+The Saves page has an **Imported music** section on Windows and macOS:
+
+- **Import music...** picks one or more `.wav`/`.mp3` files and copies them
+  into the music folder. Names are made safe for the game, and a name that is
+  already used gets ` (2)`, ` (3)`... Nothing is replaced; your originals stay
+  where they are. Each copy is staged and moved into place, so a cancelled or
+  failed import leaves no partial track. Files must look like WAV/MP3, be at
+  most 512 MiB each, and the folder holds at most 64 tracks.
+- **Remove track...** asks first, then moves the file to the Recycle Bin
+  (Trash on Mac). Close the game first.
+- **Open music folder** shows the folder.
 
 ## Playtest
 
-1. Copy two WAV files (one 44.1 kHz stereo, one 22 kHz mono) into the folder.
+1. Import two WAV files (44.1 kHz stereo, 22 kHz mono) and one MP3 with the launcher.
 2. MapMaker with `TSFP_MAPMAKER_LIMITS=1`: open Map Settings > Music, confirm
    both `Imported:` rows, pick one, save, reload the map: the row is kept.
 3. Play the map: your track plays and loops; pause (silent), resume, change
@@ -83,4 +89,6 @@ FFmpeg), never touching saves or settings. Until then copy files by hand.
 4. Rename the file and replay: tileset music and the log line above.
 5. Arcade: choose an imported row, start a level, check the music; reopen
    setup: the row is still selected; pick a stock row: stock music again.
-6. Repeat on macOS (native build).
+6. Remove the MP3 from the launcher: it goes to the Recycle Bin; a map using it
+   plays the tileset music.
+7. Repeat on macOS (native build): WAV rows only until MAC-133's FFmpeg adapter.
