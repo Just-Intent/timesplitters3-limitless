@@ -45,7 +45,7 @@ Existing wrappers reused: `sub_00078590` (rows), `sub_003006C0` (compile),
 
 `tests/media/test_custom_music.py` (host, 26 mutations, WAVs written by the
 test) and `tests/mapmaker/test_mapmaker_custommusic.py` (glue through the
-skymusic hooks, 34 mutations, XBE facts when the private XBE exists);
+skymusic hooks, 36 mutations, XBE facts when the private XBE exists);
 `tests/mapmaker/mapmaker_skymusic.c` gained output stubs. Both are in
 `runtime-patches.yml`. WinError 4551 on a fixture is the host's application
 control: rerun.
