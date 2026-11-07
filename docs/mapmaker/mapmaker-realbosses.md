@@ -34,35 +34,50 @@ case (three skeletons, two walkers, one late each), `restart-*` mutations.
 Playtest: restart a map with skeletons and walkers after a fight: each rises
 and fights again, walkers deploy their guns again.
 
-**Superseded after v0.4.0-mapmaker.40: the restart frees the level heap.**
+**After v0.4.0-mapmaker.40: the restarted bosses fight on the last run's blocks.**
 User report (.40): four giant skeletons "not spawning correctly and kind of
 flickering in and out" after a story restart; `m40b.err` shows the restart
 line `(0x4, 0x0)`, three floor/fire lines and then no throw for about 16000
 frames (the run before threw within seconds). CONFIRMED (decode and US XBE
 jump table 0x0003E810): the restart's first call `sub_0003E740(3)`
-(0x001CDD62) reaches 0x0003E7C7 -> `sub_0003E240`, which sets the level
-heap's top `[0x006B8388]` back to its base `[0x006B8380]`. Every
-`sub_0003DFA0(n, 1)` block (the skeleton state 0x4C7C, its particle block
-0x7D00, the walker's blocks) is free again and reused by what the restart
-allocates next; the split Crowe area already forgot its blocks for this
-reason. The "kept blocks" restart above ran the stock reset on that freed
-memory and fought on it.
+(0x001CDD62) reaches 0x0003E7C7 -> `sub_0003E240`, which sets heap 0's top
+`[0x006B8388]` back to its base `[0x006B8380]`. The .40 fix read that as
+freeing every `sub_0003DFA0(n, 1)` block and gave every instance new blocks
+per restart.
+
+**Corrected 2026-11-06 (CONFIRMED, `test_mapmaker_restart_heap.py`):** heap 0
+(top-down `[0x006B8388]`, `sub_0003DFA0` jump table 0x0003E094 entry 0) is
+not the Level heap. `sub_0003DFA0(n, 1)` is heap 1, bottom-up
+`[0x006B837C]`, written only by `sub_0003DF00` (game start), `sub_0003E650`
+(full level load, the branch without `[0x006B7AA8]`), `sub_0003DF70` (only
+with `[0x006B7AA8]` 0) and the allocators: none on the restart branch. The
+skeleton and walker blocks were never freed; new ones per restart only used
+up the Level heap (about 52 KB a skeleton, 190 KB a walker, never returned).
+What the .40 symptom needed was the blocks' contents: the .31 restart ran
+only the stock resets on the last fight's state and particles.
 
 Fix (`pc_mapmaker_realbosses_restart`, after the original, scene 100): every
-instance, late ones included (at most 4 each), is cleared except its spawn
-record and gets new blocks as at level init (`rbs_skel_alloc` /
-`rbs_walk_alloc`: from the level's statics `rbs_fx_base`, stock
-`sub_00287E00` / `sub_002976F0`, which end with the stock resets). A holder
+instance, late ones included (at most 4 each), keeps its spawn record and
+blocks, is cleared otherwise, and sets its blocks up again as at level init
+(`rbs_skel_again` / `rbs_walk_again`): the level's statics `rbs_fx_base` with
+the instance's block pointers and effect count, every block zeroed as a new
+Level block is (state; particles 0x7D00; the walker's two effect blocks,
+0x55F0 or 0xF0A0 by the count 0x1F4/0x578: `pc_mapmaker_bossfx.inc`), then
+the stock init's non-allocating rest: `sub_00287860` (skeleton);
+`sub_002BD480(8, 8, 1.0, state + 0x5C4)` and `sub_00297690` (walker). A holder
 left on one of our copies is dropped first (`mapmaker_fx_forget`); the boss
-pointers go to the first instance's new blocks; an instance that gets no
-memory and those after it are dropped (bot behaviour, or a late instance at
-its AI start). The old blocks are never written. Late allocation
-(`rbs_skel_more` / `rbs_walk_more`) uses the same helpers. Log: `level
-restart: giant skeleton and Crow walker blocks made again`. Fixture: four
-skeletons (the fourth late) and two walkers restarted with new addresses,
-the old blocks untouched, records found again without a fifth, the fourth
-fighting on its new blocks, an allocation failure, mission 5 and the switch
-off; mutations `restart-*`, `alloc-live-statics`. Unplayed.
+pointers go to the first instance's blocks; an instance whose blocks are not
+usable and those after it are dropped (bot behaviour, or a late instance at
+its AI start). Late allocation (`rbs_skel_more` / `rbs_walk_more`) still
+allocates (`rbs_skel_alloc` / `rbs_walk_alloc`). Log: `level restart: giant
+skeleton and Crow walker blocks set up again in place`. Fixture: four
+skeletons (the fourth late) and two walkers restarted with their blocks
+poisoned: the same addresses, zeroed (a word past a walker effect block
+kept), no allocation, the stock rests seen with each instance's blocks,
+records found again without a fifth, the fourth fighting on its blocks, a
+second restart, an unusable block and effect count, mission 5 and the switch
+off; mutations `restart-*`, `again-*`, `fx-effect-size-swapped`,
+`alloc-live-statics`. Unplayed.
 
 User report (2026-10-31): the trophy monster from story mission 5 is much
 bigger than the Arcade trophy monster and was not selectable. It is a

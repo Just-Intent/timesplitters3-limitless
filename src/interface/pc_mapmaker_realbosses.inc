@@ -166,9 +166,10 @@
  *    scenes 1 and 0x11 and the walker's (sub_00297690) only in 0x51, so in
  *    scene 100 the restarted bosses found their instances by spawn record and
  *    fought on with the last run's state. After the original, each skeleton
- *    and walker instance (late ones too) gets that stock reset with its own
- *    state and statics swapped in, and its per-fight counters cleared; the
- *    blocks, records and statics copies are kept (level memory).
+ *    and walker instance (late ones too) keeps its Level heap blocks (the
+ *    restart frees only heap 0) and record, and sets the blocks up again as
+ *    its level init did (zeroed, the level's statics, the stock init's
+ *    non-allocating rest); its per-fight counters are cleared.
  *  - princess (sub_0029FE00(entity)): for that boss in scene 100, the mansion
  *    variant (a direct call: the callee pops the caller's return address,
  *    exactly the lifted tail jump).
@@ -360,6 +361,7 @@
 #define RBS_WALK_CLASS 0x100000u        /* record +4 -> AI +0x14: sub_002998E0 */
 #define RBS_WALK_STATE 0x0078B1E8u      /* 0x64DC bytes, sub_002976F0 */
 #define RBS_WALK_STATE_SIZE 0x64DCu
+#define RBS_WALK_GRID 0x5C4u            /* state: sub_002BD480(8, 8, 1.0, state + 0x5C4) in its init (0x0029772B) */
 #define RBS_WALK_TAG 0x57454C4Cu        /* 'WELL' */
 #define RBS_RET_WELL 0x0029B331u        /* sub_002998E0: call sub_0023FF20 at 0x0029B32C */
 #define RBS_OBJ_SIZE 0x2E8u             /* level object (table [0x0072F5E8], stride 0x2E8) */
@@ -398,7 +400,7 @@
 extern void sub_00079D60(void),sub_00071630(void),sub_00071C70(void),sub_0005A130(void),sub_00062260(void);
 extern void sub_00287E00(void),sub_0029CEF0(void),sub_00286D30(void),sub_00059DB0(void),sub_000EA9C0(void),sub_0010EB90(void);
 extern void sub_002976F0(void),sub_0015DDA0(void),sub_0029CCB0(void),sub_00019D70(void),sub_002A7F30(void),sub_0005F460(void);
-extern void sub_00287860(void),sub_00297690(void);
+extern void sub_00287860(void),sub_00297690(void),sub_002BD480(void);
 extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
@@ -971,29 +973,76 @@ static int rbs_walk_alloc(RbsWalk *w)
     WORD_AT(RBS_WALK_STATE)=home;
     return ok;
 }
+/* A restarted instance's own blocks set up again as rbs_*_alloc would make
+ * them, with no allocation: the Level heap is not freed by a restart (heap 1,
+ * [0x006B837C]; sub_0003E240 resets only heap 0), so a new block every
+ * restart only used it up. From the level's statics with the instance's
+ * block pointers (and the walker's effect count), each block zeroed as a new
+ * Level block is, then the rest of the stock init: sub_00287860 (skeleton),
+ * sub_002BD480(8, 8, 1.0, state + 0x5C4) and sub_00297690 (walker). The
+ * instance's statics copy is captured; the live statics and boss pointers
+ * are put back. 0: its blocks are not usable. */
+static void rbs_zero(uint32_t a,uint32_t n) { memset((void *)((uintptr_t)a+g_xbox_mem_offset),0,n); }
+static int rbs_skel_again(RbsSkel *k)
+{
+    uint8_t cur[RBS_FX_SIZE];
+    uint32_t st=k->state,pt=k->parts,home=WORD_AT(RBS_SKEL_STATE);
+    if(!st || !pt || !MAPMAKER_PTR_OK(st,RBS_SKEL_STATE_SIZE) || !MAPMAKER_PTR_OK(pt,RBS_SKEL_PARTS_SIZE)) return 0;
+    memcpy(cur,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);
+    rbs_zero(st,RBS_SKEL_STATE_SIZE);rbs_zero(pt,RBS_SKEL_PARTS_SIZE);
+    WORD_AT(RBS_SKEL_STATE)=st;WORD_AT(RBS_SKEL_PARTS)=pt;
+    guest_call(sub_00287860,0);
+    memcpy(k->fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),cur,sizeof cur);              /* the particle pointer too */
+    WORD_AT(RBS_SKEL_STATE)=home;return 1;
+}
+static int rbs_walk_again(RbsWalk *w)
+{
+    uint8_t cur[RBS_FX_SIZE];
+    uint32_t st=w->state,home=WORD_AT(RBS_WALK_STATE);
+    uint32_t pt=mapmaker_fx_word(&w->fx,MAPMAKER_FX_PARTS),n=mapmaker_fx_word(&w->fx,MAPMAKER_FX_EFF_N);
+    uint32_t e0=mapmaker_fx_word(&w->fx,MAPMAKER_FX_EFF0),e1=mapmaker_fx_word(&w->fx,MAPMAKER_FX_EFF1),es=mapmaker_fx_eff_size(n);
+    if(!st || !MAPMAKER_PTR_OK(st,RBS_WALK_STATE_SIZE) || !pt || !MAPMAKER_PTR_OK(pt,MAPMAKER_FX_PARTS_SIZE) ||
+       !es || !e0 || !e1 || !MAPMAKER_PTR_OK(e0,es) || !MAPMAKER_PTR_OK(e1,es)) return 0;
+    memcpy(cur,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),rbs_fx_base,RBS_FX_SIZE);
+    mapmaker_fx_put(MAPMAKER_FX_EFF_N,n);mapmaker_fx_put(MAPMAKER_FX_EFF0,e0);mapmaker_fx_put(MAPMAKER_FX_EFF1,e1);
+    mapmaker_fx_put(MAPMAKER_FX_PARTS,pt);
+    rbs_zero(st,RBS_WALK_STATE_SIZE);rbs_zero(pt,MAPMAKER_FX_PARTS_SIZE);rbs_zero(e0,es);rbs_zero(e1,es);
+    WORD_AT(RBS_WALK_STATE)=st;
+    guest_call(sub_002BD480,4,8u,8u,0x3F800000u,st+RBS_WALK_GRID);
+    guest_call(sub_00297690,0);
+    memcpy(w->fx.b,rbs_g(RBS_FX),RBS_FX_SIZE);
+    memcpy(rbs_g(RBS_FX),cur,sizeof cur);
+    WORD_AT(RBS_WALK_STATE)=home;return 1;
+}
 /* WRAP sub_001CDD60 (the level restart, no args; only at 0x0003D4E1, after
  * the teardown, never the level init above). Its first call
- * sub_0003E740(3) (0x001CDD62) ends in sub_0003E240, which puts the level
- * heap's top [0x006B8388] back to its base [0x006B8380]: every block
- * sub_0003DFA0(n, 1) handed out this level is free again, our skeleton and
- * walker blocks included (the split Crowe area forgets its blocks for the
- * same reason), and whatever the restart allocates next reuses them. Until
- * v0.4.0-mapmaker.40 this kept the old blocks and ran the stock reset on
- * them (user report: four giant skeletons "not spawning correctly and kind
- * of flickering in and out" after a story restart; no throw for minutes in
- * m40b.err, a fight on memory something else then used). So after the
- * original, every instance of this level, late ones too, gets new blocks
- * as at level init (rbs_skel_alloc / rbs_walk_alloc, which end with the
- * stock reset sub_00287860 / sub_00297690) and starts its fight afresh:
+ * sub_0003E740(3) (0x001CDD62) ends in sub_0003E240, which puts heap 0's top
+ * [0x006B8388] back to its base [0x006B8380]: only heap 0 (top-down, the
+ * stock's temporaries and sub_0003E740's own buffer) is freed. The Level heap
+ * sub_0003DFA0(n, 1) is heap 1, [0x006B837C] up (jump table 0x0003E094),
+ * which no call of the restart writes: every skeleton and walker block stays
+ * this level's (test_mapmaker_restart_heap.py). The run before is still in
+ * them: until v0.4.0-mapmaker.31 the restarted bosses fought on with it, and
+ * the .31 fix ran only the stock resets on it (user report .40: four giant
+ * skeletons "not spawning correctly and kind of flickering in and out" after
+ * a story restart; no throw for minutes in m40b.err). After the original,
+ * every instance of this level, late ones too, sets its own blocks up again
+ * as at level init (rbs_skel_again / rbs_walk_again: zeroed, from the level's
+ * statics, the stock init's non-allocating rest) and starts its fight afresh:
  * counters, floor and once-per-fight flags cleared (the walker's guns are
  * deployed again); its spawn record is kept, so the restarted AI start finds
- * it again. One that gets no memory, and any after it, are dropped (bot
- * behaviour, or a late instance at its AI start). The boss pointers go to
- * the first instance's new blocks; the log budget starts afresh. */
+ * it again. No new blocks: the merged .40 fix allocated a set per restart
+ * (about 52 KB a skeleton, 190 KB a walker) and never got the old ones back.
+ * One whose blocks are not usable, and any after it, are dropped (bot
+ * behaviour, or a late instance at its AI start). The boss pointers go to the
+ * first instance's blocks; the log budget starts afresh. */
 void pc_mapmaker_realbosses_restart(void (*original)(void))
 {
     unsigned k,n,skels=0,walks=0;
-    uint32_t rec;
+    uint32_t rec,st,pt;
     original();
     if(!rbs_on()) return;
     rbs.logged=0;
@@ -1006,10 +1055,10 @@ void pc_mapmaker_realbosses_restart(void (*original)(void))
     rbs_skelf.n=0;
     for(k=0;k<n;k++) {
         RbsSkel *t=&rbs_skels[k];
-        rec=t->record;
-        memset(t,0,sizeof *t);                         /* the old blocks are free level heap */
-        t->record=rec;
-        if(!rbs_skel_alloc(t)) { t->record=0;break; }
+        rec=t->record;st=t->state;pt=t->parts;
+        memset(t,0,sizeof *t);                         /* the run before: counters, floor, throws */
+        t->record=rec;t->state=st;t->parts=pt;
+        if(!rbs_skel_again(t)) { memset(t,0,sizeof *t);break; }
         rbs_skelf.n=k+1u;skels++;
     }
     for(k=rbs_skelf.n;k<RBS_INST_MAX;k++) memset(&rbs_skels[k],0,sizeof rbs_skels[k]);
@@ -1017,16 +1066,17 @@ void pc_mapmaker_realbosses_restart(void (*original)(void))
     rbs_walkf.n=0;
     for(k=0;k<n;k++) {
         RbsWalk *w=&rbs_walks[k];
-        rec=w->record;
+        MapmakerFx fx=w->fx;                           /* its block pointers */
+        rec=w->record;st=w->state;
         memset(w,0,sizeof *w);
-        w->record=rec;
-        if(!rbs_walk_alloc(w)) { w->record=0;break; }
+        w->record=rec;w->state=st;w->fx=fx;
+        if(!rbs_walk_again(w)) { memset(w,0,sizeof *w);break; }
         rbs_walkf.n=k+1u;walks++;
     }
     for(k=rbs_walkf.n;k<RBS_INST_MAX;k++) memset(&rbs_walks[k],0,sizeof rbs_walks[k]);
     WORD_AT(RBS_SKEL_STATE)=rbs_skelf.n?rbs_skels[0].state:0u;
     WORD_AT(RBS_WALK_STATE)=rbs_walkf.n?rbs_walks[0].state:0u;
-    rbs_log("level restart: giant skeleton and Crow walker blocks made again (the restart frees the level heap) (skeletons, walkers)",skels,walks);
+    rbs_log("level restart: giant skeleton and Crow walker blocks set up again in place (the restart keeps the Level heap) (skeletons, walkers)",skels,walks);
 }
 /* The boss pointer still holds one of this level's instances (home or a
  * swapped one): nothing else has replaced it. */
