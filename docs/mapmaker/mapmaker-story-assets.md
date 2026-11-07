@@ -57,31 +57,31 @@ Mission numbers follow the story table `0x004D1AC0`: 1 intro (scene 2),
 
 ## Summary table
 
-| # | item | assets | behaviour | MapMaker today | several | effort | main blockers |
-|---|---|---|---|---|---|---|---|
-| 1 | Hidden weapons: TNT 0x2F, time grenade 0x29, uplink 0x38, variant twins | all in gun.pak and `pak/anim/gun/*` | normal projectiles (TNT = mine update `sub_000F39A0`) | weapon list holds every id 1..0x45; these are hidden by unlock type 0 | yes | **cheap** | AI use of TNT; twin semantics |
-| 1b | Story-only "weapons" 0x3C..0x3F (binoculars, whiskey, JB camera, zombie limb) | story paks only | script props | none | - | hard | name text, story ammo types |
-| 2 | Mission 1 big exploding barrel = power cell 0x53D | 34,412 B; l_2_st / l_64_ch (mounted by the mothership port) | init 20 case 12, damage `sub_00218650`, explosion 0x2F | none (barrel is 0x0A) | yes | **cheap** | stand-in record at obj+0x2D8; resource 0xCFB |
-| 3 | Mission 5 wraith (black ghost) | prop 0x1DA/0x242 11,996 B in **gun.pak**; anim 0x13E in lv60.pak (816 B) | global wraith system `sub_0024ABA0`, tag 'WRTH' | none | **no** (one global) | medium-hard | scene gate, rooms, spirit table coordinates |
-| 3b | Mission 5 worms | 0x2C | - | **ported** (worm area) | yes | done | - |
-| 4 | Cut-out targets + scoring | 0xF1..0xFA, 3,652 B each; l_63/64/65/78_ch | challenge kinds 3..5, `sub_0022E7E0`, table `[0x0075CC8C]` | none | <= 75 | medium-hard | what else `[0x7DE470]` switches |
-| 5 | Mission 6 electric zombies | anims 0x247/0x248 lv17_3.pak (66,768 B) | class 400:0 `sub_00282300` | none | INFERRED yes | hard (visual-only variant: cheap) | catacombs tags, pads, emitters |
-| 6 | Mission 6 ghosts | anims 0x249..0x24C lv17.pak (334,016 B) | class 0:40000000 `sub_002BA300`, self-contained | none | **yes** | **cheap-medium** | ghost char id (probe); shared anim ids |
-| 7 | Mission 6 pit skeleton | lv17_4.pak (395,440 B) + l_17_st props | `sub_0029E0A0` | mansion variant ported | <= 4 (instances) | hard | coexisting with the id-0x28 routing; arena |
-| 8 | Mission 6 flying imps = ragbugs | char 0xB0 (chr.pak); anims 0x243..0x246 lv17_4 | class 200000:0 parks them; flock driven by the pit fight | none | <= 6 per skeleton | medium with item 7, hard alone | flock driver lives in the boss |
-| 9 | Mission 7 robots = securibot 0x4D | anims 0xA22..0xA2C lv6.pak (828,752 B) | class 0x4000 `sub_0026B7A0`, no level state | none (0x5C nfrobosec is already a roster row) | yes | **medium** | picker row, lv6 mount |
-| 10 | Mission 7 cleaning robot 0x4F | model 0x609 chr.pak; anims 0xA2C..0xA2F lv6 | INFERRED class 0x4000 family; loop sound 0x365 | none | yes | cheap-medium | which anims and class it really uses (probe) |
-| 11 | Mission 7 slow-motion grenade = weapon 0x29 | gun.pak | projectile type 0xF, explosion 0x2B | hidden (item 1) | yes | cheap to offer, medium to verify | slow-motion code **not found** |
-| 12 | Mission 7 city sky + other story skies | `skyTS3nf1_xbox` 0x790 | sky record 52 | **already offered** (sky-music area) | - | done | - |
-| 13 | Mission 7 red laser pairs + control panels | 0x4E0..0x4E3, about 2 KB each, l_6_st | init 22 `sub_0020C300`: lasers `sub_00209680`, panel damage `sub_0020B8C0`; alarm table `0x0078B2E0` | none | yes (5 lasers per panel group, 18 alarms) | **medium** | stand-in records; alarm rows in scene 100; damage type 0x2F |
-| 14 | Mission 8 robot spiders 0x4A/0x50 | chr.pak; anims lv22.pak (610,832 B) | class 0x2000 `sub_0037B720`; pool `sub_003796B0` (15) | none | up to the pool size | medium-hard | rail paths in descriptor +0x54..+0x60; pool |
-| 15 | Mission 8 mutants = 0x59 "The Freak" | chr.pak; anims 0x76B..0x770 lv22.pak | class 8000:0 `sub_00264A10`, no level state | roster char placeable, stock AI | yes | **medium** | lv22 mount (shared with item 14) |
-| 16 | Mission 8 "rail cameras" | none of their own | the player pilots a rail bot from a wall terminal (`sub_0037ACB0`) | none | - | very hard (drop) | wall-panel pool exists only in scenes 6/17/22 |
-| 17 | Followers (Ash 0x08, Tipper 0x00, Jo-Beth 0x19, Amy 0x44, R-110 0x2D; R-107 0x90) | chr.pak, roster rows | buddy = `sub_00277FE0` by scene tag, one buddy, single player only | placeable as normal AI | placing yes; buddy behaviour 1 | cheap to place, **hard** for story follow | follow movement not located |
-| 18 | Machine Wars "Prometheus" robots = PROMETHEUS SK/8 rocket robot 0x62 (SD/7 guard robots 0x12/0x36/0x75) | chr.pak; anims `animrb.pak` (already mounted in scene 100) | robot list `sub_000D6DD0`, per id, no class | 0xA9/0xAA roster twins already placeable | yes | **cheap** | picker rows only |
-| 19 | Machine Wars tank = driveable future tank, vehicle def 2 | 0xB/0xC/0xD + gibs, stream/lv5/prop1.pak (2.6 MB) | stock vehicle system, builder `sub_00181D40` | vehicles exist (cat. 35, max 4); not our boss tank | yes (4 vehicles) | **medium** | scene-5 gate in `sub_00174120`; templates +0x30/+0x34 |
-| 20 | Scotland the Brave truck = vehicle def 0 | model 7 + Vickers turret 0xE, stream/lv4/prop3.pak (1.36 MB) | builder `sub_00180BA0` | vehicles exist | yes (4 vehicles) | **medium** | seat anims 0x78..0x83 location |
-| 21 | Mission 1 big turrets = 0xE6 prisonfixedgun | 88,716 B, l_2_st / l_26_st | generic class-0x200 turret, gun type 7 | turret categories 27-29 (cat. 29 same system) | yes | **cheap** | gun type 7 effects, flag 0x10000 |
+| # | item | assets | behaviour | MapMaker today | several | effort | main blockers | status |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Hidden weapons: TNT 0x2F, time grenade 0x29, uplink 0x38, variant twins | all in gun.pak and `pak/anim/gun/*` | normal projectiles (TNT = mine update `sub_000F39A0`) | weapon list holds every id 1..0x45; these are hidden by unlock type 0 | yes | **cheap** | AI use of TNT; twin semantics | **wave 1: 0x29, 0x2F, 0x38 in the editor list** (fixture only); twins out |
+| 1b | Story-only "weapons" 0x3C..0x3F (binoculars, whiskey, JB camera, zombie limb) | story paks only | script props | none | - | hard | name text, story ammo types | - |
+| 2 | Mission 1 big exploding barrel = power cell 0x53D | 34,412 B; l_2_st / l_64_ch (mounted by the mothership port) | init 20 case 12, damage `sub_00218650`, explosion 0x2F | none (barrel is 0x0A) | yes | **cheap** | stand-in record at obj+0x2D8; resource 0xCFB | **wave 1: drum Type option, area storyprops** (fixture only) |
+| 3 | Mission 5 wraith (black ghost) | prop 0x1DA/0x242 11,996 B in **gun.pak**; anim 0x13E in lv60.pak (816 B) | global wraith system `sub_0024ABA0`, tag 'WRTH' | none | **no** (one global) | medium-hard | scene gate, rooms, spirit table coordinates | - |
+| 3b | Mission 5 worms | 0x2C | - | **ported** (worm area) | yes | done | - | - |
+| 4 | Cut-out targets + scoring | 0xF1..0xFA, 3,652 B each; l_63/64/65/78_ch | challenge kinds 3..5, `sub_0022E7E0`, table `[0x0075CC8C]` | none | <= 75 | medium-hard | what else `[0x7DE470]` switches | - |
+| 5 | Mission 6 electric zombies | anims 0x247/0x248 lv17_3.pak (66,768 B) | class 400:0 `sub_00282300` | none | INFERRED yes | hard (visual-only variant: cheap) | catacombs tags, pads, emitters | - |
+| 6 | Mission 6 ghosts | anims 0x249..0x24C lv17.pak (334,016 B) | class 0:40000000 `sub_002BA300`, self-contained | none | **yes** | **cheap-medium** | ghost char id (probe); shared anim ids | - |
+| 7 | Mission 6 pit skeleton | lv17_4.pak (395,440 B) + l_17_st props | `sub_0029E0A0` | mansion variant ported | <= 4 (instances) | hard | coexisting with the id-0x28 routing; arena | - |
+| 8 | Mission 6 flying imps = ragbugs | char 0xB0 (chr.pak); anims 0x243..0x246 lv17_4 | class 200000:0 parks them; flock driven by the pit fight | none | <= 6 per skeleton | medium with item 7, hard alone | flock driver lives in the boss | - |
+| 9 | Mission 7 robots = securibot 0x4D | anims 0xA22..0xA2C lv6.pak (828,752 B) | class 0x4000 `sub_0026B7A0`, no level state | none (0x5C nfrobosec is already a roster row) | yes | **medium** | picker row, lv6 mount | - |
+| 10 | Mission 7 cleaning robot 0x4F | model 0x609 chr.pak; anims 0xA2C..0xA2F lv6 | INFERRED class 0x4000 family; loop sound 0x365 | none | yes | cheap-medium | which anims and class it really uses (probe) | - |
+| 11 | Mission 7 slow-motion grenade = weapon 0x29 | gun.pak | projectile type 0xF, explosion 0x2B | hidden (item 1) | yes | cheap to offer, medium to verify | slow-motion code **not found** | **wave 1: offered**; P2 offline: no slow-time code, no level state |
+| 12 | Mission 7 city sky + other story skies | `skyTS3nf1_xbox` 0x790 | sky record 52 | **already offered** (sky-music area) | - | done | - | nothing to do (already offered) |
+| 13 | Mission 7 red laser pairs + control panels | 0x4E0..0x4E3, about 2 KB each, l_6_st | init 22 `sub_0020C300`: lasers `sub_00209680`, panel damage `sub_0020B8C0`; alarm table `0x0078B2E0` | none | yes (5 lasers per panel group, 18 alarms) | **medium** | stand-in records; alarm rows in scene 100; damage type 0x2F | - |
+| 14 | Mission 8 robot spiders 0x4A/0x50 | chr.pak; anims lv22.pak (610,832 B) | class 0x2000 `sub_0037B720`; pool `sub_003796B0` (15) | none | up to the pool size | medium-hard | rail paths in descriptor +0x54..+0x60; pool | - |
+| 15 | Mission 8 mutants = 0x59 "The Freak" | chr.pak; anims 0x76B..0x770 lv22.pak | class 8000:0 `sub_00264A10`, no level state | roster char placeable, stock AI | yes | **medium** | lv22 mount (shared with item 14) | - |
+| 16 | Mission 8 "rail cameras" | none of their own | the player pilots a rail bot from a wall terminal (`sub_0037ACB0`) | none | - | very hard (drop) | wall-panel pool exists only in scenes 6/17/22 | - |
+| 17 | Followers (Ash 0x08, Tipper 0x00, Jo-Beth 0x19, Amy 0x44, R-110 0x2D; R-107 0x90) | chr.pak, roster rows | buddy = `sub_00277FE0` by scene tag, one buddy, single player only | placeable as normal AI | placing yes; buddy behaviour 1 | cheap to place, **hard** for story follow | follow movement not located | - |
+| 18 | Machine Wars "Prometheus" robots = PROMETHEUS SK/8 rocket robot 0x62 (SD/7 guard robots 0x12/0x36/0x75) | chr.pak; anims `animrb.pak` (already mounted in scene 100) | robot list `sub_000D6DD0`, per id, no class | 0xA9/0xAA roster twins already placeable | yes | **cheap** | picker rows only | **wave 1: picker rows 159/160** (fixture only) |
+| 19 | Machine Wars tank = driveable future tank, vehicle def 2 | 0xB/0xC/0xD + gibs, stream/lv5/prop1.pak (2.6 MB) | stock vehicle system, builder `sub_00181D40` | vehicles exist (cat. 35, max 4); not our boss tank | yes (4 vehicles) | **medium** | scene-5 gate in `sub_00174120`; templates +0x30/+0x34 | - |
+| 20 | Scotland the Brave truck = vehicle def 0 | model 7 + Vickers turret 0xE, stream/lv4/prop3.pak (1.36 MB) | builder `sub_00180BA0` | vehicles exist | yes (4 vehicles) | **medium** | seat anims 0x78..0x83 location | - |
+| 21 | Mission 1 big turrets = 0xE6 prisonfixedgun | 88,716 B, l_2_st / l_26_st | generic class-0x200 turret, gun type 7 | turret categories 27-29 (cat. 29 same system) | yes | **cheap** | gun type 7 effects, flag 0x10000 | **wave 1: fixed gun Model option, area storyprops** (fixture only) |
 
 ## Per-item notes
 
@@ -140,6 +140,15 @@ the 6- and 20-slot sets and the save format, and play does not re-check
 unlocks. Start with {0x29, 0x2F}. Leave the twins out until their variant
 flag is understood.
 
+**Wave 1 (2026-11-07, fixture only).** Done in the weaponset area
+(`pc_mapmaker_weaponset_unlock`, editor only): 0x29, 0x2F and 0x38. The
+variant flag is now understood: it becomes the weapon state's mode +0x38
+(0x001BE0A4), so a twin is its neighbour in its other mode; twins stay out.
+P2 offline: the type-0xF projectile path (explosion 0x2B, decal) reads no
+scene or level state and no slow-time code exists on it; the time grenade
+works in MapMaker as an ordinary grenade. Details and test steps:
+[weapon set](mapmaker-weaponset.md) "Hidden weapons".
+
 ### 2. Mission 1 big exploding barrel (intro power cell)
 
 - Model 0x53D `farfuture2/powercell`, type 1, init 20, 34,412 B. In
@@ -161,6 +170,14 @@ flag is understood.
 - Needed: a cover/barrel category variant whose record carries model 0x53D.
   The damage path reads the level record at obj+0x2D8, so it must be a real
   record, not 0 (INFERRED).
+- **Wave 1 (2026-11-07, fixture only):** area `storyprops`
+  ([mapmaker-storyprops.md](mapmaker-storyprops.md)). A placed explosive drum
+  (Props item 0x49) gets an options menu "Type: Explosive drum / Power cell";
+  the choice is item record byte +0xC (stock-unused for it). In play the
+  fill's prop record gets model 0x53D, so the record MapMaker already builds
+  is the stand-in (CONFIRMED: `sub_0006C740` stores it at obj+0x2D8; its +0 is
+  never a CEL tag, so the explosion is 0x2F). l_64_ch is mounted when the map
+  has one; 0xCFB comes with the model request. Several per map: yes.
 
 ### 3. Mission 5 wraith (black ghost)
 
@@ -475,6 +492,14 @@ by a creature class. Their anims are `pak/anim/animrb.pak` (104,288 B,
 same size as 0xAA's (114,004 B; INFERRED same mesh). So only picker rows are
 needed, in the realbosses/tank synthetic-row pattern.
 
+**Wave 1 (2026-11-07, fixture only).** Picker rows in realbosses'
+`rbs_extra`: 159 "Prometheus SK/8" stores 0x62 (preview Arcade 0xAA), 160
+"Prometheus SD/7" stores 0x36 (preview Arcade 0xA9). 0x12 and 0x75 are not
+used: they are the castle tank and mothership placeholders. Both ids are in
+the robot list (byte table 0x000D6E00) and have no Arcade row (decode test
+`test_prometheus_rows_data`). No play hook: the stock robot AI runs them.
+Several per map: yes (ordinary Story AIs).
+
 ### 19 and 20. Vehicles: Machine Wars tank and Scotland the Brave truck
 
 **Stock vehicle system** (CONFIRMED):
@@ -523,6 +548,13 @@ for def/model/templates, and the scene gate for the tank's gibs.
   from 0xE6, and only in scene 26.
 - Port: a category-29 variant with model 0xE6, gun type 7, flags 0x10040 and
   the intro limits, plus a model mount.
+- **Wave 1 (2026-11-07, fixture only):** area `storyprops`
+  ([mapmaker-storyprops.md](mapmaker-storyprops.md)). A placed fixed gun
+  (0x32..0x34) gets "Model: MapMaker gun / Prison gun (mission 1)" after its
+  weapon choice (record byte +0xC). In play the turret record gets model 0xE6
+  and gun type 7 (cat. 29 already writes 0x10040); l_26_st.pak (325 files,
+  every shared file identical elsewhere) is mounted index-only when used. The
+  intro's aim limits are not copied: the stock range option stays.
 
 ## Shared building blocks
 

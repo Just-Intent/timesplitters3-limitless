@@ -731,6 +731,37 @@ static void frontend_screen_tests(void)
     WORD_AT(0x0079094Cu)=102u;WORD_AT(0x0078AD2Cu)=0u;
 }
 
+/* the weapon list offers the hidden weapons in the editor only (sub_001CD9D0 at 0x002BFB08) */
+static void unlock_tests(void)
+{
+    static const uint32_t hidden[3]={0x29u,0x2Fu,0x38u},stock[6]={0x03u,0x27u,0x39u,0x01u,0x3Cu,0x11u};
+    unsigned k;
+    WORD_AT(0x0079094Cu)=102u;
+    for(k=0;k<3u;k++) {
+        fake_answer=0;originals=0;
+        CALL(pc_mapmaker_weaponset_unlock,fake_answer_fn,0x002BFB08u,hidden[k],0u);
+        CHECK(originals==1u && g_eax==1u);
+        fake_answer=1u;CALL(pc_mapmaker_weaponset_unlock,fake_answer_fn,0x002BFB08u,hidden[k],0u);
+        CHECK(g_eax==1u);
+        fake_answer=0;                                   /* the new-map default set, the unlock snapshot: stock */
+        CALL(pc_mapmaker_weaponset_unlock,fake_answer_fn,0x002F9EEDu,hidden[k],0u);CHECK(g_eax==0u);
+        CALL(pc_mapmaker_weaponset_unlock,fake_answer_fn,0x002CB296u,hidden[k],0u);CHECK(g_eax==0u);
+    }
+    for(k=0;k<6u;k++) {                                  /* twins, story props, ordinary ids: stock answer */
+        fake_answer=0;CALL(pc_mapmaker_weaponset_unlock,fake_answer_fn,0x002BFB08u,stock[k],0u);CHECK(g_eax==0u);
+    }
+    fake_answer=0;
+    WORD_AT(0x0079094Cu)=101u;                           /* front end profile sets: stock */
+    CALL(pc_mapmaker_weaponset_unlock,fake_answer_fn,0x002BFB08u,0x2Fu,0u);CHECK(g_eax==0u);
+    WORD_AT(0x0079094Cu)=100u;
+    CALL(pc_mapmaker_weaponset_unlock,fake_answer_fn,0x002BFB08u,0x2Fu,0u);CHECK(g_eax==0u);
+    WORD_AT(0x0079094Cu)=102u;
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);
+    CALL(pc_mapmaker_weaponset_unlock,fake_answer_fn,0x002BFB08u,0x2Fu,0u);CHECK(g_eax==0u);
+    set_env("TSFP_MAPMAKER_LIMITS","1");
+    CALL(pc_mapmaker_weaponset_unlock,fake_answer_fn,0x002BFB08u,0x2Fu,0u);CHECK(g_eax==1u);
+}
+
 int main(void)
 {
     g_xbox_mem_offset=(uintptr_t)memory;
@@ -745,6 +776,7 @@ int main(void)
     choice_tests();
     play_tests();
     frontend_screen_tests();
+    unlock_tests();
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
     printf("mapmaker weaponset ok\n");
     return 0;

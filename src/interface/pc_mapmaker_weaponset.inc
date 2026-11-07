@@ -675,6 +675,36 @@ void pc_mapmaker_weaponset_options(void (*original)(void))
     guest_call(sub_000783D0,0);
 }
 
+/* ---- hidden weapons in the weapon list (story assets wave 1) ----------------
+ * The weapon list builder sub_002BFA70 (the pane's pick list, from a slot row)
+ * walks the list table 0x004FC88C (every id 1..0x45) and skips an id when
+ * sub_001CD9D0(id) == 0 (call 0x002BFB03, return 0x002BFB08). sub_001CD9D0 is
+ * sub_001CD3E0(weapon record 0x004FA144 + id*0x3C, 0): unlock type 0 always
+ * gives 0 (jump table 0x001CD530), even with the unlock-all flag, so these
+ * ids were never offered. In the editor (scene 102, switch on) the builder's
+ * call answers 1 for an allow-list; the new-map default set (0x002F9EE8) and
+ * the unlock snapshot (0x002CB291) keep the stock answer, as does the front
+ * end's profile set list (scene 101). The play set does not re-check unlocks.
+ *  0x29 time grenade, 0x2F TNT, 0x38 temporal uplink (story maps append it).
+ * Left out: the variant twins (record +8 = 1, copied to the weapon state's
+ * mode +0x38 at 0x001BE0A4: the same weapon, name and model in its other
+ * mode), 0x39 (0x38's twin), 0x27 (the monkey gun's twin), 0x01 (no model)
+ * and 0x3C..0x45 (story props, no model or no name). */
+#define WS_UNLOCK_RET 0x002BFB08u
+static int ws_hidden_weapon(uint32_t id) { return id==0x29u || id==0x2Fu || id==0x38u; }
+/* WRAP sub_001CD9D0 (cdecl weapon id -> unlocked). */
+void pc_mapmaker_weaponset_unlock(void (*original)(void))
+{
+    uint32_t id;
+    if(!MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=WS_UNLOCK_RET || !ws_hidden_weapon(id=WORD_AT(g_esp+4u)) ||
+       WORD_AT(WS_SCENE)!=102u || !ws_on()) { original();return; }
+    original();
+    if(!g_eax) {
+        g_eax=1u;
+        ws_diag(0,"weapon list: hidden weapon 0x%02X offered (time grenade 0x29, TNT 0x2F, uplink 0x38)",(unsigned)id);
+    }
+}
+
 /* ---- play -------------------------------------------------------------- */
 /* The map's slots 7-20 in scene 100 (read once per level), or 0. */
 static int ws_play(void)

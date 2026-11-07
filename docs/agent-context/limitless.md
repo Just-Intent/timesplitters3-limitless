@@ -462,7 +462,7 @@ the unchecked 'WELL' lookup, ret 0x0029B331) and `sub_00126560` ->
 `pc_mapmaker_realbosses_fx` (beams `sub_0029CCB0` after ret 0x001CEE8C,
 stock scene 81 only). `_event` drops events at rets 0x0029AEBE/0x0029B120
 and at 0x0029CB80 removes it (`sub_0015DDA0`). bigdraw adds 0x637. Tests
-`test_walker_*`, 34 walk mutations. Not built or played. Tank: not started.
+`test_walker_*`, 34 walk mutations. Unplayed.
 Tile roof menu (user, 2026-11-01): `src/interface/pc_mapmaker_tileflags.inc`
 (area `sky`, after roof). Right click (pointer.inc, after the empty-cell Y
 case) on a placed tile in Tiles mode (`editor+0x254` 0) with nothing held ->
@@ -477,7 +477,8 @@ Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained.
-mapmaker.40: _restart reallocates (restart frees level heap); bs_skel_aim aims a floor up.
+mapmaker.40: _restart reallocates (restart frees level heap); 
+bs_skel_aim aims a floor up.
 Robot doors (.45): stacked one-floor portals combine; `rbt_hold` puts back knee-level moves through low ones (mapmaker-robot.md).
 Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, walk stops at ledges: mapmaker-crowe.md), `tank`
@@ -485,15 +486,14 @@ Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robo
 0x281 from prop6.pak, mapmaker-tank.md). Wrappers, restart: each doc. ORDER puts them
 after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
-`rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8. Tank WRAPs
+`rbs_extra` table in realbosses.inc (159/160 Prometheus); area `storyprops`: drum/gun variants; bigdraw adds 0x5F2/0x5E8. Tank WRAPs
 `sub_0015E7C0` -> `_tank_request` (level-init models), `sub_000A2740` -> `_draw`
 (log); shown (+0x28 bit 0) at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
-Boss areas/skies/open air/set slots: [boss notes](limitless-bosses.md); [.tsmap](map-transfer.md). Anim slots
+Boss areas/skies/open air/set slots/pak table/restart heap: [boss notes](limitless-bosses.md); [.tsmap](map-transfer.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
 draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; music gain/ticks: custom-music.md.
-Pak mount table, restart heap (heap 0; bosses reuse): [boss notes](limitless-bosses.md).
-`tests/mapmaker/test_mapmaker_paktable.py`.
+Pak table test: `tests/mapmaker/test_mapmaker_paktable.py`.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
 of `sub_0029CE00` (+0x3E88 == 1, `sub_002A7F30`). Walker missing: log-only
 WRAP `sub_000DAC30` -> `pc_mapmaker_realbosses_create`, AI-start log; per-level
@@ -679,10 +679,9 @@ map; its page 2 is the `matchbots` area below. Extension memory
 
 `src/interface/pc_mapmaker_weaponset.inc` (not built or played): 20 weapon
 slots with `TSFP_MAPMAKER_LIMITS=1`, no new item types. The play set
-(`sub_0006BD30`, scene 100 rebuilds 0x006F1E28: 0x44 struct, map info count 6)
-is read by slot everywhere (pickup record +0x10 = catalogue +8, Story AI chunk
-word +0x26 is a SLOT, `sub_001C8540` file loads, AI random pick); no caller
-copies it as 0x44, so the hook returns a 20+ id copy at 0x00906000 when the
+(`sub_0006BD30`, scene 100 rebuilds 0x006F1E28: 0x44 struct, map count 6)
+is read by slot (pickup record +0x10 = catalogue +8, Story AI chunk word
++0x26 is a SLOT, `sub_001C8540` loads, AI random pick); none copies 0x44, so the hook returns a 20+ id copy at 0x00906000 when the
 map's custom set is the source. A weapon/ammo pickup's slot 7-20 is record
 byte +0xC (unwritten by `sub_00300800` for categories 8/9) and editor node
 +0x30 ('WS' tag; no stock writer), paired by piece/item key on save/load.
@@ -795,7 +794,7 @@ Sets also wraps `sub_002D2C70` (match start; editor Test map bots from slots 1-1
 Sky also wraps piece move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`) to carry open-roof marks, and text `sub_0003D7B0` (+realbosses).
 Bosses also wraps `sub_0014D1F0` (HUD per viewport) to draw Sub-boss overhead meters via `sub_0013A400` before the stock loop.
 `matchbots.json` moves the 26 live per-actor reads to a 64-entry mirror at 0x00904000 and the rank table to 0x00904100 (every scene); the matchbots area fills them.
-The weaponset area (20 weapon slots) wraps the play set `sub_0006BD30`, pickup slot/veto/spawn and weapon set screen functions, and chains compile/load/reset, `sub_0003D7B0` and `sub_00078590`; roof wraps the label format `sub_00151030` and caption `sub_0032D9F0`.
+The weaponset area (20 slots; list shows hidden 0x29/0x2F/0x38: `sub_001CD9D0`) wraps the play set `sub_0006BD30`, pickup slot/veto/spawn and weapon set screen functions, and chains compile/load/reset, `sub_0003D7B0` and `sub_00078590`; roof wraps the label format `sub_00151030` and caption `sub_0032D9F0`.
 Realbosses adds the giant skeleton: story level init `sub_0025F720`, `sub_0029FE00` variant, `sub_002875F0` emerge, `sub_00287E20` throw and level events `sub_002274C0` (death event dropped).
 bigdraw `sub_000862C0`: bosses on the whole view; skelvis logs; bossroom: bosses in camera room list. openview: walk `sub_00089B90`: open-air areas unclipped (mapmaker-sky.md).
 camera wraps actor update `sub_00246000`: a switch-held camera (mode 0x80, D8/C14 reciprocal) runs with stock skip bit data+8 bit 0 (0x002460E5), so the sweep stops; the walk logs what each view reaches. Test `test_mapmaker_camera.py`; mapmaker-camera.md (4:3 frame fixed in shared pc_display_ui.inc, test_camera_widescreen.py; ~10-floor view open).
