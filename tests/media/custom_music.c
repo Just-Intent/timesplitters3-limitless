@@ -2,8 +2,10 @@
  * (stable indexes, name order, rescans), labels, every WAV form the importer
  * accepts and the ones it refuses, 16-bit conversion, the player's pacing,
  * looping, retry of a refused submission, pause, the watch ending a track,
- * and the Arcade choice file. Run by tests/media/test_custom_music.py, which
- * writes the WAV files into argv[1] first. */
+ * the routing of .mp3 files to the decoder adapter (a fake one here, reading
+ * "FAKE" files; the real one is tests/media/music_codec.c) and the Arcade
+ * choice file. Run by tests/media/test_custom_music.py, which writes the WAV
+ * and FAKE files into argv[1] first. */
 #define PC_CUSTOM_MUSIC_TEST 1
 #define PC_CUSTOM_MUSIC_IMPLEMENTATION 1
 #include "pc_custom_music.h"
@@ -31,6 +33,39 @@ int pc_music_test_submit(const uint8_t *pcm, uint32_t bytes, uint32_t rate, uint
 int pc_music_test_position(uint64_t *played, uint32_t *queued) { *played = played_bytes; *queued = 0; return 1; }
 void pc_music_test_volume(int32_t volume) { last_volume = volume; volumes++; }
 void pc_music_test_reset(void) { resets++; played_bytes = submitted_bytes = 0; }
+
+/* ---- fake decoder adapter: "FAKE" u32 rate, u32 channels, u32 frames, u32 fail_at ---- */
+struct PcMusicCodec { FILE *file; uint32_t rate, channels, frames, fail_at, at; };
+static int codec_available, codec_streams, codec_rewinds;
+static int fake_close(FILE *f) { if (f) { codec_streams--; return fclose(f); } return 0; }
+int pc_music_codec_available(void) { return codec_available; }
+PcMusicCodec *pc_music_codec_open(FILE *file, uint32_t *rate, uint32_t *channels)
+{
+    uint8_t h[20];
+    PcMusicCodec *c;
+    if (!file) return NULL;
+    codec_streams++;
+    if (!codec_available || fread(h, 1, 20, file) != 20 || memcmp(h, "FAKE", 4) || !(c = calloc(1, sizeof *c))) {
+        fake_close(file);
+        return NULL;
+    }
+    c->file = file;
+    memcpy(&c->rate, h + 4, 4); memcpy(&c->channels, h + 8, 4); memcpy(&c->frames, h + 12, 4); memcpy(&c->fail_at, h + 16, 4);
+    *rate = c->rate; *channels = c->channels;
+    return c;
+}
+long pc_music_codec_read(PcMusicCodec *c, int16_t *out, unsigned frames)
+{
+    unsigned k, j;
+    if (c->fail_at && c->at >= c->fail_at) return -1;
+    if (frames > c->frames - c->at) frames = c->frames - c->at;
+    for (k = 0; k < frames; k++)
+        for (j = 0; j < c->channels; j++) out[k * c->channels + j] = (int16_t)((c->at + k) * (j ? -1 : 1));
+    c->at += frames;
+    return (long)frames;
+}
+int pc_music_codec_rewind(PcMusicCodec *c) { codec_rewinds++; c->at = 0; return 1; }
+void pc_music_codec_close(PcMusicCodec *c) { if (c) { fake_close(c->file); free(c); } }
 
 static int watch_result = 1, watch_paused, watch_calls;
 static float watch_gain = 1.0f;
@@ -75,7 +110,9 @@ int main(int argc, char **argv)
 
     /* names */
     CHECK(pc_music_name_ok("a.wav") && pc_music_name_ok("Song Two.WAV"));
-    CHECK(!pc_music_name_ok(".wav") && !pc_music_name_ok("x.mp3") && !pc_music_name_ok("a/b.wav") &&
+    CHECK(pc_music_name_ok("x.mp3") && pc_music_name_ok("Y.MP3") && pc_music_kind("x.Mp3") == PC_MUSIC_KIND_CODEC &&
+          pc_music_kind("x.wav") == PC_MUSIC_KIND_WAV && pc_music_kind("x.ogg") == PC_MUSIC_KIND_NONE);
+    CHECK(!pc_music_name_ok(".wav") && !pc_music_name_ok("x.ogg") && !pc_music_name_ok(".mp3") && !pc_music_name_ok("a/b.wav") &&
           !pc_music_name_ok("a\\b.wav") && !pc_music_name_ok(".hidden.wav") && !pc_music_name_ok(NULL));
     {
         char longname[80];
@@ -85,6 +122,7 @@ int main(int argc, char **argv)
         CHECK(!pc_music_name_ok(longname));
     }
     pc_music_label("My_Song.wav", label, sizeof label); CHECK(!strcmp(label, "My Song"));
+    pc_music_label("Other_Song.MP3", label, sizeof label); CHECK(!strcmp(label, "Other Song"));
     pc_music_label("caf\xC3\xA9.WAV", label, sizeof label); CHECK(!strcmp(label, "caf?"));
     pc_music_label("0123456789012345678901234567890123456789012345.wav", label, sizeof label);
     CHECK(strlen(label) == PC_MUSIC_LABEL_MAX - 1u);
@@ -108,6 +146,13 @@ int main(int argc, char **argv)
     n = pc_music_scan_dir(&list, dir);
     CHECK(n == 9u && list.count == 10u && pc_music_find(&list, "a8.wav") == 0 && pc_music_find(&list, "aaa.wav") == -1);
     CHECK(pc_music_scan_dir(&list, NULL) == 0u && list.count == 10u);
+    /* .mp3 files (z_*.mp3) are listed only while the host has a decoder */
+    codec_available = 1;
+    n = pc_music_scan_dir(&list, dir);
+    CHECK(n == 14u && list.count == 15u && pc_music_find(&list, "z_fake.mp3") >= 10 && pc_music_find(&list, "a8.wav") == 0);
+    codec_available = 0;
+    n = pc_music_scan_dir(&list, dir);
+    CHECK(n == 9u && list.count == 15u && pc_music_find(&list, "z_fake.mp3") == -1);
 
     /* formats */
     CHECK(parse(dir, "a8.wav", &info) == 1 && info.bits == 8 && info.channels == 1 && info.rate == 22050);
@@ -179,6 +224,30 @@ int main(int argc, char **argv)
     pc_music_stop();
     CHECK(!pc_music_playing() && resets == n + 1u);
     pc_music_stop();                                                        /* twice is harmless */
+
+    /* compressed tracks: the decoder adapter, never the WAV reader */
+    CHECK(!pc_music_start("z_fake.mp3", watch, NULL) && codec_streams == 0); /* no decoder */
+    codec_available = 1;
+    CHECK(!pc_music_start("z_bad.mp3", watch, NULL) && codec_streams == 0);  /* decoder refuses: stream closed */
+    CHECK(!pc_music_start("z_slow.mp3", watch, NULL) && codec_streams == 0); /* 4 kHz: out of range */
+    submits = 0; submitted_bytes = played_bytes = 0; codec_rewinds = 0;
+    CHECK(pc_music_start("z_fake.mp3", watch, NULL) && codec_streams == 1);  /* 32 kHz stereo, 1000 frames */
+    pc_music_pump(300);
+    CHECK(last_rate == 32000u && last_channels == 2u);
+    CHECK(first_sample[0] == 0 && first_sample[1] == 0);
+    /* 250 ms at 32 kHz = 8000 frames from a 1000-frame track: it loops */
+    CHECK(submitted_bytes / 4u >= 8000u && submitted_bytes / 4u < 8000u + 4096u && codec_rewinds >= 7);
+    pc_music_stop();
+    CHECK(codec_streams == 0);
+    CHECK(pc_music_start("z_broken.mp3", watch, NULL));                     /* an error after 600 frames */
+    pc_music_pump(400);
+    CHECK(!pc_music_playing() && codec_streams == 0);
+    pc_music_stop();
+    CHECK(pc_music_start("z_empty.mp3", watch, NULL));                      /* no frames at all: ends, no spin */
+    pc_music_pump(500);
+    CHECK(!pc_music_playing() && codec_streams == 0 && codec_rewinds < 1000);
+    pc_music_stop();
+    codec_available = 0;
 
     /* Arcade choice beside the display settings */
     snprintf(ini, sizeof ini, "%s/pc-display.ini", argv[2]);

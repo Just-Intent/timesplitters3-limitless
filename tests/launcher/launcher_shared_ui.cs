@@ -83,6 +83,26 @@ public static class LauncherSharedUiChecks
                 var preview=new SavesPage(folder,true);Need(Find<ComboBox>(preview.View,"MapChoices").Items.Count==0,"Preview listed real maps");
                 File.WriteAllBytes(Path.Combine(dir,"anicemap.mkr"),new byte[100]);page.Reload();Need(!page.ExportMap.IsEnabled && Find<TextBlock>(page.View,"MapDetails").Text.Contains("cannot be exported"),"Damaged map offered for export");
             });
+            MusicLibraryChecks.Run(root,Test);
+            Test("save manager lists imported music and confirms removal",()=>{
+                string folder=MusicLibraryChecks.Fixture(root,"music-page");
+                var page=new SavesPage(folder,false);var tracks=Find<ComboBox>(page.View,"MusicChoices");
+                Need(tracks.Items.Count==0 && !page.RemoveMusic.IsEnabled && Find<TextBlock>(page.View,"MusicDetails").Text.Contains("No imported music"),"Empty music folder not explained");
+                Click(page.ImportMusic);Need(Find<TextBlock>(page.View,"SaveManagerStatus").Text.Contains("not available"),"Import without a picker not explained");
+                bool asked=false;page.PickMusicFiles=()=>{asked=true;return System.Threading.Tasks.Task.FromResult<string[]>(null);};
+                Click(page.ImportMusic);Need(asked && !Directory.Exists(MusicLibrary.Folder(folder)),"Cancelled music import wrote a folder");
+                Directory.CreateDirectory(MusicLibrary.Folder(folder));
+                File.WriteAllBytes(Path.Combine(MusicLibrary.Folder(folder),"Theme.wav"),MusicLibraryChecks.Wav());File.WriteAllBytes(Path.Combine(MusicLibrary.Folder(folder),"Boss.mp3"),MusicLibraryChecks.Mp3(true));
+                File.WriteAllText(Path.Combine(MusicLibrary.Folder(folder),"readme.txt"),"not music");
+                page.Reload();
+                Need(tracks.Items.Count==2 && ((MusicTrack)tracks.SelectedItem).Name=="Boss.mp3" && page.RemoveMusic.IsEnabled,"Music list or removal action missing");
+                Need(Find<TextBlock>(page.View,"MusicDetails").Text.Contains("MP3"),"Track details missing");
+                string recycled=null;page.RecycleMusic=p=>{recycled=p;};
+                Click(page.RemoveMusic);Need(Find<Button>(page.View,"ConfirmMusicRemove")!=null,"Removal did not ask for confirmation");
+                Click(Find<Button>(page.View,"CancelMusicRemove"));Need(recycled==null && File.Exists(Path.Combine(MusicLibrary.Folder(folder),"Boss.mp3")),"Cancelled removal changed music");
+                var preview=new SavesPage(folder,true);Need(Find<ComboBox>(preview.View,"MusicChoices").Items.Count==0,"Preview listed real music");
+                Click(preview.ImportMusic);Need(Find<TextBlock>(preview.View,"SaveManagerStatus").Text.Contains("Preview"),"Preview import not explained");
+            });
             Test("save manager lists dated restore points and requires restore confirmation",()=>{
                 string folder=Path.Combine(root,"saves-page");Directory.CreateDirectory(folder);
                 string saves=Core.PathIn(folder,LauncherPlatform.Saves(folder));Directory.CreateDirectory(saves);File.WriteAllText(Path.Combine(saves,"profile"),"original");

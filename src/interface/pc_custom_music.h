@@ -1,15 +1,16 @@
 #ifndef PC_CUSTOM_MUSIC_H
 #define PC_CUSTOM_MUSIC_H
-/* Imported music: the player's own WAV files, played on a host audio slot in
- * place of a level's music (docs/mapmaker/mapmaker-custom-music.md).
+/* Imported music: the player's own WAV and MP3 files, played on a host audio
+ * slot in place of a level's music (docs/mapmaker/mapmaker-custom-music.md).
  *
  * Shared Windows/macOS code. The folder is TSFP_MUSIC_DIR (the launcher sets
  * it to the install's Music folder) or private/music under the working
- * directory. Only files ending in .wav are listed: RIFF/WAVE PCM 8/16/24/32-bit
+ * directory. Files ending in .wav are read here: RIFF/WAVE PCM 8/16/24/32-bit
  * integer or 32/64-bit float (also WAVE_FORMAT_EXTENSIBLE), 1..8 channels
- * (more than two keep the front pair), 8000..192000 Hz. WAV needs no codec,
- * so both hosts read it with this file alone; other formats are converted
- * before import (the launcher's FFmpeg). Files are streamed, never loaded whole.
+ * (more than two keep the front pair), 8000..192000 Hz; WAV needs no codec.
+ * Files ending in .mp3 go through the host decoder adapter (pc_music_codec_*,
+ * pc_music_codec.c: FFmpeg's libavcodec loaded at run time) and are listed
+ * only while that decoder is available. Files are streamed, never loaded whole.
  *
  * The player runs one host thread that keeps about a quarter second queued on
  * RECOMP_AUDIO_SLOT_MUSIC (0059-custom-music-voice.patch) and asks a watch
@@ -33,6 +34,11 @@ typedef struct PcMusicList {
     unsigned char present[PC_MUSIC_MAX_TRACKS];
 } PcMusicList;
 
+/* pc_music_kind: what a file name is. */
+#define PC_MUSIC_KIND_NONE 0
+#define PC_MUSIC_KIND_WAV 1
+#define PC_MUSIC_KIND_CODEC 2              /* .mp3: decoded by pc_music_codec_* */
+
 typedef struct PcWavInfo {
     uint32_t rate, channels, bits, block;
     int is_float;
@@ -48,9 +54,12 @@ unsigned pc_music_scan(PcMusicList *list);
 unsigned pc_music_scan_dir(PcMusicList *list, const char *dir);
 /* Index of a present entry with this name (case-insensitive), or -1. */
 int pc_music_find(const PcMusicList *list, const char *name);
-/* A name a map may store: a .wav file name, no path, printable, short enough. */
+/* The kind its extension names (case-insensitive), PC_MUSIC_KIND_*. */
+int pc_music_kind(const char *name);
+/* A name a map may store: a .wav or .mp3 file name, no path, printable, short
+ * enough. A map names an MP3 even on a host without the decoder. */
 int pc_music_name_ok(const char *name);
-/* Menu text: the name without .wav, '_' as spaces, ASCII only, at most
+/* Menu text: the name without its extension, '_' as spaces, ASCII only, at most
  * PC_MUSIC_LABEL_MAX - 1 bytes. */
 void pc_music_label(const char *name, char *out, size_t bytes);
 
@@ -61,6 +70,22 @@ int pc_wav_parse(FILE *file, PcWavInfo *info);
 unsigned pc_wav_to_s16(const PcWavInfo *info, const uint8_t *in, size_t frames, int16_t *out);
 /* Linear gain (0..1) to the output's hundredths of a dB. */
 int32_t pc_music_db(float gain);
+
+/* Host decoder adapter for PC_MUSIC_KIND_CODEC files (pc_music_codec.c; a
+ * fixture supplies its own under PC_CUSTOM_MUSIC_TEST). available: 1 when a
+ * decoder can be loaded on this host. open takes the stream (read from its
+ * start) and owns it from then on, closing it on failure too; it returns NULL
+ * when the host has no decoder or the data holds no playable audio, else sets
+ * the rate and the output channels (1 or 2). read writes up to `frames`
+ * interleaved s16 frames and returns how many, 0 at the end, -1 on an error
+ * (a later frame at another rate is an error). rewind restarts at the first
+ * frame: 1 on success. */
+typedef struct PcMusicCodec PcMusicCodec;
+int pc_music_codec_available(void);
+PcMusicCodec *pc_music_codec_open(FILE *file, uint32_t *rate, uint32_t *channels);
+long pc_music_codec_read(PcMusicCodec *codec, int16_t *out, unsigned frames);
+int pc_music_codec_rewind(PcMusicCodec *codec);
+void pc_music_codec_close(PcMusicCodec *codec);
 
 /* The watch runs on the player thread about every 15 ms: return 0 to end the
  * track, else set *gain (0..1) and *paused. It may read guest memory only. */
@@ -120,11 +145,20 @@ int pc_music_dir(char *out, size_t bytes)
     return 1;
 }
 
+int pc_music_kind(const char *name)
+{
+    size_t n = name ? strlen(name) : 0;
+    if (n < 4) return PC_MUSIC_KIND_NONE;
+    if (!pc_music_casecmp(name + n - 4, ".wav")) return PC_MUSIC_KIND_WAV;
+    if (!pc_music_casecmp(name + n - 4, ".mp3")) return PC_MUSIC_KIND_CODEC;
+    return PC_MUSIC_KIND_NONE;
+}
+
 int pc_music_name_ok(const char *name)
 {
     size_t n = name ? strlen(name) : 0, k;
     if (n < 5 || n >= PC_MUSIC_NAME_MAX || name[0] == '.') return 0;
-    if (pc_music_casecmp(name + n - 4, ".wav")) return 0;
+    if (pc_music_kind(name) == PC_MUSIC_KIND_NONE) return 0;
     for (k = 0; k < n; k++) {
         unsigned char c = (unsigned char)name[k];
         if (c < 0x20 || c == 0x7F || c == '/' || c == '\\' || c == ':') return 0;
@@ -136,6 +170,7 @@ static void pc_music_add(PcMusicList *list, const char *name)
 {
     unsigned k;
     if (!pc_music_name_ok(name)) return;
+    if (pc_music_kind(name) == PC_MUSIC_KIND_CODEC && !pc_music_codec_available()) return;
     for (k = 0; k < list->count; k++)
         if (!pc_music_casecmp(list->name[k], name)) { list->present[k] = 1; return; }
     if (list->count >= PC_MUSIC_MAX_TRACKS) return;
@@ -215,7 +250,7 @@ void pc_music_label(const char *name, char *out, size_t bytes)
 {
     size_t n = strlen(name), k, o = 0, cap = bytes < PC_MUSIC_LABEL_MAX ? bytes : PC_MUSIC_LABEL_MAX;
     if (!cap) return;
-    if (n >= 4 && !pc_music_casecmp(name + n - 4, ".wav")) n -= 4;
+    if (pc_music_kind(name) != PC_MUSIC_KIND_NONE) n -= 4;
     for (k = 0; k < n && o + 1 < cap; k++) {
         unsigned char c = (unsigned char)name[k];
         if (c >= 0x80) {                       /* one '?' per UTF-8 character */
@@ -325,6 +360,7 @@ int32_t pc_music_db(float gain)
 
 typedef struct PcMusicPlayer {
     FILE *file;
+    PcMusicCodec *codec;               /* a compressed track: info.rate only */
     PcWavInfo info;
     uint64_t read_bytes;               /* of the data chunk, this pass */
     uint64_t submitted_frames, base_ms;
@@ -412,7 +448,15 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
             heard = (now - p->base_ms) * p->info.rate / 1000u;
         ahead_frames = p->submitted_frames > heard ? p->submitted_frames - heard : 0;
         if (ahead_frames * 1000u >= (uint64_t)PC_MUSIC_LEAD_MS * p->info.rate || queued >= 6u) break;
-        if (!p->pending_frames) {
+        if (!p->pending_frames && p->codec) {
+            long got = pc_music_codec_read(p->codec, p->pcm, PC_MUSIC_CHUNK_FRAMES);
+            if (!got) {                /* loop; a track that yields nothing again ends */
+                if (!pc_music_codec_rewind(p->codec)) return 0;
+                got = pc_music_codec_read(p->codec, p->pcm, PC_MUSIC_CHUNK_FRAMES);
+            }
+            if (got <= 0 || got > (long)PC_MUSIC_CHUNK_FRAMES) return 0;
+            p->pending_frames = (int)got;
+        } else if (!p->pending_frames) {
             uint64_t left = p->info.data_bytes - p->read_bytes;
             size_t want, got;
             if (!left) {               /* loop, as the stock level music does */
@@ -440,6 +484,7 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
 static void pc_music_free(PcMusicPlayer *p)
 {
     if (!p) return;
+    if (p->codec) pc_music_codec_close(p->codec);
     if (p->file) fclose(p->file);
     free(p);
 }
@@ -529,7 +574,22 @@ int pc_music_start(const char *name, PcMusicWatch watch, void *context)
     pc_music_stop();
     if (!watch || !pc_music_name_ok(name) || !pc_music_dir(dir, sizeof dir)) return 0;
     if (!(p = (PcMusicPlayer *)calloc(1, sizeof *p))) return 0;
-    if (!(p->file = pc_music_open(dir, name)) || !pc_wav_parse(p->file, &p->info)) {
+    if (!(p->file = pc_music_open(dir, name))) {
+        pc_music_free(p);
+        return 0;
+    }
+    if (pc_music_kind(name) == PC_MUSIC_KIND_CODEC) {
+        uint32_t rate = 0, channels = 0;
+        FILE *file = p->file;
+        p->file = NULL;                /* the decoder owns it now, failure included */
+        if (!(p->codec = pc_music_codec_open(file, &rate, &channels)) ||
+            rate < 8000u || rate > 192000u || channels < 1u || channels > 2u) {
+            pc_music_free(p);
+            return 0;
+        }
+        p->info.rate = rate;
+        p->info.channels = channels;
+    } else if (!pc_wav_parse(p->file, &p->info)) {
         pc_music_free(p);
         return 0;
     }
