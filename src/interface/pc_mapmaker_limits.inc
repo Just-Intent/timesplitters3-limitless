@@ -4,9 +4,9 @@
  * Pools (on by default when a MapMaker map is played, scene 100;
  * TSFP_MAPMAKER_POOLS=0 restores the original): sub_0009A140 allocates the
  * AI navigation pools from the Level heap with fixed sizes and nothing checks
- * them when pads are appended. Reimplemented here with 8000 regular pads
- * (x 32 B, plus 8000 x 44 B of per-pad AI data), 32,512 links (x 20 B) and
- * 10,496 cover pads (x 32 B); the 20 runtime pads are unchanged. Same order
+ * them when pads are appended. Reimplemented here with 16,384 regular pads
+ * (x 32 B, plus 16,384 x 44 B of per-pad AI data), 32,512 links (x 20 B) and
+ * 14,592 cover pads (x 32 B); the 20 runtime pads are unchanged. Same order
  * and zeroing as the original; the memory comes from the nav block in the
  * runtime heap when pc_mapmaker_memory.inc provides it (2026-11-02), else
  * from the Level heap as the original. Current limits: the defines below,
@@ -66,20 +66,23 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Regular pads (2026-11-02, was 4800): ids are 0x3E9 + index and the 13
- * id-threshold compares now read ids up to 0x2328 as regular
- * (config/guest-code-patches/pads.json pads-idthreshold-*), and regular
- * handles are the index itself (< 0x1F40), so 8000 regular pads decode in
- * play. The pool holds all 8000; the editor keeps 320 spare and allows 7680,
- * 511 pieces of the heaviest tile (14 pads) need 7154. */
-#define MAPMAKER_LIMIT_PADS 7680u
-#define MAPMAKER_POOL_PADS 8000u      /* regular handles 0..0x1F3F, ids 0x3E9..0x2328 */
-/* Cover pads: the runtime pad handles are moved above a 10,240-entry cover
- * handle range (config/guest-code-patches/pads.json, docs/mapmaker/mapmaker-pads.md);
- * the editor keeps 256 spare as stock did (1280 - 1024) for the start-point
- * pads a map adds at load (measured 60). */
-#define MAPMAKER_LIMIT_COVER 9984u    /* 10240 cover handles - 256 */
-#define MAPMAKER_POOL_COVER 10496u    /* 10240 cover handles + 256 guard */
+/* Regular pads (2026-11-07, was 7680; 4800 before 2026-11-02). Layout C
+ * (config/guest-code-patches/pads.json, docs/mapmaker/mapmaker-pads.md):
+ * regular handles are the index (0..0x3FFF), cover handles 0x4000 + index,
+ * runtime 0x7800 + slot. Pad ids keep every stock value: regular pads
+ * 0..7999 are 0x3E9 + index, cover pads 0x2329 + index, and regular pads
+ * from 8000 take 0x5B29 + (index - 8000), above the 14,336 cover ids
+ * (pc_mapmaker_pads.inc maps them; a map of at most 8000 regular pads is
+ * written exactly as before). The pool holds the whole regular handle range;
+ * the editor keeps 256 spare: 1023 pieces of the heaviest tile (14 pads)
+ * need 14,322. */
+#define MAPMAKER_LIMIT_PADS 16128u
+#define MAPMAKER_POOL_PADS 16384u     /* regular handles 0..0x3FFF */
+/* Cover pads (2026-11-07, was 9984 of a 10,240 range): 14,336 cover
+ * handles 0x4000..0x77FF; the editor keeps 256 spare as stock did (1280 -
+ * 1024) for the start-point pads a map adds at load (measured 60). */
+#define MAPMAKER_LIMIT_COVER 14080u   /* 14336 cover handles - 256 */
+#define MAPMAKER_POOL_COVER 14592u    /* 14336 cover handles + 256 guard */
 /* Links (2026-11-02; 12000 template links before, pool 16,336): the A*
  * nodes and routes hold link indices as int16, so the scene-100 pool is fixed
  * at 32,512 entries (indices < 32,767). Play adds stitch links between
@@ -101,12 +104,15 @@
 #define MAPMAKER_LINK_SLACK 256u
 #define MAPMAKER_LIMIT_LINKS (MAPMAKER_POOL_LINKS-MAPMAKER_LINK_SLACK)  /* template + stitch links */
 #define MAPMAKER_LINK_SLOTS_MAX 32u   /* per piece: the level record holds 32 stitch entries (+0x30..+0xF0) */
-/* Pad groups (2026-11-02, was 600): measured 1.5 per piece, so 511 pieces
- * need about 770. Group ids are int16 (pad+8), the group A* node pool is
- * bounded (pc_mapmaker_pads.inc, 8192 nodes) and the group table is sized by
- * count; the N x N distance matrix sub_00275F70 builds is (N+1) x N x 4 B,
- * 4.2 MB at 1024, and takes N x N route searches at load (unmeasured). */
-#define MAPMAKER_LIMIT_GROUPS 1024
+/* Pad groups (2026-11-07, was 1024; 600 before 2026-11-02): mixed maps
+ * measured 1.5 per piece, a full grid of tile 17 at most 1.1 (936 pieces
+ * placed under 1024). Group ids are int16 (pad+8), the group table is sized
+ * by count and the group A* node pool is bounded (pc_mapmaker_pads.inc,
+ * 8192 nodes). The N x N distance matrix of sub_00275F70 (N x N route
+ * searches at load) is built as stock up to 1024 groups; above that
+ * pc_mapmaker_pads.inc computes each entry on its first use with the same
+ * search on the load-time link state. 2047 keeps 1023 pieces at 2 groups. */
+#define MAPMAKER_LIMIT_GROUPS 2047
 /* Pieces (2026-11-07, was 511; 255 before 2026-11-02): one visibility room
  * each, so = MAPMAKER_ROOMS_MAX (rooms.json real rooms 1..0x3FF). Each piece is
  * also one engine object; since 2026-11-07 handles are slot << 21
@@ -137,9 +143,9 @@
 #define MAPMAKER_OBJECTS_EFFECTS 64u    /* >= 30 ring + 20 debris + 5 refusal margin */
 #define MAPMAKER_OBJECTS_RESERVE (MAPMAKER_OBJECTS_CHARACTERS+MAPMAKER_OBJECTS_EFFECTS)
 typedef char mapmaker_limits_effects_reserve[(MAPMAKER_OBJECTS_EFFECTS>=30u+20u+5u)?1:-1];
-/* Regular pads: the pool fits the handle range and every pool id stays at or
- * below the raised id threshold 0x2328. */
-typedef char mapmaker_limits_pad_ids[(MAPMAKER_POOL_PADS<=0x1F40u && 0x3E9u+MAPMAKER_POOL_PADS-1u<=0x2328u &&
+/* Regular pads: the pool fits the regular handle range (below the cover
+ * base 0x4000) and every id, the high ones included, stays an int16. */
+typedef char mapmaker_limits_pad_ids[(MAPMAKER_POOL_PADS<=0x4000u && 0x5B29u+MAPMAKER_POOL_PADS-8000u-1u<=0x7FFFu &&
                                       MAPMAKER_LIMIT_PADS<=MAPMAKER_POOL_PADS)?1:-1];
 /* Links: every pool index fits the int16 A* indices. */
 typedef char mapmaker_limits_link_pool[(MAPMAKER_POOL_LINKS<=0x7FFFu &&

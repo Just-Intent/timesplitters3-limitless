@@ -150,19 +150,19 @@ int main(void)
     /* ---- 7. arcade bot goal ---- */
     BYTE_AT(0x007DE455u)=1u;
     WORD_AT(0x00330000u+0x7Cu)=0x00331000u;WORD_AT(0x00331000u+0x80u)=1u;
-    WORD_AT(0x00331000u+0x684u)=0x4740u+3u;
+    WORD_AT(0x00331000u+0x684u)=0x7800u+3u;
     WORD_AT(0x00715F38u)=0x00332000u;
     WORD_AT(0x00332000u+3u*32u+8u)=0x1234FFF5u;                /* owner pad word -11 */
     WORD_AT(0x00332000u+3u*32u+4u)=0x00000007u;
     CHECK(!run(pc_mapmaker_bugfix_bot_goal,0x00330000u) && g_eax==0xFFFFFFF5u);
     WORD_AT(0x00332000u+3u*32u+8u)=0x00000102u;
     CHECK(!run(pc_mapmaker_bugfix_bot_goal,0x00330000u) && g_eax==0x102u);
-    WORD_AT(0x00331000u+0x684u)=0x4740u+19u;WORD_AT(0x00332000u+19u*32u+8u)=0x2Au;
+    WORD_AT(0x00331000u+0x684u)=0x7800u+19u;WORD_AT(0x00332000u+19u*32u+8u)=0x2Au;
     CHECK(!run(pc_mapmaker_bugfix_bot_goal,0x00330000u) && g_eax==0x2Au);
-    WORD_AT(0x00331000u+0x684u)=0x4740u+20u;CHECK(run(pc_mapmaker_bugfix_bot_goal,0x00330000u));
+    WORD_AT(0x00331000u+0x684u)=0x7800u+20u;CHECK(run(pc_mapmaker_bugfix_bot_goal,0x00330000u));
     WORD_AT(0x00331000u+0x684u)=0x473Fu;CHECK(run(pc_mapmaker_bugfix_bot_goal,0x00330000u));
     WORD_AT(0x00331000u+0x684u)=0x209Eu;CHECK(run(pc_mapmaker_bugfix_bot_goal,0x00330000u)); /* stock base: a cover pad now */
-    WORD_AT(0x00331000u+0x684u)=0x4741u;WORD_AT(0x00331000u+0x80u)=0;
+    WORD_AT(0x00331000u+0x684u)=0x7801u;WORD_AT(0x00331000u+0x80u)=0;
     CHECK(run(pc_mapmaker_bugfix_bot_goal,0x00330000u));      /* not carrying */
     WORD_AT(0x00331000u+0x80u)=1u;BYTE_AT(0x007DE455u)=6u;
     CHECK(run(pc_mapmaker_bugfix_bot_goal,0x00330000u));      /* other modes: original */
