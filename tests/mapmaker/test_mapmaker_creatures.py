@@ -129,9 +129,9 @@ def rows():
 
 def test_rows_and_wiring():
     r = rows()
-    assert [x['label'] for x in r] == ['Catacomb Ghost', 'SecuriDroid XP', 'Mutant (Story)']
+    assert [x['label'] for x in r] == ['Catacomb Ghost', 'SecuriDroid XP', 'Mutant (Story)', 'Pit Skeleton', 'Ragbug']
     assert all(len(x['label']) <= 15 for x in r)                     # rbs_extra label[16]
-    assert [x['row'] for x in r] == [161, 162, 163]                  # after realbosses' 150..160
+    assert [x['row'] for x in r] == [161, 162, 163, 164, 165]        # after realbosses' 150..160
     assert len({x['id'] for x in r}) == len(r) and all(x['level'] == '0' for x in r)
     rb = (ROOT / 'src/interface/pc_mapmaker_realbosses.inc').read_text(encoding='utf-8')
     ans = (ROOT / 'src/interface/pc_mapmaker_animslots.inc').read_text(encoding='utf-8')
@@ -206,7 +206,19 @@ KEPT = {   # label -> anim names of the kept entries
     'SecuriDroid XP': ['minimovefor', 'minimoveforslow', 'minitostillslow', 'minifrmstillslow', 'minirotlft', 'minirotrht',
                        'mini180', 'minifire', 'ministill', 'minifirefor', 'minideath'],
     'Mutant (Story)': ['mutantwalk', 'mutantelecattack', 'mutantleap', 'zomgrow', 'mutantswipe', 'mutanthitreact'],
+    'Pit Skeleton': ['princess_cat_cs', 'princess_low_idle1', 'princess_raise_up', 'princess_pit_fireattack',
+                     'princess_pit_jobetheat', 'princess_pit_roar', 'princess_pit_death', 'princess_attack_feeble_throw',
+                     'ragbugflight', 'ragbugattack', 'ragbugleftdive', 'ragbugrightdive'],
+    'Ragbug': ['ragbugflight', 'ragbugattack', 'ragbugleftdive', 'ragbugrightdive'],
 }
+# The pit fight's rows run with per-level state and the lv17_4 anims the restart unmaps: both are handled by
+# pc_mapmaker_pitboss.inc and proven by test_mapmaker_pitboss.py; the stateless checks below cover the others.
+PIT_SHARED = {'princess_low_idle1', 'princess_raise_up', 'princess_attack_feeble_throw'}
+PIT_ROWS = {'Pit Skeleton': (0x0027DDD3, 0x0029FE00), 'Ragbug': (0x0027DEDE, 0x0028B610)}
+
+
+def stateless():
+    return [x for x in rows() if x['label'] in HANDLERS]
 
 
 def test_registration_tables_and_paks():
@@ -221,7 +233,7 @@ def test_registration_tables_and_paks():
         assert by_pak[path] == (x['table'], x['count']), path
         kept = [entry(rd, x['table'], x['first'] + i) for i in range(x['n'])]
         assert [k[0] for k in kept] == KEPT[x['label']]
-        assert all(not (k[2] & 0x4000) for k in kept), x['label']
+        assert x['label'] in PIT_ROWS or all(not (k[2] & 0x4000) for k in kept), x['label']
     ghost = [entry(rd, 0x00488850, k)[1] for k in range(30, 34)]
     assert ghost == [0x249, 0x24A, 0x24B, 0x24C]
     assert [entry(rd, 0x00482610, k)[1] for k in (3, 13)] == [0xA22, 0xA2C]
@@ -241,6 +253,11 @@ def test_kept_anims_unique_in_scene_100():
                 continue
             if p.startswith('pak/anim/') or p in BOSS_PAKS or (t, c) in mine:
                 for nm, i in table(rd, t, c):
+                    if x['label'] == 'Pit Skeleton' and p == 'pak/stream/lv1/anim/lv1_6.pak':
+                        # the mansion pak names three of the pit anims too, under its own ids (known, documented
+                        # in mapmaker-pitboss.md): only the ids must differ
+                        assert all(i != k[1] for k in kept) and (nm not in [k[0] for k in kept] or nm in PIT_SHARED), nm
+                        continue
                     assert all(nm != k[0] and i != k[1] for k in kept), (x['label'], p, nm)
 
 
@@ -254,7 +271,7 @@ def test_classes_reach_their_handlers():
     assert a[0x0015B9A3].ops[1][4] == 0 and a[0x0015B9A5].ops[0][4] == 0x10 and a[0x0015B9AB].ops[0][4] == 0x14
     assert 0x11000000 in imms(a[0x002421A7]) and 0 in imms(a[0x002421AD])
     for x in rows():
-        site, handler, _ = HANDLERS[x['label']]
+        site, handler = PIT_ROWS[x['label']] if x['label'] in PIT_ROWS else HANDLERS[x['label']][:2]
         assert a[site].call and target(a[site]) == handler and a[site].function == 0x0027D590
         value = x['hi'] or x['lo'] & ~0x10000000           # one bit set in one half, the other half 0
         assert bin(value).count('1') == 1 and (x['lo'] & ~0x10000000 == 0 or x['hi'] == 0)
@@ -315,7 +332,7 @@ def test_handlers_play_only_kept_anims():
     their own: 0x249..0x24B, 0xA22..0xA2B, 0x76B..0x76F)."""
     from test_mapmaker_animslots import registrations, table
     rd, _ = registrations()
-    for x in rows():
+    for x in stateless():
         _, handler, message = HANDLERS[x['label']]
         seen, body = reach([handler] + ([message] if message else []))
         ids = {i: k for k, (_, i) in enumerate(table(rd, x['table'], x['count']))}

@@ -24,6 +24,13 @@ ported bosses' 150..160):
 | 161 | Catacomb Ghost | 0x2F | the zombie 0x17's models | 0:0x50000000 -> `sub_002BA300` | lv17.pak 0x249..0x24C |
 | 162 | SecuriDroid XP | 0x4D | its own (chrs/securibot 0x607) | 0x4000:0x10000000 -> `sub_0026B7A0` | lv6.pak 0xA22..0xA2C |
 | 163 | Mutant (Story) | 0x30 | the mutant 0x59's models | 0x8000:0x10000000 -> `sub_00264A10` | lv22.pak 0x76B..0x770 |
+| 164 | Pit Skeleton | 0x31 | the giant skeleton 0x28's model | 0x20000:0x10000000 -> `sub_0029FE00` | lv17_4.pak 0x23B..0x246 |
+| 165 | Ragbug | 0xB0 | its own (chrs/ragbug 0x6CB) | 0x200000:0x10000000 -> `sub_0028B610` | lv17_4.pak 0x243..0x246 |
+
+Rows 164/165 (wave 3) have per-level state, arena and props, run by
+`pc_mapmaker_pitboss.inc` ([pit skeleton](mapmaker-pitboss.md)); their lv17_4
+entries carry 0x4000, which that area maps again after a restart. The
+stateless checks below cover rows 161..163.
 
 Put the slot in any number of Story AIs: no row has per-level or per-AI
 state, so several per map work as one. The preview shows the zombie, the

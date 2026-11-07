@@ -967,4 +967,11 @@ Ghost 0x2F, 162 SecuriDroid XP 0x4D, 163 Mutant (Story) 0x30; text 0x52420000
 and the label slots `rbs.extra_label[RBS_EXTRA_MAX]` (16, compile-time check).
 Before, 8 rows shared 6 label slots: the Prometheus labels were stored over
 `rbs.logged` and `rbs.meters` (the log budget then looked spent). Fixture:
-14 rows, the creature picks, names and row lookups.
+16 rows, the creature picks, names and row lookups.
+
+Wave 3 adds rows 164 Pit Skeleton (carrier 0x31, made with model 0x5E9)
+and 165 Ragbug (0xB0); their fight is `pc_mapmaker_pitboss.inc`
+([pit skeleton](mapmaker-pitboss.md)). The skeleton claim at the AI start
+(char 0x28 or model 0x5E9) now skips character 0x31 (`RBS_PIT_ID`), so a
+pit skeleton never takes a mansion instance (fixture case, mutation
+`pit-carrier-claimed`).

@@ -85,6 +85,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_weaponset.inc"
 #include "pc_mapmaker_storyprops.inc"
 #include "pc_mapmaker_creatures.inc"
+#include "pc_mapmaker_pitboss.inc"
 #include "pc_mapmaker_tilesets.inc"
 #include "pc_mapmaker_restable.inc"
 /* MapMaker capacity area includes (end) */
@@ -1069,6 +1070,28 @@ void pc_mapmaker_creatures_anims(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_request(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_create(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_request(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_textures(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_level(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_princess(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_message(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_event(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_meter(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_logic(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_failure(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_ragbug(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_boss_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_coll_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_rack_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_bottle_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_bandage_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_bottle_damage(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_fire_type(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_smoke_type(void (*original)(void)) { original(); }
 void pc_mapmaker_bigdraw_rect(void (*original)(void)) { original(); }
 void pc_mapmaker_skelvis_frustum(void (*original)(void)) { original(); }
 void pc_mapmaker_tilesets_menu_row(void (*original)(void)) { original(); }

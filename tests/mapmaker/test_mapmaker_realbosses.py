@@ -130,6 +130,7 @@ MUTATIONS = {
     'skel-done-original': ('    MAPMAKER_GUEST_RET();                              /* done: scene 1 returns (0x00287FD7) */', '    original();'),
     'skel-event-any': ('WORD_AT(g_esp)!=RBS_RET_EVENT || WORD_AT(RBS_SCENE)', 'WORD_AT(RBS_SCENE)'),
     'skel-event-no-ret': ('WORD_AT(g_esp+8u));\n    MAPMAKER_GUEST_RET();\n}', 'WORD_AT(g_esp+8u));\n}'),
+    'pit-carrier-claimed': ('(RBS_H(a+RBS_ACTOR_CHAR)!=RBS_PIT_ID && MAPMAKER_PTR_OK(ent,0x100u) &&', '(MAPMAKER_PTR_OK(ent,0x100u) &&'),
     'skel-meter-shown': (' &&\n       RBS_H(a+RBS_ACTOR_CHAR)!=RBS_SKEL_ID && RBS_H(ent+RBS_ENT_MODEL)!=RBS_SKEL_MODEL &&', ' &&'),
     # the Crow walker (id 0x64)
     'walk-row-missing': ('        if((text=rbs_walk_label())!=0) {', '        if(0) {'),
