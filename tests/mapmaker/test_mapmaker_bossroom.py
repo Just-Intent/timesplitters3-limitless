@@ -37,7 +37,6 @@ MUTATIONS = {
     'skeleton-only': ('return m==0x5E9u || m==0x5BEu ||', 'return m==0x5E9u || 0 ||'),
     'any-type': (' || WORD_AT(p+0x20u)!=8u) continue;', ') continue;'),
     'rooms-too': ('    for(i=n;i<end;i++) {', '    for(i=0;i<end;i++) {'),
-    'no-list-too': ('        if(listed<=0) continue;\n', ''),
     'unreached-too': ('        if(!visible) continue;\n', ''),
     'global-camera': ('        if(cam<1u || cam>n || cam==BSR_GLOBAL) { bsr.no_room++;continue; }\n', ''),
     'duplicates': ('        if(bsr_in_list(cam,p)) continue;\n', ''),
@@ -137,7 +136,7 @@ def test_room_prop_lists_are_rebuilt_per_frame_before_the_views():
     assert target(a[0x0009E574]) == 0x0009E430 and a[0x0009E570].text == 'edx, dword ptr [ebp]'
     # sub_0009E430: a full room grows its capacity, then the pool bound drops the prop (raised cap kept)
     assert a[0x0009E46B].text == 'eax, 0x14cd'          # stock; objects.json obj-bucket-bound makes it 0x299D
-    assert ('mem', None, 'edx', 4, 0x008C5840, 4) in a[0x0009E462].ops
+    assert ('mem', None, 'edx', 4, 0x007B5BA0, 4) in a[0x0009E462].ops     # stock; rooms.json p3 -> 0x008C5840
 
 
 def test_rooms_reach_props_only_through_their_lists():

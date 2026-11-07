@@ -780,7 +780,7 @@ rectangle; skeletons were drawn while the camera's room was in their list and
 hidden while it was not (skeleton 3, whose 2-6 rooms never held it: hidden
 1137 of 1200 passes). Area `rooms`, `src/interface/pc_mapmaker_bossroom.inc`
 (called first by `pc_mapmaker_rooms_buckets`, the `sub_00086C40` body; no new
-WRAP), `tests/mapmaker/test_mapmaker_bossroom.py` (fixture, 21 mutations,
+WRAP), `tests/mapmaker/test_mapmaker_bossroom.py` (fixture, 20 mutations,
 decode checks). Not built or played.
 
 Mechanism (CONFIRMED decode): a prop is reached only through drawn rooms'
