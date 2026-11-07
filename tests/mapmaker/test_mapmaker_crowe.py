@@ -164,11 +164,11 @@ MUTATIONS = {
     'rooms-not-blocked': ('if(crw_lv.off[k] || crw_lv.wall_left[k]) WORD_AT(', 'if(crw_lv.wall_left[k]) WORD_AT('),
     'rooms-floor-height': ('crw_setf(q+4u,y+CRW_BODY_LOW);', 'crw_setf(q+4u,y-CRW_BODY_HIGH);'),
     'rooms-body-wide': ('#define CRW_BODY_HALF 0.3f', '#define CRW_BODY_HALF 3.0f'),
-    'rooms-untrusted-used': ('    if(crw_lv.off[start]) {\n        memset(crw_lv.off,0,sizeof crw_lv.off);\n', '    if(crw_lv.off[start]) {\n'),
-    'rooms-esp-kept': ('    g_esp=sp;\n    if(crw_lv.off[start]) {', '    if(crw_lv.off[start]) {'),
-    'rooms-in-frame': ('    q=(g_esp-0x40u)&~0xFu;', '    q=(g_esp+0x4u)&~0xFu;'),
+    'rooms-untrusted-used': ('    if(crw_lv.off[start]) {\n        g_esp=sp;\n        memset(crw_lv.off,0,sizeof crw_lv.off);\n', '    if(crw_lv.off[start]) {\n        g_esp=sp;\n'),
+    'rooms-esp-kept': ('    g_esp=sp;\n    for(k=0;k<CRW_CELLS;k++) { n+=', '    for(k=0;k<CRW_CELLS;k++) { n+='),
+    'rooms-in-frame': ('    q=(g_esp-0x60u)&~0xFu;', '    q=(g_esp+0x4u)&~0xFu;'),
     'shadow-none': ('    if(r<CRW_ROWS && c<CRW_COLS) crw_shadow(st,r,c);\n', ''),
-    'shadow-only-hole': ('            hit|=crw_lv.off[k];\n            if(hit)', '            hit=crw_lv.off[k];\n            if(hit)'),
+    'shadow-only-hole': ('            hit|=crw_lv.off[k] || crw_gap(', '            hit=crw_lv.off[k] || crw_gap('),
     'shadow-one-way': ('{{1,0},{-1,0},{0,1},{0,-1}}', '{{1,0},{-1,0},{0,1},{0,1}}'),
     # v0.4.0-mapmaker.34: "player cell -1,-1" on every line: an arbitrary walk order
     'player-none': ('    crw_player(st,px,pz);\n', ''),
@@ -224,6 +224,21 @@ MUTATIONS = {
     'meter-sub-hidden': ('    if(k==(int)crw_n || crw_inst[k].boss==CRW_BOSS_SUB || !crw_play())', '    if(k==(int)crw_n || !crw_play())'),
     'meter-any-caller': ('WORD_AT(g_esp)!=CRW_RET_METER) { original();return; }', '0) { original();return; }'),
     'meter-any-actor': ('(!crw_inst[k].record || crw_inst[k].record!=WORD_AT(a+CRW_ACTOR_RECORD));k++) {}', '0;k++) {}'),
+    # v0.4.0-mapmaker.40: ledges, drops and gaps
+    'ledge-no-probe': ('if(!crw_lv.off[k] && !crw_floor_at(pt,crw_getf(c+0x10u),y,crw_getf(c+0x14u))) drop[k]=1u;', 'if(0) drop[k]=1u;'),
+    'ledge-any-height': ('    return crw_sane(f) && fabsf(f-y)<=CRW_STEP;', '    return crw_sane(f);'),
+    'ledge-step-wide': ('#define CRW_STEP 1.0f', '#define CRW_STEP 6.0f'),
+    'ledge-step-none': ('#define CRW_STEP 1.0f', '#define CRW_STEP 0.1f'),
+    'ledge-no-floor-ok': ('PROBE_R)<=0) return 0;', 'PROBE_R)<=0) return 1;'),
+    'ledge-untrusted-start': ('    if(crw_floor_at(pt,crw_getf(c+0x10u),y,crw_getf(c+0x14u))) {', '    if(1) {'),
+    'ledge-drop-not-blocked': ('drops+=drop[k];crw_lv.off[k]|=drop[k]; }', 'drops+=drop[k]; }'),
+    'ledge-globals-kept': ('    WORD_AT(CRW_FLOOR_Y)=keep[0];WORD_AT(CRW_FLOOR_KEEP1)=keep[1];WORD_AT(CRW_FLOOR_KEEP2)=keep[2];\n', ''),
+    'ledge-probe-height': ('#define CRW_PROBE_UP 0x3FA00000u', '#define CRW_PROBE_UP 0x3F800000u'),
+    'ledge-point-in-box': ('q=(g_esp-0x60u)&~0xFu;pt=q+0x40u;', 'q=(g_esp-0x60u)&~0xFu;pt=q+0x8u;'),
+    'gap-ignored': ('            hit|=crw_lv.off[k] || crw_gap(i-step[d][0],j-step[d][1],i,j);', '            hit|=crw_lv.off[k];'),
+    'gap-wrong-side': ('    if(i0==i) return crw_lv.gap_h[i][j<j0?j:j0];', '    if(i0==i) return crw_lv.gap_h[i][j];'),
+    'gap-not-probed': ('crw_lv.gap_h[r][j]=(uint8_t)!crw_floor_at(', 'crw_lv.gap_h[r][j]=(uint8_t)0*!crw_floor_at('),
+    'gap-next-to-ledge': ('                if(crw_lv.off[k] || drop[k]) continue;\n', ''),
 }
 
 
@@ -582,6 +597,26 @@ def test_room_query_like_the_fall_check():
     assert 'guest_call(sub_00087310,3,q,q+0x18u,' in crowe and 'guest_call(sub_00087310,3,q,q+0x18u,' in roof
     # no teleport left: nothing writes the boss's position from the move target
     assert not re.search(r'crw_setf\(ent\+CRW_ENT_X[^;]*CRW_TARGET', crowe)
+
+
+def test_floor_probe_like_the_pad_snap():
+    """The ledge probe asks the floor finder sub_000C3C50 as the pad snap does
+    (point, 1.25, 0.1; room in eax, > 0 when found; the height in [0x004DCB00])."""
+    a = by_address()
+    assert target(a[0x0009AFD4]) == 0x000C3C50
+    assert ('imm', 0x3DCCCCCD) in a[0x0009AFC5].ops and ('imm', 0x3FA00000) in a[0x0009AFCE].ops
+    assert mem(a[0x0009AFDF])[0][4] == 0xA and ('reg', 'ax') in a[0x0009AFDF].ops   # word [pad+0xA] = ax: the room
+    assert any(op[0] == 'mem' and op[4] == 0x004DCB00 for op in a[0x0009B006].ops)
+    # the finder: three cdecl args, the room > 0 only when a floor was found
+    assert a[0x000C3C50].mnemonic == 'sub' and a[0x000C3E5E].mnemonic == 'ret'
+    assert any(op[0] == 'mem' and op[4] == 0x004DCB00 for op in a[0x000C3E43].ops)
+    writes = {mem(i)[0][4] for i in decoded() if 0x000C3C50 <= i.address < 0x000C3E5F and i.mnemonic in ('mov', 'movss')
+              and mem(i) and i.ops[0][0] == 'mem' and mem(i)[0][1] is None}
+    assert writes == {0x004DCB00, 0x004DCAFC, 0x00733088}, writes   # its own body's absolute stores
+    crowe = INC.read_text(encoding='utf-8')
+    assert '#define CRW_PROBE_UP 0x3FA00000u' in crowe and '#define CRW_PROBE_R 0x3DCCCCCDu' in crowe
+    for g in ('0x004DCB00u', '0x004DCAFCu', '0x00733088u'):
+        assert g in crowe
 
 
 def test_restart_runs_no_level_init():

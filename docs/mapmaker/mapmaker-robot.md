@@ -106,6 +106,69 @@ forward from its spawn point). 2-5 walk and attacks (projectiles through
 | `sub_0025F6A0` | `pc_mapmaker_robot_reset` | after the original, with this level's state blocks: for each, `sub_00292550` on it as scene 14 does (pointer put back after), its statics cleared, and the robot counts as not removed again |
 | `sub_0014CC80` | `pc_mapmaker_robot_hud` | chain INSIDE `pc_mapmaker_bosses_hud`: when the focus is one of this level's robots, the focus is cleared for the original and restored after, so the stock bar (with level text 0x163D as label) never shows; the bosses area then draws its Boss bar for a Boss-flagged robot (its name, multipliers), none otherwise |
 
+## Openings lower than the robot (v0.4.0-mapmaker.40)
+
+User report: "giant robots being able to follow the player through walls
+which exceed their height as long as there is some opening/door on the
+ground".
+
+Cause (CONFIRMED, decode): in every walk frame the handler sets actor
++0x684 to the player's pad (the hangar ids are -1, above) and calls the
+stock walk goal `sub_0015D500(entity, [actor+0x684])` (0x00293D22, return
+0x00293D27), which routes over the human-sized pad graph. MapMaker pads and
+links come from the tile templates and the stitches through each
+connection, so every doorway has a link; the robot's collision does not
+stop it there.
+
+Options considered: filtering the stock A* by clearance needs the robot's
+height inside the group and pad searches and the precomputed group distance
+matrix (`sub_00275F70`), which all AIs share; stopping at the first low
+opening and fighting from range alone leaves a robot stuck when a tall way
+round exists. Chosen: **its own reachable pad set, with steering**
+(`pc_mapmaker_robot_goal`, WRAP `sub_0015D500`, only that call):
+
+- Once per level the area reads the pads (`[0x00715F2C]` x `[0x007B6664]`,
+  0x20 each: +4 bit 0 used, +0xA room from the pad snap, +0xC position) and
+  the used links (`[0x00715F30]` x `[0x007B6660]`, 0x14 each: +0 flags
+  0x10000, +4/+8 pad indices; `sub_0009A2C0`, `sub_0009A5B0`). A link between
+  pads of two rooms crosses the portal joining them nearest to its midpoint
+  (room record `[0x00708788]` + room x 0xB4, +4 -> {count, ids}; portal
+  `[[0x0070878C]+id*4]`: +0/+4 rooms, +0x14 int16 vertex count, +0x18
+  vertices of 0xC, `sub_0008C620`/`sub_0008BDD0`); its opening is the
+  vertices' y extent. Links inside one room, with an unknown room or with no
+  portal between the rooms (teleporters) stay open (stock).
+- The robot's height is its entity box top (+0x1AC centre y + +0x1C4 half
+  height, read as at 0x0006B61D..0x0006B68F); 6.0 when that is not between 1 and 40 (INFERRED).
+  A link is passable when its opening is at least the height - 0.25.
+- From the robot's pad (actor +0x678) a breadth-first search gives the pads
+  it reaches (again whenever it stands on a pad outside the set). A player
+  pad outside the set is replaced by the reachable used pad nearest to it:
+  the robot walks to the opening and stays there, attacking by its stock
+  distance rules.
+- When the set has blocked links, the goal is steered: hop distances to the
+  goal over passable links, and the robot gets the last pad of its own room
+  on that path, then the first pad across the opening, one room at a time.
+  Within a room the stock route is used (INFERRED: it stays in the room).
+- The replaced goal is written to the call's argument and to actor +0x684
+  (so the stock goal compare in `sub_0015D500` sees one goal, and the
+  handler's arrival test re-picks the player's pad on arrival); the argument
+  slot is put back after.
+
+Logs (`[mapmaker] robot:`): `giant robot k (height h) reaches n of m pads
+from pad p; b links through openings lower than it blocked (c room
+crossings)` at most 4 times per robot and level, `cannot fit to the
+player's pad: it waits at the nearest pad it reaches` and `steered to the
+opening it fits through` (budgeted).
+
+INFERRED (playtest): that MapMaker portals are the doorway's shape (if a
+tile side is one portal, a robot taller than a floor passes no side of a
+one-floor tile, and one shorter passes every side); the robot's box height;
+that pad steps look smooth. Tests: `low_door()` in
+`tests/mapmaker/mapmaker_robot.c` (a robot facing a low door with and
+without a tall way round, a door as tall as it, the box fallback and a small
+robot, an unknown room, other callers and entities), the `goal-*`
+mutations and the decode test `test_walk_goal_and_pad_graph`.
+
 Health display, as the other real bosses: Boss Off = no health shown; Boss
 bar = the bosses area's bottom bar; Sub-boss bar = nothing (the robot has no
 overhead meter). The handler sets health 55 in state 0; the bosses area
@@ -192,6 +255,7 @@ order relative to existing wrappers in parentheses):
 | `sub_002936C0` | `pc_mapmaker_robot_damage` | **new (several robots)**: robot damage callback (cdecl hit record); same |
 | `sub_0009CC40` | `pc_mapmaker_robot_nav` | new wrapper |
 | `sub_000462B0` | `pc_mapmaker_robot_music` | new wrapper |
+| `sub_0015D500` | `pc_mapmaker_robot_goal` | **new (v0.4.0-mapmaker.40)**: the AI walk goal (cdecl entity, pad index; 63 callers, the hook acts only for return 0x00293D27) |
 | `sub_002274C0` | `pc_mapmaker_robot_event` | any order with `pc_mapmaker_realbosses_event` (different return addresses) |
 | `sub_00126560` | `pc_mapmaker_robot_fx` | any order with `pc_mapmaker_realbosses_fx` |
 | `sub_0025F6A0` | `pc_mapmaker_robot_reset` | new wrapper (the call is a lifted tail jump from `sub_0015E4F0`, which reaches the wrapper as a call, as `sub_0029CEF0` does) |
@@ -242,3 +306,8 @@ guide for MapMaker areas) and regenerate the wrapper patch.
    half); killing one removes only that one; a fifth is a normal bot
    (logged). Restart the level after a death: all fight again.
 6. Story mission 10 still plays stock (all hooks test scene 100).
+7. v0.4.0-mapmaker.40: a Giant Robot in a tall hall (two-floor tiles or open
+   air) with only a normal door to the player's room: it walks to the door
+   and attacks from there, never through it (log: `reaches n of m pads`,
+   `cannot fit to the player's pad`). Add a tall opening elsewhere: it walks
+   round through that (`steered to the opening it fits through`).
