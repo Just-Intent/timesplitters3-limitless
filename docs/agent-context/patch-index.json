@@ -2125,7 +2125,7 @@
     {
       "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch",
       "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch",
-      "sha256": "0fb8e52b43fd416e2e82c2aba6b8b6ee655a59675ccee8d40b338cdcfb75f4ac",
+      "sha256": "2ef3caa637c91fdfec1e6d04fbb5d7863f5dfff53fea79e79dd8171275c74c73",
       "targets": [
         "titles/futureperfect/src/recomp_manual.c"
       ]

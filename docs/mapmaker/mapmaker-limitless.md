@@ -294,7 +294,9 @@ SK/8** (the Machine Wars rocket robot) and **Prometheus SD/7** (the guard
 robot). Put them in Story AIs; any number per map. In Story play they get
 the Machine Wars robot behaviour: the SK/8 fires its own rockets without a
 weapon (until .58 it only played its firing pose). The preview shows their
-Arcade look-alikes. `TSFP_MAPMAKER_CREATURES=0` plays them as bots. The
+Arcade look-alikes. Known (.66): the SK/8 can start its firing pose out of
+range without a rocket and miss up close; stderr now says why each pose did
+or did not launch. `TSFP_MAPMAKER_CREATURES=0` plays them as bots. The
 original game plays such a map with bots and shows an empty name in the
 editor. *Automated tests only.* Details:
 [story creatures](mapmaker-creatures.md#the-prometheus-robots-rows-159160-after-the-v040-mapmaker58-report).

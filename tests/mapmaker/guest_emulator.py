@@ -99,6 +99,8 @@ class Emu:
             return self.r[self.HIGH8[name]] >> 8 & 0xFF
         if name in self.LOW8:
             return self.r[self.LOW8[name]] & 0xFF
+        if name in self.HIGH8:
+            return (self.r[self.HIGH8[name]] >> 8) & 0xFF
         if name in self.LOW16:
             return self.r[self.LOW16[name]] & 0xFFFF
         return self.r[name]
@@ -110,6 +112,9 @@ class Emu:
         elif name in self.LOW8:
             f = self.LOW8[name]
             self.r[f] = (self.r[f] & 0xFFFFFF00) | (v & 0xFF)
+        elif name in self.HIGH8:
+            f = self.HIGH8[name]
+            self.r[f] = (self.r[f] & 0xFFFF00FF) | ((v & 0xFF) << 8)
         elif name in self.LOW16:
             f = self.LOW16[name]
             self.r[f] = (self.r[f] & 0xFFFF0000) | (v & 0xFFFF)
@@ -161,6 +166,7 @@ class Emu:
         self.zf = r & mask == 0
         self.sf = bool(r & (1 << (8 * w - 1)))
         self.cf = self.of = False
+        self.pf = bin(r & 0xFF).count('1') % 2 == 0
 
     def xmm_src(self, i, k):
         import capstone.x86 as x
@@ -347,7 +353,10 @@ class Emu:
             elif m == 'cvtsi2ss':
                 v = self.val(i, 1)
                 self.x[self.xreg(i, 0)][0] = np.float32(v - (1 << 32) if v & 0x80000000 else v)
-            elif m == 'comiss':
+            elif m == 'lahf':
+                ah = (0x80 if self.sf else 0) | (0x40 if self.zf else 0) | (0x04 if self.pf else 0) | 0x02 | (0x01 if self.cf else 0)
+                self.reg_put('ah', ah)
+            elif m in ('comiss', 'ucomiss'):
                 a, b = self.x[self.xreg(i, 0)][0], self.xmm_src(i, 1)
                 if np.isnan(a) or np.isnan(b):
                     self.zf = self.pf = self.cf = True
