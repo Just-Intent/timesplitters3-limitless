@@ -200,3 +200,35 @@ def test_stock_music_code():
     assert read(0x00045E73, 5) == bytes.fromhex('a104147600')
     jukebox = [struct.unpack('<I', read(0x00537210 + 8 * k, 4))[0] for k in range(58)]
     assert jukebox[0] == 0xFFFFFFFF                                           # row 0: the level's music
+
+
+def test_stock_music_slider_code():
+    """The audio menu code the Music slider's ticks past 16 rely on
+    (src/interface/pc_menu_sliders.inc): one descriptor for Settings and the
+    pause menu, the tick's clamp at 16, the bar's call and the profile field."""
+    read = _xbe()
+    call = lambda site, target: read(site, 5) == b'\xe8' + struct.pack('<i', target - site - 5)
+    # descriptor 0x0052377C: build 0x002C3E20, tick 0x002C3720 (pc_display_menu_lookup)
+    assert struct.unpack('<II', read(0x0052377C, 8)) == (0x002C3E20, 0x002C3720)
+    assert read(0x002CBE1A, 5) == bytes.fromhex('687c375200')                 # Settings: push 0x52377C
+    assert read(0x002EC215, 5) == bytes.fromhex('687c375200')                 # pause menu: push 0x52377C
+    # tick: active check, focused item, id 1 enabled, Left/Right bits, clamp 16
+    assert call(0x002C372C, 0x00074720) and call(0x002C37C8, 0x00071A60)
+    assert read(0x002C37D8, 6) == bytes.fromhex('8b481483f904')               # id 4 first ...
+    assert read(0x002C387D, 3) == bytes.fromhex('844828')                     # ... id 1: test [eax+0x28],cl
+    assert read(0x002C3882, 12) == bytes.fromhex('8b8ec4000000f7c100000400')  # menu+0xC4 & 0x40000 (Left)
+    assert read(0x002C388E, 5) == bytes.fromhex('a1bc365200')                 # mov eax,[0x5236BC]
+    assert read(0x002C38A4, 6) == bytes.fromhex('f7c100000800')               # & 0x80000 (Right)
+    assert read(0x002C38B0, 1) == b'\x40' and read(0x002C38B3, 3) == bytes.fromhex('107c05')  # inc; cmp 16; jl
+    assert read(0x002C38B6, 12) == bytes.fromhex('b8100000003bd0a3bc365200')  # mov eax,16; store the word
+    assert call(0x002C38C4, 0x00045C60)
+    # painters: fraction = word x 1/16, bar sub_000814B0 called from these sites
+    for word, mul, site in ((0x002C3508, 0x002C3521, 0x002C35F4), (0x002C3618, 0x002C3631, 0x002C3704)):
+        assert read(word, 5) == bytes.fromhex('a1bc365200')
+        assert read(mul, 8) == bytes.fromhex('f30f5905c45d4700')              # mulss [0x475DC4] (1/16)
+        assert call(site, 0x000814B0) and read(site - 1, 1) == b'\x50'       # push eax (the fraction) last
+    # the profile keeps the word at +0x120: load, accept and back
+    assert read(0x002C3341, 11) == bytes.fromhex('8b8020010000a3bc365200')
+    assert read(0x002C39B9, 12) == bytes.fromhex('8b0dbc365200898820010000')
+    assert read(0x002C3AC6, 12) == bytes.fromhex('8b0dbc365200898820010000')
+    assert read(0x002D259D, 10) == bytes.fromhex('c705bc3652000b000000')     # a new profile: 11

@@ -50,14 +50,14 @@ in `assets/textures` (DDS via Git LFS), audited by `tools/textures/build_texture
 Private art stays local. Networking: `src/network/`, HLE/kernel patches and
 `tools/network/online.py`; [Online UI](multiplayer-ui.md). Crash capture:
 `src/diagnostics/`, runtime crash hooks and launcher diagnostics.
-Audio: `src/hle/hle_dsound*`, `hle_xmv*`; [beta](../development/positional-audio.md), [own, trim](custom-music.md).
+Audio: `src/hle/hle_dsound*`, `hle_xmv*`; [beta](../development/positional-audio.md), [own, trim, ticks](custom-music.md).
 General buffering, lifecycle, format and device recovery are unconditional;
 Enhanced Audio controls only the optional mix. Effects adapt their default
 lead from 40 to 90 ms and refill immediately after skipping stale hitch data.
 Explicit lead overrides stay fixed. See [recovery contracts/tests](audio-buffers.md).
 `audio_output.h` owns `RECOMP_AUDIO_DEFAULT_GAIN` (0.5, about -6 dB).
 XAudio applies it once to the master, SDL once per stream: quieter at 100%,
-saved Music/Sound sliders, curves and mix unchanged. An explicit `RECOMP_AUDIO_GAIN` still overrides it.
+saved Music/Sound sliders, curves and mix unchanged. Explicit `RECOMP_AUDIO_GAIN` overrides it.
 Find the connecting patch by symbol/path using `tools/repo-context.py find`.
 
 Consult `docs/development/shared-platform.md` for shared versus adapter responsibilities.
