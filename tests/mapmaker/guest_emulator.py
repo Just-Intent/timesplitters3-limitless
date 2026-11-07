@@ -182,18 +182,25 @@ class Emu:
         return {'je': self.zf, 'jne': not self.zf, 'jl': self.sf != self.of, 'jge': self.sf == self.of,
                 'jle': self.zf or self.sf != self.of, 'jg': not self.zf and self.sf == self.of,
                 'ja': not self.cf and not self.zf, 'jbe': self.cf or self.zf, 'jb': self.cf, 'jae': not self.cf,
-                'jp': self.pf, 'jnp': not self.pf}[m]
+                'jp': self.pf, 'jnp': not self.pf, 'js': self.sf, 'jns': not self.sf}[m]
 
     def fmem(self, i, k):
         return float(self.rf(self.addr(i, k)))                # fld dword: float to double, exact
 
-    def run(self, eip, end, limit):
+    def run(self, eip, end, limit, stubs=None):
+        """stubs: {address: fn(emu)} run in place of a callee (fn reads its stack, sets eax; the
+        stub then returns like a cdecl ret)."""
         import capstone.x86 as x
         np = self.np
+        stubs = stubs or {}
         while eip != end:
             self.steps += 1
             if self.steps > limit:
                 raise RuntimeError('step limit')
+            if eip in stubs:
+                stubs[eip](self)
+                eip = self.pop()
+                continue
             i = self.code[eip]
             m = i.mnemonic
             nxt = eip + i.size
@@ -278,6 +285,8 @@ class Emu:
                     self.r['esi'] += n * step
                 self.r['edi'] += n * step
                 self.r['ecx'] = 0
+            elif m in ('sete', 'setne'):
+                self.put(i, 0, int(self.zf if m == 'sete' else not self.zf))
             elif m in ('nop', 'int3'):
                 if m == 'int3':
                     raise RuntimeError(f'{eip:#x} int3')

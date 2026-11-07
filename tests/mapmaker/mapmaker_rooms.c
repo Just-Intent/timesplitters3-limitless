@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00920000/4], g_eax, g_esp;
+static uint32_t memory[0x00920000/4], g_eax, g_esp, g_ebx;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
@@ -29,6 +29,8 @@ static uint32_t build_calls,build_args[5],build_bad,build_n;
 /* word draw buckets: tests/mapmaker/mapmaker_rooms_buckets.c */
 void sub_0001A010(void) {} void sub_000A79B0(void) {} void sub_003442B0(void) {}
 void sub_00086AE0(void) {} void sub_00344350(void) {} void sub_00087720(void) {}
+static volatile int stub_light[3]; /* room light spread callees: bodies of their own */
+void sub_00094250(void) { stub_light[0]++; } void sub_00094290(void) { stub_light[1]++; } void sub_00356800(void) { stub_light[2]++; }
 /* Fake tree query: offers fake_hits[] (with repeats) to a model of the
  * callback sub_00087260, which lists a room once (record flag 0x10) as
  * room*2 | in-box bit. */
