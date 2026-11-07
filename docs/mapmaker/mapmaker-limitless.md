@@ -366,20 +366,28 @@ without the switch, just without clouds. *Automated tests only.*
 
 ### Open-sky tiles (`LIMITS`)
 
-The last tile category of every tileset ends with two extra 1x1 tiles,
-numbered after the stock 45: **46. Small Open (No Roof)** (the Small Open
-tile without its ceiling, so you see the sky) and **47. Small Open (Open
-Air)** (floor only: no ceiling and no walls). The name shows under the
-palette preview, in the label over a placed tile ("46.Small Open (No Roof)",
-like the stock "1.Small Open") and when the placed tile is selected. The
-editor never draws ceilings, so No Roof looks like Small Open there; Open Air
-shows its walls gone. Placed, moved and copied tiles keep their type, also
-after playing the map and returning to the editor, and a saved map reloads
-them. In play the open tiles show the sky
-and let weather in. Hidden walls and ceilings have no collision: rockets leave
-through the top, and you can walk out of an Open Air tile's sides, so keep it
-away from the map edge. The original game plays the map open too, but
-re-saving it there turns them back into Small Open. *Automated tests only.*
+In Tiles mode, right-click a placed tile (nothing held) to open its **Roof**
+menu: **Normal**, **No roof** (no ceiling, so you see the sky), **Open air
+(bounded)** (no ceiling or walls drawn, but invisible walls keep you on the
+tile) or **Open air (unbounded)** (no ceiling or walls; walking off the map
+edge is a fatal fall). Right-click one of several selected tiles (Escape
+or B selects) to set them all. The label over a flagged tile adds the flag,
+for example "1.Small Open (Open Air, Unbounded)". Flags stay when tiles are
+moved or copied, after playing and returning to the editor, and in saved
+maps. In play, open tiles show the sky and let weather in. From an open-air
+tile you see the tiles around it whole: their walls, floors and ceilings,
+also from outside and from tiles with no doorway into the open area.
+
+The two extra palette tiles **46. Small Open (No Roof)** and **47. Small
+Open (Open Air)** are gone; the Roof menu does the same for any tile. Maps
+that used them still load and play as before: those tiles appear as "1.Small
+Open" with the matching flag (47 becomes Open air (unbounded)), and you can
+change the flag from the menu.
+
+Unbounded walls and ceilings have no collision: rockets leave through the
+top, and you can walk out of the tile's sides. The original game plays the
+map open too, but re-saving it there turns the tiles back into normal ones.
+*Automated tests only.*
 `TSFP_MAPMAKER_ROOM_MASK_CLEAR` stays a developer test switch. Details:
 [open sky](mapmaker-sky.md).
 

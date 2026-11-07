@@ -233,8 +233,11 @@ in `docs/mapmaker/mapmaker-meter-probe.md`.
 ## Open-air tiles (`TSFP_MAPMAKER_LIMITS=1`)
 
 User request: a tile that looks like the overlap glitch (floor only, no roof,
-no walls, sky visible), placed from the special/extra tile category of every
-tileset. Files: `src/interface/pc_mapmaker_roof.inc`, `tests/mapmaker/mapmaker_roof.c`,
+no walls, sky visible). It began as two tile-8 palette presets ("46. Small
+Open (No Roof)", "47. Small Open (Open Air)"); since the tile roof menu
+(below) flags any tile, the presets were removed (user, 2026-11-07: "Remove
+two tiles I had you create as bounded and unbounded. They are not needed now
+that we have the tile flag."). Files: `src/interface/pc_mapmaker_roof.inc`, `tests/mapmaker/mapmaker_roof.c`,
 `tests/mapmaker/test_mapmaker_roof.py`. Built and played since v0.4.0-mapmaker.7; the bounded/unbounded split is not built or played yet.
 
 ### Mask bits (CONFIRMED)
@@ -278,9 +281,8 @@ player.]"
 
 - **Old maps:** `0x5202` keeps its meaning, so every open-air tile saved
   before the split loads and plays as **Open air (unbounded)** (its old
-  behaviour, now with the fall kill). Palette entry 47 is the same preset,
-  renamed "Small Open (Open Air, Unbounded)". Bounded has no palette entry; it
-  is set from the tile roof menu (any tile, tile 8 included). An older build
+  behaviour, now with the fall kill). Every mode is set from the tile roof
+  menu (any tile, tile 8 included). An older build
   ignores mark `0x5203` (unknown mode) and a stock game plays the record's
   `+8`, so a bounded tile shows there as No roof with visible walls.
 - **Bounded, draw only (CONFIRMED statically, not played).** Saving the No
@@ -432,64 +434,25 @@ player.]"
   carry over but clear on a restarted character's first tick above the floor
   (`out`) or first query inside a room (`noroom`); a dead one's on its death.
 
-### Palette entry ("tile category in each set")
+### Palette presets (removed 2026-11-07)
 
-- The tile menu (descriptor `0x0052DDF0`: build `sub_00316B50`, highlight
-  `sub_00316920`) lists categories from two static 12-byte tables
-  `{text, list, count}`: `0x0052DAC0` (8 rows, used when editor `+0x200` is
-  set) and `0x0052DB20` (3 rows), read only at `0x00316C1E`/`0x00316C26`
-  (decoder). The category lists are the same for every tileset (the tileset
-  only selects models), so one entry appears in every tileset. Each entry
-  becomes an item via `sub_000792B0(0, tile, 0, ..., sub_00316500,
-  sub_003165C0)`; the item keeps the tile id at `+0x14`; the menu's
-  highlighted item is `+0x198` and its data `+0x18C` (`0x00077061..
-  0x0007706A`).
-- The hook appends tile 8 twice (1x1, four sides + one "up" point, no mask
-  callback) to the **last** category: text 0xA36 = tiles 15 and 30 in the
-  8-row table (INFERRED to be the special/extra category: both tiles carry
-  catalogue flag `+0x12 = 0x04`), text 0xA30 in the 3-row table (which has no
-  special row). The first added item is **Small Open (No Roof)**, the
-  second **Small Open (Open Air)**. They show the tile-8 picture (the stock
-  draw callback `sub_003165C0` draws the tile from `+0x14`). The table is
-  restored right after the build, the list lives in 136 bytes from
-  `xbox_HeapAlloc`.
-- Names (CONFIRMED): the palette has no per-item text; the caption under
-  the preview is the tile name, `sub_0003D7B0(catalogue[tile] +8)` for the
-  tile `[palette+0x90]` (`0x0032E5C8..0x0032E5CF`); the label over the grid
-  is the name of the piece under the cursor (`editor+0x2F18`, else the held
-  piece `+0x2F7C`; `0x0031165C..0x00311718`); the selected piece's name comes
-  from `sub_00317C40` (`0x00317C54..0x00317C5B`). Tile 8's name is text
-  0x0A3F, "Small Open". The text hook answers 0x0A3F at exactly those three
-  return addresses (`0x0032E5D4`, `0x0031171D`, `0x00317C60`), in the
-  editor, with "Small Open (No Roof)" / "Small Open (Open Air)" (64 bytes
-  from `xbox_HeapAlloc`) for a highlighted open entry or an open piece; every
-  other lookup is the stock one.
-- Numbers (CONFIRMED, the v0.4.0-mapmaker.7 report): the number in front of
-  a name is catalogue `+4`, 1..45 in palette order (tile 8 = 1). The caption
-  draws it with `sub_0032D9F0` (eax number, -1 = none in the 3-category
-  palette, ecx name; `"%d. "` at `0x0049F838`, call `0x0032E5DE`), the grid
-  label with `sub_00151030("%d.%s", number, name)` (`0x0049F7C0`, call
-  `0x00311724`). `pc_mapmaker_roof_caption` / `pc_mapmaker_roof_format`
-  replace the number with **46 / 47** when the name is one of the open
-  labels (only those two call sites, by return address). The stock formats
-  are kept: the palette reads "46. Small Open (No Roof)" / "47. Small Open
-  (Open Air)", the grid label "46.Small Open (No Roof)" like the stock
-  "1.Small Open" (no space there in stock either); the selected piece's name
-  has no number in stock and gets none.
-- **Why not a new tile id:** every tile id indexes fixed 45-entry tables:
-  `0x00783F40` (filled by `sub_003089E0`, counter `0x00783FF4` follows),
-  `0x00785000`, `0x00789440` (`sub_00330DF0`), `0x00785080 + (tileset*45 +
-  cat[+0x11])*64`, the catalogue `0x00529510` (stride 0x140) and the play
-  builder `sub_0008A780` (`0x0008A863`, no bound); a map with id >= 45 would
-  crash a stock game and the validator rejects it. So the entry is a UI preset:
-  the piece is stock tile 8 and the map stores the open mask; the validator
-  needs no change.
-- Hover (`sub_00316920`) sets the palette preview instance mask
-  (`0x00316AF8..0x00316B16`); the hook shows the open mask and puts the stock
-  value back when another tile is highlighted. Pick (`sub_00316500`) derives
-  the new piece's `+0x44` from that preview (`0x00316573..0x0031657A`), so
-  the stock value is restored for the call; the created held piece
-  (`editor+0x2F7C`, `0x0031659E`) is marked.
+The two presets were stock tile 8 with a mark: the palette's last category
+got two more tile-8 items while the menu was built (hooks on `sub_00316B50`,
+`sub_000792B0`, `sub_00316920`, `sub_00316500`), and their names and numbers
+46/47 came from hooks on `sub_0003D7B0` and `sub_0032D9F0` (and the first
+branch of the `sub_00151030` hook). Those six hooks are gone; the palette,
+tile names and caption are stock again. Why no new tile id was possible
+(still true): every tile id indexes fixed 45-entry tables (`0x00783F40`,
+`0x00785000`, `0x00789440`, `0x00785080 + (tileset*45 + cat[+0x11])*64`, the
+catalogue `0x00529510`, the play builder `sub_0008A780`).
+
+**Old maps (CONFIRMED by the fixture).** A map that used a preset holds tile
+8 with record word `+0x26` = `0x5201` (46, No roof) or `0x5202` (47, Open
+air, now Open air (unbounded)) and the open `+8`, the same as a tile flagged
+from the roof menu. The load hook puts the mark back on the piece, so it
+loads as **1. Small Open** with its flag: the grid label reads "1.Small Open
+(No Roof)" / "1.Small Open (Open Air, Unbounded)", the right-click menu shows
+the flag and can change it, and play is unchanged. No conversion is needed.
 
 ### Storage and persistence
 
@@ -596,9 +559,9 @@ INFERRED.
 
 ### Not done
 
-- Per-map "Open all roofs" checkbox: skipped (the palette entries cover the
+- Per-map "Open all roofs" checkbox: skipped (the tile roof menu covers the
   request; a map-wide flag would need another info bit and a play-side hook).
-- English-only names; the palette picture is tile 8's.
+- English-only flag names in the grid label.
 
 ### Wrappers (area `sky`)
 
@@ -608,36 +571,31 @@ INFERRED.
     WRAP sub_002FEBF0 -> pc_mapmaker_roof_reset
     WRAP sub_003006C0 -> pc_mapmaker_roof_compile
     WRAP sub_00301A90 -> pc_mapmaker_roof_load
-    WRAP sub_00316B50 -> pc_mapmaker_roof_menu_init
-    WRAP sub_000792B0 -> pc_mapmaker_roof_menu_add
-    WRAP sub_00316920 -> pc_mapmaker_roof_menu_hover
-    WRAP sub_00316500 -> pc_mapmaker_roof_menu_pick
     WRAP sub_002F95E0 -> pc_mapmaker_roof_move
     WRAP sub_00308120 -> pc_mapmaker_roof_copy
     WRAP sub_00308480 -> pc_mapmaker_roof_piece_free
-    WRAP sub_0003D7B0 -> pc_mapmaker_roof_text
     WRAP sub_00151030 -> pc_mapmaker_roof_format
-    WRAP sub_0032D9F0 -> pc_mapmaker_roof_caption
     WRAP sub_0008A780 -> pc_mapmaker_roof_play
     WRAP sub_00085710 -> pc_mapmaker_roof_rooms
     WRAP sub_0008F6B0 -> pc_mapmaker_roof_draw
     WRAP sub_0003C440 -> pc_mapmaker_roof_tick
 
-All but the text hook call their original exactly once (no
-`MAPMAKER_GUEST_RET`); `pc_mapmaker_roof_text` returns its string with
-`MAPMAKER_GUEST_RET` for the three tile-name call sites and otherwise calls
-the original. `sub_00151030` (sprintf into `0x00749368`, 204 callers) and
-`sub_0032D9F0` (3 callers) are new, unwrapped targets; both hooks only
-change the number argument (stack word / eax) before the original and test
-a pointer first, so they cost one compare per call. `sub_0003D7B0` is already wrapped (realbosses text); chain
-the layers in either order (each handles a different id). Chains:
+Removed on 2026-11-07 (the integrator drops their lines and regenerates):
+`sub_00316B50 -> pc_mapmaker_roof_menu_init`, `sub_000792B0 ->
+pc_mapmaker_roof_menu_add`, `sub_00316920 -> pc_mapmaker_roof_menu_hover`,
+`sub_00316500 -> pc_mapmaker_roof_menu_pick`, the roof layer of
+`sub_0003D7B0` (`pc_mapmaker_roof_text`; realbosses and weaponset keep
+theirs) and `sub_0032D9F0 -> pc_mapmaker_roof_caption` (no other layer:
+the wrapper goes). Prototypes and stubs are gone too.
+
+Every remaining hook calls its original exactly once (no
+`MAPMAKER_GUEST_RET`). `sub_00151030` (sprintf into `0x00749368`, 204
+callers) only swaps the name argument for one return address and tests a
+counter first. Chains:
 `sub_003006C0` (container, aitemplates, sky compile) and `sub_00301A90`
 (editor, aitemplates) and `sub_002FEBF0` (sky reset) already have layers; the
 roof hooks only act after the original returns, so any layer order works
-(outermost is simplest). `sub_00316B50`/`sub_00316920`/`sub_00316500` are
-reached only through the menu descriptor/item callbacks (the dispatch table
-resolves them to the wrapper). `sub_000792B0` is the generic menu add (every
-menu); its hook only compares a flag set during the tile menu build. Include
+(outermost is simplest). Include
 `pc_mapmaker_roof.inc` after `pc_mapmaker_skymask.inc`; it uses
 `mapmaker_limits`, `MAPMAKER_PTR_OK`/`MAPMAKER_STACK_OK`, `WORD_AT`,
 `FLOAT_AT`, `xbox_HeapAlloc`, `g_xbox_mem_offset` and `guest_call`. It calls
@@ -662,30 +620,21 @@ are new targets. No guest-code table entry is added.
 ### What the user tests
 
 1. Build with the wrappers; `TSFP_MAPMAKER_LIMITS=1`.
-2. Editor, any tileset: open the tile list, go to the last category (the
-   one with tiles 15/30): it ends with two more 1x1 tiles. Highlight them:
-   the caption reads "46. Small Open (No Roof)" and "47. Small Open (Open
-   Air)" (stock tiles 1..45 keep theirs); the Open Air preview has no walls.
-   Point at a placed open tile: the label reads "46.Small Open (No Roof)" /
-   "47.Small Open (Open Air)" (stock style "1.Small Open"). Repeat in another
-   tileset.
-3. Place an Open air tile in the middle of a floor of normal tiles and one at
-   the map edge; place an Open roof tile; in the 3D view the open-air tile
-   shows a floor without walls (log: `roof: open air tile picked`, no `roof:`
-   warning). Move one with pick-up/drop and copy one: both stay open.
-   Undo/redo once.
-   Put a start point on a normal tile placed before the open tiles.
-4. Save, back to the main menu, load the map: still open (log has no
-   `roof:` warning). Play: look up and around (sky, neighbours' walls over the
-   edge), with weather on (rain inside the open tiles only), 2-4 player split
-   screen. Quit the match back to the editor: the open tiles still show
-   without walls and keep their 46/47 labels (no `roof:` warning); copy one
-   and play again: every open tile (the copy too) is still open.
+2. Editor, any tileset: the tile list's last category ends with its stock
+   tiles (no 46/47 entries); every caption keeps its stock number.
+3. Load a map saved with a 46/47 tile: it is a "1.Small Open" with "(No
+   Roof)" / "(Open Air, Unbounded)" in its grid label; right-click it: the
+   menu shows that flag. Play: open as before. Move and copy it: it stays
+   flagged. Undo/redo once.
+4. Flag tiles from the right-click menu (below), put a start point on a tile
+   placed before them, save, back to the main menu, load: still flagged (no
+   `roof:` warning). Play: look up and around (sky, neighbours' walls over
+   the edge), weather on, 2-4 player split screen. Quit to the editor: the
+   tiles keep their flags; copy one and play again: still open.
 5. Walk through the open sides into neighbouring tiles; at the map edge walk
-   out (expect a fall); fire a rocket straight up from inside; let AI path
-   through.
-6. Load the same map in a session without the switch: it still plays open;
-   re-save it there and it becomes a normal tile (expected).
+   out; fire a rocket straight up from inside; let AI path through.
+6. Load the map without the switch: it still plays open; re-saving it there
+   makes the tiles normal (expected).
 7. Story smoke test: one indoor and one outdoor level unchanged.
 
 ## Tile roof menu (right click, `TSFP_MAPMAKER_LIMITS=1`)
@@ -728,13 +677,13 @@ sets `editor+0x25C |= 0x4000000`, pushes `sub_00079860(root, desc, -1)` at
 | `sub_00303E10` -> `pc_mapmaker_tileflags_tiles` | with a remembered piece still under the pointer: allocates once a heap descriptor `{sub_00319300, sub_003192E0, 0, 0}`, a choice word and the texts, sets the word to the tile's current flag, opens the menu with `sub_002FB230`, and skips that frame's tile input (`MAPMAKER_GUEST_RET`) |
 | `sub_00319300` -> `pc_mapmaker_tileflags_build` | for that descriptor only (menu `+4`): the stock frame (`sub_00075B70(0x8400, 0, 50, 0, sub_002FB3C0)`, `+0x218` = 1, `sub_00071B10(1, 0.5, 1, 1)`, `sub_00071C50(0x20000)`), one choice row "Roof" built like the weaponset area's pickup Weapon choice (`sub_00079DE0(text, 1, 0x08000800, 0, 0)`, `sub_0007D4A0`, `sub_00071800` Normal 0 / No roof 1 / Open air (bounded) 2 / Open air (unbounded) 3, `sub_00078590(word)`, `sub_000783D0`), the stock Done row (text 0xB5E, `sub_00079D60` with `sub_002FB3C0`), `sub_00075E70` and the stock position call; the pickup menu itself is the original |
 | `sub_003192E0` -> `pc_mapmaker_tileflags_tick` | for that descriptor: when the word changed to row 0..3, the piece (still the same tile id) gets that row's roof mode (rows 0..3 -> modes 0, 1, 3 bounded, 2 unbounded, `tf_modes`, so saved marks keep their values); if it was selected when the menu opened, every selected piece in the editor list does too; then the original (Back closes). The menu opens on the tile's own row |
-| `sub_00151030` (roof format hook) | the grid label of any other flagged piece, and of a bounded tile 8, reads "<number>.<name> (No Roof)" / "(Open Air, Unbounded)" / "(Open Air, Bounded)" (heap copy of the name); tile 8 No roof / unbounded keep "46./47." |
+| `sub_00151030` (roof format hook) | the grid label of any flagged piece, tile 8 included, reads "<number>.<name> (No Roof)" / "(Open Air, Unbounded)" / "(Open Air, Bounded)" (heap copy of the name) |
 
 Selecting tiles: a mouse right click no longer selects a placed tile in
 Tiles mode; Escape (Back in the editor) and the gamepad B button still do. A
 right click with a piece held still rotates it; on an empty cell it still
-clears the selection. The palette's 46/47 entries stay, so older maps and the
-old way keep working. Undo: a flag change is not its own undo step (the next
+clears the selection. The 46/47 palette presets were removed (2026-11-07);
+maps that used them load with the same flags. Undo: a flag change is not its own undo step (the next
 rebuild stores it).
 
 What the user tests:
@@ -776,21 +725,21 @@ What the user tests:
   read-only check, relocated tables, node dump (once per model and table,
   stride, drawn/hidden, per-model and per-run caps, read-only; 7 more mutations).
 - `tests/mapmaker/test_mapmaker_roof.py` (fixture `tests/mapmaker/mapmaker_roof.c`): Open
-  roof / Open air: limits and scene gates, palette table patched only during
-  the build and restored, items by pointer, hover/pick preview, masks, record
+  roof / Open air flags: limits and scene gates, masks, record
   mark and mask, load matching, forget on reset/reuse, record walk bounds,
   items after the pads, play -> editor reload -> copy -> play round trip,
-  grid label and numbers 46/47, Open air (bounded): saved walls, editor view,
+  grid label flags (stock number, held piece, no memory), two-sided draws
+  (bit 0x40000 for the call only, stock bit kept, without bounded rooms),
+  Open air (bounded): saved walls, editor view,
   mark 0x5203 load, rooms by build order (with the mask cross-check), draw
   hiding and restore; Open air (unbounded): kill height from the lowest
   floor, live/dead/entry checks, scene gate, 64-entry bound, 16-bit model id, partial record walk, hidden-node count, the
   60-tick out-of-map rule, human players from their player structs, the
-  no-room rule (8 queries every 6 ticks, body box, reset, no memory) (97
-  mutations);
+  no-room rule (8 queries every 6 ticks, body box, reset, no memory);
   plus XBE data (category tables, descriptor, tile 8, tile numbers 1..45,
   both formats, floor height 5.0) and decoder checks (record word +0x26
   unused, hook and label sites, record sizes, editor start load, node-mask
-  tests, draw/room/tick/kill sites).
+  tests, draw/room/tick/kill sites, the cull-none flag sites).
 - `tests/mapmaker/test_mapmaker_skymask.py` (fixture `tests/mapmaker/mapmaker_skymask.c`): the
   room mask switch: off by default, scene 100 only, after the original, the
   relocated table only, build record untouched, 256-entry bound, one summary per
@@ -800,8 +749,9 @@ What the user tests:
   (skipped without the private XBE).
 - `tests/mapmaker/test_mapmaker_openview.py` (fixture `tests/mapmaker/mapmaker_openview.c`):
   rooms seen across open air (see "Seeing across open air"): open marks for
-  bounded/unbounded only, gates, areas by portal, closed neighbours, union,
-  depth, cap, rebuild per build, bad tables, log text (27 mutations); decoder
+  bounded/unbounded only, gates, areas by portal, closed neighbours, rooms
+  beside by box (margin, NaN/empty boxes), two-sided marks, union, depth,
+  cap, rebuild per build, bad tables, log text; decoder
   checks of the walk, its entries and the room list.
 
 ## Sky-tile test session (user, dev switch + probe)
@@ -918,3 +868,62 @@ around fully; repeat with bounded tiles; stand inside a closed tile and look
 out a doorway at the field (only the doorway shows it, as before); put a
 closed building in the field (its outer walls show from every side); 2-4
 player split screen; frame rate on a large all-open map; the log lines above.
+
+### Walls across open air (2026-11-07)
+
+User report: "when looking at tiles with walls on the other side of
+unbounded tiles, you can see the ceiling and floors of some of the tiles but
+not the walls of any."
+
+Cause (CONFIRMED in code; that tile walls have no outward faces is INFERRED
+from the stock editor never showing a tile from outside):
+- Room geometry is drawn single-sided. The room draw `sub_000A2900` reads
+  render state 6 (the cull mode: `sub_00021440`/`sub_00021450` cache, values
+  0 / 0x900 / 0x901) and switches the stock 0x900 to 0x901 for mirrored
+  rooms (record `+0xB2 & 3`, `0x000A2997..0x000A29C9`), restoring it after
+  (`0x000A2AF2..0x000A2B03`). A tile's polygons face into its room, so from
+  outside its walls are back faces. Its floor (seen from above) and ceiling
+  (seen from below) are front faces from any eye height between them: that
+  is exactly "floors and ceilings but no walls".
+- Tiles beside an open area with no portal into it (a side without a
+  connection point) were not in the openview touched set at all, so some
+  tiles showed nothing.
+
+Fix:
+- `pc_mapmaker_openview.inc`: the touched set also takes every closed room
+  whose box (record `+0x10` min xyz, `+0x1C` max xyz; `sub_000873F0` reads it,
+  `sub_00087450` tests a point against it) touches an open room's box within
+  0.5 (beside, diagonal, above or below; boxes with NaN, absurd or empty
+  extents are skipped). Once per build, no guest calls; at most rooms x open
+  rooms box tests. Every touched room and every open room is marked
+  `mapmaker_roof_play.twosided`.
+- `pc_mapmaker_roof_draw` (the existing `sub_0008F6B0` wrapper): for the
+  geometry prop of a two-sided room (same checks as the bounded draw:
+  `+4` = inst, 16-bit model `0x907 + room`) it sets prop `+0x28` bit
+  0x40000 for the call and clears it after (only if it set it). The stock
+  `sub_0008F6B0` then sets cull mode 0 for pass 0 and restores the saved
+  mode after the nodes (`0x0008F805..0x0008F822`, `0x0008F8C4..0x0008F8E4`;
+  decoder test `test_cull_none_flag_sites`). The bit's other two readers
+  (`0x000A6045` in `sub_000A5F40`, `0x000D84E6` in `sub_000D84C0`) are prop
+  ray/update code, not reached from the draw. Collision, the node masks and
+  bounded walls are unchanged.
+- Cost: draws of the touched rooms' geometry lose back-face culling (GPU
+  overdraw only); the hook stays one counter test per draw on maps without
+  open air.
+
+Not changed: rooms that touch no open room and are reached by no portal from
+one (behind a closed tile, or across a gap) stay as the stock walk leaves
+them; a wall's outside shows the inside texture mirrored and lit as inside.
+
+Logs: the openview build line now ends `(P portals read, N rooms, B beside
+by box, T two-sided)`; the first eight two-sided draws log `roof: room R
+drawn two-sided (seen across open air)`.
+
+New wrappers: none; no table change.
+
+Playtest: an unbounded field with closed tiles around it, some joined to
+the field by a doorway, some with a solid side to it, one diagonal, one a
+floor up; stand in the field and look at each from every side: walls,
+floor and ceiling all show; walk into a closed tile: its inside looks as
+before; repeat from inside a closed tile looking out across the field;
+bounded tiles still hide their walls; 2-4 player split screen; frame rate.
