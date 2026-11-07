@@ -204,6 +204,9 @@
 #define CRW_PROBE_R 0x3DCCCCCDu         /* 0.1: its radius, as the pad snap */
 #define CRW_STEP 1.0f                   /* floor height difference a walk may step (more: a ledge or a drop) */
 #define CRW_FLOOR_Y 0x004DCB00u         /* sub_000C3C50 result: the floor height found */
+#define CRW_RISE 1.25f                  /* the reference floor search climbs one search height at a time */
+#define CRW_RISE_N 9u                   /* ... up to 11.25 over the spawn height (two floors and more) */
+#define CRW_GAP_OFF 0.25f               /* gap samples this far either side of the midpoint (not on a tile seam) */
 #define CRW_FLOOR_KEEP1 0x004DCAFCu     /* ... and the two globals it also writes (put back after the probes) */
 #define CRW_FLOOR_KEEP2 0x00733088u
 #define CRW_TRACE_MAX 40u               /* fight state changes logged per boss and level */
@@ -260,6 +263,8 @@ struct crw_boss_s {
     unsigned eggs, air, calls, trace, beats;   /* skipped eggs, calls in state 9, fight calls, log lines */
     unsigned stall, clamps;             /* state 9 calls without progress; player cells stood in */
     float best;                         /* the walk's nearest distance to its target so far */
+    float ground;                       /* the reference floor under its start cell (crw_rooms) */
+    int ground_ok;                      /* ... found: 1 under the spawn, 2 above it */
     uint8_t off[CRW_CELLS];             /* cell centre in no MapMaker room at the boss's height, or over a drop */
     uint8_t gap_h[CRW_ROWS][CRW_COLS-1u];   /* no floor at its height between cell (r, c) and (r, c+1) */
     uint8_t gap_v[CRW_ROWS-1u][CRW_COLS];   /* ... between (r, c) and (r+1, c) */
@@ -617,19 +622,60 @@ static uint32_t crw_start_cell(uint32_t g,float oz,uint32_t *row,uint32_t *col)
  * neighbouring cells are probed the same way (a gap between two good cells).
  * cells blocks those and what lies beyond them in line with the boss. A start
  * cell with no floor at the boss's height means the probe cannot be trusted
- * here: only the room results count. */
-static int crw_floor_at(uint32_t pt,float x,float y,float z)
+ * here: only the room results count.
+ *
+ * v0.4.0-mapmaker.42 ("the splitter crows aren't moving at all now"): every
+ * cell is compared with the reference floor, the floor the finder gives
+ * under the boss's own (start) cell, not with the spawn height: from the
+ * spawn height first (a pad stands 0.01 over the floor the pad snap found,
+ * 0x0009B006), then, when no floor is there within a step, climbing in
+ * search heights up to 11.25 for a floor above the spawn (a spawn under its
+ * floor). The room query uses that floor too when it had to climb. The gap
+ * between two cells is sampled 0.25 either side of their midpoint and is a
+ * gap only when both samples find no floor at the reference height: with
+ * the spawn on a pad (MapMaker tiles are 6 wide, pads at their centres) the
+ * cells' x midpoints are exactly on tile seams (SUSPECTED: the finder's
+ * point-in-room step can miss a point on a seam, which blocked the whole
+ * row). */
+static int crw_floor_y(uint32_t pt,float x,float y,float z,float *f)
 {
-    float f;
     crw_setf(pt,x);crw_setf(pt+4u,y);crw_setf(pt+8u,z);
     if((int32_t)guest_call(sub_000C3C50,3,pt,CRW_PROBE_UP,CRW_PROBE_R)<=0) return 0;
-    f=crw_getf(CRW_FLOOR_Y);
-    return crw_sane(f) && fabsf(f-y)<=CRW_STEP;
+    *f=crw_getf(CRW_FLOOR_Y);
+    return crw_sane(*f);
+}
+static int crw_floor_at(uint32_t pt,float x,float ref,float z)
+{
+    float f;
+    return crw_floor_y(pt,x,ref,z,&f) && fabsf(f-ref)<=CRW_STEP;
+}
+/* The reference floor under (x, z) for a boss at height y: 0 none found. */
+static int crw_ground(uint32_t pt,float x,float y,float z,float *g,unsigned *steps)
+{
+    unsigned i;
+    float f;
+    *steps=0;
+    if(crw_floor_y(pt,x,y,z,&f) && fabsf(f-y)<=CRW_STEP) { *g=f;return 1; }
+    for(i=1;i<=CRW_RISE_N;i++)
+        if(crw_floor_y(pt,x,y+(float)i*CRW_RISE,z,&f) && f>y+CRW_STEP) { *g=f;*steps=i;return 1; }
+    return 0;
+}
+/* A gap between cell centres a and b: no floor at the reference height on
+ * either side of the midpoint. */
+static int crw_gap_at(uint32_t pt,uint32_t a,uint32_t b,float ref)
+{
+    float ax=crw_getf(a+0x10u),az=crw_getf(a+0x14u),bx=crw_getf(b+0x10u),bz=crw_getf(b+0x14u);
+    float mx=(ax+bx)*0.5f,mz=(az+bz)*0.5f,dx=bx-ax,dz=bz-az,l=sqrtf(dx*dx+dz*dz);
+    if(!(l>0.001f)) return !crw_floor_at(pt,mx,ref,mz);
+    dx*=CRW_GAP_OFF/l;dz*=CRW_GAP_OFF/l;
+    return !crw_floor_at(pt,mx-dx,ref,mz-dz) && !crw_floor_at(pt,mx+dx,ref,mz+dz);
 }
 static void crw_rooms(uint32_t st,float y)
 {
     uint32_t sp=g_esp,q,pt,k,c,start=crw_lv.row*CRW_COLS+crw_lv.col,keep[3];
-    unsigned n=0,drops=0,gaps=0,r,j;
+    unsigned n=0,drops=0,gaps=0,r,j,steps=0;
+    int found;
+    float ref=y,ry;
     uint8_t drop[CRW_CELLS];
     memset(crw_lv.off,0,sizeof crw_lv.off);
     memset(crw_lv.gap_h,0,sizeof crw_lv.gap_h);memset(crw_lv.gap_v,0,sizeof crw_lv.gap_v);
@@ -637,42 +683,42 @@ static void crw_rooms(uint32_t st,float y)
     if(!MAPMAKER_STACK_OK(0x100) || g_esp<0x00010200u || start>=CRW_CELLS) return;
     q=(g_esp-0x60u)&~0xFu;pt=q+0x40u;               /* box, 8 result words, the probe point */
     g_esp=q;
+    keep[0]=WORD_AT(CRW_FLOOR_Y);keep[1]=WORD_AT(CRW_FLOOR_KEEP1);keep[2]=WORD_AT(CRW_FLOOR_KEEP2);
+    c=st+CRW_GRID+start*CRW_CELL;
+    found=crw_ground(pt,crw_getf(c+0x10u),y,crw_getf(c+0x14u),&ref,&steps);
+    ry=found && steps?ref:y;
+    crw_lv.ground=ref;crw_lv.ground_ok=found?(steps?2:1):0;
     for(k=0;k<CRW_CELLS;k++) {
         float x,z;
         c=st+CRW_GRID+k*CRW_CELL;
         x=crw_getf(c+0x10u);z=crw_getf(c+0x14u);
-        crw_setf(q,x-CRW_BODY_HALF);crw_setf(q+4u,y+CRW_BODY_LOW);crw_setf(q+8u,z-CRW_BODY_HALF);
-        crw_setf(q+0xCu,x+CRW_BODY_HALF);crw_setf(q+0x10u,y+CRW_BODY_HIGH);crw_setf(q+0x14u,z+CRW_BODY_HALF);
+        crw_setf(q,x-CRW_BODY_HALF);crw_setf(q+4u,ry+CRW_BODY_LOW);crw_setf(q+8u,z-CRW_BODY_HALF);
+        crw_setf(q+0xCu,x+CRW_BODY_HALF);crw_setf(q+0x10u,ry+CRW_BODY_HIGH);crw_setf(q+0x14u,z+CRW_BODY_HALF);
         crw_lv.off[k]=guest_call(sub_00087310,3,q,q+0x18u,CRW_QUERY_OUT)==0u;
     }
     if(crw_lv.off[start]) {
+        WORD_AT(CRW_FLOOR_Y)=keep[0];WORD_AT(CRW_FLOOR_KEEP1)=keep[1];WORD_AT(CRW_FLOOR_KEEP2)=keep[2];
         g_esp=sp;
         memset(crw_lv.off,0,sizeof crw_lv.off);
         crw_log("split Crowe start cell is in no room: arena cells not checked (cell, state)",start,st);
         return;
     }
-    keep[0]=WORD_AT(CRW_FLOOR_Y);keep[1]=WORD_AT(CRW_FLOOR_KEEP1);keep[2]=WORD_AT(CRW_FLOOR_KEEP2);
-    c=st+CRW_GRID+start*CRW_CELL;
-    if(crw_floor_at(pt,crw_getf(c+0x10u),y,crw_getf(c+0x14u))) {
+    if(found) {
         for(k=0;k<CRW_CELLS;k++) {
             c=st+CRW_GRID+k*CRW_CELL;
-            if(!crw_lv.off[k] && !crw_floor_at(pt,crw_getf(c+0x10u),y,crw_getf(c+0x14u))) drop[k]=1u;
+            if(!crw_lv.off[k] && !crw_floor_at(pt,crw_getf(c+0x10u),ref,crw_getf(c+0x14u))) drop[k]=1u;
         }
         for(r=0;r<CRW_ROWS;r++)
             for(j=0;j<CRW_COLS;j++) {
-                uint32_t a=st+CRW_GRID+(r*CRW_COLS+j)*CRW_CELL,b;
+                uint32_t a=st+CRW_GRID+(r*CRW_COLS+j)*CRW_CELL;
                 k=r*CRW_COLS+j;
                 if(crw_lv.off[k] || drop[k]) continue;
                 if(j+1u<CRW_COLS && !crw_lv.off[k+1u] && !drop[k+1u]) {
-                    b=a+CRW_CELL;
-                    crw_lv.gap_h[r][j]=(uint8_t)!crw_floor_at(pt,(crw_getf(a+0x10u)+crw_getf(b+0x10u))*0.5f,y,
-                                                              (crw_getf(a+0x14u)+crw_getf(b+0x14u))*0.5f);
+                    crw_lv.gap_h[r][j]=(uint8_t)crw_gap_at(pt,a,a+CRW_CELL,ref);
                     gaps+=crw_lv.gap_h[r][j];
                 }
                 if(r+1u<CRW_ROWS && !crw_lv.off[k+CRW_COLS] && !drop[k+CRW_COLS]) {
-                    b=a+CRW_COLS*CRW_CELL;
-                    crw_lv.gap_v[r][j]=(uint8_t)!crw_floor_at(pt,(crw_getf(a+0x10u)+crw_getf(b+0x10u))*0.5f,y,
-                                                              (crw_getf(a+0x14u)+crw_getf(b+0x14u))*0.5f);
+                    crw_lv.gap_v[r][j]=(uint8_t)crw_gap_at(pt,a,a+CRW_COLS*CRW_CELL,ref);
                     gaps+=crw_lv.gap_v[r][j];
                 }
             }
@@ -680,6 +726,10 @@ static void crw_rooms(uint32_t st,float y)
     WORD_AT(CRW_FLOOR_Y)=keep[0];WORD_AT(CRW_FLOOR_KEEP1)=keep[1];WORD_AT(CRW_FLOOR_KEEP2)=keep[2];
     g_esp=sp;
     for(k=0;k<CRW_CELLS;k++) { n+=crw_lv.off[k];drops+=drop[k];crw_lv.off[k]|=drop[k]; }
+    if(found) fprintf(stderr,"[mapmaker] crowe: split Crowe %d reference floor %.2f (spawn height %.2f, %s)\n",
+                      (int)(crw_i-crw_inst),(double)ref,(double)y,steps?"found above the spawn":"under the spawn");
+    else fprintf(stderr,"[mapmaker] crowe: split Crowe %d reference floor none (spawn height %.2f): no height check\n",
+                 (int)(crw_i-crw_inst),(double)y);
     fprintf(stderr,"[mapmaker] crowe: split Crowe %d arena: %u of %u cells in no room at its height, %u over a drop or ledge, %u gaps between cells (blocked)\n",
             (int)(crw_i-crw_inst),n,CRW_CELLS,drops,gaps);
     fflush(stderr);
