@@ -394,6 +394,12 @@ int main(int argc,char **argv)
 {
     g_xbox_mem_offset=(uintptr_t)memory;
     if(argc==4 && !strcmp(argv[1],"matrix")) return dump_matrix((uint32_t)strtoul(argv[2],0,10),argv[3]);
+    if(argc==3 && !strcmp(argv[1],"search")) {          /* sub_0009CC40's search, ids 0..0x7FFF */
+        int32_t id;
+        pools((uint32_t)strtoul(argv[2],0,10),0u);
+        for(id=0;id<0x8000;id++) printf("%d\n",(int)mapmaker_pads_search(id));
+        return 0;
+    }
 
     /* ---- group A* pool: free list 0x0070E170, counter 0x00711FF8, 8192 nodes ---- */
     WORD_AT(0x0070E170u)=(uint32_t)-1;

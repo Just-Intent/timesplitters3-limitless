@@ -20,6 +20,10 @@ void sub_0009A2C0(void) {}
 void sub_0009A5B0(void) {}
 void sub_0009CC40(void) {}
 void sub_0009CCA0(void) {}
+/* pads: group distances (pc_mapmaker_pads.inc) */
+#define MAPMAKER_FP_PUSH(v) ((void)(v))   /* no x87 stack in these fixtures */
+void sub_001596F0(void) {}
+void sub_0009C550(void) {}
 void sub_000A5AF0(void) {}
 void sub_000AEAC0(void) {}
 void sub_000B05B0(void) {}
