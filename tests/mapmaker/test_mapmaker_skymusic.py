@@ -25,7 +25,7 @@ MUTATIONS = {
     'rows-without-limits': ('       !smx_on() || smx_scene()!=102u || !smx_label_storage())', '       smx_scene()!=102u || !smx_label_storage())'),
     'rows-any-scene': ('       !smx_on() || smx_scene()!=102u || !smx_label_storage())', '       !smx_on() || !smx_label_storage())'),
     'rows-no-bind': ('MAPMAKER_SKY_EXTRA_COUNT);\n    original();\n}', 'MAPMAKER_SKY_EXTRA_COUNT);\n}'),
-    'rows-bind-first': ('    if(ret==SMX_RET_MUSIC_BIND)\n        for(k=0;', '    original();return;\n    if(ret==SMX_RET_MUSIC_BIND)\n        for(k=0;'),
+    'rows-bind-first': ('    if(ret==SMX_RET_MUSIC_BIND) {\n        for(k=0;', '    original();return;\n    if(ret==SMX_RET_MUSIC_BIND) {\n        for(k=0;'),
     'rows-twice': ('    if(smx.labels) return 1;\n', ''),
     'music-values-overlap': ('#define SMX_MUSIC_FIRST 58 ', '#define SMX_MUSIC_FIRST 57 '),
     'weather-value-stock': ('#define SMX_WEATHER_FIRST 4u', '#define SMX_WEATHER_FIRST 3u'),

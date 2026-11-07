@@ -800,6 +800,10 @@ void pc_mapmaker_skymusic_weather_frame(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_weather_list(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_haze(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_grain_colour(void (*original)(void)) { original(); }
+void pc_custom_music_channel(void (*original)(void)) { original(); }
+void pc_custom_music_arcade_rows(void (*original)(void)) { original(); }
+void pc_custom_music_arcade_show(void (*original)(void)) { original(); }
+void pc_custom_music_arcade_store(void (*original)(void)) { original(); }
 void pc_mapmaker_camera_gun_update(void (*original)(void)) { original(); }
 void pc_mapmaker_openview_walk(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_picker_end(void (*original)(void)) { original(); }

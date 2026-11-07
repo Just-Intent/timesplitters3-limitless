@@ -455,7 +455,7 @@ namespace TimeSplitters.Launcher
                         continue;
                     }
                     bool installationRoot = relative.Length == 0 || relative.Equals(pending ? "payload" : "files", StringComparison.OrdinalIgnoreCase);
-                    Require(!installationRoot || (!new[] { "Saves", "Data", "Textures" }.Contains(name, StringComparer.OrdinalIgnoreCase) &&
+                    Require(!installationRoot || (!new[] { "Saves", "Data", "Textures", "Music" }.Contains(name, StringComparer.OrdinalIgnoreCase) &&
                         (pending || !name.Equals("Settings", StringComparison.OrdinalIgnoreCase))), "Protected data inside game cleanup folder: " + entry);
                     CheckGameCleanupTree(entry, pending, relative.Length == 0 ? name : relative + "/" + name);
                 }

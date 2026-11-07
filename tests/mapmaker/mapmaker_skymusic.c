@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00920000/4], g_eax, g_ecx, g_edx, g_esp;
+static uint32_t memory[0x00920000/4], g_eax, g_ebx, g_ecx, g_edx, g_esp;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -31,6 +31,16 @@ void sub_00062260(void) { g_ecx=5; }
 void sub_000622D0(void) { g_ecx=7; }
 void sub_000A5E40(void) { g_ecx=8; }
 void sub_000631C0(void) { g_ecx=9; }
+void sub_000717D0(void) { g_ecx=10; }
+void sub_00071940(void) { g_ecx=11; }
+void sub_00069640(void) { g_ecx=12; }
+void sub_00045A70(void) { g_ecx=13; }
+/* host audio output (pc_custom_music.h): never reached without a music folder */
+int recomp_audio_output_submit(uint32_t s,const uint8_t *p,uint32_t b,uint32_t r,uint32_t c,uint32_t bits,int32_t v) { (void)s;(void)p;(void)b;(void)r;(void)c;(void)bits;(void)v;return 0; }
+int recomp_audio_output_position(uint32_t s,uint64_t *p,uint32_t *q) { (void)s;(void)p;(void)q;return 0; }
+int recomp_audio_output_set_volume(uint32_t s,int32_t v) { (void)s;(void)v;return 0; }
+void recomp_audio_output_reset_voice(uint32_t s) { (void)s; }
+int recomp_audio_output_take_discontinuity(uint32_t s) { (void)s;return 0; }
 #define CALLS 64
 static struct { void (*f)(void); int n; uint32_t a[6]; } calls[CALLS];
 static int call_count;
