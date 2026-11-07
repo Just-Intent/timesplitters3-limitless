@@ -254,11 +254,12 @@ int main(void)
     CHECK(originals==4 && allocs==0);
     set_env("TSFP_MAPMAKER_POOLS",NULL);
 
-    /* twin pool */
+    /* twin pool (the pool calls above took the heap from 0x00900000 three times) */
+    heap_next=0x00900000u;
     originals=0;allocs=0;WORD_AT(0x007B67D0u)=5;WORD_AT(0x007B6984u)=5;WORD_AT(0x006F73B0u)=0;
     HOOK(pc_mapmaker_objects_twin_pool,fake_original);
-    CHECK(originals==0 && allocs==1 && alloc_size[0]==2047u*0x200u && WORD_AT(0x0070AAD8u)==2047u);
-    CHECK(WORD_AT(WORD_AT(0x0070AADCu))==0 && WORD_AT(WORD_AT(0x0070AADCu)+2047u*0x200u-4u)==0);
+    CHECK(originals==0 && allocs==1 && alloc_size[0]==2559u*0x200u && WORD_AT(0x0070AAD8u)==2559u);
+    CHECK(WORD_AT(WORD_AT(0x0070AADCu))==0 && WORD_AT(WORD_AT(0x0070AADCu)+2559u*0x200u-4u)==0);
     CHECK(WORD_AT(0x007B67D0u)==0 && WORD_AT(0x007B6984u)==0 && WORD_AT(0x004D9700u)==1);
     WORD_AT(0x006F73B0u)=3;
     HOOK(pc_mapmaker_objects_twin_pool,fake_original);
@@ -357,6 +358,18 @@ int main(void)
         HOOK(pc_mapmaker_objects_create,fake_original);
         set_env("TSFP_MAPMAKER_POOLS",NULL);
         CHECK(originals==4 && mapmaker_objects_full==4);
+        /* model instances (twins, attachments too): refused while fewer than 32 are left */
+        WORD_AT(0x0070AAD8u)=2559u;WORD_AT(0x007B4FACu)=100u;WORD_AT(0x007B65B8u)=0;
+        WORD_AT(0x007B67D0u)=2559u-32u;WORD_AT(0x007B6984u)=0;g_eax=7;
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        CHECK(originals==5 && g_eax==0x1234u && mapmaker_objects_full==4);
+        WORD_AT(0x007B67D0u)=2559u-31u;g_eax=7;                             /* 31 left: refused */
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        CHECK(originals==5 && g_eax==0 && mapmaker_objects_full==5);
+        WORD_AT(0x007B6984u)=1u;g_eax=7;                                    /* a freed twin: allowed */
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        CHECK(originals==6 && g_eax==0x1234u);
+        WORD_AT(0x007B67D0u)=0;WORD_AT(0x007B6984u)=0;
         WORD_AT(0x007B4FACu)=0;WORD_AT(0x0072F5E4u)=0;WORD_AT(0x0072F5E8u)=0;
         memset((char *)memory+base,0,2047u*0x2E8u);
     }

@@ -243,6 +243,16 @@ objects cap (pieces + items + 128) bound before the 1023-piece cap. Now:
   physics bodies P = 2048 (scene 100). `MAPMAKER_LIMIT_OBJECTS` 2047: 1023
   pieces + 500 items + 128 = 1651 fit, so tiles no longer take items away.
   The AI headroom (72) and the create guard read the pool size, unchanged.
+- Twins (model instances, 0x200 B, `[0x0070AADC]`): the allocator
+  `sub_00097C00` (count `[0x007B67D0]`, freed `[0x007B6984]`, no bound) is
+  called by the create and by `sub_0009F490` (characters) and `sub_0009F510`
+  (`sub_000A7070`, attachments at obj+0xA4: held weapons etc.), so twins can
+  outnumber objects (CONFIRMED callers; counts in play unmeasured; possibly
+  part of the m45c overrun). The twin pool is 2047 + 512 = 2559
+  (`MAPMAKER_OBJECTS_TWIN_EXTRA`; its size dword is read only by the sizer and
+  the clear `sub_0008DBB0`), and `pc_mapmaker_objects_create` also refuses a
+  create while fewer than 32 twins are left and none is freed (log adds
+  `model instances n of 2559`).
 - `src/input/pc_mounted.h` (host-side vehicle gun lookup) decodes `>> 21`;
   its fixtures patch the XBE with `handles.json` before translating.
 - Wire and saves (CONFIRMED in code): System Link names objects by the +0x230
@@ -260,9 +270,10 @@ objects cap (pieces + items + 128) bound before the 1023-piece cap. Now:
   serial written only by the encode and the reset, the 2512-bit visibility
   set (`sub_000A0130`) above 2047.
 - Level heap (scenes 100/102 unless noted): object pool +762 KB (2047 x
-  0x2E8 = 1.52 MB), twin +512 KB (1 MB), physics +572 KB (1.2 MB, scene 100),
-  buckets +42 KB and prop blocks +8 KB in every scene: about 1.9 MB more on a
-  MapMaker map, 50 KB on story levels. Not measured in play.
+  0x2E8 = 1.52 MB), twins +768 KB (2559 x 0x200 = 1.25 MB), physics +572 KB
+  (1.2 MB, scene 100), buckets +42 KB and prop blocks +8 KB in every scene:
+  about 2.15 MB more on a MapMaker map, 50 KB on story levels. Not measured
+  in play.
 - Tests: `test_mapmaker_handles_classified.py` (7: table = scan, mutation of a
   missing/extra row, reviewed sites, encode/serial writers, wire, host
   decoder), `mapmaker_objects.c`/`test_mapmaker_objects.py` (2047 pools,
@@ -310,7 +321,7 @@ What binds past 511, ranked (for 1023 pieces; heaviest tile 14 pads, 46 links):
 
 | # | cap | where | now | 1023 pieces need | cost / status |
 | --- | --- | --- | --- | --- | --- |
-| 1 | engine object handles | pool `[0x0072F5E8]`, handle slot << 21 (`handles.json`, 167 decodes) | 1023 -> **2047** | 1023 + items + 128 | done: 1651 at the piece and item caps; +1.9 MB Level heap |
+| 1 | engine object handles | pool `[0x0072F5E8]`, handle slot << 21 (`handles.json`, 167 decodes) | 1023 -> **2047** | 1023 + items + 128 | done: 1651 at the piece and item caps; +2.15 MB Level heap |
 | 2 | pad groups | `[0x00762CB8]`, matrix `sub_00275F70` (N+1) x N x 4 in the 6 MB nav block | 1024 | ~1,535 (1.5/piece) | binds ~680 pieces; 1,536 groups = 9.4 MB matrix and 2.4 M route searches at load |
 | 3 | links (int16 A* indices) | `MAPMAKER_POOL_LINKS` 32,512 | 32,256 | 47 K heavy | 521 heavy, 1,024 at <= 15 links; hard int16 limit |
 | 4 | regular pads (ids <= 0x2328) | `pads.json` thresholds | 7,680 | 14 K heavy | 549 heavy |

@@ -256,15 +256,31 @@ void pc_mapmaker_objects_pool(void (*original)(void))
     restore_registers(&r);
     MAPMAKER_GUEST_RET();
 }
-/* sub_0008DBF0 (the 0x200-byte twin pool) with the same size. */
+/* sub_0008DBF0 (the 0x200-byte twin pool: model instances). Twins are taken
+ * by sub_00097C00 at its count [0x007B67D0] (or a freed one when
+ * [0x007B6984] > 0) with no bound: one per object from the create
+ * (0x000A6A3D), plus attachments from sub_0009F490 (characters,
+ * sub_000DAC30) and sub_0009F510 (sub_000A7070, obj+0xA4, held weapons and
+ * other attached models, many callers). So twins can outnumber objects; the
+ * pool gets MAPMAKER_OBJECTS_TWIN_EXTRA more (2026-11-07). Its size dword
+ * [0x0070AAD8] is read only by the sizer and the clear (sub_0008DBB0), the
+ * index (twin - base) >> 9 is a time-slice key only, so a twin pool larger
+ * than the object pool is safe. */
+#define MAPMAKER_OBJECTS_TWIN_EXTRA 512u
+#define MAPMAKER_OBJECTS_TWINS (MAPMAKER_OBJECTS_POOL+MAPMAKER_OBJECTS_TWIN_EXTRA)
+#define MAPMAKER_OBJECTS_TWIN_COUNT 0x007B67D0u
+#define MAPMAKER_OBJECTS_TWIN_FREED 0x007B6984u
+#define MAPMAKER_OBJECTS_TWIN_MARGIN 32u          /* a create and its attachments */
+typedef char mapmaker_objects_twin_pool_size[(MAPMAKER_OBJECTS_TWIN_EXTRA>=MAPMAKER_OBJECTS_TWIN_MARGIN*4u &&
+                                              MAPMAKER_OBJECTS_TWINS<0x1000u)?1:-1];
 void pc_mapmaker_objects_twin_pool(void (*original)(void))
 {
     GuestRegisters r;
     uint32_t bytes,p;
     if(!mapmaker_objects_pool_on()) { original(); return; }
     save_registers(&r);
-    WORD_AT(0x0070AAD8u)=MAPMAKER_OBJECTS_POOL;
-    bytes=((MAPMAKER_OBJECTS_POOL<<9)+15u)&~15u;
+    WORD_AT(0x0070AAD8u)=MAPMAKER_OBJECTS_TWINS;
+    bytes=((MAPMAKER_OBJECTS_TWINS<<9)+15u)&~15u;
     p=guest_call(sub_0003DFA0,2,bytes,1u);
     WORD_AT(0x0070AADCu)=p;
     WORD_AT(0x007B67D0u)=0;WORD_AT(0x007B6984u)=0;
@@ -286,7 +302,9 @@ void pc_mapmaker_objects_twin_pool(void (*original)(void))
  * instead, the original's own result when the model cannot be made
  * (0x000A695C); sub_000A6EC0 and sub_000DAC30 test it. The actors area keeps
  * MAPMAKER_ACTORS_OBJECT_HEADROOM slots free for that reason, so this is the
- * last guard, not the limit. */
+ * last guard, not the limit. Since the twins also grow with attachments
+ * (above), a create is refused the same way while fewer than
+ * MAPMAKER_OBJECTS_TWIN_MARGIN twins are left and none is freed. */
 #define MAPMAKER_OBJECTS_COUNT 0x007B4FACu
 #define MAPMAKER_OBJECTS_FREED 0x007B65B8u
 #define MAPMAKER_OBJECTS_SLOT_BYTES 0x2E8u
@@ -294,6 +312,9 @@ static unsigned mapmaker_objects_full;
 static int mapmaker_objects_slot_free(void)
 {
     uint32_t count=WORD_AT(MAPMAKER_OBJECTS_COUNT),cap=WORD_AT(0x0072F5E4u),base=WORD_AT(0x0072F5E8u),i;
+    uint32_t twins=WORD_AT(0x0070AAD8u);
+    if(twins && WORD_AT(MAPMAKER_OBJECTS_TWIN_COUNT)+MAPMAKER_OBJECTS_TWIN_MARGIN>twins &&
+       !WORD_AT(MAPMAKER_OBJECTS_TWIN_FREED)) return 0;  /* model instances nearly full */
     if(count<cap) return 1;
     if(!WORD_AT(MAPMAKER_OBJECTS_FREED) || !base) return 0;
     for(i=0;i<cap;i++)                                  /* the allocator's own scan, within the pool */
@@ -304,8 +325,9 @@ void pc_mapmaker_objects_create(void (*original)(void))
 {
     if(mapmaker_objects_pool_on() && !mapmaker_objects_slot_free()) {
         if(mapmaker_objects_full++<8u || !(mapmaker_objects_full&0xFFu)) {
-            fprintf(stderr,"[mapmaker] engine objects full (%u of %u): object of template %u not created (%u so far)\n",
+            fprintf(stderr,"[mapmaker] engine objects full (%u of %u; model instances %u of %u): object of template %u not created (%u so far)\n",
                     WORD_AT(MAPMAKER_OBJECTS_COUNT)-WORD_AT(MAPMAKER_OBJECTS_FREED),WORD_AT(0x0072F5E4u),
+                    WORD_AT(MAPMAKER_OBJECTS_TWIN_COUNT)-WORD_AT(MAPMAKER_OBJECTS_TWIN_FREED),WORD_AT(0x0070AAD8u),
                     MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4):0u,mapmaker_objects_full);
             fflush(stderr);
         }

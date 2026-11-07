@@ -83,8 +83,20 @@ def test_twin_pool_is_sized_before_the_object_pool_with_the_same_slots():
     body = _function(insns, TWIN_SIZER)
     assert any(i.mnemonic == 'shl' and ('imm', 9) in i.ops for i in body)
     text = OBJECTS.read_text(encoding='utf-8')
-    assert 'bytes=((MAPMAKER_OBJECTS_POOL<<9)+15u)&~15u;' in text
-    assert 'WORD_AT(0x0070AAD8u)=MAPMAKER_OBJECTS_POOL;' in text
+    assert 'bytes=((MAPMAKER_OBJECTS_TWINS<<9)+15u)&~15u;' in text
+    assert 'WORD_AT(0x0070AAD8u)=MAPMAKER_OBJECTS_TWINS;' in text
+    assert '#define MAPMAKER_OBJECTS_TWINS (MAPMAKER_OBJECTS_POOL+MAPMAKER_OBJECTS_TWIN_EXTRA)' in text
+
+
+def test_twins_also_come_from_attachments():
+    """sub_00097C00 (twin allocator, no bound) is called by the create and by the
+    character and attachment helpers, so the twin pool needs more than one per slot;
+    the size dword is read only by the sizer and the clear."""
+    insns = decoded()
+    callers = {i.function for i in insns if i.call and ('imm', 0x00097C00) in i.ops}
+    assert callers == {CREATE, 0x0009F490, 0x0009F510}
+    size = {i.function for i in insns if any(_global(op, 0x0070AAD8) for op in i.ops)}
+    assert size == {TWIN_SIZER, 0x0008DBB0}
 
 
 def test_ai_headroom_exceeds_the_effects_reserve():

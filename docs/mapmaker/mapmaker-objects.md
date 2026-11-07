@@ -26,7 +26,7 @@ address; **INFERRED** means it was reasoned, not seen.
 | Slot-8 list `0x007161C8` | 50 | 2047 at `0x008AC000` | `obj-list8-relocate` | all |
 | Slot-0 list `0x007B4FC0` | 112 | 2047 at `0x008AE000` | `obj-list0-relocate`, `obj-list0-clear` | all |
 | Room-bucket buffer `[0x00715FB4]` | 0x14CD entries | 0x533D | `obj-bucket-*` | all |
-| Engine object pool and twin | 550 | 2047 (handles slot << 21, `handles.json`) | `pc_mapmaker_objects_pool` / `_twin_pool` | 100, 102 (pools on) |
+| Engine object pool and twin | 550 | 2047, twins 2559 (handles slot << 21, `handles.json`) | `pc_mapmaker_objects_pool` / `_twin_pool` | 100, 102 (pools on) |
 | Object handle slot field | 10 bits (`<< 22`) | 11 bits (`<< 21`), serial 1..0x1FFFFF | `handles.json` (encode, wrap, 167 decodes) | all |
 | Teleporters per colour (cat. 14-18) | 2 | 8 (editor) | `mapmaker_categories[]` + teleporter hook | editor / 100 |
 | Logic tag entries `0x0075DAF0` | 250 | 1000 at `0x008A4400` + full-table guard | `obj-tag-entries-*` | all |
