@@ -128,3 +128,15 @@ gun 0xE6 (gun type 7) chosen in item options (drum: heap descriptor via a
 node +0x30 ('SP'), applied by the play fill (`sub_002F7790`, `sub_0033DD80`,
 preload `sub_0006C090`), paks l_64_ch / l_26_st index-only. 9 WRAPs:
 mapmaker-storyprops.md. `test_mapmaker_storyprops.py`. Unplayed.
+
+Story creatures (wave 2, area `creatures`, `pc_mapmaker_creatures.inc`, after
+storyprops): one deployer, one X-macro row per creature in
+`pc_mapmaker_creatures.def` (picker row, carrier id, look, class lo/hi, anim pak
++ keep run, level hook), also read by realbosses (`rbs_extra` rows 161-163) and
+animslots (`ans_paks`). Rows: Catacomb Ghost 0x2F (zombie look, 0:0x50000000,
+lv17), SecuriDroid XP 0x4D (0x4000:0x10000000, lv6), Mutant (Story) 0x30 (0x59
+look, 0x8000:0x10000000, lv22). 4 WRAPs (sub_001C8540, sub_0015E7C0,
+sub_000DAC30, sub_0015B830): mapmaker-creatures.md. `test_mapmaker_creatures.py`
+(decode: dispatcher, no scene state, kept anims, story spawn records). Unplayed.
+Cleaning bot deferred (scripted class 0x80000). Realbosses' `extra_label` now
+holds RBS_EXTRA_MAX 16 (it held 6 for 8 rows).

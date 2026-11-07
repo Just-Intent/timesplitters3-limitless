@@ -957,3 +957,14 @@ Open: the walker took no damage in any .26 run (health stayed 60). Its damage
 callback `sub_00298BA0` -> `sub_00298570` scores hits by distance to its parts
 (state +0x188.. with +0x19C == 1) and explosion type 0x17; the stage-1 fight
 only takes hits on particular parts.
+
+## Story creature rows (wave 2)
+
+`rbs_extra` ends with the rows of `pc_mapmaker_creatures.def` (161 Catacomb
+Ghost 0x2F, 162 SecuriDroid XP 0x4D, 163 Mutant (Story) 0x30; text 0x52420000
+| id), built by an X-macro; the play side is the `creatures` area
+([story creatures](mapmaker-creatures.md)). `RBS_EXTRA_N` is the table's size
+and the label slots `rbs.extra_label[RBS_EXTRA_MAX]` (16, compile-time check).
+Before, 8 rows shared 6 label slots: the Prometheus labels were stored over
+`rbs.logged` and `rbs.meters` (the log budget then looked spent). Fixture:
+14 rows, the creature picks, names and row lookups.
