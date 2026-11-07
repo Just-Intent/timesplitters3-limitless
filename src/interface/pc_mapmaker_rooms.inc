@@ -14,6 +14,7 @@
  *   WRAP sub_00087310 -> pc_mapmaker_rooms_query
  *   WRAP sub_00086FC0 -> pc_mapmaker_rooms_tree         (replaces the body past 438 rooms)
  *   WRAP sub_0008A780 -> pc_mapmaker_rooms_compile
+ *   WRAP sub_000895F0 -> pc_mapmaker_rooms_portal_link  (pc_mapmaker_portals.inc)
  *   WRAP sub_00083F80 -> pc_mapmaker_rooms_piece
  *   WRAP sub_00085030 -> pc_mapmaker_rooms_piece
  *   WRAP sub_00242780 -> pc_mapmaker_rooms_props
@@ -214,12 +215,15 @@ void pc_mapmaker_rooms_piece(void (*original)(void))
     original();
     mapmaker_rooms_account(entry);
 }
+#include "pc_mapmaker_portals.inc"          /* the build's portal passes (WRAP sub_000895F0) */
 void pc_mapmaker_rooms_compile(void (*original)(void))
 {
     mapmaker_rooms.cap=mapmaker_rooms_cap();
     mapmaker_rooms.rooms=mapmaker_rooms.portals=mapmaker_rooms.pieces=mapmaker_rooms.dropped=0;
     mapmaker_rooms.compiling=1;
+    mapmaker_portals_build_begin();
     original();
+    mapmaker_portals_build_end();
     mapmaker_rooms.compiling=0;
     fprintf(stderr,"[MAPMAKER] rooms %u of %u, portals %u, pieces %u",
             (unsigned)WORD_AT(0x007B975Cu),(unsigned)mapmaker_rooms.cap,

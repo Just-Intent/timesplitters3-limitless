@@ -385,6 +385,70 @@ then the undo shadow `sub_00336640`), a load once, every edit once
 
 Play check (user): see [rooms](limitless-rooms.md) stage 12.
 
+## Big-map performance (2026-11-07, after .57; fixtures and decoder checks only)
+
+Report (.57, `logs/m57.err`, hang `logs/m57/crash-20261107-171433742-*`):
+676 and 716 tiles of 3x3 pieces (9,464 / 10,024 portals); the second play
+start had no frame for 60 s; play lagged near many enemies.
+
+- Stall (CONFIRMED in the dump): the game thread's native stack is
+  `sub_0008A780_gen` (from `pc_mapmaker_rooms_compile` <- `pc_mapmaker_roof_play`
+  <- `sub_0008BC10` <- `sub_001CDE30`); the host code at the RIP lies between the
+  float-multiply sites 0x0008AEA4 and 0x0008B01A, the pairing test's vertex
+  loops. sub_0008A780's portal passes are O(portals^2): pairing
+  0x0008AE03..0x0008B388 (i unpaired, j > i unpaired; normals dot < -0.999 or
+  > 0.001, so almost every pair runs both vertex loops; repeated until a pass
+  joins nothing), removal 0x0008B38E (cheap) and the coplanar merge
+  0x0008B460..0x0008BA5B (a scan of all later portals per wall quad). At
+  10,024 portals: 50 M pair tests, each ~150 lifted instructions with
+  helper-call multiplies.
+- Fix: `src/interface/pc_mapmaker_portals.inc` (included by
+  `pc_mapmaker_rooms.inc`), new `WRAP sub_000895F0 ->
+  pc_mapmaker_rooms_portal_link` (area rooms; acts only for return 0x0008BAB2,
+  frame = g_esp + 0x1C, flags at +0x1280). `rooms.json` `rooms-portals-*` makes
+  the three loop counts (0x0008AE03, 0x0008B38E, 0x0008B43E) read the zero
+  word 0x008D2200, so the guest skips the passes and C runs them before the
+  first reader (portal bounds). Same float operations (single, no FMA; the
+  lift's rsqrtss is 1/sqrtf), same order; pairing candidates come from a
+  centroid-cell grid (joins need |d| < 0.51 per axis, ascending order), the
+  merge from a sort by room pair. One pairing pass suffices: the original's
+  second pass can never join (a pair unpaired at i's turn joins then).
+  Stock quirks kept: the last portal is never an outer i, the merge reads up
+  to index count, a removal drops only the first place in each list.
+  `pc_mapmaker_rooms_compile` zeroes the word and logs if the hook did not
+  run. stderr per build: `[mapmaker] portal links: n portals, r rooms: p pairs
+  joined, u unpaired removed, g coplanar groups (a absorbed); t pair tests
+  (centroid grid), x ms; state 0x...` (`TSFP_MAPMAKER_PORTAL_INDEX=0` tests
+  every pair: same state word). Fixture: ~1.3 pair tests per portal.
+- In-play cost (CONFIRMED in code, size INFERRED): `sub_0009B540` (group A*,
+  from `sub_001596F0` 0x00159833 <- `sub_0015D500`) runs whenever an AI's
+  target pad changes; chasing AIs re-plan whenever the player changes pad,
+  twice when unreachable. Every expansion walks the open list per link
+  (0x0009B453), the closed list (`sub_0009B160`), the sorted insert
+  (`sub_0009B090`) and the goal test (`sub_0009B190`): O(expansions x deg x
+  list) lifted steps, millions per search on ~1,000 groups. Fix:
+  `src/interface/pc_mapmaker_astar.inc` (included by `pc_mapmaker_pads.inc`),
+  new `WRAP sub_0009B540 -> pc_mapmaker_pads_group_route` (area pads): the same
+  search in host code on the same pool 0x008E0000 (lift's x87 = double,
+  rounded where stored), keeping `pc_mapmaker_pads_group_node`'s 8192 bound;
+  per-link (open/closed) and per-group (open) counts skip walks that would
+  find nothing. `TSFP_MAPMAKER_ASTAR=0` original, 2 walks every list; stderr
+  `[mapmaker] group routes: ...` (first two, then every 4096th).
+- Tests: `test_mapmaker_portals.py` (29 C mutations; grid vs every pair, 24
+  recorded maps, hand maps), `test_mapmaker_astar.py` (22 mutations; counts vs
+  walks, 12 recorded graphs, chain/doors/mask/bound); both run the original
+  XBE code in `tests/mapmaker/guest_emulator.py` (portal passes 0x0008ADDD..
+  0x0008BA61 with rooms.json operands; A* 0x0009B090..0x0009B629 with the
+  pads.json pool relocation) and require identical guest memory (4 maps / 4
+  graphs x 60 searches), plus 6 / 4 mutations the emulator must catch.
+- Remaining (not changed): nearest-pad scan `sub_0009BCF0` (O(pads), 37
+  callers; per frame only for lost pads and state `sub_0027BEC0` <= 30
+  frames), random-pad picker `sub_0006A8B0` (O(pads/2) RNG tries; identical
+  results need the same draws), rendering with ~650 of 676 rooms visible on
+  an open grid (camera line `n of 676 rooms visible`). Not measured in the
+  game: compare the two stderr lines' ms (and frame time near enemies) with
+  the switches at 0.
+
 ## What bounded 511 pieces (cap 511, 2026-11-02; see above for 1023)
 
 `MAPMAKER_LIMIT_PIECES` is 511 ([rooms](limitless-rooms.md) stage 11; the

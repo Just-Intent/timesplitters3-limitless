@@ -2799,6 +2799,36 @@
       "reason": "mov byte ptr [esp + ebx + 0x280], 0: portal flag buffer moved past the old frame"
     },
     {
+      "id": "rooms-portals-08ae03",
+      "kind": "operand",
+      "function": "0x0008A780",
+      "address": "0x0008AE03",
+      "original_hex": "8b0d54977b00",
+      "operand": 1,
+      "value": "0x008D2200",
+      "reason": "mov ecx, dword ptr [0x7b9754]: portal count -> the zero word 0x008D2200: the guest skips pass 1 (portal pairing, 0x0008AE03..0x0008B388); pc_mapmaker_portals.inc runs the three passes with the same results (WRAP sub_000895F0)"
+    },
+    {
+      "id": "rooms-portals-08b38e",
+      "kind": "operand",
+      "function": "0x0008A780",
+      "address": "0x0008B38E",
+      "original_hex": "8b0d54977b00",
+      "operand": 1,
+      "value": "0x008D2200",
+      "reason": "mov ecx, dword ptr [0x7b9754]: portal count -> the zero word 0x008D2200: the guest skips pass 2 (unpaired portals leave the room lists); pc_mapmaker_portals.inc runs the three passes with the same results (WRAP sub_000895F0)"
+    },
+    {
+      "id": "rooms-portals-08b43e",
+      "kind": "operand",
+      "function": "0x0008A780",
+      "address": "0x0008B43E",
+      "original_hex": "8b0d54977b00",
+      "operand": 1,
+      "value": "0x008D2200",
+      "reason": "mov ecx, dword ptr [0x7b9754]: portal count -> the zero word 0x008D2200: the guest skips pass 3 (coplanar portal merge; pass 2 ends here too); pc_mapmaker_portals.inc runs the three passes with the same results (WRAP sub_000895F0)"
+    },
+    {
       "id": "rooms-0003f0ec",
       "kind": "operand",
       "function": "0x0003F050",
