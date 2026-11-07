@@ -311,6 +311,13 @@ MUTATIONS = {
     'aim-feet': ('    d[0]-=o[0];d[1]+=RBS_SKEL_BODY-o[1];d[2]-=o[2];', '    d[0]-=o[0];d[1]-=o[1];d[2]-=o[2];'),
     'aim-no-clamp': ('    if(d[1]>RBS_SKEL_PITCH) {', '    if(0) {'),
     'aim-wrong-target': ('    t=st+RBS_SKEL_TARGET+i*12u;', '    t=st+RBS_SKEL_TARGET;'),
+    # same-floor throws from under the floor above (v0.4.0-mapmaker.44)
+    'hand-not-lowered': ('rbs_skel_low(k,shot,o,d);   /* ... from under', '(void)0;   /* ... from under'),
+    'hand-any-height': ('o[1]-k->ground>RBS_SKEL_HAND) rbs_skel_low', '1) rbs_skel_low'),
+    'hand-floor-below': ('if(d[1]-k->ground>=-RBS_SKEL_UP && o[1]', 'if(o[1]'),
+    'hand-origin-kept': ('    rbs_setf(shot+4u,o[1]);\n', ''),
+    'hand-not-reaimed': ('    for(j=0;j<3u;j++) rbs_setf(shot+0xCu+j*4u,d[j]);\n    if(k->lowered', '    if(k->lowered'),
+    'hand-at-ceiling': ('#define RBS_SKEL_HAND 4.0f', '#define RBS_SKEL_HAND 5.5f'),
     'aim-not-normalised': ('    d[0]/=len;d[1]/=len;d[2]/=len;h/=len;', '    h/=len;'),
     'restart-when-off': ('    original();\n    if(!rbs_on()) return;\n    rbs.logged=0;', '    original();\n    rbs.logged=0;'),
     'restart-keeps-log': ('    if(!rbs_on()) return;\n    rbs.logged=0;\n', '    if(!rbs_on()) return;\n'),

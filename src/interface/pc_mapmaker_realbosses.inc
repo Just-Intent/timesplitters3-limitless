@@ -423,7 +423,7 @@ static struct {
 typedef char rbs_fx_is_the_shared_window[(RBS_FX==MAPMAKER_FX && RBS_FX_SIZE==MAPMAKER_FX_SIZE)?1:-1];
 typedef struct {
     uint32_t state, parts, record;
-    unsigned throws, skipped, fire, aimed;
+    unsigned throws, skipped, fire, aimed, lowered;
     float floor, ground, pad;           /* first-fight-frame height (its body's height); the real floor under it; height at its AI start */
     int floor_set, ground_set, pad_set;          /* ground_set: 1 under the spawn, 2 above it, -1 none found (the spawn height) */
     MapmakerFx fx;
@@ -1287,7 +1287,7 @@ void pc_mapmaker_realbosses_risen(void (*original)(void))
  * its edge or underside. For a target more than RBS_SKEL_UP over the boss's
  * own floor, the aim point is raised by RBS_SKEL_BODY (its body, not its
  * feet) and the climb is held to RBS_SKEL_PITCH (about 60 degrees). Targets
- * on the boss's floor keep the stock aim.
+ * on the boss's floor keep the stock aim (from a lowered hand: rbs_skel_low).
  *
  * v0.4.0-mapmaker.42 ("they don't hit me if I stand in place on the same
  * floor"): "over the boss's floor" is measured from its real floor, the
@@ -1342,11 +1342,38 @@ static void rbs_skel_ground(RbsSkel *k,uint32_t ent)
 }
 #define RBS_SKEL_BODY 1.5f             /* aim this far over its feet */
 #define RBS_SKEL_PITCH 0.866f          /* most upward component of the unit aim */
+/* v0.4.0-mapmaker.44 ("Skeletons can't hit me on floor one still"): the hand
+ * lets go 10.7 over the boss's feet (m43b/m44.err: 6.2 over -4.5; m40b.err:
+ * 1.2 over -9.5), a bone point of the model, not a stock height. In m44.err
+ * every aim was at a player on the 0.5 floor ("floor one", 5.0 over its
+ * floor -4.5): the hand was 5.7 over the player's feet, past the ceiling of
+ * that one-floor room (feet + 5), so the line down to the player starts
+ * over that ceiling and crosses it. A player a floor higher (5.5) has the
+ * hand in the room, which is why throws from "one floor above" hit (.42).
+ * Mission 5's courtyard has open sky. So a hand more than RBS_SKEL_HAND over
+ * the target's feet is moved straight down to that height, under the
+ * ceiling of the target's floor, before the aim (stock or raised) is taken
+ * from it; not for a target under the boss's floor (RBS_SKEL_UP). */
+#define RBS_SKEL_HAND 4.0f             /* a shot starts at most this far over the target's feet */
+static int rbs_skel_low(RbsSkel *k,uint32_t shot,float *o,const float *d)
+{
+    float y=o[1];
+    if(!(o[1]-d[1]>RBS_SKEL_HAND) || d[1]-k->ground<-RBS_SKEL_UP) return 0;
+    o[1]=d[1]+RBS_SKEL_HAND;
+    rbs_setf(shot+4u,o[1]);
+    if(k->lowered++<4u) {
+        fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u shot starts under the target's ceiling: hand %.1f -> %.1f for a target at %.1f (its floor %.1f)\n",
+                (unsigned)(k-rbs_skels)+1u,(double)y,(double)o[1],(double)d[1],(double)k->ground);
+        fflush(stderr);
+    }
+    return 1;
+}
 static void rbs_skel_aim(RbsSkel *k,uint32_t st,uint32_t ent)
 {
     uint32_t shot=st+RBS_SKEL_SHOT,i=WORD_AT(st+RBS_SKEL_TARGET_I),t;
     float o[3],d[3],h,len;
     unsigned j;
+    int low;
     if(!k->floor_set || i>1u) return;
     if(!k->ground_set) rbs_skel_ground(k,ent);
     t=st+RBS_SKEL_TARGET+i*12u;
@@ -1354,7 +1381,15 @@ static void rbs_skel_aim(RbsSkel *k,uint32_t st,uint32_t ent)
         o[j]=rbs_getf(shot+j*4u);d[j]=rbs_getf(t+j*4u);
         if(!rbs_sane(o[j]) || !rbs_sane(d[j])) return;
     }
-    if(!(d[1]-k->ground>RBS_SKEL_UP)) return;          /* the boss's floor: stock aim */
+    low=rbs_skel_low(k,shot,o,d);
+    if(!(d[1]-k->ground>RBS_SKEL_UP)) {                /* the boss's floor: the stock aim ... */
+        if(!low) return;
+        d[0]-=o[0];d[1]-=o[1];d[2]-=o[2];              /* ... taken again from the lowered hand */
+        len=rbs_sqrt((d[0]*d[0]+d[1]*d[1]+d[2]*d[2]));
+        if(!(len>0.001f)) return;
+        for(j=0;j<3u;j++) rbs_setf(shot+0xCu+j*4u,d[j]/len);
+        return;
+    }
     d[0]-=o[0];d[1]+=RBS_SKEL_BODY-o[1];d[2]-=o[2];
     h=rbs_sqrt((d[0]*d[0]+d[2]*d[2]));
     len=rbs_sqrt((h*h+d[1]*d[1]));
