@@ -78,7 +78,16 @@
  *    farther away let the stock route, sub_001596F0, cut through a low door
  *    even within the robot's own room).
  *    Rooms that are unknown, or joined by no portal (teleporters), stay
- *    passable (stock).
+ *    passable (stock). v0.4.0-mapmaker.44: each MapMaker tile side is a
+ *    portal one floor (5) tall, so a tall open area is a column of portals:
+ *    the opening combines the portals stacked above the doorway in its plane
+ *    while the floors between are open (rbt_stacked); a floor or ceiling
+ *    portal is no doorway (open).
+ *  - hold (in the handler wrapper, before the original): the robot is moved
+ *    by its animation's root motion in the dispatcher (sub_0015F0D0, call
+ *    0x0027DE12), not by its pads, and its attack states walk on with no
+ *    goal; when its room (+0x34) changed through an opening lower than it,
+ *    its previous position and room are put back.
  *  - music (sub_000462B0(track)): its death sets the music track to 0 every
  *    frame until the event (0x002944D4); dropped in scene 100.
  *  - event (sub_002274C0): when its death animation has ended the robot fires
@@ -110,6 +119,7 @@
  * pc_mapmaker_limits.inc (mapmaker_limits, MAPMAKER_GUEST_RET,
  * MAPMAKER_PTR_OK). Hot hooks (nav: AI pathing; fx: every frame; hud: every
  * HUD frame) test a fixed value first. */
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -187,6 +197,14 @@
 #define RBT_FIT_SLACK 0.25f             /* an opening this much lower than the robot still lets it through */
 #define RBT_TELL_MAX 32u                /* portal decision lines per level */
 #define RBT_OPEN 1.0e9f                 /* a link inside one room, or not across a portal */
+#define RBT_PORTAL_MAX 16384u           /* stacked openings are combined up to this many portals */
+#define RBT_WALL_MIN 1.0f               /* a portal less tall than this is a floor/ceiling opening: no doorway */
+#define RBT_STACK_MAX 8u                /* portals stacked above one doorway, at most */
+#define RBT_STACK_GAP 0.3f              /* a stacked portal starts this close to the top of the one below */
+#define RBT_STACK_PLANE 0.3f            /* ... and lies this close to its vertical plane */
+#define RBT_ENT_POS 0x64u               /* entity: x/y/z (sub_0015F0D0 0x0015F861..0x0015F871) */
+#define RBT_ENT_ROOM 0x34u              /* entity: room, set from the position by sub_0015AB80 (0x0015F889) */
+#define RBT_HOLD_JUMP 6.0f              /* a move farther than this in one frame is a teleport/restart: kept */
 #define RBT_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBT_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -204,12 +222,12 @@ static struct { uint32_t state, record, actor, statics[RBT_STATICS_N]; int remov
  * links (CSR) and the opening each link crosses. Per robot: its height,
  * the pads it can reach, the substitute for an unreachable goal and the
  * hop distances to its goal. */
-static struct { uint32_t pads, links; unsigned npads, nlinks, built, crossings, told; uint32_t *off, *adj; float *open; } rbt_nav;
+static struct { uint32_t pads, links; unsigned npads, nlinks, built, crossings, told, stacked; uint32_t *off, *adj; float *open, *stack; } rbt_nav;
 static struct {
-    float height;
-    uint32_t from, goal_for, goal_sub, dist_for;
-    unsigned blocked, reached, subs, steers, logged;
-    int built, dist_ok;
+    float height, hold[3];
+    uint32_t from, goal_for, goal_sub, dist_for, hold_room;
+    unsigned blocked, reached, subs, steers, logged, holds;
+    int built, dist_ok, hold_ok;
     uint8_t reach[RBT_PAD_MAX];
     uint16_t dist[RBT_PAD_MAX];
 } rbt_walk[RBT_MAX];
@@ -283,42 +301,132 @@ static float rbt_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)
 static int rbt_sane(float f) { return f==f && f>-100000.0f && f<100000.0f; }
 static void rbt_nav_free(void)
 {
-    free(rbt_nav.off);free(rbt_nav.adj);free(rbt_nav.open);
+    free(rbt_nav.off);free(rbt_nav.adj);free(rbt_nav.open);free(rbt_nav.stack);
     memset(&rbt_nav,0,sizeof rbt_nav);
 }
 static int16_t rbt_room(uint32_t pad) { return (int16_t)RBT_H(WORD_AT(RBT_PADS)+pad*RBT_PAD_SIZE+0xAu); }
 static float rbt_padf(uint32_t pad,uint32_t off) { return rbt_getf(WORD_AT(RBT_PADS)+pad*RBT_PAD_SIZE+off); }
-/* The opening a link between pads a and b crosses: the y extent of the
- * portal joining their rooms nearest to the link's midpoint; RBT_OPEN when
- * both are in one room, a room is unknown or no portal joins them. */
+static int rbt_room_ok(uint32_t r) { return r>=1u && r<=WORD_AT(RBT_ROOM_COUNT); }
+/* Room r's portal id list (count, then ids), or 0. */
+static uint32_t rbt_room_list(uint32_t r,uint32_t *count)
+{
+    uint32_t recs=WORD_AT(RBT_ROOM_RECS),list;
+    if(!rbt_room_ok(r) || !MAPMAKER_PTR_OK(recs,(r+1u)*RBT_ROOM_REC) || !MAPMAKER_PTR_OK(list=WORD_AT(recs+r*RBT_ROOM_REC+4u),4u)) return 0;
+    *count=WORD_AT(list);
+    return *count<=RBT_PORTALS_PER_ROOM && MAPMAKER_PTR_OK(list,4u+*count*4u)?list:0;
+}
+/* A portal: its rooms, y extent, horizontal centre and its widest horizontal
+ * segment (a..b, the doorway's span in a wall). */
+typedef struct { uint32_t r0, r1, pt; unsigned nv; float lo, hi, cx, cz, ax, az, bx, bz; } rbt_portal_t;
+static int rbt_portal(uint32_t id,rbt_portal_t *p)
+{
+    uint32_t portals=WORD_AT(RBT_PORTALS),pmax=WORD_AT(RBT_PORTAL_COUNT),v,w;
+    float far=-1.0f;
+    if(id>pmax || !MAPMAKER_PTR_OK(portals,(pmax+1u)*4u) || !MAPMAKER_PTR_OK(p->pt=WORD_AT(portals+id*4u),0x18u)) return 0;
+    p->r0=WORD_AT(p->pt);p->r1=WORD_AT(p->pt+4u);p->nv=RBT_H(p->pt+0x14u);
+    if(!p->nv || p->nv>RBT_PORTAL_VERTS || !MAPMAKER_PTR_OK(p->pt+0x18u,p->nv*0xCu)) return 0;
+    p->lo=1.0e9f;p->hi=-1.0e9f;p->cx=p->cz=0.0f;
+    for(v=0;v<p->nv;v++) {
+        float x=rbt_getf(p->pt+0x18u+v*0xCu),y=rbt_getf(p->pt+0x1Cu+v*0xCu),z=rbt_getf(p->pt+0x20u+v*0xCu);
+        if(!rbt_sane(x) || !rbt_sane(y) || !rbt_sane(z)) return 0;
+        if(y<p->lo) p->lo=y;
+        if(y>p->hi) p->hi=y;
+        p->cx+=x;p->cz+=z;
+        for(w=0;w<v;w++) {
+            float dx=x-rbt_getf(p->pt+0x18u+w*0xCu),dz=z-rbt_getf(p->pt+0x20u+w*0xCu);
+            if(dx*dx+dz*dz>far) { far=dx*dx+dz*dz;p->ax=rbt_getf(p->pt+0x18u+w*0xCu);p->az=rbt_getf(p->pt+0x20u+w*0xCu);p->bx=x;p->bz=z; }
+        }
+    }
+    if(far<0.0f) { p->ax=p->bx=p->cx;p->az=p->bz=p->cz; }
+    p->cx/=(float)p->nv;p->cz/=(float)p->nv;
+    return 1;
+}
+/* Rooms x and y are one room or joined by an open floor (a portal less tall
+ * than RBT_WALL_MIN: stacked tiles; a doorway between them does not count). */
+static int rbt_joined(uint32_t x,uint32_t y)
+{
+    uint32_t list,count,i;
+    rbt_portal_t q;
+    if(x==y) return 1;
+    if(!(list=rbt_room_list(x,&count))) return 0;
+    for(i=0;i<count;i++)
+        if(rbt_portal(WORD_AT(list+4u+i*4u),&q) && q.hi-q.lo<RBT_WALL_MIN && ((q.r0==x && q.r1==y) || (q.r0==y && q.r1==x))) return 1;
+    return 0;
+}
+/* Portal q lies in p's vertical plane and shares a good part of its span. */
+static int rbt_coplanar(const rbt_portal_t *p,const rbt_portal_t *q)
+{
+    float dx=p->bx-p->ax,dz=p->bz-p->az,len=(float)sqrt((double)(dx*dx+dz*dz)),lo=1.0e9f,hi=-1.0e9f,over;
+    unsigned v;
+    if(!(len>=0.1f)) return 0;
+    dx/=len;dz/=len;
+    for(v=0;v<q->nv;v++) {
+        float ux=rbt_getf(q->pt+0x18u+v*0xCu)-p->ax,uz=rbt_getf(q->pt+0x20u+v*0xCu)-p->az,t=ux*dx+uz*dz,off=uz*dx-ux*dz;
+        if(off>RBT_STACK_PLANE || off<-RBT_STACK_PLANE) return 0;
+        if(t<lo) lo=t;
+        if(t>hi) hi=t;
+    }
+    over=(hi<len?hi:len)-(lo>0.0f?lo:0.0f);
+    return over>=0.1f && over>=0.5f*((hi-lo)<len?(hi-lo):len);
+}
+/* v0.4.0-mapmaker.44: the height of the opening above portal id. MapMaker
+ * stacks tiles of one floor (5 units), so each tile side is its own portal of
+ * one floor, and a tall open area is a column of them. A portal starting at
+ * the top of this one (RBT_STACK_GAP), in its plane (RBT_STACK_PLANE), over
+ * the same span, whose rooms are the rooms above this one's (one room, or an
+ * open floor between: a floor portal joins them, rbt_joined), raises the
+ * opening; a floor slab between two doors (no floor portal) ends it. A portal
+ * less tall than RBT_WALL_MIN is an open floor or ceiling: RBT_OPEN. */
+static float rbt_stacked(uint32_t id)
+{
+    uint32_t pmax=WORD_AT(RBT_PORTAL_COUNT),used[RBT_STACK_MAX+1u],a,b,q,n=1,i,ba=0,bb=0;
+    rbt_portal_t p,c;
+    float top,best;
+    if(rbt_nav.stack && id<=pmax && rbt_nav.stack[id]>=0.0f) return rbt_nav.stack[id];
+    if(!rbt_portal(id,&p)) return RBT_OPEN;
+    if(p.hi-p.lo<RBT_WALL_MIN) return RBT_OPEN;
+    top=p.hi;a=p.r0;b=p.r1;used[0]=id;
+    while(pmax<=RBT_PORTAL_MAX && n<=RBT_STACK_MAX) {
+        best=top;
+        for(q=0;q<=pmax;q++) {
+            for(i=0;i<n && used[i]!=q;i++) {}
+            if(i<n || !rbt_portal(q,&c) || c.hi-c.lo<RBT_WALL_MIN || c.hi<=best) continue;
+            if(c.lo>top+RBT_STACK_GAP || c.lo<top-RBT_STACK_GAP || !rbt_coplanar(&p,&c)) continue;
+            if(rbt_joined(c.r0,a) && rbt_joined(c.r1,b)) { best=c.hi;ba=c.r0;bb=c.r1;used[n]=q; }
+            else if(rbt_joined(c.r0,b) && rbt_joined(c.r1,a)) { best=c.hi;ba=c.r1;bb=c.r0;used[n]=q; }
+        }
+        if(best<=top) break;
+        top=best;a=ba;b=bb;n++;
+    }
+    if(n>1u) rbt_nav.stacked++;
+    if(rbt_nav.stack && id<=pmax) rbt_nav.stack[id]=top-p.lo;
+    return top-p.lo;
+}
+/* The opening between rooms ra and rb near (mx, mz): the stacked height of
+ * the portal joining them nearest to that point; RBT_OPEN when both are one
+ * room, a room is unknown or no portal joins them. */
+static float rbt_pair_open(uint32_t ra,uint32_t rb,float mx,float mz)
+{
+    uint32_t list,count,i,id,best_id=0;
+    rbt_portal_t p;
+    float best=-1.0f,best_lo=0.0f,d;
+    if(ra==rb || !rbt_room_ok(ra) || !rbt_room_ok(rb) || !(list=rbt_room_list(ra,&count))) return RBT_OPEN;
+    for(i=0;i<count;i++) {
+        if(!rbt_portal(id=WORD_AT(list+4u+i*4u),&p)) continue;
+        if(!((p.r0==ra && p.r1==rb) || (p.r0==rb && p.r1==ra))) continue;
+        d=(p.cx-mx)*(p.cx-mx)+(p.cz-mz)*(p.cz-mz);
+        if(!rbt_sane(d)) continue;
+        /* nearest; of portals stacked over one spot (two tall rooms), the lowest */
+        if(best<0.0f || d<best-0.01f || (d<=best+0.01f && p.lo<best_lo)) { best=d;best_id=id;best_lo=p.lo; }
+    }
+    return best<0.0f?RBT_OPEN:rbt_stacked(best_id);
+}
+/* The opening a link between pads a and b crosses (its midpoint). */
 static float rbt_opening(uint32_t a,uint32_t b)
 {
     int ra=rbt_room(a),rb=rbt_room(b);
-    uint32_t recs=WORD_AT(RBT_ROOM_RECS),portals=WORD_AT(RBT_PORTALS),pmax=WORD_AT(RBT_PORTAL_COUNT),list,count,i,v,id,pt;
-    float mx=(rbt_padf(a,0xCu)+rbt_padf(b,0xCu))*0.5f,mz=(rbt_padf(a,0x14u)+rbt_padf(b,0x14u))*0.5f,best=-1.0f,open=RBT_OPEN;
-    if(ra==rb || ra<=0 || rb<=0 || (uint32_t)ra>WORD_AT(RBT_ROOM_COUNT) || (uint32_t)rb>WORD_AT(RBT_ROOM_COUNT)) return RBT_OPEN;
-    if(!MAPMAKER_PTR_OK(recs,((uint32_t)ra+1u)*RBT_ROOM_REC) || !MAPMAKER_PTR_OK(portals,(pmax+1u)*4u) ||
-       !MAPMAKER_PTR_OK(list=WORD_AT(recs+(uint32_t)ra*RBT_ROOM_REC+4u),4u)) return RBT_OPEN;
-    count=WORD_AT(list);
-    if(count>RBT_PORTALS_PER_ROOM || !MAPMAKER_PTR_OK(list,4u+count*4u)) return RBT_OPEN;
-    for(i=0;i<count;i++) {
-        unsigned nv;
-        float lo=1.0e9f,hi=-1.0e9f,cx=0.0f,cz=0.0f,d;
-        if((id=WORD_AT(list+4u+i*4u))>pmax || !MAPMAKER_PTR_OK(pt=WORD_AT(portals+id*4u),0x18u)) continue;
-        if(!((WORD_AT(pt)==(uint32_t)ra && WORD_AT(pt+4u)==(uint32_t)rb) || (WORD_AT(pt)==(uint32_t)rb && WORD_AT(pt+4u)==(uint32_t)ra))) continue;
-        nv=RBT_H(pt+0x14u);
-        if(!nv || nv>RBT_PORTAL_VERTS || !MAPMAKER_PTR_OK(pt+0x18u,nv*0xCu)) continue;
-        for(v=0;v<nv;v++) {
-            float x=rbt_getf(pt+0x18u+v*0xCu),y=rbt_getf(pt+0x1Cu+v*0xCu),z=rbt_getf(pt+0x20u+v*0xCu);
-            if(y<lo) lo=y;
-            if(y>hi) hi=y;
-            cx+=x;cz+=z;
-        }
-        cx/=(float)nv;cz/=(float)nv;d=(cx-mx)*(cx-mx)+(cz-mz)*(cz-mz);
-        if(!rbt_sane(lo) || !rbt_sane(hi) || !rbt_sane(d)) continue;
-        if(best<0.0f || d<best) { best=d;open=hi-lo; }
-    }
-    return open;
+    if(ra<=0 || rb<=0) return RBT_OPEN;
+    return rbt_pair_open((uint32_t)ra,(uint32_t)rb,(rbt_padf(a,0xCu)+rbt_padf(b,0xCu))*0.5f,(rbt_padf(a,0x14u)+rbt_padf(b,0x14u))*0.5f);
 }
 /* The pads' links as lists per pad, with the opening of each (once per level). */
 static int rbt_nav_build(void)
@@ -331,6 +439,8 @@ static int rbt_nav_build(void)
     rbt_nav.adj=(uint32_t *)malloc((2u*nl+1u)*sizeof(uint32_t));
     rbt_nav.open=(float *)malloc((2u*nl+1u)*sizeof(float));
     fill=(uint32_t *)calloc(np+1u,sizeof(uint32_t));
+    if(WORD_AT(RBT_PORTAL_COUNT)<=RBT_PORTAL_MAX && (rbt_nav.stack=(float *)malloc((WORD_AT(RBT_PORTAL_COUNT)+1u)*sizeof(float)))!=0)
+        for(k=0;k<=WORD_AT(RBT_PORTAL_COUNT);k++) rbt_nav.stack[k]=-1.0f;   /* each portal's stacked opening, once */
     if(!rbt_nav.off || !rbt_nav.adj || !rbt_nav.open || !fill) { free(fill);free(rbt_nav.off);free(rbt_nav.adj);free(rbt_nav.open);rbt_nav.off=0;rbt_nav.adj=0;rbt_nav.open=0;return 0; }
     for(k=0;k<nl;k++) {
         uint32_t l=links+k*RBT_LINK_SIZE;
@@ -388,8 +498,8 @@ static void rbt_tell(unsigned k)
     float need=rbt_walk[k].height-RBT_FIT_SLACK;
     if(rbt_nav.told) return;
     rbt_nav.told=1;
-    fprintf(stderr,"[mapmaker] robot: giant robot height %.2f (entity box top; openings of at least %.2f let it through), %u links cross a portal\n",
-            (double)rbt_walk[k].height,(double)need,rbt_nav.crossings);
+    fprintf(stderr,"[mapmaker] robot: giant robot height %.2f (entity box top; openings of at least %.2f let it through), %u links cross a portal, %u doorways with open floors stacked above\n",
+            (double)rbt_walk[k].height,(double)need,rbt_nav.crossings,rbt_nav.stacked);
     for(p=0;p<rbt_nav.npads;p++)
         for(e=rbt_nav.off[p];e<rbt_nav.off[p+1u];e++) {
             if(rbt_nav.adj[e]<=p || rbt_nav.open[e]>=RBT_OPEN) continue;
@@ -499,11 +609,52 @@ static void rbt_swapped(void (*original)(void),uint32_t ent)
     WORD_AT(RBT_STATE)=keep[0];
     rbt_lvl.swaps++;
 }
+/* v0.4.0-mapmaker.44 "still walks through openings one floor tall": the
+ * robot is not moved by its pads. The dispatcher moves it just before this
+ * handler (sub_0015F0D0, call 0x0027DE12): the current animation's root
+ * motion ([entity+4] +0xFC..) turned by its facing (+0x70), a collision move
+ * (sub_000D9230, 0x0015F850), the position stored (0x0015F861..0x0015F871)
+ * and its room +0x34 set again from it (sub_0015AB80, 0x0015F889). Every
+ * state from 2 to 5 keeps the walk cycle (0x808) playing, and the attack
+ * states 3-5 (straight-line distance to the player, 0x002939E9..0x00293A3C)
+ * call no walk goal, so it walks on through a doorway wherever it faces.
+ * Each frame, before the handler: when its room changed through an opening
+ * lower than it (rbt_pair_open nearest the move), the previous position and
+ * room are put back. A move of more than RBT_HOLD_JUMP in one frame
+ * (teleport, restart), a room joined by no portal or an unknown room is kept. */
+static void rbt_hold(unsigned k,uint32_t ent)
+{
+    uint32_t room=WORD_AT(ent+RBT_ENT_ROOM),i;
+    float pos[3],d=0.0f,open=0.0f;
+    for(i=0;i<3u;i++) { pos[i]=rbt_getf(ent+RBT_ENT_POS+i*4u);if(!rbt_sane(pos[i])) return; }
+    if(rbt_inst[k].removed || !rbt_room_ok(room)) return;
+    if(rbt_walk[k].hold_ok && room!=rbt_walk[k].hold_room) {
+        for(i=0;i<3u;i++) d+=(pos[i]-rbt_walk[k].hold[i])*(pos[i]-rbt_walk[k].hold[i]);
+        if(!rbt_walk[k].height) rbt_walk[k].height=rbt_height(ent);
+        if(d<=RBT_HOLD_JUMP*RBT_HOLD_JUMP &&
+           (open=rbt_pair_open(rbt_walk[k].hold_room,room,(pos[0]+rbt_walk[k].hold[0])*0.5f,(pos[2]+rbt_walk[k].hold[2])*0.5f))<rbt_walk[k].height-RBT_FIT_SLACK) {
+            memcpy((void *)((uintptr_t)(ent+RBT_ENT_POS)+g_xbox_mem_offset),rbt_walk[k].hold,sizeof rbt_walk[k].hold);
+            WORD_AT(ent+RBT_ENT_ROOM)=rbt_walk[k].hold_room;
+            if(rbt_walk[k].holds++<4u) {
+                fprintf(stderr,"[mapmaker] robot: giant robot %u held in room %u: the opening to room %u is %.2f, lower than it (%.2f)\n",
+                        k,(unsigned)rbt_walk[k].hold_room,(unsigned)room,(double)open,(double)rbt_walk[k].height);
+                fflush(stderr);
+            }
+            return;
+        }
+    }
+    rbt_walk[k].hold_ok=1;rbt_walk[k].hold_room=room;
+    memcpy(rbt_walk[k].hold,pos,sizeof pos);
+}
 /* WRAP sub_00293730 (cdecl entity; the robot's AI, dispatcher 0x0027DE18). */
 void pc_mapmaker_robot_handler(void (*original)(void))
 {
+    uint32_t ent;
+    int k;
     if(!rbt_lvl.n || !MAPMAKER_STACK_OK(8)) { original();return; }
-    rbt_swapped(original,WORD_AT(g_esp+4u));
+    ent=WORD_AT(g_esp+4u);
+    if((k=rbt_find(ent))>=0) rbt_hold((unsigned)k,ent);
+    rbt_swapped(original,ent);
 }
 /* WRAP sub_00294520 (cdecl entity, message, ..; the robot's messages, 0x0027D447). */
 void pc_mapmaker_robot_message(void (*original)(void))
@@ -547,6 +698,7 @@ void pc_mapmaker_robot_ai_start(void (*original)(void))
         if(k==rbt_lvl.n) rbt_lvl.n++;                  /* a new robot; the same record again keeps its state */
         rbt_inst[k].record=rec;rbt_inst[k].actor=a;rbt_inst[k].removed=0;
         memset(rbt_inst[k].statics,0,sizeof rbt_inst[k].statics);
+        rbt_walk[k].hold_ok=0;                         /* (re)spawned: no previous position */
         rbt_log("giant robot gets its story AI (class 0x80000) and state",a,(uint32_t)k<<16|(id&0xFFFFu));
     }
     original();
@@ -652,6 +804,7 @@ void pc_mapmaker_robot_reset(void (*original)(void))
         guest_call(sub_00292550,0);
         memset(rbt_inst[k].statics,0,sizeof rbt_inst[k].statics);
         rbt_inst[k].removed=0;
+        rbt_walk[k].hold_ok=0;                         /* back at its spawn point */
     }
     WORD_AT(RBT_STATE)=keep;
     if(rbt_lvl.resets++<2u) rbt_log("giant robot states reset for the restart",rbt_lvl.blocks,rbt_lvl.n);
