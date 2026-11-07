@@ -48,6 +48,16 @@ not read: convert them to WAV or MP3 first.
   Complete, Game Over) are the game's own; when one starts, your track stops.
 - It follows the Music volume slider (full slider = the file's own level),
   pauses with the game's music and stops when you leave the level.
+- **Volume:** at the same slider position an imported track is already
+  played 8 to 12 dB higher than the game's level music (the game's music
+  plays at 50-80% of the slider, minus 6 dB of console headroom). If it still
+  sounds quiet, add `gain_db=6` (any number from -12 to 12, in dB) on its own
+  line in `pc-music.ini` (beside the display settings, after the
+  `TSFP_MUSIC_V1` line). Positive values above what the voice can give are
+  applied to the sound itself with a soft limiter, so a loud track bends
+  rather than crackles. It takes effect when the next track starts; the
+  Arcade choice keeps the line. The log's `[music] player: level ...` line
+  shows the level used and the stock range at that slider.
 - If the music is switched off in the options, nothing plays.
 - **Fallbacks:** a map whose file is missing plays the tileset's music (the
   log says `[music] map's imported track is missing`). An Arcade choice whose

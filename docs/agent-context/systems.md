@@ -50,7 +50,7 @@ in `assets/textures` (DDS via Git LFS), audited by `tools/textures/build_texture
 Private art stays local. Networking: `src/network/`, HLE/kernel patches and
 `tools/network/online.py`; [Online UI](multiplayer-ui.md). Crash capture:
 `src/diagnostics/`, runtime crash hooks and launcher diagnostics.
-Audio: `src/hle/hle_dsound*`, `hle_xmv*`; [beta](../development/positional-audio.md), [own tracks](custom-music.md).
+Audio: `src/hle/hle_dsound*`, `hle_xmv*`; [beta](../development/positional-audio.md), [own, trim](custom-music.md).
 General buffering, lifecycle, format and device recovery are unconditional;
 Enhanced Audio controls only the optional mix. Effects adapt their default
 lead from 40 to 90 ms and refill immediately after skipping stale hitch data.

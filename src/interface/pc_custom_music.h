@@ -27,6 +27,17 @@
 #define PC_MUSIC_LABEL_MAX 40u
 #define PC_MUSIC_SLOT 273u           /* RECOMP_AUDIO_SLOT_MUSIC */
 #define PC_MUSIC_LEVEL 1.0f          /* full Music slider = 0 dB (0.65 sounded quiet next to stock music, .48) */
+/* The player's own trim, gain_db= in pc-music.ini (hundredths of a dB). The
+ * slider level plus the trim goes to the voice up to 0 dB; any part above 0 dB
+ * is applied to the samples, soft-clipped above PC_MUSIC_KNEE of full scale. */
+#define PC_MUSIC_GAIN_MIN (-1200)
+#define PC_MUSIC_GAIN_MAX 1200
+#define PC_MUSIC_KNEE 0.75f
+/* Stock level music at the same slider, for the log (2026-11-07, US XBE):
+ * sub_00045B60 = (int)(slider/16 x 100 x track level/100), track levels
+ * 0x00535858 50..80; the player's sub_00028180 gives 2000 log10(x/100), and
+ * the stream's XDK headroom takes 600 more (hle_dsound_stream_adjust). */
+#define PC_MUSIC_STOCK_HEADROOM 600
 
 typedef struct PcMusicList {
     unsigned count;
@@ -100,6 +111,13 @@ int pc_music_playing(void);
  * (pc-music.ini, like pc-audio.ini). */
 int pc_music_arcade_load(char *name, size_t bytes);
 int pc_music_arcade_save(const char *name);
+/* The trim gain_db= (-12..+12 dB, decimals allowed) in hundredths of a dB,
+ * clamped; 0 when absent or unreadable. *present (optional) says whether the
+ * file held a readable gain_db= line. Read at each track start. */
+int32_t pc_music_gain_load(int *present);
+/* Raises s16 samples by `boost` hundredths of a dB (> 0), soft-clipping above
+ * PC_MUSIC_KNEE so nothing wraps or clips hard. */
+void pc_music_boost(int16_t *pcm, size_t samples, int32_t boost);
 
 #ifdef PC_CUSTOM_MUSIC_TEST
 /* Test hooks: one player step at the given milliseconds. */
@@ -355,6 +373,20 @@ int32_t pc_music_db(float gain)
     return db < -10000.0 ? -10000 : (int32_t)lrint(db);
 }
 
+void pc_music_boost(int16_t *pcm, size_t samples, int32_t boost)
+{
+    size_t k;
+    float g;
+    if (boost <= 0 || !pcm) return;
+    g = powf(10.0f, (float)boost / 2000.0f);
+    for (k = 0; k < samples; k++) {
+        float x = (float)pcm[k] / 32768.0f * g, a = fabsf(x);
+        if (a > PC_MUSIC_KNEE)         /* tends to full scale, never reaches it */
+            a = PC_MUSIC_KNEE + (1.0f - PC_MUSIC_KNEE) * tanhf((a - PC_MUSIC_KNEE) / (1.0f - PC_MUSIC_KNEE));
+        pcm[k] = (int16_t)lrintf((x < 0 ? -a : a) * 32767.0f);
+    }
+}
+
 /* ---- the player -------------------------------------------------------- */
 #define PC_MUSIC_CHUNK_FRAMES 4096u   /* 93 ms at 44.1 kHz */
 #define PC_MUSIC_LEAD_MS 250u
@@ -367,8 +399,9 @@ typedef struct PcMusicPlayer {
     uint64_t read_bytes;               /* of the data chunk, this pass */
     uint64_t submitted_frames, base_ms;
     int32_t volume;
+    int32_t trim, boost;               /* gain_db= at the start; the part above 0 dB now */
     int paused, pending_frames;
-    int told_first, told_paused;       /* one diagnostic line each per track */
+    int told_first, told_paused, told_level; /* one diagnostic line each per track */
     const char *why;                   /* why the step ended the track */
     unsigned out_channels;
     PcMusicWatch watch;
@@ -436,8 +469,27 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
     if (!p->watch(p->context, &gain, &paused)) { p->why = "the watch ended it (see its [music] watch line)"; return 0; }
     if (PC_MUSIC_DISCONTINUITY()) { p->submitted_frames = 0; p->base_ms = now; }
     {
-        int32_t volume = paused ? -10000 : pc_music_db(gain * PC_MUSIC_LEVEL);
+        int32_t slider = paused ? -10000 : pc_music_db(gain * PC_MUSIC_LEVEL), volume = slider;
+        p->boost = 0;
+        if (slider > -10000) {         /* a silent slider stays silent whatever the trim */
+            volume = slider + p->trim;
+            if (volume > 0) { p->boost = volume; volume = 0; }
+            if (volume < -10000) volume = -10000;
+        }
         if (volume != p->volume) { p->volume = volume; PC_MUSIC_VOLUME(volume); }
+        if (!p->told_level && !paused) {
+            p->told_level = 1;
+            if (slider > -10000)
+                fprintf(stderr, "[music] player: level %d + gain_db %+.2f = voice %d, samples %+.2f dB (soft clip above %.0f%%); "
+                        "stock level music at this slider: %d..%d (track level 50..80, %d headroom)\n",
+                        (int)slider, p->trim / 100.0, (int)volume, p->boost / 100.0, PC_MUSIC_KNEE * 100.0,
+                        (int)lrint(slider + 2000.0 * log10(0.5)) - PC_MUSIC_STOCK_HEADROOM,
+                        (int)lrint(slider + 2000.0 * log10(0.8)) - PC_MUSIC_STOCK_HEADROOM, PC_MUSIC_STOCK_HEADROOM);
+            else
+                fprintf(stderr, "[music] player: level: the Music slider is at 0 (silent; gain_db %+.2f not applied)\n",
+                        p->trim / 100.0);
+            fflush(stderr);
+        }
     }
     if (paused) {                      /* hold the file position; what is queued plays out silently */
         if (!p->told_paused && !p->submitted_frames) {
@@ -468,6 +520,7 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
                 return 0;
             }
             p->pending_frames = (int)got;
+            pc_music_boost(p->pcm, (size_t)got * p->out_channels, p->boost);
         } else if (!p->pending_frames) {
             uint64_t left = p->info.data_bytes - p->read_bytes;
             size_t want, got;
@@ -483,6 +536,7 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
             p->read_bytes += got;
             p->pending_frames = (int)(got / p->info.block);
             p->out_channels = pc_wav_to_s16(&p->info, p->raw, (size_t)p->pending_frames, p->pcm);
+            pc_music_boost(p->pcm, (size_t)p->pending_frames * p->out_channels, p->boost);
         }
         {
             int accepted = PC_MUSIC_SUBMIT((const uint8_t *)p->pcm, (uint32_t)p->pending_frames * 2u * p->out_channels,
@@ -635,6 +689,7 @@ int pc_music_start(const char *name, PcMusicWatch watch, void *context)
     p->watch = watch;
     p->context = context;
     p->volume = 1;                     /* not a level pc_music_db returns: the first step sets it */
+    p->trim = pc_music_gain_load(NULL);
     p->out_channels = p->info.channels >= 2 ? 2u : 1u;
     p->base_ms = pc_music_now_ms();
     pc_music_player = p;
@@ -662,35 +717,66 @@ static int pc_music_ini(char *out, size_t bytes)
     return 1;
 }
 
-int pc_music_arcade_load(char *name, size_t bytes)
+/* The value of `key` (e.g. "arcade=") in pc-music.ini: the lines after the
+ * TSFP_MUSIC_V1 header, in any order; 1 when found. */
+static int pc_music_ini_value(const char *key, char *out, size_t bytes)
 {
     char path[4096], line[PC_MUSIC_NAME_MAX + 16];
     FILE *file;
-    int ok = 0;
+    size_t n = strlen(key);
+    int found = 0;
+    if (!pc_music_ini(path, sizeof path) || !(file = fopen(path, "rb"))) return 0;
+    if (fgets(line, sizeof line, file) && !strncmp(line, "TSFP_MUSIC_V1", 13))
+        while (!found && fgets(line, sizeof line, file))
+            if (!strncmp(line, key, n)) {
+                char *v = line + n;
+                v[strcspn(v, "\r\n")] = 0;
+                if (strlen(v) < bytes) { strcpy(out, v); found = 1; }
+            }
+    fclose(file);
+    return found;
+}
+
+int pc_music_arcade_load(char *name, size_t bytes)
+{
+    char v[PC_MUSIC_NAME_MAX + 16];
     if (!name || !bytes) return 0;
     name[0] = 0;
-    if (!pc_music_ini(path, sizeof path) || !(file = fopen(path, "rb"))) return 0;
-    if (fgets(line, sizeof line, file) && !strncmp(line, "TSFP_MUSIC_V1", 13) &&
-        fgets(line, sizeof line, file) && !strncmp(line, "arcade=", 7)) {
-        char *v = line + 7;
-        v[strcspn(v, "\r\n")] = 0;
-        if (pc_music_name_ok(v) && strlen(v) < bytes) { strcpy(name, v); ok = 1; }
-    }
-    fclose(file);
-    return ok;
+    if (!pc_music_ini_value("arcade=", v, sizeof v) || !pc_music_name_ok(v) || strlen(v) >= bytes) return 0;
+    strcpy(name, v);
+    return 1;
+}
+
+int32_t pc_music_gain_load(int *present)
+{
+    char v[PC_MUSIC_NAME_MAX + 16], *end;
+    double db;
+    if (present) *present = 0;
+    if (!pc_music_ini_value("gain_db=", v, sizeof v)) return 0;
+    db = strtod(v, &end);
+    while (*end == ' ' || *end == '\t') end++;
+    if (end == v || *end || !(db == db)) return 0;
+    if (present) *present = 1;
+    db *= 100.0;
+    if (db < PC_MUSIC_GAIN_MIN) db = PC_MUSIC_GAIN_MIN;
+    if (db > PC_MUSIC_GAIN_MAX) db = PC_MUSIC_GAIN_MAX;
+    return (int32_t)lrint(db);
 }
 
 int pc_music_arcade_save(const char *name)
 {
     char path[4096], temporary[4096 + 8];
     FILE *file;
-    int ok;
+    int ok, has_trim;
+    int32_t trim;
     if (!name) name = "";
     if (*name && !pc_music_name_ok(name)) return 0;
     if (!pc_music_ini(path, sizeof path)) return 0;
+    trim = pc_music_gain_load(&has_trim);  /* the player's gain_db= survives an Arcade choice */
     snprintf(temporary, sizeof temporary, "%s.tmp", path);
     if (!(file = fopen(temporary, "wb"))) return 0;
     ok = fprintf(file, "TSFP_MUSIC_V1\narcade=%s\n", name) > 0;
+    if (ok && has_trim) ok = fprintf(file, "gain_db=%.2f\n", trim / 100.0) > 0;
     if (fflush(file)) ok = 0;
     if (fclose(file)) ok = 0;
 #ifdef _WIN32

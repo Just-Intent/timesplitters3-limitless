@@ -61,16 +61,32 @@ Existing wrappers reused: `sub_00078590` (rows), `sub_003006C0` (compile),
   only when its count changes. Before this one 48-line budget was spent by
   list builds (m45b.err: 48 offer lines, then nothing), hiding every play
   line. Each silent play return logs `[music] play: <why> (ret, scene, eax,
-  map chunk, map music, arcade)`; a failed start logs `pc_music_error()`. Watch: scene word, slider `[0x005236BC]/16 x 0.65`, pause `[0x006D5EB8]` (set by sub_00045AB0, cleared by sub_00045AF0). Not the
+  map chunk, map music, arcade)`; a failed start logs `pc_music_error()`. Watch: scene word, slider `[0x005236BC]/16`, pause `[0x006D5EB8]` (set by sub_00045AB0, cleared by sub_00045AF0). Not the
   player's +0x28 `[0x0064BDC0]`: a state (0 idle, 1 pause-before-start, 2
   playing, 3 stopped), 3 after the menu music, which held every track silent
   through .46 (m46.err: `map: imported track`, never `slot=273`). The player
   logs its first submission, `held ... paused` and `stopped: <why>`.
 - Lead 250 ms in 4096-frame chunks; a refused submission is offered again.
+- Loudness (2026-11-07, .50 "still quiet"): stock level music reaches
+  XAudio2 at `2000 log10(pct/100) - 600`, pct = `(int)(slider/16 x 100 x
+  level/100)` (sub_00045B60; levels `0x00535858` 50..80, `0x005358B8` 80;
+  halved in scene 0x65) -> player +0x54 -> sub_00028180 `2000 log10` ->
+  `CDirectSoundStream_SetVolume`; the stream adds mix bins (0@0 1@0: 0) and
+  minus headroom 600 (`hle_dsound_stream_adjust`). One stereo voice, identity
+  matrix, same 0.5 master as slot 273; no summing. Logged: m48/m50 level
+  stock -1135 (slider 11, pct 54), menu -1737; slot 273 -325. Same curve, so
+  imported = stock + 8.0..12.0 dB at every slider. Content (ffmpeg ebur128):
+  60 s of m48's stock packets decoded from `musicts.pak` -16.3 LUFS, the
+  user's MP3 -9.9 LUFS: imported ~14.5 LU louder at the output. Not matched
+  (that cuts ~8 dB). Trim `gain_db=` in `pc-music.ini` (-12..+12, any line
+  after the header, kept by `pc_music_arcade_save`): voice = slider + trim
+  up to 0 dB (`gainOf` clamps >0), the rest is `pc_music_boost` on the
+  samples, soft-clipped above 0.75 (tanh knee). Read at each start; one
+  `[music] player: level ... stock level music at this slider: a..b` line.
 
 ## Tests
 
-`tests/media/test_custom_music.py` (host, 33 mutations, WAVs and fake
+`tests/media/test_custom_music.py` (host, 43 mutations incl. trim/boost/soft clip, WAVs and fake
 `FAKE` .mp3 decoder input written by the test), `tests/media/test_music_codec.py`
 (stub build always; real FFmpeg build where the pinned package is unpacked,
 MP3s made by its `ffmpeg.exe` with libmp3lame, 9 mutations; skipped in CI and
@@ -87,4 +103,6 @@ Any game run (MP3 decode was only exercised by the fixture); the Arcade menu's o
 two known readers were checked); whether the stock player keeps channel 0
 state consistent when id 0 plays; Mac build of the thread/`dirent` paths;
 Mac launcher build (Avalonia picker, Trash move); Mac MP3 needs an FFmpeg
-adapter (MAC-133). FFmpeg log lines (`Header missing`) may reach stderr on junk.
+adapter (MAC-133); whether the user hears the trim/boost as intended (the
+"still quiet" report contradicts the measured levels: system/stock-volume
+perception is unexplained). FFmpeg log lines (`Header missing`) may reach stderr on junk.
