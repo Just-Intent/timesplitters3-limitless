@@ -68,7 +68,7 @@ screen). Rows appear just above the last row ("Done"):
   directly). The edit screen's rows show the role instead.
 - **Logic means** (leader only): toggles group logic; the label shows the
   current state. Off (default): logic on the leader means the leader only, as
-  stock. On: logic on the leader means any member (see Logic). Logic on a copy
+  stock. On: logic on the leader means the whole group (see Logic). Logic on a copy
   always means that copy.
 - **Unlink copy**: the copy keeps its settings and leaves the group.
   **Unlink (next copy leads)** on the leader: the leader leaves, its first copy
@@ -102,13 +102,58 @@ With group logic on the leader, in play (scene 100):
 
 | Logic on the leader | Effect |
 |---|---|
-| trigger 0xB (event-style, flag 2 from `sub_0033E560`) | fires when the event happens to any member |
-| trigger 0x14 (poll `sub_00339600`, actor flag 4, then a delay) | fires when any member qualifies |
+| trigger 0xB "killed" (flag 2 from the death event `sub_0033E560`) | fires once, when every placed member has been killed (the leader's own death no longer fires it alone; a copy's death still fires the copy's own logic) |
+| trigger 0x14 "spotted the player" (poll `sub_00339600`, AI state bit 4, then the stock delay) | fires when every placed member has spotted the player (latched; a member killed first does not block, at least one must have spotted) |
 | action 2 (`sub_00163780`, `sub_000BD090` on each live actor) | applies to every member |
 | action 0x11 (spawn gate `sub_0033E620`, types 2/3/4) | holds every member until it fires (a copy's own 0x11 action still applies too) |
 
 The trigger/action names (kill, remove, spawn, ...) are inferred from code
 paths; text ids for them were not read.
+
+### Whole-group triggers and ported bosses (fixed after v0.4.0-mapmaker.40)
+
+User report: four giant skeletons in one group, "Logic means: whole group",
+an objective on "killed", later on "spotted the player": neither fired.
+Causes (CONFIRMED in text.asm unless marked):
+
+- Semantics: "whole group" meant *any* member. It now means *all* placed
+  members (a member with a spawn record, level descriptor `[0x0074C36C]`
+  +0x74/+0x78, 0x98 each, id +8; unplaced copies have none and never block).
+- Killed: the only Story AI triggers are 0xB (killed) and 0x14 (spotted)
+  (`sub_003396E0`). 0xB is flag 2 from `sub_0033E560`, reached only through
+  `sub_00228B40` from the three stock deaths (0x0026C0AA, 0x0027E9A2,
+  0x0028615D), each followed by `sub_0015DDA0` (remove AI). Ported boss
+  fights remove their AI with `sub_0015DDA0` alone: the skeleton's mansion
+  state 6 (0x0029E069), walker, robot and Crowe (`guest_call` in their
+  areas). No death event, so not even a single boss's "killed" fired.
+  New WRAP `sub_0015DDA0` -> `pc_mapmaker_aitemplates_removed`: in scene 100,
+  a removed Story AI whose spawn record class is not MapMaker's
+  (0x11000000/0 or 0x10000000/1; the boss areas write e.g. 0/0x20000) and
+  that is hurt (health +0x1CC below max +0x1D8) gets the death event first
+  (the wrapped `sub_0033E560`), unless the stock event already came for that
+  entity (16-entry ring). Placeholders that tank, mothership and Khallos
+  remove keep MapMaker's class and full health: no event.
+- Spotted: 0x14 tests AI state class bit 4 (+0x10 in story mode
+  `[0x007DE455]`==10, else +0x18), which stock think code requests through
+  `sub_00017570(ai, 4, 0)`. A boss class (0x20000 skeleton, ...) is fixed for
+  the whole fight, so it never spots. For a boss-class AI the hook counts it
+  as having spotted the player once it is hurt or a human is within 30 units
+  (INFERRED proxy; the fights have no common "seen" field). Sightings are
+  latched per AI index. On a whole-group leader, or an AI of boss class, the
+  0x14 poll is ours with the stock state machine (state 7 + delay
+  `[0x004E8CEC]` from `[0x007DE318]`, then 3 and return 1, 0x003396BF).
+- Not covered: the tank and mothership are not AIs after their placeholder
+  leaves, and the worm is no AI class, so their "killed"/"spotted" logic and
+  their group membership still do not fire (they would need a call from their
+  own death code). Khallos: a rider killed by a hit dies the stock way (works);
+  a rider removed with its chair gets no event. A level restart does not reset
+  the latches (no restart hook in this area).
+
+Hook added for the integrator (new wrapper, not in the generated patch yet):
+
+```
+WRAP sub_0015DDA0 -> pc_mapmaker_aitemplates_removed     (remove AI; cdecl entity)
+```
 
 ## Save format and compatibility
 
@@ -257,7 +302,7 @@ it from `tests/mapmaker/mapmaker_area_stubs.h` if missing there).
   different AI with the same colour at the same index after a reset could
   receive a stale propagation (only if it is itself in a group).
 - Turning group logic on changes the meaning of logic already placed on the
-  leader (it then means any member); promotion leaves it off for that reason.
+  leader (it then means the whole group); promotion leaves it off for that reason.
 - System Link: each machine applies group logic only if it runs this build
   with the switch on.
 - Trigger 0x14 on a group leader polls each copy in turn; its delay state is
@@ -300,9 +345,9 @@ Run with `TSFP_MAPMAKER_LIMITS=1`.
    AI": only killing Guard fires it.
 6. Logic, whole group: Guard -> **Logic means: this AI** (screen closes);
    reopen: it reads **Logic means: whole group**. Now a trigger on Guard fires
-   when any member is killed; an action on Guard (remove/kill style) affects
+   only when every placed member is killed; an action on Guard (remove/kill style) affects
    every member; a spawn action on Guard releases every held type 2/3/4 member;
-   an alert-style (0x14) trigger on Guard fires for any member.
+   a "spotted" (0x14) trigger on Guard fires once every member has spotted the player.
 7. Promotion: Guard -> **Unlink (next copy leads)**: Guard 2 now shows the
    leader rows (logic "this AI"), Guard 3 still follows it. Delete Guard 2:
    Guard 3 leads the rest. Unlink the last copy: no leader rows remain.

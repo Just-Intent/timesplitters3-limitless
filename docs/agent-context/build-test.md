@@ -123,12 +123,11 @@ remain separate checks.
 callback mutations. Fast results and finite fallback results are bit-exact;
 fallback arithmetic destinations allow quiet-NaN payload variation (also seen
 with fast entry disabled). Rejected inputs leave all bits/FP flags unchanged.
-Public fixtures/mutations run on both hosts; US-body tests need the private XBE.
+Fixtures/mutations (+group triggers) run on both hosts; US-body tests need the XBE.
 Camera/mothership/spawn/rigid fixtures include the shared helper.
 
 Crash capture/heartbeat and bounded Windows sharing retries: `test_crash_capture.py`.
 Darwin: `test_native_crash.py`. Both hosts run shared UI identity/failure/ZIP tests.
-
 
 `stability_transitions_game.py --scenario rocket-impact --native-fps 240
 --watch-actors --watch-effects --no-captures --no-native-trace --seconds 180`: Temple floor rocket, cleanup,
@@ -880,13 +879,11 @@ suite and both-host CI. See docs/project/STATUS.md for measured local results; n
 behavior or generated guest code changed, and no game build/publication is
 established by these asset-free checks.
 
-
 Grouped Preview UI: GameChannelPickerPage.cs uses both hosts' *Page.cs includes.
 tests/launcher/launcher_shared_ui.cs covers tracks, Save state and launcher_saves.cs
 (sparse backups, update protection, restore failures). Run
 tools/build/build-launcher.ps1 -Test. --render-preview uses synthetic tracks.
 No game build or publisher/tag-format change is required for this grouping.
-
 
 Local Windows artwork selection: build-launcher.ps1 resolves explicit image
 arguments first, then validates each build/launcher-art PNG against the shared
