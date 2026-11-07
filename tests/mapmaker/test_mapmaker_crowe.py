@@ -51,7 +51,7 @@ MUTATIONS = {
     'class-after-original': ('        WORD_AT(rec)=0;WORD_AT(rec+4u)=CRW_CLASS;\n',
                              '        original();WORD_AT(rec)=0;WORD_AT(rec+4u)=CRW_CLASS;g_esp-=4u;\n'),
     'class-without-pak': ('    else if(!crw_pak_mounted()) crw_log("lv14', '    else if(0) crw_log("lv14'),
-    'class-without-state': ('    else if(!crw_n && !crw.restarted) crw_log(', '    else if(0) crw_log('),
+    'class-without-state': ('    else if(!crw_n) crw_log(', '    else if(0) crw_log('),
     'class-two': ('    else if(k==crw_n && crw_n>=CRW_MAX) {', '    else if(k==crw_n && crw_n>=1u) {'),
     'class-ignores-optout': ('    if(crw.optout) crw_log("TSFP_MAPMAKER_REAL_BOSS=0', '    if(0) crw_log("TSFP_MAPMAKER_REAL_BOSS=0'),
     'class-any-character': ('    if(CRW_H(a+CRW_ACTOR_CHAR)!=CRW_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && CRW_H(ent+CRW_ENT_MODEL)==CRW_MODEL)) { original();return; }\n', ''),
@@ -178,14 +178,32 @@ MUTATIONS = {
     'player-row-col-swapped': ('WORD_AT(st+CRW_PCELL)=best/CRW_COLS;WORD_AT(st+CRW_PCELL+4u)=best%CRW_COLS;',
                                'WORD_AT(st+CRW_PCELL)=best%CRW_COLS;WORD_AT(st+CRW_PCELL+4u)=best/CRW_COLS;'),
     'player-nan-used': ('    if(!crw_sane(px) || !crw_sane(pz) || crw_cell_at(', '    if(crw_cell_at('),
-    # a pause-menu restart runs no level init: the blocks (level heap) were kept, the Crowes stayed on them
-    'restart-none': ('    if(had || crw.restarted) {\n        crw_reset();', '    if(0) {\n        crw_reset();'),
-    'restart-no-original': ('        crw_log("level restart: split Crowe blocks forgotten; new ones at the AI start (bosses, again)",had,(uint32_t)crw.restarted);\n    }\n    original();\n',
-                               '        crw_log("level restart: split Crowe blocks forgotten; new ones at the AI start (bosses, again)",had,(uint32_t)crw.restarted);\n    }\n'),
-    'restart-no-new-blocks': ('        crw.restarted=crw_play() && !crw.optout;\n', '        crw.restarted=0;\n'),
-    'restart-any-scene': ('        crw.restarted=crw_play() && !crw.optout;\n', '        crw.restarted=!crw.optout;\n'),
-    'restart-state-kept': ('        crw_reset();\n        WORD_AT(CRW_STATE)=0;\n', '        crw_reset();\n'),
-    'restart-flag-kept': ('    crw.restarted=0;\n', ''),
+    # a pause-menu restart runs no level init and frees only heap 0: the blocks (Level heap) are set up again in place
+    'restart-none': ('    if(!had) return;\n    crw.logged=0;\n', '    return;\n'),
+    'restart-no-original': ('        WORD_AT(CRW_STATE)=0;\n    }\n    original();\n', '        WORD_AT(CRW_STATE)=0;\n    }\n'),
+    'restart-state-kept': ('        mapmaker_fx_forget(crw_inst,sizeof crw_inst);\n        WORD_AT(CRW_STATE)=0;\n', '        mapmaker_fx_forget(crw_inst,sizeof crw_inst);\n'),
+    'restart-holder-kept': ('        mapmaker_fx_forget(crw_inst,sizeof crw_inst);\n        WORD_AT(CRW_STATE)=0;\n', '        WORD_AT(CRW_STATE)=0;\n'),
+    'restart-any-scene': ('    if(!crw_play() || crw.optout) { crw_reset();return; }\n', '    if(crw.optout) { crw_reset();return; }\n'),
+    'restart-run-kept': ('        memset(&crw_inst[k],0,sizeof crw_inst[k]);     /* the run before */\n', ''),
+    'restart-record-lost': ('        crw_inst[k].state=st;crw_inst[k].record=rec;crw_inst[k].fx=fx;\n', '        crw_inst[k].state=st;crw_inst[k].fx=fx;\n'),
+    'restart-blocks-lost': ('        crw_inst[k].state=st;crw_inst[k].record=rec;crw_inst[k].fx=fx;\n', '        crw_inst[k].state=st;crw_inst[k].record=rec;\n'),
+    'restart-new-blocks': ('        if(!crw_again(k)) break;\n', '        if(!crw_alloc(k)) break;\n'),
+    'restart-failure-kept': ('        if(!crw_again(k)) break;\n', '        if(!crw_again(k)) continue;\n'),
+    'restart-tail-kept': ('    for(k=again;k<CRW_MAX;k++) memset(&crw_inst[k],0,sizeof crw_inst[k]);\n', ''),
+    'restart-count-kept': ('    crw_n=again;\n', ''),
+    'restart-keeps-log': ('    if(!had) return;\n    crw.logged=0;\n', '    if(!had) return;\n'),
+    'again-not-zeroed': ('    crw_zero(st,CRW_STATE_SIZE);crw_zero(pt,CRW_PARTS_SIZE);crw_zero(e0,es);crw_zero(e1,es);', '    crw_zero(st,CRW_STATE_SIZE);'),
+    'again-effects-overrun': ('crw_zero(e0,es);crw_zero(e1,es);', 'crw_zero(e0,es);crw_zero(e1,es+4u);'),
+    'again-no-tail': ('    WORD_AT(CRW_STATE)=st;\n    guest_call(sub_0028D0C0,0);\n', '    WORD_AT(CRW_STATE)=st;\n'),
+    'again-parts-first': ('    WORD_AT(CRW_STATE)=st;\n    guest_call(sub_0028D0C0,0);\n    mapmaker_fx_put(MAPMAKER_FX_PARTS,pt);\n',
+                          '    WORD_AT(CRW_STATE)=st;mapmaker_fx_put(MAPMAKER_FX_PARTS,pt);\n    guest_call(sub_0028D0C0,0);\n'),
+    'again-no-parts': ('    guest_call(sub_0028D0C0,0);\n    mapmaker_fx_put(MAPMAKER_FX_PARTS,pt);\n', '    guest_call(sub_0028D0C0,0);\n'),
+    'again-effects-lost': ('    mapmaker_fx_put(MAPMAKER_FX_EFF_N,n);mapmaker_fx_put(MAPMAKER_FX_EFF0,e0);mapmaker_fx_put(MAPMAKER_FX_EFF1,e1);\n    crw_zero', '    crw_zero'),
+    'again-any-count': ('       !es || !e0 || !e1 || !MAPMAKER_PTR_OK(e0,es) || !MAPMAKER_PTR_OK(e1,es)) return 0;\n    memcpy(live.b',
+                        '       !e0 || !e1) return 0;\n    if(!es) es=0x55F0u;\n    memcpy(live.b'),
+    'again-any-state': ('    if(!st || !MAPMAKER_PTR_OK(st,CRW_STATE_SIZE) || !pt ||', '    if(!pt ||'),
+    'again-statics-kept': ('    memcpy(crw_window(),live.b,sizeof live.b);\n', ''),
+    'again-state-kept': ('    memcpy(crw_window(),live.b,sizeof live.b);\n    WORD_AT(CRW_STATE)=live_state;\n', '    memcpy(crw_window(),live.b,sizeof live.b);\n'),
     'log-budget-kept': ('    crw.logged=0;                                      /* a log budget per level', '    (void)0;                                      /* a log budget per level'),
     'message-unswapped': ('    crw_entry(WORD_AT(g_esp+4u),original);\n}\n/* WRAP sub_0028DA10', '    original();\n}\n/* WRAP sub_0028DA10'),
     'think-unswapped': ('    crw_entry(WORD_AT(g_esp+4u),original);\n}\n/* WRAP sub_0028F730', '    original();\n}\n/* WRAP sub_0028F730'),
@@ -620,12 +638,12 @@ def test_floor_probe_like_the_pad_snap():
 
 
 def test_restart_runs_no_level_init():
-    """A pause-menu restart (sub_001CDD60) sets up the level heap again but never runs sub_0025F720."""
+    """A pause-menu restart (sub_001CDD60) never runs sub_0025F720; its sub_0003E740 frees heap 0 only (test_mapmaker_restart_heap.py)."""
     a = by_address()
     assert calls_to(0x0025F720) == {0x0015E818}                       # only from sub_0015E7C0 (the full load)
     assert target(a[0x001CDC20]) == 0x0015E7C0                        # sub_001CDB80, not the restart
     assert all(i.function != 0x001CDD60 or target(i) != 0x0015E7C0 for i in decoded() if i.call)
-    assert target(a[0x001CDD62]) == 0x0003E740                        # the restart's level heap
+    assert target(a[0x001CDD62]) == 0x0003E740                        # heap 0 only: the Crowe blocks stay
 
 
 GAME = ROOT / 'private/game/pak'

@@ -227,12 +227,12 @@ static const struct { uint32_t addr, bits; int axis; } crw_consts[]={
 };
 #define CRW_NCONST (sizeof crw_consts/sizeof crw_consts[0])
 
-extern void sub_0005A130(void),sub_00062260(void),sub_0028D6D0(void),sub_002A62C0(void),sub_0028D710(void);
+extern void sub_0005A130(void),sub_00062260(void),sub_0028D6D0(void),sub_002A62C0(void),sub_0028D710(void),sub_0028D0C0(void);
 extern void sub_000EFBD0(void),sub_0015DDA0(void),sub_0005F460(void),sub_00087310(void),sub_000C3C50(void);
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 
 static struct {
-    int read, optout, restarted;   /* restarted: this level's Crowes get new blocks at their AI start */
+    int read, optout;
     unsigned logged, meters, extras, events, parts, fx, eggs;
 } crw;
 /* The globals one split Crowe's code uses (CONFIRMED, every [abs] operand of
@@ -360,7 +360,6 @@ static void crw_reset(void)
     memset(&crw_none,0,sizeof crw_none);
     crw_n=0;crw_cur=-1;crw_i=&crw_none;
     crw.logged=0;                                      /* a log budget per level (v0.4.0-mapmaker.31: spent in the first) */
-    crw.restarted=0;
 }
 /* Boss k's blocks: the stock scene 14 allocation (sub_0028D6D0: effect
  * blocks, state, its init; sub_002A62C0: particles), captured into its copy;
@@ -453,25 +452,71 @@ static uint8_t crw_boss_flag(uint32_t index)
     return 0;
 }
 
+/* Boss k's own blocks set up again as crw_alloc made them, with no
+ * allocation (a restart frees only heap 0; these are Level heap, heap 1):
+ * from the live statics with its effect count and blocks, every block zeroed
+ * as a new Level block is, the stock tail sub_0028D0C0 (every field and the
+ * arena grid), then its particle block; captured into its copy, the globals
+ * put back. 0: its blocks are not usable. */
+static void crw_zero(uint32_t a,uint32_t n) { memset((void *)((uintptr_t)a+g_xbox_mem_offset),0,n); }
+static int crw_again(unsigned k)
+{
+    struct crw_boss_s *b=&crw_inst[k];
+    uint32_t st=b->state,live_state=WORD_AT(CRW_STATE);
+    uint32_t pt=mapmaker_fx_word(&b->fx,MAPMAKER_FX_PARTS),n=mapmaker_fx_word(&b->fx,MAPMAKER_FX_EFF_N);
+    uint32_t e0=mapmaker_fx_word(&b->fx,MAPMAKER_FX_EFF0),e1=mapmaker_fx_word(&b->fx,MAPMAKER_FX_EFF1),es=mapmaker_fx_eff_size(n);
+    MapmakerFx live;
+    if(!st || !MAPMAKER_PTR_OK(st,CRW_STATE_SIZE) || !pt || !MAPMAKER_PTR_OK(pt,CRW_PARTS_SIZE) ||
+       !es || !e0 || !e1 || !MAPMAKER_PTR_OK(e0,es) || !MAPMAKER_PTR_OK(e1,es)) return 0;
+    memcpy(live.b,crw_window(),MAPMAKER_FX_SIZE);
+    mapmaker_fx_put(MAPMAKER_FX_EFF_N,n);mapmaker_fx_put(MAPMAKER_FX_EFF0,e0);mapmaker_fx_put(MAPMAKER_FX_EFF1,e1);
+    crw_zero(st,CRW_STATE_SIZE);crw_zero(pt,CRW_PARTS_SIZE);crw_zero(e0,es);crw_zero(e1,es);
+    WORD_AT(CRW_STATE)=st;
+    guest_call(sub_0028D0C0,0);
+    mapmaker_fx_put(MAPMAKER_FX_PARTS,pt);
+    memcpy(b->fx.b,crw_window(),MAPMAKER_FX_SIZE);
+    memcpy(crw_window(),live.b,sizeof live.b);
+    WORD_AT(CRW_STATE)=live_state;
+    return 1;
+}
 /* WRAP sub_001CDD60 (the level restart: the pause menu's restart,
  * sub_0003D440 with [0x006B7AA8], calls sub_001CDAF0 and then this, never
- * sub_001CDB80, so neither sub_0025F720 nor the level hook runs; level
- * memory is set up again in here, INFERRED from sub_0003E740 at 0x001CDD62). Stock resets the
- * scene 14 Crowe's state in place (sub_0025F6A0 -> sub_0028D0C0); the
- * MapMaker Crowes' blocks are level heap too. Before the original: forget
- * them (as a new level does, outside values back, [0x0075F5E8] 0); the
- * restarted Crowes come back through the AI start with the same records and
- * get new blocks there, the first one included. */
+ * sub_001CDB80, so neither sub_0025F720 nor the level hook runs). Its
+ * sub_0003E740(3) (0x001CDD62) frees only heap 0 (sub_0003E240: top-down
+ * [0x006B8388]); the Crowes' blocks are Level heap (heap 1, [0x006B837C]),
+ * which nothing in the restart frees (test_mapmaker_restart_heap.py). Until
+ * now each Crowe was forgotten and given new blocks at its AI start: a set
+ * (about 60 KB, 100 KB with one player) used up per Crowe per restart.
+ * Stock resets the scene 14 Crowe's state in place (sub_0025F6A0 ->
+ * sub_0028D0C0). Before the original the outside values come back; after
+ * it, in scene 100, each Crowe keeps its blocks and spawn record, forgets
+ * the run before (relocation, eggs, walls, death) and sets its blocks up
+ * again (crw_again); one whose blocks are not usable, and those after it,
+ * are dropped (bot behaviour). The same records find them at the AI start. */
 void pc_mapmaker_crowe_restart(void (*original)(void))
 {
-    unsigned had=crw_n;
-    if(had || crw.restarted) {
-        crw_reset();
+    unsigned had=crw_n,k,again=0;
+    if(had) {
+        if(crw_cur>=0) crw_set(-1);
+        mapmaker_fx_forget(crw_inst,sizeof crw_inst);
         WORD_AT(CRW_STATE)=0;
-        crw.restarted=crw_play() && !crw.optout;
-        crw_log("level restart: split Crowe blocks forgotten; new ones at the AI start (bosses, again)",had,(uint32_t)crw.restarted);
     }
     original();
+    if(!had) return;
+    crw.logged=0;
+    if(!crw_play() || crw.optout) { crw_reset();return; }
+    for(k=0;k<had && k<CRW_MAX;k++) {
+        uint32_t st=crw_inst[k].state,rec=crw_inst[k].record;
+        MapmakerFx fx=crw_inst[k].fx;                  /* its block pointers */
+        memset(&crw_inst[k],0,sizeof crw_inst[k]);     /* the run before */
+        crw_inst[k].state=st;crw_inst[k].record=rec;crw_inst[k].fx=fx;
+        if(!crw_again(k)) break;
+        again++;
+    }
+    for(k=again;k<CRW_MAX;k++) memset(&crw_inst[k],0,sizeof crw_inst[k]);
+    crw_n=again;
+    memset(&crw_none,0,sizeof crw_none);
+    crw_log("level restart: split Crowe blocks set up again in place (the restart keeps the Level heap) (bosses, set up)",had,again);
 }
 
 /* WRAP sub_0015B830 (cdecl AI pool entry; story mode copies record +0/+4 to
@@ -491,7 +536,7 @@ void pc_mapmaker_crowe_ai_start(void (*original)(void))
     if(k==crw_n) for(k=0;k<crw_n && crw_inst[k].record;k++) {}   /* a slot allocated but unused */
     if(crw.optout) crw_log("TSFP_MAPMAKER_REAL_BOSS=0: split Crowe with bot behaviour",a,0);
     else if(!crw_pak_mounted()) crw_log("lv14.pak not mounted: split Crowe with bot behaviour",a,0);
-    else if(!crw_n && !crw.restarted) crw_log("no split Crowe state this level: bot behaviour",a,WORD_AT(CRW_STATE));
+    else if(!crw_n) crw_log("no split Crowe state this level: bot behaviour",a,WORD_AT(CRW_STATE));
     else if(k==crw_n && crw_n>=CRW_MAX) {
         if(crw.extras++<4u) crw_log("more than 4 split Crowes in the map: this one keeps the bot behaviour",a,WORD_AT(rec+8u));
     } else if(k==crw_n && !crw_alloc(k)) {

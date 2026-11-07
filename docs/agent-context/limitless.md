@@ -490,7 +490,7 @@ walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Boss areas/skies/open air/set slots: [boss notes](limitless-bosses.md); [.tsmap](map-transfer.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
 draw (.32: grain/haze alpha WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md.
-Pak mount table: [boss notes](limitless-bosses.md).
+Pak mount table, restart heap (heap 0 only; bosses reuse their blocks): [boss notes](limitless-bosses.md).
 `tests/mapmaker/test_mapmaker_paktable.py`.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
 of `sub_0029CE00` (+0x3E88 == 1, `sub_002A7F30`). Walker missing: log-only

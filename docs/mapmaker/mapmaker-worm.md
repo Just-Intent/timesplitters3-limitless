@@ -39,6 +39,10 @@ allocates nothing. The last fight's emitter of worm 0 is not released
 reset). Fixture: four worms, two dead, restart: each set up again on its own
 block, bound and ticking. `restart-*` mutations. Playtest: restart a map with
 1-4 worms (kill one first); each is buried at its spawn again and surfaces.
+Confirmed 2026-11-06 (`test_mapmaker_restart_heap.py`): the restart's
+`sub_0003E740(3)` frees and re-allocates heap 0 only; the worm block, scratch
+(`sub_0003DFA0(0x300, 1)`) and effect node (`sub_00378400`: heap 1) are Level
+heap, which no restart call resets, so reusing them is right.
 
 ## The worm (CONFIRMED)
 
