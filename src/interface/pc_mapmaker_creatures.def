@@ -5,7 +5,8 @@
  * the pak). Docs: docs/mapmaker/mapmaker-creatures.md. The includer defines
  * MAPMAKER_CREATURE(row, id, look, preview, label, class_lo, class_hi, pak,
  * pak_name, table, count, first, n, level) and undefines it after:
- *  row       synthetic picker row (realbosses rows: 150..160 are taken)
+ *  row       synthetic picker row (realbosses rows: 150..160 are taken; rows
+ *            sharing a pak keep the union of their entries)
  *  id        character id the set member stores: no Arcade row, used by no
  *            other port, so its own rows and stock characters never change
  *  look      character id whose models (+4/+8) the creature is made with in
@@ -37,3 +38,16 @@ MAPMAKER_CREATURE(162u,0x4Du,0xFFu,0x5Cu,"SecuriDroid XP",0x10000000u,0x00004000
  * 0x59 is an Arcade row (The Freak, stock bot AI): carrier 0x30 made with its
  * models. */
 MAPMAKER_CREATURE(163u,0x30u,0x59u,0x59u,"Mutant (Story)",0x10000000u,0x00008000u,0x0049DB58u,"lv22",0x00480C60u,0x49u,41u,6u,0)
+/* Mission 6 pit fight (story assets wave 3; pc_mapmaker_pitboss.inc runs the
+ * fight, its block, arena and props): the 'PRIN' record is the giant skeleton
+ * 0x28 with class 0x20000:0x10000000 -> sub_0029FE00 -> sub_0029E0A0 outside
+ * scene 1. Carrier 0x31 (soldiermodel_talk copy, no set, no Arcade row) made
+ * with 0x28's model 0x5E9, so the mansion skeleton row (0x28) is unchanged.
+ * lv17_4 entries 16..27: princess_cat_cs .. princess_attack_feeble_throw
+ * 0x23B..0x242 and the flock's ragbug anims 0x243..0x246. */
+MAPMAKER_CREATURE(164u,0x31u,0x28u,0xA6u,"Pit Skeleton",0x10000000u,0x00020000u,0x0049D59Cu,"lv17_4",0x0048E298u,0x26u,16u,12u,0)
+/* Its flying imps: 'RAG0'..'RAG5' are 0xB0 (chrs/ragbug) with class
+ * 0x200000:0x10000000 -> sub_0028B610 (parks the bug; the pit fight flies
+ * it). 0xB0 is the imp's own story id (only set 5); ragbugflight ..
+ * ragbugrightdive 0x243..0x246. */
+MAPMAKER_CREATURE(165u,0xB0u,0xFFu,0x4Eu,"Ragbug",0x10000000u,0x00200000u,0x0049D59Cu,"lv17_4",0x0048E298u,0x26u,24u,4u,0)

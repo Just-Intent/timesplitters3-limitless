@@ -335,6 +335,7 @@
 #define RBS_SKEL_TEXT 0x52420028u
 #define RBS_SKEL_LABEL "Giant Skeleton"
 #define RBS_SKEL_STANDIN 0xA6u          /* Arcade skeleton cowboy: preview stand-in */
+#define RBS_PIT_ID 0x31u                /* "Pit Skeleton" carrier made with model 0x5E9: pc_mapmaker_pitboss.inc's, not this area's */
 #define RBS_SKEL_PAK 0x0049D6FCu        /* "pak/stream/lv1/anim/lv1_6.pak" */
 #define RBS_SKEL_CLASS 0x20000u         /* record +4 -> AI +0x14: sub_0029FE00 */
 #define RBS_SKEL_STATE 0x0078B1ECu      /* 0x4C7C bytes, sub_00287E00 */
@@ -1880,7 +1881,8 @@ void pc_mapmaker_realbosses_ai_start(void (*original)(void))
         original();
         return;
     }
-    if(RBS_H(a+RBS_ACTOR_CHAR)==RBS_SKEL_ID || (MAPMAKER_PTR_OK(ent,0x100u) && RBS_H(ent+RBS_ENT_MODEL)==RBS_SKEL_MODEL)) {
+    if(RBS_H(a+RBS_ACTOR_CHAR)==RBS_SKEL_ID || (RBS_H(a+RBS_ACTOR_CHAR)!=RBS_PIT_ID && MAPMAKER_PTR_OK(ent,0x100u) &&
+                                                 RBS_H(ent+RBS_ENT_MODEL)==RBS_SKEL_MODEL)) {
         if(rbs.optout) rbs_log("TSFP_MAPMAKER_REAL_BOSS=0: giant skeleton with bot behaviour",a,0);
         else if(!rbs_skel_pak_mounted()) rbs_log("lv1_6.pak not mounted: giant skeleton with bot behaviour",a,0);
         else if(!rbs_skelf.n || !rbs_skel_ours())
