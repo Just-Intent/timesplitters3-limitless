@@ -298,8 +298,8 @@ MUTATIONS = {
     # the throw's aim at a target a floor up (v0.4.0-mapmaker.40)
     'aim-never': ('        if(WORD_AT(st+RBS_SKEL_PHASE)==1u) rbs_skel_aim(k,st,ent);   /* aimed this frame */\n', ''),
     'aim-while-aiming': ('        if(WORD_AT(st+RBS_SKEL_PHASE)==1u) rbs_skel_aim(k,st,ent);', '        rbs_skel_aim(k,st,ent);'),
-    'aim-same-floor': ('    if(!(d[1]-k->ground>RBS_SKEL_UP)) return;', '    if(0) return;'),
-    'aim-ref-spawn': ('    if(!(d[1]-k->ground>RBS_SKEL_UP)) return;', '    if(!(d[1]-k->floor>RBS_SKEL_UP)) return;'),
+    'aim-same-floor': ('    if(!(d[1]-k->ground>RBS_SKEL_UP)) {', '    if(0) {'),
+    'aim-ref-spawn': ('    if(!(d[1]-k->ground>RBS_SKEL_UP)) {', '    if(!(d[1]-k->floor>RBS_SKEL_UP)) {'),
     'aim-up-2': ('#define RBS_SKEL_UP 2.5f', '#define RBS_SKEL_UP 2.0f'),
     'ground-no-climb': ('i<=RBS_RISE_N && !found;i++)', 'i<1u && !found;i++)'),
     'ground-climb-below': ('&f) && f>h+RBS_STEP) { found=1;steps=i; }', '&f)) { found=1;steps=i; }'),
