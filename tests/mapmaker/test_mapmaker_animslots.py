@@ -43,6 +43,7 @@ MUTATIONS = {
     'no-ret': ('    MAPMAKER_GUEST_RET();\n    return 1;', '    return 1;'),
     'count-all-at-once': ('        guest_call(sub_0005B980,3,prefix,e,1u);', '        guest_call(sub_0005B980,3,prefix,e,count-k);'),
     'wrong-prefix': ('guest_call(sub_0005B980,3,prefix,e,1u)', 'guest_call(sub_0005B980,3,table,e,1u)'),
+    'creature-rows-missing': ('#include "pc_mapmaker_creatures.def"\n', '\n'),
 }
 
 

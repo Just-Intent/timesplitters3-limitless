@@ -136,3 +136,15 @@ runs the castle's `sub_001E4030` -> `sub_00256040(tank, explosive)` only in
 scene 4 ('KNAT' tag): state 9, explosive +0x158 on the tank, part +0x15C in
 15..17, health -10.1. New WRAP sub_00228B50 -> `pc_mapmaker_tank_mine` makes
 that call for our tanks with their statics (mapmaker-tank.md). Unplayed.
+
+Story creatures (wave 2, area `creatures`, `pc_mapmaker_creatures.inc`, after
+storyprops): one deployer, one X-macro row per creature in
+`pc_mapmaker_creatures.def` (picker row, carrier id, look, class lo/hi, anim pak
++ keep run, level hook), also read by realbosses (`rbs_extra` rows 161-163) and
+animslots (`ans_paks`). Rows: Catacomb Ghost 0x2F (zombie look, 0:0x50000000,
+lv17), SecuriDroid XP 0x4D (0x4000:0x10000000, lv6), Mutant (Story) 0x30 (0x59
+look, 0x8000:0x10000000, lv22). 4 WRAPs (sub_001C8540, sub_0015E7C0,
+sub_000DAC30, sub_0015B830): mapmaker-creatures.md. `test_mapmaker_creatures.py`
+(decode: dispatcher, no scene state, kept anims, story spawn records). Unplayed.
+Cleaning bot deferred (scripted class 0x80000). Realbosses' `extra_label` now
+holds RBS_EXTRA_MAX 16 (it held 6 for 8 rows).

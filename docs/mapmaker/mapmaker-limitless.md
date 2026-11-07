@@ -57,6 +57,7 @@ are not in the launcher.
 | `TSFP_MAPMAKER_ARENA_MB=0..16` | 0 (off) | Gives the game's heap that many more MB in every scene (also story levels), taken from the same 64 MB block as textures. Measure with probe flag 32 first; see [memory](mapmaker-memory.md). | Not tested in game |
 | `TSFP_MAPMAKER_BOSS_RANGE=<units>` | 30 | How close you must be for a Boss Story AI's health bar to show (1..100000 game units). | Automated tests only |
 | `TSFP_MAPMAKER_REAL_BOSS=0` | Story behaviour on | With `LIMITS`: the giant trophy monster and the giant skeleton fight like normal bots instead of with its story behaviour. See [real bosses](mapmaker-realbosses.md). | Automated tests only |
+| `TSFP_MAPMAKER_CREATURES=0` | Story behaviour on | With `LIMITS`: the story creature rows (ghost, SecuriDroid, mutant) fight like normal bots. See [story creatures](mapmaker-creatures.md). | Automated tests only |
 | `TSFP_MAPMAKER_CREATURE_PROBE=1` | Off | Read-only log of the characters each level spawns and whether story-only creature models can load; write it to a file with `TSFP_MAPMAKER_CREATURE_PROBE_LOG=<file>`. See [bosses](mapmaker-bosses.md). | Developer use |
 | `TSFP_MAPMAKER_SAVE_MEMO=0` | Faster save on | Saves and loads the slow original way, to compare times (the log shows the milliseconds of each large save/load). | Automated tests only |
 
@@ -301,6 +302,18 @@ with the map and kept by .tsmap export. In the editor they still look like a
 drum and a MapMaker gun. The original game (or this one without the switch)
 plays them as plain drums and guns. *Automated tests only.* Details:
 [story props](mapmaker-storyprops.md).
+
+### Story creatures: ghosts, SecuriDroids and mutants (`LIMITS`)
+
+The custom character set's picker also ends with **Catacomb Ghost** (the
+ghosts of story mission 6, which look like zombies), **SecuriDroid XP** (the
+mission 7 security robot) and **Mutant (Story)** (the mission 8 mutant with
+its leap and electric attack). Put them in Story AIs and play in Story: each
+gets its story behaviour and animations; any number per map. The map loads
+that mission's small animation file only when the set uses the creature.
+`TSFP_MAPMAKER_CREATURES=0` plays them as ordinary bots. The original game
+plays such a map with bots and shows an empty name in the editor. *Automated
+tests only.* Details: [story creatures](mapmaker-creatures.md).
 
 ### Clouds per map (`LIMITS`)
 
