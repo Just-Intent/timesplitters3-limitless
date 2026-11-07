@@ -503,7 +503,10 @@ height a step above its floor; the finder's globals restored), the
 ### Reference floor (the v0.4.0-mapmaker.42 playtest)
 
 User report: "The splitter crows aren't moving at all now" (they walked in
-.34-.40; .41 added the floor probe above). No .41/.42 log was available.
+.34-.40; .41 added the floor probe above). Log `m42.err` (.41 code): every
+arena at `floor 0.51` (right), yet `arena: 15 of 35 cells in no room at its
+height, 5 over a drop or ledge` (5/15, 7/7), `0 gaps`, the player outside
+the arena, and the fight looping 4 -> 5 -> 10 -> 4 (no walk, eggs only).
 
 - SUSPECTED (geometry, not traced in game): tile seams. Every logged spawn
   is at a tile centre (x and z = 3 mod 6, MapMaker tiles 6 wide), so after
@@ -512,6 +515,10 @@ User report: "The splitter crows aren't moving at all now" (they walked in
   a seam (its last step `sub_000888A0` places the found point in a room)
   marks a gap on both sides of the start cell, and `crw_shadow` then blocks
   the whole start row.
+- SUSPECTED (m42.err): false drops at cell centres. The probe point was
+  the spawn height itself, a pad's 0.01 over the floor plane; a point on the
+  plane may fall outside its tile's room and get the floor below, or no
+  answer. Not traced in game.
 - The brief's "floor 10 below the real floor" was checked: in `m34.err`
   -9.49 is the pad snap's height (finder floor + 0.01, 0x0009B006) on
   floor -2 (`roof: ... floors -2..11`, floor y = 5n + 0.5); the Khallos
@@ -522,13 +529,20 @@ start cell, `crw_ground`: from the spawn height (within a step), else
 climbing one search height (1.25) at a time up to 11.25 for a floor above
 the spawn (a spawn under its floor); then the room query also uses it. Each
 cell is probed from and compared with that floor. A **gap** is sampled 0.25
-either side of the midpoint and counts only when both samples miss. No
+either side of the midpoint and counts only when both samples miss. Every
+probe point is `CRW_LIFT` (0.5) over the height asked. A cell is a ledge
+only when the finder answers with a floor more than a step away; no answer
+is not a ledge (counted: `N with no floor answer (not blocked)`), and the
+first 6 blocked cells per Crowe log `cell r,c over a floor at F (reference
+R): blocked`. No
 reference floor: no height check (logged). New line per Crowe:
 `split Crowe N reference floor F (spawn height Y, under the spawn | found
 above the spawn)` or `reference floor none (...)`. Tests:
 `reference_floor()` (spawn -9.49 under a 0.5 floor with a lower one at -20
 and a drop: the drop blocks, nothing else; seams missed by the finder: no
-gap, nothing blocked), mutations `ref-*`, `gap-at-seam`, `gap-one-sample`.
+gap, nothing blocked; a spawn 0.01 over its floor whose plane gives the
+floor below; no answer under a cell: not blocked), mutations `ref-*`,
+`gap-at-seam`, `gap-one-sample`, `ledge-no-lift`, `ledge-unseen-blocks`.
 
 ## Restart from the pause menu
 

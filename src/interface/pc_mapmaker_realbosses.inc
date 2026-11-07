@@ -421,8 +421,8 @@ typedef char rbs_fx_is_the_shared_window[(RBS_FX==MAPMAKER_FX && RBS_FX_SIZE==MA
 typedef struct {
     uint32_t state, parts, record;
     unsigned throws, skipped, fire, aimed;
-    float floor, ground;                /* spawn height (its body's height); the real floor under it */
-    int floor_set, ground_set;          /* ground_set: 1 under the spawn, 2 above it, -1 none found (the spawn height) */
+    float floor, ground, pad;           /* first-fight-frame height (its body's height); the real floor under it; height at its AI start */
+    int floor_set, ground_set, pad_set;          /* ground_set: 1 under the spawn, 2 above it, -1 none found (the spawn height) */
     MapmakerFx fx;
 } RbsSkel;
 typedef struct {
@@ -1220,10 +1220,11 @@ void pc_mapmaker_realbosses_risen(void (*original)(void))
 #define RBS_FLOOR_KEEP2 0x00733088u
 #define RBS_RISE 1.25f                 /* the search climbs one search height at a time ... */
 #define RBS_RISE_N 9u                  /* ... up to 11.25 over the spawn height */
+#define RBS_LIFT 0.5f                  /* probe points this far over the height asked, as the split Crowe's */
 #define RBS_STEP 1.0f                  /* a floor this near the spawn height is the boss's own */
 static int rbs_floor_y(uint32_t pt,float x,float y,float z,float *f)
 {
-    rbs_setf(pt,x);rbs_setf(pt+4u,y);rbs_setf(pt+8u,z);
+    rbs_setf(pt,x);rbs_setf(pt+4u,y+RBS_LIFT);rbs_setf(pt+8u,z);
     if((int32_t)guest_call(sub_000C3C50,3,pt,RBS_FINDER_UP,RBS_FINDER_R)<=0) return 0;
     *f=rbs_getf(RBS_FLOOR_Y);
     return rbs_sane(*f);
@@ -1231,24 +1232,24 @@ static int rbs_floor_y(uint32_t pt,float x,float y,float z,float *f)
 static void rbs_skel_ground(RbsSkel *k,uint32_t ent)
 {
     uint32_t sp=g_esp,pt,keep[3];
-    float x=rbs_getf(ent+RBS_ENT_Y-4u),z=rbs_getf(ent+RBS_ENT_Y+4u),f=k->floor,d;
+    float x=rbs_getf(ent+RBS_ENT_Y-4u),z=rbs_getf(ent+RBS_ENT_Y+4u),h=k->pad_set?k->pad:k->floor,f=h,d;
     unsigned i,steps=0;
     int found=0;
-    k->ground=k->floor;k->ground_set=-1;
+    k->ground=h;k->ground_set=-1;
     if(rbs_sane(x) && rbs_sane(z) && MAPMAKER_STACK_OK(0x100) && g_esp>=0x00010200u) {
         pt=(g_esp-0x20u)&~0xFu;                        /* the probe point, below esp */
         g_esp=pt;
         keep[0]=WORD_AT(RBS_FLOOR_Y);keep[1]=WORD_AT(RBS_FLOOR_KEEP1);keep[2]=WORD_AT(RBS_FLOOR_KEEP2);
-        if(rbs_floor_y(pt,x,k->floor,z,&f) && (d=f-k->floor,d<=RBS_STEP && d>=-RBS_STEP)) found=1;
+        if(rbs_floor_y(pt,x,h,z,&f) && (d=f-h,d<=RBS_STEP && d>=-RBS_STEP)) found=1;
         else for(i=1;i<=RBS_RISE_N && !found;i++)
-            if(rbs_floor_y(pt,x,k->floor+(float)i*RBS_RISE,z,&f) && f>k->floor+RBS_STEP) { found=1;steps=i; }
+            if(rbs_floor_y(pt,x,h+(float)i*RBS_RISE,z,&f) && f>h+RBS_STEP) { found=1;steps=i; }
         WORD_AT(RBS_FLOOR_Y)=keep[0];WORD_AT(RBS_FLOOR_KEEP1)=keep[1];WORD_AT(RBS_FLOOR_KEEP2)=keep[2];
         g_esp=sp;
     }
     if(found) { k->ground=f;k->ground_set=steps?2:1; }
-    fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u reference floor %.2f (spawn height %.2f, %s)\n",
-            (unsigned)(k-rbs_skels)+1u,(double)k->ground,(double)k->floor,
-            !found?"no floor found: the spawn height":steps?"found above the spawn":"under the spawn");
+    fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u reference floor %.2f (from height %.2f at %s, %s; fight height %.2f)\n",
+            (unsigned)(k-rbs_skels)+1u,(double)k->ground,(double)h,k->pad_set?"its AI start":"its first fight frame",
+            !found?"no floor found: that height":steps?"found above it":"under it",(double)k->floor);
     fflush(stderr);
 }
 #define RBS_SKEL_BODY 1.5f             /* aim this far over its feet */
@@ -1713,7 +1714,7 @@ static RbsSkel *rbs_skel_more(void)
 void pc_mapmaker_realbosses_ai_start(void (*original)(void))
 {
     uint32_t a,ent,rec,id;
-    RbsSkel *k;
+    RbsSkel *k=0;
     RbsWalk *w;
     if(!MAPMAKER_STACK_OK(8) || !rbs_play()) { original();return; }
     a=WORD_AT(g_esp+4u);
@@ -1756,6 +1757,11 @@ void pc_mapmaker_realbosses_ai_start(void (*original)(void))
             rbs_log("giant skeleton gets the mansion boss AI (class 0x20000)",a,id);
         }
         original();
+        if(k && k->record==rec && MAPMAKER_PTR_OK(ent,0x100u) && rbs_sane(rbs_getf(ent+RBS_ENT_Y))) {
+            k->pad=rbs_getf(ent+RBS_ENT_Y);k->pad_set=1;   /* placed: its spawn point (m42.err: the first fight frame was 5 lower) */
+            fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u placed at height %.2f (AI start)\n",(unsigned)(k-rbs_skels)+1u,(double)k->pad);
+            fflush(stderr);
+        }
         return;
     }
     if(RBS_H(a+RBS_ACTOR_CHAR)!=RBS_ID && !(MAPMAKER_PTR_OK(ent,0x100u) && RBS_H(ent+RBS_ENT_MODEL)==RBS_MODEL)) {
