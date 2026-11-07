@@ -143,9 +143,11 @@ play out`, `split Crowe defeated: removed (frames, live particles)`,
 (x, z), direction d, beam b, at (x, z), eggs skipped n (m blocking)`, the
 same with `still: state` every 600 calls, `walk blocked; ended where it
 stands, the cells ahead blocked` / `walk too long; ...`, and `split Crowe N
-arena: n of 35 cells in no room at its height (blocked)`; once per boss
+arena: n of 35 cells in no room at its height, d over a drop or ledge, g gaps
+between cells (blocked)`; once per boss
 `player outside a split Crowe's arena: its nearest cell stands in` and
-(should not appear) `start cell is in no room: arena cells not checked`. The
+(should not appear) `start cell is in no room: arena cells not checked` or
+`start cell has no floor at its height: floor probe not used`. The
 budget of the other lines (24) is per level.
 
 ## Risks (INFERRED, need a playtest)
@@ -458,6 +460,46 @@ off cell and outside on each side, each boss its own cells and walls), the
 decode test `test_walk_end_and_cells_for_the_map`. Wrappers: none new (the
 room query and the walk-to-stand anim are guest calls with existing stubs).
 
+## Ledges (the v0.4.0-mapmaker.40 playtest)
+
+User report: "splitter crow movement logic resulting in them wandering off
+of ledges". Logs (`m40a.err`, `m40b.err`): `arena: 5 of 35` / `15 of 35 cells
+in no room at its height`, so the room check ran, yet the bosses still
+walked off edges.
+
+Cause (CONFIRMED in code): the room query tests a body box at the boss's
+height, and a MapMaker room is a tile's box. A cell over a lower floor of
+the same tile (a raised platform's edge), or over a tile one floor down
+whose box reaches the boss's height, is "in a room" and stays walkable. A
+narrow hole between two good cell centres is not seen either.
+
+Fix (`crw_rooms`, no new wrapper):
+- **Floor probe**: every cell in a room also asks the game's floor finder
+  `sub_000C3C50(point, 1.25, 0.1)` at its centre and the boss's spawn
+  height, as the pad snap does (`sub_0009AF90` 0x0009AFC5..0x0009AFD4,
+  CONFIRMED: room index in eax, > 0 when a floor is under the point, the
+  floor height in `[0x004DCB00]`). No floor, or a floor more than a step
+  (1.0) above or below the boss's height, makes the cell *off* (a ledge, a
+  drop, a raised block). The finder also writes `[0x004DCAFC]` and
+  `[0x00733088]` (its own absolute stores, test); all three are put back
+  after the probes.
+- **Gaps**: the midpoints between neighbouring good cells (row and column
+  neighbours) are probed the same way; a gap there blocks the cells beyond
+  it in line with the boss, as an off cell does (`crw_shadow`).
+- **Untrusted**: when the start cell itself gets no floor at the boss's
+  height, the probe is not used (logged); the room results still count.
+- INFERRED: the step of 1.0 is below a MapMaker floor (5.0) and above a
+  stair's single step; ramps steeper than 1.0 per cell (about 6 units) block.
+  The probe point is the cell centre: a ledge between centre and edge of a
+  cell (3.2 units wide) is not seen.
+
+Tests: `ledges()` in `tests/mapmaker/mapmaker_crowe.c` (one room with a
+lower floor beyond x 13, a raised block, a small step, a gap between two
+cells; the boss on either side of the gap; an untrusted start; a spawn
+height a step above its floor; the finder's globals restored), the
+`ledge-*` and `gap-*` mutations, and the decode test
+`test_floor_probe_like_the_pad_snap`.
+
 ## Restart from the pause menu
 
 Found by the Khallos work: the pause menu's restart (`sub_0003D440`, flag
@@ -579,3 +621,8 @@ needs none of it):
    Crowe's arena` when you are away, `walk blocked; ended where it stands`
    instead of `put on its target`; after one, the next walk goes another way
    (`5 -> 6` with another direction).
+9. v0.4.0-mapmaker.40 ledges: a Split Crowe on a raised platform or a
+   balcony over a lower floor (same tile and a tile below), with a narrow
+   gap in the floor near it; it never walks off the edge or across the gap.
+   `arena: n of 35 cells in no room at its height, d over a drop or ledge, g
+   gaps between cells` once per Crowe, d > 0 near the edge.

@@ -211,6 +211,134 @@ static void robot_level(unsigned n,int line)
         if(k<4u && seen_class[1]!=0x80000u) { fprintf(stderr,"%s:%d: robot %u class 0x%X\n",__FILE__,line,k,(unsigned)seen_class[1]);failures++; }
     }
 }
+/* ---- v0.4.0-mapmaker.40: the robot through openings lower than it -------- */
+/* Room 1 (pads 0-3), the low door (y 0..3) to room 2 (pads 4, 5: the player),
+ * a tall opening (0..10) to room 3 (pads 6, 7), and room 3 to room 2 through
+ * another tall opening when 'way_round'. The robot's box top: 6. */
+#define MPADS 0x00580000u
+#define MLINKS 0x00581000u
+#define MRECS 0x00582000u
+#define MLISTS 0x00583000u
+#define MPTRS 0x00584000u
+#define MPORT 0x00585000u
+static void SETF(uint32_t a,float f) { memcpy((void *)((uintptr_t)a+g_xbox_mem_offset),&f,4); }
+static uint32_t seen_goal, seen_goal_slot;
+static void fake_goal(void) { originals++;seen_goal=WORD_AT(g_esp+8u);seen_goal_slot=WORD_AT(WORD_AT(g_esp+4u)+0x7Cu)+0x684u;seen_goal_slot=WORD_AT(seen_goal_slot);g_esp+=4u; }
+static void portal(uint32_t id,uint32_t ra,uint32_t rb,float x0,float z0,float x1,float z1,float top)
+{
+    uint32_t pt=MPORT+id*0x100u;
+    WORD_AT(MPTRS+id*4u)=pt;WORD_AT(pt)=ra;WORD_AT(pt+4u)=rb;HALF_AT(pt+0x14u)=4u;
+    SETF(pt+0x18u,x0);SETF(pt+0x1Cu,0.0f);SETF(pt+0x20u,z0);
+    SETF(pt+0x24u,x0);SETF(pt+0x28u,top);SETF(pt+0x2Cu,z0);
+    SETF(pt+0x30u,x1);SETF(pt+0x34u,top);SETF(pt+0x38u,z1);
+    SETF(pt+0x3Cu,x1);SETF(pt+0x40u,0.0f);SETF(pt+0x44u,z1);
+}
+static void low_door_map(float door,int way_round)
+{
+    static const float xz[8][2]={{0,0},{0,5},{10,0},{0,10},{12,0},{20,0},{0,12},{20,20}};
+    static const int16_t rooms[8]={1,1,1,1,2,2,3,3};
+    static const uint32_t links[9][2]={{0,1},{0,2},{0,3},{1,3},{2,4},{4,5},{3,6},{6,7},{7,5}};
+    uint32_t k;
+    memset((void *)((uintptr_t)MPADS+g_xbox_mem_offset),0,0x10000u);
+    WORD_AT(0x00715F2Cu)=MPADS;WORD_AT(0x007B6664u)=8u;
+    for(k=0;k<8u;k++) {
+        uint32_t pd=MPADS+k*0x20u;
+        WORD_AT(pd)=0x3E9u+k;BYTE_AT(pd+4u)=1u;HALF_AT(pd+0xAu)=(uint16_t)rooms[k];
+        SETF(pd+0xCu,xz[k][0]);SETF(pd+0x10u,0.0f);SETF(pd+0x14u,xz[k][1]);
+    }
+    WORD_AT(0x00715F30u)=MLINKS;WORD_AT(0x007B6660u)=9u;
+    for(k=0;k<9u;k++) { WORD_AT(MLINKS+k*0x14u)=0x10010u;WORD_AT(MLINKS+k*0x14u+4u)=links[k][0];WORD_AT(MLINKS+k*0x14u+8u)=links[k][1]; }
+    if(!way_round) WORD_AT(MLINKS+8u*0x14u)=0;                /* no link 7-5 */
+    WORD_AT(0x007B975Cu)=3u;WORD_AT(0x00708788u)=MRECS;WORD_AT(0x0070878Cu)=MPTRS;WORD_AT(0x007B9754u)=2u;
+    portal(0,1,2,11.0f,-1.0f,11.0f,1.0f,door);                 /* the door between pads 2 and 4 */
+    portal(1,3,1,1.0f,11.0f,3.0f,11.0f,10.0f);
+    portal(2,3,2,20.0f,10.0f,22.0f,10.0f,10.0f);
+    portal(3,1,2,11.0f,29.0f,11.0f,31.0f,10.0f);              /* rooms 1-2 again, tall, far from the door */
+    portal(4,2,1,-1.0f,10.5f,1.0f,10.5f,3.0f);                /* rooms 1-2, low, next to the 1-3 opening */
+    WORD_AT(0x007B9754u)=4u;
+    for(k=1;k<=3u;k++) WORD_AT(MRECS+k*0xB4u+4u)=MLISTS+k*0x40u;
+    WORD_AT(MLISTS+0x40u)=4u;WORD_AT(MLISTS+0x44u)=0u;WORD_AT(MLISTS+0x48u)=1u;WORD_AT(MLISTS+0x4Cu)=3u;WORD_AT(MLISTS+0x50u)=4u;
+    WORD_AT(MLISTS+0x80u)=4u;WORD_AT(MLISTS+0x84u)=0u;WORD_AT(MLISTS+0x88u)=2u;WORD_AT(MLISTS+0x8Cu)=3u;WORD_AT(MLISTS+0x90u)=4u;
+    WORD_AT(MLISTS+0xC0u)=2u;WORD_AT(MLISTS+0xC4u)=1u;WORD_AT(MLISTS+0xC8u)=2u;
+}
+static void goal_at(uint32_t at,uint32_t goal,int expect_orig,int line)
+{
+    WORD_AT(A(3)+0x678u)=at;WORD_AT(A(3)+0x684u)=goal;seen_goal=seen_goal_slot=0xFFFFu;
+    call(pc_mapmaker_robot_goal,fake_goal,0x00293D27u,ENT(3),goal,0,expect_orig,line);
+    if(WORD_AT(ESP0+8u)!=goal) { fprintf(stderr,"%s:%d: goal arg slot not put back\n",__FILE__,line);failures++; }
+}
+static void low_door(void)
+{
+    /* the player beyond the low door, reachable the long way round: the robot
+     * is steered room by room through the tall openings */
+    low_door_map(3.0f,1);
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,3.0f);SETF(ENT(3)+0x1C4u,3.0f);
+    goal_at(0,5,1,__LINE__);
+    CHECK(seen_goal==3u && seen_goal_slot==3u && rbt_walk[0].height==6.0f && rbt_walk[0].reached==8u);
+    CHECK(rbt_walk[0].blocked==2u && rbt_nav.crossings==3u);  /* the door link, seen from both pads */
+    goal_at(3,5,1,__LINE__);
+    CHECK(seen_goal==6u);                                     /* across the tall opening */
+    goal_at(6,5,1,__LINE__);
+    CHECK(seen_goal==7u);
+    goal_at(7,5,1,__LINE__);
+    CHECK(seen_goal==5u && seen_goal_slot==5u);               /* the last crossing: stock */
+    goal_at(4,5,1,__LINE__);                                  /* pushed through the door after all: from there */
+    CHECK(seen_goal==5u && rbt_walk[0].from==0u);
+    /* only the low door leads there: it waits at the door (the pad nearest the player) */
+    low_door_map(3.0f,0);
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,3.0f);SETF(ENT(3)+0x1C4u,3.0f);
+    goal_at(0,5,1,__LINE__);
+    CHECK(seen_goal==2u && seen_goal_slot==2u && rbt_walk[0].reached==6u && !rbt_walk[0].reach[5]);
+    goal_at(2,5,1,__LINE__);
+    CHECK(seen_goal==2u);
+    goal_at(4,5,1,__LINE__);                                  /* pushed through the door: its set from there */
+    CHECK(seen_goal==5u && rbt_walk[0].from==4u && rbt_walk[0].reached==2u);
+    goal_at(0,7,1,__LINE__);                                  /* a pad it reaches: through the tall opening */
+    CHECK(seen_goal==3u);
+    /* a door as tall as the robot: stock (the slack), everywhere */
+    low_door_map(5.8f,0);
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,3.0f);SETF(ENT(3)+0x1C4u,3.0f);
+    goal_at(0,5,1,__LINE__);
+    CHECK(seen_goal==5u && rbt_walk[0].reached==8u && !rbt_walk[0].blocked);
+    /* no usable box: 6.0; a smaller robot passes the door */
+    low_door_map(3.0f,0);
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,0.0f);SETF(ENT(3)+0x1C4u,0.0f);
+    goal_at(0,5,1,__LINE__);
+    CHECK(seen_goal==2u && rbt_walk[0].height==6.0f);
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,1.0f);SETF(ENT(3)+0x1C4u,1.0f);
+    goal_at(0,5,1,__LINE__);
+    CHECK(seen_goal==5u && rbt_walk[0].height==2.0f);
+    /* unknown rooms are passable */
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,3.0f);SETF(ENT(3)+0x1C4u,3.0f);
+    HALF_AT(MPADS+4u*0x20u+0xAu)=0;
+    goal_at(0,5,1,__LINE__);
+    CHECK(seen_goal==5u);
+    HALF_AT(MPADS+4u*0x20u+0xAu)=2u;
+    /* every other caller, another entity, a goal outside the table: stock */
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,3.0f);SETF(ENT(3)+0x1C4u,3.0f);
+    WORD_AT(A(3)+0x678u)=0;WORD_AT(A(3)+0x684u)=5u;
+    call(pc_mapmaker_robot_goal,fake_goal,0x0015D000u,ENT(3),5u,0,1,__LINE__);
+    CHECK(seen_goal==5u && WORD_AT(A(3)+0x684u)==5u);
+    actor(9,0x0C,0x400,9);WORD_AT(A(9)+0x678u)=0;
+    call(pc_mapmaker_robot_goal,fake_goal,0x00293D27u,ENT(9),5u,0,1,__LINE__);
+    CHECK(seen_goal==5u);
+    goal_at(0,8,1,__LINE__);
+    CHECK(seen_goal==8u);
+    WORD_AT(0x0079094Cu)=14u;                                 /* mission 10 itself */
+    goal_at(0,5,1,__LINE__);
+    CHECK(seen_goal==5u);
+    play_scene();
+    robot_level(0,__LINE__);                                  /* a level without robots: stock */
+    call(pc_mapmaker_robot_goal,fake_goal,0x00293D27u,ENT(3),5u,0,1,__LINE__);
+    CHECK(seen_goal==5u);
+}
 static void statics(uint32_t a,uint32_t b,uint32_t c) { WORD_AT(STAT)=a;WORD_AT(STAT+4u)=b;WORD_AT(STAT+8u)=c; }
 #define STATICS_ARE(a,b,c) (WORD_AT(STAT)==(a) && WORD_AT(STAT+4u)==(b) && WORD_AT(STAT+8u)==(c))
 
@@ -514,6 +642,8 @@ int main(void)
     WORD_AT(PLAYER+0xFF4u)=0;
     CALL(pc_mapmaker_robot_hud,fake_hud,0x0014F25Bu,0,0,0,1);
     CHECK(seen_focus==0);
+
+    low_door();
 
     if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }
     printf("mapmaker robot ok\n");

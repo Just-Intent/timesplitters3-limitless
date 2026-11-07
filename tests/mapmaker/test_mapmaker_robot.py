@@ -119,6 +119,25 @@ MUTATIONS = {
     'reset-keeps-statics': ('        memset(rbt_inst[k].statics,0,sizeof rbt_inst[k].statics);\n        rbt_inst[k].removed=0;', '        rbt_inst[k].removed=0;'),
     'reset-pointer-kept': ('    WORD_AT(RBT_STATE)=keep;\n    if(rbt_lvl.resets', '    if(rbt_lvl.resets'),
     'hud-first-only': ('    for(k=0;k<rbt_lvl.n && rbt_inst[k].record!=rec;k++) {}\n    if(k==rbt_lvl.n) { original();return; }', '    for(k=0;k<1u && k<rbt_lvl.n && rbt_inst[k].record!=rec;k++) {}\n    if(k==rbt_lvl.n || rbt_inst[k].record!=rec) { original();return; }'),
+    # v0.4.0-mapmaker.40: through openings lower than the robot
+    'goal-any-caller': ('WORD_AT(g_esp)!=RBT_RET_GOAL) { original();return; }', '0) { original();return; }'),
+    'goal-any-entity': ('    if((k=rbt_find(ent))<0 || !rbt_nav_build()', '    if((k=0)<0 || !rbt_nav_build()'),
+    'goal-kept': ('    if(to==goal) { original();return; }\n', '    if(1) { original();return; }\n'),
+    'goal-actor-kept': ('WORD_AT(sp+8u)=to;WORD_AT(a+RBT_AI_GOAL)=to;', 'WORD_AT(sp+8u)=to;'),
+    'goal-slot-kept': ('    original();\n    WORD_AT(sp+8u)=goal;\n', '    original();\n'),
+    'goal-door-ignored': ('            if(rbt_nav.open[e]<need) { if(!dist) rbt_walk[k].blocked++;continue; }', '            (void)need;'),
+    'goal-no-slack': ('#define RBT_FIT_SLACK 0.25f', '#define RBT_FIT_SLACK 0.0f'),
+    'goal-height-fixed': ('    return rbt_sane(h) && h>=1.0f && h<=40.0f?h:RBT_HEIGHT;', '    return RBT_HEIGHT;'),
+    'goal-height-box-centre': ('rbt_getf(ent+RBT_ENT_BOX_Y)+rbt_getf(ent+RBT_ENT_BOX_H);', 'rbt_getf(ent+RBT_ENT_BOX_Y);'),
+    'goal-farthest-portal': ('        if(best<0.0f || d<best) { best=d;open=hi-lo; }', '        if(best<0.0f || d>best) { best=d;open=hi-lo; }'),
+    'goal-portal-any-rooms': ("        if(!((WORD_AT(pt)==(uint32_t)ra && WORD_AT(pt+4u)==(uint32_t)rb) || (WORD_AT(pt)==(uint32_t)rb && WORD_AT(pt+4u)==(uint32_t)ra))) continue;\n", ''),
+    'goal-no-substitute': ('        goal=rbt_walk[k].goal_sub;\n', ''),
+    'goal-substitute-farthest': ('if(rbt_sane(d) && (bd<0.0f || d<bd)) { bd=d;best=p; }', 'if(rbt_sane(d) && (bd<0.0f || d>bd)) { bd=d;best=p; }'),
+    'goal-no-steer': ('    if(!rbt_walk[k].blocked || goal==at) return goal;', '    return goal;'),
+    'goal-steer-past-opening': ('        if(rbt_room(next)!=room) return p==at?next:p;', '        if(rbt_room(next)!=room) return next;'),
+    'goal-no-rebuild': ('    if(!rbt_walk[k].built || (rbt_walk[k].from!=at && !rbt_walk[k].reach[at])) {', '    if(!rbt_walk[k].built) {'),
+    'goal-nav-kept': ('    rbt_nav_free();\n    memset(rbt_walk,0,sizeof rbt_walk);\n', '    memset(rbt_walk,0,sizeof rbt_walk);\n'),
+    'goal-unused-links': ('        if(!(WORD_AT(l)&RBT_LINK_USED) || (a=WORD_AT(l+4u))>=np || (b=WORD_AT(l+8u))>=np || a==b) continue;\n        o=', '        if((a=WORD_AT(l+4u))>=np || (b=WORD_AT(l+8u))>=np || a==b) continue;\n        o='),
 }
 
 
@@ -443,3 +462,32 @@ def test_robot_per_instance_globals():
     assert mem(a[0x0029263C])[0][4] == 0x0078B1DC and a[0x00292641].mnemonic == 'jmp' and target(a[0x00292641]) == 0x00292550
     # the intro re-arms the shared particle pool (sub_002A65A0), one reason it stays shared
     assert target(a[0x0029387F]) == 0x002A62F0 and target(a[0x00293887]) == 0x002A65A0
+
+
+def test_walk_goal_and_pad_graph():
+    """v0.4.0-mapmaker.40: the handler's walk goal call and the pad, link,
+    portal and box fields the robot's own reachable pad set reads."""
+    a = by_address()
+    # sub_00293730: push [actor+0x684]; push entity; call sub_0015D500 (return 0x00293D27)
+    assert mem(a[0x00293D1A])[0][4] == 0x684 and target(a[0x00293D22]) == 0x0015D500
+    assert ends(a, 0x00293D22) == 0x00293D27
+    # sub_0015D500: the goal compare on actor +0x684
+    assert mem(a[0x0015D580])[0][4] == 0x684
+    # the handler's arrival test: +0x678 (the pad it is at) against +0x684
+    assert mem(a[0x00293B21])[0][4] == 0x678 and mem(a[0x00293B1B])[0][4] == 0x684
+    # links (sub_0009A5B0): 0x14 each, +0 flags 0x10010, +4/+8 pads; pool [0x00715F30], count [0x007B6660]
+    assert ('imm', 0x10010) in a[0x0009A603].ops and mem(a[0x0009A609])[0][4] == 4 and mem(a[0x0009A60C])[0][4] == 8
+    assert mem(a[0x0009A5E7])[0][4] == 0x00715F30 and mem(a[0x0009A5D8])[0][4] == 0x007B6660
+    # pads: room word +0xA from the floor finder (0x0009AFDF), the pad table [0x00715F2C]
+    assert mem(a[0x0009AFDF])[0][4] == 0xA and mem(a[0x0009AFBF])[0][4] == 0x00715F2C
+    # portals: +0/+4 rooms (sub_00087F80), +0x14 vertex count, +0x18 vertices of 0xC
+    assert mem(a[0x00088089])[0][4] == 0 and mem(a[0x00088093])[0][4] == 4 and mem(a[0x00088075])[0][4] == 0x0070878C
+    assert mem(a[0x0008C630])[0][4] == 0x14 and a[0x0008C63E].mnemonic == 'lea' and mem(a[0x0008C63E])[0][4] == 0x18
+    assert ('imm', 0xC) in a[0x0008BE36].ops
+    # the entity box: centre +0x1A8.., half extents +0x1C0..
+    assert mem(a[0x0006B632])[0][4] == 0x1AC and mem(a[0x0006B65F])[0][4] == 0x1C4
+    inc = INC.read_text(encoding='utf-8')
+    for k in ('RBT_RET_GOAL 0x00293D27u', 'RBT_PADS 0x00715F2Cu', 'RBT_LINKS 0x00715F30u', 'RBT_LINK_COUNT 0x007B6660u',
+              'RBT_PAD_COUNT 0x007B6664u', 'RBT_ROOM_RECS 0x00708788u', 'RBT_PORTALS 0x0070878Cu', 'RBT_AI_GOAL 0x684u',
+              'RBT_AI_PAD 0x678u', 'RBT_ENT_BOX_Y 0x1ACu', 'RBT_ENT_BOX_H 0x1C4u'):
+        assert '#define ' + k in inc, k
