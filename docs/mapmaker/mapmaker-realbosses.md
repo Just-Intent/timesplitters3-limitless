@@ -356,6 +356,37 @@ Fixture: a target 5 up and 10 ahead from a hand below its floor, a steep
 overhead target (clamped), the boss's own floor (unchanged), phase kept;
 mutations `aim-*`. Unplayed.
 
+### Same-floor throws (the v0.4.0-mapmaker.42 playtest)
+
+User report: "Now they can hit me from one floor above, but they don't hit
+me if I stand in place on the same floor." CONFIRMED (log `m42.err`, .41
+code): all four noted `floor height -4.49` on their first fight frame with
+the player on the 0.5 floor, and every throw logged `aims at a target a
+floor up (5.0 over its floor -4.5)`: the noted height is not the placed
+floor, so same-floor throws went at the body (1.5 over the feet). The
+first-frame height was the map's lowest floor in both logs (-9.49 in
+`m40b.err`, floors -2..; -4.49 here, floors -1..). Why it is lower than the
+placement is not traced (INFERRED: it sinks between its AI start and the
+fight); the body is still held at that noted height (`_face`, unchanged).
+
+Fix: `_ai_start` notes the entity height after the original (`giant
+skeleton N placed at height Y (AI start)`). `rbs_skel_ground` (once per
+fight at the first aim; reset by the restart): the reference is the finder
+floor `sub_000C3C50(point, 1.25, 0.1)` under the boss's x/z, from that
+placed height (else the first-frame height; probe point 0.5 over it),
+within a step, else
+climbing 1.25 at a time up to 11.25 for a floor above it; none: the noted
+height. Only a target more than `RBS_SKEL_UP` (now 2.5, half a floor) over
+that floor gets the raised aim; the body height (`_face`) is unchanged.
+Logged once per fight: `giant skeleton N reference floor F (spawn height
+Y, ...)`. Tests: first-frame -9.49 under a 0.5 floor (feet and 2.2 up:
+stock; 5 up and 3 ahead: raised, the line passes between its feet and head
+from a low hand and through its body from a high one), its own floor under
+an upper one, the m42 case (placed 0.51, first frame -4.49 over a -4.5
+floor: stock aim at 0.5); mutations `aim-ref-spawn`, `aim-up-2`, `ground-*`,
+`pad-not-noted`. Playtest: the skeleton's body may stand on the lower floor
+(its noted height); report where it is drawn.
+
 INFERRED: the stretching came from the same mismatch (the body drawn at height
 0 while parts follow the spawn floor). The freeze is not explained yet: if it
 recurs, wait more than 60 s before closing the game so the hang watchdog
