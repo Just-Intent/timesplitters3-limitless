@@ -45,9 +45,18 @@ Existing wrappers reused: `sub_00078590` (rows), `sub_003006C0` (compile),
 - Map: chunk `0x00C776F7` size 0x44 {word 1, byte length, 0, name[64]} before
   the terminator; stock fallback -1 stays; **not** over-stock (stock builds
   skip it). Missing file: tileset music.
-- Play: `sub_00045DE0` returns `0x00045FBC` (map, `eax == -1`, limits) or
-  `0x00045F4B` (Arcade, guest row 0); eax -> 0 (channel 0 silent), jingles
-  stock. Watch: scene word, slider `[0x005236BC]/16 x 0.65`, pause `[0x0064BDC0]`.
+- Play: `sub_00045DE0` returns `0x00045FBC` (map) or `0x00045F4B` (Arcade,
+  guest row 0); eax -> 0 (channel 0 silent), jingles stock. Map eax is
+  `sub_00045E60`: info word +0x0E, or a setup's stock Arcade pick
+  (`[0x00761404]`, mode byte != 10, jukebox[profile +0x114] != -1). Since
+  2026-11-07 the map's chunk plays when limits, scene 100 and the map's own
+  word -1 hold, even over a stock setup pick (logged); an imported Arcade
+  choice comes first and a missing one falls through to the map's track.
+- Logs: budget per message (8 each, 32 kinds); the Map Settings offer line
+  only when its count changes. Before this one 48-line budget was spent by
+  list builds (m45b.err: 48 offer lines, then nothing), hiding every play
+  line. Each silent play return logs `[music] play: <why> (ret, scene, eax,
+  map chunk, map music, arcade)`; a failed start logs `pc_music_error()`. Watch: scene word, slider `[0x005236BC]/16 x 0.65`, pause `[0x0064BDC0]`.
 - Lead 250 ms in 4096-frame chunks; a refused submission is offered again.
 
 ## Tests
@@ -58,7 +67,7 @@ Existing wrappers reused: `sub_00078590` (rows), `sub_003006C0` (compile),
 MP3s made by its `ffmpeg.exe` with libmp3lame, 9 mutations; skipped in CI and
 on non-Windows), launcher `tests/launcher/launcher_music.cs` + a Saves page
 case in `launcher_shared_ui.cs` and `tests/mapmaker/test_mapmaker_custommusic.py` (glue through the
-skymusic hooks, 36 mutations, XBE facts when the private XBE exists);
+skymusic hooks, 44 mutations incl. log budget/decision lines checked on stderr, XBE facts when the private XBE exists);
 `tests/mapmaker/mapmaker_skymusic.c` gained output stubs. Both are in
 `runtime-patches.yml`. WinError 4551 on a fixture is the host's application
 control: rerun.
