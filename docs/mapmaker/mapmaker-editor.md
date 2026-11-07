@@ -23,6 +23,8 @@ rewrites), `src/interface/pc_mapmaker_editor.inc` (C policy, wrappers),
     WRAP sub_00304330 -> pc_mapmaker_editor_free_place
     WRAP sub_002F7F30 -> pc_mapmaker_editor_free_move
     WRAP sub_00332330 -> pc_mapmaker_editor_sai_point
+    WRAP sub_003006C0 -> pc_mapmaker_editor_compile
+    WRAP sub_002FC3D0 -> pc_mapmaker_editor_top
 
 Hooks that replace their original (`sai_add`, `logic_can_add`,
 `logic_full`, `node_room`, and the refusal paths of `objective` and
@@ -188,6 +190,21 @@ piece N (saved as M)`, three times at most.
 Test: `tests/mapmaker/mapmaker_editor.c` `test_sai_points` (300/600/200-piece
 maps, other callers, foreign frames) with the `sai-point-*` mutations.
 Not built or played.
+
+## Save/load delay on large maps (2026-11-07)
+
+`sub_002FC3D0` walks every placed piece for the highest top; every piece
+mask (`sub_002FC470`, `sub_002FC680`) calls it, and a compile asks for masks
+per item, Story AI point and logic reference over the pieces before each, so
+a save or load costs about (items + points) x pieces^2 / 2 list steps.
+`pc_mapmaker_editor_top` (WRAP `sub_002FC3D0`) remembers the result while a
+compile (`pc_mapmaker_editor_compile`, WRAP `sub_003006C0`) or an editor load
+(`pc_mapmaker_editor_load`) runs, keyed on the editor, its `+0x21C` flag, the
+list head `[0x0078400C]` and the piece count `[0x00784000]`; registers out
+are the original's. Outside those scopes every call walks as before.
+`TSFP_MAPMAKER_SAVE_MEMO=0` turns it off; stderr reports walks, hits and
+milliseconds per large scope. Test: `test_top_memo` and the `top-*`
+mutations. Not built or played; the time saved is unmeasured.
 
 ## Logic (stage 2)
 

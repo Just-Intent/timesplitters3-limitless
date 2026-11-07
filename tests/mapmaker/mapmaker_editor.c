@@ -201,6 +201,137 @@ static unsigned count_tag(uint32_t c,uint32_t tag)
     return n;
 }
 
+
+/* ---- save/load delay: sub_002FC3D0 remembered inside compile/load ----- */
+#define TOP_CAT 0x0052952Cu                 /* catalogue height, type x 0x140 */
+#define TOP_PIECES 0x00500000u              /* piece i at + i x 0x48 */
+static unsigned top_originals, top_steps;
+/* sub_002FC3D0 as decoded: start -2 (4 with editor+0x21C set, no walk);
+ * per piece (int)(height - 1 + z), cmovg; outputs eax, ecx (last link), edx. */
+static void fake_top(void)
+{
+    uint32_t e=WORD_AT(0x007844A8u),d=WORD_AT(e+0x21Cu),p=WORD_AT(0x0078400Cu);
+    int32_t a=d?4:-2;
+    top_originals++;
+    if(!d && p) {
+        do {
+            float z=(float)((int32_t)WORD_AT(TOP_CAT+WORD_AT(p+0x10u)*0x140u)-1)+FLOAT_AT(p+8u);
+            d=(uint32_t)(int32_t)z;
+            if((int32_t)d>a) a=(int32_t)d;
+            p=WORD_AT(p+0x40u);top_steps++;
+        } while(p);
+    }
+    g_eax=(uint32_t)a;g_ecx=p;g_edx=d;g_esp+=4u;
+}
+static uint32_t top_ref[3];
+static void top_expect(void)                /* the original's answer for the current state */
+{
+    uint32_t sp=g_esp;
+    unsigned o=top_originals,st=top_steps;
+    g_esp=ESP0;fake_top();g_esp=sp;
+    top_ref[0]=g_eax;top_ref[1]=g_ecx;top_ref[2]=g_edx;top_originals=o;top_steps=st;
+}
+static unsigned top_mismatches, top_calls;
+static void top_call(void)                  /* a caller of sub_002FC3D0 (sub_002FC470) */
+{
+    uint32_t sp=g_esp;
+    top_expect();
+    g_eax=g_ecx=g_edx=0xDEADBEEFu;
+    g_esp=sp-4u;pc_mapmaker_editor_top(fake_top);
+    if(g_esp!=sp) esp_errors++;
+    g_esp=sp;top_calls++;
+    if(g_eax!=top_ref[0] || g_ecx!=top_ref[1] || g_edx!=top_ref[2]) top_mismatches++;
+}
+static unsigned top_n;
+static void top_piece(unsigned i,uint32_t type,float z)
+{
+    uint32_t p=TOP_PIECES+i*0x48u;
+    memset((char *)memory+p,0,0x48);WORD_AT(p+0x10u)=type;FLOAT_AT(p+8u)=z;
+}
+static void top_append(uint32_t type,float z)  /* sub_00307EF0: link at the tail, count + 1 */
+{
+    uint32_t p=TOP_PIECES+top_n*0x48u,q;
+    top_piece(top_n,type,z);
+    if(!WORD_AT(0x0078400Cu)) WORD_AT(0x0078400Cu)=p;
+    else { for(q=WORD_AT(0x0078400Cu);WORD_AT(q+0x40u);q=WORD_AT(q+0x40u)) {} WORD_AT(q+0x40u)=p; }
+    WORD_AT(0x00784000u)++;top_n++;
+}
+/* A compile: sub_00331E50 for each reference walks the pieces before its target,
+ * one piece mask (one sub_002FC3D0) each; pieces are appended in between, the
+ * flag flips and the head is unlinked, so every state change is seen. */
+static unsigned top_refs=64u;
+static void fake_compile(void)
+{
+    unsigned r,k;
+    for(r=0;r<top_refs;r++) {
+        for(k=0;k<top_n;k++) top_call();
+        if(r==7u) top_append(3u,20.0f);                         /* new top: must be seen */
+        if(r==9u) top_append(1u,-3.0f);                         /* count changes, top does not */
+        if(r==11u) WORD_AT(ED+0x21Cu)=1u;                       /* flag: 4, no walk */
+        if(r==12u) WORD_AT(ED+0x21Cu)=0u;
+        if(r==14u) { uint32_t h=WORD_AT(0x0078400Cu);           /* sub_00308480 on the head */
+                     WORD_AT(0x0078400Cu)=WORD_AT(h+0x40u);WORD_AT(0x00784000u)--; }
+        if(r==16u) { uint32_t h=WORD_AT(0x0078400Cu);           /* unlink + append: same count, new head */
+                     WORD_AT(0x0078400Cu)=WORD_AT(h+0x40u);WORD_AT(0x00784000u)--;top_append(0u,-5.0f); }
+    }
+    g_eax=0x77u;g_esp+=4u;
+}
+static void fake_load(void)                 /* the loader appends pieces while it decodes */
+{
+    unsigned k;
+    for(k=0;k<200u;k++) { top_append(k%5u,(float)(k%13u)*0.5f);top_call();top_call(); }
+    g_esp+=4u;
+}
+static void fake_load_in_compile(void)
+{
+    uint32_t sp=g_esp;
+    top_call();
+    g_esp=sp-4u;WORD_AT(g_esp+4u)=0;pc_mapmaker_editor_load(fake_load);g_esp=sp;
+    top_call();top_call();                  /* still inside the compile: remembered */
+    g_esp+=4u;
+}
+static void test_top_memo(void)
+{
+    unsigned i,before;
+    uint32_t saved_head=WORD_AT(0x0078400Cu),saved_count=WORD_AT(0x00784000u);
+    for(i=0;i<8;i++) WORD_AT(TOP_CAT+i*0x140u)=1u+i*2u;
+    WORD_AT(ED+0x21Cu)=0;WORD_AT(0x0078400Cu)=0;WORD_AT(0x00784000u)=0;top_n=0;
+    for(i=0;i<1023u;i++) top_append(i%8u,(float)((i*37u)%11u)+0.75f);
+    set_env("TSFP_MAPMAKER_SAVE_MEMO",NULL);
+    /* outside a compile or load (editor 3D view, placement): always the original */
+    top_originals=0;top_call();top_call();
+    CHECK(top_originals==2u && top_mismatches==0);
+    /* a compile of 1023 pieces x 64 references: one walk per state */
+    top_originals=top_steps=top_calls=0;top_refs=64u;
+    WORD_AT(ESP0+4u)=0x00300000u;
+    HOOK(pc_mapmaker_editor_compile,fake_compile);
+    CHECK(g_eax==0x77u && top_mismatches==0);
+    CHECK(top_calls>=64u*1023u && top_originals==7u);           /* start, +piece, +piece, flag, flag off, unlink, swap */
+    CHECK(mapmaker_top_memo.depth==0 && mapmaker_top_memo.valid==0);
+    printf("piece top: %u calls, %u walks, %u list steps (stock: %llu steps)\n",top_calls,top_originals,top_steps,
+           (unsigned long long)top_calls*1023ull);
+    /* after the scope: the original again (pieces may move in the editor) */
+    before=top_originals;top_call();
+    CHECK(top_originals==before+1u);
+    /* the editor loader: appends between calls, every call still exact */
+    top_originals=0;WORD_AT(ESP0+4u)=0;
+    HOOK(pc_mapmaker_editor_load,fake_load);
+    CHECK(top_mismatches==0 && top_originals==200u);           /* one walk per appended piece */
+    /* nested: a load inside a compile keeps the memo for the rest of the compile */
+    top_n=0;WORD_AT(0x0078400Cu)=0;WORD_AT(0x00784000u)=0;
+    for(i=0;i<300u;i++) top_append(i%8u,1.0f);
+    top_originals=0;
+    HOOK(pc_mapmaker_editor_compile,fake_load_in_compile);
+    CHECK(top_mismatches==0 && top_originals==201u && mapmaker_top_memo.depth==0);
+    /* switched off: every call walks */
+    set_env("TSFP_MAPMAKER_SAVE_MEMO","0");
+    top_originals=top_calls=0;top_refs=4u;
+    HOOK(pc_mapmaker_editor_compile,fake_compile);
+    CHECK(top_mismatches==0 && top_originals==top_calls);
+    set_env("TSFP_MAPMAKER_SAVE_MEMO",NULL);
+    WORD_AT(ED+0x21Cu)=0;WORD_AT(0x0078400Cu)=saved_head;WORD_AT(0x00784000u)=saved_count;
+}
+
 int main(void)
 {
     uint32_t c,end;
@@ -477,6 +608,7 @@ int main(void)
     }
 
     test_sai_points();
+    test_top_memo();
     CHECK(esp_errors==0);
     if(failures) return 1;
     puts("mapmaker editor ok");
