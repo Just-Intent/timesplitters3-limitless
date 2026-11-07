@@ -91,6 +91,8 @@ void pc_music_codec_close(PcMusicCodec *codec);
  * track, else set *gain (0..1) and *paused. It may read guest memory only. */
 typedef int (*PcMusicWatch)(void *context, float *gain, int *paused);
 int pc_music_start(const char *name, PcMusicWatch watch, void *context);
+/* Why the last pc_music_start returned 0 ("" after a success). */
+const char *pc_music_error(void);
 void pc_music_stop(void);
 int pc_music_playing(void);
 
@@ -567,13 +569,19 @@ void pc_music_stop(void)
 
 int pc_music_playing(void) { return pc_music_player && pc_music_run; }
 
+static const char *pc_music_why = "";
+const char *pc_music_error(void) { return pc_music_why; }
+
 int pc_music_start(const char *name, PcMusicWatch watch, void *context)
 {
     char dir[4096];
     PcMusicPlayer *p;
     pc_music_stop();
+    pc_music_why = "not a track name, no watch or no music folder";
     if (!watch || !pc_music_name_ok(name) || !pc_music_dir(dir, sizeof dir)) return 0;
+    pc_music_why = "out of memory";
     if (!(p = (PcMusicPlayer *)calloc(1, sizeof *p))) return 0;
+    pc_music_why = "the file could not be opened";
     if (!(p->file = pc_music_open(dir, name))) {
         pc_music_free(p);
         return 0;
@@ -582,6 +590,8 @@ int pc_music_start(const char *name, PcMusicWatch watch, void *context)
         uint32_t rate = 0, channels = 0;
         FILE *file = p->file;
         p->file = NULL;                /* the decoder owns it now, failure included */
+        pc_music_why = pc_music_codec_available() ? "the MP3 decoder found no playable audio (or an unsupported rate)"
+                                                  : "no MP3 decoder on this host (FFmpeg libraries not loaded)";
         if (!(p->codec = pc_music_codec_open(file, &rate, &channels)) ||
             rate < 8000u || rate > 192000u || channels < 1u || channels > 2u) {
             pc_music_free(p);
@@ -590,6 +600,7 @@ int pc_music_start(const char *name, PcMusicWatch watch, void *context)
         p->info.rate = rate;
         p->info.channels = channels;
     } else if (!pc_wav_parse(p->file, &p->info)) {
+        pc_music_why = "not a playable WAV";
         pc_music_free(p);
         return 0;
     }
@@ -600,7 +611,8 @@ int pc_music_start(const char *name, PcMusicWatch watch, void *context)
     p->base_ms = pc_music_now_ms();
     pc_music_player = p;
     pc_music_run = 1;
-    if (!pc_music_thread_start()) { pc_music_run = 0; pc_music_free(p); pc_music_player = NULL; return 0; }
+    if (!pc_music_thread_start()) { pc_music_why = "the player thread did not start"; pc_music_run = 0; pc_music_free(p); pc_music_player = NULL; return 0; }
+    pc_music_why = "";
     return 1;
 }
 

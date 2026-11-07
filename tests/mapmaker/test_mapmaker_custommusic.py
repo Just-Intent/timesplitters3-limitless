@@ -34,13 +34,19 @@ MUTATIONS = {
     'chunk-any-version': ('    if(cmu_byte(data)[0]!=1u || cmu_byte(data)[1]!=0 || !n', '    if(!n'),
     'play-not-called': ('    if(cmu_music(smx_on())) { original();return; }', '    (void)cmu_music;'),
     'play-eax-kept': ('    g_eax=0;\n    return 1;', '    return 1;'),
-    'play-over-setup': ('limits && scene==100u && g_eax==0xFFFFFFFFu &&', 'limits && scene==100u &&'),
+    'play-map-own-stock-row': ('        else if(own!=-1) why="the map\'s own music is a stock row; stock music";\n', ''),
+    'play-setup-blocks-map': ('            name=map_name;\n            if(eax!=0xFFFFFFFFu)', '            if(eax==0xFFFFFFFFu) name=map_name;\n            if(eax!=0xFFFFFFFFu)'),
+    'play-missing-arcade-blocks-map': ('            else cmu_log("Arcade\'s imported track is missing",cmu.arcade,0);', '            else { cmu_log("Arcade\'s imported track is missing",cmu.arcade,0);return 0; }'),
+    'play-early-return-silent': ('    if(!name) { cmu_trace(why,ret,scene,eax,chunk,own,arcade);return 0; }', '    if(!name) return 0;'),
+    'log-shared-budget': ('    if(k==CMU_LOG_KINDS) return 0;\n    cmu.seen[k]=what;', '    if(k==CMU_LOG_KINDS) return 0;\n    what=cmu.seen[0]?cmu.seen[0]:what;if(cmu.seen[0]) return cmu.seen_count[0]<CMU_LOG_EACH ? (cmu.seen_count[0]++,1) : 0;\n    cmu.seen[k]=what;'),
+    'log-rows-every-build': ('    if(n && n!=cmu.offered_logged) {', '    if(n) {'),
     'play-any-caller': ('    if(ret!=CMU_RET_MAP && ret!=CMU_RET_ARCADE) return 0;\n', ''),
     'play-music-off': ('    if(guest_call(sub_00045A70,0)) { cmu_log("music is switched off",name,0);return 0; }\n', ''),
     'play-no-stop': ('    pc_music_stop();                         /* a new level music ends an imported track */\n', ''),
-    'play-map-without-limits': ('    if(!name && ret==CMU_RET_MAP && limits && scene==100u', '    if(!name && ret==CMU_RET_MAP && scene==100u'),
-    'arcade-over-link': ('    arcade=ret==CMU_RET_ARCADE ? WORD_AT(CMU_ARCADE_INDEX)==0u :', '    arcade=ret==CMU_RET_ARCADE ? 1 :'),
-    'arcade-in-story': (" && cmu_byte(CMU_MODE)[0]!=0x0Au &&", ' &&'),
+    'play-map-without-limits': ('        if(!limits) why="MapMaker limits are off; stock music";\n        else if', '        if'),
+    'play-map-other-scene': ('        else if(scene!=100u) why="not a MapMaker play scene; stock music";\n', ''),
+    'arcade-over-link': ('    if(ret==CMU_RET_ARCADE) arcade=WORD_AT(CMU_ARCADE_INDEX)==0u;', '    if(ret==CMU_RET_ARCADE) arcade=1;'),
+    'arcade-in-story': ("WORD_AT(CMU_SETUP_LINK) && cmu_byte(CMU_MODE)[0]!=0x0Au ?", 'WORD_AT(CMU_SETUP_LINK) ?'),
     'watch-scene': ('    if(WORD_AT(CMU_SCENE)!=cmu.scene) return 0;\n', ''),
     'watch-pause': ('    *paused=WORD_AT(CMU_PAUSE)!=0;', '    *paused=0;'),
     'watch-slider': ('    *gain=(float)(slider>CMU_SLIDER_MAX?CMU_SLIDER_MAX:slider)/(float)CMU_SLIDER_MAX;', '    *gain=1.0f;'),
@@ -105,8 +111,17 @@ def test_mapmaker_custommusic(tmp_path, mutation):
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'mapmaker custommusic ok' in result.stdout
+        assert log_ok(result.stderr), result.stderr
     else:
-        assert result.returncode != 0, f'{mutation} was not detected'
+        assert result.returncode != 0 or not log_ok(result.stderr), f'{mutation} was not detected'
+
+
+def log_ok(stderr):
+    """Sixty list builds log the offer once, and the play decisions after them still appear."""
+    return (stderr.count('imported tracks offered in Map Settings') == 1 and
+            'play: the map names no imported track; stock music (ret 0x00045FBC, scene 100' in stderr and
+            "play: the map's imported track replaces the setup's stock choice" in stderr and
+            'play: not a MapMaker play scene' in stderr)
 
 
 def test_chunk_tag_is_free():

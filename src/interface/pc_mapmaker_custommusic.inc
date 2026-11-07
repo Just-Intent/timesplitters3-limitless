@@ -80,6 +80,9 @@
 #define CMU_PAUSE 0x0064BDC0u               /* player 0x0064BD98 +0x28 */
 #define CMU_LABEL_BYTES 56u
 #define CMU_PREFIX "Imported: "
+#define CMU_LOG_KINDS 32u
+#define CMU_LOG_EACH 8u
+#define CMU_INFO_MUSIC 0x0Eu                /* map info word: jukebox index, -1 tileset (sub_00045E60) */
 
 extern void sub_00071800(void),sub_000717D0(void),sub_00071940(void),sub_00069640(void),sub_00045A70(void);
 
@@ -90,12 +93,25 @@ static struct {
     unsigned offer[PC_MUSIC_MAX_TRACKS], offered;   /* Arcade rows 58.. -> list entry */
     char arcade[PC_MUSIC_NAME_MAX];         /* the Arcade choice, "" = stock */
     volatile uint32_t scene;                /* scene the track plays in */
-    unsigned logged;
+    const char *seen[CMU_LOG_KINDS];        /* log budget per message (pointer identity) */
+    unsigned char seen_count[CMU_LOG_KINDS];
+    unsigned offered_logged;                /* Map Settings rows: logged when the count changes */
 } cmu;
 
+/* Each message has its own budget, so a message repeated by every list
+ * build can never use up the lines a later play decision needs. */
+static int cmu_budget(const char *what)
+{
+    unsigned k;
+    for(k=0;k<CMU_LOG_KINDS && cmu.seen[k];k++)
+        if(cmu.seen[k]==what) return cmu.seen_count[k]<CMU_LOG_EACH ? (cmu.seen_count[k]++,1) : 0;
+    if(k==CMU_LOG_KINDS) return 0;
+    cmu.seen[k]=what;cmu.seen_count[k]=1;
+    return 1;
+}
 static void cmu_log(const char *what,const char *name,int a)
 {
-    if(cmu.logged++>=48u) return;
+    if(!cmu_budget(what)) return;
     fprintf(stderr,"[music] %s: %s (%d)\n",what,name?name:"",a);
     fflush(stderr);
 }
@@ -168,7 +184,7 @@ static void cmu_rows(void)
     if(!cmu.labels) return;
     for(k=0;k<cmu.list.count;k++)
         if(cmu.list.present[k]) { guest_call(sub_00071800,2,cmu_label(k),CMU_VALUE+k);n++; }
-    if(n) cmu_log("imported tracks offered in Map Settings","",(int)n);
+    if(n && n!=cmu.offered_logged) { cmu.offered_logged=n;cmu_log("imported tracks offered in Map Settings","",(int)n); }
 }
 
 /* After the rebuild (sub_003006C0): append the chunk when the editor's music
@@ -225,29 +241,63 @@ static int cmu_watch(void *context,float *gain,int *paused)
     return 1;
 }
 
+/* One play decision (ret = sub_00045DE0's return address). */
+static void cmu_trace(const char *why,uint32_t ret,uint32_t scene,uint32_t eax,int chunk,int own,int arcade)
+{
+    if(!cmu_budget(why)) return;
+    fprintf(stderr,"[music] play: %s (ret 0x%08X, scene %u, eax %d, map chunk %s, map music %d, arcade %d)\n",
+            why,ret,scene,(int)eax,chunk?"yes":"no",own,arcade);
+    fflush(stderr);
+}
+
 /* WRAP sub_00045DE0, before pc_mapmaker_skymusic.inc's own rule; returns 1
- * when an imported track plays (eax is then 0). */
+ * when an imported track plays (eax is then 0). sub_00045EB0 0x00045F7A
+ * passes sub_00045E60's result: the map's info word +0x0E, or a setup's
+ * stock Arcade choice ([0x00761404] set, mode byte not 10, jukebox entry of
+ * profile +0x114 not -1). The map's imported track is the author's explicit
+ * choice, so it plays whenever the map's own word is -1 and its chunk names a
+ * present file, even over a stock setup choice; an imported Arcade choice
+ * (profile row 0) comes first. Every silent return is logged once per reason. */
 static int cmu_music(int limits)
 {
-    uint32_t ret=MAPMAKER_PTR_OK(g_esp,4u)?WORD_AT(g_esp):0u,scene=WORD_AT(CMU_SCENE);
+    uint32_t ret=MAPMAKER_PTR_OK(g_esp,4u)?WORD_AT(g_esp):0u,scene=WORD_AT(CMU_SCENE),eax=g_eax,info=0;
     char map_name[PC_MUSIC_NAME_MAX];
-    const char *name=NULL;
-    int arcade;
+    const char *name=NULL,*why=NULL;
+    int arcade,chunk=0,own=-2;
     pc_music_stop();                         /* a new level music ends an imported track */
     if(ret!=CMU_RET_MAP && ret!=CMU_RET_ARCADE) return 0;
-    arcade=ret==CMU_RET_ARCADE ? WORD_AT(CMU_ARCADE_INDEX)==0u :
-           WORD_AT(CMU_SETUP_LINK) && cmu_byte(CMU_MODE)[0]!=0x0Au &&
-           WORD_AT(guest_call(sub_00069640,0)+CMU_PROFILE_MUSIC)==0u;
-    if(arcade) { cmu_arcade_read();if(cmu.arcade[0]) name=cmu.arcade; }
-    if(!name && ret==CMU_RET_MAP && limits && scene==100u && g_eax==0xFFFFFFFFu &&
-       cmu_chunk_name(WORD_AT(CMU_CONTAINER),map_name)) name=map_name;
-    if(!name) return 0;
+    if(ret==CMU_RET_ARCADE) arcade=WORD_AT(CMU_ARCADE_INDEX)==0u;
+    else {
+        uint32_t profile=WORD_AT(CMU_SETUP_LINK) && cmu_byte(CMU_MODE)[0]!=0x0Au ? guest_call(sub_00069640,0) : 0u;
+        arcade=profile && MAPMAKER_PTR_OK(profile,CMU_PROFILE_MUSIC+4u) && WORD_AT(profile+CMU_PROFILE_MUSIC)==0u;
+    }
     cmu_scan();
-    if(pc_music_find(&cmu.list,name)<0) { cmu_log("imported track is missing; stock music",name,0);return 0; }
+    if(arcade) {
+        cmu_arcade_read();
+        if(cmu.arcade[0]) {
+            if(pc_music_find(&cmu.list,cmu.arcade)>=0) name=cmu.arcade;
+            else cmu_log("Arcade's imported track is missing",cmu.arcade,0);
+        }
+    }
+    if(!name && ret==CMU_RET_MAP) {
+        uint32_t c=WORD_AT(CMU_CONTAINER);
+        chunk=cmu_chunk_name(c,map_name);
+        if(cmu_walk(c,NULL,&info) && info) own=(int)(int16_t)(uint16_t)WORD_AT(info+CMU_INFO_MUSIC);
+        if(!limits) why="MapMaker limits are off; stock music";
+        else if(scene!=100u) why="not a MapMaker play scene; stock music";
+        else if(!chunk) why="the map names no imported track; stock music";
+        else if(own!=-1) why="the map's own music is a stock row; stock music";
+        else if(pc_music_find(&cmu.list,map_name)<0) { cmu_log("map's imported track is missing; tileset music",map_name,0);return 0; }
+        else {
+            name=map_name;
+            if(eax!=0xFFFFFFFFu) cmu_trace("the map's imported track replaces the setup's stock choice",ret,scene,eax,chunk,own,arcade);
+        }
+    } else if(!name) why="Arcade: no imported choice; stock music";
+    if(!name) { cmu_trace(why,ret,scene,eax,chunk,own,arcade);return 0; }
     if(guest_call(sub_00045A70,0)) { cmu_log("music is switched off",name,0);return 0; }
     cmu.scene=scene;
-    if(!pc_music_start(name,cmu_watch,NULL)) { cmu_log("imported track did not start (not a playable WAV or MP3?)",name,0);return 0; }
-    cmu_log(arcade && name==cmu.arcade?"Arcade: imported track":"map: imported track",name,(int)scene);
+    if(!pc_music_start(name,cmu_watch,NULL)) { cmu_log("imported track did not start",pc_music_error(),0);cmu_log("the track that did not start",name,0);return 0; }
+    cmu_log(name==cmu.arcade?"Arcade: imported track":"map: imported track",name,(int)scene);
     g_eax=0;
     return 1;
 }
