@@ -143,7 +143,8 @@ int main(void)
     list(skel,14u,10u,1);          /* same: quiet */
     list(skel,8u,8u,0);            /* fits, camera room not touched */
     WORD_AT(skel+0x38u)=7u;list(skel,8u,8u,0);WORD_AT(skel+0x38u)=3u;   /* camera room in the list */
-    CHECK(skv.n==1u && skv.s[0].builds==5u && skv.s[0].truncated==3u && skv.s[0].dropped==3u && skv.s[0].peak==14u);
+    list(skel,10u,10u,0);          /* exactly the cap: not truncated */
+    CHECK(skv.n==1u && skv.s[0].builds==6u && skv.s[0].truncated==3u && skv.s[0].dropped==3u && skv.s[0].peak==14u);
     PHASE("phase list");
 
     /* Passes: drawn, frustum culled twice, drawn again. */
@@ -164,6 +165,12 @@ int main(void)
     *(int8_t *)((uintptr_t)(skel+0x30u)+g_xbox_mem_offset)=0;pass(0);   /* no rooms */
     *(int8_t *)((uintptr_t)(skel+0x30u)+g_xbox_mem_offset)=4;WORD_AT(skel+0x28u)=0;
     rect(3,1);reach(skel,0,1);mapmaker_skelvis_drawn(skel);pass(0);
+    /* Reached, a frustum call from another caller (not counted), then 0
+     * (in front) and a second call with nothing armed: later, frustum 0. */
+    mapmaker_skelvis_rect(skel);frustum(0x000A24A8u,-1);pass(0);
+    reach(skel,0,1);mapmaker_skelvis_drawn(skel);pass(0);
+    mapmaker_skelvis_rect(skel);frustum(SKV_RET_FRUSTUM,0);frustum(SKV_RET_FRUSTUM,-1);pass(0);
+    reach(skel,0,1);mapmaker_skelvis_drawn(skel);pass(0);
     PHASE("phase reasons");
 
     /* Another view (slot 1): not judged; the main view's next pass is. A
@@ -178,7 +185,7 @@ int main(void)
     /* Summary every 600 main passes, only when a hidden count changed. */
     while(skv.passes%600u!=599u) { reach(skel,0,1);mapmaker_skelvis_drawn(skel);pass(0); }
     reach(skel,0,1);mapmaker_skelvis_drawn(skel);pass(0);
-    for(i=0;i<600u;i++) { reach(skel,0,1);mapmaker_skelvis_drawn(skel);pass(0); }
+    for(i=0;i<601u;i++) { reach(skel,0,1);mapmaker_skelvis_drawn(skel);pass(0); }   /* 1200: no change, no summary */
     PHASE("phase summary");
 
     /* Flicker: the line budget holds (60 per level, 12 of them "unseen"). */

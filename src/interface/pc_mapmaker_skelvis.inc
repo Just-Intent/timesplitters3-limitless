@@ -196,7 +196,7 @@ static void mapmaker_skelvis_reset(const char *why)
 {
     if(skv.n) {
         skv_summary(1);
-        if(skv.lines<SKV_LINES) fprintf(stderr,"[mapmaker] skelvis: %s: forgetting %u skeleton%s\n",why,skv.n,skv.n==1u?"":"s");
+        fprintf(stderr,"[mapmaker] skelvis: %s: forgetting %u skeleton%s\n",why,skv.n,skv.n==1u?"":"s");
         fflush(stderr);
     }
     memset(&skv,0,sizeof skv);
