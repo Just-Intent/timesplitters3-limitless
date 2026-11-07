@@ -13,7 +13,7 @@ in the disassembly at the given address; INFERRED = reasoning, not observed.
 | Runtime pad handles | 0x209E..0x20B1 | 0x4740..0x4753 | same |
 | Scene-100 cover pool | 1280 x 32 B | 10,496 x 32 B (range + 256 guard) | `MAPMAKER_POOL_COVER`, `pc_display_mapmaker_pools` |
 | Editor cover limit (opt-in) | 1024 | 9,984 (range - 256, the stock spare) | `MAPMAKER_LIMIT_COVER` |
-| Link pool (scene 100) | 4400 x 20 B (editor 4400) | 32,512 x 20 B, fixed (int16 A* indices); editor: template links + 16 per piece <= 32,256 (2026-11-02; was 16,336 / 12,000) | `MAPMAKER_POOL_LINKS`, `pc_display_mapmaker_pools` |
+| Link pool (scene 100) | 4400 x 20 B (editor 4400) | 32,512 x 20 B, fixed (int16 A* indices); editor: template links + half the side slots <= 32,256 (2026-11-07; 16 per piece from 2026-11-02; was 16,336 / 12,000); stitcher stops at the pool | `MAPMAKER_POOL_LINKS`, `pc_display_mapmaker_pools`, `pc_mapmaker_pads_stitch` |
 | Group A* node pool | 1000 nodes .bss 0x0070E178, no bound | 8192 nodes at 0x008E0000, bounded | `pads.json` relocation + `pc_mapmaker_pads_group_node` |
 | Pad A* node pool | 1000 nodes .bss 0x00712058, no bound | 1000 nodes, bounded | `pc_mapmaker_pads_pad_node` |
 | Start-point cover top-up | unbounded | refused past the cover capacity (scene 100) | `pc_mapmaker_pads_cover_topup` |
@@ -192,6 +192,29 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
   32 bits was not attempted: nodes (`+0`..`+6` int16 in 16-byte nodes) and
   route buffers (int16 arrays of 100/300 in a 0x338-byte struct) are used by
   13 functions plus every route reader.
+- 2026-11-07, stitches counted (CONFIRMED code and XBE data, not played).
+  The writer's neighbour pass (`sub_002FC680`, 12 calls of `sub_00333BA0`)
+  stores one pad pair per slot of each side connection point that meets a
+  neighbour (catalogue of tile N at `row(N) - 0x30`: count `+0x44` =
+  `row + 0x14`, 6-byte entries `+0x48` with byte 0 type 1..4 = side, byte 4
+  = slots; `sub_00311C00` reads `0x00529554 + N' * 0x140`). The loader's
+  table builder (`sub_0009A7A0`, `0x0009AEA0..0x0009AED1`) skips a pair whose
+  reverse is listed, so a doorway is one link. Stock side slots per tile: 2..24
+  (tile 17, 3 x 3: 12; tiles 14/42: 24); half of any tile is at most 12, inside
+  the stock table of 16 per piece. The editor now costs template links +
+  ceil(side slots of placed + held / 2): tile 17 35 (was 45), tiles 14/42 58
+  (was 62; the flat 16 under-counted them). Pieces meeting with different
+  widths can list unmatched pairs; the 256 slack and `pc_mapmaker_pads_stitch`
+  (WRAP `sub_0009DC70`, scene 100 with the pools: cuts the table at the first
+  entry that would pass `MAPMAKER_POOL_LINKS`, logs `[mapmaker] pads: link pool
+  full`) keep that from writing past the pool. Per-tile link use (template +
+  stitch, packed grid): tile 17 29 + 6, tile 14 46 + 12, 1x1 tiles 1 + 1..2.
+  Link indices > 32,767 still need the int16 sites widened (partial, not
+  exhaustive inventory: nodes
+  `+6` read at `0x0009B175`, `0x0009B1E4`, `0x0009B458`, `0x0009B815`; route
+  words read at `0x0009BBB6`, `0x0009BCCE`, `0x001598AD`, `0x00159901`,
+  `0x00159A6D`, `sub_0006D7A0` `[route+0x10/0x12]`; 29 functions use the link
+  pool); not needed until pads pass 8000.
 
 ## Pad groups and the A* pools
 
@@ -236,7 +259,10 @@ So at 242 pieces the cover target needed is about 3,452 (worst case); the
   listed; a runtime handle computed some other way (for example from a
   table) would not be caught (none found).
 - `0x002B0363` still reads a stray, handle-independent word (stock bug).
-- The link slack for stitches assumes the stitch table holds 16 per piece.
+- The stitch table holds 16 entries per piece (`sub_0009A0F0(pieces * 16)`,
+  one table for the map, unbounded writer); stock tiles leave at most 12 per
+  piece on average after the reverse-pair drop when every doorway matches. Pieces meeting with different widths are
+  INFERRED to list a few more; not measured in play.
 - Shared docs not updated here (owned elsewhere): the header comment of
   `src/interface/pc_mapmaker_limits.inc` (still says cover is capped at 1280/1024),
   `docs/agent-context/systems.md` (cover 1024 / pool 1536) and

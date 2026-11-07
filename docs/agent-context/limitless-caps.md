@@ -22,20 +22,31 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
   13 threshold rewrites; four mislabelled sites corrected).
 - Contract and evidence: `docs/mapmaker/mapmaker-pads.md`.
 
-## Links (2026-11-02)
+## Links (2026-11-02; stitches counted 2026-11-07)
 
 - `pc_mapmaker_limits.inc`: `MAPMAKER_POOL_LINKS` 32,512 (scene-100 pool,
-  fixed; int16 A* link indices), `MAPMAKER_LINK_STITCH` 16 per piece,
-  `MAPMAKER_LINK_SLACK` 256, `MAPMAKER_LIMIT_LINKS` = pool - slack.
-  `mapmaker_link_cost` (template + 16 x pieces) feeds the meter, the held
-  preview and `mapmaker_limits_over` (bit mask of the limits passed; the
-  placement decision is `!= 0`).
-- `pc_mapmaker_objects.inc` teleporter links stop at the pool, not the
-  editor limit.
-- Tests: `mapmaker_limits.c` (exact 32,256 boundary with held pieces; 511
-  heavy-link pieces pass every cap, the 512th only the piece cap; links stop
-  at 521, pads at 549, 1024 x 15 links fit), `mapmaker_objects.c` (links past the editor limit);
-  mutations in `test_mapmaker_limits.py` / `test_mapmaker_objects.py`.
+  fixed; int16 A* link indices), `MAPMAKER_LINK_SLACK` 256,
+  `MAPMAKER_LIMIT_LINKS` = pool - slack. `mapmaker_link_total(p, h)` =
+  template links + ceil(side slots of placed + held / 2) (`MapMakerTotals.slots`
+  from `mapmaker_row_slots`: catalogue count `row + 0x14`, entries `row + 0x18`,
+  types 1..4, at most `MAPMAKER_LINK_SLOTS_MAX` 32 per piece) feeds
+  `mapmaker_limits_over`; `mapmaker_link_cost` (one list) the meter, held
+  preview and resource table. Was a flat 16 per piece (`MAPMAKER_LINK_STITCH`,
+  removed). Why half: one stitch pair per facing slot, the loader drops the
+  reversed pair (decode in [pads](../mapmaker/mapmaker-pads.md)). Tile 17 costs
+  35 (was 45; user's .57 full grid refused at ~716), tiles 14/42 58 (was 62).
+- `pc_mapmaker_pads.inc` `pc_mapmaker_pads_stitch` (WRAP `sub_0009DC70`, new
+  2026-11-07, needs regeneration): scene 100 with the pools, cuts the stitch
+  table at the first active entry past the pool; teleporter links
+  (`pc_mapmaker_objects.inc`) stop at the pool, not the editor limit.
+- Map files: unchanged (stitches are rebuilt by the writer on every compile).
+- Tests: `mapmaker_limits.c` (exact 32,256 boundary with held pieces and
+  slots; heavy 547 + 1 fit, pads refuse the 549th, links alone 556; tile 17
+  852 + 1 fit, pads refuse, links alone 921; odd slots round up over placed +
+  held; row reading), `mapmaker_pads.c` (stitch cut, inactive pads, scenes,
+  pools off), `test_mapmaker_limits_classified.py` (decode of the reverse-pair
+  drop, append, sole caller, catalogue offset; XBE slots per tile, max 24),
+  mutations in `test_mapmaker_limits.py` / `test_mapmaker_pads.py`.
 
 ## Pad groups (2026-11-02)
 
@@ -323,8 +334,8 @@ What binds past 511, ranked (for 1023 pieces; heaviest tile 14 pads, 46 links):
 | --- | --- | --- | --- | --- | --- |
 | 1 | engine object handles | pool `[0x0072F5E8]`, handle slot << 21 (`handles.json`, 167 decodes) | 1023 -> **2047** | 1023 + items + 128 | done: 1651 at the piece and item caps; +2.15 MB Level heap |
 | 2 | pad groups | `[0x00762CB8]`, matrix `sub_00275F70` (N+1) x N x 4 in the 6 MB nav block | 1024 | ~1,535 (1.5/piece) | binds ~680 pieces; 1,536 groups = 9.4 MB matrix and 2.4 M route searches at load |
-| 3 | links (int16 A* indices) | `MAPMAKER_POOL_LINKS` 32,512 | 32,256 | 47 K heavy | 521 heavy, 1,024 at <= 15 links; hard int16 limit |
-| 4 | regular pads (ids <= 0x2328) | `pads.json` thresholds | 7,680 | 14 K heavy | 549 heavy |
+| 3 | regular pads (ids <= 0x2328) | `pads.json` thresholds; regular handles < cover base 0x1F40 | 7,680 | 14 K heavy, 9.2 K tile 17 | 549 heavy, 853 tile 17: binds first since links are counted (2026-11-07); past 8000 the cover handle base and cover ids (0x2329) move |
+| 4 | links (int16 A* indices) | `MAPMAKER_POOL_LINKS` 32,512 | 32,256 (template + half side slots) | 59 K heavy, 36 K tile 17 | 556 heavy, 921 tile 17 (was 521 / 716 at 16 per piece); past 32,767 the int16 node/route sites need widening |
 | 5 | memory estimate | scale 8, 16.4 MB | 2,048,000 x 8 | | 386 heaviest-memory, 1,960 light |
 | 6 | Level heap in play | arena 47 MB (+16 MB by `TSFP_MAPMAKER_ARENA_MB`) | unmeasured | ~30-48 KB per tile with content (two maps) | real limit for heavy content; probe flag 32 |
 | 7 | cover pads | 10,240 handles | 9,984 | 14 K heavy | 713 heavy |
@@ -342,7 +353,7 @@ New table entries: `items.json` `mm-piece-pool-bytes/-loop/-last/-count`
 (2048 nodes); `level.json` re-valued (frame 0x2090, arguments +0x1060);
 `rooms.json` re-valued (see rooms stage 12). No new wrapper. Tests:
 `mapmaker_limits.c` (895 cost-free fit, 896th refused on objects, 1024
-also on pieces, 520 heavy fit and the 521st refused on links, 600 + 295),
+also on pieces, heavy tiles refused on pads at 549 (links counted, see Links), 600 + 295),
 `test_mapmaker_limits.py` (`pieces-511`, `pieces-past-rooms`, refusal lines
 `engine objects 1024 of 1023` and `pieces 1024 of 1023; engine objects`),
 `test_mapmaker_limits_classified.py` (`test_piece_pool_*`: four sites in two
