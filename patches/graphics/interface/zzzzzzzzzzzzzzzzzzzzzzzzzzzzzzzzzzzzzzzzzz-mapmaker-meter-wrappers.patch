@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,3803 @@
+@@ -1911,6 +1911,3908 @@
      sub_002FA720_gen();
  #endif
  }
@@ -210,13 +210,23 @@
 +#endif
 +}
 +
-+void sub_003006C0(void)
++static void sub_003006C0_layer7(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_compile")) pc_mapmaker_weaponset_compile(sub_003006C0_layer6);
 +    else sub_003006C0_layer6();
 +#else
 +    sub_003006C0_layer6();
++#endif
++}
++
++void sub_003006C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_compile")) pc_mapmaker_storyprops_compile(sub_003006C0_layer7);
++    else sub_003006C0_layer7();
++#else
++    sub_003006C0_layer7();
 +#endif
 +}
 +
@@ -446,13 +456,23 @@
 +#endif
 +}
 +
-+void sub_00301A90(void)
++static void sub_00301A90_layer6(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_load")) pc_mapmaker_weaponset_load(sub_00301A90_layer5);
 +    else sub_00301A90_layer5();
 +#else
 +    sub_00301A90_layer5();
++#endif
++}
++
++void sub_00301A90(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_load")) pc_mapmaker_storyprops_load(sub_00301A90_layer6);
++    else sub_00301A90_layer6();
++#else
++    sub_00301A90_layer6();
 +#endif
 +}
 +
@@ -1766,13 +1786,23 @@
 +}
 +
 +extern void sub_00319300_gen(void);
-+void sub_00319300(void)
++static void sub_00319300_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_tileflags_build")) pc_mapmaker_tileflags_build(sub_00319300_gen);
 +    else sub_00319300_gen();
 +#else
 +    sub_00319300_gen();
++#endif
++}
++
++void sub_00319300(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_build")) pc_mapmaker_storyprops_build(sub_00319300_layer0);
++    else sub_00319300_layer0();
++#else
++    sub_00319300_layer0();
 +#endif
 +}
 +
@@ -1881,13 +1911,23 @@
 +#endif
 +}
 +
-+void sub_00062790(void)
++static void sub_00062790_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_mount")) pc_mapmaker_mothership_mount(sub_00062790_layer2);
 +    else sub_00062790_layer2();
 +#else
 +    sub_00062790_layer2();
++#endif
++}
++
++void sub_00062790(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_mount")) pc_mapmaker_storyprops_mount(sub_00062790_layer3);
++    else sub_00062790_layer3();
++#else
++    sub_00062790_layer3();
 +#endif
 +}
 +
@@ -3461,6 +3501,17 @@
 +#endif
 +}
 +
++extern void sub_001CD9D0_gen(void);
++void sub_001CD9D0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_unlock")) pc_mapmaker_weaponset_unlock(sub_001CD9D0_gen);
++    else sub_001CD9D0_gen();
++#else
++    sub_001CD9D0_gen();
++#endif
++}
++
 +extern void sub_00312880_gen(void);
 +void sub_00312880(void)
 +{
@@ -3528,13 +3579,23 @@
 +}
 +
 +extern void sub_000783D0_gen(void);
-+void sub_000783D0(void)
++static void sub_000783D0_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_options")) pc_mapmaker_weaponset_options(sub_000783D0_gen);
 +    else sub_000783D0_gen();
 +#else
 +    sub_000783D0_gen();
++#endif
++}
++
++void sub_000783D0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_turret_options")) pc_mapmaker_storyprops_turret_options(sub_000783D0_layer0);
++    else sub_000783D0_layer0();
++#else
++    sub_000783D0_layer0();
 +#endif
 +}
 +
@@ -3612,6 +3673,50 @@
 +    else sub_00064E70_gen();
 +#else
 +    sub_00064E70_gen();
++#endif
++}
++
++extern void sub_002F7770_gen(void);
++void sub_002F7770(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_category")) pc_mapmaker_storyprops_category(sub_002F7770_gen);
++    else sub_002F7770_gen();
++#else
++    sub_002F7770_gen();
++#endif
++}
++
++extern void sub_0006C090_gen(void);
++void sub_0006C090(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_preload_model")) pc_mapmaker_storyprops_preload_model(sub_0006C090_gen);
++    else sub_0006C090_gen();
++#else
++    sub_0006C090_gen();
++#endif
++}
++
++extern void sub_002F7790_gen(void);
++void sub_002F7790(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_model")) pc_mapmaker_storyprops_model(sub_002F7790_gen);
++    else sub_002F7790_gen();
++#else
++    sub_002F7790_gen();
++#endif
++}
++
++extern void sub_0033DD80_gen(void);
++void sub_0033DD80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_gun_type")) pc_mapmaker_storyprops_gun_type(sub_0033DD80_gen);
++    else sub_0033DD80_gen();
++#else
++    sub_0033DD80_gen();
 +#endif
 +}
 +

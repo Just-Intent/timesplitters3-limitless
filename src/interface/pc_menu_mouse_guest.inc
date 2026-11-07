@@ -83,7 +83,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_sets.inc"
 #include "pc_mapmaker_matchbots.inc"
 #include "pc_mapmaker_weaponset.inc"
-#include "pc_mapmaker_storyprops.inc"  /* drum / fixed gun story variants (after weaponset: same node +0x30 field, other ids) */
+#include "pc_mapmaker_storyprops.inc"
 #include "pc_mapmaker_tilesets.inc"
 #include "pc_mapmaker_restable.inc"
 /* MapMaker capacity area includes (end) */
@@ -1028,6 +1028,7 @@ void pc_mapmaker_matchbots_match_start(void (*original)(void)) { original(); }
 void pc_mapmaker_matchbots_screen(void (*original)(void)) { original(); }
 void pc_mapmaker_matchbots_open(void (*original)(void)) { original(); }
 void pc_mapmaker_matchbots_store(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_unlock(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_compile(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_load(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_reset(void (*original)(void)) { original(); }
@@ -1048,7 +1049,6 @@ void pc_mapmaker_weaponset_pickup(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_preload(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_row(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_label(void (*original)(void)) { original(); }
-void pc_mapmaker_weaponset_unlock(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_compile(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_load(void (*original)(void)) { original(); }
 void pc_mapmaker_storyprops_category(void (*original)(void)) { original(); }
