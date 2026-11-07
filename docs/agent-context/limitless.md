@@ -37,7 +37,7 @@ MapMaker player/contract docs live in `docs/mapmaker/`; measured results in
 | Guest lift/runtime correctness | Runtime `tools/recomp/`, manual hooks, `tools/build/recomp-generation.py`, verified guest-code patches `tools/compiler/guest_code_patches.py` | `tests/compiler/test_recomp_float_joins.py`, `test_recomp_vehicle_joins.py` |
 
 Issue/Ideas routing (extends [build-test.md](build-test.md)): the issue chooser's
-Ideas contact link points to the fork's `Just-Intent/timesplitters3-limitless`
+Ideas contact link: the fork's `Just-Intent/timesplitters3-limitless`
 Discussions since 2026-10-31.
 
 ## Systems (extends [systems.md](systems.md))
