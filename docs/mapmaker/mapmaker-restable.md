@@ -45,7 +45,7 @@ held passes the cap, and the row is then red.
 | Pickups | placed items in categories 8-13, 19-21, 31 (weapons, ammo, keycards, health, armour, power-ups, special pickups) | 768 | play-time pickup records (`MAPMAKER_OBJECTS_PICKUPS`); not an editor cap, the 500 items keep it below |
 | Pads (Regular pads) | tile pad cost | 7680 | `MAPMAKER_LIMIT_PADS` |
 | Cover (Cover pads) | tile cover cost | 9984 | `MAPMAKER_LIMIT_COVER` |
-| Links | template links + 16 per piece | 32,256 | `mapmaker_link_cost`, `MAPMAKER_LIMIT_LINKS` |
+| Links | template links + half the side connection slots (one link per doorway) | 32,256 | `mapmaker_link_cost`, `MAPMAKER_LIMIT_LINKS` |
 | Groups (Pad groups) | global groups `[0x00762CB8]` | 1024 | `MAPMAKER_LIMIT_GROUPS` |
 | Memory | placed memory estimate (after the budget scale), KB rounded up | 2000 KB | `mapmaker_placed_memory`, `MAPMAKER_LIMIT_MEMORY` / 1024 |
 | Story AI | `editor+0x280` | 511 | `MAPMAKER_EDITOR_SAI_LIMIT` (`sub_0031BE70` add) |

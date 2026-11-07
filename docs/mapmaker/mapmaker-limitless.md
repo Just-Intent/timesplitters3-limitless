@@ -90,8 +90,13 @@ it. *Automated tests only.*
 1023. Every tile is also one engine object; since 2026-11-07 the game has
 room for 2047 of those (it was 1023), so 1023 tiles and all 500 items fit
 together and tiles no longer use up the item budget. Heavy tiles (many pads
-and links) stop earlier on Pads (about 549) or Links (about 521), and
-typical maps near 680 tiles on Pad groups. Saving and loading large maps should be
+and links) stop earlier on Pads (about 549), and typical maps near 680
+tiles on Pad groups. Since 2026-11-07 the Links count is what the map really
+uses: one link per doorway between two tiles instead of 16 per tile, so a
+full grid of 3x3 rooms (tile 17) stops on Pads at 853 tiles instead of on
+Links at about 716. If a map ever needs more doorway links than the game
+has room for, the extra doorways get no AI path (logged) instead of
+corrupting memory. *Automated tests only.* Saving and loading large maps should be
 quicker: the editor no longer re-measures every tile for each
 item. Every edit still recomputes the map. Old maps load as before, and
 System Link with other builds is unaffected.
