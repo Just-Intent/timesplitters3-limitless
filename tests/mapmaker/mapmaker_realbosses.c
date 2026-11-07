@@ -41,7 +41,7 @@ static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r
 #define WKEF_K(k) (0x00980000u+(uint32_t)(k)*0x1000u)
 static unsigned skel_seq(void), walk_seq(void);   /* instances made so far this level */
 /* after a restart (the level heap freed): blocks elsewhere, so new ones are seen */
-static uint32_t heap_gen;
+static uint32_t heap_gen;static unsigned alloc_fail_n;   /* this skeleton allocation (count) fails */
 #define SKGEN_ST(k) (heap_gen?0x00990000u+(uint32_t)(k)*0xD000u:SKST_K(k))
 #define SKGEN_PT(k) (heap_gen?0x00990000u+(uint32_t)(k)*0xD000u+0x4C80u:SKPT_K(k))
 #define WKGEN_ST(k) (heap_gen?0x009C4000u+(uint32_t)(k)*0x7000u:WKST_K(k))
@@ -134,7 +134,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     }
     if(f==sub_00287E00) {   /* sub_0003DFA0 twice, then sub_00287860 */
         nalloc++;alloc_scene=WORD_AT(0x0079094Cu);
-        if(alloc_ok) { unsigned q=skel_seq();WORD_AT(0x0078B1ECu)=SKGEN_ST(q);WORD_AT(0x0078B0D0u)=SKGEN_PT(q);WORD_AT(SKGEN_ST(q)+0x4160u)=0; }
+        if(alloc_ok && nalloc!=alloc_fail_n) { unsigned q=skel_seq();WORD_AT(0x0078B1ECu)=SKGEN_ST(q);WORD_AT(0x0078B0D0u)=SKGEN_PT(q);WORD_AT(SKGEN_ST(q)+0x4160u)=0; }
         return 0;
     }
     if(f==sub_00059DB0) { nstart++;start_args[0]=x[0];start_args[1]=x[1];return x[1]==0x19Cu?0x77u:0x66u; }
@@ -1351,10 +1351,15 @@ int main(void)
             CHECK(nprincess==q+1u && princess_state==SKGEN_ST(3) && princess_parts==SKGEN_PT(3));
             CALL(pc_mapmaker_realbosses_princess,fake,0x0027DDD8u,ENT(11),0,0,0);
             CHECK(princess_state==SKGEN_ST(1) && princess_parts==SKGEN_PT(1) && WORD_AT(0x0078B1ECu)==SKGEN_ST(0));
-            alloc_ok=0;a0=nalloc;                                           /* no memory: that one and the rest dropped */
+            alloc_fail_n=nalloc+2u;                                       /* no memory for the second: it and the rest dropped */
+            CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
+            alloc_fail_n=0;
+            CHECK(rbs_skelf.n==1u && rbs_skels[0].state==SKGEN_ST(0) && rbs_skels[0].record==REC(10) && WORD_AT(0x0078B1ECu)==SKGEN_ST(0));
+            CHECK(!rbs_skels[1].record && !rbs_skels[1].state && !rbs_skels[3].record && !rbs_skels[3].state && rbs_walkf.n==2u);
+            alloc_ok=0;                                                   /* none at all */
             CALL(pc_mapmaker_realbosses_restart,fake,0x0003D4E6u,0,0,0,1);
             alloc_ok=1;
-            CHECK(!rbs_skelf.n && !rbs_walkf.n && !rbs_skels[0].record && !rbs_skels[3].record && !WORD_AT(0x0078B1ECu));
+            CHECK(!rbs_skelf.n && !rbs_walkf.n && !rbs_skels[0].record && !WORD_AT(0x0078B1ECu) && !WORD_AT(0x0078B1E8u));
             heap_gen=0;
             CALL(pc_mapmaker_realbosses_level,fake,0x0015E81Du,0,0,0,1);
             for(q=10;q<15u;q++) CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(q),0,0,1);
