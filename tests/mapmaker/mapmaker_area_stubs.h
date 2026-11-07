@@ -6,6 +6,7 @@
 #ifndef TSFP_MAPMAKER_AREA_STUBS_H
 #define TSFP_MAPMAKER_AREA_STUBS_H
 #include <stdint.h>
+#include <stdio.h>
 void sub_000827B0(void) {} void sub_000827F0(void) {} void sub_0035E960(void) {}
 void sub_00025280(void) {} void sub_00336600(void) {}
 uint32_t xbox_ContiguousAlloc(uint32_t size, uint32_t alignment) { (void)size; (void)alignment; return 0; }
@@ -147,6 +148,12 @@ int recomp_audio_output_position(uint32_t slot,uint64_t *played,uint32_t *queued
 { (void)slot;if(played)*played=0;if(queued)*queued=0;return 0; }
 int recomp_audio_output_set_volume(uint32_t slot,int32_t volume) { (void)slot;(void)volume;return 0; }
 void recomp_audio_output_reset_voice(uint32_t slot) { (void)slot; }
+/* imported music: the MP3 decoder adapter (pc_music_codec.c) is not linked here */
+int pc_music_codec_available(void) { return 0; }
+struct PcMusicCodec *pc_music_codec_open(FILE *f,uint32_t *r,uint32_t *c) { (void)r;(void)c;if(f) fclose(f);return NULL; }
+long pc_music_codec_read(struct PcMusicCodec *d,int16_t *o,unsigned n) { (void)d;(void)o;(void)n;return -1; }
+int pc_music_codec_rewind(struct PcMusicCodec *d) { (void)d;return 0; }
+void pc_music_codec_close(struct PcMusicCodec *d) { (void)d; }
 int recomp_audio_output_take_discontinuity(uint32_t slot) { (void)slot;return 0; }
 /* khallos, worm (pc_mapmaker_khallos.inc, pc_mapmaker_worm.inc) */
 void sub_0009A420(void) {} void sub_000A9070(void) {} void sub_0010E2A0(void) {} void sub_001D1E80(void) {}
