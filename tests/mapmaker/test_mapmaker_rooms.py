@@ -342,6 +342,7 @@ ROOMS_BLOCKS = {
     'front-end view': (0x008CD000, 0x3000, ['rooms-reloc-v-0x749890']),
     'light heads': (0x008D0000, 3 * 0x20C * 4, ['rooms-reloc-l1-head', 'rooms-reloc-l1-rest']),
     'light colour': (0x008D18A0, 0x20C * 12 + 4, ['rooms-reloc-l2-0x7ac880']),
+    'boss camera lists': (0x008D4000, 0x8000, []),                # pc_mapmaker_bossroom.inc, 8 view slots
 }
 
 
@@ -420,8 +421,9 @@ def test_extension_map_rooms_sub_range():
     # the colour fill writes entries 0..0x10B from +4: inside the table it is declared with
     colour = by_id(table())['rooms-reloc-l2-0x7ac880']
     assert 12 * GLOBAL <= int(colour['new_size'], 16)          # last entry: +4+12*0x10B-4 .. +12*0x10C
-    gaps = [(a1, b0) for (a0, a1, _), (b0, b1, _) in zip(regions, regions[1:]) if b0 > a1]
-    assert regions[0][0] == 0x008C0000 and regions[-1][1] <= 0x008D4000
+    own = [r for r in regions if r[2] != 'boss camera lists']      # the bossroom block sits after the rooms' own
+    gaps = [(a1, b0) for (a0, a1, _), (b0, b1, _) in zip(own, own[1:]) if b0 > a1]
+    assert regions[0][0] == 0x008C0000 and own[-1][1] <= 0x008D4000 and regions[-1][1] <= 0x008DC000
     assert sum(b - a for a, b in gaps) < 0x3000, [(hex(a), hex(b)) for a, b in gaps]
 
 

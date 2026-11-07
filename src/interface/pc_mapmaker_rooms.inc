@@ -462,6 +462,9 @@ void pc_mapmaker_rooms_buckets(void (*original)(void))
     int any_sorted=0;
     mapmaker_rooms_depths *c;
     (void)original;
+#ifdef MAPMAKER_BOSSROOM
+    mapmaker_bossroom_view(view);   /* pc_mapmaker_bossroom.inc: giant bosses also listed in the camera's room */
+#endif
     if(mapmaker_rooms_bk.depth>=MAPMAKER_ROOMS_BUCKET_LEVELS) mapmaker_rooms_bk.nested++;
     c=&mapmaker_rooms_bk.level[mapmaker_rooms_bk.depth<MAPMAKER_ROOMS_BUCKET_LEVELS?mapmaker_rooms_bk.depth:MAPMAKER_ROOMS_BUCKET_LEVELS-1u];
     memset(normal,0,sizeof normal);memset(sorted_n,0,sizeof sorted_n);memset(replaced,0,sizeof replaced);

@@ -96,7 +96,7 @@ SDL tests (`tools/build/build-native-mac.py --test`) cover the two-slot E/Space
 cap, requested capture, release and frame-applied mouse disable. They preserve
 bindings; physical input remains unverified.
 
-CI: `runtime-patches.yml` selects work (restart/skelvis: limitless-bosses); `ci-pr-gate.py` needs both hosts.
+CI: `runtime-patches.yml` selects work (restart/skelvis/bossroom: -bosses); `ci-pr-gate.py` needs both hosts.
 Native jobs allow 45 minutes on Windows and 30 on Mac; patch upgrades allow 30.
 Required check names remain.
 `test_ci_pr_gate.py` rejects missing/failed/skipped results;
