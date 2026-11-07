@@ -43,6 +43,12 @@ MUTATIONS = {
     'pool-tables-stale': ('    mapmaker_objects_clear(0x008CC000u,0x40Du*4u);\n', '    mapmaker_objects_clear(0x007B54E0u,0xD6u*4u);\n'),
     'pool-tables-short': ('    mapmaker_objects_clear(0x008D0100u,0x40Du*4u);\n', '    mapmaker_objects_clear(0x008D0100u,0x20Du*4u);\n'),
     'twin-not-cleared': ('    mapmaker_objects_clear(p,bytes);\n', '\n'),
+    # Twins (model instances) outnumber objects (attachments): extra slots and a create guard.
+    'twin-pool-only': ('#define MAPMAKER_OBJECTS_TWIN_EXTRA 512u', '#define MAPMAKER_OBJECTS_TWIN_EXTRA 0u'),
+    'twin-guard-off': ('       !WORD_AT(MAPMAKER_OBJECTS_TWIN_FREED)) return 0;', '       0) return 0;'),
+    'twin-guard-ignores-freed': (' &&\n       !WORD_AT(MAPMAKER_OBJECTS_TWIN_FREED)) return 0;', ') return 0;'),
+    'twin-margin-off-by-one': ('WORD_AT(MAPMAKER_OBJECTS_TWIN_COUNT)+MAPMAKER_OBJECTS_TWIN_MARGIN>twins',
+                               'WORD_AT(MAPMAKER_OBJECTS_TWIN_COUNT)+MAPMAKER_OBJECTS_TWIN_MARGIN>=twins'),
     'twin-flag-inverted': ('WORD_AT(0x004D9700u)=WORD_AT(0x006F73B0u)==0;', 'WORD_AT(0x004D9700u)=WORD_AT(0x006F73B0u)!=0;'),
     'twin-story': ('    if(!mapmaker_objects_pool_on()) { original(); return; }\n    save_registers(&r);\n    WORD_AT(0x0070AAD8u)',
                    '    save_registers(&r);\n    WORD_AT(0x0070AAD8u)'),
