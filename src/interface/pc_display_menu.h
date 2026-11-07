@@ -91,10 +91,10 @@ void pc_display_mapmaker_limits(void (*original)(void));
 /* Gate for every MapMaker capacity area hook (TSFP_MAPMAKER_AREA_OFF/_TRACE). */
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 /* MapMaker capacity area hooks (begin) */
+void pc_mapmaker_pads_stitch(void (*original)(void));
 void pc_mapmaker_pads_group_node(void (*original)(void));
 void pc_mapmaker_pads_pad_node(void (*original)(void));
 void pc_mapmaker_pads_cover_topup(void (*original)(void));
-void pc_mapmaker_pads_stitch(void (*original)(void));   /* WRAP sub_0009DC70 */
 void pc_mapmaker_container_frontend_init(void (*original)(void));
 void pc_mapmaker_container_editor_init(void (*original)(void));
 void pc_mapmaker_container_undo_ring(void (*original)(void));
