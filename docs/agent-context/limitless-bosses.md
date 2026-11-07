@@ -50,3 +50,8 @@ each bar drawn or skipped once per entity and reason (story AI bosses: bar
 of ..) plus a map-start count. The chair's jet emitter, made at the train
 start, is moved to the chair at creation and each waiting frame
 (sub_0010E730); no new WRAP ([area doc](../mapmaker/mapmaker-khallos.md)).
+
+Group triggers (after .40): whole-group killed/spotted now need every placed member;
+boss fights' AI removals (sub_0015DDA0) get the missing death event (new WRAP ->
+`pc_mapmaker_aitemplates_removed`) and boss-class AIs spot when hurt or a player is within 30
+units ([aitemplates doc](../mapmaker/mapmaker-aitemplates.md)). Tank, mothership, worm not covered.

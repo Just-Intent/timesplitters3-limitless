@@ -47,15 +47,16 @@
  *
  * Play (scene 100). sub_00240C50 (level start) builds index -> leader from
  * the chunks. Logic on the leader's id (R + t + 1, R = [0x00783A50]) means
- * "any member" when the leader has group logic (or for an old-format
+ * the whole group when the leader has group logic (or for an old-format
  * template); otherwise logic stays per AI:
- *  - sub_0033E560 (event delivery): an event of a copy is delivered again
- *    with the spawn record's id (+8) set to the leader id, then restored;
+ *  - sub_0033E560 (death event): once every placed member has died, the
+ *    event is delivered again with the spawn record's id (+8) set to the
+ *    leader id, then restored (see the play section for bosses);
  *  - sub_00163780 (action type 2 on an id): repeated for every copy's id;
  *  - sub_0033E620 (spawn gate, action 0x11): a copy also waits for the
  *    leader's gate;
- *  - sub_00339600 (trigger 0x14 poll on the AI's actors): tried with each
- *    copy's id until it fires or starts its delay.
+ *  - sub_00339600 (trigger 0x14 "spotted" poll): every placed member has
+ *    spotted the player, then the stock delay.
  * Logic on a copy's own id is unchanged.
  *
  * Requires the includer's WORD_AT, guest_call, g_esp/g_eax,
