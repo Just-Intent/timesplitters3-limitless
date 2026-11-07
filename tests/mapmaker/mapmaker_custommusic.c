@@ -242,12 +242,14 @@ int main(int argc,char **argv)
     /* ---- MapMaker play ---- */
     WORD_AT(0x0079094Cu)=100u;
     make_container(C,-1);put_chunk(C,"beta_song.wav");
+    /* the stock player's state word is 3 (stopped) after the menu music: not a pause */
+    WORD_AT(0x0064BDC0u)=3u;
     CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0u && pc_music_playing());
     WORD_AT(0x005236BCu)=8u;pc_music_pump(10);
     CHECK(volume_now==pc_music_db(0.5f*0.65f) && submits>0u);
-    WORD_AT(0x0064BDC0u)=1u;pc_music_pump(20);
+    WORD_AT(0x006D5EB8u)=1u;pc_music_pump(20);                              /* sub_00045AB0: music paused */
     CHECK(volume_now==-10000 && pc_music_playing());
-    WORD_AT(0x0064BDC0u)=0u;
+    WORD_AT(0x006D5EB8u)=0u;
     hook(pc_custom_music_channel,plain_original,0x0003D000u,0u,0,0,0);       /* channel 0: keeps playing */
     CHECK(pc_music_playing());
     hook(pc_custom_music_channel,plain_original,0x0003D000u,1u,0,0,0);       /* a jingle ends it */
@@ -255,6 +257,18 @@ int main(int argc,char **argv)
     CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0u && pc_music_playing());
     WORD_AT(0x0079094Cu)=0x53u;pc_music_pump(30);                            /* back to the menus */
     CHECK(!pc_music_playing());
+    /* the scene changes between the start and the player's first step: nothing is submitted */
+    WORD_AT(0x0079094Cu)=100u;k=(int)submits;
+    CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0u && pc_music_playing());
+    WORD_AT(0x0079094Cu)=101u;pc_music_pump(40);
+    CHECK(!pc_music_playing() && (int)submits==k);
+    WORD_AT(0x0079094Cu)=100u;
+    /* paused before the first sound: held, then plays on resume */
+    WORD_AT(0x006D5EB8u)=1u;
+    CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0u && pc_music_playing());
+    pc_music_pump(50);CHECK((int)submits==k && pc_music_playing());
+    WORD_AT(0x006D5EB8u)=0u;pc_music_pump(60);CHECK((int)submits>k);
+    pc_music_stop();
     WORD_AT(0x0079094Cu)=100u;
     /* a setup's stock Arcade choice (eax 7): the map's own imported track still plays */
     CHECK(music(0x00045FBCu,7u)==0u && pc_music_playing());
