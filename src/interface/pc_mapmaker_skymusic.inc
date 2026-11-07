@@ -91,6 +91,7 @@
  * pc_mapmaker_sky.inc (mapmaker_sky_extras, mapmaker_sky_info). */
 #include <stdio.h>
 #include <string.h>
+#include "pc_mapmaker_custommusic.inc"   /* imported music (cmu_*) */
 
 #define SMX_SCENE 0x0079094Cu
 #define SMX_EDITOR 0x007844A8u
@@ -274,9 +275,10 @@ void pc_mapmaker_skymusic_rows(void (*original)(void))
     uint32_t ret=MAPMAKER_PTR_OK(g_esp,4u)?WORD_AT(g_esp):0u,k;
     if((ret!=SMX_RET_MUSIC_BIND && ret!=SMX_RET_SKY_BIND && ret!=SMX_RET_WEATHER_BIND) ||
        !smx_on() || smx_scene()!=102u || !smx_label_storage()) { original();return; }
-    if(ret==SMX_RET_MUSIC_BIND)
+    if(ret==SMX_RET_MUSIC_BIND) {
         for(k=0;k<SMX_MUSIC_COUNT;k++) guest_call(sub_00071800,2,smx.music_text[k],(uint32_t)SMX_MUSIC_FIRST+k);
-    else if(ret==SMX_RET_SKY_BIND)
+        cmu_rows();
+    } else if(ret==SMX_RET_SKY_BIND)
         for(k=0;k<MAPMAKER_SKY_EXTRA_COUNT;k++) guest_call(sub_00071800,2,smx.sky_text[k],(uint32_t)mapmaker_sky_extras[k].sky);
     else
         for(k=0;k<SMX_WEATHER_COUNT;k++) guest_call(sub_00071800,2,smx.weather_text[k],SMX_WEATHER_FIRST+k);
@@ -288,10 +290,10 @@ void pc_mapmaker_skymusic_rows(void (*original)(void))
  * After the original: stock fallbacks in the stock fields, rows in the flags. */
 void pc_mapmaker_skymusic_compile(void (*original)(void))
 {
-    uint32_t container,ed,info,music=0,sky=0,weather=0,flags;
+    uint32_t container,ed,info,music=0,sky=0,weather=0,flags,ret;
     int32_t m,s,w;
     if(!MAPMAKER_PTR_OK(g_esp,8u)) { original();return; }
-    container=WORD_AT(g_esp+4u);
+    ret=WORD_AT(g_esp);container=WORD_AT(g_esp+4u);
     original();
     ed=WORD_AT(SMX_EDITOR);
     if(!MAPMAKER_PTR_OK(ed,SMX_ED_WEATHER+4u) || !(info=mapmaker_sky_info(container))) return;
@@ -307,6 +309,7 @@ void pc_mapmaker_skymusic_compile(void (*original)(void))
     if(smx_on())
         flags|=sky<<MAPMAKER_SKY_EXTRA_SHIFT|music<<SMX_MUSIC_SHIFT|weather<<SMX_WEATHER_SHIFT;
     WORD_AT(info+SMX_INFO_FLAGS)=flags;
+    if(smx_on()) cmu_compile(container,ret);   /* imported track: its own chunk */
 }
 
 /* WRAP sub_00301A90 (editor: load a container; cdecl container, mode). */
@@ -324,6 +327,7 @@ void pc_mapmaker_skymusic_load(void (*original)(void))
     if((k=smx_bits(flags,MAPMAKER_SKY_EXTRA_MASK,MAPMAKER_SKY_EXTRA_SHIFT,MAPMAKER_SKY_EXTRA_COUNT))!=0)
         WORD_AT(ed+SMX_ED_SKY)=(uint32_t)mapmaker_sky_extras[k-1u].sky;
     if((k=smx_bits(flags,SMX_WEATHER_MASK,SMX_WEATHER_SHIFT,SMX_WEATHER_COUNT))!=0) WORD_AT(ed+SMX_ED_WEATHER)=SMX_WEATHER_FIRST+k-1u;
+    cmu_load(container);
 }
 
 /* The map's info in play, or 0 (switch off, other scene, no map). */
@@ -768,10 +772,12 @@ void pc_mapmaker_skymusic_grain_colour(void (*original)(void))
 }
 
 /* WRAP sub_00045DE0 (start the level music: eax = music id, -1 = the
- * tileset's, [esp+4]). */
+ * tileset's, [esp+4]). An imported track (pc_mapmaker_custommusic.inc) is
+ * decided first: the Arcade choice, then the map's chunk. */
 void pc_mapmaker_skymusic_music(void (*original)(void))
 {
     uint32_t info,k;
+    if(cmu_music(smx_on())) { original();return; }   /* an imported track plays; channel 0 silent */
     if(MAPMAKER_PTR_OK(g_esp,4u) && WORD_AT(g_esp)==SMX_RET_MUSIC_PLAY && g_eax==0xFFFFFFFFu &&
        (info=smx_play_info())!=0 &&
        (k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),SMX_MUSIC_MASK,SMX_MUSIC_SHIFT,SMX_MUSIC_COUNT))!=0) {

@@ -82,7 +82,7 @@ public static class LauncherSettingsChecks
         Console.WriteLine("DIRECT_GAME_STARTED");
         Console.WriteLine("CWD=" + Environment.CurrentDirectory);
         foreach (string key in new[] { "RECOMP_GAME_DIR", "RECOMP_SAVE_DIR", "RECOMP_INPUT_CONFIG",
-            "RECOMP_FFMPEG_DIR", "RECOMP_DISPLAY_CONFIG", "TSFP_DISPLAY_CONFIG", "TSFP_ONLINE_SETTINGS",
+            "RECOMP_FFMPEG_DIR", "RECOMP_DISPLAY_CONFIG", "TSFP_DISPLAY_CONFIG", "TSFP_ONLINE_SETTINGS", "TSFP_MUSIC_DIR",
             "RECOMP_LOG_FILE", "RECOMP_MOUSE_SENSITIVITY", "RECOMP_MOUSE_INVERT_Y", "RECOMP_PC_MOUSE",
             "RECOMP_XMV_PLAY", "RECOMP_UNWANTED", "TSFP_UNWANTED" })
             Console.WriteLine(key + "=" + Environment.GetEnvironmentVariable(key));
@@ -133,7 +133,7 @@ public static class LauncherSettingsChecks
         foreach(var pair in new[]{new[]{"RECOMP_GAME_DIR","Data"},new[]{"RECOMP_SAVE_DIR","Saves"},
             new[]{"RECOMP_INPUT_CONFIG","Settings/pc-controls.json"},new[]{"RECOMP_FFMPEG_DIR","Bin"},
             new[]{"RECOMP_DISPLAY_CONFIG","Settings/runtime.conf"},new[]{"TSFP_DISPLAY_CONFIG","Settings/pc-display.ini"},
-            new[]{"TSFP_ONLINE_SETTINGS","Settings/pc-online.json"}})
+            new[]{"TSFP_ONLINE_SETTINGS","Settings/pc-online.json"},new[]{"TSFP_MUSIC_DIR","Music"}})
             Require(output.Contains(pair[0]+"="+Core.PathIn(root,pair[1])));
         Require(output.Contains("RECOMP_LOG_FILE="+errors) && File.ReadAllText(errors).Contains("synthetic game diagnostic"));
         if(exitCode!=0)Require(File.ReadAllText(Path.Combine(CrashReports.Folder(root,CrashReports.Latest(root)),"game-log-tail.txt")).Contains("synthetic game diagnostic"),"Unexpected-exit report must include a short buffered stderr diagnostic.");
