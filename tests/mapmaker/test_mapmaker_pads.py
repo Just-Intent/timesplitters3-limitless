@@ -1,4 +1,5 @@
-"""MapMaker AI navigation pads: Layout B handle table and A*/cover bound checks.
+"""MapMaker AI navigation pads: Layout C handle table, ids past 8000, lazy group
+distances and the A*/cover bound checks.
 
 Compiles src/interface/pc_mapmaker_pads.inc against fake guest memory (with mutations
 that must be caught), and checks config/guest-code-patches/pads.json for
@@ -46,7 +47,49 @@ MUTATIONS = {
     'stitch-without-pools': ('    if(!mapmaker_limits.pools) { original(); return; }\n    n=', '    n='),
     'stitch-editor-limit': ('room=links<MAPMAKER_POOL_LINKS?MAPMAKER_POOL_LINKS-links:0u;',
                             'room=links<MAPMAKER_LIMIT_LINKS?MAPMAKER_LIMIT_LINKS-links:0u;'),
-    'cover-range-short':('#define MAPMAKER_PADS_COVER_RANGE 10240u', '#define MAPMAKER_PADS_COVER_RANGE 9984u'),
+    'cover-range-short':('#define MAPMAKER_PADS_COVER_RANGE 14336u', '#define MAPMAKER_PADS_COVER_RANGE 14080u'),
+    # Ids past 8000 (pc_mapmaker_pads.inc "pad ids past 8000").
+    'id-high-overlaps-cover': ('#define MAPMAKER_PADS_HIGH_ID (MAPMAKER_PADS_COVER_ID+MAPMAKER_PADS_COVER_RANGE) /* 0x5B29 */',
+                               '#define MAPMAKER_PADS_HIGH_ID (MAPMAKER_PADS_COVER_ID+MAPMAKER_PADS_COVER_RANGE-1u)'),
+    'id-low-pads-moved': ('#define MAPMAKER_PADS_LOW_PADS 8000u', '#define MAPMAKER_PADS_LOW_PADS 7999u'),
+    'search-off-by-one': ('        mid=lo+((hi-lo)>>1);', '        mid=lo+((hi-lo+1)>>1);'),
+    'search-no-minus-one': ('    if(mid==-1) return -1;\n', ''),
+    'lookup-low-ids-too': ("    if(id<(int32_t)MAPMAKER_PADS_HIGH_ID || id>=(int32_t)MAPMAKER_PADS_HIGH_END) { original(); return; }\n    mapmaker_pads.high_lookups++;\n    g_eax=(uint32_t)mapmaker_pads_search(id);",
+                           "    if(id<(int32_t)MAPMAKER_PADS_REGULAR_ID) { original(); return; }\n    mapmaker_pads.high_lookups++;\n    g_eax=(uint32_t)mapmaker_pads_search(id);"),
+    'pointer-no-scratch': ('        if(mapmaker_pads_owner_ret(ret)) p=mapmaker_pads_scratch(id);\n', ''),
+    'pointer-scratch-everyone': ('        if(mapmaker_pads_owner_ret(ret)) p=mapmaker_pads_scratch(id);', '        p=mapmaker_pads_scratch(id);'),
+    'pointer-owner-index-kept': ('            g_eax=mapmaker_pads_scratch((int32_t)(MAPMAKER_PADS_REGULAR_ID+(uint32_t)g));', '            (void)g;'),
+    'pointer-alias-ignored': ('        id=(int32_t)mapmaker_pads.alias_id[arg&0x7FFFFFFFu];', '        (void)0;'),
+    'runtime-no-fix': ('    WORD_AT(pad+0x18u)=h<0?0u:WORD_AT(WORD_AT(0x00715F2Cu)+(uint32_t)h*32u+0x18u);', '    (void)h;'),
+    'tile-no-cover-owner': ('            WORD_AT(p)=(w&0xFFFF0000u)|mapmaker_pads_id((uint32_t)owner-MAPMAKER_PADS_REGULAR_ID);', '            (void)w;'),
+    'tile-cover-word-clobbered': ('            WORD_AT(p)=(w&0xFFFF0000u)|mapmaker_pads_id((uint32_t)owner-MAPMAKER_PADS_REGULAR_ID);',
+                                  '            WORD_AT(p)=mapmaker_pads_id((uint32_t)owner-MAPMAKER_PADS_REGULAR_ID);'),
+    'tile-renumbers-low': ('    for(i=rb>MAPMAKER_PADS_LOW_PADS?rb:MAPMAKER_PADS_LOW_PADS;i<ra && i<MAPMAKER_POOL_PADS;i++)',
+                           '    for(i=rb;i<ra && i<MAPMAKER_POOL_PADS;i++)'),
+    'editor-groups-mapped': ('    mapmaker_pads.linear++;\n    original();\n    mapmaker_pads.linear--;\n}\n/* WRAP sub_00334B20',
+                             '    original();\n}\n/* WRAP sub_00334B20'),
+    'item-pads-not-mapped': ('            WORD_AT(out+k*4u)=mapmaker_pads_id(v-MAPMAKER_PADS_REGULAR_ID);', '            (void)v;'),
+    'item-pads-nested-mapped': ('    if(mapmaker_pads.linear>0) return;\n    n=g_eax&0xFFu;', '    n=g_eax&0xFFu;'),
+    'topup-no-alias': ('            WORD_AT(r+4u)=0x80000000u|aliased;\n', ''),
+    'topup-not-restored': ('    for(k=0;k<aliased;k++) WORD_AT(rec[k])=mapmaker_pads.alias_id[k];\n', ''),
+    'stitch-high-kept': ('                w=(w&~(0xFFFFu<<(16*k)))|((MAPMAKER_PADS_REGULAR_ID+(uint32_t)g)<<(16*k));', '                (void)g;'),
+    # Group distances.
+    'matrix-always-dense': ('    return groups>MAPMAKER_PADS_MATRIX_DENSE;', '    return 0;'),
+    'matrix-lazy-at-1024': ('    return groups>MAPMAKER_PADS_MATRIX_DENSE;', '    return groups>=MAPMAKER_PADS_MATRIX_DENSE;'),
+    'matrix-live-flags': ('if(now) for(k=0;k<n;k++) { now[k]=WORD_AT(pool+k*20u);WORD_AT(pool+k*20u)=mapmaker_matrix.flags[k]; }',
+                          'if(now) for(k=0;k<n;k++) { now[k]=WORD_AT(pool+k*20u); }'),
+    'matrix-flags-not-restored': ('    if(now) { for(k=0;k<n;k++) WORD_AT(pool+k*20u)=now[k]; free(now); }', '    free(now);'),
+    'matrix-costs-not-restored': ('    WORD_AT(MAPMAKER_PADS_COST_A)=keep_a;WORD_AT(MAPMAKER_PADS_COST_B)=keep_b;', '    (void)keep_a;(void)keep_b;'),
+    'matrix-one-cost': ('v=b+a; }', 'v=b; (void)a; }'),
+    'matrix-no-diagonal': ('    if(i==j) return 0.0f;                      /* the builder\'s diagonal */\n', ''),
+    'matrix-no-cache': ('            if(!mapmaker_matrix.known[i][j]) {', '            if(1) {'),
+    'matrix-swapped': ('    guest_call(sub_0009C550,2,i,out);\n    WORD_AT(r)=WORD_AT(WORD_AT(out));\n    guest_call(sub_0009C550,2,j,out);',
+                       '    guest_call(sub_0009C550,2,j,out);\n    WORD_AT(r)=WORD_AT(WORD_AT(out));\n    guest_call(sub_0009C550,2,i,out);'),
+    'matrix-char-passed': ('    result=(int32_t)guest_call(sub_001596F0,3,0u,r,0u);', '    result=(int32_t)guest_call(sub_001596F0,3,1u,r,0u);'),
+    'matrix-negative-read': ('    if(i>=n || j>=n || i<0 || j<0) v=FLOAT_AT(MAPMAKER_PADS_NO_ENTRY);', '    if(i>=n || j>=n) v=FLOAT_AT(MAPMAKER_PADS_NO_ENTRY);'),
+    'matrix-stale-level': ("       WORD_AT(0x00715F30u)!=mapmaker_matrix.link_pool || WORD_AT(MAPMAKER_PADS_GROUP_COUNT)!=mapmaker_matrix.groups) {",
+                           "       WORD_AT(0x00715F30u)!=mapmaker_matrix.link_pool) {"),
+    'matrix-no-fp-push': ('    MAPMAKER_FP_PUSH(v);\n    MAPMAKER_GUEST_RET();\n}', '    (void)v;\n    MAPMAKER_GUEST_RET();\n}'),
     # Regular pad ids past the stock threshold need the pads-idthreshold rewrites (compile-time check).
     'id-threshold-stock': ('#define MAPMAKER_PADS_ID_THRESHOLD 0x2328u', '#define MAPMAKER_PADS_ID_THRESHOLD 0x1F40u'),
     'id-threshold-overlaps-cover': ('#define MAPMAKER_PADS_ID_THRESHOLD 0x2328u', '#define MAPMAKER_PADS_ID_THRESHOLD 0x2329u'),
@@ -91,7 +134,7 @@ def test_mapmaker_pads(tmp_path, mutation):
 
 # ---- the guest-code table --------------------------------------------------
 
-OLD_RUNTIME, NEW_RUNTIME, COVER_BASE, RUNTIME_SLOTS = 0x209E, 0x4740, 0x1F40, 20
+OLD_RUNTIME, NEW_RUNTIME, COVER_BASE, NEW_COVER_BASE, RUNTIME_SLOTS = 0x209E, 0x7800, 0x1F40, 0x4000, 20
 # constant in the original instruction -> constant it must become
 REWRITE = {
     OLD_RUNTIME: NEW_RUNTIME,
@@ -102,7 +145,16 @@ REWRITE = {
 }
 EXPECTED_COUNTS = {OLD_RUNTIME: 51, OLD_RUNTIME + RUNTIME_SLOTS: 24, 0x2440: 1,
                    (-OLD_RUNTIME) & 0xFFFFFFFF: 11, (-OLD_RUNTIME * 32 + 4) & 0xFFFFFFFF: 1}
+# Cover handle base 0x1F40 -> 0x4000 (pads-coverbase-*): compares, adds, the
+# -0x1F40 conversions and the two folded cover[h - base].owner reads.
+COVER_REWRITE = {
+    COVER_BASE: NEW_COVER_BASE,
+    (-COVER_BASE) & 0xFFFFFFFF: (-NEW_COVER_BASE) & 0xFFFFFFFF,
+    (-COVER_BASE * 32 + 8) & 0xFFFFFFFF: (-NEW_COVER_BASE * 32 + 8) & 0xFFFFFFFF,
+}
+COVER_COUNTS = {COVER_BASE: 27, (-COVER_BASE) & 0xFFFFFFFF: 16, (-COVER_BASE * 32 + 8) & 0xFFFFFFFF: 2}
 KEPT = {0x002B0363}            # movsx eax,[pool-0x413D8]: does not depend on the handle
+NOT_PAD_HANDLE = {0x003BC6EC}  # cmp eax,0x1f40 on a big-endian network port (sub_003BC6D0)
 EXT_START, EXT_END = 0x008E0000, 0x00900000
 # The 13 "pad id above 8000 is a cover id" compares (cmp reg,0x1f40; jle; call
 # sub_0009CCA0; movsx [pad+8]): moved to the last regular id 0x2328.
@@ -123,7 +175,7 @@ def c_hex(name):
 
 
 def validate(table):
-    layout = [e for e in table['patches'] if e['id'].startswith('pads-layoutb-')]
+    layout = [e for e in table['patches'] if e['id'].startswith('pads-layoutc-')]
     counts = {}
     for e in layout:
         assert e['kind'] == 'code'
@@ -133,11 +185,27 @@ def validate(table):
         assert len(hits) == 1, e['id']
         v = hits[0]
         assert new == old.replace(v.to_bytes(4, 'little'), REWRITE[v].to_bytes(4, 'little')), e['id']
-        assert e['id'] == f"pads-layoutb-{int(e['address'], 16):08x}"
+        assert e['id'] == f"pads-layoutc-{int(e['address'], 16):08x}"
         assert int(e['address'], 16) not in KEPT
         counts[v] = counts.get(v, 0) + 1
     assert counts == EXPECTED_COUNTS
     assert len({e['address'] for e in layout}) == len(layout) == 88
+    cover = [e for e in table['patches'] if e['id'].startswith('pads-coverbase-')]
+    counts = {}
+    for e in cover:
+        assert e['kind'] == 'code' and e['id'] == f"pads-coverbase-{int(e['address'], 16):08x}"
+        old, new = bytes.fromhex(e['original_hex']), bytes.fromhex(e['new_hex'])
+        hits = [v for v in COVER_REWRITE if old.count(v.to_bytes(4, 'little')) == 1]
+        assert len(hits) == 1, e['id']
+        v = hits[0]
+        assert new == old.replace(v.to_bytes(4, 'little'), COVER_REWRITE[v].to_bytes(4, 'little')), e['id']
+        assert int(e['address'], 16) not in KEPT | ID_THRESHOLD_SITES | NOT_PAD_HANDLE
+        counts[v] = counts.get(v, 0) + 1
+    assert counts == COVER_COUNTS and len({e['address'] for e in cover}) == 45
+    # the regular id validity bound of sub_0009A330
+    regid = [e for e in table['patches'] if e['id'].startswith('pads-regid-')]
+    assert [(e['address'], e['original_hex'], e['new_hex']) for e in regid] == [('0x0009A37E', '81f929230000', '81f9e97b0000')]
+    assert c_hex('MAPMAKER_PADS_HIGH_END') == 0x7BE9
     # pad id thresholds: exactly the 13 sites, cmp reg,0x1f40 -> cmp reg,0x2328
     thresholds = [e for e in table['patches'] if e['id'].startswith('pads-idthreshold-')]
     threshold = c_hex('MAPMAKER_PADS_ID_THRESHOLD')
@@ -148,8 +216,9 @@ def validate(table):
         old, new = bytes.fromhex(e['original_hex']), bytes.fromhex(e['new_hex'])
         assert old[:-4] in (b'\x3d', b'\x81\xf9', b'\x81\xfd', b'\x81\xfe') and old[-4:] == COVER_BASE.to_bytes(4, 'little')
         assert new == old[:-4] + threshold.to_bytes(4, 'little'), e['id']
-    # the handle range the C bound checks assume
-    assert NEW_RUNTIME - COVER_BASE == c_define('MAPMAKER_PADS_COVER_RANGE')
+    # the handle ranges the C code assumes
+    assert NEW_RUNTIME - NEW_COVER_BASE == c_define('MAPMAKER_PADS_COVER_RANGE')
+    assert c_hex('MAPMAKER_PADS_COVER_BASE') == NEW_COVER_BASE and c_hex('MAPMAKER_PADS_RUNTIME_BASE') == NEW_RUNTIME
     # group A* pool relocation and the loop bound that makes it possible
     reloc = [e for e in table['patches'] if e['kind'] == 'relocate']
     assert len(reloc) == 1 and reloc[0]['id'] == 'pads-astar-group-pool'
@@ -182,9 +251,18 @@ def _set_new(t, address, new_hex):
 TABLE_MUTATIONS = {
     'missing-site': lambda t: _drop(t, '0x0033EFE1'),
     'wrong-runtime-base': lambda t: _set_new(t, '0x0009D488', '8d8741470000'),
-    'runtime-end-not-moved': lambda t: _set_new(t, '0x0009A469', '3d40470000'),
+    'runtime-end-not-moved': lambda t: _set_new(t, '0x0009A469', '3d00780000'),
+    'layout-b-runtime': lambda t: _set_new(t, '0x0009D488', '8d8740470000'),
+    'cover-base-missing': lambda t: _drop(t, '0x0033EFC9'),
+    'cover-base-kept': lambda t: _set_new(t, '0x0009A40B', '05401f0000'),
+    'cover-fold-kept': lambda t: _set_new(t, '0x002B5A22', '0fbf94080818fcff'),
+    'network-port-rewritten': lambda t: t['patches'].insert(0,
+        {'id': 'pads-coverbase-003bc6ec', 'kind': 'code', 'function': '0x003BC6D0', 'address': '0x003BC6EC',
+         'original_hex': '3d401f0000', 'new_hex': '3d00400000'}),
+    'regid-missing': lambda t: _drop(t, '0x0009A37E'),
+    'regid-short': lambda t: _set_new(t, '0x0009A37E', '81f9295b0000'),
     'kept-site-rewritten': lambda t: t['patches'].append(
-        {'id': 'pads-layoutb-002b0363', 'kind': 'code', 'function': '0x002B0320', 'address': '0x002B0363',
+        {'id': 'pads-layoutc-002b0363', 'kind': 'code', 'function': '0x002B0320', 'address': '0x002B0363',
          'original_hex': '0fbf8028ecfbff', 'new_hex': '0fbf8018e8f7ff'}),
     'pool-too-big': lambda t: t['patches'][-1].update(new_size='0x40000'),
     'loop-bound-changes-loop': lambda t: _set_new(t, '0x00098540', '3d20dd7000'),
@@ -257,6 +335,6 @@ def test_table_complete_against_listing():
                 found[int(m.group(1), 16)] = m.group(2)
     table = json.loads(TABLE.read_text(encoding='utf-8'))
     layout = {int(e['address'], 16): e['original_hex'] for e in table['patches']
-              if e['id'].startswith('pads-layoutb-')}
+              if e['id'].startswith('pads-layoutc-')}
     assert set(found) == set(layout) | KEPT
     assert all(found[a] == h for a, h in layout.items())
