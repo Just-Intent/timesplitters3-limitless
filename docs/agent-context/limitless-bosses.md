@@ -126,5 +126,6 @@ gun 0xE6 (gun type 7) chosen in item options (drum: heap descriptor via a
 `sub_002F7770` copy of category 26 with +8 set; gun: `sub_000783D0` at
 0x00318A8C), saved in item record byte +0xC (stock-unused for these ids) and
 node +0x30 ('SP'), applied by the play fill (`sub_002F7790`, `sub_0033DD80`,
-preload `sub_0006C090`), paks l_64_ch / l_26_st index-only. 9 WRAPs:
+preload `sub_0006C090`), paks l_64_ch / l_26_st + memory paks l_64_chm / l_26_stm (textures only
+there; .55 fix: WRAP sub_00063900 registers via sub_00096220; cell +0.737 y). 10 WRAPs:
 mapmaker-storyprops.md. `test_mapmaker_storyprops.py`. Unplayed.

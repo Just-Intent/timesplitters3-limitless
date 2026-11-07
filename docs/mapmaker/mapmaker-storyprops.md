@@ -1,8 +1,11 @@
 # MapMaker story props: power cell drums and prison guns
 
-Status 2026-11-07: implemented in `src/interface/pc_mapmaker_storyprops.inc`
+Status 2026-11-07: played in v0.4.0-mapmaker.55 (user): both variants
+appear and work, but untextured, and the power cell sat half in the floor.
+Fixed after .55 (below, "Fixed after .55"); the fix is not built or played.
+Implemented in `src/interface/pc_mapmaker_storyprops.inc`
 (area `storyprops`), fixture-tested (`tests/mapmaker/mapmaker_storyprops.c`
-+ `tests/mapmaker/test_mapmaker_storyprops.py`: 44 mutations, plus decode,
++ `tests/mapmaker/test_mapmaker_storyprops.py`: 54 mutations, plus decode,
 US XBE data and game-pak checks of every site below). **Not wired, not
 built, not played**: the wrappers are the integrator's (list below). Switch:
 `TSFP_MAPMAKER_LIMITS=1` (editor and play). No guest-code table, no fork
@@ -67,10 +70,46 @@ INFERRED = reasoning, needs a playtest.
   0, 1)`: only the index stays in memory). Every file l_26_st shares with
   another pak (15,592 shared entries) is byte-identical there, so it cannot
   shadow MapMaker's files (test `test_models_and_paks`).
-- **Textures.** As for the mothership: scene 100 skips texture registration
-  when a level-pak model is created (0x00096556), so a variant model whose
-  request carries the deferred mark (+2 & 0x10) gets `sub_00096330(file, 1)`
-  once per level before its first use.
+- **Textures** (fixed after .55, below).
+
+## Fixed after .55: no textures, a sunken power cell
+
+User report (.55): "Prison gun works great but doesn't have its texture. Big
+barrel doesn't have its texture and is stuck slightly into the ground."
+
+**Textures (CONFIRMED, tests `test_variant_textures_in_memory_paks`,
+`test_texture_queue_site`).** A model file starts with the offset of its
+texture list ({id, id, 0, 0} rows, -1 ends); the load pass queues each id as
+`textures/%06x.xbt` (`sub_00096220` -> `sub_000637E0`), and the texture
+queue's load `sub_00063900` (once, 0x0003D5E5: after the load pass
+0x0003D5AD, before the fill 0x0003D64A) reads them from the mounted paks.
+- None of the 7 power cell / 5 prison gun textures is in the model paks
+  (l_64_ch, l_26_st) or in MapMaker's paks: they are only in the story levels'
+  **memory** paks. All 7 cell textures are in `challengemem/l_64_chm.pak`
+  (284 files) and all 5 gun textures in `storymem/l_26_stm.pak` (416 files).
+  Every file either shares with another pak is byte-identical there (10,423 /
+  11,403 shared entries), so neither can shadow a MapMaker file.
+- The load pass leaves these models' textures to their creation (request
+  +2 |= 0x10 at 0x00063548), which scene 100 skips (0x00096556); the .55
+  build's `sub_00096330(file, 1)` at the fill only binds textures already
+  loaded, and none were.
+- Now the mount also mounts the model's memory pak index-only (after its
+  model pak; not when the model pak failed), and WRAP `sub_00063900` ->
+  `pc_mapmaker_storyprops_textures` first registers each deferred variant
+  model the load pass's way, `sub_00096220(path)`, which queues its textures
+  for that same load, then clears the mark. Once per level. Log: `power cell
+  0x53D textures: 7 of 7 in pak/challengemem/l_64_chm.pak (missing ...)`.
+- The mothership (same pak, same deferral) probably has the same gap; its
+  textures are in l_64_chm too (not changed here).
+
+**Height (CONFIRMED, test `test_power_cell_height`).** The cell's vertices
+span y 0..1.471, but the bounds block after its texture list (count 1,
+centre (0, -0.001, 0), half extents (0.546, 0.736, 0.546)) is centred on the
+origin: the game draws it centred, as the intro's upright and lying cells at
+one height show. The drum's vertices start at y 0 and it has no such block.
+The fill now adds 0.737 (half height - centre y) to a power cell's record y
+(+0x14; ebp is the record at the model call, 0x0024176B), so it stands on the
+floor like the drum. The editor still shows the drum model (no change).
 
 ## Hooks (WRAP lines for the integrator, area `storyprops`)
 
@@ -81,6 +120,7 @@ WRAP sub_002F7770 -> pc_mapmaker_storyprops_category       (new; return-address 
 WRAP sub_00319300 -> pc_mapmaker_storyprops_build          (chained with pc_mapmaker_tileflags_build; each acts only for its own heap descriptor, menu +4)
 WRAP sub_000783D0 -> pc_mapmaker_storyprops_turret_options (chained with pc_mapmaker_weaponset_options; return-address tests 0x00318A8C / 0x003193A2 differ)
 WRAP sub_00062790 -> pc_mapmaker_storyprops_mount          (chained with the mothership/tank mounts; order free: each mounts after the original and skips a mounted pak)
+WRAP sub_00063900 -> pc_mapmaker_storyprops_textures       (new after .55; texture queue load, no args, only caller 0x0003D5E5; before the original)
 WRAP sub_0006C090 -> pc_mapmaker_storyprops_preload_model  (new; return-address test 0x0023F5DB)
 WRAP sub_002F7790 -> pc_mapmaker_storyprops_model          (new; return-address tests 0x00241787 / 0x002419C4)
 WRAP sub_0033DD80 -> pc_mapmaker_storyprops_gun_type       (new; return-address test 0x00241AA6)
@@ -89,11 +129,14 @@ WRAP sub_0033DD80 -> pc_mapmaker_storyprops_gun_type       (new; return-address 
 All cdecl, plain `ret`; the build hook answers itself for its descriptor
 (`MAPMAKER_GUEST_RET`). Include the `.inc` after `pc_mapmaker_weaponset.inc`.
 The guest functions it calls are already stubbed in
-`tests/mapmaker/mapmaker_area_stubs.h` (tileflags, mothership).
+`tests/mapmaker/mapmaker_area_stubs.h` (tileflags, mothership; `sub_00096220`
+added after .55).
 
 Log lines (`[mapmaker] storyprops: ...`, 32 per run): `saved story prop
-variants`, `mounted l_64_ch.pak for the power cells`, `mounted l_26_st.pak
-for the prison guns`, `registered the variant model's textures`, `drum
+variants`, `mounted pak/challenge/l_64_ch.pak for the power cells`, `mounted
+pak/challengemem/l_64_chm.pak for the power cells`, the same two for the
+prison guns (l_26_st, l_26_stm), `<kind> 0x.. textures: N of M in <pak>`,
+`registered the variant model's textures before the texture queue loads`, `drum
 placed as the mission 1 power cell`, `fixed gun placed as the mission 1
 prison gun`, and every fallback (`... stays a drum`, `... stays a MapMaker
 gun`, `pak mount table full`, `model not read this level`).
@@ -107,8 +150,12 @@ gun`, `pak mount table full`, `model not read this level`).
 - Resource rows for 0x53D / 0xE6 in scene 100's table (the hooks fall back
   to the stock model and log when a row is missing).
 - In the editor the item keeps the drum / MapMaker gun model (cosmetic).
-- Memory: l_26_st's index (325 entries) and the two models (34,412 B and
-  88,716 B) per level that uses them.
+- Memory: the indexes of l_26_st / l_26_stm (325 / 416 entries) and l_64_ch /
+  l_64_chm, the two models (34,412 B and 88,716 B) and their textures per
+  level that uses them.
+- That the queued textures load and bind in scene 100 (the load pass's own
+  path for prop-stream models), and that the physics body rests where the
+  raised cell starts.
 
 ## User test steps
 
@@ -119,10 +166,11 @@ gun`, `pak mount table full`, `model not read this level`).
    weapon choice, **Model** -> Prison gun (mission 1).
 3. Save, reload the map: the choices are kept (open the options again).
    Export the map (.tsmap) and import it: kept.
-4. Test map: stderr has `mounted l_64_ch.pak for the power cells`, `mounted
-   l_26_st.pak for the prison guns`, `drum placed as the mission 1 power
-   cell`, `fixed gun placed as the mission 1 prison gun`. The cell looks like
-   the intro's blue power cell; shoot it: a bigger blast than the drum's. The
-   prison gun looks like the intro's turret; mount and fire it.
+4. Test map: stderr has the four `mounted pak/...` lines, `power cell 0x53D
+   textures: 7 of 7` and `prison gun 0xE6 textures: 5 of 5`, `drum placed as
+   the mission 1 power cell`, `fixed gun placed as the mission 1 prison gun`.
+   The cell is textured (the intro's power cell) and stands on the floor;
+   shoot it: a bigger blast than the drum's. The prison gun is textured; mount
+   and fire it.
 5. Several cells and prison guns in one map all work. Without the switch the
    same map plays plain drums and MapMaker guns.

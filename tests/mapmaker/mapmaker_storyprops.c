@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00A00000/4], g_eax, g_ebx, g_ecx, g_edx, g_esi, g_esp;
+static uint32_t memory[0x00A00000/4], g_eax, g_ebp, g_ebx, g_ecx, g_edx, g_esi, g_esp;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -27,7 +27,7 @@ static volatile uint32_t stub_ran;
 STUB(sub_0003DFA0,1) STUB(sub_00075B70,2) STUB(sub_00071B10,3) STUB(sub_00071C50,4) STUB(sub_00079DE0,5)
 STUB(sub_0007D4A0,6) STUB(sub_00071800,7) STUB(sub_00078590,8) STUB(sub_000783D0,9) STUB(sub_00079D60,10)
 STUB(sub_00075E70,11) STUB(sub_00077320,12) STUB(sub_0003D7B0,13) STUB(sub_00333700,14) STUB(sub_002FDF50,15)
-STUB(sub_000622D0,16) STUB(sub_00062260,17) STUB(sub_000631C0,18) STUB(sub_00096330,19)
+STUB(sub_000622D0,16) STUB(sub_00062260,17) STUB(sub_000631C0,18) STUB(sub_00096220,19)
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -55,6 +55,14 @@ static unsigned noptions,nbinds,nchoices,nends,ndone,nframe,nmounts,ntextured,or
 static uint32_t mounted_paths[8];
 static unsigned nmounted;
 static int mount_fails;
+static uint32_t pak_tex_crc[8],pak_tex_n;          /* what a pak mounted next lists */
+static uint32_t crc_name(const char *s)
+{
+    uint32_t c=0xFFFFFFFFu;
+    int k;
+    for(;*s;s++) { c^=(uint8_t)*s; for(k=0;k<8;k++) c=c&1u?(c>>1)^0xEDB88320u:c>>1; }
+    return ~c;
+}
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -82,10 +90,18 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         if(nmounts<8u) mounts[nmounts]=x[0];
         nmounts++;
         if(mount_fails) r=0xFFFFFFFFu;
-        else { if(nmounted<8u) mounted_paths[nmounted++]=x[0]; WORD_AT(0x006D7880u)++; }
+        else {
+            if(nmounted<8u) {
+                uint32_t slot=0x00907000u+nmounted*0x1Cu,index=0x00540000u+nmounted*0x1000u;
+                WORD_AT(slot+8u)=pak_tex_n;WORD_AT(slot+0x10u)=index;
+                for(i=0;i<(int)pak_tex_n;i++) WORD_AT(index+(uint32_t)i*16u)=pak_tex_crc[i];
+                mounted_paths[nmounted++]=x[0];
+            }
+            WORD_AT(0x006D7880u)++;
+        }
     }
     else if(f==sub_000631C0) r=x[0]==0x00520000u?REQS:x[0]==0x00520100u?REQS+0x100u:0u;
-    else if(f==sub_00096330) { CHECK(x[1]==1u);if(ntextured<8u) textured[ntextured]=x[0]; ntextured++; }
+    else if(f==sub_00096220) { if(ntextured<8u) textured[ntextured]=x[0]; ntextured++; }
     return r;
 }
 #include "pc_mapmaker_budget.inc"
@@ -282,19 +298,35 @@ static void resources(int cell_read,int gun_read,uint8_t deferred)
     WORD_AT(RESTAB+6u*0x30u+4u)=0;WORD_AT(RESTAB+6u*0x30u+0x10u)=0x00520100u;
     WORD_AT(REQS+0x10u)=cell_read?0x00530000u:0u;BYTE_AT(REQS+2u)=deferred;
     WORD_AT(REQS+0x110u)=gun_read?0x00531000u:0u;BYTE_AT(REQS+0x102u)=deferred;
+    /* the cell's file lists 3 textures (rows {id, id, 0, 0}, -1 ends), the gun's 1 */
+    WORD_AT(0x00530000u)=0x10u;
+    WORD_AT(0x00530010u)=WORD_AT(0x00530014u)=0x2A6ABDu;WORD_AT(0x00530020u)=WORD_AT(0x00530024u)=0x450CF9u;
+    WORD_AT(0x00530030u)=WORD_AT(0x00530034u)=0x123456u;WORD_AT(0x00530040u)=0xFFFFFFFFu;
+    WORD_AT(0x00531000u)=0x20u;WORD_AT(0x00531020u)=WORD_AT(0x00531024u)=0x91B0F7u;WORD_AT(0x00531030u)=0xFFFFFFFFu;
 }
 static void play_tests(void)
 {
     WORD_AT(0x0079094Cu)=100u;
     container(map,2);
     resources(1,1,0x10u);
-    /* mount: both paks, kept open; once each */
+    /* mount: the model paks, then their memory paks (the textures), kept open; once each */
     WORD_AT(0x006D7880u)=40u;nmounts=nmounted=0;originals=0;
+    pak_tex_crc[0]=crc_name("textures/2a6abd.xbt");pak_tex_crc[1]=crc_name("textures/450cf9.xbt");
+    pak_tex_crc[2]=crc_name("textures/91b0f7.xbt");pak_tex_n=3u;
     CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);
-    CHECK(originals==1u && nmounts==2u && sp_lv.want[0]==1u && sp_lv.want[1]==1u);
+    CHECK(originals==1u && nmounts==4u && sp_lv.want[0]==1u && sp_lv.want[1]==1u);
     CHECK(!strcmp((const char *)((uintptr_t)mounts[0]+g_xbox_mem_offset),"pak/challenge/l_64_ch.pak"));
     CHECK(!strcmp((const char *)((uintptr_t)mounts[1]+g_xbox_mem_offset),"pak/story/l_26_st.pak"));
-    CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==2u);
+    CHECK(!strcmp((const char *)((uintptr_t)mounts[2]+g_xbox_mem_offset),"pak/challengemem/l_64_chm.pak"));
+    CHECK(!strcmp((const char *)((uintptr_t)mounts[3]+g_xbox_mem_offset),"pak/storymem/l_26_stm.pak"));
+    CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==4u);
+    /* the texture queue's load: both deferred models registered the load pass's way, once */
+    ntextured=0;originals=0;
+    CALL(pc_mapmaker_storyprops_textures,fake_plain,0x0003D5EAu,0,0);
+    CHECK(originals==1u && ntextured==2u && textured[0]==0x00520000u && textured[1]==0x00520100u);
+    CHECK(!(BYTE_AT(REQS+2u)&0x10u) && !(BYTE_AT(REQS+0x102u)&0x10u));
+    BYTE_AT(REQS+2u)=0x10u;                                 /* once per level, even if marked again */
+    CALL(pc_mapmaker_storyprops_textures,fake_plain,0x0003D5EAu,0,0);CHECK(ntextured==2u && originals==2u);
     /* preload: the variant's model is requested */
     g_esi=rec_at[0][0];fake_answer=0x8B1u;
     CALL(pc_mapmaker_storyprops_preload_model,fake_answer_fn,0x0023F5DBu,0x00524F58u+0x49u*0xC4u,0);CHECK(g_eax==0x53Du);
@@ -302,12 +334,13 @@ static void play_tests(void)
     g_esi=rec_at[1][0];fake_answer=0x8A0u;
     CALL(pc_mapmaker_storyprops_preload_model,fake_answer_fn,0x0023F5DBu,0,0);CHECK(g_eax==0xE6u);
     CALL(pc_mapmaker_storyprops_preload_model,fake_answer_fn,0x0023F5D0u,0,0);CHECK(g_eax==0x8A0u);   /* other caller */
-    /* fill: power cell model, textures registered once */
-    ntextured=0;
-    g_esi=rec_at[0][0];fake_answer=0x8B1u;
+    /* fill: power cell model, raised by its half height (record +0x14 = ebp + 0x14) */
+    g_esi=rec_at[0][0];fake_answer=0x8B1u;g_ebp=0x00560000u;FLOAT_AT(g_ebp+0x14u)=1.0f;
     CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(g_eax==0x53Du);
-    CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(g_eax==0x53Du);
-    CHECK(ntextured==1u && textured[0]==0x00530000u);
+    CHECK(FLOAT_AT(g_ebp+0x14u)>1.736f && FLOAT_AT(g_ebp+0x14u)<1.738f);
+    FLOAT_AT(g_ebp+0x14u)=1.0f;g_esi=rec_at[0][1];          /* a plain drum keeps its height */
+    CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(g_eax==0x8B1u && FLOAT_AT(g_ebp+0x14u)==1.0f);
+    g_esi=rec_at[0][0];
     g_esi=rec_at[0][1];CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(g_eax==0x8B1u);
     g_esi=rec_at[0][0];CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x002419C4u,0x49u,0);CHECK(g_eax==0x8B1u);  /* wrong case */
     CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x002F0000u,0x49u,0);CHECK(g_eax==0x8B1u);           /* editor caller */
@@ -315,7 +348,8 @@ static void play_tests(void)
     CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x002F0000u,0x33u,0);CHECK(g_eax==0x8A0u);
     /* turret: model then gun type 7 for that item only */
     g_esi=rec_at[1][0];fake_answer=0x8A0u;
-    CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x002419C4u,0x33u,0);CHECK(g_eax==0xE6u && ntextured==2u);
+    FLOAT_AT(g_ebp+0x14u)=1.0f;
+    CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x002419C4u,0x33u,0);CHECK(g_eax==0xE6u && FLOAT_AT(g_ebp+0x14u)==1.0f);
     fake_answer=9u;
     CALL(pc_mapmaker_storyprops_gun_type,fake_answer_fn,0x00241AA6u,0,0x33u);CHECK(g_eax==7u);
     CALL(pc_mapmaker_storyprops_gun_type,fake_answer_fn,0x00241AA6u,0,0x33u);CHECK(g_eax==9u);   /* used once */
@@ -331,13 +365,14 @@ static void play_tests(void)
     g_esi=rec_at[1][0];fake_answer=0x8A0u;
     CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x002419C4u,0x33u,0);
     fake_answer=9u;CALL(pc_mapmaker_storyprops_gun_type,fake_answer_fn,0x00241A14u,0,0x33u);CHECK(g_eax==9u);   /* 0x35's call */
-    /* a model the load pass did not read stays stock */
+    /* a model the load pass did not read stays stock, and is not registered */
     resources(0,1,0);
     CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);           /* new level */
+    ntextured=0;CALL(pc_mapmaker_storyprops_textures,fake_plain,0x0003D5EAu,0,0);CHECK(ntextured==0u);   /* gun: not deferred */
     g_esi=rec_at[0][0];fake_answer=0x8B1u;
     CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(g_eax==0x8B1u);
-    g_esi=rec_at[1][0];fake_answer=0x8A0u;ntextured=0;
-    CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x002419C4u,0x33u,0);CHECK(g_eax==0xE6u && ntextured==0u);   /* load pass registered */
+    g_esi=rec_at[1][0];fake_answer=0x8A0u;
+    CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x002419C4u,0x33u,0);CHECK(g_eax==0xE6u);   /* load pass registered */
     WORD_AT(RESTAB+5u*0x30u+4u)=1u;                         /* resource loaded */
     g_esi=rec_at[0][0];fake_answer=0x8B1u;
     CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(g_eax==0x53Du);
@@ -360,9 +395,10 @@ static void play_tests(void)
     /* the mount table nearly full, a failed mount, the switch off, the editor: no mount */
     container(map,2);nmounts=nmounted=0;
     WORD_AT(0x006D7880u)=57u;CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==0u);
-    WORD_AT(0x006D7880u)=40u;mount_fails=1;
+    WORD_AT(0x006D7880u)=40u;mount_fails=1;                 /* the models fail: no texture paks either */
     CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==2u && nmounted==0u);
     g_esi=rec_at[0][0];CALL(pc_mapmaker_storyprops_model,fake_answer_fn,0x00241787u,0x49u,0);CHECK(g_eax==0x8B1u);
+    ntextured=0;CALL(pc_mapmaker_storyprops_textures,fake_plain,0x0003D5EAu,0,0);CHECK(ntextured==0u);   /* no model pak */
     mount_fails=0;nmounts=0;
     WORD_AT(0x006D7C4Cu)=1u;originals=0;
     CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==0u && originals==1u);
@@ -373,7 +409,11 @@ static void play_tests(void)
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==0u);
     WORD_AT(0x0079094Cu)=100u;
-    CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==2u);
+    CALL(pc_mapmaker_storyprops_mount,fake_plain,0x001CDB8Au,0,0);CHECK(nmounts==4u);
+    /* the texture hook outside play runs the original only */
+    WORD_AT(0x0079094Cu)=102u;ntextured=0;originals=0;
+    CALL(pc_mapmaker_storyprops_textures,fake_plain,0x0003D5EAu,0,0);CHECK(ntextured==0u && originals==1u);
+    WORD_AT(0x0079094Cu)=100u;
 }
 
 int main(void)
