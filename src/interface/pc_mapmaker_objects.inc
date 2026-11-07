@@ -265,6 +265,48 @@ void pc_mapmaker_objects_twin_pool(void (*original)(void))
     MAPMAKER_GUEST_RET();
 }
 
+/* ---- object creation at the pool's end -------------------------------- */
+/* 2026-11-07 (v0.4.0-mapmaker.45, 106 Story AI, logs/m45c): sub_000A6880,
+ * the object create and only caller of the slot allocator sub_0009EE00,
+ * takes a slot with no bound. With no freed slot ([0x007B65B8] 0, or none of
+ * [0, count) flagged +0x2B & 0x80) it appends at the count [0x007B4FAC], so
+ * slot 1023+ lay past the pool and its twin (base [0x0070AADC] + slot x
+ * 0x200) inside the object pool that follows the twin pool: twin 1026 wrote
+ * a model over slot 2, and sub_0009FF10 faulted on its room list. While the
+ * pools are on (scene 100/102) a create that would pass the pool returns 0
+ * instead, the original's own result when the model cannot be made
+ * (0x000A695C); sub_000A6EC0 and sub_000DAC30 test it. The actors area keeps
+ * MAPMAKER_ACTORS_OBJECT_HEADROOM slots free for that reason, so this is the
+ * last guard, not the limit. */
+#define MAPMAKER_OBJECTS_COUNT 0x007B4FACu
+#define MAPMAKER_OBJECTS_FREED 0x007B65B8u
+#define MAPMAKER_OBJECTS_SLOT_BYTES 0x2E8u
+static unsigned mapmaker_objects_full;
+static int mapmaker_objects_slot_free(void)
+{
+    uint32_t count=WORD_AT(MAPMAKER_OBJECTS_COUNT),cap=WORD_AT(0x0072F5E4u),base=WORD_AT(0x0072F5E8u),i;
+    if(count<cap) return 1;
+    if(!WORD_AT(MAPMAKER_OBJECTS_FREED) || !base) return 0;
+    for(i=0;i<cap;i++)                                  /* the allocator's own scan, within the pool */
+        if(*(uint8_t *)((uintptr_t)(base+i*MAPMAKER_OBJECTS_SLOT_BYTES+0x2Bu)+g_xbox_mem_offset)&0x80u) return 1;
+    return 0;
+}
+void pc_mapmaker_objects_create(void (*original)(void))
+{
+    if(mapmaker_objects_pool_on() && !mapmaker_objects_slot_free()) {
+        if(mapmaker_objects_full++<8u || !(mapmaker_objects_full&0xFFu)) {
+            fprintf(stderr,"[mapmaker] engine objects full (%u of %u): object of template %u not created (%u so far)\n",
+                    WORD_AT(MAPMAKER_OBJECTS_COUNT)-WORD_AT(MAPMAKER_OBJECTS_FREED),WORD_AT(0x0072F5E4u),
+                    MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4):0u,mapmaker_objects_full);
+            fflush(stderr);
+        }
+        g_eax=0;
+        MAPMAKER_GUEST_RET();
+        return;
+    }
+    original();
+}
+
 /* ---- physics bodies --------------------------------------------------- */
 /* 2026-11-06 (v0.4.0-mapmaker.39/.40: shot barrels on a map near the object
  * cap neither exploded nor hurt anyone). sub_0016C430 (level init, right

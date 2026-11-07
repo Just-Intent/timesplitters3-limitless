@@ -678,6 +678,7 @@ void pc_mapmaker_objects_teleporters(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_tag(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_physics(void (*original)(void)) { original(); }
 void pc_mapmaker_objects_prop_break(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_create(void (*original)(void)) { original(); }
 void pc_mapmaker_editor_sai_add(void (*original)(void)) { original(); }
 void pc_mapmaker_editor_load(void (*original)(void)) { original(); }
 void pc_mapmaker_editor_level_load(void (*original)(void)) { original(); }

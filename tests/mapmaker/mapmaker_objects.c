@@ -325,6 +325,41 @@ int main(void)
         CHECK(originals==1 && mapmaker_objects_breaks[0]==0u);
         WORD_AT(0x0079094Cu)=100u;
     }
+    /* ---- object create (sub_000A6880): never past the pool (m45c crash) ---- */
+    {
+        const uint32_t base=0x00400000u;
+        WORD_AT(0x0072F5E8u)=base;WORD_AT(0x0072F5E4u)=1023u;
+        for(i=0;i<1023u;i++) memory[(base+i*0x2E8u+0x28u)/4]=0x00500861u;   /* all live */
+        WORD_AT(0x0079094Cu)=100u;mapmaker_objects_full=0;
+        WORD_AT(0x007B4FACu)=1022u;WORD_AT(0x007B65B8u)=0;                   /* one slot left */
+        frame(0x000A6EEDu,0x55u,0,0);originals=0;g_eax=7;
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        CHECK(originals==1 && g_eax==0x1234u && mapmaker_objects_full==0);
+        WORD_AT(0x007B4FACu)=1023u;g_eax=7;                                  /* full: refused, 0 */
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        CHECK(originals==1 && g_eax==0 && mapmaker_objects_full==1);
+        WORD_AT(0x007B4FACu)=1030u;g_eax=7;                                  /* already past: refused */
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        CHECK(originals==1 && g_eax==0 && mapmaker_objects_full==2);
+        WORD_AT(0x007B4FACu)=1023u;WORD_AT(0x007B65B8u)=1u;                  /* freed count, no flagged slot */
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        CHECK(originals==1 && g_eax==0 && mapmaker_objects_full==3);
+        memory[(base+1022u*0x2E8u+0x28u)/4]|=0x80000000u;                    /* the last slot freed: reused */
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        CHECK(originals==2 && g_eax==0x1234u && mapmaker_objects_full==3);
+        memory[(base+1022u*0x2E8u+0x28u)/4]&=0x7FFFFFFFu;WORD_AT(0x007B65B8u)=0;
+        WORD_AT(0x0079094Cu)=102u;                                           /* the editor's pool too */
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        CHECK(originals==2 && g_eax==0 && mapmaker_objects_full==4);
+        WORD_AT(0x0079094Cu)=53u;                                            /* story levels: original */
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        WORD_AT(0x0079094Cu)=100u;set_env("TSFP_MAPMAKER_POOLS","0");         /* pools off: original */
+        HOOK(pc_mapmaker_objects_create,fake_original);
+        set_env("TSFP_MAPMAKER_POOLS",NULL);
+        CHECK(originals==4 && mapmaker_objects_full==4);
+        WORD_AT(0x007B4FACu)=0;WORD_AT(0x0072F5E4u)=0;WORD_AT(0x0072F5E8u)=0;
+        memset((char *)memory+base,0,1023u*0x2E8u);
+    }
 
     /* ---- teleporters: 14 of 3 colours (stock arrays hold 10) ---- */
     for(i=0x0A;i<=0x0E;i++) colour((int)i,i==0x0Bu?0x22u:i==0x0Cu?0x33u:0x11u);
