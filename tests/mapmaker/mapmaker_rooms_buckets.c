@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t memory[0x00900000/4], g_eax, g_esp;
+static uint32_t memory[0x00900000/4], g_eax, g_esp, g_ebx;
 static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
@@ -54,6 +54,9 @@ void sub_0001A010(void) { GOT('A',WORD_AT(g_esp+4),WORD_AT(g_esp+8),WORD_AT(g_es
 void sub_000A79B0(void) { GOT('G',WORD_AT(g_esp+4),0,0,0);g_esp+=4u; }
 void sub_003442B0(void) { GOT('P',0,0,0,0);g_esp+=4u; }
 void sub_00344350(void) { GOT('Q',0,0,0,0);g_esp+=4u; }
+void sub_00094250(void) { GOT('L',0,0,0,0);g_esp+=4u; }   /* room light spread callees (not reached here) */
+void sub_00094290(void) { GOT('M',0,0,0,0);g_esp+=4u; }
+void sub_00356800(void) { GOT('N',0,0,0,0);g_esp+=4u; }
 void sub_00086AE0(void);
 /* sub_00087720(room, out, max): the view room's neighbours (fixed per room). */
 static uint32_t neighbours[16],neighbour_n;

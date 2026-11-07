@@ -15,6 +15,7 @@
  *   WRAP sub_00086FC0 -> pc_mapmaker_rooms_tree         (replaces the body past 438 rooms)
  *   WRAP sub_0008A780 -> pc_mapmaker_rooms_compile
  *   WRAP sub_000895F0 -> pc_mapmaker_rooms_portal_link  (pc_mapmaker_portals.inc)
+ *   WRAP sub_00115F50 -> pc_mapmaker_rooms_light_spread (pc_mapmaker_roomlight.inc)
  *   WRAP sub_00083F80 -> pc_mapmaker_rooms_piece
  *   WRAP sub_00085030 -> pc_mapmaker_rooms_piece
  *   WRAP sub_00242780 -> pc_mapmaker_rooms_props
@@ -426,6 +427,8 @@ void pc_mapmaker_rooms_light_create(void (*original)(void))
     }
     if(!light && picked) mapmaker_rooms_light_set(picked,room);   /* filled, not linked: keep its id */
 }
+
+#include "pc_mapmaker_roomlight.inc"        /* WRAP sub_00115F50: room light colour to the room's objects */
 
 /* ---- word draw buckets (stage 6 of rooms past 255) ---------------------
  * The view's rooms are drawn by portal-walk depth: room r of the current
