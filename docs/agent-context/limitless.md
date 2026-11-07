@@ -680,10 +680,9 @@ map; its page 2 is the `matchbots` area below. Extension memory
 
 `src/interface/pc_mapmaker_weaponset.inc` (not built or played): 20 weapon
 slots with `TSFP_MAPMAKER_LIMITS=1`, no new item types. The play set
-(`sub_0006BD30`, scene 100 rebuilds 0x006F1E28: 0x44 struct, map info count 6)
-is read by slot everywhere (pickup record +0x10 = catalogue +8, Story AI chunk
-word +0x26 is a SLOT, `sub_001C8540` file loads, AI random pick); no caller
-copies it as 0x44, so the hook returns a 20+ id copy at 0x00906000 when the
+(`sub_0006BD30`, scene 100 rebuilds 0x006F1E28: 0x44 struct, map count 6)
+is read by slot (pickup record +0x10 = catalogue +8, Story AI chunk word
++0x26 is a SLOT, `sub_001C8540` loads, AI random pick); none copies 0x44, so the hook returns a 20+ id copy at 0x00906000 when the
 map's custom set is the source. A weapon/ammo pickup's slot 7-20 is record
 byte +0xC (unwritten by `sub_00300800` for categories 8/9) and editor node
 +0x30 ('WS' tag; no stock writer), paired by piece/item key on save/load.
@@ -796,7 +795,7 @@ Sets also wraps `sub_002D2C70` (match start; editor Test map bots from slots 1-1
 Sky also wraps piece move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`) to carry open-roof marks, and text `sub_0003D7B0` (+realbosses).
 Bosses also wraps `sub_0014D1F0` (HUD per viewport) to draw Sub-boss overhead meters via `sub_0013A400` before the stock loop.
 `matchbots.json` moves the 26 live per-actor reads to a 64-entry mirror at 0x00904000 and the rank table to 0x00904100 (every scene); the matchbots area fills them.
-The weaponset area (20 weapon slots) wraps the play set `sub_0006BD30`, pickup slot/veto/spawn and weapon set screen functions, and chains compile/load/reset, `sub_0003D7B0` and `sub_00078590`; roof wraps the label format `sub_00151030` and caption `sub_0032D9F0`.
+The weaponset area (20 slots; list shows hidden 0x29/0x2F/0x38: `sub_001CD9D0`) wraps the play set `sub_0006BD30`, pickup slot/veto/spawn and weapon set screen functions, and chains compile/load/reset, `sub_0003D7B0` and `sub_00078590`; roof wraps the label format `sub_00151030` and caption `sub_0032D9F0`.
 Realbosses adds the giant skeleton: story level init `sub_0025F720`, `sub_0029FE00` variant, `sub_002875F0` emerge, `sub_00287E20` throw and level events `sub_002274C0` (death event dropped).
 bigdraw `sub_000862C0`: bosses on the whole view; skelvis logs; bossroom: bosses in camera room list. openview: walk `sub_00089B90`: open-air areas unclipped (mapmaker-sky.md).
 camera wraps actor update `sub_00246000`: a switch-held camera (mode 0x80, D8/C14 reciprocal) runs with stock skip bit data+8 bit 0 (0x002460E5), so the sweep stops; the walk logs what each view reaches. Test `test_mapmaker_camera.py`; mapmaker-camera.md (4:3 frame fixed in shared pc_display_ui.inc, test_camera_widescreen.py; ~10-floor view open).

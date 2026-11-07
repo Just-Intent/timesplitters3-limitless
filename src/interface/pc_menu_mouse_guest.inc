@@ -1047,6 +1047,7 @@ void pc_mapmaker_weaponset_pickup(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_preload(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_row(void (*original)(void)) { original(); }
 void pc_mapmaker_weaponset_label(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_unlock(void (*original)(void)) { original(); }
 void pc_mapmaker_bigdraw_rect(void (*original)(void)) { original(); }
 void pc_mapmaker_skelvis_frustum(void (*original)(void)) { original(); }
 void pc_mapmaker_tilesets_menu_row(void (*original)(void)) { original(); }
