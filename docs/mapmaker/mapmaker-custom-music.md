@@ -56,7 +56,11 @@ not read: convert them to WAV or MP3 first.
   imported track, which also replaces a stock Arcade music pick made in the
   play setup. A map whose Music row is a stock track plays that track.
 - **Log:** every decision is logged as `[music] play: ...` or
-  `[music] map: imported track`; a track that does not start says why.
+  `[music] map: imported track`; a track that does not start says why. The
+  player then logs `[music] player: first submission ...`, and when it ends,
+  `[music] player: stopped: <why>`. Builds .44-.46 started the track but kept
+  it silent (they read the wrong pause word); .47+ follow the game's music
+  pause.
 - **System Link:** your track plays only on your machine. Other players hear
   the level's music (the game sends "level music" for an imported choice).
 - The Arcade choice applies only while the game's own choice is "level
