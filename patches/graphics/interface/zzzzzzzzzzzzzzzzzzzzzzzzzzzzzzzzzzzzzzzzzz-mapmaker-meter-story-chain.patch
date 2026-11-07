@@ -18,3 +18,12 @@
  {
  #ifdef TSFP_PC_CONTROLS
      pc_story_network_npc_spawn(sub_0015F8C0_gen);
+@@ -1088,7 +1088,7 @@
+     pc_native_npc_weapon_event();
+ #endif
+ }
+-void sub_001BB5C0(void)
++void sub_001BB5C0_upstream(void)
+ { pc_network_bots_guest_shot(pc_feed_npc_fire); }
+ extern void sub_0009EAB0_gen(void);
+ void sub_0009EAB0(void)
