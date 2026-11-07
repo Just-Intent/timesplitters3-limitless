@@ -460,6 +460,46 @@ start had no frame for 60 s; play lagged near many enemies.
   game: compare the two stderr lines' ms (and frame time near enemies) with
   the switches at 0.
 
+### After .58/.59 (2026-11-07)
+
+- .58 HugeMap hang (`logs/m58/crash-20261107-190923035-*`, 853 rooms,
+  11,942 portals): the game thread is again in the lifted portal pairing of
+  `sub_0008A780` (host RIP after site 0x0008B023), a later play start of the
+  same map (the 0..60 s builds of `m58b.err`); .58 predates the passes in C.
+  The editor itself is not slow (load 7 ms, compiles 68-73 ms).
+- .59 `portal links ... 13997 ms` and `group routes ... 7 ms` per search:
+  `guest_writable` is a VirtualQuery per call, and both incs checked every
+  list step with it (5,040 joins x 853 room lists x 2). They now use
+  `MAPMAKER_PTR_OK` (fixtures fall back to `guest_writable`).
+- .59 HugeMap crash (`logs/m59/crash-20261107-192806369-*`): `[mapmaker] heap
+  full: heap 1 size 102416 caller 0x0009EF16 ... -1056` right after the
+  build, so the Level heap overran heap 0 at the arena top; on the first
+  frame `sub_000DC7B0` (from `sub_001CE2E0`) read entry type garbage from
+  the 85-entry table `[0x00737BD4]` (0x8330xxxx, heap 0) and faulted at
+  0x000DC8E9 (`mov edx,[edx+0x34]`, edx 0xE04E5E28). The table corruption is
+  INFERRED from the addresses. Fix: in scene 100 the engine object pool
+  (1.52 MB) and the physics body arrays (1.2 MB, 64-aligned) come from the
+  nav block (`mapmaker_objects_source`, `mapmaker_nav_take`), grown 6 -> 16
+  MB so the group matrix of up to 1,535 groups still fits;
+  `TSFP_MAPMAKER_NAV_OBJECTS=0` keeps them in the Level heap. The twin pool
+  stays in the Level heap. Window/runtime headroom with 16 MB: the map-start
+  line's `runtime_heap_free_min` (38.7 MB with 6 MB) should stay above 25 MB.
+- View lag toward many Story AI (CONFIRMED in code, frame share INFERRED):
+  each drawn type-2 object in scene 100 (`sub_000A1DC0` 0x000A1E8B ->
+  `sub_00116130`, the room's animated light) calls `sub_00115F50`, which
+  walks the whole object pool to colour that room's objects: visible rooms
+  x objects lifted iterations per frame. New `WRAP sub_00115F50 ->
+  pc_mapmaker_rooms_light_spread` (`pc_mapmaker_roomlight.inc`, area rooms):
+  the same walk in host code (count and pool re-read per step, held ids
+  0x401..0x404 as rooms.json, same guest calls in order);
+  `TSFP_MAPMAKER_ROOM_LIGHT=0` runs the original. Our draw hooks
+  (bigdraw, skelvis, tank, probe, roof) only compare a few fields.
+- Tests: `test_mapmaker_roomlight.py` (10 mutations, 8 recorded series,
+  kinds; the original 0x00115F50..0x0011612B in the emulator with the callee
+  fakes as stubs: same calls and memory, 4 mutations caught),
+  `test_mapmaker_memory.py` (`nav-unaligned`, `nav-objects-not-registered`),
+  `test_mapmaker_objects.py` (physics through `mapmaker_objects_take`).
+
 ## What bounded 511 pieces (cap 511, 2026-11-02; see above for 1023)
 
 `MAPMAKER_LIMIT_PIECES` is 511 ([rooms](limitless-rooms.md) stage 11; the
