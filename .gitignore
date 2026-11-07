@@ -53,3 +53,5 @@ xbox_kernel.log
 /config/pc-audio.ini.tmp
 
 /config/pc-audio.ini.bak
+/config/pc-music.ini
+/config/pc-music.ini.tmp

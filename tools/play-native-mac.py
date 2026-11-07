@@ -43,6 +43,7 @@ def game_environment(base, root, fps=None):
                RECOMP_INPUT_CONFIG=str(root / 'config/pc-controls.json'),
                RECOMP_DISPLAY_CONFIG=str(settings / 'runtime.conf'),
                TSFP_DISPLAY_CONFIG=str(root / 'config/pc-display.ini'),
+               TSFP_MUSIC_DIR=str(root / 'private/music'),
                XDG_CONFIG_HOME=str(settings / 'xdg-config'),
                XDG_DATA_HOME=str(settings / 'xdg-data'), RECOMP_TRACE_BUDGET='0',
                RECOMP_LOG_FILE=str(root / 'logs/native-play.err'))

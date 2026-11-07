@@ -47,6 +47,8 @@ that `Data`, `Settings`, `Saves`, `Bin` and root checkout paths are interchangea
 `DownloadTransfer.cs`: transfers; `InstallationMaintenance.cs`: repairs;
 `GameSessions.cs`: game launch/lifetime; `GameSettings.cs`/`SettingsPage.cs`:
 settings; `TexturePack.cs`/`TextureDownload.cs`: optional textures.
+`TSFP_MUSIC_DIR` = `LauncherPlatform.Music` (`Music`; Mac checkout
+`private/music`), a protected install-root name: [imported music](custom-music.md).
 `GameSettings.NativeFps` stores original(0)/120/180/240 beta selection in a separate
 `pc-frame-rate.ini` and exports `TSFP_NATIVE_FPS`; it needs a compatible game
 build and does not revive interpolation or change the console interrupt clock.
