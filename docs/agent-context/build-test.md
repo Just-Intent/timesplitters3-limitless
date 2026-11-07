@@ -184,7 +184,7 @@ presence semantics, decoding/reporting, and repeated-lookup/executor mutations.
 `test_window_theme.py`: menu drawing, mnemonics, inserted/reordered rows (#333).
 
 [Audio tests](audio-buffers.md): timing, gain, buffer/device recovery, beta
-ON/OFF, XAudio/SDL fakes; [gain](custom-music.md).
+ON/OFF, XAudio/SDL fakes; [gain, slider ticks](custom-music.md).
 
 `test_controller_profile.py`: devices/maps/disconnect and SDL virtual input;
 physical pads/Mac gameplay remain unverified.
@@ -369,7 +369,7 @@ partial slow-frame attribution; native Mac gameplay remains separate acceptance.
 --display-size 3440 1440 --fov 73 --no-native-trace --profile-presents
 --no-captures --seconds 180` replays the tracked unlimited-score ten-bot route.
 Use `--native-fps 0` for Original60. It requires active Venice checkpoints and
-ten configured bots; it does not prove every bot is simultaneously visible.
+ten configured bots; not proof every bot is visible at once.
 `crowd-hotel` (scene39), `crowd-temple` (scene49) and `crowd-disco` (scene56)
 use frequent move/fire/respawn input. `--crowd-weapons rockets` selects the normal
 Rockets preset; use spawn+5..35s to fit the recorder cap. Routes focus at startup.
