@@ -174,6 +174,11 @@ static uint32_t actor(unsigned i,uint32_t id)
     return a;
 }
 static unsigned kind_of(uint32_t id) { return crt_kind_of(id); }
+#define SK8 kind_of(0x62u)
+#define SD7 kind_of(0x36u)
+#define GHOST kind_of(0x2Fu)
+#define MUT kind_of(0x30u)
+#define SECB kind_of(0x4Du)
 
 int main(void)
 {
@@ -187,11 +192,15 @@ int main(void)
         map(0x11u,set,sizeof set/sizeof set[0]);
     }
     /* the table: three rows, as documented */
-    CHECK(CRT_KINDS==3u);
-    CHECK(kind_of(0x2Fu)==0 && kind_of(0x4Du)==1 && kind_of(0x30u)==2 && kind_of(0x17u)==CRT_KINDS && kind_of(0x59u)==CRT_KINDS);
-    CHECK(crt_kinds[0].lo==0x50000000u && crt_kinds[0].hi==0 && crt_kinds[0].look==0x17u);
-    CHECK(crt_kinds[1].lo==0x10000000u && crt_kinds[1].hi==0x4000u && crt_kinds[1].look==CRT_NO_LOOK);
-    CHECK(crt_kinds[2].lo==0x10000000u && crt_kinds[2].hi==0x8000u && crt_kinds[2].look==0x59u);
+    CHECK(CRT_KINDS>=5u);
+    CHECK(SK8==0 && SD7==1 && GHOST==2 && SECB==3 && MUT==4 && kind_of(0x17u)==CRT_KINDS && kind_of(0x59u)==CRT_KINDS);
+    CHECK(kind_of(0xAAu)==CRT_KINDS && kind_of(0xA9u)==CRT_KINDS);           /* the Arcade twins stay stock */
+    CHECK(crt_kinds[SK8].lo==0x10000004u && crt_kinds[SK8].hi==0 && crt_kinds[SK8].look==CRT_NO_LOOK && crt_kinds[SK8].row==159u);
+    CHECK(crt_kinds[SD7].lo==0x10000004u && crt_kinds[SD7].hi==0 && crt_kinds[SD7].look==CRT_NO_LOOK && crt_kinds[SD7].row==160u);
+    CHECK(crt_kinds[SK8].pak==0x0047E65Cu && crt_kinds[SK8].first==0 && crt_kinds[SK8].n==crt_kinds[SK8].count);
+    CHECK(crt_kinds[GHOST].lo==0x50000000u && crt_kinds[GHOST].hi==0 && crt_kinds[GHOST].look==0x17u);
+    CHECK(crt_kinds[SECB].lo==0x10000000u && crt_kinds[SECB].hi==0x4000u && crt_kinds[SECB].look==CRT_NO_LOOK);
+    CHECK(crt_kinds[MUT].lo==0x10000000u && crt_kinds[MUT].hi==0x8000u && crt_kinds[MUT].look==0x59u);
 
     /* ---- switch off: every hook is the original, nothing else --------- */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
@@ -291,11 +300,11 @@ int main(void)
     a=actor(0,0x2Fu);
     CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
     CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);      /* anims not registered */
-    anim_map_row(0,0x40u);
-    HALF_AT(0x007E03C0u+HALF_AT(crt_kinds[0].table+(crt_kinds[0].first+3u)*0x18u+0x10u)*2u)=0xFFFFu;   /* one missing */
+    anim_map_row(GHOST,0x40u);
+    HALF_AT(0x007E03C0u+HALF_AT(crt_kinds[GHOST].table+(crt_kinds[GHOST].first+3u)*0x18u+0x10u)*2u)=0xFFFFu;   /* one missing */
     CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
     CHECK(seen_class[0]==0x11000000u);
-    anim_map_row(0,0x40u);anim_map_row(1,0x41u);anim_map_row(2,0x42u);
+    anim_map_row(GHOST,0x40u);anim_map_row(SECB,0x41u);anim_map_row(MUT,0x42u);
     CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
     CHECK(seen_class[0]==0x50000000u && seen_class[1]==0);
     for(k=1;k<4u;k++) {                                       /* several per map */
@@ -317,6 +326,32 @@ int main(void)
     CHECK(seen_class[0]==0x11000000u);
     WORD_AT(POOL+8u*0xEA0u+0xBF0u)=0;HALF_AT(POOL+8u*0xEA0u+0x48u)=0x2Fu;     /* no record */
     CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,POOL+8u*0xEA0u,0);
+    /* ---- the Prometheus robots: the story robot class, animrb.pak as every level mounts it ---- */
+    {
+        static const uint16_t set[]={0x0C,0x62,0x36,0xAA};
+        unsigned before=nmounts;
+        map(0x11u,set,4u);
+        mounted_paths[nmounted++]=0x0047E65Cu;                /* stock: pak/anim/animrb.pak */
+        CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+        CHECK(nmounts==before);                                 /* already mounted: nothing more */
+        CALL(pc_mapmaker_creatures_request,fake_plain,0x0015E7C5u,0,0);
+        a=actor(9,0x62u);
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x11000000u);                      /* its anims not registered yet: bot */
+        anim_map_row(SK8,0x43u);                                /* the whole animrb table (shared with SD/7) */
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x10000004u && seen_class[1]==0);
+        a=actor(10,0x36u);
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x10000004u && seen_class[1]==0);
+        a=actor(11,0x62u);                                      /* several per map */
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x10000004u);
+        a=actor(12,0xAAu);                                      /* the Arcade rocket robot: stock */
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x11000000u);
+        nmounted--;
+    }
     /* pak not mounted (another level's mount table): bot */
     nmounted=0;
     a=actor(0,0x4Du);

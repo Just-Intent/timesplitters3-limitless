@@ -70,7 +70,8 @@ static const struct ans_pak_s {
     {0x0048BEC8u,0x1Eu,{{5,1},{21,8},{0,0}},"lv1_2"},     /* mansion worm: barney_worm 0x149, wrmburst..wrmdeath 0x194..0x19B */
     /* the story creatures (pc_mapmaker_creatures.def): one run per row; rows
      * sharing a pak keep the union of their runs (ans_keep) */
-#define MAPMAKER_CREATURE(row,id,look,preview,label,lo,hi,pak,pak_name,table,count,first,n,level) {table,count,{{first,n},{0,0},{0,0}},pak_name},
+#define MAPMAKER_CREATURE(row,id,look,preview,label,lo,hi,pak,pak_name,table,count,first,n,level) \
+    {((first)==0u && (n)==(count))?0u:(table),count,{{first,n},{0,0},{0,0}},pak_name},   /* whole table: no row (table 0 never matches) */
 #include "pc_mapmaker_creatures.def"
 #undef MAPMAKER_CREATURE
 };

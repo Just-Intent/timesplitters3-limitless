@@ -329,6 +329,16 @@ int main(void)
     nested=0;
     { unsigned o=0;reg(bosses[LV1_3].table,3u,&o);CHECK(o==1u && nested==0 && lastn==3u); }
 
+    /* ---- animrb.pak (the Prometheus rows keep its whole table): no budget row, stock when it fits ---- */
+    {
+        unsigned o=0;
+        put_gen(0x0048F240u,1200u,0x15u,NULL);
+        load(10u,0,NULL);
+        nested=0;
+        reg(0x0048F240u,0x15u,&o);
+        CHECK(o==1u && nested==0 && lastn==0x15u);
+    }
+
     /* ---- the story creatures' paks (pc_mapmaker_creatures.def): only each row's run ---- */
     {
         static const struct { uint32_t table, count, first, n; } crt[]={
