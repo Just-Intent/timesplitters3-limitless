@@ -67,3 +67,11 @@ Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
 anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 (30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear
 0x0006275B -> 0x1C0 dwords; areas use MOUNT_MAX 64 / KEEP 8.
+
+Crowe walk (.43, "not moving at all"): no static ledge blocking now. The
+.41-.43 floor probe blocked cells over a lower floor (m43b.err: 15-20 of 35),
+so state 5's picker (`sub_002A9E60`: 5 x 5 round the player, in line, 2+
+away) found nothing. Cells in no room stay blocked unless that starves the
+picker (`crw_pickable`); in state 9 `crw_ahead` probes 2 ahead (room query,
+floor finder) and ends the walk (`crw_stop`) at no room or a floor 2+ below
+the reference. Tests: `ledges()` in `mapmaker_crowe.c`, `ahead-*`/`starve-*`.
