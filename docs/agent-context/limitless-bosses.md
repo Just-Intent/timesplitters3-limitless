@@ -44,6 +44,18 @@ Khallos' (each its own state; realbosses runs the stock skeleton/walker
 resets after the original). Robot (`sub_0025F6A0` reset), skymusic, roof
 and openview need none; see each area doc's restart section.
 
+Restart heap (2026-11-06, after .40; CONFIRMED, `test_mapmaker_restart_heap.py`):
+the restart's `sub_0003E740(3)` -> `sub_0003E240` resets only heap 0 (top-down
+`[0x006B8388]`, jump tables 0x0003E094/0x0003E1C4 entry 0). The Level heap
+`sub_0003DFA0(n, 1)` is heap 1 (`[0x006B837C]`), written only by
+`sub_0003DF00`/`sub_0003DF70`/`sub_0003E650`/the allocators, none reachable
+from the restart branch. So no area's guest block goes stale: every area call
+asks for heap 1, host blocks are `xbox_HeapAlloc`. The .40 skeleton fix and the
+Crowe restart allocated new blocks per restart (Level heap used up, about
+52-190 KB a boss); both now set their own blocks up again in place (zeroed,
+stock non-allocating init rest: `rbs_skel_again`/`rbs_walk_again`/`crw_again`,
+block sizes in `pc_mapmaker_bossfx.inc`), as the worm already did.
+
 .34 Khallos/bars: the focus chair keeps its stock bar (rider's Story AI name,
 khallos text hook); pc_mapmaker_bosses_hud skips a proxied focus and logs
 each bar drawn or skipped once per entity and reason (story AI bosses: bar
