@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3694 @@
+@@ -1037,6 +1037,3738 @@
      sub_002FA720_gen();
  #endif
  }
@@ -3690,6 +3690,50 @@
 +    else sub_000F8DC0_gen();
 +#else
 +    sub_000F8DC0_gen();
++#endif
++}
++
++extern void sub_000289C0_gen(void);
++void sub_000289C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("music","pc_custom_music_channel")) pc_custom_music_channel(sub_000289C0_gen);
++    else sub_000289C0_gen();
++#else
++    sub_000289C0_gen();
++#endif
++}
++
++extern void sub_00071BE0_gen(void);
++void sub_00071BE0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("music","pc_custom_music_arcade_rows")) pc_custom_music_arcade_rows(sub_00071BE0_gen);
++    else sub_00071BE0_gen();
++#else
++    sub_00071BE0_gen();
++#endif
++}
++
++extern void sub_002C71C0_gen(void);
++void sub_002C71C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("music","pc_custom_music_arcade_show")) pc_custom_music_arcade_show(sub_002C71C0_gen);
++    else sub_002C71C0_gen();
++#else
++    sub_002C71C0_gen();
++#endif
++}
++
++extern void sub_002C7430_gen(void);
++void sub_002C7430(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("music","pc_custom_music_arcade_store")) pc_custom_music_arcade_store(sub_002C7430_gen);
++    else sub_002C7430_gen();
++#else
++    sub_002C7430_gen();
 +#endif
 +}
  

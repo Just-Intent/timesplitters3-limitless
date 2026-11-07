@@ -26,7 +26,11 @@ static int active=1,mode,original_calls,selections;
 static uint32_t navigation;
 static int closed_pause,in_dispatch,changed_tab;
 static unsigned long long tick=1000;
-static unsigned long long GetTickCount64(void) {return tick;}
+#ifdef _WIN32
+#include <windows.h>   /* declared once here (the imported-music player includes it too) */
+#endif
+static unsigned long long menu_test_tick64(void) {return tick;}
+#define GetTickCount64() menu_test_tick64()
 static int footer_enabled=1,measure_profile;
 static uint32_t early_action,early_held,early_source;
 static unsigned shape_w=16,shape_h=9;

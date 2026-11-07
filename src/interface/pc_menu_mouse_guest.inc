@@ -804,10 +804,6 @@ void pc_mapmaker_skymusic_weather_frame(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_weather_list(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_haze(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_grain_colour(void (*original)(void)) { original(); }
-void pc_custom_music_channel(void (*original)(void)) { original(); }
-void pc_custom_music_arcade_rows(void (*original)(void)) { original(); }
-void pc_custom_music_arcade_show(void (*original)(void)) { original(); }
-void pc_custom_music_arcade_store(void (*original)(void)) { original(); }
 void pc_mapmaker_camera_gun_update(void (*original)(void)) { original(); }
 void pc_mapmaker_openview_walk(void (*original)(void)) { original(); }
 void pc_mapmaker_realbosses_picker_end(void (*original)(void)) { original(); }
@@ -995,6 +991,10 @@ void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_level_reset(void (*original)(void)) { original(); }
 void pc_display_viewfinder(void (*original)(void)) { original(); }
 void pc_display_view_static(void (*original)(void)) { original(); }
+void pc_custom_music_channel(void (*original)(void)) { original(); }
+void pc_custom_music_arcade_rows(void (*original)(void)) { original(); }
+void pc_custom_music_arcade_show(void (*original)(void)) { original(); }
+void pc_custom_music_arcade_store(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
