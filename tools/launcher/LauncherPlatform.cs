@@ -10,13 +10,15 @@ namespace TimeSplitters.Launcher
     {
         // Cloud Files markers describe storage, not a redirected pathname.
         // Keep every other reparse tag (including unknown tags) rejected.
-        // The native Mac window owns mac.lock for its entire lifetime. Its busy
-        // state serializes save work; standalone callers still acquire that lock.
+        // The launcher window owns the installation lock for its entire lifetime
+        // (mac.lock on Mac; the installation mutex on Windows, taken on the UI
+        // thread in Launcher.cs). Its busy state serializes save work, so save
+        // work it starts on a worker thread must not ask again: a Windows mutex
+        // is per thread, and the worker would wait 30 s and fail ("Another
+        // launcher is using this installation"). Standalone callers still lock.
         public static IDisposable AcquireSaveLock(string root,bool installationLockHeld)
         {
-#if MACOS
             if(installationLockHeld)return null;
-#endif
             return AcquireUpdateLock(root);
         }
         public static bool IsCloudTag(uint tag) { return (tag & 0xFFFF0FFFu) == 0x9000001Au; }
