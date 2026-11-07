@@ -1,0 +1,82 @@
+phase off
+[mapmaker] skelvis: skeleton 1: tracked (prop 0x400000): radius 6.50 (half size 6.50, 6.50, 6.50), box centre offset (0.25, 5.00, -0.50) (root bone, moves with the animation), at (10.00, 0.50, -4.00)
+[mapmaker] skelvis: skeleton 1: room list 10 of 14 touched rooms (cap 10) TRUNCATED, home room 3, camera room 7 DROPPED by the cap
+[mapmaker] skelvis: skeleton 1: room list 10 of 14 touched rooms (cap 10) TRUNCATED, home room 3, camera room 7 DROPPED by the cap
+[mapmaker] skelvis: skeleton 1: room list 8 of 8 touched rooms (cap 10), home room 3, camera room 7 not touched by its box
+[mapmaker] skelvis: skeleton 1: room list 8 of 8 touched rooms (cap 10), home room 3, camera room 7 in the list
+phase list
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 2 passes hidden (frustum culled at 0x000A24AA)
+phase frustum
+[mapmaker] skelvis: skeleton 1: hidden (listed rooms visible but not reached by their prop lists), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 0, frustum 0, flags 0x0
+[mapmaker] skelvis: skeleton 1: hidden (none of its listed rooms visible), was listed rooms visible but not reached by their prop lists for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 0, frustum 0, flags 0x0
+[mapmaker] skelvis: skeleton 1: hidden (reached but its listed rooms give an empty rectangle), was none of its listed rooms visible for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 1, frustum 1, flags 0x0
+[mapmaker] skelvis: skeleton 1: hidden (view-plane culled at 0x000A2515), was reached but its listed rooms give an empty rectangle for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 1, frustum 1, flags 0x802000
+[mapmaker] skelvis: skeleton 1: hidden (culled after the frustum test (screen rectangle 0x000A271D) or not drawn), was view-plane culled at 0x000A2515 for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 1, frustum 1, flags 0x800000
+[mapmaker] skelvis: skeleton 1: hidden (no rooms in its list (0x000A2455)), was culled after the frustum test (screen rectangle 0x000A271D) or not drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 0 rooms (0 visible), camera room 7 not in the list, reached 0, frustum 0, flags 0x800000
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (no rooms in its list (0x000A2455))
+phase reasons
+phase views
+[mapmaker] skelvis: summary after 600 passes: skeleton 1 drawn 592, hidden: no list 1, rooms unseen 1, not reached 1, empty rect 1, frustum 2, planes 1, later 1; list builds 5, truncated 3, camera room dropped 3, most rooms touched 14 (cap 10); other views 1
+phase summary
+[mapmaker] skelvis: skeleton 1: hidden (none of its listed rooms visible), was drawn for 1189 passes: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 0, frustum 0, flags 0x0
+[mapmaker] skelvis: summary after 1200 passes: skeleton 1 drawn 1191, hidden: no list 1, rooms unseen 2, not reached 1, empty rect 1, frustum 2, planes 1, later 1; list builds 5, truncated 3, camera room dropped 3, most rooms touched 14 (cap 10); other views 1
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (none of its listed rooms visible)
+[mapmaker] skelvis: skeleton 1: hidden (none of its listed rooms visible), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 0, frustum 0, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (none of its listed rooms visible)
+[mapmaker] skelvis: skeleton 1: hidden (none of its listed rooms visible), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 0, frustum 0, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (none of its listed rooms visible)
+[mapmaker] skelvis: skeleton 1: hidden (none of its listed rooms visible), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 0, frustum 0, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (none of its listed rooms visible)
+[mapmaker] skelvis: skeleton 1: hidden (none of its listed rooms visible), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 0, frustum 0, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (none of its listed rooms visible)
+[mapmaker] skelvis: skeleton 1: hidden (none of its listed rooms visible), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (0 visible), camera room 7 not in the list, reached 0, frustum 0, flags 0x0
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: skeleton 1: drawn again after 1 pass hidden (frustum culled at 0x000A24AA)
+[mapmaker] skelvis: skeleton 1: hidden (frustum culled at 0x000A24AA), was drawn for 1 pass: player 6.7 away, box centre (10.25, 5.50, -4.50) half 6.50, animation 0x1A0, list 4 rooms (1 visible), camera room 7 not in the list, reached 1, frustum -1, flags 0x0
+[mapmaker] skelvis: 60 lines this level, quiet now (summaries go on)
+phase budget
+[mapmaker] skelvis: final summary after 1362 passes: skeleton 1 drawn 1271, hidden: no list 1, rooms unseen 41, not reached 1, empty rect 1, frustum 42, planes 1, later 1; list builds 5, truncated 3, camera room dropped 3, most rooms touched 14 (cap 10); other views 1
+[mapmaker] skelvis: skeleton 1: tracked (prop 0x400000): radius 6.50 (half size 6.50, 6.50, 6.50), box centre offset (0.25, 5.00, -0.50) (root bone, moves with the animation), at (10.00, 0.50, -4.00)
+[mapmaker] skelvis: skeleton 1: room list 8 of 8 touched rooms (cap 10), home room 3, camera room 7 not touched by its box
+[mapmaker] skelvis: final summary after 0 passes: skeleton 1 drawn 0, hidden: no list 0, rooms unseen 0, not reached 0, empty rect 0, frustum 0, planes 0, later 0; list builds 1, truncated 0, camera room dropped 0, most rooms touched 8 (cap 10); other views 0 (frustum hook not seen: frustum culls count as later)
+[mapmaker] skelvis: level restart: forgetting 1 skeleton
+[mapmaker] skelvis: skeleton 1: tracked (prop 0x400000): radius 6.50 (half size 6.50, 6.50, 6.50), box centre offset (0.25, 5.00, -0.50) (root bone, moves with the animation), at (10.00, 0.50, -4.00)
+[mapmaker] skelvis: skeleton 1: room list 8 of 8 touched rooms (cap 10), home room 3, camera room 7 not touched by its box
+[mapmaker] skelvis: final summary after 1 passes: skeleton 1 drawn 0, hidden: no list 0, rooms unseen 0, not reached 0, empty rect 0, frustum 0, planes 0, later 0; list builds 1, truncated 0, camera room dropped 0, most rooms touched 8 (cap 10); other views 0 (frustum hook not seen: frustum culls count as later)
+[mapmaker] skelvis: rooms rebuilt: forgetting 1 skeleton
+phase reset
+phase bad
+mapmaker skelvis ok

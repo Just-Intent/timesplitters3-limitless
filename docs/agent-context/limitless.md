@@ -797,7 +797,7 @@ Bosses also wraps `sub_0014D1F0` (HUD per viewport) to draw Sub-boss overhead me
 `matchbots.json` moves the 26 live per-actor reads to a 64-entry mirror at 0x00904000 and the rank table to 0x00904100 (every scene); the matchbots area fills them.
 The weaponset area (20 weapon slots) wraps the play set `sub_0006BD30`, pickup slot/veto/spawn and weapon set screen functions, and chains compile/load/reset, `sub_0003D7B0` and `sub_00078590`; roof wraps the label format `sub_00151030` and caption `sub_0032D9F0`.
 Realbosses adds the giant skeleton: story level init `sub_0025F720`, `sub_0029FE00` variant, `sub_002875F0` emerge, `sub_00287E20` throw and level events `sub_002274C0` (death event dropped).
-bigdraw wraps `sub_000862C0` (prop scissor, ret 0x000A2470): real bosses over the whole view. openview wraps the walk `sub_00089B90`: open-air areas unclipped (mapmaker-sky.md).
+bigdraw: `sub_000862C0` puts bosses on the whole view; skelvis `sub_0008C020` logs. openview wraps the walk `sub_00089B90`: open-air areas unclipped (mapmaker-sky.md).
 camera wraps actor update `sub_00246000`: a switch-held camera (mode 0x80, D8/C14 reciprocal) runs with stock skip bit data+8 bit 0 (0x002460E5), so the sweep stops; the walk logs what each view reaches. Test `test_mapmaker_camera.py`; mapmaker-camera.md (4:3 frame fixed in shared pc_display_ui.inc, test_camera_widescreen.py; ~10-floor view open).
 
 ## Build and test (extends [build-test.md](build-test.md))
