@@ -20,6 +20,7 @@ foreach ($name in @($info.EnvironmentVariables.Keys)) {
 }
 # Optional authored pack; installing it later needs no launcher changes.
 $info.EnvironmentVariables['TSFP_TEXTURE_PACK_DIR'] = Join-Path $gameRoot 'Textures'
+$info.EnvironmentVariables['TSFP_MUSIC_DIR'] = Join-Path $gameRoot 'Music'
 $info.EnvironmentVariables['TSFP_TEXTURE_MODE'] = 'classic'
 $info.EnvironmentVariables['TSFP_CRASH_DIR'] = Join-Path $logRoot 'Crashes'
 $info.EnvironmentVariables['RECOMP_GAME_DIR'] = Join-Path $gameRoot 'Data'

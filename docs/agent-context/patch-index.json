@@ -117,6 +117,15 @@
       ]
     },
     {
+      "name": "0059-custom-music-voice.patch",
+      "path": "patches/media/0059-custom-music-voice.patch",
+      "sha256": "6bc1fada268bd0ddd6c6cfa639a11441b0b0ded6992f57db6138b6f25a5c6d23",
+      "targets": [
+        "src/hle/audio_output.h",
+        "src/hle/audio_output_xaudio2.cpp"
+      ]
+    },
+    {
       "name": "0060-independent-classification.patch",
       "path": "patches/compiler/0060-independent-classification.patch",
       "sha256": "f8db701d03791b2b6eb3794f6d4634d14deb018400b9c171acab4af5ab0bd1b6",

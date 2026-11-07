@@ -488,7 +488,7 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Boss areas, skies, open air, set slots: [boss notes](limitless-bosses.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
-draw (.32: grain/haze alpha WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md.
+draw (.32: grain/haze alpha WRAPs sub_00154FE0/sub_0011A930, fog 7): mapmaker-sky-music.md; [own music](custom-music.md).
 Pak mount table (mapmaker.20: 29 of 30 used -> stretched bosses, robot/crowe
 anims unmounted): `config/guest-code-patches/paktable.json` moves 0x006D7900
 (30 x 0x1C) to 0x00907000 (64), caps 0x00062049/0x000620F9 -> 0x40, clear

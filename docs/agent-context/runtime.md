@@ -17,6 +17,8 @@ settings holders and invalid rate/alignment. DirectSoundDoWork therefore reclaim
 invalid stopped buffers as well as playing ones. Valid stopped/paused buffers
 are retained; no live voice is evicted to admit another sound. See
 [audio lifecycle tests](audio-buffers.md). Guest Release remains unchanged.
+`media/0059-custom-music-voice.patch` adds output slot 273
+(`RECOMP_AUDIO_SLOT_MUSIC`) for [imported music](custom-music.md).
 
 `media/0057-dsound-format-and-tail-recovery.patch` includes rate/alignment in
 buffer identity, retains raw source size while clocking complete frames, and

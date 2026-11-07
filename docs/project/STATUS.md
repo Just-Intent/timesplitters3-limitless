@@ -1,3 +1,15 @@
+## Imported music for MapMaker and Arcade (2026-11-03, not built or played)
+
+Branch `custom-music` from `mapmaker-recon` abc041c4. Windows 11 x64 host,
+MSVC fixtures only: `tests/media/test_custom_music.py` (host WAV reader,
+listing, player pacing/pause/loop/retry, `pc-music.ini`) and
+`tests/mapmaker/test_mapmaker_custommusic.py` (rows, map chunk, load, play
+decisions, Arcade rows/show/store; XBE facts) pass with their mutations;
+`test_mapmaker_skymusic.py` and `test_native_mac_launcher.py` pass. Fixture
+runs sometimes stop with WinError 4551 (application control) and pass when
+rerun. Not run: any game build or run, the launcher C# build/tests, macOS
+compile. See [custom music](../mapmaker/mapmaker-custom-music.md).
+
 ## MapMaker resource panel: collapsed, click/I toggle, aligned columns (2026-11-03, not built or played)
 
 Source: branch restable-compact from mapmaker-recon 04cc2691, Windows 11 x64, MSVC fixtures only.
