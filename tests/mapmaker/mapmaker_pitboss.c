@@ -374,7 +374,7 @@ int main(void)
     CHECK(FLOAT_AT(st1+0x423Cu)==0.0f);                 /* rack timer held */
     for(i=0;i<13u;i++) {                                 /* pads: the instance's records, through the table */
         uint32_t r=PADTAB+(uint32_t)((int32_t)WORD_AT(st1+0x4BF0u+i*4u)*0x20);
-        CHECK(WORD_AT(st1+0x4BF0u+i*4u)==8000u-13u+i);   /* the pool's tail, below 0x1F40 (sub_0009A420's cover range) */
+        CHECK(WORD_AT(st1+0x4BF0u+i*4u)==MAPMAKER_POOL_PADS-13u+i);   /* the pool's tail, below the cover base 0x4000 (sub_0009A420) */
         CHECK(WORD_AT(r)==0x4B5u+i && WORD_AT(r+4u)==1u);
         CHECK(near(FLOAT_AT(r+0xCu),pit_pad_xyz[i][0]+15.8f) && near(FLOAT_AT(r+0x10u),pit_pad_xyz[i][1]+102.279f));
     }
@@ -473,7 +473,7 @@ int main(void)
         CHECK(near(FLOAT_AT(st1+0x4274u),8.0f-2.6667f-2.6667f*0.25f) && orig_state==st1);
     }
     {   /* a map whose own pads reach the pool's tail: the rim pads are not written over them */
-        WORD_AT(0x007B6664u)=7990u;WORD_AT(st1+0x4BF0u)=0xFFFFFFFFu;
+        WORD_AT(0x007B6664u)=MAPMAKER_POOL_PADS-10u;WORD_AT(st1+0x4BF0u)=0xFFFFFFFFu;
         CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
         CHECK(WORD_AT(st1+0x4BF0u)==0xFFFFFFFFu);
         WORD_AT(0x007B6664u)=0;
