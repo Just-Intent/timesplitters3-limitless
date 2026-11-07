@@ -569,10 +569,11 @@ static void multi(void)
 static void cells_at(float px,float pz) { CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+4u,FB(px),FB(pz),1); }
 /* v0.4.0-mapmaker.40: one room, the boss's floor at y 4 with a lower floor
  * (y -1) beyond x 13 (columns 5, 6), a raised block (y 5.2) under cell 1,1, a
- * small step (4.5) under cell 4,0 and a gap between cells 0,2 and 0,3 */
+ * small step (4.5) under cell 4,0, no floor answer near x 1, z < -31 and
+ * the lower floor again past z -2 (beyond row 4) */
 static int ledge_floor(float x,float z,float *y)
 {
-    if(x>13.0f) *y=-1.0f;
+    if(x>13.0f || z>-2.0f) *y=-1.0f;
     else if(z<-31.0f && x>0.5f && x<1.5f) return 0;
     else if(x<-11.0f && z>-8.0f) *y=4.5f;
     else if(fabsf(x+8.0f)<3.0f && fabsf(z+28.0f)<3.0f) *y=5.2f;
@@ -580,9 +581,21 @@ static int ledge_floor(float x,float z,float *y)
     return 1;
 }
 static int no_floor(float x,float z,float *y) { (void)x;(void)z;(void)y;return 0; }
+/* one fight call of a walk in direction dir with the boss at (x, z); its state after */
+static uint32_t walk_at(uint32_t dir,float x,float z)
+{
+    WORD_AT(A(0)+0x20u)=9u;WORD_AT(CST+0x1D24u)=dir;WORD_AT(CST+0x2DE8u)=10u;
+    SETF(ENT(0)+0x64u,x);SETF(ENT(0)+0x6Cu,z);
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    return WORD_AT(A(0)+0x20u);
+}
+/* v0.4.0-mapmaker.43 (m43b.err: 15-20 of 35 cells "over a drop or ledge",
+ * the fight looping 4 -> 5 -> 10 and never walking): no cell is blocked for
+ * its floor; the walk looks CRW_AHEAD ahead and ends at a drop, a ledge or
+ * the end of the rooms */
 static void ledges(void)
 {
-    unsigned k;
+    unsigned k,n;
     uint32_t a=A(0),st=CST;
     CHECK(level_gives_class());
     one_big_room();
@@ -592,50 +605,116 @@ static void ledges(void)
     WORD_AT(a+0x20u)=0;nquery=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     CHECK(nquery==35u && WORD_AT(st+0x1198u)==2u && WORD_AT(st+0x119Cu)==4u);
-    /* the start cell, every cell in a room, the midpoints between good cells */
-    CHECK(nfloor==1u+35u+(5u*4u+4u*5u-2u-2u)+1u);
-    CHECK(crw_inst[0].ground_ok==1 && near_eq(crw_inst[0].ground,4.0f));
+    CHECK(nfloor==1u);                                             /* only the reference floor under the start cell */
+    CHECK(crw_inst[0].ground_ok==1 && near_eq(crw_inst[0].ground,4.0f) && crw_inst[0].rooms_ok);
     CHECK(WORD_AT(0x004DCB00u)==0x1111u && WORD_AT(0x004DCAFCu)==0x2222u && WORD_AT(0x00733088u)==0x3333u);
-    for(k=0;k<35u;k++) CHECK(crw_inst[0].off[k]==(k%7u>=5u || k==CELL(1u,1u)));
-    CHECK(!crw_inst[0].off[CELL(4u,0u)]);                          /* a step, not a ledge */
-    CHECK(crw_inst[0].gap_h[0][2]==1u);
-    for(k=0;k<5u*6u;k++) CHECK(crw_inst[0].gap_h[k/6u][k%6u]==(k==2u));
-    for(k=0;k<4u*7u;k++) CHECK(!crw_inst[0].gap_v[k/7u][k%7u]);
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);                 /* cells over the lower floor stay pickable */
     prev_k=crw_enter(0);
     cells_at(10.0f,-12.0f);
-    CHECK(blocked_cells(st)==11u && BLOCKED(st,2u,5u)==1u && BLOCKED(st,2u,6u)==1u && BLOCKED(st,1u,1u)==1u);
-    CHECK(!BLOCKED(st,2u,3u) && !BLOCKED(st,2u,0u) && !BLOCKED(st,4u,0u) && !BLOCKED(st,0u,4u));
-    /* the boss on row 0: the cells beyond the gap in line with it */
-    WORD_AT(st+0x1198u)=0u;WORD_AT(st+0x119Cu)=4u;
-    cells_at(10.0f,-12.0f);
-    CHECK(blocked_cells(st)==14u && BLOCKED(st,0u,2u)==1u && BLOCKED(st,0u,1u)==1u && BLOCKED(st,0u,0u)==1u && !BLOCKED(st,0u,3u));
-    WORD_AT(st+0x1198u)=0u;WORD_AT(st+0x119Cu)=2u;                  /* ... from the other side */
-    cells_at(10.0f,-12.0f);
-    CHECK(blocked_cells(st)==13u && BLOCKED(st,0u,3u)==1u && BLOCKED(st,0u,4u)==1u && !BLOCKED(st,0u,1u));
-    WORD_AT(st+0x1198u)=2u;WORD_AT(st+0x119Cu)=4u;
+    CHECK(blocked_cells(st)==0);
     crw_leave(prev_k);
-    /* no floor under the start cell: the probe is not trusted, the rooms still count */
+    /* the walk x+ towards the lower floor: on while the floor 2 ahead is its own ... */
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    SETF(st+0x1CECu,22.0f);SETF(st+0x1CF0u,-20.0f);
+    nanim=0;nfloor=0;nquery=0;crw_inst[0].air=crw_inst[0].stall=0;
+    CHECK(walk_at(3u,10.0f,-20.0f)==9u && walk_at(3u,10.9f,-20.0f)==9u && nanim==0);
+    CHECK(nquery==2u && nfloor==2u && query_box+0x38u<=ESP0);       /* each call: the room there, then its floor */
+    CHECK(near_eq(query_last[0],12.6f) && near_eq(query_last[3],13.2f) && near_eq(query_last[1],4.25f));
+    CHECK(WORD_AT(0x004DCB00u)==0x1111u && WORD_AT(0x004DCAFCu)==0x2222u && WORD_AT(0x00733088u)==0x3333u);
+    /* ... and ends where it stands when it is 5 above the floor there */
+    CHECK(walk_at(3u,11.5f,-20.0f)==10u && nanim==1u && anim_args[1]==0x810u);
+    CHECK(near_eq(F(ENT(0)+0x64u),11.5f) && near_eq(F(ENT(0)+0x6Cu),-20.0f) && F(st+0x2DF0u)==0.0f);
+    CHECK(crw_inst[0].wall_left[CELL(2u,5u)]==1800u && crw_inst[0].wall_left[CELL(2u,6u)]==1800u && !crw_inst[0].wall_left[CELL(2u,3u)]);
+    CHECK(WORD_AT(0x004DCB00u)==0x1111u && WORD_AT(0x004DCAFCu)==0x2222u && WORD_AT(0x00733088u)==0x3333u);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    /* not ledges: a step up, a raised block, a small step, no floor answer (a tile seam) */
+    nanim=0;
+    CHECK(walk_at(0u,-8.0f,-32.0f)==9u);                           /* z+ onto the 5.2 block */
+    CHECK(walk_at(1u,-10.0f,-4.0f)==9u);                           /* x- onto the 4.5 step */
+    CHECK(walk_at(2u,1.0f,-30.0f)==9u);                            /* z- to no answer */
+    CHECK(walk_at(1u,13.5f,-20.0f)==9u);                           /* from the lower floor back up */
+    CHECK(walk_at(2u,10.0f,-3.5f)==9u && nanim==0);                /* z- away from the edge past z -2 ... */
+    CHECK(walk_at(0u,10.0f,-3.5f)==10u && nanim==1u);              /* ... z+ towards it */
+    CHECK(crw_inst[0].wall_left[CELL(3u,4u)]==1800u && crw_inst[0].wall_left[CELL(4u,4u)]==1800u && !crw_inst[0].wall_left[CELL(1u,4u)]);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);nanim=0;
+    CHECK(nanim==0);
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].wall_left[k]);
+    /* the other directions see their own side: x- away from the lower floor, z+ and z- beside it */
+    CHECK(walk_at(1u,12.0f,-20.0f)==9u && walk_at(0u,14.0f,-20.0f)==10u && walk_at(2u,14.0f,-20.0f)==10u);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    /* the rooms end at x 13: no room 2 ahead ends the walk too */
+    nrooms=0;room(0,-1000.0f,-1000.0f,-1000.0f,13.0f,1000.0f,1000.0f);
+    floor_of=NULL;
+    CHECK(walk_at(3u,10.0f,-20.0f)==9u && walk_at(3u,11.5f,-20.0f)==10u);
+    CHECK(crw_inst[0].wall_left[CELL(2u,5u)]==1800u);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    one_big_room();
+    /* no floor under the start cell: no reference floor, no ledge check; the rooms still count */
     CHECK(level_gives_class());
     floor_of=no_floor;nfloor=0;
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(nfloor==1u+9u && !crw_inst[0].ground_ok);                /* the spawn height, then climbing 9 search heights */
+    CHECK(nfloor==1u+9u && !crw_inst[0].ground_ok && crw_inst[0].rooms_ok);   /* the spawn height, then climbing 9 search heights */
+    floor_of=ledge_floor;nfloor=0;nanim=0;
+    SETF(st+0x1CECu,22.0f);SETF(st+0x1CF0u,-20.0f);
+    CHECK(walk_at(3u,11.5f,-20.0f)==9u && nfloor==0 && nanim==0);
+    /* the start cell in no room: the query is not trusted, the floor still is */
+    CHECK(level_gives_class());
+    nrooms=0;
+    WORD_AT(a+0x20u)=0;
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x6Cu,-20.0f);
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(!crw_inst[0].rooms_ok && crw_inst[0].ground_ok==1);
     for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
-    for(k=0;k<5u*6u;k++) CHECK(!crw_inst[0].gap_h[k/6u][k%6u]);
+    nquery=0;
+    CHECK(walk_at(3u,10.0f,-20.0f)==9u && nquery==0 && walk_at(3u,11.5f,-20.0f)==10u);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    one_big_room();
     /* the boss's own floor a step lower than its spawn height: still its floor */
     CHECK(level_gives_class());
-    floor_of=ledge_floor;
-    SETF(ENT(0)+0x68u,4.9f);
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.9f);SETF(ENT(0)+0x6Cu,-20.0f);
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(crw_inst[0].off[CELL(2u,5u)] && !crw_inst[0].off[CELL(2u,3u)] && !crw_inst[0].off[CELL(4u,0u)]);
+    CHECK(crw_inst[0].ground_ok==1 && near_eq(crw_inst[0].ground,4.0f));
+    /* m43b.err: a Crowe at 2,4 with the player's stand-in 4,3; columns 0-2 in no room
+     * (and 2,0-2,2 in line with it): blocked while 0,4, 4,4 and 2,6 are free */
+    for(k=0;k<35u;k++) crw_inst[0].off[k]=k%7u<3u;
+    prev_k=crw_enter(0);
+    WORD_AT(st+0x1198u)=2u;WORD_AT(st+0x119Cu)=4u;
+    cells_at(10.0f,-4.0f);                                         /* the player inside, cell 4,4 */
+    CHECK(WORD_AT(st+0x1190u)==4u && WORD_AT(st+0x1194u)==4u && !crw_inst[0].starved);
+    CHECK(blocked_cells(st)==15u && !BLOCKED(st,0u,4u) && !BLOCKED(st,2u,6u));
+    /* ... every cell it could take in no room: none blocked for that, the walk looks ahead */
+    for(k=0;k<35u;k++) crw_inst[0].off[k]=k%7u!=4u && k%7u!=3u;
+    for(k=0;k<5u;k++) crw_inst[0].off[CELL(k,4u)]=k==0u || k==4u;
+    n=crw_inst[0].starved_logs;
+    cells_at(10.0f,-4.0f);
+    CHECK(crw_inst[0].starved && blocked_cells(st)==0 && crw_inst[0].starved_logs==n+1u);
+    cells_at(10.0f,-4.0f);                                         /* logged once */
+    CHECK(crw_inst[0].starved && crw_inst[0].starved_logs==n+1u);
+    /* ... eggs and stopped walks still block */
+    crw_inst[0].wall_left[CELL(0u,4u)]=5u;
+    cells_at(10.0f,-4.0f);
+    CHECK(crw_inst[0].starved && blocked_cells(st)==1u && BLOCKED(st,0u,4u)==1u);
+    crw_inst[0].wall_left[CELL(0u,4u)]=0;
+    /* ... and when those alone leave it nothing, the cells in no room stay blocked */
+    for(k=0;k<35u;k++) crw_inst[0].wall_left[k]=k%7u==4u || k/7u==2u?5u:0u;
+    cells_at(10.0f,-4.0f);
+    CHECK(!crw_inst[0].starved && BLOCKED(st,1u,0u)==1u && crw_inst[0].starved_logs==n+2u);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    /* a free cell back: blocked again */
+    memset(crw_inst[0].off,0,sizeof crw_inst[0].off);
+    crw_inst[0].off[CELL(1u,0u)]=1u;
+    cells_at(10.0f,-4.0f);
+    CHECK(!crw_inst[0].starved && blocked_cells(st)==1u && BLOCKED(st,1u,0u)==1u);
+    crw_leave(prev_k);
     CHECK(level_gives_class());                                   /* back on y 4, no floor map */
     floor_of=NULL;
-    SETF(ENT(0)+0x68u,4.0f);
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     memset(crw_inst[0].off,0,sizeof crw_inst[0].off);
-    memset(crw_inst[0].gap_h,0,sizeof crw_inst[0].gap_h);memset(crw_inst[0].gap_v,0,sizeof crw_inst[0].gap_v);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
     WORD_AT(a+0x20u)=4u;
 }
 /* v0.4.0-mapmaker.42 ("the splitter crows aren't moving at all now"):
@@ -647,16 +726,6 @@ static int two_floors(float x,float top,float z,float *y)
     if(hi<=top) *y=hi;
     else if(-20.0f<=top) *y=-20.0f;
     else return 0;
-    return 1;
-}
-/* one floor at y 4 whose finder misses points on the tile seams (the cells'
- * x midpoints, 6 apart) and 0.25 short of them */
-static int seam_floor(float x,float z,float *y)
-{
-    float m=fmodf(x+11.0f+600.0f,6.0f),n=fmodf(x+11.25f+600.0f,6.0f);
-    (void)z;
-    if(m<0.05f || m>5.95f || n<0.05f || n>5.95f) return 0;
-    *y=4.0f;
     return 1;
 }
 /* floors at y 4 and -1; a point on the upper floor's plane (under 4.05)
@@ -679,8 +748,8 @@ static void reference_floor(void)
     unsigned k;
     uint32_t a=A(0),st=CST;
     /* the spawn 10 under the floor the player walks on (arena floor -9.49,
-     * player floor 0.5): the reference is the floor above it, the cells are
-     * compared with that, and the drop beyond x 13 still blocks */
+     * player floor 0.5): the reference is the floor above it, the walk is
+     * compared with that and ends before the drop beyond x 13 */
     CHECK(level_gives_class());
     nrooms=0;room(0,-1000.0f,-0.5f,-1000.0f,1000.0f,5.0f,1000.0f);
     floor_of=NULL;floor_below=two_floors;nfloor=0;
@@ -688,60 +757,55 @@ static void reference_floor(void)
     SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,-9.49f);SETF(ENT(0)+0x6Cu,-20.0f);
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(crw_inst[0].ground_ok==2 && near_eq(crw_inst[0].ground,0.5f));
+    CHECK(crw_inst[0].ground_ok==2 && near_eq(crw_inst[0].ground,0.5f) && near_eq(crw_inst[0].room_y,0.5f));
     CHECK(WORD_AT(0x004DCB00u)==0x1111u && WORD_AT(0x004DCAFCu)==0x2222u && WORD_AT(0x00733088u)==0x3333u);
-    for(k=0;k<35u;k++) CHECK(crw_inst[0].off[k]==(k%7u>=5u));
-    for(k=0;k<5u*6u;k++) CHECK(!crw_inst[0].gap_h[k/6u][k%6u]);
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);                 /* the room query at the floor above */
     prev_k=crw_enter(0);
     cells_at(10.0f,-12.0f);
-    CHECK(blocked_cells(st)==10u && !BLOCKED(st,2u,3u) && !BLOCKED(st,0u,4u) && !BLOCKED(st,4u,0u));
+    CHECK(blocked_cells(st)==0);
     crw_leave(prev_k);
+    SETF(st+0x1CECu,22.0f);SETF(st+0x1CF0u,-20.0f);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
+    nquery=0;
+    CHECK(walk_at(3u,10.0f,-20.0f)==9u && near_eq(query_last[1],0.75f) && walk_at(3u,11.5f,-20.0f)==10u);
+    CHECK(WORD_AT(0x004DCB00u)==0x1111u && WORD_AT(0x004DCAFCu)==0x2222u && WORD_AT(0x00733088u)==0x3333u);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
     /* the spawn on its own floor (-9.49 over -9.5), the player's floor 10 up:
      * the boss's floor counts, not the higher one */
     CHECK(level_gives_class());
     one_big_room();
     floor_below=NULL;floor_of=ledge_floor;
-    SETF(ENT(0)+0x68u,4.01f);
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.01f);SETF(ENT(0)+0x6Cu,-20.0f);
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(crw_inst[0].ground_ok==1 && near_eq(crw_inst[0].ground,4.0f) && crw_inst[0].off[CELL(1u,1u)] && !crw_inst[0].off[CELL(2u,3u)]);
-    /* the spawn a pad's 0.01 over its floor: probed over the plane */
+    CHECK(crw_inst[0].ground_ok==1 && near_eq(crw_inst[0].ground,4.0f));
+    /* the spawn a pad's 0.01 over its floor: the start and the walk probed over the plane */
     CHECK(level_gives_class());
     floor_of=NULL;floor_below=plane_floors;
-    SETF(ENT(0)+0x68u,4.01f);
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.01f);SETF(ENT(0)+0x6Cu,-20.0f);
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     CHECK(crw_inst[0].ground_ok==1 && near_eq(crw_inst[0].ground,4.0f));
     for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
+    SETF(st+0x1CECu,22.0f);SETF(st+0x1CF0u,-20.0f);
+    CHECK(walk_at(3u,10.0f,-20.0f)==9u);
     floor_below=NULL;
-    /* no floor answer under a cell (m42.err: 5-15 cells per Crowe "over a
-     * drop" and no walk): not a ledge, nothing blocked */
+    /* no floor answer ahead (m42.err: the finder may miss a tile seam): not a ledge */
     CHECK(level_gives_class());
     floor_of=hole_floor;
-    SETF(ENT(0)+0x68u,4.0f);
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
-    /* tile seams: no gap, nothing blocked, the walk is free */
-    CHECK(level_gives_class());
-    floor_of=seam_floor;nfloor=0;
-    SETF(ENT(0)+0x68u,4.0f);
-    WORD_AT(a+0x20u)=0;
-    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
-    CHECK(nfloor==1u+35u+30u*2u+28u);
-    for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
-    for(k=0;k<5u*6u;k++) CHECK(!crw_inst[0].gap_h[k/6u][k%6u]);
-    for(k=0;k<4u*7u;k++) CHECK(!crw_inst[0].gap_v[k/7u][k%7u]);
-    prev_k=crw_enter(0);
-    cells_at(10.0f,-12.0f);
-    CHECK(blocked_cells(st)==0);
-    crw_leave(prev_k);
+    SETF(st+0x1CECu,4.0f);SETF(st+0x1CF0u,-40.0f);
+    nanim=0;
+    CHECK(walk_at(2u,4.0f,-10.0f)==9u && nanim==0);
     CHECK(level_gives_class());                                   /* back on y 4, no floor map */
     floor_of=NULL;
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     memset(crw_inst[0].off,0,sizeof crw_inst[0].off);
-    memset(crw_inst[0].gap_h,0,sizeof crw_inst[0].gap_h);memset(crw_inst[0].gap_v,0,sizeof crw_inst[0].gap_v);
+    memset(crw_inst[0].wall_left,0,sizeof crw_inst[0].wall_left);
     WORD_AT(a+0x20u)=4u;
 }
 static void walls(void)
@@ -879,11 +943,12 @@ static void walls(void)
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
-    /* every cell off: the player's stand-in is the nearest cell */
+    /* every cell off: the player's stand-in is the nearest cell; nothing left
+     * for the picker, so none is blocked for being off (.43) */
     for(k=0;k<35u;k++) crw_inst[0].off[k]=1u;
     prev_k=crw_enter(0);
     cells_at(60.0f,-4.0f);
-    CHECK(WORD_AT(st+0x1190u)==4u && WORD_AT(st+0x1194u)==6u && blocked_cells(st)==35u);
+    CHECK(WORD_AT(st+0x1190u)==4u && WORD_AT(st+0x1194u)==6u && blocked_cells(st)==0 && crw_inst[0].starved);
     crw_leave(prev_k);
     memset(crw_inst[0].off,0,sizeof crw_inst[0].off);
     one_big_room();
