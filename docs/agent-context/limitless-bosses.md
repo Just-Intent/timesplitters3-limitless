@@ -69,6 +69,15 @@ before the original and maps them to the same slot/data after it (data is
 in the Level heap pak buffer) when the slot is empty and below the next
 slot. The worm's lv1_2 anims carry the flag too (worm area, not fixed).
 
+Skeleton same-floor throws (.44, "can't hit me on floor one still"): in
+`m43b`/`m44.err` the floor (-4.49/-4.50) was right and every aim was at a
+player on 0.5; the shot origin is a model bone point (0x0029CFA4..0x0029D050)
+about 10.7 over its feet, 5.7 over that player, past the ceiling of the
+player's one-floor room (INFERRED: blocked there). `rbs_skel_low` (inside
+`rbs_skel_aim`, no new WRAP) starts a shot at most 4 over the target's feet
+(not for a target under its floor), then the stock/raised aim. Fixture m44
+case, mutations `hand-*`. Unplayed.
+
 .34 Khallos/bars: the focus chair keeps its stock bar (rider's Story AI name,
 khallos text hook); pc_mapmaker_bosses_hud skips a proxied focus and logs
 each bar drawn or skipped once per entity and reason (story AI bosses: bar
