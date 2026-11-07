@@ -284,3 +284,5 @@ when it ends:
 changes. The next playtest's log decides the fix: gate the fire pose on the
 failing test (sight, muzzle) in the robot handler, and the aim point if the
 floor shots miss.
+
+Integrator note (2026-11-07): `WRAP sub_001BB5C0 -> pc_mapmaker_creatures_robot_fire` is not generated. Upstream already defines `sub_001BB5C0` (network bot shot / kill feed) and the generated story-chain rename for it does not apply in the staged patch run, so the fire-call count stays 0 in game; the muzzle-hit and sight counts still log.

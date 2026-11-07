@@ -2117,7 +2117,7 @@
     {
       "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-story-chain.patch",
       "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-story-chain.patch",
-      "sha256": "2fa4e20bc6eac6c45577d2d318c5c126318a1e98c0a2c26592b90e5d022027c4",
+      "sha256": "0f790e306ec4150a3f4da03d159de44c9e3eab2a1c774c79b4cb8333da8d53f6",
       "targets": [
         "titles/futureperfect/src/recomp_manual.c"
       ]
@@ -2125,7 +2125,7 @@
     {
       "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch",
       "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch",
-      "sha256": "a22396d8b5bd2723cab320dac663240a2df5fda0b4719620e91a707153431f9c",
+      "sha256": "2ef3caa637c91fdfec1e6d04fbb5d7863f5dfff53fea79e79dd8171275c74c73",
       "targets": [
         "titles/futureperfect/src/recomp_manual.c"
       ]
