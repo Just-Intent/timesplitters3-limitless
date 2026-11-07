@@ -1,12 +1,23 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4013 @@
+@@ -1911,6 +1911,4035 @@
      sub_002FA720_gen();
  #endif
  }
 +
 +/* MapMaker capacity areas (src/pc_mapmaker_<area>.inc, research/capacity-raise-plan.md).
 + * Each hook acts only in MapMaker contexts and otherwise runs the original. */
++extern void sub_0009B540_gen(void);
++void sub_0009B540(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_group_route")) pc_mapmaker_pads_group_route(sub_0009B540_gen);
++    else sub_0009B540_gen();
++#else
++    sub_0009B540_gen();
++#endif
++}
++
 +extern void sub_0009DC70_gen(void);
 +void sub_0009DC70(void)
 +{
@@ -645,6 +656,17 @@
 +    else sub_00332330_gen();
 +#else
 +    sub_00332330_gen();
++#endif
++}
++
++extern void sub_000895F0_gen(void);
++void sub_000895F0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_portal_link")) pc_mapmaker_rooms_portal_link(sub_000895F0_gen);
++    else sub_000895F0_gen();
++#else
++    sub_000895F0_gen();
 +#endif
 +}
 +
