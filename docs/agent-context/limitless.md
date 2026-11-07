@@ -23,8 +23,7 @@ Tests: `tests/mapmaker/`, `tests/compiler/test_guest_code_patches.py`,
 Fork-specific subsystem notes, kept out of the shared size-capped guides so
 upstream merges stay clean. Each part names the shared guide it extends.
 MapMaker player/contract docs live in `docs/mapmaker/`; measured results in
-`docs/project/STATUS.md`; Mac follow-up in `docs/project/MAC_PORT_BACKLOG.md`
-(MAC-126 and later).
+`docs/project/STATUS.md`; Mac follow-up in `docs/project/MAC_PORT_BACKLOG.md`.
 
 ## Subsystem map rows (extends [systems.md](systems.md))
 
@@ -734,8 +733,9 @@ mount slots, open failure) the map plays as Lab (argument, header +0xA,
 `[0x00784020]`). `mapmaker_container_over_chunks` counts header tileset 0 as
 past stock, so such maps save in the 64 KB tier (stock and System Link refuse
 them). Contract, asset audit and WRAP lines: `docs/mapmaker/mapmaker-tilesets.md`;
-tests `tests/mapmaker/test_mapmaker_tilesets.py` (fixture, XBE, decoder, pak
-audit) and the container fixture's tileset-0 tier.
+tests `tests/mapmaker/test_mapmaker_tilesets.py` and the container fixture's
+tileset-0 tier. Its tile textures are only in `l_102m.pak`. Disco variant
+plan: `docs/mapmaker/mapmaker-disco-variant.md`.
 
 ### Guest memory extension block
 
@@ -922,8 +922,7 @@ README warning. It is never a published release. Tests:
 `tools/build/fetch-video.ps1` downloads the BtbN month-end build
 `autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-shared-8.1.zip`
 (SHA-256 `3e47bda1…6811a`, also recorded by `tools/release/package-release.py`). The
-previous pin named the moving `latest` asset, which BtbN rebuilds daily, so its
-checksum stopped matching; month-end builds are retained. Without
+previous pin named BtbN's daily-rebuilt `latest` asset; month-end builds are retained. Without
 `third_party/ffmpeg/include` the runtime builds without `XMV_HAVE_FFMPEG`
 (no XMV movie playback), so fetch FFmpeg before a release build.
 
