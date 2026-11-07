@@ -101,7 +101,7 @@ def test_mapmaker_custommusic(tmp_path, mutation):
     wav(music / 'beta_song.wav')
     (music / 'readme.txt').write_text('ignored')
     env = {k: v for k, v in os.environ.items() if not k.startswith(('TSFP_', 'RECOMP_'))}
-    result = subprocess.run([str(exe), str(music), str(settings)], env=env, capture_output=True, text=True, timeout=60)
+    result = subprocess.run([str(exe), str(music), str(settings)], env=env, cwd=tmp_path, capture_output=True, text=True, timeout=60)
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'mapmaker custommusic ok' in result.stdout
