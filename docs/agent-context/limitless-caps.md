@@ -179,6 +179,51 @@ logs have no object, pool or effect line for it (no counter was logged).
 - Play check: on the m40 map shoot several barrels, push crates around, then
   shoot again; each break should log `explosion` and hurt nearby characters.
 
+## Engine object pool end: many Story AI (2026-11-07, after .45)
+
+Symptom (`logs/m45c.err`, crash `logs/m45c/crash-20261107-080316885-*`):
+BigMap, 395 pieces and about 106 Story AI, crashed about a second into
+play, every load; no MapMaker line before it.
+
+- Cause (CONFIRMED in the dump and the code): access violation in
+  `sub_0009FF10` (0x0009FF79, room table `[0x007B0CC0]` + id x 12 + 0x1000)
+  on object slot 2 (pool `[0x0072F5E8]` = 0x8174AA70, edi 0x5D0): its room
+  count byte +0x30 was 0x40 and room id +0x38 the pointer 0x81E718EC. The
+  last model drawn (`model-history.txt`) was 0x8174B070 = slot 2 + 0x30 =
+  twin 1026 (twin pool `[0x0070AADC]` = 0x816CAC70, 0x200 per slot, ends where
+  the object pool starts), and that model's +0 is object 1026. So slots past
+  1022 were handed out: `sub_0009EE00` (only caller `sub_000A6880`, the
+  create) takes slot = count `[0x007B4FAC]` with no bound once no freed slot
+  (`[0x007B65B8]`, +0x2B & 0x80) exists. The editor's budget (pieces + items
+  + 64 characters + 64 effects <= 1023) holds, so each AI takes more than its
+  body (held weapons: INFERRED, not measured); 63 alive AI need 106+ placed.
+- Fix 1 (actors, no new wrapper): `pc_mapmaker_actors_slot` refuses a new
+  AI (the stock -1; the spawner retries later frames) while fewer than
+  `MAPMAKER_ACTORS_OBJECT_HEADROOM` 72 slots are free in local scene-100 play
+  (any mode; not System Link, not other scenes); `pc_mapmaker_actors_placed`
+  clamps the level-start count to free - 72. Log
+  `[mapmaker] engine objects nearly full: AI not spawned yet, free object
+  slots (n of 1023)` (first 3).
+- Fix 2: `pc_mapmaker_objects_create` (new `WRAP sub_000A6880`): in scene
+  100/102 with pools on, a create with no free slot below the pool returns 0,
+  the original's own model-failure result (0x000A695C), and logs
+  `[mapmaker] engine objects full (n of 1023): object of template t not
+  created` (first 8, then every 256th). `sub_000A6EC0` and `sub_000DAC30`
+  test it; `sub_000A6FD0`, `sub_0016EAB0`, `sub_00174120`, `sub_001F6660`,
+  `sub_001F9800` do not (stock behaviour at a failed model). Last guard only.
+- Editor: unchanged. The 1024-handle ceiling remains; the editor's 128-slot
+  reserve already counts 64 characters, and the AI headroom is enforced in
+  play, where the real per-character cost is known.
+- Tests: `mapmaker_actors.c` (72/71 free, freed slots, past the pool, modes,
+  System Link, story levels, no pool, placed clamp; 10 `objects-*`
+  mutations), `mapmaker_objects.c` (append at 1022 allowed, full/past/stale
+  free count refused, freed slot reused, editor, story, pools off; 7
+  `full-*` mutations), `test_mapmaker_objpool_classified.py` (count writers,
+  one caller, no bound, null tests, twin sizing, headroom > effects).
+- Play check: the m45c BigMap loads and plays; stderr shows the headroom
+  line once AI fill the pool, no `engine objects full`; kill AI and watch new
+  ones spawn; shoot barrels with many AI alive.
+
 ## Play memory and the memory estimate (2026-11-02)
 
 - `pc_mapmaker_memory.inc` nav block: 6 MB (`MAPMAKER_NAV_BYTES`) from the

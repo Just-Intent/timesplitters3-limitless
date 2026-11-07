@@ -61,6 +61,20 @@ MUTATIONS = {
     # level-start AI
     'placed-unclamped': ('        WORD_AT(level+0x30u)=cap;', '        (void)cap;'),
     'placed-ignores-humans': ('cap=slots>humans?slots-humans:0u;', 'cap=slots;'),
+    # engine object headroom (m45c crash: 106 Story AI ran the object pool past 1023)
+    'objects-headroom-stock': ('#define MAPMAKER_ACTORS_OBJECT_HEADROOM 72u', '#define MAPMAKER_ACTORS_OBJECT_HEADROOM 5u'),
+    'objects-headroom-off-by-one': ('free_objects<(int32_t)MAPMAKER_ACTORS_OBJECT_HEADROOM) {',
+                                    'free_objects<=(int32_t)MAPMAKER_ACTORS_OBJECT_HEADROOM) {'),
+    'objects-freed-ignored': ('live=(int32_t)WORD_AT(MAPMAKER_ACTORS_OBJ_COUNT)-(int32_t)WORD_AT(MAPMAKER_ACTORS_OBJ_FREE);',
+                              'live=(int32_t)WORD_AT(MAPMAKER_ACTORS_OBJ_COUNT);'),
+    'objects-past-pool-wraps': ('return live>=(int32_t)cap?0:(int32_t)cap-live;', 'return (int32_t)cap-live;'),
+    'objects-network': ('    if(!mapmaker_actors_local100() || !cap) return -1;', '    if(!cap) return -1;'),
+    'objects-no-pool-refuses': ('    if(!mapmaker_actors_local100() || !cap) return -1;', '    if(!mapmaker_actors_local100()) return -1;'),
+    'objects-slot-unchecked': ('    if(free_objects>=0 && free_objects<(int32_t)MAPMAKER_ACTORS_OBJECT_HEADROOM) {',
+                               '    if(0) {'),
+    'objects-slot-not-counted': ('        mapmaker_actors_drop(MAPMAKER_ACTORS_DROP_OBJECTS,', '        (void)(MAPMAKER_ACTORS_DROP_OBJECTS,'),
+    'objects-placed-unclamped': ('        if(room<cap) cap=room;', '        (void)room;'),
+    'objects-placed-no-headroom': ('(uint32_t)free_objects-MAPMAKER_ACTORS_OBJECT_HEADROOM:0u;', '(uint32_t)free_objects:0u;'),
     # list
     'list-63': ('if(count<MAPMAKER_ACTORS_MAX) return 0;', 'if(count<MAPMAKER_ACTORS_MAX-1u) return 0;'),
     'list-unbounded': ('if(count<MAPMAKER_ACTORS_MAX) return 0;', 'if(1) return 0;'),

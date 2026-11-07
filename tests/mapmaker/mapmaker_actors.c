@@ -348,6 +348,24 @@ int main(void)
     fill(4u,27u,1);CHECK(slot_call()==1);
     WORD_AT(SCENE)=100u;
 
+    /* ---- engine object headroom (m45c: 106 Story AI ran the object pool past 1023) ---- */
+    WORD_AT(0x007DE304u)=1u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_pool,fake_pool);
+    WORD_AT(0x0072F5E4u)=1023u;WORD_AT(0x007B65B8u)=0;
+    drops=mapmaker_actors.drops[MAPMAKER_ACTORS_DROP_OBJECTS];
+    fill(1u,30u,1);WORD_AT(0x007B4FACu)=1023u-72u;CHECK(slot_call()==1);   /* 72 free: spawned */
+    WORD_AT(0x007B4FACu)=1023u-71u;CHECK(slot_call()==0);                  /* 71: refused, retried later */
+    CHECK(mapmaker_actors.drops[MAPMAKER_ACTORS_DROP_OBJECTS]==drops+1u);
+    WORD_AT(0x007B65B8u)=1u;CHECK(slot_call()==1);                         /* a freed slot counts */
+    WORD_AT(0x007B65B8u)=0;WORD_AT(0x007B4FACu)=1100u;CHECK(slot_call()==0); /* past the pool: 0 free */
+    fill(1u,0u,0);WORD_AT(0x007B4FACu)=1023u;CHECK(slot_call()==0);        /* other modes in scene 100 too */
+    WORD_AT(NETWORK)=1u;fill(1u,10u,1);CHECK(slot_call()==1);              /* System Link: stock */
+    WORD_AT(NETWORK)=0;
+    pool_record(1u);WORD_AT(SCENE)=1u;fill(1u,10u,1);CHECK(slot_call()==1); /* story levels: stock */
+    WORD_AT(SCENE)=100u;WORD_AT(0x0072F5E4u)=0;
+    WORD_AT(0x007DE304u)=1u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_pool,fake_pool);
+    fill(1u,10u,1);CHECK(slot_call()==1);                                  /* no object pool yet */
+    WORD_AT(0x007B4FACu)=0;
+
     /* ---- level-start AI clamp ---- */
     WORD_AT(LEVEL)=0x00660000u;WORD_AT(HUMANS)=1u;
     pool_record(1u);WORD_AT(POOLPTR)=POOL;
@@ -358,6 +376,15 @@ int main(void)
     WORD_AT(0x007DE304u)=1u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_pool,fake_pool);
     WORD_AT(0x00660030u)=70u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_placed,fake_plain);
     CHECK(WORD_AT(0x00660030u)==63u);
+    WORD_AT(0x0072F5E4u)=1023u;WORD_AT(0x007B65B8u)=0;WORD_AT(0x007B4FACu)=1023u-72u-20u;
+    WORD_AT(0x00660030u)=70u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_placed,fake_plain);
+    CHECK(originals==1 && WORD_AT(0x00660030u)==20u);                      /* the object headroom kept */
+    WORD_AT(0x007B4FACu)=1023u-50u;
+    WORD_AT(0x00660030u)=70u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_placed,fake_plain);
+    CHECK(WORD_AT(0x00660030u)==0u);
+    WORD_AT(NETWORK)=1u;WORD_AT(0x00660030u)=10u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_placed,fake_plain);
+    CHECK(WORD_AT(0x00660030u)==10u);                                      /* System Link: no object check */
+    WORD_AT(NETWORK)=0;WORD_AT(0x0072F5E4u)=0;WORD_AT(0x007B4FACu)=0;
 
     /* ---- live list appends ---- */
     WORD_AT(COUNT)=63u;call_setup(0,0,0);HOOK(pc_mapmaker_actors_list_add,fake_plain);CHECK(originals==1);

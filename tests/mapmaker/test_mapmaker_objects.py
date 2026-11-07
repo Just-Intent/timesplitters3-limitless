@@ -95,6 +95,18 @@ MUTATIONS = {
     'break-log-any-scene': ('    if(mapmaker_objects_scene(100u) && MAPMAKER_STACK_OK(8)) {\n        int32_t used',
                             '    if(MAPMAKER_STACK_OK(8)) {\n        int32_t used'),
     'break-no-original': ('    original();\n}\n\n/* ---- teleporters', '}\n\n/* ---- teleporters'),
+    # Object create (m45c): never append past the pool; reuse a freed slot; MapMaker scenes only.
+    'full-off-by-one': ('    if(count<cap) return 1;', '    if(count<=cap) return 1;'),
+    'full-trusts-free-count': ("    if(!WORD_AT(MAPMAKER_OBJECTS_FREED) || !base) return 0;\n    for(i=0;i<cap;i++)",
+                               "    if(!WORD_AT(MAPMAKER_OBJECTS_FREED) || !base) return 0;\n    return 1;\n    for(i=0;i<cap;i++)"),
+    'full-no-reuse': ('&0x80u) return 1;\n    return 0;', '&0x80u) return 0;\n    return 0;'),
+    'full-not-zero': ('        g_eax=0;\n        MAPMAKER_GUEST_RET();\n        return;\n    }\n    original();\n}\n\n/* ---- physics',
+                      '        MAPMAKER_GUEST_RET();\n        return;\n    }\n    original();\n}\n\n/* ---- physics'),
+    'full-runs-original': ('        g_eax=0;\n        MAPMAKER_GUEST_RET();\n        return;\n    }\n    original();\n}\n\n/* ---- physics',
+                           '        g_eax=0;\n    }\n    original();\n}\n\n/* ---- physics'),
+    'full-any-scene': ('    if(mapmaker_objects_pool_on() && !mapmaker_objects_slot_free()) {',
+                       '    if(!mapmaker_objects_slot_free()) {'),
+    'full-not-counted': ('if(mapmaker_objects_full++<8u ||', 'if(mapmaker_objects_full<8u ||'),
 }
 
 
