@@ -285,8 +285,7 @@ one-floor robot), mutations `stack-*` and `hold-*`.
 
 ### The room follows the eye: a geometric hold (v0.4.0-mapmaker.45)
 
-User report (.44): "Giant robots still walked through one floor opening." No
-.44 log was available.
+User report (.44): "Giant robots still walked through one floor opening."
 
 Cause (CONFIRMED, decode, `test_room_traced_at_the_eye`): the .44 hold waited
 for the room +0x34 to change, and at a low doorway it does not. The ordinary
@@ -324,6 +323,17 @@ data cannot be read); at most 4 `giant robot k held at (x, y, z): it walked
 into portal p (rooms a-b), opening o, lower than it (h); its room read r, kept
 s` and 4 `giant robot k passed portal p (rooms a-b), opening o, at (x, y, z);
 its room r -> s`. A held line with r equal to s confirms the eye cause.
+Every 600 handler frames, when a count changed (at most 40 per robot and
+level): `giant robot k after f frames: h holds, p passes, l frames its pad's
+room was not its room; at (x, y, z) room r, pad q (room s)`; lag frames are
+the eye lag.
+
+The .44 log (`logs/m44.err`) agrees: each robot rebuilt its pad set from pad
+208/209 (`reaches 9 of 234 pads`), the far side of the 5.00 links pad 25/26
+(room 3) - pad 208/209 (room 64), before its first `held in room 3: the
+opening to room 64` line. Its feet were already through while +0x34 still
+read room 3; the room-change hold fired only when the eye trace caught up,
+holding it on the wrong side.
 
 INFERRED (playtest): that the robot's centre passes inside the doorway's
 portal polygon (portals are the door outlines), and that knee height is
@@ -331,7 +341,7 @@ inside every MapMaker doorway. Tests: `hold()` adds the room unchanged (the
 .45 case), no room known, beside the doorway, a floor above, a triangular
 portal (outside the polygon inside its bounds, then through it the other
 way) and the eye point put back; mutations `hold-room-change-only`,
-`hold-eye-*`, `cross-*`.
+`hold-eye-*`, `cross-*`, `summary-*`.
 
 ## Several robots
 
