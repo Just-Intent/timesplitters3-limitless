@@ -187,6 +187,74 @@ All cdecl, plain `ret`. Include `pc_mapmaker_pitboss.inc` after
 `pc_mapmaker_creatures.inc` (done in `pc_menu_mouse_guest.inc`; declarations
 in `pc_display_menu.h`, stubs in its `#else` branch).
 
+## Playtest .66: bottle at the feet, not hurt by shots (fixed after .66)
+
+User report (.66): "Gas bottle appears at base of pit skeleton without
+texture, shooting it doesn't result in skeleton taking damage, and the
+bottle is easily destroyed. Ragbugs spawning/logic doesn't appear improved."
+
+What `m66.err` shows (CONFIRMED by the log): the bottle **was** made every
+run (`gas bottle 0x24A made ...`): in the first run at (123.02, 8.00,
+420.21) with the boss at (117.00, 0.51, 411.00); after the level reloads and
+the restart at (117.77, 1.64, 411.59), the boss's feet, once at (NaN, NaN,
+NaN); the eye bandage likewise at 12.86 the first time and at the feet (0.97,
+1.53) after. No death and no level event in any run; the bosses bar was "out
+of range" in the later runs (the player far from the boss). All four models
+"not loaded, file read, textures registered by the load pass".
+
+How the story makes and uses the bottle (CONFIRMED, decode): state 1 creates
+0x24A (`sub_000A6F90`) at the boss's bone point (model bone 0x29's segment
+through its matrix, `sub_00151E80`, minus a lean offset) once the intro is
+0.315 in; every frame (0x0029E5EE..) it is put back at that bone point with
+the bone's rotation and the boss's health +0x1CC is the bottle's +0x4274. Its
+damage callback `sub_0028C2F0` is the object's +0x19C (`sub_0009E720`), which
+the damage code calls instead of the generic prop damage (0x000BB62D..
+0x000BB638). The boss's bone matrices ([entity+4]+0x10) are computed by
+`sub_000A1B80(prop)` once per view slot, only from the prop draw
+(`sub_0008F6B0`, 0x0008F700) or a stock bone reader (`sub_0018F8E0`).
+
+Causes (INFERRED from the above; the new lines decide):
+- **At the feet / NaN**: the catacombs boss is always on screen, so its bones
+  are posed every frame; a MapMaker one out of view is not drawn, so the
+  fight read stale or never-computed matrices and put the bottle (and the
+  bandage, attached to a bone) at the feet or at NaN.
+- **Shots do nothing**: hanging at the mouth (8-12 over a one-floor tile) the
+  bottle lists no room (`0 listed rooms`), so no room's prop list holds it
+  for the hit tests (the drawing gap of .62, which bossroom closed for drawing
+  only). No `damage` call reached `sub_0028C2F0` (health never fell, no
+  death). What the user saw "easily destroyed" was not traced; the new hit
+  lines show whether the bottle is hit at all.
+- **Untextured**: not settled. The load pass registered the four models'
+  textures (no deferred mark), and l_17_stm was mounted before it; the
+  untextured object at the feet may be the stale-posed bottle or the
+  collision hull 0x249 (made at the boss's feet, listed in room 12, drawn by
+  the stock room pass; in the story slot 4 `sub_0028C540` flags it).
+
+Fixes:
+- Pose: every fight frame, before the fight, the boss's view-slot bit
+  (prop word +0x14) is cleared and `sub_000A1B80(boss)` called, as
+  `sub_0018F8E0` does, so the bone points (bottle, bandage, fire, throws)
+  are this frame's. Log `pit skeleton pose computed before its fight each
+  frame (skeleton, view slot)`.
+- Rooms: after each fight frame, a bottle, rack or bandage that lists no room
+  gets the boss's listed rooms (+0x30/+0x38) and room +0x34, so the bucket pass
+  links it where the boss stands (drawn and hit there).
+- Logs: each bottle hit (`gas bottle hit (type, kind, amount): health a ->
+  b`, 16 a fight); a trace every 2 s (24 a fight: boss and bottle positions,
+  the bottle's model, rooms, room, damage callback, health, ragbug phases);
+  each ragbug's phase change.
+
+Ragbugs in the story (CONFIRMED, decode of `sub_0028AAA0`/`sub_0028A0A0`):
+they wait parked 2.2 under the pit floor (phase 0). Each time the fight passes
+state 10 (after a fire attack and raise), up to 3 parked ones rise out of the
+floor on a circle of radius 5 round the boss (phase 1, about 1 s), circle it
+(3), pick a player and dive (4), strike (5) and explode (6, `sub_000EFBD0`),
+then return to the park (0) until the next launch. So in the story they show
+in waves of up to three, not all at once and not for good; one at a time
+round the skeleton matches a flock whose bugs dive and explode at different
+times. The .62 release only adds one launch at state 6. The phase lines show
+what each bug does.
+
 ## Restart
 
 The restart keeps the Level heap (limitless-bosses.md), so the blocks are
