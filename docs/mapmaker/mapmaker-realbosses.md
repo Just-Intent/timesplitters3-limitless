@@ -79,6 +79,39 @@ second restart, an unusable block and effect count, mission 5 and the switch
 off; mutations `restart-*`, `again-*`, `fx-effect-size-swapped`,
 `alloc-live-statics`. Unplayed.
 
+**After v0.4.0-mapmaker.43: the restart unmaps the mansion anims.** User
+report (.43): four skeletons "glitching out after restarting". `m40b`, `m42`
+and `m43b.err` show no throw after any restart (the first run threw within
+about 10 s); fresh level loads always threw. CONFIRMED (decode and US XBE,
+`test_restart_drops_the_mansion_anims`): the restart's `sub_0005FC60`
+(0x001CDD6A) tail-jumps to `sub_0005C2F0`. It stops entity anims whose slot
+word (0x007DE660 + slot*8, +4) has 0x4000, unmaps every loaded anim with that
+flag (`[[0x007E3954] + slot*4]` = 0, id map `[0x007E03C0 + id*2]` = 0xFFFF)
+and puts the next slot `[0x006D77F8]` back to the mark `[0x006D77FC]`.
+Registration (`sub_001CA2F0`) runs only while `[0x006D781C]` is 0 (full level
+load, `sub_0005A120`). Every kept lv1_6 entry (0x5800 / 0x1005800) and lv1_3
+entry (0x5800) has the flag; lv81's and lv14's have not, so walkers and split
+Crowes were fine. With princess_start unmapped, `sub_0005F460` plays nothing,
+the entrance check `sub_00059DB0(entity, 0x19C)` never answers and the fight
+stays in its entrance state: fire drawn, no throws. The pak this area mounts
+is a Level heap buffer (`sub_0005A130` -> `sub_000622D0(path, 1, 1)` ->
+`sub_0003E0B0(0x80, size, 1)`), which the restart keeps.
+
+Fix (`rbs_anims_note` / `rbs_anims_again` in `pc_mapmaker_realbosses_restart`):
+before the original, in scene 100 story with the switch on, the ids of this
+map's trophy monster (0x127..0x12E) and skeleton (0x19C..0x1A6, 0x1A9) are
+noted when the set has the boss, its pak is mounted, and the id maps to a
+loaded, flagged anim. After the original each one gets the same slot and
+pointer back, if the id is free, the slot empty and below the next free
+slot. Otherwise it is left alone and counted. Log: `level restart: mansion
+boss anims mapped again (mapped, not mapped)`. Other 0x4000 anims stay stock
+(mission 5's own restart too). The worm's lv1_2 anims also carry the flag
+(worm area; not handled here). The death log now names the skeleton
+(`(entity, skeleton)`); its old second value was message 2. Fixture: restart
+with the slot table, then a second restart, a slot taken after the drop, a
+slot at the mark, the trophy monster in the set or unmounted, mission 5, and
+the switches off. Mutations `anims-*`. Unplayed.
+
 User report (2026-10-31): the trophy monster from story mission 5 is much
 bigger than the Arcade trophy monster and was not selectable. It is a
 separate character (research: `logs/limits/features/real-bosses.md`, main
