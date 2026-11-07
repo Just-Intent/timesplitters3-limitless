@@ -53,6 +53,9 @@ void sub_00045390(void) {mode=15;}
 void sub_00045820(void) {mode=16;}
 void sub_00045C60(void) {mode=13;}
 void sub_00021780(void) {mode=14;}
+void sub_00074720(void) {mode=17;}
+void sub_00071A60(void) {mode=18;}
+static uint32_t audio_menu_active=1,audio_focus;
 static PcMenuPointer pc_controls_menu_pointer(void) { PcMenuPointer p=cursor;cursor.wheel=0;return p; }
 static PcMenuPointer pc_controls_menu_hover_pointer(void) { return cursor; }
 static void pc_controls_menu_mode(int on) { mode=on; }
@@ -80,6 +83,8 @@ static uint32_t guest_call(void (*fn)(void),unsigned n,...)
     if(fn==sub_00045820) {CHECK(n==1);++sensitivity_previews;return 0;}
     if(fn==sub_00045C60) {CHECK(n==0);++music_previews;return 0;}
     if(fn==sub_00021780) {CHECK(n==1);++sound_previews;return 0;}
+    if(fn==sub_00074720) {CHECK(n==1);return audio_menu_active;}
+    if(fn==sub_00071A60) {CHECK(n==1);return audio_focus;}
     if(fn==sub_002E49F0) {CHECK(n==0);return 0;}
     if(fn==sub_002E4A30) {CHECK(n==0);return 3;}
     va_start(ap,n);menu=va_arg(ap,uint32_t);
@@ -247,6 +252,7 @@ static void audio_tests(void)
     const uint32_t m=0x2000,music=0x3000,sound=0x3400;
     memset(memory,0,sizeof memory);memset(&menu_mouse,0,sizeof menu_mouse);
     memset(menu_mouse_footer,0,sizeof menu_mouse_footer);menu_slider_drag=0;
+    CHECK(pc_music_slider_extra_set(0));
     active=1;navigation=0;WORD_AT(0x79094c)=101;
     WORD_AT(0x4e8cf0)=640;WORD_AT(0x4e8cf4)=480;
     WORD_AT(m+0x1b0)=3;WORD_AT(m+0x178)=music;WORD_AT(music+4)=sound;
@@ -262,16 +268,18 @@ static void audio_tests(void)
         MenuSliderTrack *t=&menu_slider_tracks[0];
         CHECK(t->x==225 && t->w==215 && t->h==(layout?10:20));
         WORD_AT(0x5236bc)=16;WORD_AT(0x5236c0)=16;
+        /* Music: 24 positions over the same bar; the word keeps 0..16 */
         cursor.x=ox+(t->x+t->w*.25f)*scale;cursor.y=oy+(t->y+2)*scale;
         run(m);cursor.left=1;run(m);
-        CHECK(WORD_AT(0x5236bc)==4 && WORD_AT(m+0x198)==music);
+        CHECK(WORD_AT(0x5236bc)==6 && pc_music_slider_extra()==0 && WORD_AT(m+0x198)==music);
         CHECK(!(WORD_AT(m+0xc4)&0x10) && menu_slider_drag==music);
         unsigned previews=music_previews;run(m);CHECK(music_previews==previews);
         cursor.x=ox+(t->x+t->w*.75f)*scale;cursor.y=oy+(t->y+105)*scale;cursor.wheel=-1;
-        run(m);CHECK(WORD_AT(0x5236bc)==12 && WORD_AT(0x5236c0)==16);
+        run(m);CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==2 && WORD_AT(0x5236c0)==16);
         CHECK(WORD_AT(m+0x198)==music && !(WORD_AT(m+0xc4)&0x001F001F));
-        cursor.x=ox+(t->x-30)*scale;run(m);CHECK(WORD_AT(0x5236bc)==0);
-        cursor.x=ox+(t->x+t->w+30)*scale;run(m);CHECK(WORD_AT(0x5236bc)==16);
+        cursor.x=ox+(t->x-30)*scale;run(m);CHECK(WORD_AT(0x5236bc)==0 && pc_music_slider_extra()==0);
+        cursor.x=ox+(t->x+t->w+30)*scale;run(m);
+        CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==PC_MUSIC_SLIDER_EXTRA_MAX);
         cursor.left=0;run(m);CHECK(!menu_slider_drag);
         t=&menu_slider_tracks[1];cursor.x=ox+(t->x+t->w*.5f)*scale;cursor.y=oy+(t->y+2)*scale;
         run(m);cursor.left=1;run(m);CHECK(WORD_AT(0x5236c0)==8);
@@ -293,6 +301,116 @@ static void audio_tests(void)
     CHECK(music_previews && sound_previews);
     CHECK(pc_menu_slider_value(-1,0,100,16)==0 && pc_menu_slider_value(101,0,100,16)==16);
     CHECK(pc_menu_slider_value(NAN,0,100,16)==0 && pc_menu_slider_value(1,0,0,16)==0);
+}
+/* The audio painter's call to the bar primitive sub_000814B0: fraction =
+ * word x 1/16 at [esp+4], from 0x002C35F4 (return 0x002C35F9) or the compact
+ * 0x002C3704 (0x002C3709). */
+static uint32_t bar_return=0x002C35F9u;
+static float bar_fraction;
+static void audio_bar_painter(void)
+{
+    uint32_t frame=g_esp;
+    g_esp=0x1900;WORD_AT(g_esp)=bar_return;
+    FLOAT_AT(g_esp+4)=(float)WORD_AT(0x5236bc)*.0625f;
+    WORD_AT(g_esp+8)=225;WORD_AT(g_esp+12)=130;WORD_AT(g_esp+16)=215;WORD_AT(g_esp+20)=20;
+    pc_display_menu_slider_bar(audio_draw_original);CHECK(g_esp==0x1904);
+    bar_fraction=FLOAT_AT(0x1904);
+    g_esp=frame+4;
+}
+static float audio_bar(uint32_t m,uint32_t row,uint32_t id,int compact)
+{
+    WORD_AT(row)=4;WORD_AT(row+0x88)=m;WORD_AT(row+0x14)=id;
+    FLOAT_AT(0x7000)=180;FLOAT_AT(0x7004)=100;FLOAT_AT(0x7008)=460;FLOAT_AT(0x700c)=160;
+    g_esp=0x1800;WORD_AT(g_esp+4)=m;WORD_AT(g_esp+8)=row;WORD_AT(g_esp+12)=0x7000;
+    bar_fraction=-1;
+    pc_display_menu_audio_draw(audio_bar_painter,compact);CHECK(g_esp==0x1804);
+    return bar_fraction;
+}
+/* Stock sub_002C3720 for the focused item: Left (0x40000) first, then Right
+ * (0x80000), clamped 0..16; a change calls sub_00045C60 and the click. */
+static void audio_tick_original(void)
+{
+    uint32_t menu=WORD_AT(g_esp+4),c4=WORD_AT(menu+0xc4),v=WORD_AT(0x5236bc),old=v;
+    if(audio_menu_active && WORD_AT(audio_focus+0x14)==1 && !(WORD_AT(audio_focus+0x28)&1u)) {
+        if(c4&0x40000u) v=(int32_t)v-1<=0?0:v-1;
+        else if(c4&0x80000u) v=v+1>=16?16:v+1;
+        WORD_AT(0x5236bc)=v;
+        if(v!=old) {++music_previews;++sound_previews;}
+    }
+    g_esp+=4;
+}
+static void audio_key(uint32_t m,uint32_t keys)
+{
+    WORD_AT(m+0xc4)=keys;g_esp=0x1800;WORD_AT(g_esp+4)=m;
+    pc_display_menu_audio_tick(audio_tick_original);CHECK(g_esp==0x1804);
+    WORD_AT(m+0xc4)=0;
+    CHECK(WORD_AT(0x5236bc)<=16);                    /* the profile's word never past 16 */
+}
+static void music_ini(char *out,size_t bytes)
+{
+    const char *display=getenv("TSFP_DISPLAY_CONFIG");
+    CHECK(display && strlen(display)+16<bytes);
+    snprintf(out,bytes,"%s",display);
+    char *slash=strrchr(out,'/'),*back=strrchr(out,'\\');
+    if(back>slash) slash=back;
+    snprintf(slash?slash+1:out,bytes-(size_t)(slash?slash+1-out:0),"pc-music.ini");
+}
+static void music_slider_tests(void)
+{
+    const uint32_t m=0x2000,music=0x3000,sound=0x3400;
+    const uint32_t left=0x40000u,right=0x80000u;
+    char path[600],text[256]={0};
+    FILE *f;
+    memset(memory,0,sizeof memory);
+    WORD_AT(0x7ba16c)=1;WORD_AT(0x7ba178)=0x6000;WORD_AT(0x6008)=42;
+    WORD_AT(music+0x14)=1;WORD_AT(sound+0x14)=3;audio_focus=music;audio_menu_active=1;
+    music_ini(path,sizeof path);
+    f=fopen(path,"wb");CHECK(f);if(f) {fputs("TSFP_MUSIC_V1\narcade=x.wav\ngain_db=-3\n",f);fclose(f);}
+    pc_music_extra_live=-1;CHECK(pc_music_slider_extra()==0);
+    /* bar: position / 24 in both layouts; other bars and callers untouched */
+    for(unsigned position=0;position<=MENU_MUSIC_TICKS;position++) {
+        WORD_AT(0x5236bc)=position<16?position:16;
+        pc_music_extra_live=position>16?(int)position-16:0;
+        float want=(float)position/24.f;
+        CHECK(audio_bar(m,music,1,0)==want && audio_bar(m,music,1,1)==want && want<=1.f);
+        bar_return=0x002C3709u;CHECK(audio_bar(m,music,1,1)==want);bar_return=0x002C35F9u;
+    }
+    WORD_AT(0x5236bc)=8;pc_music_extra_live=0;
+    CHECK(audio_bar(m,sound,3,0)==.5f);                /* the Sound bar keeps 16 steps */
+    bar_return=0x002EA3E0u;CHECK(audio_bar(m,music,1,0)==.5f);bar_return=0x002C35F9u;
+    audio_bar_painter();CHECK(bar_fraction==.5f);      /* outside an audio row */
+    WORD_AT(0x5236bc)=11;CHECK(audio_bar(m,music,1,0)==11.f/24.f);
+    /* keys: 0..16 exactly as stock, then Right adds ticks up to 8 */
+    WORD_AT(0x5236bc)=15;pc_music_slider_extra_set(0);
+    unsigned clicks=sound_previews,previews=music_previews;
+    audio_key(m,right);CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==0);
+    CHECK(sound_previews==clicks+1 && music_previews==previews+1);
+    audio_key(m,right);CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==1);
+    CHECK(sound_previews==clicks+2 && music_previews==previews+1);   /* click only: stock volume unchanged */
+    for(int i=0;i<10;i++) audio_key(m,right);
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==8 && sound_previews==clicks+9);
+    f=fopen(path,"rb");CHECK(f);if(f) {CHECK(fread(text,1,sizeof text-1,f)>0);fclose(f);}
+    CHECK(!strcmp(text,"TSFP_MUSIC_V1\narcade=x.wav\ngain_db=-3.00\nslider_extra=8\n"));
+    pc_music_extra_live=-1;CHECK(pc_music_slider_extra()==8);  /* read back */
+    audio_key(m,left|right);                           /* Left first, as stock */
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==7 && music_previews==previews+3);
+    for(int i=0;i<7;i++) audio_key(m,left);
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==0);
+    audio_key(m,left);CHECK(WORD_AT(0x5236bc)==15 && pc_music_slider_extra()==0);
+    /* only the focused, enabled Music item of an active menu */
+    WORD_AT(0x5236bc)=16;pc_music_slider_extra_set(3);
+    WORD_AT(music+0x28)=1;audio_key(m,right);audio_key(m,left);
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==3);
+    WORD_AT(music+0x28)=0;audio_focus=sound;audio_key(m,right);CHECK(pc_music_slider_extra()==3);
+    audio_focus=music;audio_menu_active=0;audio_key(m,right);CHECK(pc_music_slider_extra()==3);
+    audio_menu_active=1;audio_key(m,0);CHECK(pc_music_slider_extra()==3);
+    /* a profile below 16 ignores the stored ticks; reaching 16 again starts at 16 */
+    WORD_AT(0x5236bc)=11;CHECK(menu_music_position()==11 && audio_bar(m,music,1,0)==11.f/24.f);
+    for(int i=0;i<5;i++) audio_key(m,right);
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==0 && menu_music_position()==16);
+    pc_music_slider_extra_set(99);CHECK(pc_music_slider_extra()==PC_MUSIC_SLIDER_EXTRA_MAX);
+    pc_music_slider_extra_set(-4);CHECK(pc_music_slider_extra()==0);
+    remove(path);
 }
 /* Simulate the original sensitivity painter calling its shared bar primitive.
  * The uneven width represents translated labels; the adapter must use exactly
@@ -788,6 +906,9 @@ int main(void)
     const uint32_t m=0x2000,item=0x3000,v=0x4000;
     float x,y;
     PcMenuPointer p={960,540,1920,1080,1,0,0,0};
+    /* The Music slider's ticks past 16 persist in pc-music.ini beside this
+     * path: the test must give a disposable one (never config/). */
+    CHECK(getenv("TSFP_DISPLAY_CONFIG") && *getenv("TSFP_DISPLAY_CONFIG"));
     CHECK(pc_menu_mouse_position(p,16.f/9,640,480,&x,&y) && x==320 && y==240);
     p.x=480;CHECK(pc_menu_mouse_position(p,16.f/9,640,480,&x,&y) && fabsf(x-106.6667f)<.001f);
     p=(PcMenuPointer){1720,720,3440,1440,1,0,0,0};
@@ -1044,6 +1165,7 @@ int main(void)
     cursor.left=0;run(m);WORD_AT(m+4)=0;cursor.left=1;run(m);CHECK(!early_action);
     CHECK(original_calls>10);
     audio_tests();
+    music_slider_tests();
     setting_slider_tests();
     choice_tests();
     team_tests();

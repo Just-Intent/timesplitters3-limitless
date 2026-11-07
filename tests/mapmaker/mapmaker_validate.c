@@ -50,6 +50,7 @@ typedef struct Map {
     uint32_t rec_type; int32_t rec_count, rec_idx;
     uint32_t s73, s74, s75;
     int malformed, no_end, truncate;           /* truncate: piece chunk size short by N bytes */
+    uint32_t flags;                            /* info flags +0x244 (bit 31: Disco variant) */
 } Map;
 static Map def(void)
 {
@@ -97,6 +98,7 @@ static void build(const Map *m)
     WORD_AT(c+8+4)=(uint32_t)m->header_pieces;
     BYTE_AT(c+8+0xA)=(uint8_t)m->tileset;BYTE_AT(c+8+0xB)=(uint8_t)(m->tileset>>8);
     BYTE_AT(c+8+0x42)=(uint8_t)m->words;
+    WORD_AT(c+8+0x244)=m->flags;
     for(i=0;i<m->title && i<0xE0u;i++) BYTE_AT(c+8+0x162+i)='T';
     finish(c);
     pieces_chunk(m,m->pieces);
@@ -200,6 +202,10 @@ int main(void)
     m=def();m.rec_type=7;m.rec_count=99;m.rec_idx=-9;CHECK(editor(&m)==1); /* other types: no links */
     m=def();m.patrol=0;m.name=0;CHECK(editor(&m)==1);
     m=def();m.s73=0;m.s74=0;m.s75=0;CHECK(editor(&m)==1);
+    /* Disco variant marker: kept on base Virtual, cleared (not refused) elsewhere */
+    m=def();m.tileset=5;m.flags=0x80050000u;CHECK(editor(&m)==1 && WORD_AT(chunk_of[0]+8+0x244)==0x80050000u);
+    m=def();m.tileset=3;m.flags=0x80050000u;CHECK(editor(&m)==1 && WORD_AT(chunk_of[0]+8+0x244)==0x00050000u);
+    m=def();m.tileset=0;m.flags=0x7FFFFFFFu;CHECK(editor(&m)==1 && WORD_AT(chunk_of[0]+8+0x244)==0x7FFFFFFFu);
 
     /* ---- editor: crafted / damaged maps are refused the stock way ---- */
     m=def();m.tileset=7;CHECK(editor(&m)==0);
@@ -236,6 +242,7 @@ int main(void)
     /* ---- level setup: only scene 100's one-time pass ---- */
     WORD_AT(0x00784014u)=C;WORD_AT(0x0079094Cu)=100u;WORD_AT(0x006F32ECu)=0;
     m=def();level(&m);CHECK(hidden_seen==1 && end_at_seen);         /* only the chunk already hidden */
+    m=def();m.tileset=3;m.flags=0x80000000u;level(&m);              /* play: marker left as it is */
     m=def();m.title=0xE0;level(&m);
     CHECK(tag_hidden(chunk_of[0])==1 && tag_hidden(chunk_of[1])==1); /* header and its pieces */
     m=def();m.header_pieces=513;m.pieces=513;m.items=0;level(&m);

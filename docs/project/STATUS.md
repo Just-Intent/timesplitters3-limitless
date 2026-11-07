@@ -23,6 +23,21 @@ now also wrap, so the game will not link until the wrapper patch is
 regenerated (`test_fresh_checkout_and_repeated_build` reports the duplicates).
 Not run: game build, gameplay, Mac/Linux builds, MapMaker mutation sweeps.
 
+## MapMaker Disco tileset variant and Abstract tile textures (2026-11-07, not built or played)
+
+Branch `disco-variant` from `c0b951a1`; Windows 11 x64, MSVC x64 fixtures only.
+New: Map Settings "Disco" row (Virtual + info flag bit 31), alias of five
+Virtual tile texture ids to `arcademem/l_56_arm.pak` textures in play and in
+the editor, Disco sky/music defaults; Abstract maps also mount
+`arcademem/l_102m.pak` (their tile textures were never mounted in play).
+Validation: `tests/mapmaker/test_mapmaker_disco.py` (fixed + 40 mutations,
+decoder proof of the free bit, XBE bytes, pak audit against local game data),
+`test_mapmaker_tilesets.py` (fixed + 41 mutations), and the sky, skymusic,
+custommusic, validate, editor, menu-mouse, limits and container suites
+(WinError 4551 flakes rerun). Unverified: game build and run on both hosts,
+the in-game Disco look, the editor stream reload, Abstract textures in play,
+Mac fixtures. Details: `docs/mapmaker/mapmaker-disco-variant.md`.
+
 ## Imported music for MapMaker and Arcade (2026-11-03, not built or played)
 
 MP3 support and launcher import (2026-11-07, branch `music-mp3` from
@@ -37,6 +52,30 @@ and `test_mapmaker_skymusic.py` fixed cases passed, with mutation sweeps cut
 short by WinError 4551 / endpoint protection (rerun pending). Launcher
 `-Test` result: see the commit report. Unverified: game build/run, Mac build
 (MP3 is WAV-only there until an FFmpeg adapter, MAC-138), Mac launcher.
+
+Loudness after .50 "still quiet" (2026-11-07, branch `music-loud` from
+`8ba2dc43`; Windows 11 x64, MSVC fixtures; not built or played): at slider
+11/16 stock level music reached XAudio2 at -11.35 dB (m48/m50 `level -1135`)
+and the imported track at -3.25 dB on the same master; offline, 60 s of stock
+packets from `musicts.pak` measured -16.3 LUFS and the user's MP3 -9.9 LUFS
+(ffmpeg ebur128), so the import was already ~14.5 LU louder. Added the
+`gain_db=` trim in `pc-music.ini` (+ soft-clipped sample boost) and a level
+log line; default unchanged. `test_custom_music.py` fixed + 43 mutations and
+`test_mapmaker_custommusic.py` / `test_music_codec.py` passed (WinError 4551
+reruns). Unverified: the game build and what the player hears.
+
+Music slider past 16 (2026-11-07, branch `music-slider` from `24e64c03`;
+Windows 11 x64, MSVC fixtures; not built or played): the Audio Options Music
+bar (Settings and pause menu) has 24 steps; 0..16 stay stock, each step past
+16 adds 1.5 dB to imported music (`slider_extra=` in `pc-music.ini`, sum with
+`gain_db=` capped at +12 dB); the profile's word stays 0..16; stock music is
+unchanged past 16. Passed: `test_menu_mouse.py` fixed + 15 mutations (7 new),
+`test_custom_music.py` fixed + 51 mutations (8 new),
+`test_mapmaker_custommusic.py` incl. the new XBE check
+`test_stock_music_slider_code`, `test_mapmaker_restable.py`,
+`test_mapmaker_probe.py`, and the Windows `fov_settings.c` fixture built
+against the main checkout's runtime headers (this worktree has no
+`external/`). Unrun: the macOS `-fsyntax-only` menu compile, any game run.
 
 ## MapMaker Story AI points past piece 255 restored on editor reload (2026-11-06, not built or played)
 

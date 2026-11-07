@@ -297,6 +297,7 @@ def test_upgrade_previous_controls_with_newer_input_features(checkout):
                           'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-probe.patch',
                           'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-raise.patch',
                           'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-stagea.patch',
+                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-story-chain.patch',
                           'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch',
                           '2160-custom-music-codec.patch'):
             continue  # Requires the display wrapper / native test block, absent in this historical state.

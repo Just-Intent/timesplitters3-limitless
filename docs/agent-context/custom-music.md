@@ -61,23 +61,69 @@ Existing wrappers reused: `sub_00078590` (rows), `sub_003006C0` (compile),
   only when its count changes. Before this one 48-line budget was spent by
   list builds (m45b.err: 48 offer lines, then nothing), hiding every play
   line. Each silent play return logs `[music] play: <why> (ret, scene, eax,
-  map chunk, map music, arcade)`; a failed start logs `pc_music_error()`. Watch: scene word, slider `[0x005236BC]/16 x 0.65`, pause `[0x006D5EB8]` (set by sub_00045AB0, cleared by sub_00045AF0). Not the
+  map chunk, map music, arcade)`; a failed start logs `pc_music_error()`. Watch: scene word, slider `[0x005236BC]/16`, pause `[0x006D5EB8]` (set by sub_00045AB0, cleared by sub_00045AF0). Not the
   player's +0x28 `[0x0064BDC0]`: a state (0 idle, 1 pause-before-start, 2
   playing, 3 stopped), 3 after the menu music, which held every track silent
   through .46 (m46.err: `map: imported track`, never `slot=273`). The player
   logs its first submission, `held ... paused` and `stopped: <why>`.
 - Lead 250 ms in 4096-frame chunks; a refused submission is offered again.
+- Loudness (2026-11-07, .50 "still quiet"): stock level music reaches
+  XAudio2 at `2000 log10(pct/100) - 600`, pct = `(int)(slider/16 x 100 x
+  level/100)` (sub_00045B60; levels `0x00535858` 50..80, `0x005358B8` 80;
+  halved in scene 0x65) -> player +0x54 -> sub_00028180 `2000 log10` ->
+  `CDirectSoundStream_SetVolume`; the stream adds mix bins (0@0 1@0: 0) and
+  minus headroom 600 (`hle_dsound_stream_adjust`). One stereo voice, identity
+  matrix, same 0.5 master as slot 273; no summing. Logged: m48/m50 level
+  stock -1135 (slider 11, pct 54), menu -1737; slot 273 -325. Same curve, so
+  imported = stock + 8.0..12.0 dB at every slider. Content (ffmpeg ebur128):
+  60 s of m48's stock packets decoded from `musicts.pak` -16.3 LUFS, the
+  user's MP3 -9.9 LUFS: imported ~14.5 LU louder at the output. Not matched
+  (that cuts ~8 dB). Trim `gain_db=` in `pc-music.ini` (-12..+12, any line
+  after the header, kept by `pc_music_arcade_save`): voice = slider + trim
+  up to 0 dB (`gainOf` clamps >0), the rest is `pc_music_boost` on the
+  samples, soft-clipped above 0.75 (tanh knee). Read at each start; one
+  `[music] player: level ... stock level music at this slider: a..b` line.
+- Slider ticks past 16 (2026-11-07, "increase the number of ticks ... so I
+  can turn it up louder"): `src/interface/pc_menu_sliders.inc`. The Music bar
+  shows 24 positions; the word `[0x005236BC]` and profile +0x120 stay 0..16
+  (load sub_002C3300 0x2C3341, accept/back 0x2C39B9/0x2C3AC6, new profile 11
+  at 0x2D259D: only stock code and our clamped writes touch it), so stock
+  builds read every profile unchanged. Ticks 17..24 = `slider_extra=` 0..8 in
+  `pc-music.ini` (`pc_music_slider_extra[_set]`, live value
+  `pc_music_extra_live`, read on the game thread; every rewrite keeps
+  `arcade=`/`gain_db=`), counted only when the word is 16 (gain 1): +150 per
+  tick added to `gain_db=`, the sum capped at +1200, then the same voice/boost
+  split. Stock music is not raised: its pct (sub_00045B60, <= 80 at 16) is
+  passed through the guest player and the XDK `SetVolume` original
+  (HLE_CALL_ORIGINAL), whose handling of pct > 100 / positive mB is unproven;
+  host `gainOf`/SDL clamp at 0. Paths: descriptor 0x0052377C {build
+  0x2C3E20, tick 0x2C3720}, pushed by Settings 0x2CBE1A and pause 0x2EC215.
+  Tick: `pc_display_menu_lookup` 0x2C3720 -> `audio_options_tick` ->
+  `pc_display_menu_audio_tick` (not a WRAP). Before the original it reads
+  menu+0xC4 (0x40000 Left first, 0x80000 Right) and, via sub_00074720 /
+  sub_00071A60, whether the focused item is Music (id 1, +0x28 bit 0 clear);
+  after it, at a word of 16: Right adds a tick + click; Left with ticks takes
+  one and puts back the 16 the original lowered to 15 (sub_00045C60 again);
+  15 -> 16 clears stale ticks. Bar: `pc_display_menu_audio_draw` notes the
+  row id; `pc_display_menu_slider_bar` (sub_000814B0) from return
+  0x2C35F9/0x2C3709 gets `[esp+4]` = position/24, same rectangle at every
+  aspect. Mouse: `menu_music_set` over 24. Log on change: `[music] player:
+  Music slider 16 + N ticks`.
 
 ## Tests
 
-`tests/media/test_custom_music.py` (host, 33 mutations, WAVs and fake
+`tests/media/test_custom_music.py` (host, 51 mutations incl. trim/boost/soft clip/slider ticks, WAVs and fake
 `FAKE` .mp3 decoder input written by the test), `tests/media/test_music_codec.py`
 (stub build always; real FFmpeg build where the pinned package is unpacked,
 MP3s made by its `ffmpeg.exe` with libmp3lame, 9 mutations; skipped in CI and
 on non-Windows), launcher `tests/launcher/launcher_music.cs` + a Saves page
 case in `launcher_shared_ui.cs` and `tests/mapmaker/test_mapmaker_custommusic.py` (glue through the
 skymusic hooks, 44 mutations incl. log budget/decision lines checked on stderr, XBE facts when the private XBE exists);
-`tests/mapmaker/mapmaker_skymusic.c` gained output stubs. Both are in
+`tests/mapmaker/mapmaker_skymusic.c` gained output stubs. Slider ticks:
+`tests/input/menu_mouse.c` `music_slider_tests` (bar fraction at 25
+positions/both layouts, keys, focus/disabled/inactive, `pc-music.ini` text;
+`TSFP_DISPLAY_CONFIG` required) with 7 mutations in `test_menu_mouse.py`,
+and `test_stock_music_slider_code` (XBE bytes). Both are in
 `runtime-patches.yml`. WinError 4551 on a fixture is the host's application
 control: rerun.
 
@@ -87,4 +133,8 @@ Any game run (MP3 decode was only exercised by the fixture); the Arcade menu's o
 two known readers were checked); whether the stock player keeps channel 0
 state consistent when id 0 plays; Mac build of the thread/`dirent` paths;
 Mac launcher build (Avalonia picker, Trash move); Mac MP3 needs an FFmpeg
-adapter (MAC-138). FFmpeg log lines (`Header missing`) may reach stderr on junk.
+adapter (MAC-138); whether the user hears the trim/boost as intended (the
+"still quiet" report contradicts the measured levels: system/stock-volume
+perception is unexplained); the slider ticks past 16 in a game (draw,
+keys, mouse, pause menu, controller repeat), and whether the sub_00071A60
+item matches the original's focus in every case. FFmpeg log lines (`Header missing`) may reach stderr on junk.

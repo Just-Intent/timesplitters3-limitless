@@ -1,0 +1,20 @@
+--- a/titles/futureperfect/src/recomp_manual.c
++++ b/titles/futureperfect/src/recomp_manual.c
+@@ -310,7 +310,7 @@
+ extern RECOMP_MANUAL_TLS uint32_t g_esi;
+ #include "pc_network_bots_guest.inc"
+ extern void sub_000DAC30_gen(void);
+-void sub_000DAC30(void)
++void sub_000DAC30_upstream(void)
+ {
+ #ifdef TSFP_PC_CONTROLS
+     pc_story_network_npc_constructor(sub_000DAC30_gen);
+@@ -360,7 +360,7 @@
+ }
+ 
+ extern void sub_0015F8C0_gen(void);
+-void sub_0015F8C0(void)
++void sub_0015F8C0_upstream(void)
+ {
+ #ifdef TSFP_PC_CONTROLS
+     pc_story_network_npc_spawn(sub_0015F8C0_gen);

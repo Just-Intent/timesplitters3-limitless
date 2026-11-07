@@ -490,7 +490,7 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Boss areas/skies/open air/set slots: [boss notes](limitless-bosses.md); [.tsmap](map-transfer.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
-draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; music restart: custom-music.md.
+draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; music gain/ticks: custom-music.md.
 Pak mount table, restart heap (heap 0; bosses reuse): [boss notes](limitless-bosses.md).
 `tests/mapmaker/test_mapmaker_paktable.py`.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch
@@ -614,10 +614,9 @@ and `sub_002FA720` (editor limits, recomputed after the original only with
 and force one guest regeneration. Policy: `src/interface/pc_mapmaker_budget.inc`,
 `src/interface/pc_mapmaker_limits.inc`; see `docs/agent-context/systems.md`.
 
-`*-mapmaker-meter-wrappers.patch` (sorting after `-stagea`) holds the wrappers
-of every capacity area (see `docs/agent-context/systems.md`, MapMaker capacity
-areas); it is regenerated whole when an area is added and is skipped with the
-other MapMaker patches in the historical-upgrade fixture.
+`*-mapmaker-meter-wrappers.patch` (after `-stagea`) holds every area's wrappers;
+regenerated whole, skipped with the other MapMaker patches in the
+historical-upgrade fixture. Upstream-owned WRAPs: [runtime](runtime.md#upstream-defined-mapmaker-wrappers).
 
 ### Verified guest-code patches
 
@@ -721,21 +720,21 @@ Link, story type, monkey sub-mode 0x13 and ordinary Arcade maps stay stock.
 Contract and WRAP lines: `docs/mapmaker/mapmaker-matchbots.md`; tests
 `tests/mapmaker/test_mapmaker_matchbots.py`, `..._matchbots_classified.py`.
 
-### MapMaker Abstract tileset (area `tilesets`)
+### MapMaker Abstract and Disco tilesets (area `tilesets`)
 
-`src/interface/pc_mapmaker_tilesets.inc` re-enables the hidden tileset index 0
-(table `0x0052CF38`, the editor's preview set: tiles/pads only in
-`pak/arcade/l_102.pak`, textures and item models in `tileset1.pak`). WRAP
-`sub_00071800` (return 0x0031354A, value 5, `LIMITS`, scene 102) appends the
-Map Settings row "Abstract" (value 0). WRAP `sub_00338170` (only caller
-0x000628ED in `sub_00062790`) mounts `l_102.pak` with `sub_000622D0(path, 1,
-1)` before an Abstract map's tileset pak, ungated; when impossible (< 8 free
-mount slots, open failure) the map plays as Lab (argument, header +0xA,
-`[0x00784020]`). `mapmaker_container_over_chunks` counts header tileset 0 as
-past stock, so such maps save in the 64 KB tier (stock and System Link refuse
-them). Contract, asset audit and WRAP lines: `docs/mapmaker/mapmaker-tilesets.md`;
-tests `tests/mapmaker/test_mapmaker_tilesets.py` (fixture, XBE, decoder, pak
-audit) and the container fixture's tileset-0 tier.
+`src/interface/pc_mapmaker_tilesets.inc` re-enables hidden index 0 (table
+`0x0052CF38`; tiles/pads only in `pak/arcade/l_102.pak`, tile textures only in
+`arcademem/l_102m.pak`). WRAP `sub_00071800` (return 0x0031354A, value 5,
+`LIMITS`, scene 102) appends rows "Disco" (6) and "Abstract" (0). WRAP
+`sub_00338170` (caller 0x000628ED) mounts `l_102.pak` whole, then `l_102m.pak`
+index-only, before an Abstract map's tileset pak, ungated; without `l_102.pak`
+it plays as Lab. Tileset 0 saves in the 64 KB tier. Disco
+(`pc_mapmaker_disco.inc`, skymusic TU): header stays Virtual 5 plus info flag
+bit 31 (decoder-proven free), editor +0x204 = 6; WRAPs `sub_0008E3E0` (alias
+5 Virtual ids in fresh texture lists), `sub_002FC0A0` (row to base, reload on
+a switch), `sub_00338180` (editor stream reload); map start mounts
+`arcademem/l_56_arm.pak`. Docs `mapmaker-tilesets.md`, `mapmaker-disco-variant.md`
+(`docs/mapmaker/`); tests `test_mapmaker_tilesets.py`, `test_mapmaker_disco.py`.
 
 ### Guest memory extension block
 
@@ -904,7 +903,7 @@ branch removes that record after its tests pass. Adding a new executed build
 test requires listing it in the compile-only skipped list;
 `tests/repository/test_compile_only_build.py` fails otherwise (static checks on every
 host, PowerShell checks on Windows). A compile-only build is never a passing
-build and is not sealed for System Link or packaging.
+build nor sealed for System Link or packaging.
 
 ### Local test release folder
 
@@ -922,8 +921,7 @@ README warning. It is never a published release. Tests:
 `tools/build/fetch-video.ps1` downloads the BtbN month-end build
 `autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-shared-8.1.zip`
 (SHA-256 `3e47bda1…6811a`, also recorded by `tools/release/package-release.py`). The
-previous pin named the moving `latest` asset, which BtbN rebuilds daily, so its
-checksum stopped matching; month-end builds are retained. Without
+previous pin named BtbN's daily-rebuilt `latest` asset; month-end builds are retained. Without
 `third_party/ffmpeg/include` the runtime builds without `XMV_HAVE_FFMPEG`
 (no XMV movie playback), so fetch FFmpeg before a release build.
 
