@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4138 @@
+@@ -1911,6 +1911,4369 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2040,20 +2040,30 @@
 +static void sub_00062790_layer4(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_mount")) pc_mapmaker_storyprops_mount(sub_00062790_layer3);
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_mount")) pc_mapmaker_pitboss_mount(sub_00062790_layer3);
 +    else sub_00062790_layer3();
 +#else
 +    sub_00062790_layer3();
 +#endif
 +}
 +
-+void sub_00062790(void)
++static void sub_00062790_layer5(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_mount")) pc_mapmaker_vehicles_mount(sub_00062790_layer4);
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_mount")) pc_mapmaker_storyprops_mount(sub_00062790_layer4);
 +    else sub_00062790_layer4();
 +#else
 +    sub_00062790_layer4();
++#endif
++}
++
++void sub_00062790(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_mount")) pc_mapmaker_vehicles_mount(sub_00062790_layer5);
++    else sub_00062790_layer5();
++#else
++    sub_00062790_layer5();
 +#endif
 +}
 +
@@ -2407,13 +2417,23 @@
 +#endif
 +}
 +
-+void sub_0015B830(void)
++static void sub_0015B830_layer7(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("creatures","pc_mapmaker_creatures_ai_start")) pc_mapmaker_creatures_ai_start(sub_0015B830_layer6);
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_ai_start")) pc_mapmaker_pitboss_ai_start(sub_0015B830_layer6);
 +    else sub_0015B830_layer6();
 +#else
 +    sub_0015B830_layer6();
++#endif
++}
++
++void sub_0015B830(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("creatures","pc_mapmaker_creatures_ai_start")) pc_mapmaker_creatures_ai_start(sub_0015B830_layer7);
++    else sub_0015B830_layer7();
++#else
++    sub_0015B830_layer7();
 +#endif
 +}
 +
@@ -2458,13 +2478,23 @@
 +#endif
 +}
 +
-+void sub_0014CC80(void)
++static void sub_0014CC80_layer4(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")) pc_mapmaker_bosses_hud(sub_0014CC80_layer3);
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_hud")) pc_mapmaker_pitboss_hud(sub_0014CC80_layer3);
 +    else sub_0014CC80_layer3();
 +#else
 +    sub_0014CC80_layer3();
++#endif
++}
++
++void sub_0014CC80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_hud")) pc_mapmaker_bosses_hud(sub_0014CC80_layer4);
++    else sub_0014CC80_layer4();
++#else
++    sub_0014CC80_layer4();
 +#endif
 +}
 +
@@ -2479,13 +2509,23 @@
 +#endif
 +}
 +
-+void sub_0013A400(void)
++static void sub_0013A400_layer1(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_meter")) pc_mapmaker_crowe_meter(sub_0013A400_layer0);
 +    else sub_0013A400_layer0();
 +#else
 +    sub_0013A400_layer0();
++#endif
++}
++
++void sub_0013A400(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_meter")) pc_mapmaker_pitboss_meter(sub_0013A400_layer1);
++    else sub_0013A400_layer1();
++#else
++    sub_0013A400_layer1();
 +#endif
 +}
 +
@@ -2520,7 +2560,7 @@
 +#endif
 +}
 +
-+void sub_0025F720(void)
++static void sub_0025F720_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_level")) pc_mapmaker_worm_level(sub_0025F720_layer2);
@@ -2530,14 +2570,34 @@
 +#endif
 +}
 +
++void sub_0025F720(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_level")) pc_mapmaker_pitboss_level(sub_0025F720_layer3);
++    else sub_0025F720_layer3();
++#else
++    sub_0025F720_layer3();
++#endif
++}
++
 +extern void sub_0029FE00_gen(void);
-+void sub_0029FE00(void)
++static void sub_0029FE00_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_princess")) pc_mapmaker_realbosses_princess(sub_0029FE00_gen);
 +    else sub_0029FE00_gen();
 +#else
 +    sub_0029FE00_gen();
++#endif
++}
++
++void sub_0029FE00(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_princess")) pc_mapmaker_pitboss_princess(sub_0029FE00_layer0);
++    else sub_0029FE00_layer0();
++#else
++    sub_0029FE00_layer0();
 +#endif
 +}
 +
@@ -2594,7 +2654,7 @@
 +#endif
 +}
 +
-+void sub_002274C0(void)
++static void sub_002274C0_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_event")) pc_mapmaker_khallos_event(sub_002274C0_layer2);
@@ -2604,14 +2664,34 @@
 +#endif
 +}
 +
++void sub_002274C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_event")) pc_mapmaker_pitboss_event(sub_002274C0_layer3);
++    else sub_002274C0_layer3();
++#else
++    sub_002274C0_layer3();
++#endif
++}
++
 +extern void sub_0028D0A0_gen(void);
-+void sub_0028D0A0(void)
++static void sub_0028D0A0_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_message")) pc_mapmaker_realbosses_message(sub_0028D0A0_gen);
 +    else sub_0028D0A0_gen();
 +#else
 +    sub_0028D0A0_gen();
++#endif
++}
++
++void sub_0028D0A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_message")) pc_mapmaker_pitboss_message(sub_0028D0A0_layer0);
++    else sub_0028D0A0_layer0();
++#else
++    sub_0028D0A0_layer0();
 +#endif
 +}
 +
@@ -2808,20 +2888,30 @@
 +static void sub_001CDD60_layer6(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_restart")) pc_mapmaker_bosses_restart(sub_001CDD60_layer5);
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_restart")) pc_mapmaker_pitboss_restart(sub_001CDD60_layer5);
 +    else sub_001CDD60_layer5();
 +#else
 +    sub_001CDD60_layer5();
 +#endif
 +}
 +
-+void sub_001CDD60(void)
++static void sub_001CDD60_layer7(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("music","pc_custom_music_restart")) pc_custom_music_restart(sub_001CDD60_layer6);
++    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_restart")) pc_mapmaker_bosses_restart(sub_001CDD60_layer6);
 +    else sub_001CDD60_layer6();
 +#else
 +    sub_001CDD60_layer6();
++#endif
++}
++
++void sub_001CDD60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("music","pc_custom_music_restart")) pc_custom_music_restart(sub_001CDD60_layer7);
++    else sub_001CDD60_layer7();
++#else
++    sub_001CDD60_layer7();
 +#endif
 +}
 +
@@ -3131,13 +3221,23 @@
 +#endif
 +}
 +
-+void sub_0015E7C0(void)
++static void sub_0015E7C0_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("creatures","pc_mapmaker_creatures_request")) pc_mapmaker_creatures_request(sub_0015E7C0_layer2);
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_request")) pc_mapmaker_pitboss_request(sub_0015E7C0_layer2);
 +    else sub_0015E7C0_layer2();
 +#else
 +    sub_0015E7C0_layer2();
++#endif
++}
++
++void sub_0015E7C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("creatures","pc_mapmaker_creatures_request")) pc_mapmaker_creatures_request(sub_0015E7C0_layer3);
++    else sub_0015E7C0_layer3();
++#else
++    sub_0015E7C0_layer3();
 +#endif
 +}
 +
@@ -3446,6 +3546,158 @@
 +    else sub_002193A0_gen();
 +#else
 +    sub_002193A0_gen();
++#endif
++}
++
++extern void sub_00063900_gen(void);
++static void sub_00063900_layer0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_textures")) pc_mapmaker_pitboss_textures(sub_00063900_gen);
++    else sub_00063900_gen();
++#else
++    sub_00063900_gen();
++#endif
++}
++
++static void sub_00063900_layer1(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_textures")) pc_mapmaker_storyprops_textures(sub_00063900_layer0);
++    else sub_00063900_layer0();
++#else
++    sub_00063900_layer0();
++#endif
++}
++
++void sub_00063900(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_textures")) pc_mapmaker_vehicles_textures(sub_00063900_layer1);
++    else sub_00063900_layer1();
++#else
++    sub_00063900_layer1();
++#endif
++}
++
++extern void sub_00234270_gen(void);
++void sub_00234270(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_logic")) pc_mapmaker_pitboss_logic(sub_00234270_gen);
++    else sub_00234270_gen();
++#else
++    sub_00234270_gen();
++#endif
++}
++
++extern void sub_00212160_gen(void);
++void sub_00212160(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_failure")) pc_mapmaker_pitboss_failure(sub_00212160_gen);
++    else sub_00212160_gen();
++#else
++    sub_00212160_gen();
++#endif
++}
++
++extern void sub_0028B610_gen(void);
++void sub_0028B610(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_ragbug")) pc_mapmaker_pitboss_ragbug(sub_0028B610_gen);
++    else sub_0028B610_gen();
++#else
++    sub_0028B610_gen();
++#endif
++}
++
++extern void sub_00289720_gen(void);
++void sub_00289720(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_boss_slot")) pc_mapmaker_pitboss_boss_slot(sub_00289720_gen);
++    else sub_00289720_gen();
++#else
++    sub_00289720_gen();
++#endif
++}
++
++extern void sub_00289E20_gen(void);
++void sub_00289E20(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_coll_slot")) pc_mapmaker_pitboss_coll_slot(sub_00289E20_gen);
++    else sub_00289E20_gen();
++#else
++    sub_00289E20_gen();
++#endif
++}
++
++extern void sub_0028C1C0_gen(void);
++void sub_0028C1C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_rack_slot")) pc_mapmaker_pitboss_rack_slot(sub_0028C1C0_gen);
++    else sub_0028C1C0_gen();
++#else
++    sub_0028C1C0_gen();
++#endif
++}
++
++extern void sub_0028C390_gen(void);
++void sub_0028C390(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_bottle_slot")) pc_mapmaker_pitboss_bottle_slot(sub_0028C390_gen);
++    else sub_0028C390_gen();
++#else
++    sub_0028C390_gen();
++#endif
++}
++
++extern void sub_0028C4A0_gen(void);
++void sub_0028C4A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_bandage_slot")) pc_mapmaker_pitboss_bandage_slot(sub_0028C4A0_gen);
++    else sub_0028C4A0_gen();
++#else
++    sub_0028C4A0_gen();
++#endif
++}
++
++extern void sub_0028C2F0_gen(void);
++void sub_0028C2F0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_bottle_damage")) pc_mapmaker_pitboss_bottle_damage(sub_0028C2F0_gen);
++    else sub_0028C2F0_gen();
++#else
++    sub_0028C2F0_gen();
++#endif
++}
++
++extern void sub_00289080_gen(void);
++void sub_00289080(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_fire_type")) pc_mapmaker_pitboss_fire_type(sub_00289080_gen);
++    else sub_00289080_gen();
++#else
++    sub_00289080_gen();
++#endif
++}
++
++extern void sub_00288E20_gen(void);
++void sub_00288E20(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_smoke_type")) pc_mapmaker_pitboss_smoke_type(sub_00288E20_gen);
++    else sub_00288E20_gen();
++#else
++    sub_00288E20_gen();
 +#endif
 +}
 +
@@ -3840,27 +4092,6 @@
 +    else sub_00064E70_gen();
 +#else
 +    sub_00064E70_gen();
-+#endif
-+}
-+
-+extern void sub_00063900_gen(void);
-+static void sub_00063900_layer0(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("storyprops","pc_mapmaker_storyprops_textures")) pc_mapmaker_storyprops_textures(sub_00063900_gen);
-+    else sub_00063900_gen();
-+#else
-+    sub_00063900_gen();
-+#endif
-+}
-+
-+void sub_00063900(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("vehicles","pc_mapmaker_vehicles_textures")) pc_mapmaker_vehicles_textures(sub_00063900_layer0);
-+    else sub_00063900_layer0();
-+#else
-+    sub_00063900_layer0();
 +#endif
 +}
 +
