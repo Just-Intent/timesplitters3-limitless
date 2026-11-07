@@ -915,7 +915,7 @@ tracked semibold title recreates identical pixels after video labels replace it.
 Grouped Preview UI: GameChannelPickerPage.cs uses both hosts' *Page.cs includes.
 tests/launcher/launcher_shared_ui.cs covers tracks, Save state and launcher_saves.cs
 (sparse backups, update protection, restore failures). Run
-tools/build/build-launcher.ps1 -Test. --render-preview uses synthetic tracks.
+tools/build/build-launcher.ps1 -Test (fork label: launcher.md). --render-preview: fake tracks.
 No game build or publisher/tag-format change is required for this grouping.
 
 [Local launcher artwork selection](build-test-details.md#local-launcher-artwork-selection).

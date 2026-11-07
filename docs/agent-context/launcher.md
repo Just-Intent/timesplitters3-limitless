@@ -858,3 +858,10 @@ workflow checks and all fifteen verified assets. This version-only change
 retains update, installation, preservation and optional-texture contracts.
 Game 0.5.2 is prepared independently as a Windows/Linux draft, with native Mac
 game packaging deferred to the maintainer's Mac at the matching tag revision.
+
+## Fork identity (2026-11-07)
+
+The Windows sidebar version label reads `TS3 LIMITLESS  /  MAPMAKER FORK  /  LAUNCHER v<version>`
+(`Launcher.cs` and its `Launcher.xaml` default). Releases and updates come only from
+`ReleaseClient.Repository` (`JustinDent/timesplitters3-limitless`); `UpstreamRepository`
+is credit only. The native Mac window has no matching label.

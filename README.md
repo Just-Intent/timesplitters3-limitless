@@ -38,9 +38,21 @@ This fork adds:
   (`TSFP_MAPMAKER_LIMITS=1`): 511 tiles, 200 items, up to 255 Story AI, up to
   64 characters alive in a MapMaker Story map, more movable objects, keycards,
   turrets, teleporters and logic, a 512 KB map file and an 8x memory budget.
-- **New MapMaker features:** sixteen floors on an 80x80 grid, optional
+- **New MapMaker features:** sixteen floors on an 80x80 grid, open-air tiles
+  with every story and arcade sky plus weather (including sandstorm), optional
   overlapping tiles and stacked items, any unlocked character in MapMaker Story,
-  Story AI duplicates and linked copies, and a per-map Clouds option.
+  Story AI duplicates and linked copies, whole-group triggers, 20-slot bot and
+  weapon sets, a resource table showing how much of each limit a map uses, and
+  a **Disco** tileset that dresses Virtual's tiles in the Disco level's
+  textures (read from your own game files).
+- **Story bosses in MapMaker:** the giant skeleton, Crow walker, split Crowe,
+  giant robot, tank, Khallos, the mansion worm and the mothership, several per
+  map where the game allows it.
+- **Your own music:** import WAV or MP3 tracks (from the launcher's Saves page
+  or a `Music` folder) and pick one per map or for Arcade; the Music volume bar
+  goes past its old maximum for imported tracks.
+- **Share maps:** export and import MapMaker maps as `.tsmap` files from the
+  launcher's Saves page.
 - **PC control fixes:** MapMaker editor mouse controls, click-to-load in the map
   browser, click-to-confirm on the character screen and mission/event briefings,
   and mouse aiming for mounted
@@ -60,10 +72,10 @@ This fork adds:
   which stays empty until a release is made.
 - Not yet tested with the fork's changes: System Link, splitscreen, native Mac
   and most story levels.
-- MapMaker work lives on the `mapmaker-recon` branch, which is based on the
-  original project's `main` at `141f440a` and has since merged the original
-  port up to `db029630` (v0.5.3 plus later fixes, 2026-11-07). Later fixes are
-  merged when needed. Upstream's Linux and Developer Tools additions came with
+- Tested builds are merged into this fork's `main` (now
+  `v0.5.3-mapmaker.53`); day-to-day MapMaker work happens on `mapmaker-recon`.
+  The fork has merged the original port up to `db029630` (v0.5.3 plus later
+  fixes, 2026-11-07); later fixes are merged when needed. Upstream's Linux and Developer Tools additions came with
   that merge but are not yet tested with the fork's changes.
 
 > [!IMPORTANT]

@@ -174,7 +174,7 @@ namespace TimeSplitters.Launcher
             WindowTheme.Attach(Window);
             using (var icon = Assembly.GetExecutingAssembly().GetManifestResourceStream("launcher.ico"))
                 Window.Icon = BitmapFrame.Create(icon, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-            Text("LauncherVersionLabel", "TSFP  /  COMMUNITY PC PROJECT  /  LAUNCHER v" + LauncherVersion.Value + (LocalReleaseSource.Active ? "  /  TEST-ONLY LOCAL RELEASE SOURCE" : ""));
+            Text("LauncherVersionLabel", "TS3 LIMITLESS  /  MAPMAKER FORK  /  LAUNCHER v" + LauncherVersion.Value + (LocalReleaseSource.Active ? "  /  TEST-ONLY LOCAL RELEASE SOURCE" : ""));
             using (var logo = Assembly.GetExecutingAssembly().GetManifestResourceStream("launcher-logo.png"))
             {
                 if (logo != null)
