@@ -1012,7 +1012,7 @@ Crossplay: [acceptance](multiplayer-ui.md#physical-windowsmac-online-acceptance)
 
 Crossplay rotation/lock/recycle: `test_crossplay_peer.py`; Online interpreter:
 `test_native_mac_tools.py`.
-MM caps/props/body:limitless-caps
+MM caps/props/body/AIobj:limitless-caps
 
 Markers: test_ui_layout.py; test_patch_updates.py checks 2290/2291 after migration.
 

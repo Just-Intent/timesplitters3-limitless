@@ -63,8 +63,19 @@ Include `pc_mapmaker_objects.inc` after `pc_mapmaker_limits.inc` in
     WRAP sub_002402B0 -> pc_mapmaker_objects_tag
     WRAP sub_0016C430 -> pc_mapmaker_objects_physics
     WRAP sub_000AE4F0 -> pc_mapmaker_objects_prop_break
+    WRAP sub_000A6880 -> pc_mapmaker_objects_create
 
 All of these functions are cdecl with a plain `ret` (CONFIRMED).
+
+`pc_mapmaker_objects_create` (2026-11-07, the m45c crash with about 106 Story
+AI): the slot allocator `sub_0009EE00` (only caller `sub_000A6880`) appends at
+the count `[0x007B4FAC]` with no bound when no freed slot exists, so object
+1023+ was written past the pool and its twin (0x200 a slot) into the object
+pool that follows the twin pool. With the pools on (scene 100/102) a create
+with no free slot returns 0, the original's own model-failure result
+(0x000A695C). The actors area keeps 72 slots free before a new AI, so this is
+the last guard. Evidence: `docs/agent-context/limitless-caps.md` "Engine
+object pool end"; `tests/mapmaker/test_mapmaker_objpool_classified.py`.
 `sub_0006CE80` also takes `edi`, `ebx` and `esi` in registers; the hook leaves
 them untouched.
 

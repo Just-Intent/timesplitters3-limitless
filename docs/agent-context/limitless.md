@@ -188,17 +188,17 @@ compile the whole include chain take link stubs from
 runtime pad handles 0x4740.., bounded A* pools, pad/link/object/memory caps: [caps](limitless-caps.md), group A* pool relocated to
 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
-`objects` (768 pickups, 2048 props, 1024 bodies: [caps](limitless-caps.md)), `editor`, `rooms` (511 pieces, `level.json` frame, word buckets, view stride 0x3000, plan to 1023: [rooms](limitless-rooms.md)) and `actors` (64 characters / 63 AI
-in a local MapMaker story map instead of 20 alive; live list moved to
+`objects` (768 pickups, 2048 props, 1024 bodies, no create past the pool: [caps](limitless-caps.md)), `editor`, `rooms` (511 pieces, `level.json` frame, word buckets, view stride 0x3000, plan to 1023: [rooms](limitless-rooms.md)) and `actors` (64 characters / 63 AI
+in a local MapMaker story map instead of 20, 72 object slots kept free; live list moved to
 0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
 `actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;
-perception slice 0xC00 shared with `objects.json`; 19 hooks incl. the 32-entry
+perception slice 0xC00 shared with `objects.json`; 19 hooks incl. 32-entry
 stack-array AI pickers (`sub_0027BA40` in two passes), a side table at
 0x00900600 for kill words of victims 32..63, radar blips moved to 0x00902100
-(256, bounded) with the radar loop at 64, the per-death effect lists 0x0075F670/0x0075F5F8 at 64 (0x00903400/0x00903200, stock 30 outside wide play), and the patrol table 0x00520C38 read
-from a copy at 0x00901600 (ids >= 32 have no route); `pc_network_bots_revive`
-writes the moved AI table; `TSFP_MAPMAKER_ALIVE=1..64` lowers it; sites and
-risks in `docs/mapmaker/mapmaker-actors.md`), and `grid` (editor only: with
+(256, bounded), radar loop 64, per-death effect lists at 64 (0x00903400/0x00903200; stock 30 outside wide play), and the patrol table 0x00520C38 read
+from a copy at 0x00901600 (ids >= 32: no route); `pc_network_bots_revive`
+writes the moved AI table; `TSFP_MAPMAKER_ALIVE=1..64` lowers it; sites, risks:
+`docs/mapmaker/mapmaker-actors.md`), and `grid` (editor only: with
 `TSFP_MAPMAKER_LIMITS=1` floors -2..13, an 80x80x17 grid ([floors](limitless-floors.md)), the five
 grid functions `sub_00307C20/CC0/CF0/DA0/E60` reimplemented, a placement
 guard above the top level; `TSFP_MAPMAKER_OVERLAP=1` overlapping tiles and
