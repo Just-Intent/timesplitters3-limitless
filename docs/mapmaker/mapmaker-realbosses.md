@@ -394,7 +394,7 @@ code): all four noted `floor height -4.49` on their first fight frame with
 the player on the 0.5 floor, and every throw logged `aims at a target a
 floor up (5.0 over its floor -4.5)`: the noted height is not the placed
 floor, so same-floor throws went at the body (1.5 over the feet).
-INFERRED then, disproved by `m43b.err`: that it sank below its placement.
+(The .43 guess that it sank: wrong, see below.)
 
 Fix: `_ai_start` notes the entity height after the original (`giant
 skeleton N placed at height Y (AI start)`). `rbs_skel_ground` (once per
@@ -412,20 +412,21 @@ an upper one, placed 0.51 over a -4.49 first frame; mutations `aim-ref-spawn`,
 
 ### Same-floor throws again (the v0.4.0-mapmaker.44 playtest)
 
-"Skeletons can't hit me on floor one still." `m43b.err`: all placed at
--4.49 (AI start; floors -1..12), reference -4.50: right. CONFIRMED (decode
+"Skeletons can't hit me on floor one still." `m43b`/`m44.err`: all placed
+at -4.49 (AI start), reference -4.50; all 109 m44 aims at
+a player on 0.5 ("floor one"), 5.0 over. CONFIRMED (decode
 0x0029CFA4..0x0029D050, logs): the origin is a model bone point (row 0x29
 +0xAC, `sub_00151E80` x2), mostly 10.7 over its feet (6.2 over -4.5; 1.2 over
 -9.5 in `m40b.err`), not a stock height; the target y is the player's +0x68
-(0x002893A7). So a line to the feet of a player on its floor crosses the
-floor above (its floor + 5); INFERRED: it hits that underside unless the
-player is in the opening round the boss. The throw is the only damage path.
+(0x002893A7). So the hand is 5.7 over that player, past the ceiling of a
+one-floor room (feet + 5), and a player at 5.5 has it in the room (the .42
+"hit from one floor above"). INFERRED: the shot meets that ceiling.
 
-Fix (`rbs_skel_low`): target within `RBS_SKEL_UP` of its floor, hand over
-`RBS_SKEL_HAND` (4): origin y = floor + 4, stock unit aim from there; logged
-(4): `aims at a target on its floor`. Others unchanged. Tests: m43b case
-(-4.5, jump: lowered; 0.5: raised; low hand, floor below: stock; fire);
-mutations `hand-*`. Unplayed.
+Fix (`rbs_skel_low`): a hand more than `RBS_SKEL_HAND` (4) over the target
+(not one under its floor) moves down to target + 4; the aim (stock or
+raised) is taken from there; logged (4): `shot starts under the target's
+ceiling`. Tests: m44 case (0.5, -4.5, jump: lowered; 5.5, low hand, floor
+below: not; fire); mutations `hand-*`. Unplayed.
 
 INFERRED: the stretching came from the same mismatch (the body drawn at height
 0 while parts follow the spawn floor). The freeze is not explained yet: if it

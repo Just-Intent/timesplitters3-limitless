@@ -476,7 +476,7 @@ Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained.
-Aim (.44): rbs_skel_aim lifts floor-up aims; rbs_skel_low starts same-floor shots low.
+Aim (.44): rbs_skel_aim lifts floor-up aims; rbs_skel_low: shot under target ceiling.
 Robot doors (.44): stacked one-floor portals combine; `rbt_hold` undoes root-motion walks through low ones (mapmaker-robot.md).
 Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, walk stops at ledges: mapmaker-crowe.md), `tank`
