@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "loaderSha256": "f56c496aaf495469d4061243e3ce4ca26cf6f843879e438aa9a337726fc13a5d",
+  "loaderSha256": "c97b61986d7630fdbd8ce3ce2e2924e278953bac14a0c100bdea4b794dc2fbb9",
   "patches": [
     {
       "name": "0010-dsound-audio-timing.patch",
@@ -2680,6 +2680,14 @@
       "name": "2140-native-online.patch",
       "path": "patches/network/2140-native-online.patch",
       "sha256": "4b5969a17815e4b753508dd7f76c38b2f4ac86930256daa9f9709c91e4a23640",
+      "targets": [
+        "titles/futureperfect/CMakeLists.txt"
+      ]
+    },
+    {
+      "name": "2160-custom-music-codec.patch",
+      "path": "patches/media/2160-custom-music-codec.patch",
+      "sha256": "9019b210ba2f4918ee6a0313998c2b3c55d5f088e1d7c45bed682387002fbdfe",
       "targets": [
         "titles/futureperfect/CMakeLists.txt"
       ]
