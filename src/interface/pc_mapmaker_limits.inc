@@ -28,10 +28,10 @@
  * sub-entries, and writes the meter (editor+0x270, placed only) and the held
  * piece preview (editor+0x274) from the same limits. After the original runs,
  * the decision and both values are recomputed with pads 4800, links 12000,
- * pad groups 600, 500 items ("sub-entries"; cover pads stay 1024) and 511
+ * pad groups 600, 500 items ("sub-entries"; cover pads stay 1024) and 1023
  * pieces (one visibility room each: the engine's 200-room limit is raised to
- * 511 by config/guest-code-patches/rooms.json, see src/interface/pc_mapmaker_rooms.inc;
- * 255 until 2026-11-02);
+ * 1023 by config/guest-code-patches/rooms.json, see src/interface/pc_mapmaker_rooms.inc;
+ * 255 until 2026-11-02, 511 until 2026-11-07);
  * memory (raised separately by TSFP_MAPMAKER_MEMORY_SCALE) keeps its limit.
  * The editor's item node pool is 5300 (config/guest-code-patches/items.json):
  * 500 items, their clipboard copies and up to 81 start points fit twice over.
@@ -98,18 +98,23 @@
  * count; the N x N distance matrix sub_00275F70 builds is (N+1) x N x 4 B,
  * 4.2 MB at 1024, and takes N x N route searches at load (unmeasured). */
 #define MAPMAKER_LIMIT_GROUPS 1024
-/* Pieces (2026-11-02, was 255): one visibility room each, so = MAPMAKER_ROOMS_MAX
- * (rooms.json real rooms 1..0x1FF). 511 light or medium pieces stop here; 511
- * of the heaviest-memory tiles stop first on the memory estimate (386 at the
- * default scale 8; scale 11 = TSFP_MAPMAKER_ARENA_MB >= 6 fits them). */
-#define MAPMAKER_LIMIT_PIECES 511u
+/* Pieces (2026-11-07, was 511; 255 before 2026-11-02): one visibility room
+ * each, so = MAPMAKER_ROOMS_MAX (rooms.json real rooms 1..0x3FF). Each piece is
+ * also one engine object, so the objects cap (pieces + items + 128 <= 1023)
+ * binds first: 895 pieces without items, 511 pieces with 384 items. The
+ * piece cap itself is reached only once the object pool grows past its
+ * 1024-handle encoding (slot << 22). The editor piece pool is 2048 nodes
+ * (items.json), so a copy of every placed piece still fits. Heavy tiles stop
+ * on links (521), pads (549) or the memory estimate (386 at scale 8). */
+#define MAPMAKER_LIMIT_PIECES 1023u
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
 /* Engine objects (2026-11-02): in play each piece (room) and about each item
  * takes one slot of the engine object pool (pc_mapmaker_objects.inc, 1023
  * slots, taken without a bound check; 462 used at 236 pieces + 200 items),
  * characters up to 64 more. The editor refuses placement past the pool, so
- * 511 pieces leave 384 items; 395 pieces keep the 500 items.
+ * 511 pieces leave 384 items; 395 pieces keep the 500 items; 895 pieces
+ * leave none.
  * The reserve (2026-11-03, v0.4.0-mapmaker.37: 459 pieces + about 500 items
  * filled all 1023 slots in play and shot barrels did nothing) is 64
  * characters plus 64 for what explodes and breaks: sub_000AB590 refuses a

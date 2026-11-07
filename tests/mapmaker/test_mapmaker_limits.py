@@ -52,11 +52,12 @@ MUTATIONS = {
     'keycards-round2': ('    {0x00524CECu,2u,16u},', '    {0x00524CECu,2u,8u},'),
     'movers-round2': ('    {0x00524E3Cu,20u,160u},', '    {0x00524E3Cu,20u,80u},'),
     'markers-round2': ('    {0x00524EE4u,20u,160u},', '    {0x00524EE4u,20u,80u},'),
-    # Pieces 511 = rooms (rooms.json real rooms 1..0x1FF); 255 was the cap before.
-    'pieces-stock': ('#define MAPMAKER_LIMIT_PIECES 511u', '#define MAPMAKER_LIMIT_PIECES 200u'),
-    'pieces-241': ('#define MAPMAKER_LIMIT_PIECES 511u', '#define MAPMAKER_LIMIT_PIECES 241u'),
-    'pieces-255': ('#define MAPMAKER_LIMIT_PIECES 511u', '#define MAPMAKER_LIMIT_PIECES 255u'),
-    'pieces-past-rooms': ('#define MAPMAKER_LIMIT_PIECES 511u', '#define MAPMAKER_LIMIT_PIECES 512u'),
+    # Pieces 1023 = rooms (rooms.json real rooms 1..0x3FF); 511 was the cap before, 255 before that.
+    'pieces-stock': ('#define MAPMAKER_LIMIT_PIECES 1023u', '#define MAPMAKER_LIMIT_PIECES 200u'),
+    'pieces-241': ('#define MAPMAKER_LIMIT_PIECES 1023u', '#define MAPMAKER_LIMIT_PIECES 241u'),
+    'pieces-255': ('#define MAPMAKER_LIMIT_PIECES 1023u', '#define MAPMAKER_LIMIT_PIECES 255u'),
+    'pieces-511': ('#define MAPMAKER_LIMIT_PIECES 1023u', '#define MAPMAKER_LIMIT_PIECES 511u'),
+    'pieces-past-rooms': ('#define MAPMAKER_LIMIT_PIECES 1023u', '#define MAPMAKER_LIMIT_PIECES 1024u'),
     'memory-unchecked': ('    if(memory>MAPMAKER_LIMIT_MEMORY) over|=MAPMAKER_CAP_MEMORY;\n', ''),
     # The refusal reason (stderr): logged, and only when the caps passed change.
     'reason-not-logged': ('        mapmaker_limits_log(over,&p,&h,total_mem,groups,sub);\n', ''),
@@ -121,7 +122,10 @@ def reasons_ok(stderr):
     memory = ('[MAPMAKER] placement refused: memory estimate 2052407 of 2048000 at scale 8 '
               '(TSFP_MAPMAKER_ARENA_MB raises it);')
     # memory: refused two frames running, logged once
-    return '[MAPMAKER] placement refused: pieces 512 of 511;' in lines and lines.count(memory) == 1
+    objects = '[MAPMAKER] placement refused: engine objects 1024 of 1023 (pieces + items + 128 reserved);'
+    both = ('[MAPMAKER] placement refused: pieces 1024 of 1023; '
+            'engine objects 1152 of 1023 (pieces + items + 128 reserved);')
+    return objects in lines and both in lines and lines.count(memory) == 1
 
 
 def test_stage_a_patch():

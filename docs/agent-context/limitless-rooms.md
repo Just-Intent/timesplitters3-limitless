@@ -84,7 +84,7 @@ Room machinery reaches 1023 ids (specials 0x400..0x40C) after stages 6-10;
 the view shadow stops at 341 ids until the view stride changes (stage 7).
 Real maps are capped earlier by pads (~500-570 heaviest tiles), links
 (~712, int16 A* indices) and play memory (~550-650 tiles, unmeasured).
-Next safe target: 511 (view stride 0x3000), reached in stage 11.
+Next safe target: 511 (view stride 0x3000), reached in stage 11; 1023 in stage 12.
 
 ## Stage 6: word draw buckets (every scene)
 
@@ -161,3 +161,53 @@ Tests: `test_mapmaker_rooms.py` (511/512 drop, 256 kept, prop slots 611,
 `test_mapmaker_validate.py` (`test_level_frame_*`: every frame site decoded,
 512 kept, 513 hidden), `test_mapmaker_skymask.py`. Playtest: mapmaker-rooms.md
 "Stage 11".
+
+## Stage 12: cap 1023 (2026-11-07, static only)
+
+`rooms.json` re-valued by one mapping from the 511 layout (406 entries, same
+sites; `check-tables.py` verified): real rooms 1..0x3FF (21 `cmp` -> 0x3FF),
+spare 0x400, players 0x401..0x405 (adds -0x401), views 0x406..0x40B, global
+0x40C, id space 0x40D (SHIFT 0x337); per-room clears and the t7 capacity
+0x400; per-id loop ends 0x1034/0x1030; `[0x7B977C]` 0x410 bytes (clear 0x103
+dwords + stosw); model table 0xD08 words (bounds 0xD08, clear 0x684, per-model
+array 0x138C0); light row 0x40C (stride 0x1030, clear end `0x008E00BC`, a
+bound only); view stride 0x5000 (35 steps, init multiples/fields, array
+0x1E008 / clear 0x7802, division magic `0xCCCCCCCD` with `sar 0xE`, exact for
+every multiple and the 32-bit extremes), shadow rects +0x1000 (unchanged),
+flags +0x40A0, list +0x44B0 (count-relative +0x36A8/+0x36A6), list cap 0x40C.
+
+Blocks (`ROOMS_BLOCKS`): t1 `0x008C0000`, t3 `0x008C1000` (sky mask), t2
+`0x008C2000` (0x1000 each), t4 `0x008C3000` (0x3000), t6 `0x008C6000`, t7
+`0x008C7000`, staging row `0x008C8000`, query `0x008C9000` (2 x 1023 words:
+the tree holds real rooms only), model table `0x008CA000` (unchanged base,
+to `0x008CBA10`), round robin `0x008CBC00` (68 groups), p1 `0x008CC000`, p4
+`0x008CD040` (globals at +0x1030), p2 `0x008CE080`, p3 `0x008CF0C0`, p5
+`0x008D0100`, drawn flag `0x008D1140` (0x1040 each), boss camera lists
+`0x008D4000` (unchanged), light heads `0x008DC000` (0x3090); above the pak
+table: front-end view `0x00908000` (0x5000) and light colour `0x0090D000`
+(0x3094). Free: `0x008D2180..0x008D4000`, `0x008DF090..0x008E0000`. C
+followers: rooms defines, objects clears (0x40D dwords), probe (counts/lists,
+ids 0x40D, models 0xD08), bossroom (p1/p4/p3, global 0x40C, rooms 0x40B),
+skymask (t3, 1024 rooms), roof (1024 rooms, 4096 piece slots), camera 1023,
+sky music stride, openview comment. Level heap: view array +48 KB and
+per-model array +12 KB in every scene, prop slots +25 KB in scene 100
+(rooms 201..1023 copied from room 200's slot), level fill frame +4 KB stack
+(`level.json`, 1024 records), editor piece pool +72 KB (`items.json`).
+
+Gating as before (editor limit with `TSFP_MAPMAKER_LIMITS=1`; compile guard
+1023 only when room models 0x908..0xD06 all have slots). What bounds a map
+now: [caps](limitless-caps.md) "Tiles 511 -> 1023" (engine objects first).
+Tests: `test_mapmaker_rooms.py` (`cap-511`, `cap-raised` 1024 refused at
+compile time, 1024th piece dropped, 1123 prop slots, `p1-511-size`,
+`light-row-511`, `model-*-511`, `front-end-view-511-place`, high range in
+the extension map), `test_mapmaker_rooms_bytes_classified.py`, the bossroom,
+objects, probe, skymask and sky music fixtures, `test_mapmaker_validate.py`.
+
+Play check (user, not done by the agent): (1) a story level (level 1) and an
+Arcade map play as before, splitscreen menus and security-camera screens
+draw; (2) an old 511-tile map loads and plays; (3) with `LIMITS`, place
+light tiles to the Objects cap (about 895 with no items): the editor stops on
+`engine objects 1024 of 1023`, save, reload, play: stderr `rooms n of 1023`
+and no `DROPPED`; walk across it and watch for missing rooms or lights;
+(4) copy a large group on that map (piece pool); (5) note save/load seconds
+at 511 and at the cap.

@@ -12,13 +12,13 @@
  * whose 2-6 rooms never held the camera room, was hidden 1137 of 1200 passes).
  * A prop is only reached through the prop lists of drawn rooms: per view the
  * readers sub_00086480/sub_000865E0 run sub_000A79B0(room) (cull) and
- * sub_000A2900(room) (draw) over count [0x008C7000 + 4*room] entries of list
- * [0x008C7CC0 + 4*room]. Those lists are rebuilt each frame by sub_0009E4B0
+ * sub_000A2900(room) (draw) over count [0x008CC000 + 4*room] entries of list
+ * [0x008CD040 + 4*room]. Those lists are rebuilt each frame by sub_0009E4B0
  * (0x001CE368/0x001CE38B, before the views): per room a chunk of the bucket
  * pool [0x00715FB4] sized by last frame's capacity, then for every non-room
  * prop (index [0x007B975C]..[0x007B4FAC], table [0x0072F5E8]) and each room of
  * its +0x38 list, sub_0009E430 appends it. sub_0009E430 (CONFIRMED decode):
- * a full room grows its capacity (0x008C5840) and takes a new chunk at the
+ * a full room grows its capacity (0x008CF0C0) and takes a new chunk at the
  * pool end; when the pool is past 0x299D dwords (0x0009E46B) the prop is NOT
  * linked to that room, but the raised capacity stays, so the next appends to
  * that room write past its chunk into the next room's. Props also skip
@@ -40,7 +40,7 @@
  * stock cull and draw for the boss: its rectangle is still the union of its
  * own listed rooms (pc_mapmaker_bigdraw_rect widens it), so a boss none of
  * whose rooms is visible stays culled. Skipped (counted): no real camera room
- * (global 0x20C), a capacity or count past the buffer. Scene 100 with
+ * (global 0x40C), a capacity or count past the buffer. Scene 100 with
  * TSFP_MAPMAKER_LIMITS=1; TSFP_MAPMAKER_BOSSROOM=0 turns it off. Lines
  * "[mapmaker] bossroom: ..." (BSR_LINES per level). Requires the includer's
  * WORD_AT, g_xbox_mem_offset and pc_mapmaker_limits.inc. */
@@ -56,14 +56,14 @@
 #define BSR_FIRST 0x007B975Cu          /* room count: props 0..n-1 are the rooms' own (not linked) */
 #define BSR_END 0x007B4FACu            /* prop count */
 #define BSR_PROPS_MAX 4096u
-#define BSR_COUNTS 0x008C7000u         /* rooms.json p1: prop count per room */
-#define BSR_LISTS 0x008C7CC0u          /* rooms.json p4: prop list per room */
-#define BSR_CAPS 0x008C5840u           /* rooms.json p3: capacity per room */
+#define BSR_COUNTS 0x008CC000u         /* rooms.json p1: prop count per room */
+#define BSR_LISTS 0x008CD040u          /* rooms.json p4: prop list per room */
+#define BSR_CAPS 0x008CF0C0u           /* rooms.json p3: capacity per room */
 #define BSR_POOL_USED 0x0072F298u      /* dwords of the bucket pool in use */
 #define BSR_POOL_PTR 0x00715FB4u       /* bucket pool (new per level) */
 #define BSR_POOL_BOUND 0x299Du         /* objects.json obj-bucket-bound (0x0009E46B) */
-#define BSR_ROOMS_MAX 0x20Bu           /* real rooms 1..0x1FF; 0x20C global */
-#define BSR_GLOBAL 0x20Cu
+#define BSR_ROOMS_MAX 0x40Bu           /* real rooms 1..0x3FF; 0x40C global */
+#define BSR_GLOBAL 0x40Cu
 #define BSR_VIEW_SLOT 0x214u
 #define BSR_CAMERA_ROOM 0x2A0u
 #define BSR_RECTS 0x1000u              /* view shadow: room r at +0x1000+12*r, int32 depth */

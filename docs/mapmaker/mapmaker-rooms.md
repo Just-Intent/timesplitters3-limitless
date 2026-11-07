@@ -1048,3 +1048,9 @@ Then MapMaker (stage 5):
    lights, doors, items in rooms 242..255, open-air tiles near room 255, and
    the front-end menus after leaving the map.
 3. A map of 200 pieces built in the stock game still loads and plays the same.
+
+## Stage 12: cap 1023 (2026-11-07)
+
+Ids 1..0x3FF, specials 0x400..0x40C, view stride 0x5000, tables repacked
+around the fixed model table: [limitless-rooms](../agent-context/limitless-rooms.md)
+stage 12. Engine objects bind first: [caps](../agent-context/limitless-caps.md).
