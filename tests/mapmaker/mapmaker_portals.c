@@ -20,6 +20,8 @@ static uintptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<MEMORY_BYTES && n<=MEMORY_BYTES-p; }
 #include "pc_mapmaker_portals.inc"
+#define MAPMAKER_GUEST_RET() (g_esp+=4u)
+#include "pc_mapmaker_roomray.inc"
 
 static int failures;
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
@@ -33,6 +35,7 @@ static int failures;
 
 static uint32_t heap,rooms_n,portals_n,records,table_ptrs[MAX_PORTALS+2],lists[MAX_ROOMS+1];
 static uint32_t rng=1;
+static int walls_inward;               /* wall normals into the tile instead of out of it */
 static uint32_t next_rand(void) { rng^=rng<<13;rng^=rng>>17;rng^=rng<<5;return rng; }
 static float frand(float lo,float hi) { return lo+(hi-lo)*(float)(next_rand()%100000u)/100000.0f; }
 static void set_f(uint32_t a,float f) { uint32_t w; memcpy(&w,&f,4); WORD_AT(a)=w; }
@@ -50,7 +53,8 @@ static void reset(uint32_t seed)
 {
     static const uint32_t k[][2]={{0x0047D3A4u,0xBF7FBE77u},{0x00475DBCu,0x3A83126Fu},{0x00475D5Cu,0x7F7FFFFFu},
         {0x00478618u,0xFF7FFFFFu},{0x00475C78u,0x3F800000u},{0x0047D3A0u,0x3E800D1Bu},{0x0047D39Cu,0x3FA00347u},
-        {0x00476040u,0x3F666666u},{0x0047D398u,0xBF666666u},{0x004765F4u,0x33D6BF95u}};
+        {0x00476040u,0x3F666666u},{0x0047D398u,0xBF666666u},{0x004765F4u,0x33D6BF95u},
+        {0x0047D394u,0xBF11EB85u},{0x0047D390u,0x3F11EB85u}};   /* ray step: -0.57, 0.57 */
     unsigned i;
     memset(memory,0,sizeof memory);
     g_xbox_mem_offset=(uintptr_t)memory;
@@ -99,7 +103,7 @@ static uint32_t wall(uint32_t room,int axis,float at,float a0,float a1,float y0,
         w[1]=y+frand(-jitter,jitter);
         w[2-axis]=a+frand(-jitter,jitter);
     }
-    n[axis]=sign;
+    n[axis]=walls_inward?-sign:sign;    /* inward: the side a ray leaves the room through (ray tests) */
     if(order==7) { n[axis]=sign*0.99f;n[1]=0.1410674f*sign; }  /* slightly tilted normal: joins only another tilted one */
     if(next_rand()%5u==0) return add_portal((int32_t)room,-1,n,v,4,4);   /* the room in the first slot */
     return add_portal(-1,(int32_t)room,n,v,4,4);
@@ -386,8 +390,82 @@ static int dump(const char *path)
     return 1;
 }
 
+/* Ray steps (sub_00088430 in C) on the joined grid: random origins in the
+ * grid, vectors (some zero or along an axis), from-rooms, bounded or not.
+ * Prints: room from segment ox oy oz dx dy dz (float bits) result, then
+ * the hit and rest buffers (bits). The emulator test runs the original. */
+#define RAY_ORIGIN 0x00870000u
+#define RAY_DIR 0x00870010u
+#define RAY_HIT 0x00870020u
+#define RAY_REST 0x00870030u
+static uint32_t ray_bits(float f) { uint32_t w; memcpy(&w,&f,4); return w; }
+static void ray_steps(uint32_t count,uint32_t tiles,int print)
+{
+    uint32_t s,k;
+    for(s=0;s<count;s++) {
+        uint32_t room=1u+next_rand()%rooms_n,from=next_rand()%3u?0u:1u+next_rand()%rooms_n,segment=next_rand()&1u,r;
+        float o[3],d[3];
+        if(room<=tiles*tiles && next_rand()%4u) {   /* mostly inside the room's own tile */
+            o[0]=4.0f*(float)((room-1u)%tiles)+frand(0.3f,3.7f);o[2]=4.0f*(float)((room-1u)/tiles)+frand(0.3f,3.7f);
+        } else { o[0]=frand(-2.0f,(float)tiles*4.0f+2.0f);o[2]=frand(-2.0f,(float)tiles*4.0f+2.0f); }
+        o[1]=frand(0.0f,3.0f);
+        d[0]=frand(-12.0f,12.0f);d[1]=frand(-1.0f,1.0f);d[2]=frand(-12.0f,12.0f);
+        if(next_rand()%3u==0) { d[0]*=0.15f;d[1]*=0.15f;d[2]*=0.15f; }   /* short: ends inside the room */
+        if(next_rand()%9u==0) d[0]=d[1]=d[2]=0.0f;
+        if(next_rand()%7u==0) { d[1]=0.0f;d[2]=0.0f; }
+        if(next_rand()%11u==0) room=0x400u+next_rand()%3u;   /* past the real rooms */
+        for(k=0;k<3;k++) { set_f(RAY_ORIGIN+4u*k,o[k]);set_f(RAY_DIR+4u*k,d[k]); }
+        for(k=0;k<12u;k++) { WORD_AT(RAY_HIT+4u*k)=0xA5A50000u+k; }
+        r=mapmaker_ray_step(RAY_ORIGIN,RAY_DIR,room,from,segment,RAY_HIT,RAY_REST);
+        if(print) {
+            printf("%u %u %u",room,from,segment);
+            for(k=0;k<3;k++) printf(" %u",ray_bits(o[k]));
+            for(k=0;k<3;k++) printf(" %u",ray_bits(d[k]));
+            printf(" %u",r);
+            for(k=0;k<8;k++) printf(" %u",WORD_AT(RAY_HIT+4u*k));
+            printf("\n");
+        }
+    }
+}
+
+/* every call of a series lands somewhere: some rays cross, some do not */
+static void test_rays(void)
+{
+    uint32_t crossed=0,s;
+    walls_inward=1;
+    build_grid(4242,6);
+    run(0);
+    for(s=0;s<400;s++) {
+        uint32_t room=1u+s%rooms_n,r;
+        float o[3]={2.0f+4.0f*(float)((room-1u)%6u),1.5f,2.0f+4.0f*(float)((room-1u)/6u%6u)},d[3]={6.0f,0.0f,0.5f};
+        uint32_t k;
+        for(k=0;k<3;k++) { set_f(RAY_ORIGIN+4u*k,o[k]);set_f(RAY_DIR+4u*k,d[k]); }
+        r=mapmaker_ray_step(RAY_ORIGIN,RAY_DIR,room,0,0,RAY_HIT,RAY_REST);
+        if(r!=room) crossed++;
+    }
+    CHECK(crossed>0u && crossed<400u);
+    /* a zero vector and a room past the bound return the room */
+    WORD_AT(RAY_DIR)=0;WORD_AT(RAY_DIR+4u)=0;WORD_AT(RAY_DIR+8u)=0;
+    CHECK(mapmaker_ray_step(RAY_ORIGIN,RAY_DIR,3,0,0,RAY_HIT,RAY_REST)==3u);
+    set_f(RAY_DIR,6.0f);
+    CHECK(mapmaker_ray_step(RAY_ORIGIN,RAY_DIR,0x400u,0,0,RAY_HIT,RAY_REST)==0x400u);
+    CHECK(mapmaker_ray_step(RAY_ORIGIN,RAY_DIR,0,0,0,RAY_HIT,RAY_REST)==0u);
+    walls_inward=0;
+}
+
 int main(int argc,char **argv)
 {
+    if(argc==6 && !strcmp(argv[1],"raydump")) {
+        FILE *f;
+        uint32_t tiles=(uint32_t)strtoul(argv[3],NULL,0);
+        walls_inward=1;
+        build_grid((uint32_t)strtoul(argv[2],NULL,0),tiles);
+        run(0);
+        if(!(f=fopen(argv[4],"wb"))) return 2;
+        fwrite(memory,1,sizeof memory,f);fclose(f);
+        ray_steps((uint32_t)strtoul(argv[5],NULL,0),tiles,1);
+        return 0;
+    }
     if(argc==6 && !strcmp(argv[1],"dump")) {
         build_grid((uint32_t)strtoul(argv[2],NULL,0),(uint32_t)strtoul(argv[3],NULL,0));
         memset((char *)memory+FRAME+0x1280u,0xCC,0x4000u);   /* the emulator runs the flag clear itself */
@@ -400,6 +478,7 @@ int main(int argc,char **argv)
     test_no_join();
     test_merge();
     test_hook();
+    test_rays();
     if(argc==2 && !strcmp(argv[1],"golden")) { test_index_equals_every_pair(1);return 0; }
     test_index_equals_every_pair(0);
     if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }
