@@ -21,9 +21,18 @@ ported bosses' 150..160):
 
 | row | label | stores | made with | AI class (hi:lo) | anims |
 |---|---|---|---|---|---|
+| 159 | Prometheus SK/8 | 0x62 | its own (rocket robot 0x633) | 0:0x10000004 -> `sub_0027F8E0` case 4 -> `sub_00283730` | animrb.pak (every level's), whole |
+| 160 | Prometheus SD/7 | 0x36 | its own (guard robot 0x5F8) | 0:0x10000004, as SK/8 | animrb.pak, whole |
 | 161 | Catacomb Ghost | 0x2F | the zombie 0x17's models | 0:0x50000000 -> `sub_002BA300` | lv17.pak 0x249..0x24C |
 | 162 | SecuriDroid XP | 0x4D | its own (chrs/securibot 0x607) | 0x4000:0x10000000 -> `sub_0026B7A0` | lv6.pak 0xA22..0xA2C |
 | 163 | Mutant (Story) | 0x30 | the mutant 0x59's models | 0x8000:0x10000000 -> `sub_00264A10` | lv22.pak 0x76B..0x770 |
+| 164 | Pit Skeleton | 0x31 | the giant skeleton 0x28's model | 0x20000:0x10000000 -> `sub_0029FE00` | lv17_4.pak 0x23B..0x246 |
+| 165 | Ragbug | 0xB0 | its own (chrs/ragbug 0x6CB) | 0x200000:0x10000000 -> `sub_0028B610` | lv17_4.pak 0x243..0x246 |
+
+Rows 164/165 (wave 3) have per-level state, arena and props, run by
+`pc_mapmaker_pitboss.inc` ([pit skeleton](mapmaker-pitboss.md)); their lv17_4
+entries carry 0x4000, which that area maps again after a restart. The
+stateless checks below cover rows 161..163.
 
 Put the slot in any number of Story AIs: no row has per-level or per-AI
 state, so several per map work as one. The preview shows the zombie, the
@@ -169,3 +178,52 @@ new guest calls (link stubs for `sub_0005A130`, `sub_00062260`,
 5. `TSFP_MAPMAKER_CREATURES=0`: the same AIs are bots (stderr `keeps the bot
    AI`). Without `TSFP_MAPMAKER_LIMITS` the rows are absent; the map plays
    with bots. Story missions 6, 7 and 8 play stock.
+
+## The Prometheus robots (rows 159/160, after the v0.4.0-mapmaker.58 report)
+
+User (.58+): "New Prometheus SK/8 story AI addition, if unarmed, continues to
+repeat its rocket firing animation without actually firing a projectile. If
+given a weapon, it does this as well but does not fire its given weapon unless
+very close to the player."
+
+**Cause (CONFIRMED, `test_robot_class_4_path`, `test_bot_class_never_reaches_the_robot_code`,
+`test_rocket_robot_built_in_weapon`, `test_story_robots_spawn_class_4`).** Wave 1
+added the rows as editor rows only, so the Story AIs kept MapMaker's bot class
+0x01000000 (`sub_0026EFC0`, 0x0027D8B6). The story levels spawn them with class
+0:0x10000004 and no weapon (mission 9: 21 SK/8 records such as SB06/PR01/GB04;
+mission 10: 11 SD/7 records such as DW03/TC03). Class 4 runs `sub_0027F8E0` (story
+mode, lo & 0x1FFF, from `sub_0027FE30`): case 4 (0x0027F9C4) sends a robot (robot
+list `sub_000D6DD0`, 0x0027FA37) with a target to the robot handler `sub_00283730`
+(robot moves and fire poses from animrb's table 0x00520840, by type: 0x34 / 0x62 /
+other); messages go to `sub_00283F80` (0x0027D05C). In scene 100 the stock code
+already has a robot branch: no built-in weapon (+0x94), no +0x2BC and no usable
+weapon -> the unarmed attack `sub_0027E4E0` (0x0027FA43..0x0027FA86). The AI start
+gives 0x62 its built-in rocket weapon 0x43 (+0x94 at 0x0015B927, ammo from weapon
+0x43's record) when the record has no weapon list (+0x18 -1, which MapMaker writes
+at 0x00242155). Nothing the bot class reaches calls the robot list, the robot
+handler or `sub_0027F8E0`, so the rocket weapon was never fired; the robot's
+model still turned the bot's fire requests into its rocket pose, which looped.
+INFERRED: the bot only fired a given weapon at close range because its aim/fire
+timing ran against the robot's poses (not traced further; the story class
+replaces the whole path).
+
+**Change.** The two rows move from realbosses' `rbs_extra` into
+`pc_mapmaker_creatures.def` (first in the table, so the picker order, row numbers
+159/160, text ids 0x52420062/0x52420036 and previews 0xAA/0xA9 are unchanged; saved
+maps store the character ids, never the rows, so old maps load as before). The
+creatures area's AI start now writes 0:0x10000004 for 0x62 and 0x36. Their pak is
+`pak/anim/animrb.pak` (0x0047E65C), which every MapMaker level mounts and
+registers whole (0x001CB133..0x001CB151): the row keeps the whole table (first 0,
+n = count), so the area never mounts it (logged "anim pak already mounted") and
+the anim slot budget adds no row for it (a whole-table row becomes table 0 in
+`ans_paks`, which matches nothing). The AI start still checks that all 21 animrb
+ids are mapped. The Arcade twins 0xA9/0xAA keep the bot AI.
+
+**State.** `sub_00283730` and `sub_00283F80` read no scene-only state (the same
+reach test as the other rows); the class-4 path tests the scene only for its own
+scene-100 branches. No per-level state, no level hook: several per map.
+
+**Unverified (playtest):** the SK/8's rockets in a MapMaker map; what an unarmed
+SD/7 does (`sub_0027E4E0`) and how SK/8/SD/7 use a weapon given in the editor
+(the robot handler fires the held weapon, slot +0x204); MapMaker logic triggers
+on their deaths.
