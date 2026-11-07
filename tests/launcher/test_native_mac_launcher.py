@@ -50,6 +50,7 @@ def test_built_texture_pack_is_available_without_changing_settings(tmp_path):
     pack.mkdir(parents=True)
     env = launcher.game_environment({}, tmp_path)
     assert env['TSFP_TEXTURE_PACK_DIR'] == str(pack)
+    assert env['TSFP_MUSIC_DIR'] == str(tmp_path/'private/music')   # imported music, never created here
     assert 'TSFP_TEXTURE_MODE' not in env
     assert not (tmp_path/'config').exists()
 
