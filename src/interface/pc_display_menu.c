@@ -689,6 +689,13 @@ static void audio_options_build(void)
     uint32_t caption=audio_options_caption();
     if(caption && guest_writable(menu,0x208))WORD_AT(menu+0x204)=caption;
 }
+/* The audio menu's tick (the descriptor's next entry after its build): the
+ * Music slider's ticks past 16, pc_menu_sliders.inc. */
+static void audio_options_tick(void)
+{
+    extern void sub_002C3720(void);
+    pc_display_menu_audio_tick(sub_002C3720);
+}
 /* Reuse the title's Settings actions and profile selector. Cheats lives in
  * Extras alongside Unlock Content. The native back/save flow is unchanged. */
 static void settings_build(void)
@@ -1044,6 +1051,7 @@ void (*pc_display_menu_lookup(uint32_t address))(void)
 {
     if(address==0x002D9390u)return display_highlight_draw;
     if(address==0x002C3E20u)return audio_options_build;
+    if(address==0x002C3720u)return audio_options_tick;
     if(address==0x002CBFC0u)return settings_build;
     switch(address) {
     case AUDIO_BETA_CHANGE:return audio_beta_change;

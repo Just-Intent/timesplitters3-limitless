@@ -24,6 +24,19 @@ log line; default unchanged. `test_custom_music.py` fixed + 43 mutations and
 `test_mapmaker_custommusic.py` / `test_music_codec.py` passed (WinError 4551
 reruns). Unverified: the game build and what the player hears.
 
+Music slider past 16 (2026-11-07, branch `music-slider` from `24e64c03`;
+Windows 11 x64, MSVC fixtures; not built or played): the Audio Options Music
+bar (Settings and pause menu) has 24 steps; 0..16 stay stock, each step past
+16 adds 1.5 dB to imported music (`slider_extra=` in `pc-music.ini`, sum with
+`gain_db=` capped at +12 dB); the profile's word stays 0..16; stock music is
+unchanged past 16. Passed: `test_menu_mouse.py` fixed + 15 mutations (7 new),
+`test_custom_music.py` fixed + 51 mutations (8 new),
+`test_mapmaker_custommusic.py` incl. the new XBE check
+`test_stock_music_slider_code`, `test_mapmaker_restable.py`,
+`test_mapmaker_probe.py`, and the Windows `fov_settings.c` fixture built
+against the main checkout's runtime headers (this worktree has no
+`external/`). Unrun: the macOS `-fsyntax-only` menu compile, any game run.
+
 ## MapMaker Story AI points past piece 255 restored on editor reload (2026-11-06, not built or played)
 
 v0.4.0-mapmaker.39/.40: on maps of more than 256 pieces, Story AIs placed on

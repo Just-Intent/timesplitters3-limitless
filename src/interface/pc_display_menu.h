@@ -24,6 +24,9 @@ void pc_display_menu_mouse_input(void (*original)(void));
 void pc_display_menu_mouse_footer(void (*original)(void));
 void pc_display_menu_mouse_dispatch(void (*original)(void));
 void pc_display_menu_audio_draw(void (*original)(void),int compact);
+/* Audio menu tick sub_002C3720 (descriptor 0x0052377C): Music ticks past 16.
+ * Reached through pc_display_menu_lookup, not a WRAP. */
+void pc_display_menu_audio_tick(void (*original)(void));
 void pc_display_menu_sensitivity_draw(void (*original)(void));
 void pc_display_menu_slider_bar(void (*original)(void));
 void pc_display_mapmaker_meter(void (*original)(void));
