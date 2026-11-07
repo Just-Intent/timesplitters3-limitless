@@ -232,7 +232,7 @@ int main(void)
     g_xbox_mem_offset=(uintptr_t)memory;
     stock_categories();
     WORD_AT(0x007844A8u)=ED;
-    WORD_AT(0x00762CB8u)=700;                          /* pad groups */
+    WORD_AT(0x00762CB8u)=1400;                         /* pad groups */
     WORD_AT(ED+0x2f34)=(uint32_t)-1;                   /* nothing held from the palette */
     WORD_AT(ED+0x280)=37;                              /* Story AI */
     WORD_AT(ED+0x41E0)=12;                             /* logic ops */
@@ -361,10 +361,10 @@ int main(void)
         snprintf(want[1],32," %u/500",(unsigned)items);
         snprintf(want[2],32," %u/2047",(unsigned)(90u+items+128u));
         snprintf(want[3],32," 40/768");            /* weapons + keycards + health */
-        snprintf(want[4],32," 900/7680");
-        snprintf(want[5],32," 810/9984");
+        snprintf(want[4],32," 900/16128");
+        snprintf(want[5],32," 810/14080");
         snprintf(want[6],32," 2340/32256");
-        snprintf(want[7],32," 700/1024");
+        snprintf(want[7],32," 1400/2047");
         snprintf(want[8],32," %u/2000 KB",(unsigned)kb);
         snprintf(want[9],32," 37/511");
         snprintf(want[10],32," 12/120");
@@ -386,7 +386,7 @@ int main(void)
         CHECK(draws[0].x==22.f+MAPMAKER_TABLE_PAD && draws[0].y==36.f+MAPMAKER_TABLE_PAD);
         CHECK(rect[2]<200 && rect[3]<260);                       /* compact and above the floor buttons */
         /* The same numbers as the check: the meter fraction is the fullest of the capped rows. */
-        CHECK(fabsf(FLOAT_AT(ED+0x270)-700.f/1024.f)<1e-4f);
+        CHECK(fabsf(FLOAT_AT(ED+0x270)-1400.f/2047.f)<1e-4f);
         CHECK(colour_of("Tiles")==MAPMAKER_TABLE_OK && colour_of(want[0])==MAPMAKER_TABLE_OK);
         CHECK(colour_of("Movers")==MAPMAKER_TABLE_NEAR && colour_of(want[11])==MAPMAKER_TABLE_NEAR);
         CHECK(colour_of("Turrets")==MAPMAKER_TABLE_FULL);       /* turret type 27 at 24/24 */
@@ -465,24 +465,24 @@ int main(void)
     mapmaker_table.expanded=1;
 
     /* A refused cap turns its row red at the placed count (placed + held over). */
-    WORD_AT(0x00762CB8u)=1024;                                    /* groups at the cap: allowed, red (full) */
+    WORD_AT(0x00762CB8u)=2047;                                    /* groups at the cap: allowed, red (full) */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(!(WORD_AT(ED+0x25c)&0x400000u));
     draw();
-    CHECK(colour_of(" 1024/1024")==MAPMAKER_TABLE_FULL && colour_of("Groups")==MAPMAKER_TABLE_FULL);
-    WORD_AT(0x00762CB8u)=922;                                     /* 90% (922/1024) */
+    CHECK(colour_of(" 2047/2047")==MAPMAKER_TABLE_FULL && colour_of("Groups")==MAPMAKER_TABLE_FULL);
+    WORD_AT(0x00762CB8u)=1843;                                    /* 90% (1843/2047) */
     pc_display_mapmaker_limits(fake_limits);
     draw();
-    CHECK(colour_of(" 922/1024")==MAPMAKER_TABLE_NEAR);
-    WORD_AT(0x00762CB8u)=700;
-    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,800);         /* held: 800 x 9 cover = 7200 + 810 */
-    WORD_AT(0x00529404u+0x280u)=12;                               /* 9600 + 810 > 9984: refused on cover */
+    CHECK(colour_of(" 1843/2047")==MAPMAKER_TABLE_NEAR);
+    WORD_AT(0x00762CB8u)=1400;
+    WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1200);        /* held: 1200 x 12 cover */
+    WORD_AT(0x00529404u+0x280u)=12;                               /* 14400 + 810 > 14080: refused on cover */
     pc_display_mapmaker_limits(fake_limits);
     CHECK(WORD_AT(ED+0x25c)&0x400000u);
     CHECK(mapmaker_limits_view.over&MAPMAKER_CAP_COVER);
     draw();
-    CHECK(colour_of(" 810/9984")==MAPMAKER_TABLE_FULL);            /* placed shown, refusal coloured */
-    CHECK(colour_of(" 900/7680")==MAPMAKER_TABLE_OK);
+    CHECK(colour_of(" 810/14080")==MAPMAKER_TABLE_FULL);           /* placed shown, refusal coloured */
+    CHECK(colour_of(" 900/16128")==MAPMAKER_TABLE_OK);
     WORD_AT(0x00529404u+0x280u)=9;
     WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
     /* Pieces: 1023 placed + 1 held refused (template links 0 so only the
@@ -515,20 +515,20 @@ int main(void)
     mapmaker_table.expanded=0;
     WORD_AT(ED+0x306c)=460u<<16;                                  /* items 460/500, objects 928/2047 */
     WORD_AT(0x0078400Cu)=make_list(0x00400000u,TYPEB,340);
-    WORD_AT(0x00762CB8u)=930;                                     /* groups 930/1024 */
+    WORD_AT(0x00762CB8u)=1859;                                    /* groups 1859/2047 */
     pc_display_mapmaker_limits(fake_limits);
     draw();
     CHECK(drawn("+ Fullest: Items 460/500")==0 && draws[0].colour==MAPMAKER_TABLE_NEAR);
     if(drawn("+ Fullest: Items 460/500")) fprintf(stderr,"collapsed: '%s'\n",draws[0].text);
-    WORD_AT(0x00762CB8u)=950;                                     /* groups 92.8%, after items: groups now */
+    WORD_AT(0x00762CB8u)=1900;                                    /* groups 92.8%, after items: groups now */
     pc_display_mapmaker_limits(fake_limits);
     draw();
-    CHECK(drawn("+ Fullest: Groups 950/1024")==0);
-    WORD_AT(ED+0x306c)=420u<<16;WORD_AT(0x00762CB8u)=930;        /* items 84%, objects 43% (ok) */
+    CHECK(drawn("+ Fullest: Groups 1900/2047")==0);
+    WORD_AT(ED+0x306c)=420u<<16;WORD_AT(0x00762CB8u)=1859;        /* items 84%, objects 43% (ok) */
     pc_display_mapmaker_limits(fake_limits);
     draw();
-    CHECK(drawn("+ Fullest: Groups 930/1024")==0);
-    WORD_AT(0x00762CB8u)=700;
+    CHECK(drawn("+ Fullest: Groups 1859/2047")==0);
+    WORD_AT(0x00762CB8u)=1400;
     mapmaker_table.expanded=1;
     WORD_AT(ED+0x306c)=5u<<16;
     WORD_AT(0x0078400Cu)=pieces;WORD_AT(ED+0x2f7c)=make_list(0x00480000u,TYPEB,1);
