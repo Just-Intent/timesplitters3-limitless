@@ -162,9 +162,9 @@ MUTATIONS = {
     # v0.4.0-mapmaker.34: cells in no room (off the map, another floor) were targets
     'rooms-none': ('    crw_rooms(st,sy);\n', ''),
     'rooms-not-blocked': ('if(crw_lv.off[k] || crw_lv.wall_left[k]) WORD_AT(', 'if(crw_lv.wall_left[k]) WORD_AT('),
-    'rooms-floor-height': ('crw_setf(q+4u,y+CRW_BODY_LOW);', 'crw_setf(q+4u,y-CRW_BODY_HIGH);'),
+    'rooms-floor-height': ('crw_setf(q+4u,ry+CRW_BODY_LOW);', 'crw_setf(q+4u,ry-CRW_BODY_HIGH);'),
     'rooms-body-wide': ('#define CRW_BODY_HALF 0.3f', '#define CRW_BODY_HALF 3.0f'),
-    'rooms-untrusted-used': ('    if(crw_lv.off[start]) {\n        g_esp=sp;\n        memset(crw_lv.off,0,sizeof crw_lv.off);\n', '    if(crw_lv.off[start]) {\n        g_esp=sp;\n'),
+    'rooms-untrusted-used': ('        g_esp=sp;\n        memset(crw_lv.off,0,sizeof crw_lv.off);\n', '        g_esp=sp;\n'),
     'rooms-esp-kept': ('    g_esp=sp;\n    for(k=0;k<CRW_CELLS;k++) { n+=', '    for(k=0;k<CRW_CELLS;k++) { n+='),
     'rooms-in-frame': ('    q=(g_esp-0x60u)&~0xFu;', '    q=(g_esp+0x4u)&~0xFu;'),
     'shadow-none': ('    if(r<CRW_ROWS && c<CRW_COLS) crw_shadow(st,r,c);\n', ''),
@@ -243,8 +243,8 @@ MUTATIONS = {
     'meter-any-caller': ('WORD_AT(g_esp)!=CRW_RET_METER) { original();return; }', '0) { original();return; }'),
     'meter-any-actor': ('(!crw_inst[k].record || crw_inst[k].record!=WORD_AT(a+CRW_ACTOR_RECORD));k++) {}', '0;k++) {}'),
     # v0.4.0-mapmaker.40: ledges, drops and gaps
-    'ledge-no-probe': ('if(!crw_lv.off[k] && !crw_floor_at(pt,crw_getf(c+0x10u),ref,crw_getf(c+0x14u))) drop[k]=1u;', 'if(0) drop[k]=1u;'),
-    'ledge-any-height': ('    return crw_floor_y(pt,x,ref,z,&f) && fabsf(f-ref)<=CRW_STEP;', '    return crw_floor_y(pt,x,ref,z,&f);'),
+    'ledge-no-probe': ('            drop[k]=1u;\n            if(shown++', '            if(shown++'),
+    'ledge-any-height': ('            if(fabsf(f-ref)<=CRW_STEP) continue;\n', '            continue;\n'),
     'ledge-step-wide': ('#define CRW_STEP 1.0f', '#define CRW_STEP 6.0f'),
     'ledge-step-none': ('#define CRW_STEP 1.0f', '#define CRW_STEP 0.1f'),
     'ledge-no-floor-ok': ('PROBE_R)<=0) return 0;', 'PROBE_R)<=0) { *f=y;return 1; }'),
