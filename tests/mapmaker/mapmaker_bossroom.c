@@ -100,7 +100,7 @@ int main(void)
     for(i=0;i<=0x20Cu;i++) { depth(VIEW0,i,-1);depth(VIEW1,i,-1); }
     depth(VIEW0,CAM,0);depth(VIEW0,3,2);depth(VIEW1,CAM,0);depth(VIEW1,3,1);
     for(i=0;i<NROOMS;i++) prop(i,1u,(uint16_t)(0x908u+i),1,i,0);   /* the rooms' own props: never touched */
-    *(uint16_t *)((uintptr_t)(PROP(5)+0x94u)+g_xbox_mem_offset)=0x5E9u;   /* a room prop with the boss model: below the first index */
+    prop(5,8u,0x5E9u,1,3,0);   /* a room's own prop with a boss's model, type and list: below the first index */
     skel=prop(22,8u,0x5E9u,2,3,4);human=prop(23,8u,0x634u,2,3,4);walker=prop(24,8u,0x637u,1,9,0);
     trophy=prop(25,8u,0x5BEu,2,CAM,3);object=prop(26,1u,0x5E9u,1,3,0);empty=prop(27,8u,0x5F2u,0,3,0);
     cam_ids[0]=human;cam_ids[1]=trophy;relink(CAM,2,cam_ids);
@@ -165,8 +165,13 @@ int main(void)
     /* Bad tables: nothing. */
     relink(CAM,2,cam_ids);
     WORD_AT(0x007B4FACu)=5000u;mapmaker_bossroom_view(VIEW0);
-    WORD_AT(0x007B4FACu)=30u;WORD_AT(0x0072F5E8u)=0x10u;mapmaker_bossroom_view(VIEW0);
-    WORD_AT(0x0072F5E8u)=PROPS;mapmaker_bossroom_view(0x00000100u);
+    WORD_AT(0x007B4FACu)=30u;WORD_AT(0x0072F5E8u)=0x03FFF000u;mapmaker_bossroom_view(VIEW0);   /* past guest RAM */
+    WORD_AT(0x0072F5E8u)=PROPS;
+    {
+        unsigned long long views=bsr.views,no_room=bsr.no_room;
+        mapmaker_bossroom_view(0x00000100u);
+        CHECK(bsr.views==views && bsr.no_room==no_room);
+    }
     CHECK(WORD_AT(0x008C7CC0u+CAM*4u)==POOL+CAM*32u);
     PHASE("phase bad");
 
