@@ -97,3 +97,15 @@ away) found nothing. Cells in no room stay blocked unless that starves the
 picker (`crw_pickable`); in state 9 `crw_ahead` probes 2 ahead (room query,
 floor finder) and ends the walk (`crw_stop`) at no room or a floor 2+ below
 the reference. Tests: `ledges()` in `mapmaker_crowe.c`, `ahead-*`/`starve-*`.
+
+Skeleton vanishing log (after .45, "disappear up close / mid-animation"; LOG
+ONLY): `pc_mapmaker_skelvis.inc` (included after limits; callers test
+`MAPMAKER_SKELVIS`) reads the 10-room list build (rooms query under
+0x0009FCF5: touched vs kept, camera room view +0x2A0 in/dropped), the bigdraw
+rect (reached, empty), NEW WRAP `sub_0008C020` -> `pc_mapmaker_skelvis_frustum`
+(only caller 0x000A249E; < 0 culls at 0x000A24AA), the tank draw hook
+(`sub_000A2740`) and, before openview's walk, ends the main view's pass.
+Per-pass reason, state changes only, 60 lines a level + summaries every 600
+passes; grep `[mapmaker] skelvis:` (formats in mapmaker-realbosses.md
+"Skeleton visibility log"). `test_mapmaker_skelvis.py` (fixture +
+`mapmaker_skelvis.expected`, mutations, decode). Unplayed.

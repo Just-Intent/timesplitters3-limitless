@@ -758,6 +758,9 @@ void pc_mapmaker_tank_draw(void (*original)(void))
 {
     uint32_t prop;
     unsigned k;
+#ifdef MAPMAKER_SKELVIS
+    if(MAPMAKER_STACK_OK(8)) mapmaker_skelvis_drawn(WORD_AT(g_esp+4u));   /* pc_mapmaker_skelvis.inc, log only */
+#endif
     if(tnk_lv.n && MAPMAKER_STACK_OK(8) && (prop=WORD_AT(g_esp+4u))!=0)
         for(k=0;k<tnk_lv.n && k<TNK_MAX;k++) {
             if(tnk_lv.t[k].obj!=prop) continue;
