@@ -136,6 +136,7 @@ void sub_00096330(void) {}  /* mothership: texture registration */
 void sub_002F7920(void) {}  /* sets: spawn mode mask of an editor item */
 void sub_0003E0B0(void) {} void sub_00165760(void) {}  /* objects: physics body pools */
 void sub_0033E560(void) {}  /* aitemplates: the AI death event */
+void sub_000C3C50(void) {}  /* crowe: the floor finder */
 /* khallos, worm (pc_mapmaker_khallos.inc, pc_mapmaker_worm.inc) */
 void sub_0009A420(void) {} void sub_000A9070(void) {} void sub_0010E2A0(void) {} void sub_001D1E80(void) {}
 void sub_0010E730(void) {}  /* khallos: the jet emitter's position */

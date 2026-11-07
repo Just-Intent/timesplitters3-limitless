@@ -68,6 +68,7 @@ void sub_00019D70(void) { g_ecx=14; }
 void sub_002A7F30(void) { g_ecx=15; }
 void sub_0005F460(void) { g_ecx=16; }
 void sub_00087310(void) { g_ecx=23; }   /* crowe: the room query (none here: nothing is checked) */
+void sub_000C3C50(void) { g_ecx=24; }   /* crowe: the floor finder (not reached without rooms) */
 void sub_00287860(void) { g_ecx=40; }   /* realbosses: the stock skeleton/walker resets at a restart */
 void sub_00297690(void) { g_ecx=41; }
 void sub_0028D6D0(void) { g_ecx=17; }
