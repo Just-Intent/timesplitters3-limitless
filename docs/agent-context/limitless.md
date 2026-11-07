@@ -462,7 +462,7 @@ the unchecked 'WELL' lookup, ret 0x0029B331) and `sub_00126560` ->
 `pc_mapmaker_realbosses_fx` (beams `sub_0029CCB0` after ret 0x001CEE8C,
 stock scene 81 only). `_event` drops events at rets 0x0029AEBE/0x0029B120
 and at 0x0029CB80 removes it (`sub_0015DDA0`). bigdraw adds 0x637. Tests
-`test_walker_*`, 34 walk mutations. Not built or played. Tank: not started.
+`test_walker_*`, 34 walk mutations. Unplayed.
 Tile roof menu (user, 2026-11-01): `src/interface/pc_mapmaker_tileflags.inc`
 (area `sky`, after roof). Right click (pointer.inc, after the empty-cell Y
 case) on a placed tile in Tiles mode (`editor+0x254` 0) with nothing held ->
@@ -477,7 +477,8 @@ Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained.
-mapmaker.40: _restart reallocates (restart frees level heap); bs_skel_aim aims a floor up.
+mapmaker.40: _restart reallocates (restart frees level heap); 
+bs_skel_aim aims a floor up.
 Robot doors (.45): stacked one-floor portals combine; `rbt_hold` puts back knee-level moves through low ones (mapmaker-robot.md).
 Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, walk stops at ledges: mapmaker-crowe.md), `tank`
@@ -485,7 +486,7 @@ Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robo
 0x281 from prop6.pak, mapmaker-tank.md). Wrappers, restart: each doc. ORDER puts them
 after realbosses, before bosses (HUD inside `bosses_hud`; robot level outer of
 realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
-`rbs_extra` table in realbosses.inc; bigdraw adds 0x5F2/0x5E8. Tank WRAPs
+`rbs_extra` table in realbosses.inc (159/160 Prometheus); bigdraw adds 0x5F2/0x5E8. Tank WRAPs
 `sub_0015E7C0` -> `_tank_request` (level-init models), `sub_000A2740` -> `_draw`
 (log); shown (+0x28 bit 0) at create. .22: tank yard/target search bounded;
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).

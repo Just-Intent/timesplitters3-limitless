@@ -261,6 +261,16 @@ Health display work as for the trophy monster (Off = no health shown). The
 dust clouds of the original fight are not shown. *Not yet built or played.*
 Details: [real bosses](mapmaker-realbosses.md).
 
+### Prometheus robots from story mission 9 (`LIMITS`)
+
+The custom character set's picker ends with two more rows: **Prometheus
+SK/8** (the Machine Wars rocket robot) and **Prometheus SD/7** (the guard
+robot). Put them in Story AIs; any number per map. They use the game's own
+robot behaviour and animations; the preview shows their Arcade look-alikes.
+The original game plays such a map with the same robots but shows an empty
+name in the editor. *Automated tests only.* Details:
+[story assets](mapmaker-story-assets.md) item 18.
+
 ### Clouds per map (`LIMITS`)
 
 **Map Settings** gains a **Clouds** checkbox beside the sky choice. Clouds are

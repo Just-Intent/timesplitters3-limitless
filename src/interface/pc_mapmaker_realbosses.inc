@@ -504,7 +504,7 @@ static uint32_t rbs_walk_label(void)
  * (model 0x5F2), 0x46 split Crowe (0x5E8), 0x12 the guard robot that stands in
  * for the castle tank prop (pc_mapmaker_tank.inc). sub_002BE270 is 0 for all
  * three (byte table 0x002BE29C entry 1), so the variant is -1 as for 0x15. */
-#define RBS_EXTRA_N 6u
+#define RBS_EXTRA_N 8u
 static const struct { uint32_t row, id, text, standin; char label[16]; } rbs_extra[RBS_EXTRA_N]={
     {153u,0x42u,0x52420042u,0xA8u,"Giant Robot"},  /* preview: the Arcade giant robot */
     {154u,0x46u,0x52420046u,0x1Eu,"Split Crowe"},  /* preview: Arcade Old Crow */
@@ -512,6 +512,11 @@ static const struct { uint32_t row, id, text, standin; char label[16]; } rbs_ext
     {156u,0x33u,0x52420033u,0x02u,"Khallos (Chair)"},  /* pc_mapmaker_khallos.inc; preview: Arcade Khallos */
     {157u,0x2Cu,0x5242002Cu,0x6Bu,"Mansion Worm"}, /* pc_mapmaker_worm.inc; preview: Arcade mansion zombie nurse */
     {158u,0x75u,0x52420075u,0x4Eu,"Mothership"},   /* pc_mapmaker_mothership.inc; preview: Arcade Timesplitter */
+    /* Machine Wars "Prometheus" robots (docs/mapmaker/mapmaker-story-assets.md item 18):
+     * the story ids, in the robot list sub_000D6DD0 (robot AI, animrb.pak anims,
+     * mounted in scene 100), no level state; previews: their Arcade twins. */
+    {159u,0x62u,0x52420062u,0xAAu,"Prometheus SK/8"},  /* rocket robot (set 10); preview: Arcade 0xAA */
+    {160u,0x36u,0x52420036u,0xA9u,"Prometheus SD/7"},  /* guard robot (0x12/0x75 are taken); preview: Arcade 0xA9 */
 };
 static unsigned rbs_extra_by_row(uint32_t row)
 {
