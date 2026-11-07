@@ -6,8 +6,12 @@
  * from it, gets the union of the area's visible rectangles (the whole
  * viewport from inside the area) and a depth when the walk did not reach it;
  * rooms elsewhere, other scenes, the switch off and maps without open air
- * keep the stock result. The original runs exactly once and pops only its
- * return address. The Python side checks the stderr text. */
+ * keep the stock result. Rooms whose box touches an open room's box (a tile
+ * beside the area with no portal into it) are touched as well, and every
+ * touched room is marked two-sided for the roof's draw hook (back faces
+ * drawn: tiles seen from outside show their walls). The original runs
+ * exactly once and pops only its return address. The Python side checks the
+ * stderr text. */
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -66,6 +70,20 @@ static int room_is(uint32_t r,int32_t depth,int x0,int y0,int x1,int y1)
     return (int32_t)WORD_AT(entry(r))==depth && *h(entry(r)+4u)==x0 && *h(entry(r)+6u)==y0 && *h(entry(r)+8u)==x1 && *h(entry(r)+10u)==y1;
 }
 static int unseen(uint32_t r) { return room_is(r,-1,640,480,-1,-1); }
+static void set_box(uint32_t r,float x0,float y0,float z0,float x1,float y1,float z1)
+{
+    FLOAT_AT(RECORDS+r*0xB4u+0x10u)=x0;FLOAT_AT(RECORDS+r*0xB4u+0x14u)=y0;FLOAT_AT(RECORDS+r*0xB4u+0x18u)=z0;
+    FLOAT_AT(RECORDS+r*0xB4u+0x1Cu)=x1;FLOAT_AT(RECORDS+r*0xB4u+0x20u)=y1;FLOAT_AT(RECORDS+r*0xB4u+0x24u)=z1;
+}
+static int two_sided(const char *want)    /* want[r-1]: '1' two-sided, '0' not */
+{
+    uint32_t r,n=0;
+    for(r=1;r<=ROOMS;r++) {
+        if(mapmaker_roof_play.twosided[r-1u]!=(want[r-1u]=='1')) return 0;
+        n+=want[r-1u]=='1';
+    }
+    return mapmaker_roof_play.twosided_rooms==n;
+}
 
 /* Stock sub_00089B90 reduced to its result: reset (depth -1, x0/y0 the
  * screen size, x1/y1 -1), then the walk's rectangles from walk[]. */
@@ -199,6 +217,7 @@ int main(void)
     CHECK(unseen(5) && unseen(6) && unseen(7) && unseen(8));
     CHECK(WORD_AT(VIEW+0xD28u)==1u);
     CHECK(checksum_outside()==before);
+    CHECK(two_sided("111101101"));                  /* the areas and their portal neighbours */
     call();CHECK(room_is(3,1,0,0,640,480));          /* same every frame */
     puts("phase inside");fflush(stdout);fflush(stderr);
 
@@ -243,6 +262,47 @@ int main(void)
     call();
     CHECK(room_is(2,1,0,0,640,480) && room_is(9,1,0,0,640,480) && unseen(3) && unseen(4));
     puts("phase rebuild");fflush(stdout);fflush(stderr);
+
+    /* Boxes: 1, 2, 3 in a row along x (5 wide), 4 beyond 3, 9 diagonal to 1;
+     * the closed 5 beside 1 (no portal into the area) is touched by its box
+     * and drawn two-sided; 8 far away is not; a box with a NaN, an empty one
+     * and boxes of rooms past the records do not count. */
+    play_build();
+    set_box(1,0,0,0,5,5,5);set_box(2,5,0,0,10,5,5);set_box(3,10,0,0,15,5,5);set_box(4,15,0,0,20,5,5);
+    set_box(5,0,0,5.25f,5,5,10);set_box(9,-5,0,-5,0,5,0);set_box(6,200,0,0,205,5,5);set_box(7,205,0,0,210,5,5);
+    set_box(8,100,0,0,105,5,5);
+    no_walk();sees(1,0,0,0,640,480);WORD_AT(VIEW+0x2A0u)=1u;
+    call();
+    CHECK(room_is(5,1,0,0,640,480) && unseen(8));
+    CHECK(two_sided("111111101"));
+    CHECK(mapmaker_openview.beside==1u);
+    set_box(8,15,0,0,20,5,5);FLOAT_AT(RECORDS+8u*0xB4u+0x14u)=strtof("nan",NULL);   /* NaN: no box */
+    play_build();call();
+    CHECK(unseen(8) && mapmaker_openview.beside==1u);
+    set_box(8,-1e9f,-1e9f,-1e9f,1e9f,1e9f,1e9f);       /* absurd: no box */
+    play_build();call();
+    CHECK(unseen(8) && mapmaker_openview.beside==1u);
+    set_box(8,10,0,50,15,5,55);                         /* above room 3 in x, far in z */
+    play_build();call();
+    CHECK(unseen(8) && mapmaker_openview.beside==1u);
+    set_box(8,10,50,0,15,55,5);                         /* far in y */
+    play_build();call();
+    CHECK(unseen(8) && mapmaker_openview.beside==1u);
+    set_box(8,15,0,0,15,5,5);                           /* empty */
+    play_build();call();
+    CHECK(unseen(8) && mapmaker_openview.beside==1u);
+    set_box(8,15.4f,0,0,20,5,5);                        /* 0.4 from room 3: touching */
+    play_build();call();
+    CHECK(room_is(8,1,0,0,640,480) && mapmaker_openview.beside==2u && two_sided("111111111"));
+    set_box(8,15.6f,0,0,20,5,5);                        /* 0.6 away: not */
+    play_build();call();
+    CHECK(unseen(8) && mapmaker_openview.beside==1u && two_sided("111111101"));
+    /* no boxes again for the next phase */
+    {
+        uint32_t r;
+        for(r=1;r<=ROOMS;r++) set_box(r,0,0,0,0,0,0);
+    }
+    puts("phase boxes");fflush(stdout);fflush(stderr);
 
     /* Bad tables: nothing written, the original still runs. */
     play_build();
