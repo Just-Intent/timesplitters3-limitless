@@ -356,6 +356,7 @@ static void arcade_table(void)
     WORD_AT(0x00521A18u+43u*0x30u+4u)=0xA7u;                 /* trophy monster row */
     WORD_AT(0x00521A18u+144u*0x30u+4u)=0xA6u;                /* skeleton cowboy row */
     WORD_AT(0x00521A18u+90u*0x30u+4u)=0xA8u;                 /* giant robot row */
+    WORD_AT(0x00521A18u+88u*0x30u+4u)=0xA9u;WORD_AT(0x00521A18u+89u*0x30u+4u)=0xAAu;   /* Prometheus SD/7, SK/8 */
     WORD_AT(0x00521A18u+14u*0x30u+4u)=0x1Eu;                 /* Old Crow row */
     for(i=0;i<43u;i++) if(WORD_AT(0x00521A18u+i*0x30u+4u)==0xA7u) WORD_AT(0x00521A18u+i*0x30u+4u)=0x20u;
 }
@@ -482,7 +483,7 @@ int main(void)
     CHECK(nrows==0);
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_picker_end,fake,0x002C1FA5u,0,0,0,1);
-    CHECK(nrows==9 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
+    CHECK(nrows==11 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
     CHECK(!strcmp(rows[0].label,"Giant Trophy Monster"));
     CHECK(rows[1].id==151u && rows[1].flags==0x20900u && rows[1].cb==0x002C1C90u && !strcmp(rows[1].label,"Giant Skeleton"));
     CHECK(rows[2].id==152u && rows[2].flags==0x20900u && rows[2].cb==0x002C1C90u && !strcmp(rows[2].label,"Crow Walker"));
@@ -490,7 +491,8 @@ int main(void)
     CHECK(rows[5].id==155u && !strcmp(rows[5].label,"Castle Tank") && rows[5].flags==0x20900u && rows[5].cb==0x002C1C90u);
     CHECK(rows[6].id==156u && !strcmp(rows[6].label,"Khallos (Chair)") && rows[7].id==157u && !strcmp(rows[7].label,"Mansion Worm"));
     CHECK(rows[8].id==158u && !strcmp(rows[8].label,"Mothership"));
-    CHECK(nenable==9 && enable_item==ITEM && enable_flag==0);
+    CHECK(rows[9].id==159u && !strcmp(rows[9].label,"Prometheus SK/8") && rows[10].id==160u && !strcmp(rows[10].label,"Prometheus SD/7"));
+    CHECK(nenable==11 && enable_item==ITEM && enable_flag==0);
     /* pick: row 150 -> id 0x15, variant -1; other slots untouched */
     for(k=0;k<10u;k++) { WORD_AT(0x0075FD90u+k*0x1Cu)=0x40u+k;WORD_AT(0x0075FD90u+k*0x1Cu+0x14u)=k;WORD_AT(0x0075FD90u+k*0x1Cu+0x18u)=0; }
     CALL(pc_mapmaker_realbosses_pick,fake_pick,0x00077000u,0x00330000u,0,0,1);
@@ -537,7 +539,9 @@ int main(void)
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,155u,0,0,0)==0x52420012u);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,156u,0,0,0)==0x52420033u);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,158u,0,0,0)==0x52420075u);
-    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,159u,0,0,1)==0);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,159u,0,0,0)==0x52420062u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,160u,0,0,0)==0x52420036u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,161u,0,0,1)==0);
     {   /* the ported bosses' rows: names, pick, row lookups and previews */
         uint32_t s=CALL(pc_mapmaker_realbosses_text,fake,0x00077000u,0x52420012u,0,0,0);
         CHECK(s && !strcmp((const char *)((uintptr_t)s+g_xbox_mem_offset),"Castle Tank"));
@@ -555,6 +559,18 @@ int main(void)
         WORD_AT(0x00700000u)=153u;
         CALL(pc_mapmaker_realbosses_highlight,fake_highlight,0x00077000u,0x00330000u,0,0,1);
         CHECK(WORD_AT(0x0078AEA8u)==90u);
+        /* the Prometheus robots: rows 159/160 store 0x62/0x36, previews their Arcade twins 0xAA/0xA9 */
+        WORD_AT(0x0075FD90u+7u*0x1Cu+0x14u)=159u;WORD_AT(0x0075FD90u+8u*0x1Cu+0x14u)=160u;
+        CALL(pc_mapmaker_realbosses_pick,fake,0x00077000u,0x00330000u,0,0,1);
+        CHECK(WORD_AT(0x0075FD90u+7u*0x1Cu)==0x62u && WORD_AT(0x0075FD90u+8u*0x1Cu)==0x36u && WORD_AT(0x0075FD90u+7u*0x1Cu+0x18u)==0xFFFFFFFFu);
+        WORD_AT(0x0075FD90u+7u*0x1Cu+0x14u)=7u;WORD_AT(0x0075FD90u+8u*0x1Cu+0x14u)=8u;
+        orig_eax=0xFFFFFFFFu;
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C054Cu,0x62u,0xFFFFFFFFu,0,0)==159u);
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C1805u,0x62u,0xFFFFFFFFu,0,0)==89u);
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C1805u,0x36u,0xFFFFFFFFu,0,0)==88u);
+        s=CALL(pc_mapmaker_realbosses_text,fake,0x00077000u,0x52420062u,0,0,0);
+        CHECK(s && !strcmp((const char *)((uintptr_t)s+g_xbox_mem_offset),"Prometheus SK/8"));
+        orig_eax=0;
         orig_eax=0;
     }
     orig_eax=0xE20u;
