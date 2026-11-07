@@ -476,7 +476,7 @@ Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained.
-mapmaker.40: _restart reallocates (restart frees level heap); bs_skel_aim aims a floor up.
+mapmaker.40: _restart reallocates; rbs_skel_aim aims a floor up; .42: it and crw_rooms use the finder floor under the boss.
 Ported bosses in their own areas (merged 2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, room-checked cells: mapmaker-crowe.md), `tank`
 (`pc_mapmaker_tank.inc`: guard robot id 0x12 placeholder -> castle tank prop
