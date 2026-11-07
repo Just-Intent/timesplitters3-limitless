@@ -75,6 +75,13 @@ int pc_music_test_position(uint64_t *played,uint32_t *queued) { *played=0;*queue
 static int32_t volume_now=1;
 void pc_music_test_volume(int32_t volume) { volume_now=volume; }
 void pc_music_test_reset(void) { resets++; }
+/* host decoder adapter (pc_music_codec.c): none here, so .mp3 is not listed */
+struct PcMusicCodec;
+int pc_music_codec_available(void) { return 0; }
+struct PcMusicCodec *pc_music_codec_open(FILE *f,uint32_t *r,uint32_t *c) { (void)r;(void)c;if(f) fclose(f);return NULL; }
+long pc_music_codec_read(struct PcMusicCodec *d,int16_t *o,unsigned n) { (void)d;(void)o;(void)n;return -1; }
+int pc_music_codec_rewind(struct PcMusicCodec *d) { (void)d;return 0; }
+void pc_music_codec_close(struct PcMusicCodec *d) { (void)d; }
 
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"

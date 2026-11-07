@@ -1,0 +1,20 @@
+--- a/titles/futureperfect/CMakeLists.txt
++++ b/titles/futureperfect/CMakeLists.txt
+@@ -322,3 +322,17 @@
+     target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/generated")
+     target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3 "-framework Cocoa")
+ endif()
++
++# Imported music's MP3 adapter (src/interface/pc_music_codec.c): FFmpeg's
++# libavcodec loaded at run time, so only the headers are needed here, from the
++# same package as the XMV movies (src/video, XBOXRECOMP_FFMPEG_DIR). Without
++# them the file builds as a stub and imported music stays WAV-only.
++if(TSFP_SHARED_SOURCE)
++    set(TSFP_MUSIC_CODEC "${TSFP_SHARED_SOURCE}/interface/pc_music_codec.c")
++    target_sources(${PROJECT_NAME} PRIVATE "${TSFP_MUSIC_CODEC}")
++    if(XBOXRECOMP_FFMPEG_DIR AND EXISTS "${XBOXRECOMP_FFMPEG_DIR}/include/libavcodec/avcodec.h")
++        set_property(SOURCE "${TSFP_MUSIC_CODEC}" APPEND PROPERTY INCLUDE_DIRECTORIES "${XBOXRECOMP_FFMPEG_DIR}/include")
++        set_property(SOURCE "${TSFP_MUSIC_CODEC}" APPEND PROPERTY COMPILE_DEFINITIONS
++            PC_MUSIC_HAVE_FFMPEG PC_MUSIC_FFMPEG_BIN="${XBOXRECOMP_FFMPEG_DIR}/bin")
++    endif()
++endif()

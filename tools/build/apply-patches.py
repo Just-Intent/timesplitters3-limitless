@@ -132,6 +132,11 @@ def patch_records(paths):
     if online:
         paths.remove(online)
         paths.append(online)
+    # Imported music's decoder adapter follows the native online block it borders.
+    music_codec = by_name.get('2160-custom-music-codec.patch')
+    if music_codec:
+        paths.remove(music_codec)
+        paths.append(music_codec)
     records = []
     for patch in paths:
         # Native boot wraps the SDK library block; networking adds a separate

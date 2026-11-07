@@ -41,6 +41,13 @@ int recomp_audio_output_position(uint32_t s,uint64_t *p,uint32_t *q) { (void)s;(
 int recomp_audio_output_set_volume(uint32_t s,int32_t v) { (void)s;(void)v;return 0; }
 void recomp_audio_output_reset_voice(uint32_t s) { (void)s; }
 int recomp_audio_output_take_discontinuity(uint32_t s) { (void)s;return 0; }
+/* host decoder adapter (pc_music_codec.c): none here, so .mp3 is not listed */
+struct PcMusicCodec;
+int pc_music_codec_available(void) { return 0; }
+struct PcMusicCodec *pc_music_codec_open(FILE *f,uint32_t *r,uint32_t *c) { (void)r;(void)c;if(f) fclose(f);return NULL; }
+long pc_music_codec_read(struct PcMusicCodec *d,int16_t *o,unsigned n) { (void)d;(void)o;(void)n;return -1; }
+int pc_music_codec_rewind(struct PcMusicCodec *d) { (void)d;return 0; }
+void pc_music_codec_close(struct PcMusicCodec *d) { (void)d; }
 #define CALLS 64
 static struct { void (*f)(void); int n; uint32_t a[6]; } calls[CALLS];
 static int call_count;
