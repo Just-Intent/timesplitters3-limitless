@@ -103,12 +103,12 @@ FLOW = {
 }
 # Tables indexed (or addressed) by a byte room id, by base: (element bytes, stock entries, where they live now).
 FLOW_TABLES = {
-    0x007B54E0: (4, 0xD6, 'per-id prop count, rooms.json -> 0x008C7000 (0x20D)'),
-    0x007B5F00: (4, 0xD6, 'per-id prop list, rooms.json -> 0x008C7CC0 (0x20D)'),
-    0x007B5180: (4, 0xD6, 'per-id drawn flag, rooms.json -> 0x008C8500 (0x210, check 6)'),
-    0x0073C350: (4, 3 * 0xD5, 'light heads [3][0xD5], rooms.json -> 0x008D0000 [3][0x20C]'),
-    0x0073D910: (4, 14, 'light round robin room/16, rooms.json -> 0x008CB700 (64)'),
-    0x007AC880: (12, 0xD5, 'room light colour float[0xD5][3], rooms.json -> 0x008D18A0 [0x20C][3]'),
+    0x007B54E0: (4, 0xD6, 'per-id prop count, rooms.json -> 0x008CC000 (0x40D)'),
+    0x007B5F00: (4, 0xD6, 'per-id prop list, rooms.json -> 0x008CD040 (0x40D)'),
+    0x007B5180: (4, 0xD6, 'per-id drawn flag, rooms.json -> 0x008D1140 (0x410, check 6)'),
+    0x0073C350: (4, 3 * 0xD5, 'light heads [3][0xD5], rooms.json -> 0x008DC000 [3][0x40C]'),
+    0x0073D910: (4, 14, 'light round robin room/16, rooms.json -> 0x008CBC00 (68)'),
+    0x007AC880: (12, 0xD5, 'room light colour float[0xD5][3], rooms.json -> 0x0090D000 [0x40C][3]'),
 }
 
 
@@ -364,8 +364,8 @@ def _flag_table_problems(rooms, objects):
         out.append('declared range must be entries 0..0xD5 (0x354 bytes)')
     if new_size < 0x210 * 4:
         out.append('new table holds fewer than 0x210 ids')
-    if not (0x008C0000 <= new and new + new_size <= 0x008CD000):
-        out.append('new table is outside the rooms tables (0x008C0000..0x008CD000)')
+    if not (0x008C0000 <= new and new + new_size <= 0x008D4000):
+        out.append('new table is outside the rooms tables (0x008C0000..0x008D4000)')
     list0 = next(e for e in objects if e['id'] == 'obj-list0-relocate')
     if int(list0['old'], 16) + int(list0['size'], 16) >= 0x007B5180 or '0x000A79C8' in list0['sites']:
         out.append('objects.json slot-0 list still claims 0x007B5180')

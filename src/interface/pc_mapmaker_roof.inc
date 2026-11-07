@@ -109,7 +109,7 @@
 #define MAPMAKER_ROOF_CATS_BASIC 0x0052DB20u    /* 3 x {text, list, count} */
 #define MAPMAKER_ROOF_RET_MENU_ADD 0x00316C84u  /* sub_00316B50 -> sub_000792B0 */
 #define MAPMAKER_ROOF_LIST_MAX 32u
-#define MAPMAKER_ROOF_SLOTS 2048u               /* > the 1024-piece pool */
+#define MAPMAKER_ROOF_SLOTS 4096u               /* > the 2048-piece pool (items.json) */
 #define MAPMAKER_ROOF_CONTAINER_MAX 0x00080000u
 #define MAPMAKER_ROOF_LIST_STEPS 4096u
 #define MAPMAKER_ROOF_NAME_TEXT 0x0A3Fu         /* catalogue[8] +8 (0x00529F18): "Small Open" */
@@ -124,7 +124,7 @@
 #define MAPMAKER_ROOF_SUFFIX_BYTES 64u
 #define MAPMAKER_ROOF_ITEM_MIN 0x18u           /* item sub-record: (count byte +0x14 * 4 + 0x1B) & ~3 */
 #define MAPMAKER_ROOF_SCENE_PLAY 100u
-#define MAPMAKER_ROOF_ROOMS 512u                /* per-room tables (rooms.json: 512 entries) */
+#define MAPMAKER_ROOF_ROOMS 1024u               /* per-room tables (rooms.json: 1024 entries) */
 #define MAPMAKER_ROOF_ROOM_MODEL 0x907u         /* room r is drawn by a prop of model 0x907 + r */
 #define MAPMAKER_ROOF_PLAY_PIECES 2048u
 #define MAPMAKER_ROOF_BUILD_SIZE 0x48u          /* reads +0x14 rooms, +0x28 first room, +0x44 mask */

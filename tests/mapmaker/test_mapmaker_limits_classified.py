@@ -7,6 +7,10 @@
 - Items 500: the editor item node pool's size constants all live in the two
   functions items.json patches, the pool pointer [0x00784008] has no other
   users, and the four entries agree on one node count.
+- Pieces 1023 (2026-11-07): the editor piece node pool's four size constants
+  (0x400 nodes of 0x48 B) all live in the same two functions, the pool's
+  pointer [0x00783FFC] and free count [0x00783FF8] have only the known users,
+  and the four items.json entries agree on 2048 nodes.
 """
 import json
 from pathlib import Path
@@ -79,4 +83,40 @@ def test_item_pool_has_no_other_users():
              for kind, v in i.values() if v in (0x7C40, 0x7BFC, 0x7C10, 0x212)}
     sites = {i.address for i in decoded() if i.function in (0x00302A60, 0x00307C20)
              and any(v in (0x7C40, 0x7BFC, 0x7C10, 0x212) for _, v in i.values())}
-    assert len(sizes) == 4 and sites == patched('items')
+    item_sites = {int(e['address'], 16) for e in table('items') if e['id'].startswith('mm-subentry-')}
+    assert len(sizes) == 4 and sites == item_sites and item_sites <= patched('items')
+
+
+PIECE_POOL = 2048
+
+
+def test_piece_pool_constants():
+    by_id = {e['id']: e for e in table('items')}
+    le = lambda v: v.to_bytes(4, 'little').hex()
+    n, stride = PIECE_POOL, 0x48
+    assert by_id['mm-piece-pool-bytes']['new_hex'] == '68' + le(n * stride)
+    assert by_id['mm-piece-pool-loop']['new_hex'] == '3d' + le((n - 1) * stride)
+    assert by_id['mm-piece-pool-last']['new_hex'] == '8990' + le((n - 1) * stride + 0x40)
+    assert by_id['mm-piece-pool-count']['new_hex'] == 'c705f83f7800' + le(n)
+    # 1023 placed pieces (MAPMAKER_LIMIT_PIECES), a copy of every one of them and the new held piece
+    limits = (ROOT / 'src/interface/pc_mapmaker_limits.inc').read_text(encoding='utf-8')
+    assert '#define MAPMAKER_LIMIT_PIECES 1023u' in limits and n >= 2 * 1023 + 1
+
+
+def test_piece_pool_has_no_other_users():
+    base = {i.function for i in decoded() if absolute(i, {0x00783FFC})}
+    count = {i.address for i in decoded() if absolute(i, {0x00783FF8})}
+    assert {0x00302A60, 0x00307C20} <= base
+    # set by the init, dec by the two allocators, inc by the free: never compared
+    assert count == {0x00307C61, 0x00307EDE, 0x00307FEF, 0x00308540, 0x0030854C}, sorted(hex(a) for a in count)
+    by_address = {i.address: i for i in decoded()}
+    assert [by_address[a].mnemonic for a in sorted(count)] == ['mov', 'dec', 'dec', 'mov', 'mov']
+    stock = (0x12000, 0x11FB8, 0x11FF8, 0x400)
+    sites = {i.address for i in decoded() if i.function in (0x00302A60, 0x00307C20)
+             and any(v in stock for _, v in i.values())}
+    piece_sites = {int(e['address'], 16) for e in table('items') if e['id'].startswith('mm-piece-pool-')}
+    assert sites == piece_sites, sorted(hex(a) for a in sites ^ piece_sites)
+    by_address = {i.address: i for i in decoded()}
+    for e in table('items'):
+        if e['id'].startswith('mm-piece-pool-'):
+            assert by_address[int(e['address'], 16)].hex == e['original_hex'], e['id']

@@ -4,7 +4,7 @@
  * Each tile room is one model whose nodes are drawn only when the node's mask
  * (+0x5C) is 0 or shares a bit with the instance mask inst+0x30
  * (sub_0008F5E0, 0x0008F637..0x0008F64D). The instance mask comes from one
- * per-room dword table, stock 0x00703460, relocated to 0x008C0800 (all 512
+ * per-room dword table, stock 0x00703460, relocated to 0x008C1000 (all 1024
  * entries) by config/guest-code-patches/rooms.json. Decoder scan of the stock
  * range (tools/analysis/guest-refs.py 0x703460 0x31C), CONFIRMED:
  *   0x000857A3 sub_00085710  the only store: table[build+0x28 + j] = build+0x44
@@ -34,8 +34,8 @@
 #define MAPMAKER_STACK_OK(n) MAPMAKER_PTR_OK(g_esp,(n))
 #endif
 
-#define MAPMAKER_SKYMASK_TABLE 0x008C0800u   /* relocated 0x00703460 */
-#define MAPMAKER_SKYMASK_ROOMS 512u          /* dev switch: every entry of the 0x800-byte table (was 256) */
+#define MAPMAKER_SKYMASK_TABLE 0x008C1000u   /* relocated 0x00703460 */
+#define MAPMAKER_SKYMASK_ROOMS 1024u         /* dev switch: every entry of the 0x1000-byte table (was 512) */
 #define MAPMAKER_SKYMASK_SCENE_PLAY 100u
 #define MAPMAKER_SKYMASK_DETAILS 64u
 #define MAPMAKER_SKYMASK_BUILD_SIZE 0x48u    /* reads +0x14, +0x28, +0x44 */

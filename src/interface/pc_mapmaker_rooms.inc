@@ -1,14 +1,14 @@
-/* US 45410066 MapMaker rooms: 200 -> 511 visibility rooms (one per piece;
- * 255 until 2026-11-02), room machinery for 511.
+/* US 45410066 MapMaker rooms: 200 -> 1023 visibility rooms (one per piece;
+ * 511 until 2026-11-07), room machinery for 1023.
  *
  * The guest-code table config/guest-code-patches/rooms.json renumbers the
- * room special ids above the real rooms (players 0xCA..0xCE -> 0x201..0x205,
- * views 0xCF..0xD4 -> 0x206..0x20B, global 0xD5 -> 0x20C, spare 0xC9 ->
- * 0x200, id space 0xD6 -> 0x20D; in every scene), raises every "real room"
- * test from 200 to 511 (ids 1..0x1FF), moves the static per-room and per-id
- * tables into 0x008C0000..0x008D4000 and the view struct's per-room arrays
+ * room special ids above the real rooms (players 0xCA..0xCE -> 0x401..0x405,
+ * views 0xCF..0xD4 -> 0x406..0x40B, global 0xD5 -> 0x40C, spare 0xC9 ->
+ * 0x400, id space 0xD6 -> 0x40D; in every scene), raises every "real room"
+ * test from 200 to 1023 (ids 1..0x3FF), moves the static per-room and per-id
+ * tables into 0x008C0000..0x008E0000 and 0x00908000.. and the view struct's per-room arrays
  * into a shadow at view+0x1000 inside a view stride grown from 0xFFC to
- * 0x3000 (see docs/mapmaker/mapmaker-rooms.md). This
+ * 0x5000 (see docs/mapmaker/mapmaker-rooms.md). This
  * file is the C half:
  *
  *   WRAP sub_00087310 -> pc_mapmaker_rooms_query
@@ -53,7 +53,7 @@
  * sub_00114290): a light record (pool [0x0073D950], stride 0xB8, count
  * [0x004E62DC]; plus the one 0xC0 record [0x0073D960]) keeps its room in the
  * byte +0x99 and has no spare field, so a room id above 0xFF (real rooms
- * 0x100..0x1FF and the special ids 0x200..0x20C, in every scene) is kept here per light, in a
+ * 0x100..0x3FF and the special ids 0x400..0x40C, in every scene) is kept here per light, in a
  * side table. Creation (sub_00114290) gets the full room as its 4th argument
  * and picks the light's pool group with it, but its round-robin step
  * (0x00114829) and its link call (0x00114851) re-read the byte: the link hook
@@ -63,7 +63,7 @@
  * room 0, its "no room" path (for the colour the same result a special id
  * above the real rooms gives stock: the colour unchanged; in scene 100 a light
  * with a source prop reads the prop's dword room instead, so only sourceless
- * lights in rooms 0x100..0x1FF keep their colour untinted). Lights in rooms
+ * lights in rooms 0x100..0x3FF keep their colour untinted). Lights in rooms
  * 0..0xFF (every room of a story level, and every light of the 241 layout)
  * take the original paths unchanged.
  *
@@ -75,14 +75,14 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAPMAKER_ROOMS_MAX 511u
-#define MAPMAKER_ROOMS_IDS_REAL 0x1FFu          /* rooms.json: real rooms 1..0x1FF, special ids 0x200.. */
+#define MAPMAKER_ROOMS_MAX 1023u
+#define MAPMAKER_ROOMS_IDS_REAL 0x3FFu          /* rooms.json: real rooms 1..0x3FF, special ids 0x400.. */
 #define MAPMAKER_ROOMS_STOCK 200u
 #define MAPMAKER_ROOMS_PORTALS 0x3FFFu          /* flag bytes at esp+0x1280, 0x4000 B */
 #define MAPMAKER_ROOMS_MODEL_TABLE 0x008CA000u   /* relocated 0x0078B860, MAPMAKER_ROOMS_MODEL_ENTRIES words */
-#define MAPMAKER_ROOMS_MODEL_ENTRIES 0xB08u      /* rooms.json: models 0..0xB07, room models 0x908..0xB06 (511 rooms) */
+#define MAPMAKER_ROOMS_MODEL_ENTRIES 0xD08u      /* rooms.json: models 0..0xD07, room models 0x908..0xD06 (1023 rooms) */
 #define MAPMAKER_ROOMS_MODEL_FIRST 0x908u        /* model of room 1 */
-#define MAPMAKER_ROOMS_QUERY_BUFFER 0x008CB800u
+#define MAPMAKER_ROOMS_QUERY_BUFFER 0x008C9000u   /* 2 x 1023 words; the tree holds real rooms only */
 #define MAPMAKER_ROOMS_QUERY_BYTES 0x800u
 #define MAPMAKER_ROOMS_QUERY_LEVELS 2u
 #define MAPMAKER_ROOMS_SLOT 0x30u
@@ -224,10 +224,10 @@ void pc_mapmaker_rooms_props(void (*original)(void))
 #define MAPMAKER_ROOMS_LIGHT_ONE 0x0073D960u    /* -> the one 0xC0 record (type-1 source) */
 #define MAPMAKER_ROOMS_LIGHT_STRIDE 0xB8u
 #define MAPMAKER_ROOMS_LIGHT_SLOTS 512u
-#define MAPMAKER_ROOMS_LIGHT_HEADS 0x008D0000u  /* light heads [3][row] (relocated 0x0073C350) */
-#define MAPMAKER_ROOMS_LIGHT_ROW 0x20Cu         /* head row width = the global room id */
-#define MAPMAKER_ROOMS_LIGHT_GROUPS 0x008CB700u /* round robin per room/16 (relocated 0x0073D910) */
-#define MAPMAKER_ROOMS_LIGHT_GROUP_COUNT 64u    /* its entries (ids up to 0x3FF) */
+#define MAPMAKER_ROOMS_LIGHT_HEADS 0x008DC000u  /* light heads [3][row] (relocated 0x0073C350) */
+#define MAPMAKER_ROOMS_LIGHT_ROW 0x40Cu         /* head row width = the global room id */
+#define MAPMAKER_ROOMS_LIGHT_GROUPS 0x008CBC00u /* round robin per room/16 (relocated 0x0073D910) */
+#define MAPMAKER_ROOMS_LIGHT_GROUP_COUNT 68u    /* its entries (ids up to 0x43F) */
 #define MAPMAKER_ROOMS_LIGHT_PER 0x0073D954u    /* records per room group */
 #define MAPMAKER_ROOMS_LIGHT_OTHERS 256u        /* records outside the pool (see below) */
 
@@ -396,7 +396,7 @@ void pc_mapmaker_rooms_light_create(void (*original)(void))
  * copies the depth's list there, at most 255 per call, sets that depth's
  * count byte and runs the reader once per 255 rooms (only a depth of more
  * than 255 rooms takes more than one call). sub_000897D0 (per-view sorted
- * room list, view shadow +0x2AB0, count word +0xE08) builds the same list
+ * room list, view shadow +0x44B0, count word +0xE08) builds the same list
  * from the same depths without byte tables. With at most 255 rooms per depth
  * (every level of up to 255 rooms) the rooms, order and calls are the stock
  * ones. Deviations: a depth >= 80 (stock wrote past its 80 rows and counts)
@@ -404,16 +404,16 @@ void pc_mapmaker_rooms_light_create(void (*original)(void))
 #define MAPMAKER_ROOMS_VIEW_CURRENT 0x007B0CC0u  /* -> the view being drawn (0xFFC struct + shadow) */
 #define MAPMAKER_ROOMS_VIEW_ARRAY 0x007B0CE4u    /* -> view 0 */
 #define MAPMAKER_ROOMS_VIEW_COUNT 0x007B0CE0u
-#define MAPMAKER_ROOMS_VIEW_STRIDE 0x3000u       /* rooms.json: stock 0xFFC (struct) -> 0x3000 (struct, shadow) */
+#define MAPMAKER_ROOMS_VIEW_STRIDE 0x5000u       /* rooms.json: stock 0xFFC (struct) -> 0x5000 (struct, shadow) */
 #define MAPMAKER_ROOMS_VIEW_RECTS 0x1000u        /* shadow: room r at +0x1000+12*r (int32 depth, int16 x0,y0,x1,y1) */
-#define MAPMAKER_ROOMS_VIEW_FLAGS 0x28A0u        /* shadow: visible flag byte per id (0x210) */
-#define MAPMAKER_ROOMS_VIEW_LIST 0x2AB0u         /* shadow: sorted room list (words), count word +0xE08 */
-#define MAPMAKER_ROOMS_VIEW_LIST_WORDS 0x20Du
-#define MAPMAKER_ROOMS_VIEW_LIST_CAP 0x20Cu      /* rooms.json 0x000899CA: cmp ax,cap before a neighbour */
-#define MAPMAKER_ROOMS_ID_GLOBAL 0x20Cu          /* rooms.json: global room id */
+#define MAPMAKER_ROOMS_VIEW_FLAGS 0x40A0u        /* shadow: visible flag byte per id (0x410) */
+#define MAPMAKER_ROOMS_VIEW_LIST 0x44B0u         /* shadow: sorted room list (words), count word +0xE08 */
+#define MAPMAKER_ROOMS_VIEW_LIST_WORDS 0x40Du
+#define MAPMAKER_ROOMS_VIEW_LIST_CAP 0x40Cu      /* rooms.json 0x000899CA: cmp ax,cap before a neighbour */
+#define MAPMAKER_ROOMS_ID_GLOBAL 0x40Cu          /* rooms.json: global room id */
 #define MAPMAKER_ROOMS_DEPTHS 0x50u
 #define MAPMAKER_ROOMS_SORTED 10u                /* stock 0x702A40 rows: 10 per depth */
-#define MAPMAKER_ROOMS_BUCKET_ROW 0x008C3000u    /* staging row (rooms.json: reader stride 0) */
+#define MAPMAKER_ROOMS_BUCKET_ROW 0x008C8000u    /* staging row (rooms.json: reader stride 0) */
 #define MAPMAKER_ROOMS_BUCKET_COUNTS 0x00702DB0u /* reader count bytes per depth (stock) */
 #define MAPMAKER_ROOMS_BUCKET_SEGMENT 255u
 #define MAPMAKER_ROOMS_BUCKET_ROOMS 2048u        /* room ids the C lists hold (1..2047) */

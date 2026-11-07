@@ -35,6 +35,42 @@
       "original_hex": "c705c02c760012020000",
       "new_hex": "c705c02c7600b4140000",
       "reason": "free count 0x212 -> 0x14B4 (5300)"
+    },
+    {
+      "id": "mm-piece-pool-bytes",
+      "kind": "code",
+      "function": "0x00302A60",
+      "address": "0x00302FF0",
+      "original_hex": "6800200100",
+      "new_hex": "6800400200",
+      "reason": "MapMaker editor piece pool 1024 -> 2048 nodes of 0x48 B (1023 pieces, 2026-11-07): allocation 0x12000 -> 0x24000 (Level heap, editor only). Placed pieces and the held/copied group share it; a group copy takes one node per piece and sub_002F9920 writes through a null node when it runs out, so 1023 placed pieces + a copy of all of them must fit"
+    },
+    {
+      "id": "mm-piece-pool-loop",
+      "kind": "code",
+      "function": "0x00307C20",
+      "address": "0x00307C43",
+      "original_hex": "3db81f0100",
+      "new_hex": "3db83f0200",
+      "reason": "piece free-list init loop end (N-1)*0x48: 0x11FB8 -> 0x23FB8"
+    },
+    {
+      "id": "mm-piece-pool-last",
+      "kind": "code",
+      "function": "0x00307C20",
+      "address": "0x00307C4F",
+      "original_hex": "8990f81f0100",
+      "new_hex": "8990f83f0200",
+      "reason": "last piece node's next pointer at (N-1)*0x48+0x40: 0x11FF8 -> 0x23FF8"
+    },
+    {
+      "id": "mm-piece-pool-count",
+      "kind": "code",
+      "function": "0x00307C20",
+      "address": "0x00307C61",
+      "original_hex": "c705f83f780000040000",
+      "new_hex": "c705f83f780000080000",
+      "reason": "piece free count [0x783FF8] 0x400 -> 0x800 (no code tests it)"
     }
   ]
 }

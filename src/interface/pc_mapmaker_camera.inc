@@ -50,7 +50,7 @@
 #define MAPMAKER_CAMERA_FROZEN 0x1u      /* data +8 bit 0: sub_00246000 skips its state machine */
 #define MAPMAKER_CAMERA_LOG_CAP 96u
 #define MAPMAKER_CAMERA_GUNS 16u
-#define MAPMAKER_CAMERA_ROOMS 511u          /* real rooms 1..0x1FF (rooms.json per-room tables) */
+#define MAPMAKER_CAMERA_ROOMS 1023u         /* real rooms 1..0x3FF (rooms.json per-room tables) */
 #define MAPMAKER_CAMERA_VIEW_RECTS 0x1000u /* view shadow: room r at +0x1000+12*r (rooms.json; stock +0x3BC) */
 
 static struct {
