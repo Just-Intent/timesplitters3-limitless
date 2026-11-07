@@ -66,16 +66,16 @@ Mission numbers follow the story table `0x004D1AC0`: 1 intro (scene 2),
 | 3b | Mission 5 worms | 0x2C | - | **ported** (worm area) | yes | done | - | - |
 | 4 | Cut-out targets + scoring | 0xF1..0xFA, 3,652 B each; l_63/64/65/78_ch | challenge kinds 3..5, `sub_0022E7E0`, table `[0x0075CC8C]` | none | <= 75 | medium-hard | what else `[0x7DE470]` switches | - |
 | 5 | Mission 6 electric zombies | anims 0x247/0x248 lv17_3.pak (66,768 B) | class 400:0 `sub_00282300` | none | INFERRED yes | hard (visual-only variant: cheap) | catacombs tags, pads, emitters | - |
-| 6 | Mission 6 ghosts | anims 0x249..0x24C lv17.pak (334,016 B) | class 0:40000000 `sub_002BA300`, self-contained | none | **yes** | **cheap-medium** | ghost char id (probe); shared anim ids | - |
+| 6 | Mission 6 ghosts | anims 0x249..0x24C lv17.pak (334,016 B) | class 0:40000000 `sub_002BA300`, self-contained | none | **yes** | **cheap-medium** | ghost char id (probe); shared anim ids | **wave 2: row 161 "Catacomb Ghost"** (fixture only) |
 | 7 | Mission 6 pit skeleton | lv17_4.pak (395,440 B) + l_17_st props | `sub_0029E0A0` | mansion variant ported | <= 4 (instances) | hard | coexisting with the id-0x28 routing; arena | - |
 | 8 | Mission 6 flying imps = ragbugs | char 0xB0 (chr.pak); anims 0x243..0x246 lv17_4 | class 200000:0 parks them; flock driven by the pit fight | none | <= 6 per skeleton | medium with item 7, hard alone | flock driver lives in the boss | - |
-| 9 | Mission 7 robots = securibot 0x4D | anims 0xA22..0xA2C lv6.pak (828,752 B) | class 0x4000 `sub_0026B7A0`, no level state | none (0x5C nfrobosec is already a roster row) | yes | **medium** | picker row, lv6 mount | - |
-| 10 | Mission 7 cleaning robot 0x4F | model 0x609 chr.pak; anims 0xA2C..0xA2F lv6 | INFERRED class 0x4000 family; loop sound 0x365 | none | yes | cheap-medium | which anims and class it really uses (probe) | - |
+| 9 | Mission 7 robots = securibot 0x4D | anims 0xA22..0xA2C lv6.pak (828,752 B) | class 0x4000 `sub_0026B7A0`, no level state | none (0x5C nfrobosec is already a roster row) | yes | **medium** | picker row, lv6 mount | **wave 2: row 162 "SecuriDroid XP"** (fixture only) |
+| 10 | Mission 7 cleaning robot 0x4F | model 0x609 chr.pak; anims 0xA2C..0xA2F lv6 | INFERRED class 0x4000 family; loop sound 0x365 | none | yes | cheap-medium | which anims and class it really uses (probe) | deferred: scripted class 0x80000 (see creatures doc) |
 | 11 | Mission 7 slow-motion grenade = weapon 0x29 | gun.pak | projectile type 0xF, explosion 0x2B | hidden (item 1) | yes | cheap to offer, medium to verify | slow-motion code **not found** | **wave 1: offered**; P2 offline: no slow-time code, no level state |
 | 12 | Mission 7 city sky + other story skies | `skyTS3nf1_xbox` 0x790 | sky record 52 | **already offered** (sky-music area) | - | done | - | nothing to do (already offered) |
 | 13 | Mission 7 red laser pairs + control panels | 0x4E0..0x4E3, about 2 KB each, l_6_st | init 22 `sub_0020C300`: lasers `sub_00209680`, panel damage `sub_0020B8C0`; alarm table `0x0078B2E0` | none | yes (5 lasers per panel group, 18 alarms) | **medium** | stand-in records; alarm rows in scene 100; damage type 0x2F | - |
 | 14 | Mission 8 robot spiders 0x4A/0x50 | chr.pak; anims lv22.pak (610,832 B) | class 0x2000 `sub_0037B720`; pool `sub_003796B0` (15) | none | up to the pool size | medium-hard | rail paths in descriptor +0x54..+0x60; pool | - |
-| 15 | Mission 8 mutants = 0x59 "The Freak" | chr.pak; anims 0x76B..0x770 lv22.pak | class 8000:0 `sub_00264A10`, no level state | roster char placeable, stock AI | yes | **medium** | lv22 mount (shared with item 14) | - |
+| 15 | Mission 8 mutants = 0x59 "The Freak" | chr.pak; anims 0x76B..0x770 lv22.pak | class 8000:0 `sub_00264A10`, no level state | roster char placeable, stock AI | yes | **medium** | lv22 mount (shared with item 14) | **wave 2: row 163 "Mutant (Story)"** (fixture only) |
 | 16 | Mission 8 "rail cameras" | none of their own | the player pilots a rail bot from a wall terminal (`sub_0037ACB0`) | none | - | very hard (drop) | wall-panel pool exists only in scenes 6/17/22 | - |
 | 17 | Followers (Ash 0x08, Tipper 0x00, Jo-Beth 0x19, Amy 0x44, R-110 0x2D; R-107 0x90) | chr.pak, roster rows | buddy = `sub_00277FE0` by scene tag, one buddy, single player only | placeable as normal AI | placing yes; buddy behaviour 1 | cheap to place, **hard** for story follow | follow movement not located | - |
 | 18 | Machine Wars "Prometheus" robots = PROMETHEUS SK/8 rocket robot 0x62 (SD/7 guard robots 0x12/0x36/0x75) | chr.pak; anims `animrb.pak` (already mounted in scene 100) | robot list `sub_000D6DD0`, per id, no class | 0xA9/0xAA roster twins already placeable | yes | **cheap** | picker rows only | **wave 1: picker rows 159/160** (fixture only) |
@@ -283,6 +283,10 @@ records, loaded only when `[0x7DE458] & 0x40`. Fields:
 - Port: class override on any roster character (e.g. 0x80 `chrs/ghost`),
   lv17.pak mount, 4 anim slots. Other lv17 names share ids, so use the
   worm-style shared-name handling.
+- **Wave 2 (2026-11-07, fixture only): [story creatures](mapmaker-creatures.md), row 161.
+  CONFIRMED: the GHT1..GHT7 records are zombies 0x17/0x18/0x23/0x2A with
+  class 0:0x50000000 (0x10000000 = active at spawn); the ghost is a class.
+  Carrier 0x2F made with the zombie 0x17's models; lv17 entries 30..33.
 
 ### 7. Mission 6 pit-fight skeleton
 
@@ -338,6 +342,10 @@ props the boss spawns to mounted models where l_17_st is too large.
 - The scene-6 case of `sub_0025F720` only sets a sound. No statics, no scene
   reads.
 - 0x5C nfrobosec (same name) is an Arcade row and already placeable.
+- **Wave 2 (2026-11-07, fixture only): [story creatures](mapmaker-creatures.md), row 162 stores 0x4D.
+  CONFIRMED: RS01/RS02/CR01 records are 0x4D with class 0x4000:0x10000000;
+  the handler reads the scene only in `sub_00228B40` (scene 100: MapMaker's
+  kill marker). lv6 entries 3..13.
 
 ### 10. Mission 7 cleaning robot
 
@@ -349,6 +357,10 @@ props the boss spawns to mounted models where l_17_st is too large.
   So it is INFERRED to use the securibot handler family, with anims chosen by
   data.
 - No push or suck code found. Probe P1.
+- **Wave 2: deferred.** CONFIRMED: its one record 'TPCB' (CR01 is a
+  securibot) has lo 0x10080000 -> `sub_002682A0`, a scripted handler that
+  reads the scene, tagged objects and level events. Anims are 0xA2D..0xA30
+  (`cleanbotfor/death/rotlft/rotrht`), played by no code by id.
 
 ### 12. Skies
 
@@ -438,6 +450,10 @@ safely (0x0037ACC7). Drop it, or treat it as part of wall terminals (very hard).
   lv22.pak.
 - `chrs/dam_mutant` 0x571 has no model in any pak.
 - The lv22_3 slice anims belong to the auto-slicer set piece.
+- **Wave 2 (2026-11-07, fixture only): [story creatures](mapmaker-creatures.md), row 163.
+  CONFIRMED: MT06..MT19 are 0x59 with 0x8000:0x10000000 (SDM1..4 use the
+  slicer class 0x10000). 0x59 is an Arcade row, so the row stores carrier
+  0x30 made with 0x59's models. lv22 entries 41..46.
 
 ### 17. Followers
 
@@ -606,7 +622,9 @@ for def/model/templates, and the scene gate for the tank's gibs.
 - **W2 (creatures):**
   1. Build block 2 first with the ghost class (self-contained, lv17.pak).
   2. Then the mutant 0x59 + spiders 0x4A/0x50 together (one lv22 mount, pool
-     init, paths from patrol points).
+     init, paths from patrol points). Wave 2: block 2 built
+     ([story creatures](mapmaker-creatures.md)); ghost, securibot and mutant
+     rows done; spiders and the cleaning bot open.
   3. Then securibot 0x4D + cleaning bot 0x4F (lv6).
   4. Then Prometheus picker rows (no pak).
   5. Wraith last in this wave (one per map, global system).

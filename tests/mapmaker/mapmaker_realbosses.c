@@ -103,7 +103,7 @@ static int bosses_area=1;
 int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)hook;return strcmp(area,"bosses") || bosses_area; }
 
 static unsigned nrows, nenable, nmount;
-static struct { uint32_t text, id, flags, cb; char label[32]; } rows[12];
+static struct { uint32_t text, id, flags, cb; char label[32]; } rows[16];
 static uint32_t enable_item, enable_flag=0xEEu, mount_arg;
 static int pak_mounted, skel_mounted, walk_mounted, mount_ok=1, alloc_ok=1, player_dead;
 static unsigned nwalk_alloc, nremove, nfx;
@@ -135,7 +135,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         return 3u;
     }
     if(f==sub_00079D60) {
-        if(nrows<12) {
+        if(nrows<16) {
             rows[nrows].text=x[0];rows[nrows].id=x[1];rows[nrows].flags=x[2];rows[nrows].cb=x[4];
             memcpy(rows[nrows].label,(const char *)((uintptr_t)x[0]+g_xbox_mem_offset),31);rows[nrows].label[31]=0;
         }
@@ -483,7 +483,7 @@ int main(void)
     CHECK(nrows==0);
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_picker_end,fake,0x002C1FA5u,0,0,0,1);
-    CHECK(nrows==11 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
+    CHECK(nrows==14 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
     CHECK(!strcmp(rows[0].label,"Giant Trophy Monster"));
     CHECK(rows[1].id==151u && rows[1].flags==0x20900u && rows[1].cb==0x002C1C90u && !strcmp(rows[1].label,"Giant Skeleton"));
     CHECK(rows[2].id==152u && rows[2].flags==0x20900u && rows[2].cb==0x002C1C90u && !strcmp(rows[2].label,"Crow Walker"));
@@ -492,7 +492,10 @@ int main(void)
     CHECK(rows[6].id==156u && !strcmp(rows[6].label,"Khallos (Chair)") && rows[7].id==157u && !strcmp(rows[7].label,"Mansion Worm"));
     CHECK(rows[8].id==158u && !strcmp(rows[8].label,"Mothership"));
     CHECK(rows[9].id==159u && !strcmp(rows[9].label,"Prometheus SK/8") && rows[10].id==160u && !strcmp(rows[10].label,"Prometheus SD/7"));
-    CHECK(nenable==11 && enable_item==ITEM && enable_flag==0);
+    /* the story creatures (pc_mapmaker_creatures.def): rows 161..163 */
+    CHECK(rows[11].id==161u && !strcmp(rows[11].label,"Catacomb Ghost") && rows[11].flags==0x20900u && rows[11].cb==0x002C1C90u);
+    CHECK(rows[12].id==162u && !strcmp(rows[12].label,"SecuriDroid XP") && rows[13].id==163u && !strcmp(rows[13].label,"Mutant (Story)"));
+    CHECK(nenable==14 && enable_item==ITEM && enable_flag==0);
     /* pick: row 150 -> id 0x15, variant -1; other slots untouched */
     for(k=0;k<10u;k++) { WORD_AT(0x0075FD90u+k*0x1Cu)=0x40u+k;WORD_AT(0x0075FD90u+k*0x1Cu+0x14u)=k;WORD_AT(0x0075FD90u+k*0x1Cu+0x18u)=0; }
     CALL(pc_mapmaker_realbosses_pick,fake_pick,0x00077000u,0x00330000u,0,0,1);
@@ -541,7 +544,10 @@ int main(void)
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,158u,0,0,0)==0x52420075u);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,159u,0,0,0)==0x52420062u);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,160u,0,0,0)==0x52420036u);
-    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,161u,0,0,1)==0);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,161u,0,0,0)==0x5242002Fu);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,162u,0,0,0)==0x5242004Du);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,163u,0,0,0)==0x52420030u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,164u,0,0,1)==0);
     {   /* the ported bosses' rows: names, pick, row lookups and previews */
         uint32_t s=CALL(pc_mapmaker_realbosses_text,fake,0x00077000u,0x52420012u,0,0,0);
         CHECK(s && !strcmp((const char *)((uintptr_t)s+g_xbox_mem_offset),"Castle Tank"));
@@ -570,6 +576,20 @@ int main(void)
         CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C1805u,0x36u,0xFFFFFFFFu,0,0)==88u);
         s=CALL(pc_mapmaker_realbosses_text,fake,0x00077000u,0x52420062u,0,0,0);
         CHECK(s && !strcmp((const char *)((uintptr_t)s+g_xbox_mem_offset),"Prometheus SK/8"));
+        /* the creatures: rows 161..163 store 0x2F/0x4D/0x30 (variant -1), names, row lookups, previews */
+        WORD_AT(0x0075FD90u+6u*0x1Cu+0x14u)=161u;WORD_AT(0x0075FD90u+7u*0x1Cu+0x14u)=162u;WORD_AT(0x0075FD90u+8u*0x1Cu+0x14u)=163u;
+        CALL(pc_mapmaker_realbosses_pick,fake,0x00077000u,0x00330000u,0,0,1);
+        CHECK(WORD_AT(0x0075FD90u+6u*0x1Cu)==0x2Fu && WORD_AT(0x0075FD90u+7u*0x1Cu)==0x4Du && WORD_AT(0x0075FD90u+8u*0x1Cu)==0x30u);
+        CHECK(WORD_AT(0x0075FD90u+6u*0x1Cu+0x18u)==0xFFFFFFFFu && WORD_AT(0x0075FD90u+8u*0x1Cu+0x18u)==0xFFFFFFFFu);
+        WORD_AT(0x0075FD90u+6u*0x1Cu+0x14u)=6u;WORD_AT(0x0075FD90u+7u*0x1Cu+0x14u)=7u;WORD_AT(0x0075FD90u+8u*0x1Cu+0x14u)=8u;
+        orig_eax=0xFFFFFFFFu;
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002C054Cu,0x2Fu,0xFFFFFFFFu,0,0)==161u);
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x002BE65Fu,0x4Du,0xFFFFFFFFu,0x003033C0u,0)==162u);
+        CHECK(CALL(pc_mapmaker_realbosses_row_of,fake,0x000668F5u,0x30u,0xFFFFFFFFu,0,1)==0xFFFFFFFFu);   /* play: stock */
+        s=CALL(pc_mapmaker_realbosses_text,fake,0x00077000u,0x5242004Du,0,0,0);
+        CHECK(s && !strcmp((const char *)((uintptr_t)s+g_xbox_mem_offset),"SecuriDroid XP"));
+        /* the eight older extra rows' labels no longer spill over the log budget (extra_label[6] held 6) */
+        CHECK(rbs.logged<24u);
         orig_eax=0;
         orig_eax=0;
     }

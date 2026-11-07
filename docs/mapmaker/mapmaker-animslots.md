@@ -116,3 +116,12 @@ budget. The worm's mount stopgap then keeps lv1_2 out next to lv1_3/lv1_6.
    (eggs off), Khallos sits idle, the worm bursts, attacks and dies.
 3. Add the giant trophy monster too: it should still load (8 more slots).
 4. Weapons in the player's hands animate (grenade throw and reload).
+
+## Story creature paks (wave 2)
+
+`ans_paks` also gets one row per story creature from
+`pc_mapmaker_creatures.def` (lv17 entries 30..33, lv6 3..13, lv22 41..46;
+[story creatures](mapmaker-creatures.md)). `ans_keep` keeps the union of the
+runs of every row with the same table and count, so two creatures of one pak
+(the securibot and a later cleaning bot in lv6) each keep theirs. Fixture: the
+three tables register only their runs; mutation `creature-rows-missing`.
