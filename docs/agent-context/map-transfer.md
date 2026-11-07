@@ -14,7 +14,7 @@ pickers in `Launcher.cs` (WPF dialogs) and `macos/NativeWindow.cs` (Avalonia
 StorageProvider). Import holds the save lock, refuses while the game runs,
 calls `SaveBackups.CreateLocked` (reason `Before map import`, now accepted by
 the manifest check), never writes existing files and stages in
-`.tsmap-import-<guid>`. Caps: 511 pieces, tileset < 7, five size tiers.
+`.tsmap-import-<guid>`. Caps: 1023 pieces (the game cap since .55), tileset < 7, five size tiers.
 
 Tests: `tests/launcher/launcher_maps.cs` via shared UI checks, plus a page
 test in `launcher_shared_ui.cs`; both builds compile them (build-launcher.ps1,

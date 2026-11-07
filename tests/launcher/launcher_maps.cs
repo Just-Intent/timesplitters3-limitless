@@ -108,8 +108,8 @@ public static class MapTransferChecks
             var crc=(byte[])package.Clone();crc[mapStart+700]^=0x10;refused(Reseal(crc),"CRC");
             refused(package.Take(package.Length-1).ToArray(),"damaged");refused(Encoding.ASCII.GetBytes("not a map"),"damaged");
             var header=(byte[])package.Clone();Put(header,mapStart+4,0x12C);refused(Reseal(header),"version");
-            byte[] many=Map("Crowded",512);
-            Reject(()=>MapTransfer.Parse(many,"Crowded"),"511");Reject(()=>MapTransfer.Parse(many.Take(0x6000).ToArray(),"Short"),"size tier");
+            byte[] many=Map("Crowded",1024);
+            Reject(()=>MapTransfer.Parse(many,"Crowded"),"1023");Need(MapTransfer.Parse(Map("Wide",1023),"Wide").Pieces==1023,"A 1023-piece map was refused");Reject(()=>MapTransfer.Parse(many.Take(0x6000).ToArray(),"Short"),"size tier");
             Reject(()=>MapTransfer.Parse(Map("Arena",5),"badéname"),"ASCII");
             Need(Same(before,Tree(root)) && SaveBackups.List(root).Length==backups,"Rejected import changed saves or made a backup");
         });

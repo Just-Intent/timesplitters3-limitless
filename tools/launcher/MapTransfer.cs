@@ -41,7 +41,7 @@ namespace TimeSplitters.Launcher
     {
         public const string TitleFolder = "UserData/45410066", MapFile = "anicemap.mkr", MetaFile = "SaveMeta.xbx";
         public const string ExportFolder = "Backups/Maps", Extension = ".tsmap", BackupReason = "Before map import";
-        public const int SignatureSize = 20, MaxPieces = 511, MaxNameBytes = 31, MaxTileset = 7;
+        public const int SignatureSize = 20, MaxPieces = 1023, MaxNameBytes = 31, MaxTileset = 7;
         public static readonly int[] Tiers = { 0x7FE0, 0xFFE0, 0x1FFE0, 0x3FFE0, 0x7FFE0 };
         public static readonly string[] Prefixes = { "MapMaker: ", "Carte: " };
         const uint Magic = 0x00C77667, Version = 0x12D, InfoTag = 0x00C77668, EndTag = 0x00C7766A;
