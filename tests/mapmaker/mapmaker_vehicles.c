@@ -139,10 +139,13 @@ static uint32_t fake_answer;
 static void fake_answer_fn(void) { originals++;g_eax=fake_answer;g_esp+=4u; }
 /* the create: the builder reads the record's +0x28..+0x34 */
 static uint32_t seen_rec[4];
+#define BLOCK 0x00580000u
+static uint32_t def_flags=0x17u;                    /* the builder copies def +0xA8 to block +0x58 */
 static void fake_create(void)
 {
-    uint32_t rec=WORD_AT(g_esp+8u);
+    uint32_t obj=WORD_AT(g_esp+4u),rec=WORD_AT(g_esp+8u);
     originals++;
+    WORD_AT(obj+0x7Cu)=BLOCK;WORD_AT(BLOCK+0x58u)=def_flags;WORD_AT(BLOCK+0x140u)=2u;
     seen_rec[0]=WORD_AT(rec+0x28u);seen_rec[1]=WORD_AT(rec+0x2Cu);seen_rec[2]=WORD_AT(rec+0x30u);seen_rec[3]=WORD_AT(rec+0x34u);
     g_esp+=4u;
 }
@@ -329,7 +332,9 @@ static void fill_record(uint32_t rec,uint32_t model,uint32_t def)
     memset((void *)((uintptr_t)rec+g_xbox_mem_offset),0,0x40);
     WORD_AT(rec)=0xFFFFFFFFu;WORD_AT(rec+8u)=model;WORD_AT(rec+0x24u)=def;
     WORD_AT(rec+0x28u)=0;WORD_AT(rec+0x2Cu)=1u;WORD_AT(rec+0x30u)=0xFFFFFFFFu;WORD_AT(rec+0x34u)=0x77u;
+    FLOAT_AT(rec+0x10u)=1.0f;                         /* the pad y */
 }
+static int near(float a,float b) { return a>b-1e-4f && a<b+1e-4f; }
 /* the fill's vehicle case: the def call, then +0x24 = def, +0x28 0, +0x2C 1, +0x30 -1 (0x00241D3C..0x00241D4D) */
 static void fill_def(uint32_t rec,uint32_t item,int line)
 {
@@ -387,28 +392,53 @@ static void play_tests(void)
     FILL(VREC+0x80u,rec_at[1][0]);CHECK(g_eax==0u && WORD_AT(VREC+0x88u)==7u);
     FILL(VREC+0xC0u,rec_at[1][1]);CHECK(g_eax==0u && WORD_AT(VREC+0xC8u)==7u);
     CHECK(vh_lv.nrec==3u);
+    /* spawn height: each story model's depth below its origin + 0.01; the theme vehicle stays at the pad */
+    CHECK(near(FLOAT_AT(VREC+0x10u),1.0f+2.375f) && near(FLOAT_AT(VREC+0x50u),1.0f));
+    CHECK(near(FLOAT_AT(VREC+0x90u),1.0f+0.945f) && near(FLOAT_AT(VREC+0xD0u),1.0f+0.945f));
+    CHECK(vh_lv.lift_logged[0] && vh_lv.lift_logged[1]);
     /* create: the story fields before the builder; the stock buggy and other callers untouched */
     for(i=0;i<4u;i++) { WORD_AT(VREC+i*0x40u+0x28u)=0;WORD_AT(VREC+i*0x40u+0x2Cu)=1u;WORD_AT(VREC+i*0x40u+0x30u)=0xFFFFFFFFu; }
     originals=0;
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC);
     CHECK(originals==1u && seen_rec[0]==4u && seen_rec[1]==4u && seen_rec[2]==1u && seen_rec[3]==2u);
+    CHECK(WORD_AT(BLOCK+0x58u)==0x07u && vh_lv.entry_logged);   /* the tank opens to players, tracked bit kept */
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC+0x40u);
     CHECK(seen_rec[0]==0u && seen_rec[1]==1u && seen_rec[2]==0xFFFFFFFFu && seen_rec[3]==0x77u);
+    CHECK(WORD_AT(BLOCK+0x58u)==0x17u);                         /* other vehicles keep their flags */
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC+0x80u);
     CHECK(seen_rec[0]==0u && seen_rec[1]==1u && seen_rec[2]==0u && seen_rec[3]==0xFFFFFFFFu);
+    CHECK(WORD_AT(BLOCK+0x58u)==0x17u);
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC+0xC0u);
     CHECK(seen_rec[0]==0u && seen_rec[1]==1u && seen_rec[2]==0xFFFFFFFFu && seen_rec[3]==0xFFFFFFFFu);
     WORD_AT(VREC+0x30u)=0xFFFFFFFFu;
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006CE68u,0x00570000u,VREC);   /* a story level's create */
-    CHECK(seen_rec[2]==0xFFFFFFFFu);
+    CHECK(seen_rec[2]==0xFFFFFFFFu && WORD_AT(BLOCK+0x58u)==0x17u);
     /* restart: no mount, no fill; the records keep their values and are set again */
     WORD_AT(VREC+0x28u)=0;WORD_AT(VREC+0x30u)=0xFFFFFFFFu;
     CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC);
-    CHECK(seen_rec[0]==4u && seen_rec[2]==1u);
+    CHECK(seen_rec[0]==4u && seen_rec[2]==1u && WORD_AT(BLOCK+0x58u)==0x07u);
+    CHECK(near(FLOAT_AT(VREC+0x10u),1.0f+2.375f));                /* the raised y is kept, not raised again */
     /* a record whose def or model changed is left alone */
     WORD_AT(VREC+0x24u)=5u;WORD_AT(VREC+0x30u)=0xFFFFFFFFu;
-    CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC);CHECK(seen_rec[2]==0xFFFFFFFFu);
+    CALL(pc_mapmaker_vehicles_create,fake_create,0x0006E949u,0x00570000u,VREC);
+    CHECK(seen_rec[2]==0xFFFFFFFFu && WORD_AT(BLOCK+0x58u)==0x17u);
     WORD_AT(VREC+0x24u)=2u;
+    /* the playtest overrides, read once: a valid value replaces the lift, a bad one is ignored */
+    set_env("TSFP_MAPMAKER_TANK_LIFT","1.5");set_env("TSFP_MAPMAKER_TRUCK_LIFT","9");
+    vh.lift_read[0]=vh.lift_read[1]=0;vh_lv.lift_logged[0]=vh_lv.lift_logged[1]=0;vh_lv.nrec=0;
+    FILL(VREC,rec_at[0][0]);CHECK(near(FLOAT_AT(VREC+0x10u),2.5f));
+    FILL(VREC+0xC0u,rec_at[1][1]);CHECK(near(FLOAT_AT(VREC+0xD0u),1.945f));
+    set_env("TSFP_MAPMAKER_TANK_LIFT",NULL);set_env("TSFP_MAPMAKER_TRUCK_LIFT",NULL);vh.lift_read[0]=vh.lift_read[1]=0;
+    /* every tank of the level is opened (the log line once) */
+    vh_lv.entry_logged=0;FILL(VREC,rec_at[0][0]);
+    {
+        uint32_t sp=g_esp;
+        g_esp-=12u;WORD_AT(g_esp)=0x0006E949u;WORD_AT(g_esp+4u)=0x00570000u;WORD_AT(g_esp+8u)=VREC;
+        def_flags=0x17u;
+        pc_mapmaker_vehicles_create(fake_create);
+        g_esp=sp;
+    }
+    CHECK(WORD_AT(BLOCK+0x58u)==0x07u);
     /* the gun model not read: the truck with a gun stays the theme vehicle; the plain truck does not need it */
     resources(0xFF&~(1u<<7),0);
     CALL(pc_mapmaker_vehicles_mount,fake_plain,0x001CDB8Au,0,0);              /* new level */

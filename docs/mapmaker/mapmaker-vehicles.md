@@ -2,9 +2,12 @@
 
 Status 2026-11-07: implemented in `src/interface/pc_mapmaker_vehicles.inc`
 (area `vehicles`), fixture-tested (`tests/mapmaker/mapmaker_vehicles.c` +
-`tests/mapmaker/test_mapmaker_vehicles.py`: 60 mutations, plus decode, US XBE
-data and game-pak checks of every site below). **Not wired, not built, not
-played**: the wrappers are the integrator's (list below). Switch:
+`tests/mapmaker/test_mapmaker_vehicles.py`: 73 mutations, plus decode, US XBE
+data and game-pak checks of every site below). Played in v0.4.0-mapmaker.61
+(user): all three sank into the floor; both trucks rose onto the floor once
+entered and drove well, the Vickers gun works; the tank sank further and
+could not be entered. Fixed after .61 (below, no new wrapper); not played
+since. Switch:
 `TSFP_MAPMAKER_LIMITS=1` (editor and play). No guest-code table, no fork
 chunk, no new save size. Story assets wave 3, items 19 and 20
 ([inventory](mapmaker-story-assets.md)). The castle boss tank (prop 0x281,
@@ -31,6 +34,8 @@ options menu (category 35 has none in stock) with **Vehicle**:
   the game ignores.
 - **Up to 4 vehicles per map in all** (any mix), the stock vehicle pool. The
   limits switch used to raise category 35 to 8; that is removed (see "Pool").
+- Players get in and out of the tank as of a buggy (the story's no-player
+  flag is cleared).
 - The tank, like the stock buggies, cannot be destroyed in a MapMaker map
   (see "Not changed").
 
@@ -120,6 +125,39 @@ their def and model, this level's list survives, and step 6 sets the fields
 again. Nothing is allocated by this area in play. INFERRED: the stock pool
 reset makes the 4 blocks free again, as for the buggies.
 
+## Fixed after .61: spawn height and tank entry
+
+Log (m61: `20261107-141636-131.err`): tank, truck with gunner seat and truck
+created, every texture loaded (7/7, 5/5, 3/3, 14/14, 10/10).
+
+**Sunk (CONFIRMED, `test_spawn_heights`).** The fill puts the record y at
+the vehicle pad (`sub_0033E2B0`: pad +0xC..+0x14). The stock buggies and
+the jeep stand on their origin: the lowest of their position rows ({x, y,
+z, 0xFFFFFFE0}) is y 0. The truck's wheels reach y -0.935 and the tank's
+tracks y -2.365 below their origin, which is how deep they sank (the story
+levels place them by their records). A parked vehicle's body does not
+settle; entering wakes it, which is why the trucks rose. The fill hook now
+adds that depth + 0.01 (the props' floor gap) to the record y (+0x10):
+`tank spawn height: record y +2.375 (model base y -2.365)`, `truck spawn
+height: record y +0.945 ...` (once per level each). For a playtest
+`TSFP_MAPMAKER_TANK_LIFT=<m>` / `TSFP_MAPMAKER_TRUCK_LIFT=<m>` (-1..4, read
+once) replace the value. The restart re-creates from the raised record.
+
+**Tank not enterable (CONFIRMED, `test_tank_no_player_flag`).** The create
+copies def +0xA8 into the vehicle block +0x58 (0x00182B51). Def 2 has 0x17;
+bit 0x10 there means "no player": the enterable test `sub_0017A260`
+(0x0017A27E) used by the nearest-vehicle scan `sub_0017C6A0`, the use prompt
+`sub_0017D1D0` (0x0017D1E8), the exit (0x0017DAFB) and the vehicle tick
+(0x0017ECD6) all refuse it; they are the only tests of that bit in the
+vehicle code. Machine Wars seats the player by script. The truck (4) and
+the buggies (0x24) lack it. The create hook now clears bit 0x10 of a
+MapMaker tank's block after the builder (bit 0, tracked, kept): `tank open
+to players: block flags 0x17 -> 0x7 (... tracked bit 1; seats 2)`, once per
+level. Its seats have no anims; the enter path skips anim id 0
+(0x0017C985), so the player is placed without one, as the story does.
+INFERRED: driving with the tracked adapter, the driver's main gun and the
+gunner seat's AA gun then work as in Machine Wars.
+
 ## Pool (fixed here)
 
 The vehicle pool is allocated once per level: `sub_001806B0` (0x000A5C95)
@@ -189,7 +227,8 @@ mount`, `vehicle model or pak not available`).
 
 - Everything in play: entering, driving and leaving the tank and the truck
   in a MapMaker room, both tank guns and the Vickers gunner seat, the
-  tracked-driver adapter outside Machine Wars, spawn height (the fill's
+  tracked-driver adapter outside Machine Wars, the raised spawn height
+  (the fill's
   position, then physics).
 - Resource rows for 0xB, 0xC, 0xD, 7, 0xE, 0x54D..0x54F in scene 100's table
   (prop_all has them; the hooks fall back to the theme vehicle and log when
@@ -211,7 +250,11 @@ mount`, `vehicle model or pak not available`).
 3. Test map: stderr has `mounted pak/stream/lv5/prop1.pak for the tanks`,
    `mounted pak/stream/lv4/prop3.pak for the trucks`, the `model 0x..
    textures: N of N` lines, `vehicle placed as ...` and `created a future
-   tank` / `created a truck`.
+   tank` / `created a truck`, `tank spawn height: record y +2.375`, `truck
+   spawn height: record y +0.945` and `tank open to players: block flags
+   0x17 -> 0x7`. All three stand on the floor before anyone gets in. If one
+   still sinks or floats, rerun with `TSFP_MAPMAKER_TANK_LIFT=2.6` (or
+   `TSFP_MAPMAKER_TRUCK_LIFT=1.1`, ...) and report the value that rests.
 4. Drive the tank: get in, drive (tracks: the stick turns as in Machine
    Wars), fire the main gun, switch to or let a second player take the AA
    gun; get out. Drive the truck; take its gunner seat and fire the Vickers.
