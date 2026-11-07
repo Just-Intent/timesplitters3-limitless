@@ -177,3 +177,6 @@ held (no hostage), rim pads 0x4B5..0x4C1 copied; ragbugs join the nearest
 skeleton's flock (NEW WRAP sub_0028B610), removed without one; realbosses
 skips char 0x31. 11 NEW WRAPs + 11 chains: mapmaker-pitboss.md.
 `test_mapmaker_pitboss.py`. Unplayed.
+After .62 (no bottle, ragbugs one at a time): bossroom/bigdraw also draw the
+pit satellites (0x24A/0x246/0x24B/0x6CB) high over their tile; the flock is
+launched together at state 6 (`sub_0028A0A0` x2); prop/flock log lines.

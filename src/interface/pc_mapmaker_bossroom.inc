@@ -81,13 +81,21 @@ static struct {
     uint32_t seen[BSR_SEEN];             /* boss props logged (first add) */
     unsigned seen_n;
     int last_unlinked[BSR_SEEN];
-    unsigned long long adds, no_room, full, views;
+    unsigned long long adds, no_room, full, views, satellites;
 } bsr;
 
 static int bsr_boss_model(uint32_t m)
 {
     return m==0x5E9u || m==0x5BEu || m==0x5BFu || m==0x637u || m==0x5F2u || m==0x5E8u;
 }
+/* The pit skeleton's satellites (pc_mapmaker_pitboss.inc): its gas bottle,
+ * rack and eye bandage props and its ragbugs (character 0x6CB). They fly or
+ * hang high over its tile (the bottle at its mouth, about 10 up), so their
+ * boxes list no room or an unreached one, exactly as the boss's own (playtest
+ * .62: "bomb didn't appear in pit skeleton mouth", ragbugs "appear randomly
+ * one at a time"). Satellites ride on the bosses: any listed room reached, or
+ * none listed while a giant boss of this view was reached. */
+static int bsr_satellite(uint32_t m) { return m==0x24Au || m==0x246u || m==0x24Bu || m==0x6CBu; }
 static int bsr_on(void)
 {
     if(!bsr.read) { const char *v=getenv("TSFP_MAPMAKER_BOSSROOM");bsr.read=1;bsr.off=v && v[0]=='0' && !v[1]; }
@@ -131,7 +139,8 @@ static void bsr_note(uint32_t p,uint32_t model,uint32_t cam,unsigned listed,unsi
 /* From pc_mapmaker_rooms_buckets (sub_00086C40), first thing, per view. */
 static void mapmaker_bossroom_view(uint32_t view)
 {
-    uint32_t n,cam,table,end,i,slot,buf,count,list;
+    uint32_t n,cam,table,end,i,slot,buf,count,list,pass;
+    unsigned bosses=0;
     int own;
     if(!bsr_on()) return;
     if(WORD_AT(BSR_POOL_PTR)!=bsr.pool) {           /* a new level */
@@ -147,20 +156,22 @@ static void mapmaker_bossroom_view(uint32_t view)
     slot=WORD_AT(view+BSR_VIEW_SLOT)&(BSR_SLOTS-1u);
     buf=BSR_BUFFER+slot*BSR_SLOT_BYTES;
     list=0;count=0;own=0;
-    for(i=n;i<end;i++) {
+    for(pass=0;pass<2u;pass++) for(i=n;i<end;i++) {
         uint32_t p=table+i*BSR_PROP,model=*(uint16_t *)((uintptr_t)(p+0x94u)+g_xbox_mem_offset),r,k;
         int listed;
         unsigned visible=0,linked=0;
-        if(!bsr_boss_model(model) || WORD_AT(p+0x20u)!=8u) continue;
+        if(pass) { if(!bsr_satellite(model)) continue; }
+        else if(!bsr_boss_model(model) || WORD_AT(p+0x20u)!=8u) continue;
         listed=*(int8_t *)((uintptr_t)(p+0x30u)+g_xbox_mem_offset);
-        if(listed<=0) continue;
+        if(listed<0 || (listed==0 && (!pass || !bosses))) continue;
         if(listed>10) listed=10;
         for(k=0;k<(uint32_t)listed;k++) {
             r=WORD_AT(p+0x38u+k*4u);
             if(r<1u || r>n || (int32_t)WORD_AT(view+BSR_RECTS+r*12u)<0) continue;
             visible++;linked+=(unsigned)bsr_in_list(r,p);
         }
-        if(!visible) continue;
+        if(!pass && visible) bosses++;
+        if(!visible && !(pass && bosses && !listed)) continue;
         if(cam<1u || cam>n || cam==BSR_GLOBAL) { bsr.no_room++;continue; }
         if(!list) {
             list=WORD_AT(BSR_LISTS+cam*4u);count=WORD_AT(BSR_COUNTS+cam*4u);
@@ -178,6 +189,7 @@ static void mapmaker_bossroom_view(uint32_t view)
         WORD_AT(buf+count*4u)=p;
         WORD_AT(BSR_COUNTS+cam*4u)=++count;
         bsr.adds++;
+        if(pass) bsr.satellites++;
         bsr_note(p,model,cam,(unsigned)listed,visible,linked);
     }
 }
