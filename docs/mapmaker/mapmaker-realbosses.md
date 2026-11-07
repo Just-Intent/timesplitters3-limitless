@@ -356,6 +356,29 @@ Fixture: a target 5 up and 10 ahead from a hand below its floor, a steep
 overhead target (clamped), the boss's own floor (unchanged), phase kept;
 mutations `aim-*`. Unplayed.
 
+### Same-floor throws (the v0.4.0-mapmaker.42 playtest)
+
+User report: "Now they can hit me from one floor above, but they don't hit
+me if I stand in place on the same floor." No .42 log was available.
+SUSPECTED: the same-floor target counted as "a floor up" against the noted
+spawn height (first fight frame), so the throw went at its body (1.5 over
+its feet) instead of its feet; a first-frame height under the floor (the
+rise from the ground) or a target 2 over its feet would do that. In
+`m40b.err` the noted -9.49 equals a pad on floor -2 (pad snap +0.01), so the
+underground case is not confirmed there.
+
+Fix (`rbs_skel_ground`, once per fight at the first aim; reset by the
+restart): the reference is the finder floor `sub_000C3C50(point, 1.25,
+0.1)` under the boss's x/z, from the noted height (within a step), else
+climbing 1.25 at a time up to 11.25 for a floor above it; none: the noted
+height. Only a target more than `RBS_SKEL_UP` (now 2.5, half a floor) over
+that floor gets the raised aim; the body height (`_face`) is unchanged.
+Logged once per fight: `giant skeleton N reference floor F (spawn height
+Y, ...)`. Tests: first-frame -9.49 under a 0.5 floor (feet and 2.2 up:
+stock; 5 up and 3 ahead: raised, the line passes between its feet and head
+from a low hand and through its body from a high one), its own floor under
+an upper one; mutations `aim-ref-spawn`, `aim-up-2`, `ground-*`.
+
 INFERRED: the stretching came from the same mismatch (the body drawn at height
 0 while parts follow the spawn floor). The freeze is not explained yet: if it
 recurs, wait more than 60 s before closing the game so the hang watchdog

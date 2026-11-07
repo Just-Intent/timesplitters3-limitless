@@ -500,6 +500,36 @@ height a step above its floor; the finder's globals restored), the
 `ledge-*` and `gap-*` mutations, and the decode test
 `test_floor_probe_like_the_pad_snap`.
 
+### Reference floor (the v0.4.0-mapmaker.42 playtest)
+
+User report: "The splitter crows aren't moving at all now" (they walked in
+.34-.40; .41 added the floor probe above). No .41/.42 log was available.
+
+- SUSPECTED (geometry, not traced in game): tile seams. Every logged spawn
+  is at a tile centre (x and z = 3 mod 6, MapMaker tiles 6 wide), so after
+  the move every cell's x centre is a tile centre and every x midpoint
+  between neighbouring cells lies exactly on a tile seam. A finder miss on
+  a seam (its last step `sub_000888A0` places the found point in a room)
+  marks a gap on both sides of the start cell, and `crw_shadow` then blocks
+  the whole start row.
+- The brief's "floor 10 below the real floor" was checked: in `m34.err`
+  -9.49 is the pad snap's height (finder floor + 0.01, 0x0009B006) on
+  floor -2 (`roof: ... floors -2..11`, floor y = 5n + 0.5); the Khallos
+  chairs of the same map stand at -9.49. So NOT confirmed; still handled.
+
+Fix (`crw_rooms`): the **reference floor** is the finder's floor under the
+start cell, `crw_ground`: from the spawn height (within a step), else
+climbing one search height (1.25) at a time up to 11.25 for a floor above
+the spawn (a spawn under its floor); then the room query also uses it. Each
+cell is probed from and compared with that floor. A **gap** is sampled 0.25
+either side of the midpoint and counts only when both samples miss. No
+reference floor: no height check (logged). New line per Crowe:
+`split Crowe N reference floor F (spawn height Y, under the spawn | found
+above the spawn)` or `reference floor none (...)`. Tests:
+`reference_floor()` (spawn -9.49 under a 0.5 floor with a lower one at -20
+and a drop: the drop blocks, nothing else; seams missed by the finder: no
+gap, nothing blocked), mutations `ref-*`, `gap-at-seam`, `gap-one-sample`.
+
 ## Restart from the pause menu
 
 Found by the Khallos work: the pause menu's restart (`sub_0003D440`, flag
