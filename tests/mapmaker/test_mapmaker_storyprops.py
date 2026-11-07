@@ -70,8 +70,10 @@ MUTATIONS = {
     'textures-keep-mark': ('    SP_B(r+2u)&=(uint8_t)~0x10u;                       /* registered: no creation-time pass */\n', ''),
     'textures-creation-way': ('    guest_call(sub_00096220,1,path);', '    guest_call(sub_00096220,1,file);'),
     'textures-outside-play': ('    if(sp_play()) for(k=0;k<SP_KINDS;k++) if(sp_lv.want[k]) sp_register(k);', '    for(k=0;k<SP_KINDS;k++) if(sp_lv.want[k]) sp_register(k);'),
-    'lift-none': ('#define SP_CELL_LIFT 0.737f', '#define SP_CELL_LIFT 0.0f'),
-    'lift-guns': ('    else if(MAPMAKER_PTR_OK(g_ebp,0x60u)) SP_F(g_ebp+SP_REC_Y)+=SP_CELL_LIFT;', '    if(MAPMAKER_PTR_OK(g_ebp,0x60u)) SP_F(g_ebp+SP_REC_Y)+=SP_CELL_LIFT;'),
+    'lift-half-height': ('#define SP_CELL_LIFT 0.0f', '#define SP_CELL_LIFT 0.737f'),
+    'lift-no-override': ('            if(end && end!=v && !*end && f>=SP_LIFT_MIN && f<=SP_LIFT_MAX) sp.lift=f;', '            if(0) sp.lift=f;'),
+    'lift-unbounded': ('f>=SP_LIFT_MIN && f<=SP_LIFT_MAX) sp.lift=f;', 'f>=SP_LIFT_MIN) sp.lift=f;'),
+    'lift-no-log': ('        sp_lift_log(lift);\n', ''),
     'lift-wrong-field': ('#define SP_REC_Y 0x14u', '#define SP_REC_Y 0x10u'),
     'guntype-any-item': ('    if(sp_lv.gun_item && sp_lv.gun_item==g_esi && sp_play()) g_eax=SP_PRISON_GUN_TYPE;', '    if(sp_lv.gun_item && sp_play()) g_eax=SP_PRISON_GUN_TYPE;'),
     'guntype-sticks': ('    if(sp_lv.gun_item && sp_lv.gun_item==g_esi && sp_play()) g_eax=SP_PRISON_GUN_TYPE;\n    sp_lv.gun_item=0;', '    if(sp_lv.gun_item && sp_lv.gun_item==g_esi && sp_play()) g_eax=SP_PRISON_GUN_TYPE;'),
@@ -114,6 +116,8 @@ def test_mapmaker_storyprops(tmp_path, mutation):
         assert '[mapmaker] storyprops: mounted pak/storymem/l_26_stm.pak for the prison guns' in result.stderr
         assert '[mapmaker] storyprops: power cell 0x53D textures: 2 of 3 in pak/challengemem/l_64_chm.pak (missing 123456' in result.stderr
         assert '[mapmaker] storyprops: prison gun 0xE6 textures: 1 of 1 in pak/storymem/l_26_stm.pak' in result.stderr
+        assert '[mapmaker] storyprops: power cell height: record y +0.000 (model base y 0; bounds centre y -0.001, half height 0.736)' in result.stderr
+        assert 'power cell height: record y +0.250' in result.stderr and '(TSFP_MAPMAKER_POWERCELL_LIFT)' in result.stderr
         assert '[mapmaker] storyprops: drum placed as the mission 1 power cell' in result.stderr
         assert '[mapmaker] storyprops: fixed gun placed as the mission 1 prison gun' in result.stderr
     else:
@@ -405,10 +409,11 @@ def test_variant_textures_in_memory_paks():
 
 
 def test_power_cell_height():
-    """0x53D's vertices span y 0..1.471 but its bounds block (after the texture list:
-    count, centre x/y/z, half extents) is centred at y -0.001 with half height 0.736,
-    so it is drawn centred on its origin (the intro's upright and lying cells share
-    one height); the drum's vertices start at y 0 and it has no such block."""
+    """0x53D's vertices span y 0..1.471, so it stands on its origin like the drum
+    (whose vertices also start at y 0, test below). Its bounds block (after the
+    texture list: count, centre x/y/z, half extents) is centred at y -0.001 with
+    half height 0.736: a box around the origin, not the drawn extent (the .57 lift
+    of that half height floated the cell). The default lift is 0."""
     if not (GAME / 'challenge/l_64_ch.pak').exists():
         pytest.skip('game paks not available locally')
     d = _body(GAME / 'challenge/l_64_ch.pak', _model('farfuture2/powercell'))
@@ -417,10 +422,14 @@ def test_power_cell_height():
         off += 16
     count, cx, cy, cz, hx, hy, hz = struct.unpack_from('<I6f', d, off + 16)
     assert count == 1 and abs(cx) < 1e-3 and abs(cz) < 1e-3 and abs(hx - 0.546) < 0.01
-    lift = hy - cy
     src = INC.read_text(encoding='utf-8')
-    want = float(src.split('#define SP_CELL_LIFT ')[1].split('f')[0])
-    assert abs(lift - want) < 0.002, lift
+    assert float(src.split('#define SP_CELL_LIFT ')[1].split('f')[0]) == 0.0
+    assert abs(cy + 0.001) < 0.001 and abs(hy - 0.736) < 0.002
     # the vertex rows {x, y, z, packed} of the cell's body: y from 0 to 2 * half height
     ys = [struct.unpack_from('<f', d, 0x3804 + 16 * i + 4)[0] for i in range(352)]
     assert abs(min(ys)) < 1e-3 and abs(max(ys) - 2 * hy) < 0.01
+    # the drum's drawn vertices also start at y 0 (rows {x, y, z, packed} at 0xD50 / 0x256C)
+    drum = _body(GAME / 'stream/lv100/tileset/tileset1.pak', _model('mapmaker/labdrumexplosive'))
+    for start, n in ((0xD50, 53), (0x256C, 75)):
+        dy = [struct.unpack_from('<f', drum, start + 16 * i + 4)[0] for i in range(n)]
+        assert abs(min(dy)) < 1e-3, start

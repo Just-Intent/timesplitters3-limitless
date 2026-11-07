@@ -49,13 +49,16 @@
  *    storymem/l_26_stm.pak (prison gun) are mounted index-only beside them;
  *  - fill (sub_002F7790 at 0x00241787 prop / 0x002419C4 turret): the record
  *    gets the variant model once it is read, else the stock model (logged);
- *    a power cell's record is raised by its model's half height: 0x53D is
- *    drawn centred on its origin (bounds block after its texture list: centre
- *    y -0.001, half height 0.736), the drum stands on its origin (.55: sunk);
+ *    a power cell's record y is the drum's: both models stand on their
+ *    origin (vertices from y 0; .57 floated by the 0.737 lift that read the
+ *    bounds block after the cell's texture list as the drawn box). That block
+ *    (centre y -0.001, half height 0.736) is logged with the applied lift;
+ *    TSFP_MAPMAKER_POWERCELL_LIFT=<m> (-1..2) tunes it for a playtest;
  *  - gun type (sub_0033DD80 at 0x00241AA6): 7 for a swapped turret.
  * Requires WORD_AT, guest_call, g_eax, g_ebp, g_esi, g_esp, g_xbox_mem_offset,
  * xbox_HeapAlloc, pc_mapmaker_limits.inc (and MAPMAKER_* from the areas). */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifndef MAPMAKER_GUEST_RET
@@ -89,7 +92,9 @@
 #define SP_CELL_MODEL 0x53Du
 #define SP_PRISON_MODEL 0xE6u
 #define SP_PRISON_GUN_TYPE 7u
-#define SP_CELL_LIFT 0.737f              /* 0x53D bounds: half height 0.7364 - centre y (-0.00098) */
+#define SP_CELL_LIFT 0.0f                /* 0x53D's vertices start at y 0, as the drum's (.57: 0.737 floated) */
+#define SP_LIFT_MIN (-1.0f)
+#define SP_LIFT_MAX 2.0f
 #define SP_REC_Y 0x14u                   /* prop record: position y (the fill's +0x14, 0x0024176B) */
 #define SP_PAKTABLE 0x00907000u          /* mount table (paktable.json): 64 x 0x1C, +8 count, +0x10 index */
 #define SP_SLOT 0x1Cu
@@ -146,6 +151,8 @@ static const char sp_texts[6][SP_TEXT_BYTES]={"Type","Explosive drum","Power cel
 static struct {
     uint32_t desc, cat, texts, paks[SP_KINDS*2u];   /* model pak k, texture pak SP_KINDS + k */
     unsigned logged, failed;
+    int lift_read;
+    float lift;
 } sp;
 /* This level (cleared by every level's pak mount). */
 static struct {
@@ -153,6 +160,7 @@ static struct {
     int textured[SP_KINDS];              /* textures registered this level */
     unsigned swapped[SP_KINDS], refused[SP_KINDS];
     uint32_t gun_item;                   /* the turret item whose model was just swapped */
+    int lift_logged;
 } sp_lv;
 
 static void sp_log(const char *what,uint32_t a,uint32_t b)
@@ -556,6 +564,45 @@ void pc_mapmaker_storyprops_preload_model(void (*original)(void))
     g_eax=sp_kind[k].model;
 }
 
+/* The power cell's record y offset: SP_CELL_LIFT, or the playtest override. */
+static float sp_cell_lift(void)
+{
+    if(!sp.lift_read) {
+        const char *v=getenv("TSFP_MAPMAKER_POWERCELL_LIFT");
+        char *end=0;
+        float f;
+        sp.lift_read=1;sp.lift=SP_CELL_LIFT;
+        if(v && *v) {
+            f=strtof(v,&end);
+            if(end && end!=v && !*end && f>=SP_LIFT_MIN && f<=SP_LIFT_MAX) sp.lift=f;
+            else sp_log("TSFP_MAPMAKER_POWERCELL_LIFT ignored (not a number in -1..2)",0,0);
+        }
+    }
+    return sp.lift;
+}
+/* Once per level: the applied offset and the cell file's bounds block (after
+ * the texture list: count, centre x/y/z, half x/y/z), for a playtest log. */
+static void sp_lift_log(float lift)
+{
+    uint32_t e,r,file,list,i;
+    float cy=0.f,hy=0.f;
+    int have=0;
+    if(sp_lv.lift_logged) return;
+    sp_lv.lift_logged=1;
+    if((e=sp_resource(SP_CELL_MODEL)) && (r=sp_request(WORD_AT(e+0x10u))) && (file=WORD_AT(r+0x10u)) && MAPMAKER_PTR_OK(file,0x10u)) {
+        list=file+WORD_AT(file);
+        for(i=0;i<SP_TEX_MAX && MAPMAKER_PTR_OK(list+i*16u,0x30u) && WORD_AT(list+i*16u)!=0xFFFFFFFFu;i++) {}
+        if(i<SP_TEX_MAX && MAPMAKER_PTR_OK(list+i*16u,0x30u) && WORD_AT(list+i*16u+16u)==1u) {
+            cy=SP_F(list+i*16u+24u);hy=SP_F(list+i*16u+36u);have=1;
+        }
+    }
+    if(have) fprintf(stderr,"[mapmaker] storyprops: power cell height: record y %+.3f (model base y 0; bounds centre y %.3f, half height %.3f)%s\n",
+                     (double)lift,(double)cy,(double)hy,lift!=SP_CELL_LIFT?" (TSFP_MAPMAKER_POWERCELL_LIFT)":"");
+    else fprintf(stderr,"[mapmaker] storyprops: power cell height: record y %+.3f (no bounds block read)%s\n",
+                 (double)lift,lift!=SP_CELL_LIFT?" (TSFP_MAPMAKER_POWERCELL_LIFT)":"");
+    fflush(stderr);
+}
+
 /* WRAP sub_002F7790 (cdecl item id -> model): in the play fill's prop and
  * turret cases (esi = the item record) a variant record gets its model. */
 void pc_mapmaker_storyprops_model(void (*original)(void))
@@ -574,7 +621,11 @@ void pc_mapmaker_storyprops_model(void (*original)(void))
     }
     g_eax=sp_kind[k].model;
     if(k==1) sp_lv.gun_item=g_esi;
-    else if(MAPMAKER_PTR_OK(g_ebp,0x60u)) SP_F(g_ebp+SP_REC_Y)+=SP_CELL_LIFT;   /* stands on the floor like the drum */
+    else {
+        float lift=sp_cell_lift();
+        sp_lift_log(lift);
+        if(lift!=0.f && MAPMAKER_PTR_OK(g_ebp,0x60u)) SP_F(g_ebp+SP_REC_Y)+=lift;
+    }
     if(sp_lv.swapped[k]++<4u) sp_log(k?"fixed gun placed as the mission 1 prison gun":"drum placed as the mission 1 power cell",
                                      g_esi,sp_lv.swapped[k]);
 }
