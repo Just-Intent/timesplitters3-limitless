@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3738 @@
+@@ -1037,6 +1037,3749 @@
      sub_002FA720_gen();
  #endif
  }
@@ -3602,6 +3602,17 @@
 +    else sub_000862C0_gen();
 +#else
 +    sub_000862C0_gen();
++#endif
++}
++
++extern void sub_0008C020_gen(void);
++void sub_0008C020(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("bigdraw","pc_mapmaker_skelvis_frustum")) pc_mapmaker_skelvis_frustum(sub_0008C020_gen);
++    else sub_0008C020_gen();
++#else
++    sub_0008C020_gen();
 +#endif
 +}
 +
