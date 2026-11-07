@@ -453,7 +453,10 @@ static unsigned mapmaker_objects_teleporters_read(void)
                     id=(int16_t)(WORD_AT(q+0xCu)>>16);
                     pad=WORD_AT(q+0x18u);
                     if(id>=0x0A && id<=0x0E && n<MAPMAKER_OBJECTS_TELEPORTER_CAP) {
-                        if((int32_t)pad>0x1F40) {
+                        /* a cover pad id (0x2329.., below the high regular ids 0x5B29.. of
+                         * pc_mapmaker_pads.inc) stands for its owner; until 2026-11-07 this
+                         * read "> 0x1F40", which took regular pads 7000..7999 as cover */
+                        if((int32_t)pad>=0x2329 && (int32_t)pad<0x5B29) {
                             uint32_t cover=guest_call(sub_0009CCA0,1,pad);
                             pad=guest_writable(cover,12)?(uint32_t)(int32_t)(int16_t)WORD_AT(cover+8u):UINT32_MAX;
                         }

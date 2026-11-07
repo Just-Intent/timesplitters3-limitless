@@ -87,7 +87,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         if(nlinks<64) { links[nlinks][0]=g_ebx;links[nlinks][1]=g_edi; }
         nlinks++;WORD_AT(0x007B6660u)++;
     }
-    else if(f==sub_0009CCA0) { p=COVER_STRUCT;WORD_AT(COVER_STRUCT+8)=(args[0]-0x1F40u+700u)&0xFFFFu; }
+    else if(f==sub_0009CCA0) { p=COVER_STRUCT;WORD_AT(COVER_STRUCT+8)=(args[0]-0x2329u+700u)&0xFFFFu; }
     else if(f==sub_00333700) p=args[0]&3u;
     else if(f==sub_002FDF50) p=1;
     restore_registers(&r);
@@ -386,22 +386,22 @@ int main(void)
     WORD_AT(piece)=5;WORD_AT(piece+0x1C)=9u<<16;
     q=piece+0x38;
     q=item(q,0x0A,1,1);q=item(q,0x0B,2,1);q=item(q,0x11,3,1);  /* a weapon pickup, colour 0x11 too */
-    q=item(q,0x0D,4,3);q=item(q,0x0C,5,1);q=item(q,0x0A,0x1F45u,1); /* cover handle -> pad 705 */
+    q=item(q,0x0D,4,3);q=item(q,0x0C,5,1);q=item(q,0x0A,0x232Eu,1); /* cover id -> pad 705 */
     q=item(q,0x0B,7,1);q=item(q,0x0E,8,1);q=item(q,0x0C,9,1);
     /* piece 1: type 4 -> header 0x30; 8 items */
     WORD_AT(q)=4;WORD_AT(q+0x1C)=8u<<16;piece=q;q=piece+0x30;
     q=item(q,0x0A,10,1);q=item(q,0x0A,11,1);q=item(q,0x0B,12,1);q=item(q,0x0D,13,1);
     q=item(q,0x0A,14,1);q=item(q,0x0A,15,1);q=item(q,0x09,16,1);
-    q=item(q,0x0C,0x1F40u,1);                                  /* 0x1F40 is not a cover handle */
+    q=item(q,0x0C,0x2328u,1);                                  /* 0x2328 is the last low regular id */
     WORD_AT(CONTAINER+8+12+16+4)=q-(CONTAINER+8+12+16+8);
     WORD_AT(q)=0x00C7766Au;
     WORD_AT(0x007B6660u)=100;nlinks=0;existing[0]=0x100u+705u;existing[1]=0x100u+8u; /* 705 -> 8 exists */
     originals=0;g_ebx=0xB0B0u;g_edi=0xD0D0u;
     HOOK(pc_mapmaker_objects_teleporters,fake_original);
     CHECK(originals==0 && g_ebx==0xB0B0u && g_edi==0xD0D0u);
-    /* colour 0x11: pads 1,4,705,8,10,11,13,14,15 -> chain (705->8 already exists); 0x22: 2,7,12; 0x33: 5,9,0x1F40 */
+    /* colour 0x11: pads 1,4,705,8,10,11,13,14,15 -> chain (705->8 already exists); 0x22: 2,7,12; 0x33: 5,9,0x2328 */
     {
-        static const uint32_t want[][2]={{1,4},{2,7},{4,705},{5,9},{7,12},{8,10},{9,0x1F40},{10,11},{11,13},{13,14},{14,15}};
+        static const uint32_t want[][2]={{1,4},{2,7},{4,705},{5,9},{7,12},{8,10},{9,0x2328},{10,11},{11,13},{13,14},{14,15}};
         unsigned k;
         CHECK(nlinks==11);
         for(k=0;k<11 && k<nlinks;k++)

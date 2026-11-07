@@ -32,7 +32,7 @@ MUTATIONS = {
     'death-session-ignored': ('MAPMAKER_BUGFIX_B(MAPMAKER_BUGFIX_MODE)==10u &&\n           !WORD_AT(MAPMAKER_BUGFIX_SESSION);', 'MAPMAKER_BUGFIX_B(MAPMAKER_BUGFIX_MODE)==10u;'),
     'death-no-player': ('    if(player>=WORD_AT(MAPMAKER_BUGFIX_HUMANS)) {', '    if(0) {'),
     'death-any-path': ('if((int32_t)WORD_AT(pl+4u)<0) {', 'if(1) {'),
-    'goal-stock-base': ('#define MAPMAKER_BUGFIX_RUNTIME_BASE 0x4740u', '#define MAPMAKER_BUGFIX_RUNTIME_BASE 0x209Eu'),
+    'goal-stock-base': ('#define MAPMAKER_BUGFIX_RUNTIME_BASE 0x7800u', '#define MAPMAKER_BUGFIX_RUNTIME_BASE 0x209Eu'),
     'goal-flags-field': ('(h-MAPMAKER_BUGFIX_RUNTIME_BASE)*32u+8u)', '(h-MAPMAKER_BUGFIX_RUNTIME_BASE)*32u+4u)'),
     'goal-zero-extend': ('g_eax=(uint32_t)(int32_t)(int16_t)(WORD_AT(', 'g_eax=(uint32_t)(WORD_AT('),
     'goal-any-mode': ('if(MAPMAKER_BUGFIX_B(MAPMAKER_BUGFIX_MODE)!=1u || !MAPMAKER_STACK_OK(8))', 'if(!MAPMAKER_STACK_OK(8))'),
@@ -148,6 +148,6 @@ def test_hooked_sites_are_as_documented():
 def test_runtime_base_matches_pads_table():
     pads = json.loads((ROOT / 'config/guest-code-patches/pads.json').read_text(encoding='utf-8'))['patches']
     entry = next(e for e in pads if e['address'] == '0x002B0348')
-    assert entry['new_hex'] == '3d40470000'              # cmp eax,0x4740
+    assert entry['new_hex'] == '3d00780000'              # cmp eax,0x7800
     text = SOURCE.read_text(encoding='utf-8')
-    assert '#define MAPMAKER_BUGFIX_RUNTIME_BASE 0x4740u' in text
+    assert '#define MAPMAKER_BUGFIX_RUNTIME_BASE 0x7800u' in text

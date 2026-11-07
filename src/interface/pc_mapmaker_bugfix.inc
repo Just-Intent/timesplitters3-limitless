@@ -28,7 +28,7 @@
  *    0x002B0363 returns the word 0x413D8 bytes before the pool (the
  *    function's initial -1 used as the handle). The intended value is the
  *    runtime pad's owner pad, word +8 of runtime[handle - base] (pads.json:
- *    runtime handles 0x4740..0x4753, 32-byte records; owner stores in
+ *    runtime handles 0x7800..0x7813 (Layout C), 32-byte records; owner stores in
  *    sub_0009D3B0 @0x0009D40A/0x0009D428). That path returns it here; every
  *    other path runs the original.
  *
@@ -83,7 +83,7 @@
 #define MAPMAKER_BUGFIX_EFFECTS_STOCK 30u
 /* 7 */
 #define MAPMAKER_BUGFIX_RUNTIME 0x00715F38u       /* runtime pads, 20 x 32 B */
-#define MAPMAKER_BUGFIX_RUNTIME_BASE 0x4740u      /* pads.json layout B (stock 0x209E) */
+#define MAPMAKER_BUGFIX_RUNTIME_BASE 0x7800u      /* pads.json layout C (B 0x4740, stock 0x209E) */
 #define MAPMAKER_BUGFIX_RUNTIME_PADS 20u
 
 enum { MAPMAKER_BUGFIX_DROP_FRAGMENT, MAPMAKER_BUGFIX_DROP_TURRET, MAPMAKER_BUGFIX_DROP_DEATH_PLAYER,

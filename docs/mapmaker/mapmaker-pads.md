@@ -345,6 +345,9 @@ that reads ids is covered (inventory: `test_mapmaker_padids_classified.py`,
   first (fits the u16). Start-point top-up (`0x0023FA20` filters ids
   >= 0x2329): high seed ids are replaced by aliases 0x80000000 + k for the
   call (resolved by the pointer hook) and restored.
+- Host code: the teleporter pairing (`pc_mapmaker_objects.inc`) read pad
+  ids `> 0x1F40` as cover (wrong for regular pads 7000..7999 too); now the
+  cover range 0x2329..0x5B28. `pc_mapmaker_bugfix.inc` runtime base 0x7800.
 - Editor: `sub_00332490` returns the high id; `sub_002FA150` (group count)
   and `sub_00334B20` (item pads as base + local) run on 0x3E9 + index in a
   scope, and `sub_00334B20`'s list is mapped afterwards outside it.
