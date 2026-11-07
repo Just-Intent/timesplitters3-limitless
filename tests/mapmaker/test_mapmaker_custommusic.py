@@ -49,6 +49,7 @@ MUTATIONS = {
     'arcade-in-story': ("WORD_AT(CMU_SETUP_LINK) && cmu_byte(CMU_MODE)[0]!=0x0Au ?", 'WORD_AT(CMU_SETUP_LINK) ?'),
     'watch-scene': ('    if(WORD_AT(CMU_SCENE)!=cmu.scene) return 0;\n', ''),
     'watch-pause': ('    *paused=WORD_AT(CMU_PAUSE)!=0;', '    *paused=0;'),
+    'watch-pause-player-state': ('#define CMU_PAUSE 0x006D5EB8u', '#define CMU_PAUSE 0x0064BDC0u'),
     'watch-slider': ('    *gain=(float)(slider>CMU_SLIDER_MAX?CMU_SLIDER_MAX:slider)/(float)CMU_SLIDER_MAX;', '    *gain=1.0f;'),
     'channel-zero-stops': ('    if(MAPMAKER_PTR_OK(g_esp,8u) && WORD_AT(g_esp+4u)!=0u && pc_music_playing()) {',
                            '    if(MAPMAKER_PTR_OK(g_esp,8u) && pc_music_playing()) {'),
@@ -121,7 +122,10 @@ def log_ok(stderr):
     return (stderr.count('imported tracks offered in Map Settings') == 1 and
             'play: the map names no imported track; stock music (ret 0x00045FBC, scene 100' in stderr and
             "play: the map's imported track replaces the setup's stock choice" in stderr and
-            'play: not a MapMaker play scene' in stderr)
+            'play: not a MapMaker play scene' in stderr and
+            'player: first submission accepted' in stderr and
+            'player: stopped: the game ended it' in stderr and
+            "player: held before its first sound: the game's music is paused" in stderr)
 
 
 def test_chunk_tag_is_free():
@@ -169,7 +173,9 @@ def test_stock_music_code():
     assert read(0x002C7232, 0xC) == bytes.fromhex('8b0dd41376008988c8000000')
     assert read(0x002C7223, 2) == b'\x6a\x0e' and read(0x002C748D, 2) == b'\x6a\x0e'
     assert read(0x00028A22, 6) == bytes.fromhex('893534914b00')               # sub_000289C0: [0x4B9134] = channel
-    assert read(0x00029EAA, 7) == bytes.fromhex('c7462801000000')             # pause: +0x28 = 1
+    assert read(0x00029EAA, 7) == bytes.fromhex('c7462801000000')             # player state +0x28 = 1 ...
+    assert read(0x00045AB6, 10) == bytes.fromhex('c705b85e6d0001000000')       # pause music: [0x6D5EB8] = 1
+    assert read(0x00045AF6, 10) == bytes.fromhex('c705b85e6d0000000000')       # resume: [0x6D5EB8] = 0
     assert read(0x00028964, 5) == bytes.fromhex('b998bd6400')                 # player 0x0064BD98
     assert read(0x00045BE8, 8) == bytes.fromhex('f30f2a05bc365200')           # slider [0x005236BC]
     assert struct.unpack('<f', read(0x00475DC4, 4))[0] == 0.0625              # / 16
