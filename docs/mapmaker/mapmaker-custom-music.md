@@ -42,9 +42,11 @@ not read: convert them to WAV or MP3 first.
 
 ## What to expect
 
+- A jingle during the level (an objective, a pickup) pauses your track; it
+  carries on when the jingle ends. Restarting the level starts it again.
 - The track replaces the level music only. The end-of-match jingles (Mission
   Complete, Game Over) are the game's own; when one starts, your track stops.
-- It follows the Music volume slider (at about the stock tracks' level),
+- It follows the Music volume slider (full slider = the file's own level),
   pauses with the game's music and stops when you leave the level.
 - If the music is switched off in the options, nothing plays.
 - **Fallbacks:** a map whose file is missing plays the tileset's music (the
