@@ -116,6 +116,10 @@ void pc_mapmaker_rooms_query(void (*original)(void))
 {
     uint32_t box=WORD_AT(g_esp+4u),out=WORD_AT(g_esp+8u),max=WORD_AT(g_esp+12u);
     uint32_t buffer,count,records,i,found=0,take=1;
+#ifdef MAPMAKER_SKELVIS
+    /* pc_mapmaker_skelvis.inc (log only): sub_0009FBE0's room list query */
+    uint32_t touched=0,list_call=MAPMAKER_PTR_OK(g_esp,20u) && WORD_AT(g_esp)==SKV_RET_QUERY && WORD_AT(g_esp+16u)==SKV_RET_LIST;
+#endif
     if(mapmaker_rooms.query_depth>=MAPMAKER_ROOMS_QUERY_LEVELS) { original(); return; }
     buffer=MAPMAKER_ROOMS_QUERY_BUFFER+mapmaker_rooms.query_depth*MAPMAKER_ROOMS_QUERY_BYTES;
     mapmaker_rooms.query_depth++;
@@ -132,7 +136,13 @@ void pc_mapmaker_rooms_query(void (*original)(void))
             WORD_AT(out+found*4u)=room;
             if(++found==max) take=0;
         }
+#ifdef MAPMAKER_SKELVIS
+        touched+=word&1u;
+#endif
     }
+#ifdef MAPMAKER_SKELVIS
+    if(list_call) mapmaker_skelvis_list(out,max,touched,found,buffer,count);
+#endif
     mapmaker_rooms.query_depth--;
     g_eax=found;
     MAPMAKER_GUEST_RET();                    /* sub_00087310 ends in a plain ret */

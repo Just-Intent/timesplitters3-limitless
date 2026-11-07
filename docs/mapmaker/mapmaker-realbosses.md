@@ -743,6 +743,34 @@ only its head is on screen. The giant trophy monster gets the same fix (it
 is clipped the same way once taller than the portal it is seen through).
 Other characters, objects, scenes and story levels: stock.
 
+## Skeleton visibility log
+
+User report (after .45): giant skeletons briefly vanish when the player walks
+close or mid-animation. Log only, no behaviour change: area `bigdraw`,
+`src/interface/pc_mapmaker_skelvis.inc`, `tests/mapmaker/test_mapmaker_skelvis.py`
+(fixture, expected text, 27 mutations, decode checks). Not built or played.
+Suspects (INFERRED): the room list keeps 10 of the rooms the radius box
+touches, missing those by the camera; or the frustum box follows the root
+bone (`sub_0009EAB0`, centre `[[+4]+0x10]+0x30`) while limbs stay on screen.
+Hooks: `pc_mapmaker_rooms_query` under 0x0009FCF5 (rooms touched vs kept, camera
+room), `pc_mapmaker_bigdraw_rect` (reached, empty rectangle), new WRAP of the
+frustum test `sub_0008C020` (only caller 0x000A249E, < 0 culls at 0x000A24AA),
+`pc_mapmaker_tank_draw` (`sub_000A2740`: drawn), `pc_mapmaker_openview_walk`
+before the walk (ends the main view's previous pass), realbosses restart (reset).
+Hidden reasons: no list (0x000A2455), no listed room visible, visible but not
+reached, empty rectangle, frustum (0x000A24AA), view planes (0x000A2515, flag
+0x2000), later (0x000A271D). Grep `[mapmaker] skelvis:` for:
+
+- `skelvis: skeleton N: tracked (prop ..): radius .., box centre offset .. (root bone|fixed)`, once per skeleton.
+- `skelvis: skeleton N: room list K of T touched rooms (cap 10)[ TRUNCATED], home room H, camera room C in the list|DROPPED by the cap|not touched by its box`, on change.
+- `skelvis: skeleton N: hidden (<reason>), was <state> for P passes: player D away, box centre .., half .., animation 0x.., list .. rooms (.. visible), camera room .., reached .., frustum .., flags 0x..`
+- `skelvis: skeleton N: drawn again after P passes hidden (<reason>)`
+- `skelvis: summary after P passes: skeleton N drawn .., hidden: ..; list builds .., truncated .., camera room dropped .., most rooms touched ..` every 600 main passes when a count changed (40 a level); `final summary` on reset.
+
+60 lines a level (12 for "none of its listed rooms visible" and its redraws),
+then `60 lines this level, quiet now`. Distance is to player 1, not the camera.
+Without the new wrapper, frustum culls count as "later" (summary says so).
+
 ## Save format and stock games
 
 Unchanged: a stock custom-set member (word id 0x15, sbyte variant -1). No
@@ -778,6 +806,7 @@ WRAP sub_002875F0 -> pc_mapmaker_realbosses_risen          (new; per skeleton fr
 WRAP sub_00287E20 -> pc_mapmaker_realbosses_throw          (new; per skeleton frame)
 WRAP sub_002274C0 -> pc_mapmaker_realbosses_event          (new; level events, return-address test first)
 WRAP sub_000862C0 -> pc_mapmaker_bigdraw_rect             (new, area bigdraw; prop draw rectangle, per frame per prop of a drawn room)
+WRAP sub_0008C020 -> pc_mapmaker_skelvis_frustum          (new after .45, area bigdraw; frustum test, only caller 0x000A249E; log only)
 ```
 
 Added for several giant skeletons / Crow walkers per map (after v0.4.0-mapmaker.25):
@@ -804,7 +833,8 @@ Include the `.inc` after `pc_mapmaker_bosses.inc` / `pc_mapmaker_characters.inc`
 the off-build no-op hooks are in `pc_menu_mouse_guest.inc`, prototypes in `pc_display_menu.h`.
 `pc_mapmaker_bigdraw.inc` (area `bigdraw`) is included right after it (needs
 only `pc_mapmaker_limits.inc`; its stub and prototype are in place, no link
-stubs). No extension memory.
+stubs). `pc_mapmaker_skelvis.inc` goes right after `pc_mapmaker_limits.inc` (its
+callers test `MAPMAKER_SKELVIS`). No extension memory.
 
 ## User test steps
 

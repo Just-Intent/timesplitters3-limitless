@@ -46,9 +46,9 @@ EXPECTED = '\n'.join([
 MUTATIONS = {
     'no-switch': (INC, '    if(!mapmaker_limits.limits) return;\n', ''),
     'any-scene': (INC, ' || WORD_AT(OPENVIEW_SCENE)!=OPENVIEW_PLAY) return;', ') return;'),
-    'before-original': [(INC, '    int32_t deepest;\n    original();\n', '    int32_t deepest;\n'),
+    'before-original': [(INC, '    original();\n#ifdef MAPMAKER_CAMERA_VIEW_DIAG\n', '#ifdef MAPMAKER_CAMERA_VIEW_DIAG\n'),
                         (INC, '    if((int32_t)WORD_AT(view+OPENVIEW_DEEPEST)<deepest)', '    original();\n    if((int32_t)WORD_AT(view+OPENVIEW_DEEPEST)<deepest)')],
-    'pops-twice': (INC, '    int32_t deepest;\n    original();\n', '    int32_t deepest;\n    original();g_esp+=4u;\n'),
+    'pops-twice': (INC, '    original();\n#ifdef MAPMAKER_CAMERA_VIEW_DIAG\n', '    original();g_esp+=4u;\n#ifdef MAPMAKER_CAMERA_VIEW_DIAG\n'),
     'whole-view-always': (INC, '        if(depth<0) continue;                       /* no room of this area is visible */\n',
                           '        if(depth<0) { x0=0;y0=0;x1=640;y1=480;depth=0; }\n'),
     'unseen-counts': (INC, '            if(d<0 || !(a<c && b<f)) continue;', '            if(d<0) continue;'),

@@ -81,6 +81,9 @@ void pc_mapmaker_bigdraw_rect(void (*original)(void))
     if(MAPMAKER_STACK_OK(8u) && WORD_AT(g_esp)==BIGDRAW_RET) prop=WORD_AT(g_esp+4u);
     original();
     if(!prop || !MAPMAKER_PTR_OK(prop,BIGDRAW_PROP_SIZE)) return;
+#ifdef MAPMAKER_SKELVIS
+    mapmaker_skelvis_rect(prop);   /* pc_mapmaker_skelvis.inc (log only), the stock rectangle */
+#endif
     model=BIGDRAW_H(prop+BIGDRAW_MODEL);
     if((model!=BIGDRAW_SKELETON && model!=BIGDRAW_TROPHY && model!=BIGDRAW_WALKER &&
         model!=BIGDRAW_ROBOT && model!=BIGDRAW_CROWE) || WORD_AT(prop+BIGDRAW_TYPE)!=BIGDRAW_CHARACTER) return;
