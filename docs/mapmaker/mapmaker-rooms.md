@@ -22,6 +22,7 @@ Parts:
 
 ```
 WRAP sub_00087310 -> pc_mapmaker_rooms_query
+WRAP sub_00086FC0 -> pc_mapmaker_rooms_tree   (no args, plain ret; stage 13)
 WRAP sub_0008A780 -> pc_mapmaker_rooms_compile
 WRAP sub_00083F80 -> pc_mapmaker_rooms_piece
 WRAP sub_00085030 -> pc_mapmaker_rooms_piece
@@ -194,9 +195,10 @@ rest are other structs.
   stack per room; the recomp gives the guest main thread an 8 MB stack
   (`XBOX_STACK_SIZE`), so 241 levels (~110 KB) are fine (INFERRED: the level
   runs on the main guest thread).
-- The room AABB tree (`sub_00086FC0`) stages 0x1C bytes per room in the 32 KB
-  scratch block of `sub_0003D6E0(3)` (room for ~1170 rooms) and allocates its
-  nodes from the Level heap (`sub_00157970`).
+- The room AABB tree (`sub_00086FC0`) stages 0x1C bytes per room in
+  `sub_0003D6E0(3)`: 3 of the 4 KB pages of a 16 KB pool (438 rooms). Past 585
+  it overran into XDK globals (heap handle `[0x007EB4B4]` at room 602: the
+  676-tile crash); `pc_mapmaker_rooms_tree` stages past 438 at `0x00911000`.
 
 ## Lights
 
@@ -589,7 +591,7 @@ room is 0x3FF; 1024 needs them one higher (0x401..0x40D), same work.
 | 17 | play memory (Level heap; arena 47,104,000 B, +16 MB max by `TSFP_MAPMAKER_ARENA_MB`) | measured | see below | see below | 14 |
 | 18 | editor memory estimate x8 (16.4 MB) | 16.4 MB | ~390 heavy | 43 MB heavy | 14 |
 | 19 | map container / undo ring | 512 KB / 1 MB | ~1,000+ (tens of KB at 241) | ~250 KB | no |
-| 20 | room AABB scratch (32 KB, 0x1C per room), portal walk recursion (0x1E4 per room, 8 MB stack) | ~1,170 / ~17,000 | | fits | no |
+| 20 | room AABB scratch (12 KB, 0x1C per room; was misread as 32 KB), portal walk recursion (0x1E4 per room, 8 MB stack) | 438 / ~17,000 | 586 (crash 602) | C staging | done |
 | 21 | view room list (shadow, cap `cmp ax,0x10C`) | 0x10C | 0x10D | 0x40D | 7 |
 | 22 | editor piece walk (`mapmaker_list_totals`, 4096) and grid 80x80x16 | 4096 | | fits | no |
 

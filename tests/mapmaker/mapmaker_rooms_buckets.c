@@ -48,6 +48,7 @@ static void log_to(event *e,unsigned *n,char kind,uint32_t a,uint32_t b,uint32_t
 #define RECT(view,r) ((view)+MAPMAKER_ROOMS_VIEW_RECTS+12u*(r))
 
 void sub_00157440(void) {}
+void sub_00157970(void) {}
 void sub_0003DFA0(void) {}
 void sub_0001A010(void) { GOT('A',WORD_AT(g_esp+4),WORD_AT(g_esp+8),WORD_AT(g_esp+12),WORD_AT(g_esp+16));g_esp+=4u; }
 void sub_000A79B0(void) { GOT('G',WORD_AT(g_esp+4),0,0,0);g_esp+=4u; }
@@ -274,6 +275,27 @@ static void test_buckets_wide(void)
 }
 
 /* A reader reached without sub_00086C40 draws nothing. */
+/* A portal walk 80+ deep ([view+0xD28] >= 0x50): stock passes the unclamped
+ * depth to sub_00086AE0, whose readers took count bytes past 0x702DB0+0x4F (the
+ * room tree header). The C lists hold depths 0..0x4F only, so deeper reader
+ * calls return without drawing. */
+static void test_buckets_deep_walk(void)
+{
+    uint32_t view=VIEWS+MAPMAKER_ROOMS_VIEW_STRIDE,r,i,deep=0,drawn=0;
+    WORD_AT(0x00708788u)=RECORDS;WORD_AT(0x007E71C8u)=VIEWPORT;
+    WORD_AT(0x007B975Cu)=200;
+    setup_view(view,200,0x58,0,0x50);
+    for(r=0;r<=201;r++) *u8(RECORDS+r*0xB4u+0xB2u)=0;
+    memset(u8(0x00702DB0u+0x50u),0xFF,0x20);           /* what the stock reader would count */
+    got_n=0;
+    run_buckets(view);
+    for(i=0;i<got_n && i<EVENTS;i++) {
+        if(got[i].kind=='C' && got[i].b>=0x50u) deep++;
+        if(got[i].kind=='R') drawn++;
+    }
+    CHECK(deep==0 && drawn>0 && WORD_AT(view+0xD28u)==0x58u && !reader_esp_bad);
+    CHECK(mapmaker_rooms_bk.depth==0);
+}
 static void test_reader_outside(void)
 {
     *u8(0x00702DB0u+3u)=77;
@@ -408,6 +430,7 @@ int main(void)
     g_xbox_mem_offset=(uintptr_t)memory;
     test_buckets_match_stock();
     test_buckets_wide();
+    test_buckets_deep_walk();
     test_reader_outside();
     test_view_lists_match_stock();
     test_view_lists_wide();

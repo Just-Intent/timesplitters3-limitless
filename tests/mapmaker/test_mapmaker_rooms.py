@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ROOMS = ROOT / 'src/interface/pc_mapmaker_rooms.inc'
 TABLE = ROOT / 'config/guest-code-patches/rooms.json'
 SUB_RANGE = (0x008C0000, 0x008E0000)
-SUB_RANGE_HIGH = (0x00908000, 0x00911000)   # 1023 layout: front-end view and light colour (above the pak table)
+SUB_RANGE_HIGH = (0x00908000, 0x00918000)   # 1023 layout: front-end view, light colour, room tree staging (above the pak table)
 SUB_RANGES = (SUB_RANGE, SUB_RANGE_HIGH)
 
 MUTATIONS = {
@@ -28,6 +28,15 @@ MUTATIONS = {
     'query-no-depth-guard': ('if(mapmaker_rooms.query_depth>=MAPMAKER_ROOMS_QUERY_LEVELS) { original(); return; }', ''),
     'query-one-buffer': ('+mapmaker_rooms.query_depth*MAPMAKER_ROOMS_QUERY_BYTES;', ';'),
     'query-wrong-box-end': ('box,box+0xCu,0x00087260u', 'box,box+0x10u,0x00087260u'),
+    # room tree staging (crash at 676 rooms, 2026-11-07)
+    'tree-stock-past-scratch': ('if(count<=(int32_t)MAPMAKER_ROOMS_TREE_SCRATCH)', 'if(count<=(int32_t)MAPMAKER_ROOMS_MAX)'),
+    'tree-scratch-585': ('#define MAPMAKER_ROOMS_TREE_SCRATCH 438u', '#define MAPMAKER_ROOMS_TREE_SCRATCH 585u'),
+    'tree-box-shifted': ('WORD_AT(records+r*0xB4u+0x10u+4u*k)', 'WORD_AT(records+r*0xB4u+0x14u+4u*k)'),
+    'tree-room-word': ('mapmaker_rooms_set_u16(rec,(uint16_t)r);', 'mapmaker_rooms_set_u16(rec,(uint16_t)(r-1u));'),
+    'tree-params-leaf': ('WORD_AT(MAPMAKER_ROOMS_TREE_PARAMS+4u)=4u;', 'WORD_AT(MAPMAKER_ROOMS_TREE_PARAMS+4u)=6u;'),
+    'tree-no-clip': ('if(n>MAPMAKER_ROOMS_MAX) { n=MAPMAKER_ROOMS_MAX;mapmaker_rooms_tree_clipped++; }', ''),
+    'tree-staging-in-pool': ('#define MAPMAKER_ROOMS_TREE_STAGING 0x00911000u', '#define MAPMAKER_ROOMS_TREE_STAGING 0x007E72E0u'),
+    'tree-staging-small': ('#define MAPMAKER_ROOMS_TREE_BYTES 0x7000u', '#define MAPMAKER_ROOMS_TREE_BYTES 0x4000u'),
     'totals-not-reset': ('mapmaker_rooms.rooms=mapmaker_rooms.portals=mapmaker_rooms.pieces=mapmaker_rooms.dropped=0;',
                          'mapmaker_rooms.pieces=mapmaker_rooms.dropped=0;'),
     'drop-keeps-records': ('WORD_AT(entry+0x18u)=0;WORD_AT(entry+0x24u)=0;', 'WORD_AT(entry+0x18u)=0;'),
@@ -83,7 +92,7 @@ def build(tmp_path, mutation):
 
 
 # Refused by a compile-time size check: a cap past the real room ids 1..0x3FF.
-COMPILE_REFUSED = {'cap-raised'}
+COMPILE_REFUSED = {'cap-raised', 'tree-staging-small'}
 
 
 @pytest.mark.parametrize('mutation', ['fixed', *MUTATIONS])
@@ -354,6 +363,7 @@ ROOMS_BLOCKS = {
     'light heads': (0x008DC000, 3 * 0x40C * 4, ['rooms-reloc-l1-head', 'rooms-reloc-l1-rest']),
     'front-end view': (0x00908000, 0x5000, ['rooms-reloc-v-0x749890']),
     'light colour': (0x0090D000, 0x40C * 12 + 4, ['rooms-reloc-l2-0x7ac880']),
+    'room tree staging': (0x00911000, 0x7000, []),                # pc_mapmaker_rooms_tree: 0x1C x 1023 + params
 }
 
 
@@ -376,6 +386,9 @@ def blocks_problems(patches):
             placed.add(rid)
     if set(relocs) - placed:
         out.append(f'relocations without a block: {sorted(set(relocs) - placed)}')
+    tree = ROOMS_BLOCKS['room tree staging']
+    if (define('MAPMAKER_ROOMS_TREE_STAGING'), define('MAPMAKER_ROOMS_TREE_BYTES')) != tree[:2]:
+        out.append('room tree staging')
     model, query = ROOMS_BLOCKS['model table'], ROOMS_BLOCKS['query']
     if define('MAPMAKER_ROOMS_MODEL_TABLE') != model[0]:
         out.append('model table')
@@ -656,3 +669,65 @@ def test_every_view_stride_is_classified():
     by_address = {i.address: i for i in insns}
     for m, s in STRIDE_DIVISIONS.items():       # mov eax, magic; imul ecx; add edx, ecx; sar edx, shift
         assert by_address[m].text == 'eax, 0x80200803' and by_address[s].text == 'edx, 0xb'
+
+
+# ---- room AABB tree staging (sub_00086FC0; the 676-room crash, 2026-11-07) ----
+# sub_00086FC0 stages 0x1C bytes per room in sub_0003D6E0(3): 3 pages of the
+# scratch pool (4 pages of 0x1000 at 0x007E72E0, page mask byte 0x006B7B00). Past
+# the pool's end come XDK globals: the process heap handle [0x007EB4B4] (read by
+# the allocator wrapper sub_0038209D) is 0x41D4 bytes in, record 601 (room 602).
+SCRATCH_BASE, SCRATCH_PAGE, SCRATCH_PAGES = 0x007E72E0, 0x1000, 4
+TREE_PAGES, TREE_RECORD, HEAP_HANDLE = 3, 0x1C, 0x007EB4B4
+
+# Every caller of the scratch pool and why its fill is not room-bound (audit 2026-11-07).
+SCRATCH_CALLERS = {
+    0x0004C56C: 'polygon clip vertices (1 page)',
+    0x0004E2FB: 'polygon clip vertices (1 page)',
+    0x00054739: 'polygon clip vertices (1 page)',
+    0x00086138: 'sub_00086130: [0x0070AAE0] records, capped at 0x145 (9100 B of 12 KB)',
+    0x00086FD3: 'sub_00086FC0: one 0x1C record per room -> pc_mapmaker_rooms_tree past 438 rooms',
+    0x00097C1A: 'animation nodes, pages from the size',
+    0x0011A991: 'per-view flare items (at most 8)',
+    0x00170E32: 'AI actor lists (capped at 0xDB)',
+    0x0017201D: 'AI event lists (capped)',
+    0x00350EC9: 'skeleton bones',
+    0x003513DC: 'skeleton bones',
+}
+
+
+def _mem_disp(i, value):
+    return any(o[0] == 'mem' and not o[1] and not o[2] and o[4] == value for o in i.ops)
+
+
+def test_room_tree_scratch_decoded():
+    """The stock tree staging and the pool are what the wrapper's threshold assumes."""
+    import sys
+    sys.path.insert(0, str(ROOT / 'tests/mapmaker'))
+    from mapmaker_decoded import decoded
+    insns = decoded()
+    fn = {}
+    for i in insns:
+        fn.setdefault(i.function, []).append(i)
+    tree = fn[0x00086FC0]
+    calls = [n for n, i in enumerate(tree) if i.call and ('imm', 0x0003D6E0) in i.ops]
+    assert len(calls) == 1
+    push = next(i for i in reversed(tree[:calls[0]]) if i.mnemonic == 'push')            # its argument
+    assert push.ops == (('imm', TREE_PAGES),) and calls[0] - tree.index(push) <= 2
+    assert any(i.mnemonic == 'imul' and ('imm', TREE_RECORD) in i.ops for i in tree)       # record index * 0x1C
+    assert any(i.mnemonic == 'imul' and ('imm', 0xB4) in i.ops for i in tree)              # room record stride
+    assert any(i.call and ('imm', 0x00157970) in i.ops for i in tree)                      # the builder
+    assert any(i.mnemonic == 'push' and i.ops == (('imm', 0x00086120),) for i in tree)     # its callback
+    assert any(_mem_disp(i, 0x007B975C) for i in tree)                                     # count = rooms
+    alloc = fn[0x0003D6E0]
+    assert any(i.mnemonic == 'mov' and i.ops == (('reg', 'edi'), ('imm', SCRATCH_PAGES)) for i in alloc)
+    assert any(i.mnemonic == 'shl' and ('imm', 12) in i.ops for i in alloc)
+    assert any(i.mnemonic == 'add' and ('imm', SCRATCH_BASE) in i.ops for i in alloc)
+    assert any(_mem_disp(i, HEAP_HANDLE) for i in fn[0x0038209D])
+    # the wrapper's threshold is the stock block; past it the records must leave the pool
+    assert define('MAPMAKER_ROOMS_TREE_SCRATCH') == TREE_PAGES * SCRATCH_PAGE // TREE_RECORD == 438
+    assert define('MAPMAKER_ROOMS_MAX') * TREE_RECORD > SCRATCH_PAGES * SCRATCH_PAGE      # stock would overrun the pool
+    assert (HEAP_HANDLE - SCRATCH_BASE) // TREE_RECORD + 1 == 602                         # the first room that reaches it
+    assert define('MAPMAKER_ROOMS_MAX') * TREE_RECORD + 12 <= define('MAPMAKER_ROOMS_TREE_BYTES') - 4
+    # every scratch-pool caller is reviewed
+    found = {i.address for i in insns if i.call and ('imm', 0x0003D6E0) in i.ops}
+    assert found == set(SCRATCH_CALLERS), sorted(hex(a) for a in found ^ set(SCRATCH_CALLERS))
