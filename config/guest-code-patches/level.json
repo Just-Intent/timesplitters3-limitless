@@ -7,8 +7,8 @@
       "address": "0x00240C50",
       "original_hex": "b830100000",
       "operand": 1,
-      "value": "0x1090",
-      "reason": "sub_00240C50 (MapMaker level fill pass) frame 0x1030 -> 0x1090: the per-piece array [esp+i*8+0xA0] (frame+0x90, 8 B per piece) holds 500 -> 512 pieces; entry 500 was the return address"
+      "value": "0x2090",
+      "reason": "sub_00240C50 (MapMaker level fill pass) frame 0x1030 -> 0x2090: the per-piece array [esp+i*8+0xA0] (frame+0x90, 8 B per piece) holds 500 -> 1024 pieces; entry 500 was the return address"
     },
     {
       "id": "level-frame-arg-00240c5c",
@@ -17,8 +17,8 @@
       "address": "0x00240C5C",
       "original_hex": "8bac243c100000",
       "operand": 1,
-      "value": "0x109C",
-      "reason": "sub_00240C50 argument [esp+0x103C] -> [esp+0x109C] (frame grown by 0x60)"
+      "value": "0x209C",
+      "reason": "sub_00240C50 argument [esp+0x103C] -> [esp+0x209C] (frame grown by 0x1060)"
     },
     {
       "id": "level-frame-arg-00240da3",
@@ -27,8 +27,8 @@
       "address": "0x00240DA3",
       "original_hex": "8b842444100000",
       "operand": 1,
-      "value": "0x10A4",
-      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x10A4] (frame grown by 0x60)"
+      "value": "0x20A4",
+      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x20A4] (frame grown by 0x1060)"
     },
     {
       "id": "level-frame-arg-00241df7",
@@ -37,8 +37,8 @@
       "address": "0x00241DF7",
       "original_hex": "8b842444100000",
       "operand": 1,
-      "value": "0x10A4",
-      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x10A4] (frame grown by 0x60)"
+      "value": "0x20A4",
+      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x20A4] (frame grown by 0x1060)"
     },
     {
       "id": "level-frame-arg-00242159",
@@ -47,8 +47,8 @@
       "address": "0x00242159",
       "original_hex": "8b842444100000",
       "operand": 1,
-      "value": "0x10A4",
-      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x10A4] (frame grown by 0x60)"
+      "value": "0x20A4",
+      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x20A4] (frame grown by 0x1060)"
     },
     {
       "id": "level-frame-arg-0024225e",
@@ -57,8 +57,8 @@
       "address": "0x0024225E",
       "original_hex": "8b942444100000",
       "operand": 1,
-      "value": "0x10A4",
-      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x10A4] (frame grown by 0x60)"
+      "value": "0x20A4",
+      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x20A4] (frame grown by 0x1060)"
     },
     {
       "id": "level-frame-arg-00242288",
@@ -67,8 +67,8 @@
       "address": "0x00242288",
       "original_hex": "8b842444100000",
       "operand": 1,
-      "value": "0x10A4",
-      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x10A4] (frame grown by 0x60)"
+      "value": "0x20A4",
+      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x20A4] (frame grown by 0x1060)"
     },
     {
       "id": "level-frame-arg-002422e4",
@@ -77,8 +77,8 @@
       "address": "0x002422E4",
       "original_hex": "8b8c2444100000",
       "operand": 1,
-      "value": "0x10A4",
-      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x10A4] (frame grown by 0x60)"
+      "value": "0x20A4",
+      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x20A4] (frame grown by 0x1060)"
     },
     {
       "id": "level-frame-arg-002423d2",
@@ -87,8 +87,8 @@
       "address": "0x002423D2",
       "original_hex": "8bb42444100000",
       "operand": 1,
-      "value": "0x10A4",
-      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x10A4] (frame grown by 0x60)"
+      "value": "0x20A4",
+      "reason": "sub_00240C50 argument [esp+0x1044] -> [esp+0x20A4] (frame grown by 0x1060)"
     },
     {
       "id": "level-frame-end-00242427",
@@ -97,8 +97,8 @@
       "address": "0x00242427",
       "original_hex": "81c430100000",
       "operand": 1,
-      "value": "0x1090",
-      "reason": "sub_00240C50 epilogue frame 0x1030 -> 0x1090 (its only exit)"
+      "value": "0x2090",
+      "reason": "sub_00240C50 epilogue frame 0x1030 -> 0x2090 (its only exit)"
     }
   ]
 }

@@ -507,22 +507,22 @@ static void mapmaker_probe_click(uint32_t menu,float x,float y,uint32_t hit,unsi
 /* Flag 128, read-only, scene 100. Room draw sub_000A2900(room, pass) (callers
  * 0x0008658F..0x00086B80 and 0x001B920B..0x001B924D) walks the room's props:
  * count [0x007B54E0+room*4], list [0x007B5F00+room*4] (relocated by
- * config/guest-code-patches/rooms.json to 0x008C7000 / 0x008C7CC0). It skips a
+ * config/guest-code-patches/rooms.json to 0x008CC000 / 0x008CD040). It skips a
  * prop whose +0x34 is a real room and whose +0x28 has 0x800000 (0x000A2945),
  * or whose instance [prop+4] has byte +0x1F6 bit 3 (0x000A2951), and draws the
  * rest with sub_0008F950(instance, pass, layer) (0x000A2AC5). Prop +0x94 is the
  * model id (0x000A6F4F); a room's geometry is model 0x908 + room - 1
  * (sub_00085CC0, 0x00085D6B). Hot path: cheap pointer checks only. */
-#define MAPMAKER_PROBE_ROOM_COUNTS 0x008C7000u
-#define MAPMAKER_PROBE_ROOM_LISTS 0x008C7CC0u
-#define MAPMAKER_PROBE_ROOM_IDS 0x20Du             /* ids 0..0x20C (rooms.json) */
+#define MAPMAKER_PROBE_ROOM_COUNTS 0x008CC000u
+#define MAPMAKER_PROBE_ROOM_LISTS 0x008CD040u
+#define MAPMAKER_PROBE_ROOM_IDS 0x40Du             /* ids 0..0x40C (rooms.json) */
 #define MAPMAKER_PROBE_ROOM_PROPS 64u
 #define MAPMAKER_PROBE_ROOM_WINDOW 5000u
 #define MAPMAKER_PROBE_ROOM_PERIOD 30000u
 #define MAPMAKER_PROBE_ROOM_GAP 2000u
 #define MAPMAKER_PROBE_ROOM_SEEN 1024u
 #define MAPMAKER_PROBE_MODEL_ROOMS 0x908u
-#define MAPMAKER_PROBE_MODEL_ROOMS_END 0xB08u      /* room models 0x908..0xB06 (rooms.json model table) */
+#define MAPMAKER_PROBE_MODEL_ROOMS_END 0xD08u      /* room models 0x908..0xD06 (rooms.json model table) */
 #define MAPMAKER_PROBE_PTR_OK(p,n) ((((uint32_t)(p))>=0x00010000u && ((uint32_t)(p))<0x04000000u-(uint32_t)(n)) || \
                                     (((uint32_t)(p))>=0x80000000u && ((uint32_t)(p))<0x84000000u-(uint32_t)(n)))
 static struct {

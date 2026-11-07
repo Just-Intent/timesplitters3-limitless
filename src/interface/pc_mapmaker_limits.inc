@@ -102,7 +102,7 @@
  * (rooms.json real rooms 1..0x1FF). 511 light or medium pieces stop here; 511
  * of the heaviest-memory tiles stop first on the memory estimate (386 at the
  * default scale 8; scale 11 = TSFP_MAPMAKER_ARENA_MB >= 6 fits them). */
-#define MAPMAKER_LIMIT_PIECES 511u
+#define MAPMAKER_LIMIT_PIECES 1023u
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
 /* Engine objects (2026-11-02): in play each piece (room) and about each item
