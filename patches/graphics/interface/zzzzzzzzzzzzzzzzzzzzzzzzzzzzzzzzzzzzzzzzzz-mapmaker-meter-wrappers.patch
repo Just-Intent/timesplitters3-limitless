@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,3962 @@
+@@ -1911,6 +1911,4002 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1019,13 +1019,23 @@
 +#endif
 +}
 +
-+void sub_000DAC30(void)
++static void sub_000DAC30_layer3(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_create")) pc_mapmaker_khallos_create(sub_000DAC30_layer2);
 +    else sub_000DAC30_layer2();
 +#else
 +    sub_000DAC30_layer2();
++#endif
++}
++
++void sub_000DAC30(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("creatures","pc_mapmaker_creatures_create")) pc_mapmaker_creatures_create(sub_000DAC30_layer3);
++    else sub_000DAC30_layer3();
++#else
++    sub_000DAC30_layer3();
 +#endif
 +}
 +
@@ -2222,13 +2232,23 @@
 +#endif
 +}
 +
-+void sub_001C8540(void)
++static void sub_001C8540_layer4(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("worm","pc_mapmaker_worm_anims")) pc_mapmaker_worm_anims(sub_001C8540_layer3);
 +    else sub_001C8540_layer3();
 +#else
 +    sub_001C8540_layer3();
++#endif
++}
++
++void sub_001C8540(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("creatures","pc_mapmaker_creatures_anims")) pc_mapmaker_creatures_anims(sub_001C8540_layer4);
++    else sub_001C8540_layer4();
++#else
++    sub_001C8540_layer4();
 +#endif
 +}
 +
@@ -2293,13 +2313,23 @@
 +#endif
 +}
 +
-+void sub_0015B830(void)
++static void sub_0015B830_layer6(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_ai_start")) pc_mapmaker_mothership_ai_start(sub_0015B830_layer5);
 +    else sub_0015B830_layer5();
 +#else
 +    sub_0015B830_layer5();
++#endif
++}
++
++void sub_0015B830(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("creatures","pc_mapmaker_creatures_ai_start")) pc_mapmaker_creatures_ai_start(sub_0015B830_layer6);
++    else sub_0015B830_layer6();
++#else
++    sub_0015B830_layer6();
 +#endif
 +}
 +
@@ -3007,13 +3037,23 @@
 +#endif
 +}
 +
-+void sub_0015E7C0(void)
++static void sub_0015E7C0_layer2(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_request")) pc_mapmaker_mothership_request(sub_0015E7C0_layer1);
 +    else sub_0015E7C0_layer1();
 +#else
 +    sub_0015E7C0_layer1();
++#endif
++}
++
++void sub_0015E7C0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("creatures","pc_mapmaker_creatures_request")) pc_mapmaker_creatures_request(sub_0015E7C0_layer2);
++    else sub_0015E7C0_layer2();
++#else
++    sub_0015E7C0_layer2();
 +#endif
 +}
 +
