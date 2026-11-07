@@ -1,3 +1,18 @@
+## MapMaker Disco tileset variant and Abstract tile textures (2026-11-07, not built or played)
+
+Branch `disco-variant` from `c0b951a1`; Windows 11 x64, MSVC x64 fixtures only.
+New: Map Settings "Disco" row (Virtual + info flag bit 31), alias of five
+Virtual tile texture ids to `arcademem/l_56_arm.pak` textures in play and in
+the editor, Disco sky/music defaults; Abstract maps also mount
+`arcademem/l_102m.pak` (their tile textures were never mounted in play).
+Validation: `tests/mapmaker/test_mapmaker_disco.py` (fixed + 40 mutations,
+decoder proof of the free bit, XBE bytes, pak audit against local game data),
+`test_mapmaker_tilesets.py` (fixed + 41 mutations), and the sky, skymusic,
+custommusic, validate, editor, menu-mouse, limits and container suites
+(WinError 4551 flakes rerun). Unverified: game build and run on both hosts,
+the in-game Disco look, the editor stream reload, Abstract textures in play,
+Mac fixtures. Details: `docs/mapmaker/mapmaker-disco-variant.md`.
+
 ## Imported music for MapMaker and Arcade (2026-11-03, not built or played)
 
 MP3 support and launcher import (2026-11-07, branch `music-mp3` from

@@ -37,6 +37,7 @@ void sub_000717D0(void) { g_ecx=10; }
 void sub_00071940(void) { g_ecx=11; }
 void sub_00069640(void) { g_ecx=12; }
 void sub_00045A70(void) { g_ecx=13; }
+void sub_00061D80(void) { g_ecx=14; }  /* disco: editor stream unload */
 #define CALLS 128
 static struct { void (*f)(void); int n; uint32_t a[6]; } calls[CALLS];
 static int call_count;

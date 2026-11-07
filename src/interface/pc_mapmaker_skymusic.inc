@@ -85,6 +85,11 @@
  *    the map start (level, above) gives the map scene 2's fog row 7;
  *    music (WRAP sub_00045DE0)
  *    plays the extra track when the map's index is -1.
+ * Disco variant (pc_mapmaker_disco.inc, included at the end): compile stores
+ * the Disco row (editor +0x204 = 6, base Virtual) as info flag bit 31, load
+ * gives it back to the row, the map start mounts its textures pak and gives a
+ * map whose sky is -1 the record 59 while it runs, music plays 0xBA for a
+ * map whose index is -1 (an extra track or an imported one wins).
  * A stock or older build loads such a map with the fallbacks. Requires the
  * includer's WORD_AT, guest_call, g_eax, g_esp, g_xbox_mem_offset,
  * xbox_HeapAlloc, mapmaker_limits/mapmaker_limits_read, MAPMAKER_PTR_OK and
@@ -185,7 +190,7 @@ static const struct { const char *label, *pak, *mem; uint32_t list; } smx_weathe
     {"Sandstorm","pak/challenge/l_64_ch.pak","pak/challengemem/l_64_chm.pak",SMX_SAND_LIST},
 };
 #define SMX_WEATHER_COUNT ((uint32_t)(sizeof smx_weather/sizeof smx_weather[0]))
-#define SMX_PATHS (2u*(MAPMAKER_SKY_EXTRA_COUNT+SMX_WEATHER_COUNT))   /* level and texture paks */
+#define SMX_PATHS (2u*(MAPMAKER_SKY_EXTRA_COUNT+SMX_WEATHER_COUNT)+1u)   /* level and texture paks, the Disco pak */
 #define SMX_TEXTURES 0x004B85C8u             /* loaded textures: +0 rows (0x34, id +0x1C), +0xC end (sub_00018B90) */
 #define SMX_TEX_STRIDE 0x34u
 #define SMX_TEX_ID 0x1Cu
@@ -194,6 +199,9 @@ static const struct { const char *label, *pak, *mem; uint32_t list; } smx_weathe
 #define SMX_TEX_LOGGED 8u
 
 extern void sub_00071800(void),sub_00062260(void),sub_000622D0(void),sub_000A5E40(void),sub_000631C0(void);
+static void dsc_level_reset(void);          /* pc_mapmaker_disco.inc, included at the end */
+static void dsc_level_start(uint32_t info);
+static void dsc_frame(void);
 
 static struct {
     uint32_t labels;                         /* guest: every row label */
@@ -305,9 +313,13 @@ void pc_mapmaker_skymusic_compile(void (*original)(void))
     if((sky=smx_sky_row(s))!=0) smx_set16(info+SMX_INFO_SKY,(uint32_t)mapmaker_sky_extras[sky-1u].fallback);
     if(w>=(int32_t)SMX_WEATHER_FIRST && w<(int32_t)(SMX_WEATHER_FIRST+SMX_WEATHER_COUNT)) weather=(uint32_t)w-SMX_WEATHER_FIRST+1u;
     if(weather || w<0 || w>(int32_t)SMX_WEATHER_STOCK_LAST) *smx_byte(info+SMX_INFO_WEATHER)=0;
-    flags=WORD_AT(info+SMX_INFO_FLAGS)&~SMX_MASK;
-    if(smx_on())
+    flags=WORD_AT(info+SMX_INFO_FLAGS)&~(SMX_MASK|MAPMAKER_VARIANT_FLAG);
+    if(smx_on()) {
         flags|=sky<<MAPMAKER_SKY_EXTRA_SHIFT|music<<SMX_MUSIC_SHIFT|weather<<SMX_WEATHER_SHIFT;
+        /* The Disco row (pc_mapmaker_disco.inc): only on its base tileset. */
+        if(WORD_AT(ed+MAPMAKER_VARIANT_ED_TILESET)==MAPMAKER_VARIANT_ROW && (WORD_AT(info+0x08u)>>16)==MAPMAKER_VARIANT_BASE)
+            flags|=MAPMAKER_VARIANT_FLAG;
+    }
     WORD_AT(info+SMX_INFO_FLAGS)=flags;
     if(smx_on()) cmu_compile(container,ret);   /* imported track: its own chunk */
 }
@@ -327,6 +339,7 @@ void pc_mapmaker_skymusic_load(void (*original)(void))
     if((k=smx_bits(flags,MAPMAKER_SKY_EXTRA_MASK,MAPMAKER_SKY_EXTRA_SHIFT,MAPMAKER_SKY_EXTRA_COUNT))!=0)
         WORD_AT(ed+SMX_ED_SKY)=(uint32_t)mapmaker_sky_extras[k-1u].sky;
     if((k=smx_bits(flags,SMX_WEATHER_MASK,SMX_WEATHER_SHIFT,SMX_WEATHER_COUNT))!=0) WORD_AT(ed+SMX_ED_WEATHER)=SMX_WEATHER_FIRST+k-1u;
+    if(mapmaker_variant_disco(info)) WORD_AT(ed+MAPMAKER_VARIANT_ED_TILESET)=MAPMAKER_VARIANT_ROW;   /* the Disco row */
     cmu_load(container);
 }
 
@@ -418,6 +431,7 @@ void pc_mapmaker_skymusic_mount(void (*original)(void))
     smx.sky_row=0;smx.sand_ready=0;smx.sand_on=0;smx.level_logs=0;smx.frames=0;
     smx.tex_total=0;smx.tex_loaded=0;smx.grains=0;
     smx.sand_steps=SMX_GRAIN_EVERY-1u;smx.haze_boosts=0;smx.grain_boosts=0;smx.tileset_fog=0;
+    dsc_level_reset();
     if(pending==100u && smx_on()) smx_log("new MapMaker level (scene now, mounted paks)",smx_scene(),WORD_AT(SMX_MOUNTS));
 }
 
@@ -469,7 +483,17 @@ static void smx_level_sky(void (*original)(void))
 }
 void pc_mapmaker_skymusic_level(void (*original)(void))
 {
-    smx_level_sky(original);
+    uint32_t info=smx_play_info();
+    int old;
+    if(info) dsc_level_start(info);           /* Disco map: its textures pak, before the load pass */
+    if(info && mapmaker_variant_disco(info) && (old=smx_get16(info+SMX_INFO_SKY))<0 &&
+       !smx_bits(WORD_AT(info+SMX_INFO_FLAGS),MAPMAKER_SKY_EXTRA_MASK,MAPMAKER_SKY_EXTRA_SHIFT,MAPMAKER_SKY_EXTRA_COUNT)) {
+        /* The variant's default sky while the map's own choice is -1. */
+        smx_set16(info+SMX_INFO_SKY,(uint32_t)MAPMAKER_VARIANT_SKY);
+        smx_level_sky(original);
+        smx_set16(info+SMX_INFO_SKY,(uint32_t)old);
+        smx_log("map start: Disco default sky (record, map's)",(uint32_t)MAPMAKER_VARIANT_SKY,(uint32_t)old);
+    } else smx_level_sky(original);
     smx_sand_fog();
 }
 
@@ -679,6 +703,7 @@ static void smx_sand_probe(void);
 void pc_mapmaker_skymusic_weather_frame(void (*original)(void))
 {
     uint32_t list,index,type,k,alive=0,made=0,rooms[SMX_SAND_EMITTER_COUNT*SMX_SAND_ROOM_SLOTS],ring;
+    dsc_frame();                              /* Disco: the level's rewrites, once */
     if(smx.sand_on!=1 || smx_scene()!=100u || !WORD_AT(SMX_SANDSTORM)) { original();return; }
     for(k=0;k<SMX_SAND_EMITTER_COUNT*SMX_SAND_ROOM_SLOTS;k++) {
         uint32_t a=SMX_SAND_EMITTERS+(k/SMX_SAND_ROOM_SLOTS)*0x44u+(k%SMX_SAND_ROOM_SLOTS)*4u;
@@ -783,6 +808,12 @@ void pc_mapmaker_skymusic_music(void (*original)(void))
        (k=smx_bits(WORD_AT(info+SMX_INFO_FLAGS),SMX_MUSIC_MASK,SMX_MUSIC_SHIFT,SMX_MUSIC_COUNT))!=0) {
         g_eax=smx_music[k-1u].id;
         smx_log("music: extra track (row, id)",k,g_eax);
+    } else if(MAPMAKER_PTR_OK(g_esp,4u) && WORD_AT(g_esp)==SMX_RET_MUSIC_PLAY && g_eax==0xFFFFFFFFu &&
+              (info=smx_play_info())!=0 && mapmaker_variant_disco(info)) {
+        g_eax=MAPMAKER_VARIANT_MUSIC;          /* the Disco variant's default track */
+        smx_log("music: Disco default track (jukebox index, id)",26u,g_eax);
     }
     original();
 }
+
+#include "pc_mapmaker_disco.inc"
