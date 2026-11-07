@@ -39,7 +39,7 @@ static int failures;
 static int near(float a,float b) { return a-b<0.002f && b-a<0.002f; }
 
 /* ---- the guest functions the area calls -------------------------------- */
-void sub_0028A0A0(void);
+void sub_0028A0A0(void),sub_000A1B80(void);
 void sub_0029E0A0(void),sub_0028C560(void),sub_00287E00(void),sub_00287860(void),sub_0015DDA0(void),
     sub_00059DD0(void),sub_000A9070(void),sub_000622D0(void),sub_00062260(void),sub_000A5E40(void),
     sub_000631C0(void),sub_00096220(void);
@@ -54,6 +54,7 @@ void sub_000A5E40(void) { g_ecx=17; }
 void sub_000631C0(void) { g_ecx=18; }
 void sub_00096220(void) { g_ecx=19; }
 void sub_0028A0A0(void) { g_ecx=20; }
+void sub_000A1B80(void) { g_ecx=21; }
 
 static uint32_t heap=HEAP0,mounted[8],removed[16],deleted[16],requested[8],textured[8];
 static unsigned nmounted,nremoved,ndeleted,nrequested,ntextured,nallocs,ninits,mount_calls;
@@ -61,6 +62,8 @@ static int anim_done,alloc_fails,mount_fail;
 static uint32_t next_block=BLOCKS;
 static unsigned launches;
 static int hold_intro;
+static unsigned poses;
+static uint32_t pose_ent,pose_bits;
 static uint32_t launch_state;
 static float launch_cx;
 uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment)
@@ -111,6 +114,11 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         launches++;launch_state=st;launch_cx=FLOAT_AT(0x0049F380u);
         for(k=0;k<6u && m<3u;k++) if(WORD_AT(st+0x4A30u+k*0x44u) && !WORD_AT(st+0x4A54u+k*0x44u)) { WORD_AT(st+0x4A54u+k*0x44u)=1u;m++; }
     }
+    else if(f==sub_000A1B80) {                         /* the pose: the slot bit must be clear for it to compute */
+        CHECK(n==1);
+        poses++;pose_ent=x[0];pose_bits=HALF_AT(x[0]+0x14u);
+        HALF_AT(x[0]+0x14u)|=(uint16_t)(1u<<(WORD_AT(WORD_AT(0x007B0CC0u)+0x214u)&15u));
+    }
     else CHECK(!"unexpected guest call");
     return r;
 }
@@ -136,6 +144,7 @@ void sub_0029E0A0(void)
         uint32_t o=st==BLOCKS?0x00452000u:0x00453000u;
         WORD_AT(a+0x20u)=6u;WORD_AT(st+0x4270u)=o;
         HALF_AT(o+0x94u)=0x24Au;BYTE_AT(o+0x30u)=0;FLOAT_AT(o+0x64u)=FLOAT_AT(0x0049F488u);
+        BYTE_AT(ent+0x30u)=2;WORD_AT(ent+0x38u)=12u;WORD_AT(ent+0x3Cu)=13u;   /* the boss lists rooms 12, 13 */
     }
     g_esp+=4u;                                          /* the lifted tail jump's ret */
 }
@@ -144,6 +153,7 @@ void sub_0028C560(void) { seen_msg_state=WORD_AT(0x0078B1ECu);g_eax=0xFFFFFFFFu;
 static unsigned originals;
 static uint32_t orig_state;
 static void fake_plain(void) { originals++;orig_state=WORD_AT(0x0078B1ECu);g_esp+=4u; }
+static void fake_damage(void) { uint32_t st=WORD_AT(0x0078B1ECu);originals++;orig_state=st;FLOAT_AT(st+0x4274u)-=2.6667f;g_esp+=4u; }
 static float bug_park;
 static void fake_ragbug(void) { originals++;bug_park=FLOAT_AT(0x0049F390u);g_esp+=4u; }
 static uint32_t hud_focus;
@@ -260,6 +270,8 @@ int main(void)
     g_esp=ESP0;
     constants();anims();models(0,1);
     WORD_AT(0x00715F2Cu)=PADTAB;
+    WORD_AT(0x007B0CC0u)=0x00470800u;WORD_AT(0x00470800u+0x214u)=3u;
+    WORD_AT(0x00470000u+0x10u)=0x00471000u;   /* every fake entity's anim controller: posed bones */
     WORD_AT(0x007B0C7Cu)=0x00460000u;WORD_AT(0x00783A50u)=0x00001000u;   /* Story AI ids: R + index + 1 */
     {
         static const uint16_t set[]={0x0C,0x31,0xB0,0x28};
@@ -353,13 +365,16 @@ int main(void)
     /* ---- the fight: its block, its statics, its arena; all back after --- */
     WORD_AT(0x0078B0D0u)=0x456u;
     anim_done=0;
+    HALF_AT(e1+0x14u)=8u;                               /* drawn earlier this view slot: stale bones */
     CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
     CHECK(fights==1 && seen_state==st1 && seen_fx==pit_lv.k[0].parts);
+    CHECK(poses==0u && HALF_AT(e1+0x14u)==8u);         /* .68: no pose call from the fight frame (it broke the camera) */
     CHECK(near(seen_x,4.0f) && near(seen_y,2.0f) && near(seen_z,-6.0f) && near(seen_cx,11.8f-15.8f));
     CHECK(constants_stock() && WORD_AT(0x0078B1ECu)==st1 && WORD_AT(0x0078B0D0u)==0x456u);
     CHECK(FLOAT_AT(st1+0x423Cu)==0.0f);                 /* rack timer held */
     for(i=0;i<13u;i++) {                                 /* pads: the instance's records, through the table */
         uint32_t r=PADTAB+(uint32_t)((int32_t)WORD_AT(st1+0x4BF0u+i*4u)*0x20);
+        CHECK(WORD_AT(st1+0x4BF0u+i*4u)==8000u-13u+i);   /* the pool's tail, below 0x1F40 (sub_0009A420's cover range) */
         CHECK(WORD_AT(r)==0x4B5u+i && WORD_AT(r+4u)==1u);
         CHECK(near(FLOAT_AT(r+0xCu),pit_pad_xyz[i][0]+15.8f) && near(FLOAT_AT(r+0x10u),pit_pad_xyz[i][1]+102.279f));
     }
@@ -423,6 +438,7 @@ int main(void)
     CALL(pc_mapmaker_pitboss_ragbug,fake_ragbug,0x0027DEE3u,WORD_AT(b3),0);
     CHECK(pit_lv.bug[1].owner==0 && pit_lv.bug[2].owner==0 && pit_lv.bug[2].slot==1 && near(bug_park,-12.73f+15.8f));
     WORD_AT(WORD_AT(b2)+0x28u)=0xFFu;
+    WORD_AT(st1+0x4BCCu)=0x00454000u;HALF_AT(0x00454000u+0x94u)=0x249u;   /* its collision hull */
     hold_intro=1;                                       /* still in its intro (state 1): the flock waits */
     CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
     CHECK(launches==0u && !pit_lv.k[0].released);
@@ -432,6 +448,36 @@ int main(void)
     /* the fight proper: the flock released together, with pit 1's block and arena; once */
     CHECK(launches==2u && launch_state==st1 && near(launch_cx,11.8f-15.8f) && constants_stock());
     CHECK(WORD_AT(st1+0x4A54u)==1u && WORD_AT(st1+0x4A98u)==1u && WORD_AT(st1+0x4270u)==0x00452000u && pit_lv.k[0].released);
+    CHECK(BYTE_AT(0x00452000u+0x30u)==2u && WORD_AT(0x00452000u+0x38u)==12u && WORD_AT(0x00452000u+0x3Cu)==13u && WORD_AT(0x00452000u+0x34u)==12u);
+    /* the bottle at the mouth: 11 over the feet, 2.5 ahead (yaw 0: +z), whatever the fight wrote; the hull has its callback */
+    CHECK(near(FLOAT_AT(0x00452000u+0x64u),4.0f) && near(FLOAT_AT(0x00452000u+0x68u),13.0f) && near(FLOAT_AT(0x00452000u+0x6Cu),-3.5f));
+    CHECK(WORD_AT(0x00454000u+0x19Cu)==0x0028C2F0u);
+    {   /* a NaN bone point and a turned boss: still a finite mouth, no NaN left */
+        uint32_t o=0x00452000u;
+        memset((void *)((uintptr_t)(o+0x64u)+g_xbox_mem_offset),0xFF,12u);FLOAT_AT(o+0xC0u)=FLOAT_AT(o+0x64u);
+        FLOAT_AT(e1+0x70u)=1.5707963f;
+        CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
+        CHECK(near(FLOAT_AT(o+0x64u),6.5f) && near(FLOAT_AT(o+0x68u),13.0f) && near(FLOAT_AT(o+0x6Cu),-6.0f) && FLOAT_AT(o+0xC0u)==0.0f);
+        CHECK(near(FLOAT_AT(o+0x70u),1.5707963f));
+        FLOAT_AT(e1+0x70u)=0.0f;
+    }
+    /* a hit on it: logged with the health before and after */
+    {
+        static void (*const dmg)(void)=fake_damage;
+        WORD_AT(0x00446000u)=0x00452000u;WORD_AT(0x00446000u+0x14u)=0x21u;FLOAT_AT(0x00446000u+0x20u)=1.0f;
+        FLOAT_AT(st1+0x4274u)=8.0f;
+        CALL(pc_mapmaker_pitboss_bottle_damage,dmg,0x000BB63Au,0x00446000u,0);
+        CHECK(FLOAT_AT(st1+0x4274u)==8.0f-2.6667f && orig_state==st1);
+        WORD_AT(0x00446000u)=0x00454000u;                /* a hit on the hull: a quarter */
+        CALL(pc_mapmaker_pitboss_bottle_damage,dmg,0x000BB63Au,0x00446000u,0);
+        CHECK(near(FLOAT_AT(st1+0x4274u),8.0f-2.6667f-2.6667f*0.25f) && orig_state==st1);
+    }
+    {   /* a map whose own pads reach the pool's tail: the rim pads are not written over them */
+        WORD_AT(0x007B6664u)=7990u;WORD_AT(st1+0x4BF0u)=0xFFFFFFFFu;
+        CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
+        CHECK(WORD_AT(st1+0x4BF0u)==0xFFFFFFFFu);
+        WORD_AT(0x007B6664u)=0;
+    }
     WORD_AT(st1+0x4A30u)=0;                             /* the death removed it */
     CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
     CHECK(WORD_AT(st1+0x4A30u)==0 && WORD_AT(st1+0x4A74u)==WORD_AT(b3) && launches==2u);

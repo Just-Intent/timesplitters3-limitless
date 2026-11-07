@@ -151,6 +151,9 @@ WRAP sub_001C8540 -> pc_mapmaker_creatures_anims     (layer with realbosses/robo
 WRAP sub_0015E7C0 -> pc_mapmaker_creatures_request   (layer with khallos/tank request, any order)
 WRAP sub_000DAC30 -> pc_mapmaker_creatures_create    (layer with realbosses/khallos create, any order)
 WRAP sub_0015B830 -> pc_mapmaker_creatures_ai_start  (layer with realbosses/robot/crowe/khallos/... ai_start; its id set is disjoint from theirs)
+WRAP sub_002B8F90 -> pc_mapmaker_creatures_robot_weapon (after .66, log only; built-in weapon update, every AI every frame)
+WRAP sub_001BB5C0 -> pc_mapmaker_creatures_robot_fire   (after .66, log only; an AI fires its weapon)
+WRAP sub_00088C60 -> pc_mapmaker_creatures_robot_muzzle (after .66, log only; collision ray, hot: return-address test 0x001BC420 first)
 ```
 
 Area name `creatures`. Prototypes are in `pc_display_menu.h`, off-build stubs
@@ -227,3 +230,59 @@ scene-100 branches. No per-level state, no level hook: several per map.
 SD/7 does (`sub_0027E4E0`) and how SK/8/SD/7 use a weapon given in the editor
 (the robot handler fires the held weapon, slot +0x204); MapMaker logic triggers
 on their deaths.
+
+## The .66 playtest: fire pose out of range, misses up close (log only so far)
+
+User (build .66, both robots "gets its story AI, class 0x0:0x10000004, 21 of
+21 anims"): "Prometheus rocket shooting animation begins when they are well
+out of range and not actually firing rockets. When close, they fire normally
+but can easily miss you if standing in place."
+
+**How a rocket is (not) launched (CONFIRMED, `test_robot_fire_pose_choice`,
+`test_robot_fire_gates`).**
+- The robot handler `sub_00283730` only chooses poses. In state 1 it takes a
+  fire pose (SK/8, type 2: `bigbotrocketadvfire` 0x9A7 or `bigbotrocket` 0x9A5)
+  when the squared target distance AI +0xAF4 is below 100 (10 units,
+  0x004785C8), or one time in three below 289 (17 units, 0x0049F33C). It
+  checks neither sight, ammo nor the muzzle.
+- The rocket itself comes from the built-in weapon update `sub_002B8F90` (every
+  AI each frame, from `sub_001B8C40`): only for +0x94 0x42/0x43 or +0x2BC, while
+  the current anim is a fire pose (slot word 0x100000), with the ammo state of
+  `sub_001B9340`, sight `sub_0015E120(ai, 0)` (the shared visibility table) and
+  the pose's fire event 0x200 (`sub_00061570`); then `sub_001BB5C0` fires. Its
+  projectile path first casts a 4-unit ray from the muzzle along the aim
+  (`sub_00088C60`, return 0x001BC420; flags 0x2000058): any hit and no rocket
+  leaves (0x001BC425).
+- The SK/8's aim point is the target's feet - 0.2 when the target is more
+  than 5 units away and not above the robot (0x000D87A0..0x000D87E6: rockets
+  are aimed at the floor for their blast); closer it uses the ordinary aim.
+- The SD/7 has no built-in weapon (+0x94 0, `sub_002B8F90` returns at
+  0x002B9153): it fires only a weapon given in the editor.
+
+So the pose and the launch are decided by different code: a pose taken
+without sight or with a blocked muzzle plays without a rocket. Which gate
+stops the rockets in MapMaker maps is **not known yet**; candidates, all
+INFERRED: the 4-unit muzzle ray hitting MapMaker geometry (tile walls, floor
+lips, the robot's own surroundings) when aimed down at the floor point, the
+visibility table (MapMaker rooms and portals), or the fire event. The misses
+up close are likewise unexplained (aim at the body with the stock aim error,
+or rockets aimed at the floor exploding out of reach).
+
+**Change (log only).** Three hooks log, once per robot and outcome per level
+(at most two of each, eight per robot), every fire pose of a class-4 robot row
+when it ends:
+
+```
+[mapmaker] creatures: Prometheus SK/8 #1: fire pose ended without a rocket (squared distance 250.0 at its start,
+  5 frames, 5 without sight, 0 fire calls, 0 muzzle hits, built-in weapon 0x43)
+[mapmaker] creatures: Prometheus SK/8 #1: fire pose launched a rocket (squared distance 30.0 ...)
+```
+
+"without sight" counts frames where the weapon code's own sight test failed,
+"fire calls" calls of `sub_001BB5C0`, "muzzle hits" muzzle-ray hits (a pose is
+"launched" when it had more fire calls than muzzle hits). Nothing in the game
+changes. The next playtest's log decides the fix: gate the fire pose on the
+failing test (sight, muzzle) in the robot handler, and the aim point if the
+floor shots miss.
+
+Integrator note (2026-11-07): `WRAP sub_001BB5C0 -> pc_mapmaker_creatures_robot_fire` is not generated. Upstream already defines `sub_001BB5C0` (network bot shot / kill feed) and the generated story-chain rename for it does not apply in the staged patch run, so the fire-call count stays 0 in game; the muzzle-hit and sight counts still log.

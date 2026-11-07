@@ -5,7 +5,7 @@ Each area's full wrapper list and history is in its `docs/mapmaker/mapmaker-<are
 
 More boss areas (2026-11-01): `khallos` (id 0x33 chair prop 0x376; .28 WRAP sub_00045670),
 `worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`
-(159/160 Prometheus SK/8 0x62, SD/7 0x36: creatures.def rows, class 4 after .58); wrapper
+(159/160 Prometheus SK/8 0x62, SD/7 0x36: creatures.def rows, class 4 after .58, fire log after .66); wrapper
 lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
 sky/sand/music, +mem paks, MM sand grains, .32 grain/haze alpha + fog row 7; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
 for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll
@@ -184,3 +184,11 @@ skips char 0x31. 11 NEW WRAPs + 11 chains: mapmaker-pitboss.md.
 After .62 (no bottle, ragbugs one at a time): bossroom/bigdraw also draw the
 pit satellites (0x24A/0x246/0x24B/0x6CB) high over their tile; the flock is
 launched together at state 6 (`sub_0028A0A0` x2); prop/flock log lines.
+After .66 (bottle at the feet, shots did nothing): the boss's pose is computed
+before each fight frame (`sub_000A1B80`, view bit cleared: bones were stale
+off screen) and roomless props take the boss's rooms; hit, trace and ragbug
+phase lines (mapmaker-pitboss.md).
+After .68 (camera broken): that pose call is gone (it posed the view slot 0
+camera); the bottle is held 11 up, 2.5 ahead of the boss; the hull hits
+count a quarter; the rim pads live in the pad pool's tail (dives need index
+< 0x1F40, sub_0009A420).

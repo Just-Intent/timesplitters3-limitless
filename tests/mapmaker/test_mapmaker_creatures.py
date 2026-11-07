@@ -50,6 +50,12 @@ MUTATIONS = {
     'start-no-hi': ('WORD_AT(rec)=crt_kinds[k].lo;WORD_AT(rec+4u)=crt_kinds[k].hi;', 'WORD_AT(rec)=crt_kinds[k].lo;'),
     'start-after-original': ('            fflush(stderr);\n        }\n    }\n    original();\n}', '            fflush(stderr);\n        }\n    }\n}'),
     'start-any-char': ('(k=crt_kind_of(CRT_H(a+CRT_ACTOR_CHAR)))>=CRT_KINDS', '(k=0)>=CRT_KINDS'),
+    'rb-any-row': ("(crt_kinds[k].lo&0x1FFFu)==0u ||   /* the class-4 robot rows */", "0 ||"),
+    'rb-muzzle-any-call': ('WORD_AT(g_esp)!=CRT_RET_MUZZLE) { original();return; }', '0) { original();return; }'),
+    'rb-launch-ignores-hits': ('    int launched=crt_rb.r[i].calls>crt_rb.r[i].hits;', '    int launched=crt_rb.r[i].calls>0u;'),
+    'rb-no-sight-test': ('        if(!guest_call(sub_0015E120,2,ai,0u)) crt_rb.r[i].blind++;', '        crt_rb.r[i].blind++;'),
+    'rb-sight-mode-1': ('guest_call(sub_0015E120,2,ai,0u)', 'guest_call(sub_0015E120,2,ai,1u)'),
+    'rb-no-level-reset': ('    memset(&crt_rb,0,sizeof crt_rb);                   /* robot fire log: per level */\n', ''),
 }
 DEF_MUTATIONS = {
     'ghost-class': ('"Catacomb Ghost",0x50000000u,0x00000000u', '"Catacomb Ghost",0x40000000u,0x00000000u'),
@@ -114,6 +120,11 @@ def test_mapmaker_creatures(tmp_path, mutation):
         assert "Mutant (Story): made with the look's models (character, object) (0x59, 0x777000)" in err
         assert "Catacomb Ghost: made with the look's models (character, object) (0x17, 0x777000)" in err
         assert "Mutant (Story): requested the look's models (0x613, 0x614)" in err
+        assert ('Prometheus SK/8 #1: fire pose ended without a rocket (squared distance 250.0 at its start, 5 frames, '
+                '5 without sight, 0 fire calls, 0 muzzle hits, built-in weapon 0x43)') in err
+        assert ('Prometheus SK/8 #1: fire pose ended without a rocket (squared distance 64.0 at its start, 1 frames, '
+                '0 without sight, 1 fire calls, 1 muzzle hits, built-in weapon 0x43)') in err
+        assert 'Prometheus SK/8 #1: fire pose launched a rocket (squared distance 30.0' in err
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 
@@ -153,7 +164,7 @@ def test_rows_and_wiring():
     guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
     header = (ROOT / 'src/interface/pc_display_menu.h').read_text(encoding='utf-8')
     assert '#include "pc_mapmaker_creatures.inc"' in guest
-    for hook in ('anims', 'request', 'create', 'ai_start'):
+    for hook in ('anims', 'request', 'create', 'ai_start', 'robot_weapon', 'robot_muzzle'):  # robot_fire: not wrapped (upstream defines sub_001BB5C0)
         assert f'void pc_mapmaker_creatures_{hook}(void (*original)(void));' in header
         assert f'void pc_mapmaker_creatures_{hook}(void (*original)(void)) {{ original(); }}' in guest
     assert not (ROOT / 'config/guest-code-patches/creatures.json').exists()
@@ -516,3 +527,43 @@ def test_story_robots_spawn_class_4():
         assert len(recs) == len(tags), pak
         for r in recs.values():
             assert all((lo, hi) == (0x10000004, 0) and member(setno, slot) == rid for lo, hi, slot in r), (pak, r)
+
+
+# ---- the Prometheus fire path (the .66 playtest: fire pose out of range, no rocket; close shots miss) ----
+
+def test_robot_fire_pose_choice():
+    """sub_00283730 picks the poses from the type row 0x00520838 + type*0x20 (type 0 = 0x34, 2 = 0x62, else 1;
+    0x002837C8..0x002837D5); state 1 takes a fire pose when the squared distance +0xAF4 is below 100
+    (0x004785C8 at 0x00283D40) or, one time in three, below 289 (0x0049F33C at 0x002839E4). +0xAF4 is squared
+    (sub_0015EAE0 0x0015EC98). The rocket robot's row: 0x9A7 advance-fire, 0x9A5 fire still; both slot words have
+    0x100000 (a fire pose), its advance 0x9A6 not."""
+    rd = xbe()
+    a = by_address()
+    f = lambda va: struct.unpack('<f', rd(va, 4))[0]
+    assert f(0x004785C8) == 100.0 and f(0x0049F33C) == 289.0
+    assert a[0x00283D40].ops[1][4] == 0x004785C8 and a[0x002839E4].ops[1][4] == 0x0049F33C
+    assert 0x34 in imms(a[0x002837C8]) and 0x62 in imms(a[0x002837CE])
+    row = struct.unpack('<8I', rd(0x00520838 + 2 * 0x20, 32))
+    assert row[2] == row[3] == 0x9A7 and row[7] == 0x9A5
+    for k, flag in ((8, True), (9, False), (10, True)):              # bigbotrocket, ...adv, ...advfire
+        assert bool(struct.unpack_from('<I', rd(0x0048F240 + k * 0x18, 0x18), 0xC)[0] & 0x100000) == flag
+
+
+def test_robot_fire_gates():
+    """The built-in weapon fires in sub_002B8F90 (every AI each frame from sub_001B8C40, 0x001B8C5A): only +0x2BC
+    or +0x94 0x42/0x43 (0x002B9145..0x002B9153), the current anim's 0x100000 (0x002B8FCC), sight sub_0015E120(.., 0)
+    (0x002B8FA0), the fire event 0x200 (sub_00061570 at 0x002B97F7) and then sub_001BB5C0 (0x002B984B), whose
+    projectile path casts a 4-unit muzzle ray sub_00088C60 (0x001BC41B, 4.0 at 0x00475DB4) and leaves on a hit
+    (0x001BC425). The 0x62 aim point is the target's feet - 0.2 beyond 5 units (0x000D87A0..0x000D87E6)."""
+    rd = xbe()
+    a = by_address()
+    assert target(a[0x001B8C5A]) == 0x002B8F90
+    assert 0x42 in imms(a[0x002B914B]) and 0x43 in imms(a[0x002B9150]) and 0x100000 in imms(a[0x002B8FCC])
+    assert target(a[0x002B8FA0]) == 0x0015E120 and 0x200 in imms(a[0x002B97F1]) and target(a[0x002B97F7]) == 0x00061570
+    assert target(a[0x002B984B]) == 0x001BB5C0 and target(a[0x001BC41B]) == 0x00088C60
+    assert struct.unpack('<f', rd(0x00475DB4, 4))[0] == 4.0 and a[0x001BC3BB].ops[1][4] == 0x00475DB4
+    assert a[0x001BC425].text.endswith('0x1bc00d')
+    assert 0x62 in imms(a[0x000D87A0]) and struct.unpack('<f', rd(0x0047D208, 4))[0] == 25.0
+    src = INC.read_text(encoding='utf-8')
+    assert '#define CRT_RET_MUZZLE 0x001BC420u' in src and '#define CRT_FIRE_POSE 0x100000u' in src
+
