@@ -257,6 +257,19 @@ MUTATIONS = {
     'restart-forgets-request': ('    tnk_lv.requested=requested;\n', ''),
     'restart-statics-left': ('    if(tnk_lv.act) tnk_load(tnk_lv.rest,tnk_lv.rest_sounds);\n', ''),
     'restart-when-off': ('    if(tnk_on()) tnk_restart_reset();', '    tnk_restart_reset();'),
+    # .55: TNT on the stunned tank (the castle's sub_00256040 call for our tanks)
+    'mine-never': ('    guest_call(sub_00256040,2,obj,x);\n', ''),
+    'mine-args-swapped': ('guest_call(sub_00256040,2,obj,x);', 'guest_call(sub_00256040,2,x,obj);'),
+    'mine-unswapped': ('    p=tnk_enter(k);\n    st=WORD_AT(TNK_STATE);part=', '    p=k;\n    st=WORD_AT(TNK_STATE);part='),
+    'mine-not-left': ('    tnk_leave(k,p);\n    original();\n}', '    original();\n}'),
+    'mine-no-original': ('    tnk_leave(k,p);\n    original();\n}', '    tnk_leave(k,p);\n    g_esp+=4u;\n}'),
+    'mine-other-swallowed': ('|| !tnk_play()) { original();return; }', '|| !tnk_play()) { g_esp+=4u;return; }'),
+    'mine-any-mode': ('(obj=WORD_AT(x+TNK_MINE_ON))) || !tnk_play()) {', '(obj=WORD_AT(x+TNK_MINE_ON)))) {'),
+    'mine-wrong-field': ('#define TNK_MINE_ON 0x158u', '#define TNK_MINE_ON 0x15Cu'),
+    'mine-any-object': ('    if(!tnk_lv.n || !MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(x=WORD_AT(g_esp+4u),TNK_MINE_PART+4u) ||\n       !(k=tnk_find(obj=',
+                        '    if(!tnk_lv.n || !MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(x=WORD_AT(g_esp+4u),TNK_MINE_PART+4u) ||\n       !(k=1u+0*tnk_find(obj='),
+    'mine-hurt-uncounted': ('    if(h1<h0) {\n        if(!TK.tnt_hurt++)', '    if(h1>h0) {\n        if(!TK.tnt_hurt++)'),
+    'mine-refusal-uncounted': ('    } else if(!TK.tnt_not++) {', '    } else if(0) {'),
 }
 
 
@@ -527,6 +540,47 @@ def test_per_tank_statics_and_entries():
     # the castle's own ways in: its 'KNAT' object, its level scripts
     assert calls_to(0x00256040) == {0x001E4059} and ('imm', 0x54414E4B) in a[0x001E4044].ops
     assert calls_to(0x002533E0) == {0x001E782A}
+
+
+def test_tnt_on_the_stunned_tank():
+    """.55: TNT damages the castle tank only through the castle level's own
+    call. A sticky explosive going off (sub_000F0430, every caller) explodes
+    first, then in story mode calls sub_00228B50, which runs sub_001E4030 only
+    in scene 4; that calls sub_00256040(tank, explosive) for its 'KNAT' object.
+    sub_00256040 hurts only a stunned tank (state 9) with the explosive stuck
+    on parts 15..17. The explosion itself (type 4 for TNT 0x13) is no damage
+    type the tank's damage callback takes (8, 0xC)."""
+    rd = xbe_reader()
+    a = by_address()
+    # sub_000F0430: TNT (projectile type 0x13) explodes with type 4
+    assert ('imm', 0x13) in a[0x000F0432].ops and ('imm', 4) in a[0x000F043D].ops
+    assert target(a[0x000F0471]) == 0x000EFBD0 and a[0x000F0470].ops == (('reg', 'edi'),)
+    # then, story mode only, sub_00228B50(explosive) before the explosive is freed
+    assert mem(a[0x000F048C])[0][4] == 0x007DE455 and ('imm', 10) in a[0x000F0494].ops
+    assert a[0x000F0499].ops == (('reg', 'esi'),) and target(a[0x000F049A]) == 0x00228B50
+    assert target(a[0x000F04A3]) == 0x000DC550
+    assert calls_to(0x00228B50) == {0x000F049A}
+    assert calls_to(0x000F0430) == {0x000F08AE, 0x000F398D, 0x000F3AD0, 0x000F48F5}
+    # sub_00228B50: scene 4 (the castle) only, a tail jump
+    assert mem(a[0x00228B50])[0][4] == 0x0079094C and ('imm', 4) in a[0x00228B50].ops
+    assert a[0x00228B59].mnemonic == 'jmp' and target(a[0x00228B59]) == 0x001E4030 and a[0x00228B5E].mnemonic == 'ret'
+    # sub_001E4030: explosive +0x158 == the 'KNAT' object -> sub_00256040(that object, explosive)
+    assert mem(a[0x001E4035])[0][4] == 0x158 and ('imm', 0x54414E4B) in a[0x001E4044].ops
+    assert [a[x].ops for x in (0x001E4057, 0x001E4058)] == [(('reg', 'esi'),), (('reg', 'edi'),)]
+    assert target(a[0x001E4059]) == 0x00256040 and calls_to(0x00256040) == {0x001E4059}
+    # sub_00256040: state 9, part +0x15C in 15..17, health -= 10.1 (8.1 on difficulty 2), death at 0
+    assert mem(a[0x00256040])[0][4] == 0x0078B594 and ('imm', 9) in a[0x00256040].ops
+    assert mem(a[0x0025604D])[0][4] == 0x15C and ('imm', 0xF) in a[0x00256053].ops and ('imm', 0x11) in a[0x00256058].ops
+    assert a[0x00256056].mnemonic == 'jl' and a[0x0025605B].mnemonic == 'jg'
+    assert mem(a[0x0025605D])[0][4] == 0x007DE457 and mem(a[0x0025606C])[0][4] == 0x1CC
+    assert mem(a[0x0025607B])[0][4] == 0x0049F13C and mem(a[0x00256085])[0][4] == 0x0049F138
+    assert f32(rd, 0x0049F138) == pytest.approx(10.1) and f32(rd, 0x0049F13C) == pytest.approx(8.1)
+    assert target(a[0x002560A3]) == 0x00255E70 and a[0x002560AB].mnemonic == 'jmp' and target(a[0x002560AB]) == 0x00251BA0
+    # the stuck object and part: sub_000F39A0 stores them; no part on an object without 0x200000
+    assert mem(a[0x000F3D6D])[0][4] == 0x158 and 'ebp' in a[0x000F3D6D].text and mem(a[0x000F3D89])[0][4] == 0x15C
+    assert ('imm', 0x200000) in a[0x000F3E0E].ops and ('imm', 0xFFFFFFFF) in a[0x000F3E17].ops
+    # the damage callback takes only types 8 and 0xC (record +0x14)
+    assert mem(a[0x00255FDD])[0][4] == 0x14 and ('imm', 8) in a[0x00255FE0].ops and ('imm', 0xC) in a[0x00255FE5].ops
 
 
 def test_story_ai_spawn_gate():

@@ -48,6 +48,11 @@ void sub_000A6F90(void) { g_ecx=3; }
 void sub_0015DDA0(void) { g_ecx=4; }
 void sub_000A5E40(void) { g_ecx=6; }
 void sub_000631C0(void) { g_ecx=7; }
+void sub_00256040(void) { g_ecx=8; }
+/* sub_00256040(tank, explosive), as stock: only in state 9 with the explosive
+ * on parts 15..17, health -= 10.1, the death (state 10) at 0 */
+static unsigned nmine;
+static uint32_t mine_args[2], mine_state, mine_guns;
 /* model requests: rows 3/4/5 (tank/turret/wreck) have path PATH(row) and,
  * once requested, a request REQ(row) whose +0x10 holds the file when read */
 #define PATH(r) (0x00530000u+(uint32_t)(r)*0x40u)
@@ -98,6 +103,14 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         return spawn_obj;
     }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
+    if(f==sub_00256040) {
+        int32_t part=(int32_t)WORD_AT(x[1]+0x15Cu);
+        nmine++;mine_args[0]=x[0];mine_args[1]=x[1];mine_state=WORD_AT(0x0078B594u);mine_guns=WORD_AT(0x0078B560u);
+        if(WORD_AT(0x0078B594u)!=9u || part<15 || part>17) return 0;
+        FLOAT_AT(x[0]+0x1CCu)-=10.1f;
+        if(!(FLOAT_AT(x[0]+0x1CCu)>0.0f)) WORD_AT(0x0078B594u)=10u;
+        return 0;
+    }
     if(f==sub_000A5E40) {   /* queued; the load pass reads it before any AI starts */
         int16_t r=(int16_t)HALF_AT(0x008CA000u+x[0]*2u);
         if(nrequest<8u) requested[nrequest]=x[0];
@@ -1001,6 +1014,65 @@ int main(void)
         CALL(pc_mapmaker_tank_restart,fake,0x0003D4E6u,0,0,0,1);        /* off: the original only */
         CHECK(tnk_lv.n==2u);
         set_env("TSFP_MAPMAKER_LIMITS","1");
+    }
+
+    /* ---- .55: TNT on a stunned tank (sub_00228B50 from sub_000F0430 0x000F049A:
+     * stock calls the castle's sub_00256040 only in scene 4, for 'KNAT') ---- */
+    {
+        static uint32_t live[TNK_BLOCK_WORDS];
+        uint32_t t1=0x00450000u,t2=0x00451000u,xp=0x00571000u;
+        unsigned m=nmine;
+        if(tnk_lv.act) tnk_leave(tnk_lv.act,0);
+        CHECK(tnk_lv.n==2u && tnk_lv.t[0].obj==t1 && tnk_lv.t[1].obj==t2);
+        play_scene();
+        memcpy(live,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof live);
+        tnk_lv.t[0].block[13]=3u;tnk_lv.t[1].block[13]=9u;             /* tank 2 stunned by its weak point */
+        FLOAT_AT(t1+0x1CCu)=30.0f;FLOAT_AT(t2+0x1CCu)=30.0f;
+        WORD_AT(xp+0x158u)=t2;WORD_AT(xp+0x15Cu)=16u;                  /* TNT stuck on its part 16 */
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        CHECK(nmine==m+1u && mine_args[0]==t2 && mine_args[1]==xp);    /* the castle's call, with tank 2's statics */
+        CHECK(mine_state==9u && mine_guns==tnk_lv.t[1].block[0]);
+        CHECK(NEAR(FLOAT_AT(t2+0x1CCu),19.9f) && FLOAT_AT(t1+0x1CCu)==30.0f && tnk_lv.t[1].tnt_hurt==1u && !tnk_lv.t[1].tnt_not);
+        CHECK(!tnk_lv.act && !memcmp(live,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof live));
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);          /* a second charge */
+        CHECK(nmine==m+2u && NEAR(FLOAT_AT(t2+0x1CCu),9.8f) && tnk_lv.t[1].tnt_hurt==2u);
+        /* not stunned, or not on parts 15..17: stock refuses, logged once */
+        WORD_AT(xp+0x158u)=t1;
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        CHECK(nmine==m+3u && mine_args[0]==t1 && mine_state==3u && FLOAT_AT(t1+0x1CCu)==30.0f && tnk_lv.t[0].tnt_not==1u && !tnk_lv.t[0].tnt_hurt);
+        WORD_AT(xp+0x158u)=t2;WORD_AT(xp+0x15Cu)=0xFFFFFFFFu;
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        CHECK(nmine==m+4u && NEAR(FLOAT_AT(t2+0x1CCu),9.8f) && tnk_lv.t[1].tnt_not==1u);
+        /* the killing charge: its death state is kept by tank 2 */
+        WORD_AT(xp+0x15Cu)=17u;
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        CHECK(nmine==m+5u && tnk_lv.t[1].block[13]==10u && tnk_lv.t[0].block[13]==3u && !tnk_lv.act);
+        CHECK(!memcmp(live,(void *)((uintptr_t)0x0078B560u+g_xbox_mem_offset),sizeof live));
+        /* inside tank 1's frame (a charge going off during its update) */
+        tnk_lv.t[1].block[13]=9u;FLOAT_AT(t2+0x1CCu)=30.0f;
+        tnk_enter(1u);
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        CHECK(nmine==m+6u && mine_state==9u && NEAR(FLOAT_AT(t2+0x1CCu),19.9f) && tnk_lv.act==1u && WORD_AT(0x0078B594u)==3u);
+        tnk_leave(1u,0);
+        /* not ours: stock only */
+        WORD_AT(xp+0x158u)=ENT(3);
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        WORD_AT(xp+0x158u)=0;
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,0,0,0,1);
+        CHECK(nmine==m+6u);
+        WORD_AT(xp+0x158u)=t2;
+        WORD_AT(0x0079094Cu)=4u;                                       /* the castle: its own sub_001E4030 */
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        play_scene();BYTE_AT(0x007DE455u)=5u;                          /* not story mode */
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        play_scene();
+        set_env("TSFP_MAPMAKER_LIMITS",NULL);
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);
+        set_env("TSFP_MAPMAKER_LIMITS","1");
+        CHECK(nmine==m+6u && NEAR(FLOAT_AT(t2+0x1CCu),19.9f));
+        CALL(pc_mapmaker_tank_mine,fake,0x000F049Fu,xp,0,0,1);          /* and back on */
+        CHECK(nmine==m+7u);
     }
 
     if(failures) { fprintf(stderr,"%d failure(s)\n",failures);return 1; }
