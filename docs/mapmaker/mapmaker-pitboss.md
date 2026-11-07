@@ -5,7 +5,7 @@ Status 2026-11-07 (story assets wave 3, items 7 and 8 of the
 `src/interface/pc_mapmaker_pitboss.inc` (area `pitboss`) plus two rows in
 `src/interface/pc_mapmaker_creatures.def`, fixture-tested
 (`tests/mapmaker/mapmaker_pitboss.c` + `tests/mapmaker/test_mapmaker_pitboss.py`:
-41 mutations, decode, US XBE data and story pak checks). **Not wired, not
+40 mutations, decode, US XBE data and story pak checks). **Not wired, not
 built, not played**: the wrappers are the integrator's (list below). Switch:
 `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_CREATURES=0` keeps both rows on the
 MapMaker bot AI. No guest-code table, no fork chunk, no save change.
