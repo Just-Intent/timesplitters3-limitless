@@ -56,7 +56,11 @@ Existing wrappers reused: `sub_00078590` (rows), `sub_003006C0` (compile),
   only when its count changes. Before this one 48-line budget was spent by
   list builds (m45b.err: 48 offer lines, then nothing), hiding every play
   line. Each silent play return logs `[music] play: <why> (ret, scene, eax,
-  map chunk, map music, arcade)`; a failed start logs `pc_music_error()`. Watch: scene word, slider `[0x005236BC]/16 x 0.65`, pause `[0x0064BDC0]`.
+  map chunk, map music, arcade)`; a failed start logs `pc_music_error()`. Watch: scene word, slider `[0x005236BC]/16 x 0.65`, pause `[0x006D5EB8]` (set by sub_00045AB0, cleared by sub_00045AF0). Not the
+  player's +0x28 `[0x0064BDC0]`: a state (0 idle, 1 pause-before-start, 2
+  playing, 3 stopped), 3 after the menu music, which held every track silent
+  through .46 (m46.err: `map: imported track`, never `slot=273`). The player
+  logs its first submission, `held ... paused` and `stopped: <why>`.
 - Lead 250 ms in 4096-frame chunks; a refused submission is offered again.
 
 ## Tests

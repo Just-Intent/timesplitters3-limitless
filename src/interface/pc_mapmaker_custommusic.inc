@@ -13,8 +13,13 @@
  *    (return 0x00045F4B; eax = jukebox[[0x007613D0]]).
  *  - sub_000289C0(channel) plays a channel: [0x004B9134] = channel; the end of
  *    a match plays a jingle channel (1 or 2) this way.
- *  - Player object 0x0064BD98: +0x28 pause state (sub_00029EA0 sets 1,
- *    sub_00029EE0 clears). Music slider [0x005236BC] 0..16 (default 11):
+ *  - Music pause: sub_00045AB0 (pause) stores [0x006D5EB8] = 1 and
+ *    sub_00045AF0 (resume) 0, unconditionally, before tail-jumping to the
+ *    player's pause/resume (sub_00028A40/A50 -> 0x0064BD98 sub_00029EA0/
+ *    EE0); sub_00045A50 reads it back. The player's own +0x28 is a state
+ *    (0 idle, 1 pause before start, 2 playing, 3 stopped by sub_00029B40), not
+ *    a pause flag: it is 3 after the menu music stops, which held every
+ *    imported track silent before 2026-11-07. Music slider [0x005236BC] 0..16 (default 11):
  *    sub_00045B60 = slider/16 x 100 x track level (0x00535858: 60..70) / 100.
  *  - Arcade setup menu sub_002C78F0: item 0xE (text 0x1831) gets the 58
  *    jukebox rows with sub_000717D0(text) (values = row numbers 0..57) in a
@@ -77,7 +82,7 @@
 #define CMU_MODE 0x007DE455u                /* ... and this byte is not 10 */
 #define CMU_SLIDER 0x005236BCu              /* music volume 0..16 */
 #define CMU_SLIDER_MAX 16u
-#define CMU_PAUSE 0x0064BDC0u               /* player 0x0064BD98 +0x28 */
+#define CMU_PAUSE 0x006D5EB8u               /* 1 between sub_00045AB0 (pause music) and sub_00045AF0 */
 #define CMU_LABEL_BYTES 56u
 #define CMU_PREFIX "Imported: "
 #define CMU_LOG_KINDS 32u

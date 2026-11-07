@@ -368,6 +368,8 @@ typedef struct PcMusicPlayer {
     uint64_t submitted_frames, base_ms;
     int32_t volume;
     int paused, pending_frames;
+    int told_first, told_paused;       /* one diagnostic line each per track */
+    const char *why;                   /* why the step ended the track */
     unsigned out_channels;
     PcMusicWatch watch;
     void *context;
@@ -431,13 +433,18 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
     int paused = 0, rounds;
     uint64_t played = 0, ahead_frames;
     uint32_t queued = 0;
-    if (!p->watch(p->context, &gain, &paused)) return 0;
+    if (!p->watch(p->context, &gain, &paused)) { p->why = "the game ended it (scene changed or stopped)"; return 0; }
     if (PC_MUSIC_DISCONTINUITY()) { p->submitted_frames = 0; p->base_ms = now; }
     {
         int32_t volume = paused ? -10000 : pc_music_db(gain * PC_MUSIC_LEVEL);
         if (volume != p->volume) { p->volume = volume; PC_MUSIC_VOLUME(volume); }
     }
     if (paused) {                      /* hold the file position; what is queued plays out silently */
+        if (!p->told_paused && !p->submitted_frames) {
+            p->told_paused = 1;
+            fprintf(stderr, "[music] player: held before its first sound: the game's music is paused\n");
+            fflush(stderr);
+        }
         if (!p->paused) p->paused = 1;
         return 1;
     }
@@ -453,10 +460,13 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
         if (!p->pending_frames && p->codec) {
             long got = pc_music_codec_read(p->codec, p->pcm, PC_MUSIC_CHUNK_FRAMES);
             if (!got) {                /* loop; a track that yields nothing again ends */
-                if (!pc_music_codec_rewind(p->codec)) return 0;
+                if (!pc_music_codec_rewind(p->codec)) { p->why = "the decoder could not rewind"; return 0; }
                 got = pc_music_codec_read(p->codec, p->pcm, PC_MUSIC_CHUNK_FRAMES);
             }
-            if (got <= 0 || got > (long)PC_MUSIC_CHUNK_FRAMES) return 0;
+            if (got <= 0 || got > (long)PC_MUSIC_CHUNK_FRAMES) {
+                p->why = got < 0 ? "decoder error" : "no audio after a rewind";
+                return 0;
+            }
             p->pending_frames = (int)got;
         } else if (!p->pending_frames) {
             uint64_t left = p->info.data_bytes - p->read_bytes;
@@ -466,21 +476,37 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
                 left = p->info.data_bytes;
             }
             want = (size_t)(left < (uint64_t)PC_MUSIC_CHUNK_FRAMES * p->info.block ? left : (uint64_t)PC_MUSIC_CHUNK_FRAMES * p->info.block);
-            if (fseek(p->file, (long)(p->info.data_offset + p->read_bytes), SEEK_SET)) return 0;
+            if (fseek(p->file, (long)(p->info.data_offset + p->read_bytes), SEEK_SET)) { p->why = "the file could not be read"; return 0; }
             got = fread(p->raw, 1, want, p->file);
             got -= got % p->info.block;
-            if (!got) return 0;        /* the file shrank or went away */
+            if (!got) { p->why = "the file shrank or went away"; return 0; }
             p->read_bytes += got;
             p->pending_frames = (int)(got / p->info.block);
             p->out_channels = pc_wav_to_s16(&p->info, p->raw, (size_t)p->pending_frames, p->pcm);
         }
-        if (!PC_MUSIC_SUBMIT((const uint8_t *)p->pcm, (uint32_t)p->pending_frames * 2u * p->out_channels,
-                             p->info.rate, p->out_channels, p->volume))
-            break;                     /* offered again next step, never skipped */
+        {
+            int accepted = PC_MUSIC_SUBMIT((const uint8_t *)p->pcm, (uint32_t)p->pending_frames * 2u * p->out_channels,
+                                           p->info.rate, p->out_channels, p->volume);
+            if (!p->told_first) {
+                p->told_first = 1;
+                fprintf(stderr, "[music] player: first submission %s (%d frames, %u Hz, %u ch, level %d)\n",
+                        accepted ? "accepted" : "refused (offered again)", p->pending_frames,
+                        (unsigned)p->info.rate, p->out_channels, (int)p->volume);
+                fflush(stderr);
+            }
+            if (!accepted) break;      /* offered again next step, never skipped */
+        }
         p->submitted_frames += (uint64_t)p->pending_frames;
         p->pending_frames = 0;
     }
     return 1;
+}
+
+static void pc_music_ended(PcMusicPlayer *p)
+{
+    fprintf(stderr, "[music] player: stopped: %s (%llu frames submitted)\n", p->why ? p->why : "ended",
+            (unsigned long long)p->submitted_frames);
+    fflush(stderr);
 }
 
 static void pc_music_free(PcMusicPlayer *p)
@@ -496,6 +522,7 @@ void pc_music_pump(uint64_t now_ms)
 {
     pc_music_test_now = now_ms;
     if (pc_music_player && !pc_music_step(pc_music_player, now_ms)) {
+        pc_music_ended(pc_music_player);
         PC_MUSIC_RESET();
         pc_music_free(pc_music_player);
         pc_music_player = NULL;
@@ -517,6 +544,7 @@ static void pc_music_loop(void)
 {
     PcMusicPlayer *p = pc_music_player;
     while (pc_music_run && pc_music_step(p, pc_music_now_ms())) pc_music_sleep(PC_MUSIC_TICK_MS);
+    if (pc_music_run) pc_music_ended(p);   /* not a pc_music_stop from the game thread */
     PC_MUSIC_RESET();
     pc_music_run = 0;
 }
