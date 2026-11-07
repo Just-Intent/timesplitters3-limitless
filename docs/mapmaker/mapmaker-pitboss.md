@@ -1,0 +1,198 @@
+# MapMaker pit skeleton: the mission 6 pit fight and its ragbugs
+
+Status 2026-11-07 (story assets wave 3, items 7 and 8 of the
+[inventory](mapmaker-story-assets.md)): implemented in
+`src/interface/pc_mapmaker_pitboss.inc` (area `pitboss`) plus two rows in
+`src/interface/pc_mapmaker_creatures.def`, fixture-tested
+(`tests/mapmaker/mapmaker_pitboss.c` + `tests/mapmaker/test_mapmaker_pitboss.py`:
+40 mutations, decode, US XBE data and story pak checks). **Not wired, not
+built, not played**: the wrappers are the integrator's (list below). Switch:
+`TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_CREATURES=0` keeps both rows on the
+MapMaker bot AI. No guest-code table, no fork chunk, no save change.
+
+CONFIRMED = decode, XBE data or story pak (the test names the site);
+INFERRED = reasoning, needs a playtest.
+
+## What the player gets
+
+| row | label | stores | made with | class (hi:lo) | anims (lv17_4.pak) |
+|---|---|---|---|---|---|
+| 164 | Pit Skeleton | 0x31 | the giant skeleton 0x28's model 0x5E9 | 0x20000:0x10000000 -> `sub_0029FE00` -> `sub_0029E0A0` | entries 16..27 (0x23B..0x246) |
+| 165 | Ragbug | 0xB0 (its own) | chrs/ragbug 0x6CB | 0x200000:0x10000000 -> `sub_0028B610` | entries 24..27 (0x243..0x246) |
+
+Both classes are the catacombs level's own records ('PRIN', 'RAG0'..'RAG5',
+CONFIRMED). The mansion **Giant Skeleton** row (151, id 0x28) is unchanged:
+`pc_mapmaker_realbosses.inc` no longer claims a model-0x5E9 actor whose
+character is 0x31 (`RBS_PIT_ID`). Preview: the Arcade skeleton cowboy (0xA6)
+and the Arcade Timesplitter (0x4E). A stock build plays the map with bots
+on a soldier (0x31) and the ragbug model, and an empty name in the editor.
+
+Play: the skeleton rises with `princess_cat_cs` (the catacombs intro), then
+fights as in the pit: roars, fire attacks at the rim, throws, launches its
+ragbugs. It cannot be hurt; the **gas bottle** it carries (later set down
+beside it) is the only target: health 8.0, a type-0x21 hit takes 2.667,
+another 0.8 x its damage (`sub_0028C2F0`). At 0 it dies (`princess_pit_death`
+0x241), its ragbugs explode and are removed, and once a fade ends (about 17 s,
+or sooner when a player stands 25 above its floor) the props and the AI are
+removed the stock way (`sub_0015DDA0`). Several per map: up to 4, each with
+its own block, statics, arena and up to 6 ragbugs.
+
+## The story fight (CONFIRMED)
+
+`sub_0029E0A0`, 17 states (jump table 0x0029FDBC), state in the shared
+skeleton block `[0x0078B1EC]` (0x4C7C, `sub_00287E00`) and the particle
+statics 0x0078B080.. (`pc_mapmaker_bossfx.inc`):
+
+| state | what |
+|---|---|
+| 0 | boss pinned to (-11.8, -100.279, 56.295); 13 rim pads 0x4B5..0x4C1 looked up (`sub_0009CC40` -> +0x4BF0..+0x4C20); focus = boss; collision prop 0x249 and eye bandage 0x24B created; 'NMME' (`sub_00234190`) not triggered -> `princess_cat_cs` |
+| 1 | bottle 0x24A at a bone once the intro is 0.315 in; 'NMME' triggered -> rack 0x246 at (-11.28, -77.8, 55.6), callbacks, rack stage 1, `feeble_throw` 0x242, state 6 |
+| 2-13 | idle, fire (0x23E), raise (0x23D), roar (0x240, shake), ragbug launch (`sub_0028A0A0`), the bottle again at (-3.68, -96.88, 58.8) when gone, hostage eaten (12, 0x23F) |
+| 14 | bottle health <= 0: explosion, 0x241, then every ragbug exploded and removed, focus cleared, level event 2 (0x0029FC33), stage 5 |
+| 15 | stage 6 (`sub_0028B780`: fade or a player above y -75): props deleted, AI removed |
+| 16 | hostage lost: props deleted, `sub_00212160` (mission failed), AI removed |
+
+The rack timer +0x423C (seconds) lowers the hostage rack at 20/50/80 s
+(`sub_0028B780`); at stage 4 it requests state 12. The hostage is the 'PRJB'
+record's AI (`sub_0015BA10`; null-safe everywhere). Message handler
+`sub_0028C560` (stock for every scene but 1): -1 to messages 1/2 (no hurt, no
+death), 5 deletes the props. Ragbug class handler `sub_0028B610` only parks
+the bug at (-12.73, -102.5, 62.42) and plays `ragbugflight`; its damage
+callback resets its health (it cannot be shot down); the flock (slots +0x4A30
++ k*0x44, found by record tag 'RAGk' when empty) is flown by the fight
+(`sub_00289F30`, `sub_0028A0A0`, `sub_0028AAA0`).
+
+## What this area does
+
+| hook | WRAP | what (scene 100 story, switch on) |
+|---|---|---|
+| mount | chain `sub_00062790` | set holds 0x31: `story/l_17_st.pak` and `storymem/l_17_stm.pak` kept open (`sub_000622D0(path, 0, 1)`, index only), 8 table slots kept free. Every entry they share with another pak is byte-identical there (test) |
+| request | chain `sub_0015E7C0` | `sub_000A5E40` for 0x249, 0x24B, 0x24A, 0x246 |
+| textures | chain `sub_00063900` | each read prop model the load pass left marked (request +2 & 0x10): `sub_00096220(path)`, mark cleared (as the story props area) |
+| level | chain `sub_0025F720` | one block per pit Story AI (1..4) from the stock `sub_00287E00`, statics put back; the arena constants' stock values; `[0x0078B1EC]` = the first block only when it was 0 |
+| ai_start | chain `sub_0015B830` | after the original: pit skeleton (char 0x31, class 0x20000) -> its block by spawn record (late block when more were placed), spawn point, Boss flag; ragbug (0xB0) noted |
+| princess | chain `sub_0029FE00` | char 0x31: its block and statics in, the 34 arena constants moved by (spawn - boss point), `sub_0029E0A0()` directly (it pops the caller's return, as the tail jump), all back; after: timer held at 0 (state < 14), the 13 pad indices pointed at the instance's own pad records. No block or props not loaded: AI removed, logged |
+| message | chain `sub_0028D0A0` | pit skeleton: `sub_0028C560()` with its block |
+| logic | **NEW** `sub_00234270` | inside a pit call: at 0x0029EDA5 answers 0 (intro plays), at 0x0029EED1 1 once `sub_00059DD0` says the boss's animation finished |
+| event | chain `sub_002274C0` | return 0x0029FC38 (event 2): dropped, logged |
+| failure | **NEW** `sub_00212160` | return 0x0029FD15: dropped (not reachable with the timer held) |
+| ragbug | **NEW** `sub_0028B610` | no pit skeleton this level: removed. Else the nearest placed skeleton with a free slot owns it; the park runs with that one's arena; its entity fills that flock slot before each fight call (bit 0 of +0x28 cleared as the tag lookup does), never again after the fight emptied it |
+| callbacks | **NEW** `sub_00289720`, `sub_00289E20`, `sub_0028C1C0`, `sub_0028C390`, `sub_0028C4A0`, `sub_0028C2F0` | the owner's block (boss entity or prop; the damage record's +0 for the bottle), else the current or first one |
+| particles | **NEW** `sub_00289080`, `sub_00288E20` | the current or first block (no entity) |
+| restart | chain `sub_001CDD60` | before: props deleted (`sub_000A9070`), this map's lv17_4 anims noted (all carry 0x4000); after: mapped again if free, every block zeroed + `sub_00287860` in place, bugs unassigned |
+| hud | chain `sub_0014CC80` (inside `pc_mapmaker_bosses_hud`) | focus = a pit skeleton: cleared for the original (no stock bar, no hostage meter) |
+| meter | chain `sub_0013A400` | return 0x0014D264, a pit skeleton without the Sub-boss bar: none |
+
+Arena constants (all read only by pit code reachable from the two entries,
+test): the boss point 0x0049F498/94/0x0049F37C; the flight centre 0x0049F380
+(+11.8, subtracted) and 0x0049F378 (+100.279, subtracted); the ragbug rest
+point 0x0049F390/8C/88, park y 0x0049F3A4, heights 0x0049F398/94, "out of
+the pit" y 0x0049F3A8; rack heights 0x0049F3AC/B0/B4 and spawn
+0x0049F45C/8C/58; hostage drop y 0x0049F478; the bottle 0x0049F488/84/80;
+four rim points 0x0049F34C..0x0049F374 and 0x0049E854 (`sub_00288540`,
+x/y/z triples). Times, speeds and yaw limits are not moved.
+
+Rim pads: the 13 catacombs pads (pad file entry 0x671173A1 of l_17_st.pak,
+ids 0x4B5..0x4C1, test) are copied per instance (+0 id, +4 1, +8 0x1A,
++0xC position + offset, +0x18 yaw) into a block placed so that (record -
+`[0x00715F2C]`) is a multiple of 0x20; the fight reads `table + index*0x20`.
+MapMaker pad ids start at 0x3E9, so a map with 205+ pads would hand the
+stock lookup a MapMaker pad: the area always overwrites the 13 indices.
+
+Log lines (`[mapmaker] pitboss: ...`, 40 a level): `mounted pak/story/...
+for the pit skeleton's props`, `requested the pit props`, `pit prop textures
+registered ...`, `pit skeleton blocks allocated (first, count)`, `pit
+skeleton N placed at (x, y, z): the catacombs arena moved by (dx, dy, dz)`,
+`pit skeleton fight starts`, `pit skeleton fight state (skeleton, state)`
+(24), `ragbug joins pit skeleton N's flock (slot k)`, `pit skeleton killed:
+its level event dropped`, `level restart: pit skeleton blocks set up again
+...`, and every removal (`... removed`) or refusal.
+
+## Wrappers for the integrator
+
+```
+WRAP sub_00062790 -> pc_mapmaker_pitboss_mount        (chain with storyprops/mothership/tank/khallos mounts; after the original)
+WRAP sub_0015E7C0 -> pc_mapmaker_pitboss_request      (chain with creatures/khallos/tank/mothership request)
+WRAP sub_00063900 -> pc_mapmaker_pitboss_textures     (chain with storyprops/skymusic textures; before the original)
+WRAP sub_0025F720 -> pc_mapmaker_pitboss_level        (chain with realbosses/robot/crowe/worm level; order free)
+WRAP sub_0015B830 -> pc_mapmaker_pitboss_ai_start     (chain; acts after the original on 0x31/0xB0 only; order vs creatures free)
+WRAP sub_0029FE00 -> pc_mapmaker_pitboss_princess     (chain with realbosses_princess; order free)
+WRAP sub_0028D0A0 -> pc_mapmaker_pitboss_message      (chain with realbosses_message; order free)
+WRAP sub_002274C0 -> pc_mapmaker_pitboss_event        (chain; return 0x0029FC38 only)
+WRAP sub_001CDD60 -> pc_mapmaker_pitboss_restart      (chain with the other restarts; own state only)
+WRAP sub_0014CC80 -> pc_mapmaker_pitboss_hud          (chain INSIDE pc_mapmaker_bosses_hud, like realbosses_hud)
+WRAP sub_0013A400 -> pc_mapmaker_pitboss_meter        (chain; return 0x0014D264 only)
+WRAP sub_00234270 -> pc_mapmaker_pitboss_logic        (NEW; logic item test, hot: tests the current pit call first)
+WRAP sub_00212160 -> pc_mapmaker_pitboss_failure      (NEW; return 0x0029FD15 only)
+WRAP sub_0028B610 -> pc_mapmaker_pitboss_ragbug       (NEW; class 0x200000 handler)
+WRAP sub_00289720 -> pc_mapmaker_pitboss_boss_slot    (NEW; boss slot 2)
+WRAP sub_00289E20 -> pc_mapmaker_pitboss_coll_slot    (NEW; collision prop slot 2)
+WRAP sub_0028C1C0 -> pc_mapmaker_pitboss_rack_slot    (NEW; rack slot 2)
+WRAP sub_0028C390 -> pc_mapmaker_pitboss_bottle_slot  (NEW; bottle slot 3)
+WRAP sub_0028C4A0 -> pc_mapmaker_pitboss_bandage_slot (NEW; bandage slot 0xC)
+WRAP sub_0028C2F0 -> pc_mapmaker_pitboss_bottle_damage (NEW; bottle damage callback, record +0 = object)
+WRAP sub_00289080 -> pc_mapmaker_pitboss_fire_type    (NEW; particle type callback)
+WRAP sub_00288E20 -> pc_mapmaker_pitboss_smoke_type   (NEW; particle type callback)
+```
+
+All cdecl, plain `ret`. Include `pc_mapmaker_pitboss.inc` after
+`pc_mapmaker_creatures.inc` (done in `pc_menu_mouse_guest.inc`; declarations
+in `pc_display_menu.h`, stubs in its `#else` branch).
+
+## Restart
+
+The restart keeps the Level heap (limitless-bosses.md), so the blocks are
+set up again in place. lv17_4's entries all carry 0x4000, so the restart's
+`sub_0005C2F0` unmaps them; this map's ids 0x23B..0x246 are noted before and
+mapped again after (same slot and data, as `rbs_anims_again`). The props the
+fight made are deleted first (whether the stock restart deletes runtime
+props was not traced). The records keep their class; the restarted AI start
+places each skeleton again.
+
+## Not done / unverified (INFERRED)
+
+- Unplayed. The arena keeps the catacombs' orientation (no rotation); the
+  rack hangs 22.5 above the spawn and the rim points sit 9-13 above it, so in
+  a low MapMaker room they may be above the ceiling (cosmetic; the fire
+  attack aims at the rim pads).
+- No hostage, no timer, no failure (the rack stays at stage 1; the stock
+  hostage meter is hidden). A MapMaker hostage/timer mode is not offered.
+- The Health and Boss multipliers: the fight writes the bottle's health into
+  entity +0x1CC every frame, so the bosses area's bar shows bottle health
+  (maximum 8, +0x1D8) and a health multiplier has no effect.
+- The death removal counts for MapMaker kill logic like the mansion
+  skeleton's (stock `sub_0015DDA0`); the generic kill statistics are skipped.
+- Particle type callbacks see the first instance's block outside a fight
+  call (visual only with several skeletons). A mansion skeleton's message
+  arriving during a pit call would run on the pit block (needs a mansion
+  skeleton in the pit's fire; not handled).
+- lv1_6 (mansion) names three pit anims too (`princess_low_idle1`,
+  `princess_raise_up`, `princess_attack_feeble_throw`) under its own ids
+  (CONFIRMED, test). With both skeletons in one map the registration's name
+  lookup may take the other pak's file for those three ids (same rig;
+  timing may differ).
+- `TSFP_MAPMAKER_AREA_OFF=pitboss` alone would let the creatures area give
+  the class without a block: turn `creatures` off with it.
+- Memory: the two story pak indexes, four models (177 KB) and their
+  textures, lv17_4 (0.40 MB), 52 KB per skeleton.
+
+## User test steps
+
+1. `TSFP_MAPMAKER_LIMITS=1`. Editor -> custom character set: add **Pit
+   Skeleton** and **Ragbug**. Place one Pit Skeleton Story AI on an open
+   floor (a tall room helps) and three Ragbug Story AIs near it. Play in
+   Story.
+2. stderr: `creatures: Pit Skeleton: mounted lv17_4.pak`, both `pitboss:
+   mounted pak/story...` lines, `pit skeleton blocks allocated`, `pit
+   skeleton 1 placed at ...`, `ragbug joins pit skeleton 1's flock` (x3),
+   `pit skeleton fight starts`, then `fight state` lines.
+3. Watch: the intro rises, the skeleton holds a bottle; ragbugs circle and
+   dive; fire hits the floor around it. Shoot the bottle: the skeleton dies,
+   the ragbugs explode; about 17 s later it is gone; stderr `pit skeleton
+   killed: its level event dropped`.
+4. Pause -> restart: it rises and fights again (`level restart: pit
+   skeleton blocks set up again ... (0x1, 0xC)`).
+5. Two Pit Skeletons far apart, three ragbugs each: each flies its own.
+6. A map with only Ragbugs: they vanish at start (`ragbug without a pit
+   skeleton this level`). Report the room size, what you saw and the
+   `pitboss:` lines.
