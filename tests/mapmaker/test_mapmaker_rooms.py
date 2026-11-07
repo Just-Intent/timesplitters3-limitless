@@ -359,6 +359,7 @@ ROOMS_BLOCKS = {
     'p3': (0x008CF0C0, 0x1040, ['rooms-reloc-p3-0x7b5ba0']),      # bossroom
     'p5': (0x008D0100, 0x1040, ['rooms-reloc-p5-0x7b6260']),
     'drawn flag': (0x008D1140, 0x1040, ['rooms-reloc-f-0x7b5180']),
+    'portal zero word': (0x008D2200, 0x10, []),                   # pc_mapmaker_portals.inc: the skipped loops' count
     'boss camera lists': (0x008D4000, 0x8000, []),                # pc_mapmaker_bossroom.inc, 8 view slots
     'light heads': (0x008DC000, 3 * 0x40C * 4, ['rooms-reloc-l1-head', 'rooms-reloc-l1-rest']),
     'front-end view': (0x00908000, 0x5000, ['rooms-reloc-v-0x749890']),
