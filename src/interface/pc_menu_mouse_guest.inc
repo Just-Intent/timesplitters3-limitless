@@ -930,6 +930,7 @@ void pc_mapmaker_crowe_hit(void (*original)(void)) { original(); }
 void pc_mapmaker_crowe_eggs(void (*original)(void)) { original(); }
 void pc_mapmaker_crowe_cells(void (*original)(void)) { original(); }
 void pc_mapmaker_crowe_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_mine(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_mount(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_ai_start(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_update(void (*original)(void)) { original(); }
@@ -950,7 +951,6 @@ void pc_mapmaker_tank_damage(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_bar(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_draw(void (*original)(void)) { original(); }
 void pc_mapmaker_tank_restart(void (*original)(void)) { original(); }
-void pc_mapmaker_tank_mine(void (*original)(void)) { original(); }
 void pc_mapmaker_khallos_mount(void (*original)(void)) { original(); }
 void pc_mapmaker_khallos_anims(void (*original)(void)) { original(); }
 void pc_mapmaker_khallos_request(void (*original)(void)) { original(); }
