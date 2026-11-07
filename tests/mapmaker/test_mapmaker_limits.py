@@ -15,8 +15,9 @@ MUTATIONS = {
     'pools-off-by-default': ("mapmaker_limits.pools=!(p && p[0]=='0' && !p[1]);", 'mapmaker_limits.pools=p!=NULL;'),
     'pools-any-scene': (' || WORD_AT(0x0079094Cu)!=100u) {', ') {'),
     'pools-not-cleared': ('memset((void *)((uintptr_t)p+g_xbox_mem_offset),0,bytes);', '(void)0;'),
-    'cover-raised': ('#define MAPMAKER_LIMIT_COVER 9984u', '#define MAPMAKER_LIMIT_COVER 10240u'),
-    'cover-pool-stock': ('#define MAPMAKER_POOL_COVER 10496u', '#define MAPMAKER_POOL_COVER 1280u'),
+    'cover-raised': ('#define MAPMAKER_LIMIT_COVER 14080u', '#define MAPMAKER_LIMIT_COVER 14336u'),
+    'cover-pool-stock': ('#define MAPMAKER_POOL_COVER 14592u', '#define MAPMAKER_POOL_COVER 1280u'),
+    'cover-layout-b': ('#define MAPMAKER_LIMIT_COVER 14080u', '#define MAPMAKER_LIMIT_COVER 9984u'),
     'pools-ignore-nav': ('uint32_t p=mapmaker_pool_source?mapmaker_pool_source(bytes):0u;', 'uint32_t p=0u;'),
     'pools-no-fallback': ('    if(!p) p=guest_call(sub_0003DFA0,2,bytes,1u);', '    if(0) p=guest_call(sub_0003DFA0,2,bytes,1u);'),
     'link-pool-editor-limit': ('mapmaker_pool(MAPMAKER_POOL_LINKS*20u)', 'mapmaker_pool(MAPMAKER_LIMIT_LINKS*20u)'),
@@ -49,14 +50,14 @@ MUTATIONS = {
     'objects-placed-only': ('mapmaker_objects_needed(p->pieces+h->pieces,sub)', 'mapmaker_objects_needed(p->pieces,sub)'),
     'objects-stock-pool': ('#define MAPMAKER_LIMIT_OBJECTS 2047u', '#define MAPMAKER_LIMIT_OBJECTS 1000u'),
     'objects-slot22-pool': ('#define MAPMAKER_LIMIT_OBJECTS 2047u', '#define MAPMAKER_LIMIT_OBJECTS 1023u'),
-    # Pad groups 1024: 511 pieces at the measured 1.5 groups each fit.
-    'groups-round3': ('#define MAPMAKER_LIMIT_GROUPS 1024\n', '#define MAPMAKER_LIMIT_GROUPS 600\n'),
-    'groups-unbounded': ('#define MAPMAKER_LIMIT_GROUPS 1024\n', '#define MAPMAKER_LIMIT_GROUPS 2048\n'),
+    # Pad groups 2047 (lazy distances above 1024): 1023 pieces at 1.5 groups each fit.
+    'groups-round3': ('#define MAPMAKER_LIMIT_GROUPS 2047\n', '#define MAPMAKER_LIMIT_GROUPS 1024\n'),
+    'groups-unbounded': ('#define MAPMAKER_LIMIT_GROUPS 2047\n', '#define MAPMAKER_LIMIT_GROUPS 4096\n'),
     'groups-off-by-one': ('if(groups>MAPMAKER_LIMIT_GROUPS)', 'if(groups>=MAPMAKER_LIMIT_GROUPS)'),
-    # Regular pads: 7680 in the editor, 8000 in the pool (pad id threshold 0x2328).
-    'pads-round3': ('#define MAPMAKER_LIMIT_PADS 7680u', '#define MAPMAKER_LIMIT_PADS 4800u'),
-    'pads-pool-stock': ('#define MAPMAKER_POOL_PADS 8000u', '#define MAPMAKER_POOL_PADS 4800u'),
-    'pads-past-ids': ('#define MAPMAKER_POOL_PADS 8000u', '#define MAPMAKER_POOL_PADS 8001u'),
+    # Regular pads: 16,128 in the editor, 16,384 in the pool (Layout C, ids past 8000).
+    'pads-round3': ('#define MAPMAKER_LIMIT_PADS 16128u', '#define MAPMAKER_LIMIT_PADS 7680u'),
+    'pads-pool-stock': ('#define MAPMAKER_POOL_PADS 16384u', '#define MAPMAKER_POOL_PADS 8000u'),
+    'pads-past-ids': ('#define MAPMAKER_POOL_PADS 16384u', '#define MAPMAKER_POOL_PADS 16385u'),
     'sub-stock-round2': ('#define MAPMAKER_LIMIT_SUB 500u', '#define MAPMAKER_LIMIT_SUB 200u'),
     'sub-past-pool': ('#define MAPMAKER_LIMIT_SUB 500u', '#define MAPMAKER_LIMIT_SUB 501u'),
     'keycards-round2': ('    {0x00524CECu,2u,16u},', '    {0x00524CECu,2u,8u},'),
