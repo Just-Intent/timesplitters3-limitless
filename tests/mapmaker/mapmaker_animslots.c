@@ -207,7 +207,7 @@ static void put_table(uint32_t t,const struct ent *e,uint32_t n)
         HALF_AT(t+k*0x18u+0x10u)=(uint16_t)e[k].id;
     }
 }
-static char gnames[1100][12];
+static char gnames[1300][12];
 /* the scene's own anims: names g<first>.. with ids 0x200+ (no boss pak's: 0x1BA..0x6B8 free); entry 0 optionally another */
 static void put_gen(uint32_t t,uint32_t first,uint32_t n,const struct ent *e0)
 {
@@ -328,6 +328,29 @@ int main(void)
     load(10u,0,NULL);
     nested=0;
     { unsigned o=0;reg(bosses[LV1_3].table,3u,&o);CHECK(o==1u && nested==0 && lastn==3u); }
+
+    /* ---- the story creatures' paks (pc_mapmaker_creatures.def): only each row's run ---- */
+    {
+        static const struct { uint32_t table, count, first, n; } crt[]={
+            {0x00488850u,0x2Au,30u,4u},{0x00482610u,0x46u,3u,11u},{0x00480C60u,0x49u,41u,6u}};
+        unsigned c;
+        for(c=0;c<3u;c++) {
+            uint32_t t=crt[c].table;
+            put_gen(t,1020u+c*0x50u,crt[c].count,NULL);         /* fresh names; ids below */
+            for(k=0;k<crt[c].count;k++) HALF_AT(t+k*0x18u+0x10u)=(uint16_t)(0xA00u+c*0x80u+k);
+        }
+        load(10u,0,NULL);
+        for(c=0;c<3u;c++) {
+            unsigned o=0;
+            nested=0;
+            reg(crt[c].table,crt[c].count,&o);
+            CHECK(o==0u && nested==crt[c].n);
+            for(k=0;k<crt[c].count;k++) {
+                int in=k>=crt[c].first && k<crt[c].first+crt[c].n;
+                CHECK((HALF_AT(MAP+(0xA00u+c*0x80u+k)*2u)!=0xFFFFu)==in);
+            }
+        }
+    }
     if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }
     puts("ok");
     return 0;

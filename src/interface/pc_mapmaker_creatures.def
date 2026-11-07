@@ -1,0 +1,39 @@
+/* US 45410066 MapMaker story creatures: one row per creature kind, read by
+ * pc_mapmaker_creatures.inc (play: anim pak, AI class, look), by
+ * pc_mapmaker_realbosses.inc (editor: the custom-set picker row, its label and
+ * preview) and by pc_mapmaker_animslots.inc (the anim names registered from
+ * the pak). Docs: docs/mapmaker/mapmaker-creatures.md. The includer defines
+ * MAPMAKER_CREATURE(row, id, look, preview, label, class_lo, class_hi, pak,
+ * pak_name, table, count, first, n, level) and undefines it after:
+ *  row       synthetic picker row (realbosses rows: 150..160 are taken)
+ *  id        character id the set member stores: no Arcade row, used by no
+ *            other port, so its own rows and stock characters never change
+ *  look      character id whose models (+4/+8) the creature is made with in
+ *            play (0xFF: its own); requested at level init when not in the set
+ *  preview   Arcade character id shown by the picker's preview panel
+ *  label     picker and Story AI name, at most 15 characters (Latin-1)
+ *  class_lo, class_hi  AI class (spawn record +0/+4) as the creature's story
+ *            level spawns it (0x10000000 = active at spawn, sub_0015F8C0)
+ *  pak       guest address of the anim pak path, mounted whole (sub_0005A130)
+ *  pak_name  its short name for the logs and the anim slot budget
+ *  table, count  the pak's registration table in sub_001CA2F0
+ *  first, n  the table entries the creature's handlers play (kept); the rest
+ *            of the story level's cast is left out
+ *  level     optional per-level state hook (void fn(unsigned kind), 0 none),
+ *            called at the level's anim mount when the set holds the id
+ * CONFIRMED rows: tests/mapmaker/test_mapmaker_creatures.py (US XBE data,
+ * decode, story level spawn records). */
+/* Mission 6 ghosts: the catacombs' GHT1..GHT7 records are zombies 0x17, 0x18,
+ * 0x23, 0x2A with class 0:0x50000000 -> sub_002BA300 (no level state);
+ * ghostidle/trap/attack/death 0x249..0x24C. Carrier 0x2F (soldiermodel_talk
+ * copy, no set, no Arcade row), made with the zombie 0x17's models. */
+MAPMAKER_CREATURE(161u,0x2Fu,0x17u,0x17u,"Catacomb Ghost",0x50000000u,0x00000000u,0x0049D968u,"lv17",0x00488850u,0x2Au,30u,4u,0)
+/* Mission 7 SecuriDroid XP 0x4D (chrs/securibot): RS01/RS02/CR01.. records
+ * class 0x4000:0x10000000 -> sub_0026B7A0 (no level state; it notifies the
+ * MapMaker kill marker itself in scene 100); mini* 0xA22..0xA2C. */
+MAPMAKER_CREATURE(162u,0x4Du,0xFFu,0x5Cu,"SecuriDroid XP",0x10000000u,0x00004000u,0x0049DA84u,"lv6",0x00482610u,0x46u,3u,11u,0)
+/* Mission 8 mutants: MT06..MT19 records are 0x59 with class 0x8000:0x10000000
+ * -> sub_00264A10 (no level state); mutantwalk..mutanthitreact 0x76B..0x770.
+ * 0x59 is an Arcade row (The Freak, stock bot AI): carrier 0x30 made with its
+ * models. */
+MAPMAKER_CREATURE(163u,0x30u,0x59u,0x59u,"Mutant (Story)",0x10000000u,0x00008000u,0x0049DB58u,"lv22",0x00480C60u,0x49u,41u,6u,0)
