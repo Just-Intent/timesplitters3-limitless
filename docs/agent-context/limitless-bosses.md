@@ -50,3 +50,13 @@ each bar drawn or skipped once per entity and reason (story AI bosses: bar
 of ..) plus a map-start count. The chair's jet emitter, made at the train
 start, is moved to the chair at creation and each waiting frame
 (sub_0010E730); no new WRAP ([area doc](../mapmaker/mapmaker-khallos.md)).
+
+.40 movement: the giant robot's walk goal (WRAP sub_0015D500, return
+0x00293D27 only -> `pc_mapmaker_robot_goal`) is limited to its own reachable
+pad set: links across a portal lower than its box height are closed, an
+unreachable player pad becomes the nearest reachable pad, and with closed
+links the goal is steered room by room ([robot doc](../mapmaker/mapmaker-robot.md),
+`low_door()`). The split Crowe's arena check adds the floor finder
+`sub_000C3C50(point, 1.25, 0.1)` per cell and between cells: no floor or more
+than a 1.0 step off is blocked (guest call, no new WRAP;
+[Crowe doc](../mapmaker/mapmaker-crowe.md), `ledges()`).

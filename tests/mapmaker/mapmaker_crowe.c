@@ -53,6 +53,7 @@ void sub_000EFBD0(void) { g_ecx=7; }
 void sub_0015DDA0(void) { g_ecx=8; }
 void sub_0005F460(void) { g_ecx=9; }
 void sub_00087310(void) { g_ecx=10; }
+void sub_000C3C50(void) { g_ecx=11; }
 static int bosses_area=1;
 int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)hook;return strcmp(area,"bosses") || bosses_area; }
 
@@ -72,6 +73,11 @@ static void room(unsigned i,float x0,float y0,float z0,float x1,float y1,float z
     if(i>=nrooms) nrooms=i+1u;
 }
 static void one_big_room(void) { nrooms=0;room(0,-1000.0f,-1000.0f,-1000.0f,1000.0f,1000.0f,1000.0f); }
+/* The floor finder sub_000C3C50(point, up, radius): the floor of (x, z), the
+ * room (> 0) when it is at most up above the point, height in [0x004DCB00];
+ * the stock also writes [0x004DCAFC] and [0x00733088]. No floor map: none. */
+static int (*floor_of)(float x,float z,float *y);
+static unsigned nfloor;
 /* the stock grid: 5 x 7 cells (type 0 on even rows), outer, 14 edges (10 used).
  * The type-0 cell nearest the outer centre is column 3; 310.0 is in column 4
  * (grid_gap 1: in no cell, and cell 17 not a platform; 2: cell 18 not a
@@ -125,6 +131,18 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     if(f==sub_000EFBD0) { nexplode++;memcpy(explode_args,x,sizeof explode_args);return 0; }
     if(f==sub_0015DDA0) { nremove++;remove_arg=x[0];return 0; }
     if(f==sub_0005F460) { nanim++;memcpy(anim_args,x,sizeof anim_args);return 0; }
+    if(f==sub_000C3C50) {
+        float p[3],y;
+        nfloor++;
+        if(x[1]!=0x3FA00000u || x[2]!=0x3DCCCCCDu || x[0]<g_esp || (x[0]>=query_box && x[0]<query_box+0x38u)) {
+            fprintf(stderr,"floor finder arguments\n");exit(4);
+        }
+        memcpy(p,(const void *)((uintptr_t)x[0]+g_xbox_mem_offset),12);
+        WORD_AT(0x004DCAFCu)=0xDEADu;WORD_AT(0x00733088u)=0xBEEFu;
+        if(!floor_of || !floor_of(p[0],p[2],&y) || y>p[1]+1.25f) return 0;
+        memcpy((void *)((uintptr_t)0x004DCB00u+g_xbox_mem_offset),&y,4);
+        return 3u;
+    }
     if(f==sub_00087310) {
         uint32_t found=0,r,j;
         float b[6];
@@ -509,6 +527,76 @@ static void multi(void)
 /* ---- v0.4.0-mapmaker.34: the Crowes walked into walls and off the map ---- */
 
 static void cells_at(float px,float pz) { CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+4u,FB(px),FB(pz),1); }
+/* v0.4.0-mapmaker.40: one room, the boss's floor at y 4 with a lower floor
+ * (y -1) beyond x 13 (columns 5, 6), a raised block (y 9) under cell 1,1, a
+ * small step (4.5) under cell 4,0 and a gap between cells 0,2 and 0,3 */
+static int ledge_floor(float x,float z,float *y)
+{
+    if(x>13.0f) *y=-1.0f;
+    else if(z<-31.0f && x>0.5f && x<1.5f) return 0;
+    else if(x<-11.0f && z>-8.0f) *y=4.5f;
+    else if(fabsf(x+8.0f)<3.0f && fabsf(z+28.0f)<3.0f) *y=9.0f;
+    else *y=4.0f;
+    return 1;
+}
+static int no_floor(float x,float z,float *y) { (void)x;(void)z;(void)y;return 0; }
+static void ledges(void)
+{
+    unsigned k;
+    uint32_t a=A(0),st=CST;
+    CHECK(level_gives_class());
+    one_big_room();
+    floor_of=ledge_floor;nfloor=0;
+    WORD_AT(0x004DCB00u)=0x1111u;WORD_AT(0x004DCAFCu)=0x2222u;WORD_AT(0x00733088u)=0x3333u;
+    SETF(ENT(0)+0x64u,10.0f);SETF(ENT(0)+0x68u,4.0f);SETF(ENT(0)+0x6Cu,-20.0f);
+    WORD_AT(a+0x20u)=0;nquery=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(nquery==35u && WORD_AT(st+0x1198u)==2u && WORD_AT(st+0x119Cu)==4u);
+    /* the start cell, every cell in a room, the midpoints between good cells */
+    CHECK(nfloor==1u+35u+(5u*4u+4u*5u-2u-2u));
+    CHECK(WORD_AT(0x004DCB00u)==0x1111u && WORD_AT(0x004DCAFCu)==0x2222u && WORD_AT(0x00733088u)==0x3333u);
+    for(k=0;k<35u;k++) CHECK(crw_inst[0].off[k]==(k%7u>=5u || k==CELL(1u,1u)));
+    CHECK(!crw_inst[0].off[CELL(4u,0u)]);                          /* a step, not a ledge */
+    CHECK(crw_inst[0].gap_h[0][2]==1u);
+    for(k=0;k<5u*6u;k++) CHECK(crw_inst[0].gap_h[k/6u][k%6u]==(k==2u));
+    for(k=0;k<4u*7u;k++) CHECK(!crw_inst[0].gap_v[k/7u][k%7u]);
+    prev_k=crw_enter(0);
+    cells_at(10.0f,-12.0f);
+    CHECK(blocked_cells(st)==11u && BLOCKED(st,2u,5u)==1u && BLOCKED(st,2u,6u)==1u && BLOCKED(st,1u,1u)==1u);
+    CHECK(!BLOCKED(st,2u,3u) && !BLOCKED(st,2u,0u) && !BLOCKED(st,4u,0u) && !BLOCKED(st,0u,4u));
+    /* the boss on row 0: the cells beyond the gap in line with it */
+    WORD_AT(st+0x1198u)=0u;WORD_AT(st+0x119Cu)=4u;
+    cells_at(10.0f,-12.0f);
+    CHECK(blocked_cells(st)==14u && BLOCKED(st,0u,2u)==1u && BLOCKED(st,0u,1u)==1u && BLOCKED(st,0u,0u)==1u && !BLOCKED(st,0u,3u));
+    WORD_AT(st+0x1198u)=0u;WORD_AT(st+0x119Cu)=2u;                  /* ... from the other side */
+    cells_at(10.0f,-12.0f);
+    CHECK(blocked_cells(st)==13u && BLOCKED(st,0u,3u)==1u && BLOCKED(st,0u,4u)==1u && !BLOCKED(st,0u,1u));
+    WORD_AT(st+0x1198u)=2u;WORD_AT(st+0x119Cu)=4u;
+    crw_leave(prev_k);
+    /* no floor under the start cell: the probe is not trusted, the rooms still count */
+    CHECK(level_gives_class());
+    floor_of=no_floor;nfloor=0;
+    WORD_AT(a+0x20u)=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(nfloor==1u);
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
+    for(k=0;k<5u*6u;k++) CHECK(!crw_inst[0].gap_h[k/6u][k%6u]);
+    /* the boss's own floor a step lower than its spawn height: still its floor */
+    CHECK(level_gives_class());
+    floor_of=ledge_floor;
+    SETF(ENT(0)+0x68u,4.9f);
+    WORD_AT(a+0x20u)=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(crw_inst[0].off[CELL(2u,5u)] && !crw_inst[0].off[CELL(2u,3u)] && !crw_inst[0].off[CELL(4u,0u)]);
+    CHECK(level_gives_class());                                   /* back on y 4, no floor map */
+    floor_of=NULL;
+    SETF(ENT(0)+0x68u,4.0f);
+    WORD_AT(a+0x20u)=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    memset(crw_inst[0].off,0,sizeof crw_inst[0].off);
+    memset(crw_inst[0].gap_h,0,sizeof crw_inst[0].gap_h);memset(crw_inst[0].gap_v,0,sizeof crw_inst[0].gap_v);
+    WORD_AT(a+0x20u)=4u;
+}
 static void walls(void)
 {
     unsigned k;
@@ -892,6 +980,7 @@ int main(void)
     crw_leave(prev_k);
 
     walls();
+    ledges();
 
     /* ---- bar and meter ---------------------------------------------------- */
     WORD_AT(PLAYER+0xFF4u)=ENT(0);
