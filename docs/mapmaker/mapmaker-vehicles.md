@@ -2,12 +2,14 @@
 
 Status 2026-11-07: implemented in `src/interface/pc_mapmaker_vehicles.inc`
 (area `vehicles`), fixture-tested (`tests/mapmaker/mapmaker_vehicles.c` +
-`tests/mapmaker/test_mapmaker_vehicles.py`: 73 mutations, plus decode, US XBE
+`tests/mapmaker/test_mapmaker_vehicles.py`: 87 mutations, plus decode, US XBE
 data and game-pak checks of every site below). Played in v0.4.0-mapmaker.61
 (user): all three sank into the floor; both trucks rose onto the floor once
 entered and drove well, the Vickers gun works; the tank sank further and
-could not be entered. Fixed after .61 (below, no new wrapper); not played
-since. Switch:
+could not be entered. Fixed after .61 (below, no new wrapper). Played in
+.63: all stand on the floor, the tank drives and fires; its driver view
+sat low, the gun could not aim below the screen centre and the reticle was
+a blue rectangle. Fixed after .63 (below, no new wrapper); not played since. Switch:
 `TSFP_MAPMAKER_LIMITS=1` (editor and play). No guest-code table, no fork
 chunk, no new save size. Story assets wave 3, items 19 and 20
 ([inventory](mapmaker-story-assets.md)). The castle boss tank (prop 0x281,
@@ -158,6 +160,53 @@ level. Its seats have no anims; the enter path skips anim id 0
 INFERRED: driving with the tracked adapter, the driver's main gun and the
 gunner seat's AA gun then work as in Machine Wars.
 
+## Fixed after .63: tank reticle, gun pitch and driver camera
+
+Log m63.err: spawn heights applied, `tank open to players`, the driver in
+player mode 0x400; no texture or HUD line names the reticle.
+
+**Blue reticle (CONFIRMED, `test_tank_reticle_hud_group`,
+`test_tank_reticle_pak`).** HUD sprites (table 0x004D2D50, 0x18 each) are
+requested by `sub_000810C0` when their group passes `sub_00080F40`. The
+tank's reticle `tank_half` (0x125) is in group 0x200 with the Machine Wars
+scanlines and robot HUD ticks; only scene 5's level info (0x004D1AC0 +
+k*0x44, +8) holds 0x200, so scene 100 never requests it and the HUD draws
+an empty quad. Its file `assets/ts/textures/xbox/tank_half.xbt` (16,512 B;
+`sub_00063B40` reads `.raw` requests as `.xbt`) is only in
+`pak/story/l_5_st.pak` (323 files; its 15,707 shared entries are
+byte-identical elsewhere). A map with a tank now mounts that pak
+index-only and the def preload requests the sprite the HUD load's way,
+`sub_000810C0(0x125)` (the level setup `sub_001CDC50` loads the HUD at
+0x001CDC55, before the MapMaker preload). Log: `tank reticle tank_half (HUD
+0x125, group 0x200): requested from pak/story/l_5_st.pak`. The AA gun
+(weapon 0x3C) uses the stock crosshair 2.
+
+**Aim stuck at the centre (CONFIRMED, `test_tank_camera_and_gun_pitch`).**
+The turret init `sub_00245990` copies the template's pitch limits (+0x30,
++0x34) into the gun data +0x34/+0x38, and the driver aim clamps to them
+(0x0017A97D, + is down). The main gun's are 0..0.001: it only fires level,
+as in Machine Wars, where you shoot giant robots on open ground; in a
+MapMaker room every target on the floor is below its barrel. The AA gun's
+are -45..0 (up only). A MapMaker tank's guns (block +0x144 / +0x154) now
+get -10..20 and -45..15 after the builder; story tanks keep the templates.
+
+**Low driver view (CONFIRMED decode; the remedy is INFERRED).** The
+driver's chase camera takes preset def +0xAC (2 for the tank: distance 15,
+height 4.6, `0x004DD420 + index*0x20` via `sub_000CB060` at each seat
+change) and `sub_000CA040` keeps it under the room's top - 0.5 unless the
+room is open air (0x000CAB1C..0x000CABB4). MapMaker floors are 5 m; the
+tank's hull reaches 3.86 m and its turret more, so in a one-floor room the
+camera is pressed to the hull top and looks across it. Machine Wars is
+open ground. A MapMaker tank's block now points (+0x50) to a copy of def 2
+whose +0xAC indexes a copy of preset 2 with **distance 10, height 3**
+(32-byte aligned, so `0x004DD420 + index*0x20` reaches it); the static def
+and preset (story tanks) are unchanged. `TSFP_MAPMAKER_TANK_CAMERA=<distance>,<height>`
+(2..30, 0..10, read once) replaces them for a playtest. Log once per level:
+`tank view: chase camera distance 10.0 height 3.0 (story 15.0, 4.6); gun
+pitch main -10.0..20.0 (was 0.0..0.001), AA -45.0..15.0 (was -45.0..0.0),
+guns 2`. **Rooms two floors high or open-sky tiles give the tank room to
+see over itself**; a one-floor room stays cramped.
+
 ## Pool (fixed here)
 
 The vehicle pool is allocated once per level: `sub_001806B0` (0x000A5C95)
@@ -252,11 +301,16 @@ mount`, `vehicle model or pak not available`).
    textures: N of N` lines, `vehicle placed as ...` and `created a future
    tank` / `created a truck`, `tank spawn height: record y +2.375`, `truck
    spawn height: record y +0.945` and `tank open to players: block flags
-   0x17 -> 0x7`. All three stand on the floor before anyone gets in. If one
+   0x17 -> 0x7`, `tank reticle tank_half ... requested from
+   pak/story/l_5_st.pak` and `tank view: chase camera distance 10.0 ...`.
+   All three stand on the floor before anyone gets in. If one
    still sinks or floats, rerun with `TSFP_MAPMAKER_TANK_LIFT=2.6` (or
    `TSFP_MAPMAKER_TRUCK_LIFT=1.1`, ...) and report the value that rests.
 4. Drive the tank: get in, drive (tracks: the stick turns as in Machine
-   Wars), fire the main gun, switch to or let a second player take the AA
+   Wars), fire the main gun (the reticle is the Machine Wars sight, not a
+   blue box; you can aim down at bots on the floor), try a room two floors
+   high or open-sky tiles for the view (and `TSFP_MAPMAKER_TANK_CAMERA=8,2.5`
+   or other values; report what works), switch to or let a second player take the AA
    gun; get out. Drive the truck; take its gunner seat and fire the Vickers.
    Both are textured.
 5. START -> restart: the vehicles are back with their guns; stderr repeats

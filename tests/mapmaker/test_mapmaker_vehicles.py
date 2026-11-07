@@ -101,6 +101,22 @@ MUTATIONS = {
     'entry-all-flags': ('    WORD_AT(block+VH_BLOCK_FLAGS)=was&~VH_NO_PLAYER;\n', '    WORD_AT(block+VH_BLOCK_FLAGS)=0;\n'),
     'entry-every-vehicle': ('    if(!ours || v!=1u) return;\n', '    if(!ours) return;\n'),
     'entry-stock-vehicles': ('    if(!ours || v!=1u) return;\n', '    if(v>1u) return;\n'),
+    'reticle-none': ('        if(v==1u) vh_reticle();\n', ''),
+    'reticle-wrong-sprite': ('#define VH_HUD_TANK 0x125u', '#define VH_HUD_TANK 0x129u'),
+    'reticle-without-pak': ('    if(mounted && !before) guest_call(sub_000810C0,1,VH_HUD_TANK);', '    if(!before) guest_call(sub_000810C0,1,VH_HUD_TANK);'),
+    'reticle-every-time': ('    if(mounted && !before) guest_call(sub_000810C0,1,VH_HUD_TANK);', '    if(mounted) guest_call(sub_000810C0,1,VH_HUD_TANK);'),
+    'reticle-pak-always': ('    if(j==VH_HUD_PAK) return vh_lv.want[1]!=0u;', '    if(j==VH_HUD_PAK) return 1;'),
+    'reticle-wrong-pak': ('                                              "pak/story/l_5_st.pak"};', '                                              "pak/storymem/l_5_stm.pak"};'),
+    'pitch-story': ('{{-10.0f,20.0f},{-45.0f,15.0f}}', '{{0.0f,0.001f},{-45.0f,0.0f}}'),
+    'pitch-wrong-gun': ('#define VH_GUN_AA 0x154u', '#define VH_GUN_AA 0x144u'),
+    'pitch-wrong-field': ('#define VH_GUN_PITCH 0x34u', '#define VH_GUN_PITCH 0x3Cu'),
+    'camera-static-def': ('    if((d=vh_tank_def(def==vh.tank_def?0x004E8658u:def))) WORD_AT(block+0x50u)=d;\n', '    d=vh_tank_def(def);\n'),
+    'camera-edits-story': ('        WORD_AT(d+VH_DEF_CAMERA)=(p-VH_PRESETS)>>5;\n', '        WORD_AT(def+VH_DEF_CAMERA)=(p-VH_PRESETS)>>5;\n'),
+    'camera-unaligned': ('        p=raw+((VH_PRESETS-raw)&31u);', '        p=raw+4u;'),
+    'camera-story-values': ('        VH_F(p)=vh.cam[0];VH_F(p+4u)=vh.cam[1];\n', ''),
+    'camera-no-override': ('            if(end && end!=t && !*end && d>=2.0f && d<=30.0f && h>=0.0f && h<=10.0f) { vh.cam[0]=d;vh.cam[1]=h;return; }',
+                           '            if(0) { vh.cam[0]=d;vh.cam[1]=h;return; }'),
+    'view-not-called': ('    vh_tank_view(block);\n}\n', '}\n'),
 }
 
 
@@ -148,6 +164,10 @@ def test_mapmaker_vehicles(tmp_path, mutation):
         assert '[mapmaker] vehicles: truck spawn height: record y +0.945 (model base y -0.935)' in err
         assert 'tank spawn height: record y +1.500 (model base y -2.365) (TSFP_MAPMAKER_TANK_LIFT)' in err
         assert '[mapmaker] vehicles: tank open to players: block flags 0x17 -> 0x7 (story no-player bit 0x10; tracked bit 1; seats 2)' in err
+        assert '[mapmaker] vehicles: tank reticle tank_half (HUD 0x125, group 0x200): requested from pak/story/l_5_st.pak' in err
+        assert '[mapmaker] vehicles: mounted pak/story/l_5_st.pak for the tank reticle' in err
+        assert ('[mapmaker] vehicles: tank view: chase camera distance 10.0 height 3.0 (story 15.0, 4.6); gun pitch main '
+                '-10.0..20.0 (was 0.0..0.001), AA -45.0..15.0 (was -45.0..0.0), guns 2') in err
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 
@@ -365,6 +385,46 @@ def test_tank_no_player_flag():
     assert a[0x0017C983].mnemonic == 'test' and '0x17ca5d' in a[0x0017C985].text and '0x5f460' in a[0x0017C9C6].text
 
 
+def test_tank_reticle_hud_group():
+    """HUD sprite 0x125 tank_half is in group 0x200, which only scene 5's level info
+    holds (0x004D1AC0 + k*0x44, +8); sub_000810C0 requests 'assets/ts/textures/xbox/%s.raw',
+    which sub_00063B40 reads as .xbt; the level setup loads the HUD (sub_00081220) before
+    the MapMaker preload (sub_0006C920)."""
+    a = by_address()
+    rd = xbe()
+    e = 0x004D2D50 + 0x125 * 0x18
+    assert cstr(rd, u32(rd, e + 0xC)) == 'tank_half' and u32(rd, e + 8) == 0x200
+    groups = {struct.unpack('<h', rd(0x004D1AC0 + k * 0x44 + 6, 2))[0]: u32(rd, 0x004D1AC0 + k * 0x44 + 8)
+              for k in range((0x004D1E3A - 0x004D1AC6) // 0x44 + 1)}
+    assert [s for s, m in groups.items() if m & 0x200] == [5]
+    assert cstr(rd, 0x0047D20C) == 'assets/ts/textures/xbox/%s.raw' and cstr(rd, 0x0047834C) == '.xbt'
+    assert ('imm', 0x004D2D60) not in a[0x000810F3].ops and 0x004D2D60 in disp(a[0x000810F3])
+    assert '0x63b40' in a[0x000811D0].text and '0x80f40' in a[0x00081233].text
+    assert '0x81220' in a[0x001CDC55].text and '0x6c920' in a[0x001CDD3B].text
+    assert ('imm', 0x64) in a[0x00080FF9].ops                     # scene 100 takes the generic group test
+
+
+def test_tank_camera_and_gun_pitch():
+    """The chase camera preset is def +0xAC (2 for the tank: distance 15, height 4.6) at
+    0x004DD420 + index*0x20 (sub_000CB060), read through the block's def +0x50 at the seat
+    sites; the chase camera keeps the camera under the room's top - 0.5 unless the room
+    is open air. Gun pitch limits come from the template (+0x30/+0x34) into the gun data
+    +0x34/+0x38 (sub_00245990), which the driver aim clamps to."""
+    a = by_address()
+    rd = xbe()
+    assert u32(rd, 0x004E8658 + 0xAC) == 2 and struct.unpack('<2f', rd(0x004DD460, 8)) == (15.0, pytest.approx(4.6))
+    assert ('imm', 5) in a[0x000CB06E].ops and ('imm', 0x004DD420) in a[0x000CB071].ops
+    for x in (0x00177ACA, 0x0017CA1A, 0x0017D0F4, 0x0017EBFB):
+        assert 0xAC in disp(a[x]), hex(x)
+    assert 0x50 in disp(a[0x0017CA17]) and 0x50 in disp(a[0x00182B10])
+    assert ('imm', 0x2000000) in a[0x000CAB1C].ops and 0x280 in disp(a[0x000CABA3]) and 0x280 in disp(a[0x000CABB4])
+    assert [disp(a[x]) for x in (0x00245A82, 0x00245A85, 0x00245A88, 0x00245A8B)] == [[0x30], [0x34], [0x34], [0x38]]
+    assert 0x34 in disp(a[0x0017A97D]) and 0x38 in disp(a[0x0017A98C]) and '0x124f0' in a[0x0017A998].text
+    assert 0x144 in disp(a[0x0018094F]) and 0x144 in disp(a[0x0017A469])
+    pitch = lambda i: struct.unpack('<2f', rd(0x004E8300 + i * 0x8C + 0x30, 8))
+    assert pitch(1) == (0.0, pytest.approx(0.001)) and pitch(2) == (-45.0, 0.0) and pitch(0) == (-30.0, 13.0)
+
+
 def test_scene5_gates_left_alone():
     """The death handler (gibs, explosions) and the impact hook run their story parts
     only in scene 5; in scene 100 both do nothing, as for the stock buggies."""
@@ -454,6 +514,30 @@ def test_spawn_heights():
     src = INC.read_text(encoding='utf-8')
     assert '6u,3u,0u,-2.365f,"future tank"}' in src and '{7u},1u,1u,1u,-0.935f,"truck"}' in src
     assert '{7u,0xEu},2u,2u,1u,-0.935f,' in src
+
+
+def test_tank_reticle_pak():
+    """tank_half.xbt is only in story/l_5_st.pak, and every file that pak shares with
+    another is byte-identical there (so mounting it shadows nothing)."""
+    if not (GAME / 'story/l_5_st.pak').exists():
+        pytest.skip('game paks not available locally')
+    c = _crc('assets/ts/textures/xbox/tank_half.xbt')
+    pak = GAME / 'story/l_5_st.pak'
+    me = _index(pak)
+    assert c in me
+    with open(pak, 'rb') as f:
+        for other in sorted(GAME.rglob('*.pak')):
+            if other.samefile(pak):
+                continue
+            try:
+                oi = _index(other)
+            except (OSError, struct.error):
+                continue
+            assert c not in oi, other.name
+            with open(other, 'rb') as g:
+                for k in set(me) & set(oi):
+                    f.seek(me[k][0]); g.seek(oi[k][0])
+                    assert f.read(me[k][2] or me[k][1]) == g.read(oi[k][2] or oi[k][1]), (other.name, hex(k))
 
 
 def test_story_vehicle_records():

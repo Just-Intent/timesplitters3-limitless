@@ -72,6 +72,32 @@
  *    script; the create hook clears the bit on a MapMaker tank after its
  *    builder (tracked bit 1 kept). Its seats have no anims: the enter path
  *    skips anim id 0 (0x0017C985).
+ * Fixed after .63 (playtest: the tank drives and fires, but the driver view
+ * sits low, the gun cannot aim below the screen centre, the reticle is a
+ * blue rectangle):
+ *  - reticle: the HUD sprite table 0x004D2D50 (0x18 each) loads a sprite
+ *    when its group mask passes sub_00080F40; scene 5's level info
+ *    (0x004D1AC0 + k*0x44, +8) has group 0x200 (tank_half 0x125, scanlines,
+ *    robot HUD ticks), scene 100 never passes it, so the tank reticle
+ *    texture assets/ts/textures/xbox/tank_half.xbt (sub_00063B40 turns .raw
+ *    into .xbt) is never requested; it is only in pak/story/l_5_st.pak. With
+ *    tanks in the map that pak is mounted index-only (its 15,707 shared
+ *    entries are byte-identical elsewhere) and the def preload requests the
+ *    sprite the HUD load's way, sub_000810C0(0x125);
+ *  - gun pitch: the turret init sub_00245990 copies the template's pitch
+ *    limits (+0x30/+0x34) to the gun data +0x34/+0x38, which the driver aim
+ *    clamps to (0x0017A97D). The main gun's are 0..0.001 (level only; +
+ *    is down), the AA gun's -45..0. A MapMaker tank's guns (block +0x144 /
+ *    +0x154) get -10..20 and -45..15 after the builder;
+ *  - camera: the chase camera sub_000CA040 holds the camera under the
+ *    room's top - 0.5 unless the room is open air (0x0CAB1C..0x0CABB4);
+ *    the tank's preset 2 (def +0xAC, 0x004DD420 + 2*0x20: distance 15,
+ *    height 4.6) suits Machine Wars' open ground, not 5 m MapMaker floors.
+ *    A MapMaker tank's block gets a heap copy of def 2 (+0x50) whose +0xAC
+ *    indexes a heap copy of preset 2 with distance 10, height 3
+ *    (sub_000CB060 computes 0x004DD420 + index*0x20, so the index of a
+ *    32-byte-aligned copy reaches it); TSFP_MAPMAKER_TANK_CAMERA=<d>,<h>
+ *    tunes it. Story tanks keep the static def and preset.
  * Not changed: the death handler sub_00174120 makes gibs and explosions only
  * in scene 5 (0x00174152) and the impact hook only calls the scene-5 script
  * (0x0017BB19): in scene 100 a tank, like the stock buggies, is not destroyed.
@@ -108,7 +134,7 @@
 #define VH_NODE_VAR 0x30u                /* editor node dword: VH_NODE_TAG | variant */
 #define VH_NODE_TAG 0x56480000u          /* 'VH' */
 #define VH_KINDS 3u                      /* variants 1..3 */
-#define VH_PAKS 2u
+#define VH_PAKS 3u                       /* tank models, truck models, tank reticle */
 #define VH_PAKTABLE 0x00907000u          /* mount table (paktable.json): 64 x 0x1C, +8 count, +0x10 index */
 #define VH_SLOT 0x1Cu
 #define VH_SLOTS 64u
@@ -150,7 +176,8 @@
 extern void sub_00075B70(void),sub_00071B10(void),sub_00071C50(void),sub_00079DE0(void),sub_0007D4A0(void),
     sub_00071800(void),sub_00078590(void),sub_000783D0(void),sub_00079D60(void),sub_00075E70(void),
     sub_00077320(void),sub_0003D7B0(void),sub_00333700(void),sub_002FDF50(void),
-    sub_000622D0(void),sub_00062260(void),sub_000631C0(void),sub_00096220(void),sub_000B3B20(void);
+    sub_000622D0(void),sub_00062260(void),sub_000631C0(void),sub_00096220(void),sub_000B3B20(void),
+    sub_000810C0(void);
 
 /* Variant k (1..3) is vh_kind[k-1]: def, model, record +0x28/+0x2C/+0x30/
  * +0x34, gun templates (-1 none), the models it creates (all need a scene-100
@@ -166,13 +193,30 @@ static const struct {
     {0u,7u,0u,1u,0u,0xFFFFFFFFu,{0,-1},{7u,0xEu},2u,2u,1u,-0.935f,"truck with Vickers gun"},
     {0u,7u,0u,1u,0xFFFFFFFFu,0xFFFFFFFFu,{-1,-1},{7u},1u,1u,1u,-0.935f,"truck"},
 };
-static const char *const vh_pak_path[VH_PAKS]={"pak/stream/lv5/prop1.pak","pak/stream/lv4/prop3.pak"};
+static const char *const vh_pak_path[VH_PAKS]={"pak/stream/lv5/prop1.pak","pak/stream/lv4/prop3.pak",
+                                              "pak/story/l_5_st.pak"};
+static const char *const vh_pak_for[VH_PAKS]={"tanks","trucks","tank reticle"};
+#define VH_HUD_PAK 2u
+#define VH_HUD_TANK 0x125u               /* HUD sprite tank_half (group 0x200, scene 5 only) */
+#define VH_HUD_TABLE 0x004D2D50u         /* HUD sprites: 0x18 each, +0x10 requested */
+#define VH_DEF_SIZE 0xD8u
+#define VH_DEF_CAMERA 0xACu              /* def: chase camera preset index */
+#define VH_PRESETS 0x004DD420u           /* chase camera presets, 0x20 each (sub_000CB060) */
+#define VH_GUN_MAIN 0x144u               /* vehicle block: gun data of turret 0, 1 */
+#define VH_GUN_AA 0x154u
+#define VH_GUN_PITCH 0x34u               /* gun data: pitch min, max (+ is down) */
+static const float vh_pitch[2][2]={{-10.0f,20.0f},{-45.0f,15.0f}};   /* main, AA (story 0..0.001, -45..0) */
+#define VH_CAM_DIST 10.0f                /* story preset 2: 15 */
+#define VH_CAM_HEIGHT 3.0f               /* story preset 2: 4.6 */
 /* Editor texts: label + four choices (guest copies on the heap). */
 static const char vh_texts[5][VH_TEXT_BYTES]={"Vehicle","Theme vehicle","Future tank (Machine Wars)",
                                               "Castle truck + Vickers gun","Castle truck"};
 
 static struct {
     uint32_t desc, cat, texts, paks[VH_PAKS];
+    uint32_t tank_def, tank_preset;      /* heap copies (once) */
+    float cam[2];
+    int cam_read;
     unsigned logged, failed;
     int lift_read[2];                    /* 0 tank, 1 truck */
     float lift[2];
@@ -183,7 +227,7 @@ static struct {
     int textured[VH_PAKS];               /* textures registered this level, per pak */
     unsigned refused[VH_KINDS+1u], placed[VH_KINDS+1u], created;
     uint32_t rec[VH_RECS]; uint8_t rec_var[VH_RECS]; unsigned nrec;
-    int lift_logged[2], entry_logged;
+    int lift_logged[2], entry_logged, reticle_logged, view_logged;
 } vh_lv;
 
 static void vh_log(const char *what,uint32_t a,uint32_t b)
@@ -421,6 +465,7 @@ static void vh_want(uint32_t item,uint32_t piece,void *ctx)
 static int vh_pak_wanted(unsigned j)
 {
     unsigned v;
+    if(j==VH_HUD_PAK) return vh_lv.want[1]!=0u;
     for(v=1u;v<=VH_KINDS;v++) if(vh_lv.want[v] && vh_kind[v-1u].pak==j) return 1;
     return 0;
 }
@@ -540,16 +585,18 @@ void pc_mapmaker_vehicles_mount(void (*original)(void))
         uint32_t mounted;
         if(!vh_pak_wanted(j) || !vh_pak(j) || vh_slot(j)!=-1) continue;
         if((mounted=WORD_AT(VH_MOUNTS))+VH_MOUNT_KEEP>VH_MOUNT_MAX) {
-            vh_log(j?"pak mount table full: trucks stay theme vehicles (pak)":"pak mount table full: tanks stay theme vehicles (pak)",
+            vh_log(j==VH_HUD_PAK?"pak mount table full: no tank reticle (pak)":
+                   j?"pak mount table full: trucks stay theme vehicles (pak)":"pak mount table full: tanks stay theme vehicles (pak)",
                    mounted,j);
             continue;
         }
         if((int32_t)guest_call(sub_000622D0,3,vh.paks[j],0u,1u)<0) {
-            fprintf(stderr,"[mapmaker] vehicles: %s did not mount: %s stay theme vehicles\n",vh_pak_path[j],j?"trucks":"tanks");
+            fprintf(stderr,"[mapmaker] vehicles: %s did not mount: %s\n",vh_pak_path[j],
+                    j==VH_HUD_PAK?"no tank reticle":j?"trucks stay theme vehicles":"tanks stay theme vehicles");
             fflush(stderr);
         } else {
             fprintf(stderr,"[mapmaker] vehicles: mounted %s for the %s (table %u; tanks %u, trucks %u)\n",vh_pak_path[j],
-                    j?"trucks":"tanks",(unsigned)mounted+1u,vh_lv.want[1],vh_lv.want[2]+vh_lv.want[3]);
+                    vh_pak_for[j],(unsigned)mounted+1u,vh_lv.want[1],vh_lv.want[2]+vh_lv.want[3]);
             fflush(stderr);
         }
     }
@@ -617,6 +664,60 @@ static float vh_lift(unsigned v)
     return vh.lift[t];
 }
 
+/* The tank reticle: the HUD sprite the Machine Wars HUD group loads, from
+ * the mounted l_5_st pak, the way the HUD load requests it. */
+static void vh_reticle(void)
+{
+    uint32_t e=VH_HUD_TABLE+VH_HUD_TANK*0x18u;
+    int mounted=vh_slot(VH_HUD_PAK)!=-1;
+    uint32_t before=WORD_AT(e+0x10u);
+    if(mounted && !before) guest_call(sub_000810C0,1,VH_HUD_TANK);
+    if(!vh_lv.reticle_logged) {
+        vh_lv.reticle_logged=1;
+        fprintf(stderr,"[mapmaker] vehicles: tank reticle tank_half (HUD 0x125, group 0x200): %s\n",
+                !mounted?"pak/story/l_5_st.pak not mounted, the reticle stays blank":
+                before?"already requested":WORD_AT(e+0x10u)?"requested from pak/story/l_5_st.pak":"request refused");
+        fflush(stderr);
+    }
+}
+
+/* The MapMaker tank's chase camera distance and height (read once). */
+static void vh_camera_read(void)
+{
+    const char *s;
+    if(vh.cam_read) return;
+    vh.cam_read=1;vh.cam[0]=VH_CAM_DIST;vh.cam[1]=VH_CAM_HEIGHT;
+    if((s=getenv("TSFP_MAPMAKER_TANK_CAMERA")) && *s) {
+        char *end=0;
+        float d=strtof(s,&end),h;
+        if(end && end!=s && *end==',') {
+            const char *t=end+1;
+            h=strtof(t,&end);
+            if(end && end!=t && !*end && d>=2.0f && d<=30.0f && h>=0.0f && h<=10.0f) { vh.cam[0]=d;vh.cam[1]=h;return; }
+        }
+        vh_log("TSFP_MAPMAKER_TANK_CAMERA ignored (want <distance 2..30>,<height 0..10>)",0,0);
+    }
+}
+/* Once: a copy of the tank def whose camera preset index reaches a copy of
+ * the story preset with the MapMaker distance and height. */
+static uint32_t vh_tank_def(uint32_t def)
+{
+    if(!vh.tank_def) {
+        uint32_t d=xbox_HeapAlloc(VH_DEF_SIZE,4u),raw=xbox_HeapAlloc(0x40u,4u),p,story;
+        if(!d || !raw || !MAPMAKER_PTR_OK(d,VH_DEF_SIZE) || !MAPMAKER_PTR_OK(raw,0x40u) || !MAPMAKER_PTR_OK(def,VH_DEF_SIZE)) return 0;
+        p=raw+((VH_PRESETS-raw)&31u);                  /* (p - presets) a multiple of 0x20 */
+        story=VH_PRESETS+WORD_AT(def+VH_DEF_CAMERA)*0x20u;
+        if(WORD_AT(def+VH_DEF_CAMERA)>4u) return 0;
+        memcpy((void *)((uintptr_t)d+g_xbox_mem_offset),(const void *)((uintptr_t)def+g_xbox_mem_offset),VH_DEF_SIZE);
+        memcpy((void *)((uintptr_t)p+g_xbox_mem_offset),(const void *)((uintptr_t)story+g_xbox_mem_offset),0x20u);
+        vh_camera_read();
+        VH_F(p)=vh.cam[0];VH_F(p+4u)=vh.cam[1];
+        WORD_AT(d+VH_DEF_CAMERA)=(p-VH_PRESETS)>>5;
+        vh.tank_def=d;vh.tank_preset=p;
+    }
+    return vh.tank_def;
+}
+
 /* WRAP sub_0033DDA0 (cdecl item, theme -> vehicle def): the preload gets the
  * variant's def and its gun templates; the fill the def and model of a
  * variant whose models were read. Every other call is stock. */
@@ -632,6 +733,7 @@ void pc_mapmaker_vehicles_def(void (*original)(void))
         if(!vh_available(v)) return;
         for(i=0;i<2u;i++) if(vh_kind[v-1u].templates[i]>=0)
             guest_call(sub_000B3B20,1,VH_TEMPLATES+(uint32_t)vh_kind[v-1u].templates[i]*VH_TEMPLATE);
+        if(v==1u) vh_reticle();
         g_eax=vh_kind[v-1u].def;
         return;
     }
@@ -659,6 +761,32 @@ void pc_mapmaker_vehicles_def(void (*original)(void))
     if(vh_lv.placed[v]++<4u) vh_log(v==1u?"vehicle placed as the Machine Wars future tank (record, count)":
                                     v==2u?"vehicle placed as the Scotland the Brave truck with its Vickers gun (record, count)":
                                     "vehicle placed as the Scotland the Brave truck (record, count)",g_ebp,vh_lv.placed[v]);
+}
+
+/* A MapMaker tank's camera and gun pitch (after its builder). */
+static void vh_tank_view(uint32_t block)
+{
+    uint32_t def,d,g[2];
+    unsigned k,guns=0;
+    float was[2][2]={{0,0},{0,0}};
+    if(!MAPMAKER_PTR_OK(block,0x170u)) return;
+    def=WORD_AT(block+0x50u);
+    if((d=vh_tank_def(def==vh.tank_def?0x004E8658u:def))) WORD_AT(block+0x50u)=d;
+    g[0]=WORD_AT(block+VH_GUN_MAIN);g[1]=WORD_AT(block+VH_GUN_AA);
+    for(k=0;k<2u && k<WORD_AT(block+0x164u);k++) {
+        if(!MAPMAKER_PTR_OK(g[k],VH_GUN_PITCH+8u)) continue;
+        was[k][0]=VH_F(g[k]+VH_GUN_PITCH);was[k][1]=VH_F(g[k]+VH_GUN_PITCH+4u);
+        VH_F(g[k]+VH_GUN_PITCH)=vh_pitch[k][0];VH_F(g[k]+VH_GUN_PITCH+4u)=vh_pitch[k][1];
+        guns++;
+    }
+    if(vh_lv.view_logged) return;
+    vh_lv.view_logged=1;
+    fprintf(stderr,"[mapmaker] vehicles: tank view: chase camera distance %.1f height %.1f (story 15.0, 4.6)%s%s; "
+            "gun pitch main %.1f..%.1f (was %.1f..%.3f), AA %.1f..%.1f (was %.1f..%.1f), guns %u\n",
+            (double)vh.cam[0],(double)vh.cam[1],d?"":" NOT APPLIED",getenv("TSFP_MAPMAKER_TANK_CAMERA")?" (TSFP_MAPMAKER_TANK_CAMERA)":"",
+            (double)vh_pitch[0][0],(double)vh_pitch[0][1],(double)was[0][0],(double)was[0][1],
+            (double)vh_pitch[1][0],(double)vh_pitch[1][1],(double)was[1][0],(double)was[1][1],guns);
+    fflush(stderr);
 }
 
 /* WRAP sub_00182A20 (cdecl object, record: the vehicle create): a filled
@@ -694,6 +822,7 @@ void pc_mapmaker_vehicles_create(void (*original)(void))
                 MAPMAKER_PTR_OK(block,0x144u)?(unsigned)WORD_AT(block+0x140u):0u);
         fflush(stderr);
     }
+    vh_tank_view(block);
 }
 
 #ifdef TSFP_MAPMAKER_VEHICLES_TEST
