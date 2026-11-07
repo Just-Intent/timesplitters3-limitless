@@ -96,7 +96,9 @@ def test_mapmaker_validate(tmp_path, mutation):
 def test_editor_load_calls_the_validator_first():
     """The editor area's loader hook refuses before hiding chunks; the include chain declares it."""
     editor = (ROOT / 'src/interface/pc_mapmaker_editor.inc').read_text(encoding='utf-8')
-    body = editor[editor.index('void pc_mapmaker_editor_load('):]
+    hook = editor[editor.index('void pc_mapmaker_editor_load('):]
+    assert 'mapmaker_editor_load_run(original);' in hook[:hook.index('\n}\n')]
+    body = editor[editor.index('static void mapmaker_editor_load_run('):]
     body = body[:body.index('\n}\n')]
     assert body.index('pc_mapmaker_validate_editor_load(container,original)') < body.index('mapmaker_hide_run(')
     guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
