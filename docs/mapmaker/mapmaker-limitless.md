@@ -220,6 +220,13 @@ use more memory. The editor shows a pickup on slots 7-20 with its own
 slot's model. *Automated tests only.* Details:
 [weapon set](mapmaker-weaponset.md).
 
+With the switch the editor's weapon list (pick a weapon for a slot) also
+offers three weapons the game hides: **Time Grenade**, **TNT** and the
+**Temporal Uplink**. They work in slots, pickups and Story AI weapons; the
+time grenade explodes like a grenade (no slow motion was found in the game's
+code). The front end's profile weapon sets are unchanged. *Automated tests
+only.*
+
 The **Bots** screen of an Arcade match setup (front end and the in-game pause
 menu's setup) has its own page 2 when you play a MapMaker map: see the next
 section. In the editor the Test map setup's Bots screen edits the map's set

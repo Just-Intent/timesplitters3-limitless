@@ -239,6 +239,42 @@ pane 0x005236EC exists only inside screen 0x0052371C = {`sub_002D44D0`,
   more Level heap (not measured). Watch the memory area's `heap full` log and
   the probe's free-memory figure.
 
+## Hidden weapons in the weapon list (story assets wave 1, 2026-11-07)
+
+User request (story assets track): make the hidden weapons placeable and
+selectable. CONFIRMED (decode test `test_hidden_weapons_in_the_list`):
+
+- The weapon list builder `sub_002BFA70` walks the list table 0x004FC88C (69
+  ids, every id 1..0x45) and skips an id when `sub_001CD9D0(id)` is 0 (call
+  0x002BFB03, return 0x002BFB08). `sub_001CD9D0` = `sub_001CD3E0(0x004FA144
+  + id*0x3C, 0)`; unlock type 0 (record +0x10) always gives 0, even with the
+  unlock-all flag. Other callers: the new-map default set (0x002F9EE8) and the
+  unlock snapshot (0x002CB291 / 0x002CB505).
+- `pc_mapmaker_weaponset_unlock` (WRAP `sub_001CD9D0`) answers 1 at that
+  return address only, in the editor (scene 102) with the switch, for 0x29
+  time grenade, 0x2F TNT and 0x38 temporal uplink (story-type maps already
+  append 0x38 to the play set). The other callers, the front end's profile
+  sets (scene 101) and play keep the stock answer; play does not re-check
+  unlocks, so the weapons work in slots, pickups and Story AI weapons like
+  any other. Log: `[mapmaker] weaponset: weapon list: hidden weapon 0x2F
+  offered ...` (screen budget).
+- Left out: the variant twins 0x03, 0x06, 0x09, 0x11, 0x18, 0x1A, 0x1C, 0x1F,
+  0x21, 0x25, 0x2D, 0x31, 0x39: weapon record +8 (variant flag) is copied to
+  the weapon state's mode +0x38 (0x001BE082 -> 0x001BE0A4), the mode the
+  scope wheel reads, and each twin has its neighbour's name, model and ammo:
+  the same weapon starting in its other mode. 0x27 (the monkey gun's twin),
+  0x01 (no model) and the story props 0x3C..0x45 stay out too.
+- Time grenade (story assets item 11, probe P2 done offline): projectile type
+  0xF (`sub_000F2B80`) explodes with type 0x2B (0x000F2DF2: 7 / 6 / 5, flags
+  0 in table 0x004DB490, stride 0x18) and leaves a decal (`sub_00114AF0`).
+  No code reads the scene `[0x0079094C]` on that path; the only mode read is
+  the story-mode AI alert of every explosion (0x000EFEF8). No slow-time code
+  was found (as in wave 0), so in MapMaker it is a grenade with its own
+  explosion; nothing needs per-level state or a gate. Whether the original
+  slows time anywhere is still unverified in game.
+- TNT 0x2F: projectile type 0x13, the mine update `sub_000F39A0` (pool
+  objects, several per map). Bots may not use it well (INFERRED).
+
 ## Extension memory
 
 0x00906000..0x0090607F play set, 0x00906080..0x009060FF AI pick set,
@@ -269,6 +305,7 @@ WRAP sub_0033E780 -> pc_mapmaker_weaponset_weapon_veto  (new)
 WRAP sub_0033E7B0 -> pc_mapmaker_weaponset_ammo_veto    (new)
 WRAP sub_0033E3B0 -> pc_mapmaker_weaponset_pickup       (new; level load)
 WRAP sub_0023F390 -> pc_mapmaker_weaponset_preload      (new; level load, no arguments)
+WRAP sub_001CD9D0 -> pc_mapmaker_weaponset_unlock       (new 2026-11-07; return-address test 0x002BFB08, editor only)
 ```
 
 All cdecl, plain `ret`; a hook that answers itself pops the return address
@@ -306,5 +343,9 @@ already stubbed).
    stderr has no `[mapmaker] weaponset:` or `heap full` line.
 5. A map that uses none of this saves as before (stock size). A map using it:
    a stock build refuses it; System Link refuses it.
+5b. Editor, weapon set screen, any slot: the weapon list now also offers
+   Time Grenade, TNT and the Temporal Uplink (stderr: `weapon list: hidden
+   weapon 0x29 offered`). Put them in slots, pickups and Story AIs; save,
+   reload and play: they spawn and fire like other weapons.
 6. Without the switch: six rows (`slot pane build (stock 6 rows: ...)`), no extra choices; the map from step 3 still
    loads and plays with its 20 slots.

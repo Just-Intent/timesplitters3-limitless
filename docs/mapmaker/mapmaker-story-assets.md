@@ -59,7 +59,7 @@ Mission numbers follow the story table `0x004D1AC0`: 1 intro (scene 2),
 
 | # | item | assets | behaviour | MapMaker today | several | effort | main blockers | status |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Hidden weapons: TNT 0x2F, time grenade 0x29, uplink 0x38, variant twins | all in gun.pak and `pak/anim/gun/*` | normal projectiles (TNT = mine update `sub_000F39A0`) | weapon list holds every id 1..0x45; these are hidden by unlock type 0 | yes | **cheap** | AI use of TNT; twin semantics | - |
+| 1 | Hidden weapons: TNT 0x2F, time grenade 0x29, uplink 0x38, variant twins | all in gun.pak and `pak/anim/gun/*` | normal projectiles (TNT = mine update `sub_000F39A0`) | weapon list holds every id 1..0x45; these are hidden by unlock type 0 | yes | **cheap** | AI use of TNT; twin semantics | **wave 1: 0x29, 0x2F, 0x38 in the editor list** (fixture only); twins out |
 | 1b | Story-only "weapons" 0x3C..0x3F (binoculars, whiskey, JB camera, zombie limb) | story paks only | script props | none | - | hard | name text, story ammo types | - |
 | 2 | Mission 1 big exploding barrel = power cell 0x53D | 34,412 B; l_2_st / l_64_ch (mounted by the mothership port) | init 20 case 12, damage `sub_00218650`, explosion 0x2F | none (barrel is 0x0A) | yes | **cheap** | stand-in record at obj+0x2D8; resource 0xCFB | - |
 | 3 | Mission 5 wraith (black ghost) | prop 0x1DA/0x242 11,996 B in **gun.pak**; anim 0x13E in lv60.pak (816 B) | global wraith system `sub_0024ABA0`, tag 'WRTH' | none | **no** (one global) | medium-hard | scene gate, rooms, spirit table coordinates | - |
@@ -71,7 +71,7 @@ Mission numbers follow the story table `0x004D1AC0`: 1 intro (scene 2),
 | 8 | Mission 6 flying imps = ragbugs | char 0xB0 (chr.pak); anims 0x243..0x246 lv17_4 | class 200000:0 parks them; flock driven by the pit fight | none | <= 6 per skeleton | medium with item 7, hard alone | flock driver lives in the boss | - |
 | 9 | Mission 7 robots = securibot 0x4D | anims 0xA22..0xA2C lv6.pak (828,752 B) | class 0x4000 `sub_0026B7A0`, no level state | none (0x5C nfrobosec is already a roster row) | yes | **medium** | picker row, lv6 mount | - |
 | 10 | Mission 7 cleaning robot 0x4F | model 0x609 chr.pak; anims 0xA2C..0xA2F lv6 | INFERRED class 0x4000 family; loop sound 0x365 | none | yes | cheap-medium | which anims and class it really uses (probe) | - |
-| 11 | Mission 7 slow-motion grenade = weapon 0x29 | gun.pak | projectile type 0xF, explosion 0x2B | hidden (item 1) | yes | cheap to offer, medium to verify | slow-motion code **not found** | - |
+| 11 | Mission 7 slow-motion grenade = weapon 0x29 | gun.pak | projectile type 0xF, explosion 0x2B | hidden (item 1) | yes | cheap to offer, medium to verify | slow-motion code **not found** | **wave 1: offered**; P2 offline: no slow-time code, no level state |
 | 12 | Mission 7 city sky + other story skies | `skyTS3nf1_xbox` 0x790 | sky record 52 | **already offered** (sky-music area) | - | done | - | - |
 | 13 | Mission 7 red laser pairs + control panels | 0x4E0..0x4E3, about 2 KB each, l_6_st | init 22 `sub_0020C300`: lasers `sub_00209680`, panel damage `sub_0020B8C0`; alarm table `0x0078B2E0` | none | yes (5 lasers per panel group, 18 alarms) | **medium** | stand-in records; alarm rows in scene 100; damage type 0x2F | - |
 | 14 | Mission 8 robot spiders 0x4A/0x50 | chr.pak; anims lv22.pak (610,832 B) | class 0x2000 `sub_0037B720`; pool `sub_003796B0` (15) | none | up to the pool size | medium-hard | rail paths in descriptor +0x54..+0x60; pool | - |
@@ -139,6 +139,15 @@ return address is 0x002BFB08 (the list builder). Ids below 0x46 already fit
 the 6- and 20-slot sets and the save format, and play does not re-check
 unlocks. Start with {0x29, 0x2F}. Leave the twins out until their variant
 flag is understood.
+
+**Wave 1 (2026-11-07, fixture only).** Done in the weaponset area
+(`pc_mapmaker_weaponset_unlock`, editor only): 0x29, 0x2F and 0x38. The
+variant flag is now understood: it becomes the weapon state's mode +0x38
+(0x001BE0A4), so a twin is its neighbour in its other mode; twins stay out.
+P2 offline: the type-0xF projectile path (explosion 0x2B, decal) reads no
+scene or level state and no slow-time code exists on it; the time grenade
+works in MapMaker as an ordinary grenade. Details and test steps:
+[weapon set](mapmaker-weaponset.md) "Hidden weapons".
 
 ### 2. Mission 1 big exploding barrel (intro power cell)
 

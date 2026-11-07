@@ -127,6 +127,13 @@ MUTATIONS = {
     'pickup-one-based': ('    if(s) WS_H(p+0x10u)=(int16_t)(s-1u);', '    if(s) WS_H(p+0x10u)=(int16_t)s;'),
     'preload-type': ('id<0x17u?2u:0x40u,w);', '2u,w);'),
     'preload-stale-cache': ('    unsigned n=0;\n    ws.valid=0;\n', '    unsigned n=0;\n'),
+    # the hidden weapons in the editor's weapon list (sub_001CD9D0 at 0x002BFB08)
+    'unlock-any-caller': ('WORD_AT(g_esp)!=WS_UNLOCK_RET || !ws_hidden_weapon', '0 || !ws_hidden_weapon'),
+    'unlock-any-scene': ('       WORD_AT(WS_SCENE)!=102u || !ws_on()) { original();return; }\n    original();\n    if(!g_eax)', '       !ws_on()) { original();return; }\n    original();\n    if(!g_eax)'),
+    'unlock-ignores-switch': ('       WORD_AT(WS_SCENE)!=102u || !ws_on()) { original();return; }\n    original();\n    if(!g_eax)', '       WORD_AT(WS_SCENE)!=102u) { original();return; }\n    original();\n    if(!g_eax)'),
+    'unlock-twins': ('return id==0x29u || id==0x2Fu || id==0x38u;', 'return id==0x29u || id==0x2Fu || id==0x38u || id==0x03u;'),
+    'unlock-no-tnt': ('return id==0x29u || id==0x2Fu || id==0x38u;', 'return id==0x29u || id==0x38u;'),
+    'unlock-skips-original': ('    original();\n    if(!g_eax) {\n        g_eax=1u;', '    g_eax=0;\n    if(!g_eax) {\n        g_eax=1u;'),
 }
 
 
@@ -422,3 +429,42 @@ def test_screens():
 def test_fork_tag_unused():
     hits = [i for i in decoded() if any(v in (0x00C776F6,) for _, v in i.values())]
     assert not hits
+
+
+def test_hidden_weapons_in_the_list():
+    """sub_002BFA70 asks sub_001CD9D0(id) for every list id (return 0x002BFB08); unlock
+    type 0 (weapon record +0x10) is never unlocked; the allow-listed ids have a name,
+    a pickup model and an anim pak; the twins are the same weapon in its other mode."""
+    a = by_address()
+    assert ret_of(a, 0x002BFB03, 0x1cd9d0) == 0x002BFB08 and a[0x002BFB03].function == 0x002BFA70
+    assert a[0x002BFB0D].mnemonic == 'je' and ('imm', 0x004FC88C) in a[0x002BFAF9].ops
+    assert ('imm', 0x004FC9A0) in a[0x002BFB5C].ops                       # 69 ids
+    # the other callers keep the stock answer: unlock snapshot, new-map default set
+    assert callers_of(0x1cd9d0) == {0x002BFB03, 0x002CB291, 0x002CB505, 0x002F9EE8}
+    # sub_001CD9D0 = sub_001CD3E0(0x004FA144 + id*0x3C, 0)
+    assert ('imm', 0x3C) in a[0x001CD9D4].ops and ('imm', 0x004FA144) in a[0x001CD9D7].ops
+    assert '0x1cd3e0' in a[0x001CD9DF].text
+    # the variant flag (record +8) becomes the weapon state's mode +0x38
+    assert 0x004FA13C in disp(a[0x001BE082]) and 0x38 in disp(a[0x001BE0A4])
+    data = (_private() / 'game/default.xbe').read_bytes()
+    base = struct.unpack_from('<I', data, 0x104)[0]
+    nsec, shdr = struct.unpack_from('<II', data, 0x11C)
+
+    def i32(va):
+        for k in range(nsec):
+            _, v, vs, raw, rs = struct.unpack_from('<5I', data, shdr - base + k * 0x38)
+            if v <= va < v + vs:
+                return struct.unpack_from('<i', data, raw + va - v)[0]
+        raise KeyError(hex(va))
+    assert {i32(0x004FC88C + 4 * k) for k in range(69)} == set(range(1, 0x46))
+    for w in (0x29, 0x2F, 0x38):
+        assert i32(0x004FA134 + w * 0x3C + 0x10) == 0                     # unlock type 0
+        assert i32(0x004FB190 + w * 0x54) > 0 and i32(0x004FB194 + w * 0x54) > -1   # name, pickup model
+        assert i32(0x004FA134 + w * 0x3C + 0xC) != 0                      # anim pak path
+    assert (i32(0x004FB194 + 0x29 * 0x54), i32(0x004FB194 + 0x2F * 0x54)) == (0x160, 0x141)
+    for twin, base_id in ((0x03, 0x02), (0x06, 0x05), (0x11, 0x10), (0x21, 0x20), (0x39, 0x38)):
+        assert i32(0x004FB190 + twin * 0x54) == i32(0x004FB190 + base_id * 0x54)        # same name
+        assert i32(0x004FB194 + twin * 0x54) == i32(0x004FB194 + base_id * 0x54)        # same model
+        assert i32(0x004FA134 + twin * 0x3C + 4) == i32(0x004FA134 + base_id * 0x3C + 4)  # same ammo
+        assert i32(0x004FA134 + twin * 0x3C + 8) != i32(0x004FA134 + base_id * 0x3C + 8)  # other mode
+    assert i32(0x004FB194 + 0x01 * 0x54) == -1                            # 0x01: no model
