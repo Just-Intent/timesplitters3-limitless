@@ -55,6 +55,23 @@
  *  - create (sub_00182A20 at 0x0006E949, also the restart's re-create, whose
  *    records keep the fill's values): +0x28, +0x2C, +0x30 (the fill writes
  *    0, 1, -1 after the def call) and +0x34 of a filled variant record.
+ * Fixed after .61 (playtest: all three sunk in the floor, the tank could not
+ * be entered):
+ *  - spawn height: the fill puts the record y at the vehicle pad, where the
+ *    stock buggies and the jeep have their lowest vertex (model y 0: they
+ *    stand on their origin). The truck's wheels reach y -0.935 and the
+ *    tank's tracks y -2.365 below their origin (vertex rows of models 7 and
+ *    0xB), so the fill hook raises the record y (+0x10) by that depth + 0.01
+ *    (the props' floor gap); TSFP_MAPMAKER_TANK_LIFT / _TRUCK_LIFT (-1..4 m)
+ *    replace it for a playtest. The restart keeps the raised record;
+ *  - tank entry: def 2 +0xA8 = 0x17 is copied to the vehicle block +0x58
+ *    (0x00182B51); bit 0x10 there refuses a player: sub_0017A260 (the
+ *    enterable test of the nearest-vehicle scan sub_0017C6A0, 0x0017A27E),
+ *    the use prompt sub_0017D1D0 (0x0017D1E8), the exit (0x0017DAFB) and the
+ *    tick sub_0017E680 (0x0017ECD6). Machine Wars puts the player in by
+ *    script; the create hook clears the bit on a MapMaker tank after its
+ *    builder (tracked bit 1 kept). Its seats have no anims: the enter path
+ *    skips anim id 0 (0x0017C985).
  * Not changed: the death handler sub_00174120 makes gibs and explosions only
  * in scene 5 (0x00174152) and the impact hook only calls the scene-5 script
  * (0x0017BB19): in scene 100 a tank, like the stock buggies, is not destroyed.
@@ -120,6 +137,12 @@
 #define VH_TEMPLATE 0x8Cu
 #define VH_RECS 8u                       /* filled variant records per level (4 in the pool) */
 #define VH_TEXT_BYTES 32u
+#define VH_REC_Y 0x10u                   /* vehicle record: position y */
+#define VH_LIFT_MIN (-1.0f)
+#define VH_LIFT_MAX 4.0f
+#define VH_FLOOR_GAP 0.01f               /* as the fill's props (cell + 0.01, 0x0024175E) */
+#define VH_BLOCK_FLAGS 0x58u             /* vehicle block (obj +0x7C): def +0xA8 */
+#define VH_NO_PLAYER 0x10u               /* block flag: no player may enter or leave */
 #define VH_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define VH_H(a) (*(int16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define VH_F(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
@@ -136,11 +159,12 @@ static const struct {
     uint32_t def, model, r28, r2c, r30, r34;
     int32_t templates[2];
     uint32_t models[6]; unsigned nmodels, ready, pak;
+    float base;                          /* the model's lowest vertex y (the buggies: 0) */
     const char *what;
 } vh_kind[VH_KINDS]={
-    {2u,0xBu,4u,4u,1u,2u,{1,2},{0xBu,0xCu,0xDu,0x54Du,0x54Eu,0x54Fu},6u,3u,0u,"future tank"},
-    {0u,7u,0u,1u,0u,0xFFFFFFFFu,{0,-1},{7u,0xEu},2u,2u,1u,"truck with Vickers gun"},
-    {0u,7u,0u,1u,0xFFFFFFFFu,0xFFFFFFFFu,{-1,-1},{7u},1u,1u,1u,"truck"},
+    {2u,0xBu,4u,4u,1u,2u,{1,2},{0xBu,0xCu,0xDu,0x54Du,0x54Eu,0x54Fu},6u,3u,0u,-2.365f,"future tank"},
+    {0u,7u,0u,1u,0u,0xFFFFFFFFu,{0,-1},{7u,0xEu},2u,2u,1u,-0.935f,"truck with Vickers gun"},
+    {0u,7u,0u,1u,0xFFFFFFFFu,0xFFFFFFFFu,{-1,-1},{7u},1u,1u,1u,-0.935f,"truck"},
 };
 static const char *const vh_pak_path[VH_PAKS]={"pak/stream/lv5/prop1.pak","pak/stream/lv4/prop3.pak"};
 /* Editor texts: label + four choices (guest copies on the heap). */
@@ -150,6 +174,8 @@ static const char vh_texts[5][VH_TEXT_BYTES]={"Vehicle","Theme vehicle","Future 
 static struct {
     uint32_t desc, cat, texts, paks[VH_PAKS];
     unsigned logged, failed;
+    int lift_read[2];                    /* 0 tank, 1 truck */
+    float lift[2];
 } vh;
 /* This level (cleared by every level's pak mount; a restart keeps it). */
 static struct {
@@ -157,6 +183,7 @@ static struct {
     int textured[VH_PAKS];               /* textures registered this level, per pak */
     unsigned refused[VH_KINDS+1u], placed[VH_KINDS+1u], created;
     uint32_t rec[VH_RECS]; uint8_t rec_var[VH_RECS]; unsigned nrec;
+    int lift_logged[2], entry_logged;
 } vh_lv;
 
 static void vh_log(const char *what,uint32_t a,uint32_t b)
@@ -571,6 +598,25 @@ void pc_mapmaker_vehicles_preload_model(void (*original)(void))
     g_eax=vh_kind[v-1u].model;
 }
 
+/* The record y raise of variant v: its model's depth below the origin plus
+ * the floor gap, or the playtest override (read once). */
+static float vh_lift(unsigned v)
+{
+    unsigned t=v==1u?0u:1u;
+    if(!vh.lift_read[t]) {
+        const char *name=t?"TSFP_MAPMAKER_TRUCK_LIFT":"TSFP_MAPMAKER_TANK_LIFT",*s=getenv(name);
+        char *end=0;
+        float f;
+        vh.lift_read[t]=1;vh.lift[t]=VH_FLOOR_GAP-vh_kind[v-1u].base;
+        if(s && *s) {
+            f=strtof(s,&end);
+            if(end && end!=s && !*end && f>=VH_LIFT_MIN && f<=VH_LIFT_MAX) vh.lift[t]=f;
+            else vh_log(t?"TSFP_MAPMAKER_TRUCK_LIFT ignored (not a number in -1..4)":"TSFP_MAPMAKER_TANK_LIFT ignored (not a number in -1..4)",0,0);
+        }
+    }
+    return vh.lift[t];
+}
+
 /* WRAP sub_0033DDA0 (cdecl item, theme -> vehicle def): the preload gets the
  * variant's def and its gun templates; the fill the def and model of a
  * variant whose models were read. Every other call is stock. */
@@ -598,27 +644,56 @@ void pc_mapmaker_vehicles_def(void (*original)(void))
     vh_lv.rec[vh_lv.nrec]=g_ebp;vh_lv.rec_var[vh_lv.nrec]=(uint8_t)v;vh_lv.nrec++;
     WORD_AT(g_ebp+8u)=vh_kind[v-1u].model;
     g_eax=vh_kind[v-1u].def;
+    {
+        unsigned t=v==1u?0u:1u;
+        float lift=vh_lift(v);
+        VH_F(g_ebp+VH_REC_Y)+=lift;
+        if(!vh_lv.lift_logged[t]) {
+            vh_lv.lift_logged[t]=1;
+            fprintf(stderr,"[mapmaker] vehicles: %s spawn height: record y %+.3f (model base y %.3f)%s\n",t?"truck":"tank",
+                    (double)lift,(double)vh_kind[v-1u].base,
+                    lift!=VH_FLOOR_GAP-vh_kind[v-1u].base?(t?" (TSFP_MAPMAKER_TRUCK_LIFT)":" (TSFP_MAPMAKER_TANK_LIFT)"):"");
+            fflush(stderr);
+        }
+    }
     if(vh_lv.placed[v]++<4u) vh_log(v==1u?"vehicle placed as the Machine Wars future tank (record, count)":
                                     v==2u?"vehicle placed as the Scotland the Brave truck with its Vickers gun (record, count)":
                                     "vehicle placed as the Scotland the Brave truck (record, count)",g_ebp,vh_lv.placed[v]);
 }
 
 /* WRAP sub_00182A20 (cdecl object, record: the vehicle create): a filled
- * variant record gets its story fields before the builder reads them. */
+ * variant record gets its story fields before the builder reads them; after
+ * it a tank's block loses the story's no-player flag (players enter and
+ * leave it as a buggy). */
 void pc_mapmaker_vehicles_create(void (*original)(void))
 {
-    uint32_t rec;
-    unsigned k,v=0;
+    uint32_t rec,obj,block,was;
+    unsigned k,v=0,ours=0;
     if(!MAPMAKER_STACK_OK(12) || WORD_AT(g_esp)!=VH_CREATE_RET || !vh_play()) { original();return; }
-    rec=WORD_AT(g_esp+8u);
+    obj=WORD_AT(g_esp+4u);rec=WORD_AT(g_esp+8u);
     for(k=0;k<vh_lv.nrec;k++) if(vh_lv.rec[k]==rec) v=vh_lv.rec_var[k];
     if(v && MAPMAKER_PTR_OK(rec,0x40u) && WORD_AT(rec+0x24u)==vh_kind[v-1u].def && WORD_AT(rec+8u)==vh_kind[v-1u].model) {
         WORD_AT(rec+0x28u)=vh_kind[v-1u].r28;WORD_AT(rec+0x2Cu)=vh_kind[v-1u].r2c;
         WORD_AT(rec+0x30u)=vh_kind[v-1u].r30;WORD_AT(rec+0x34u)=vh_kind[v-1u].r34;
+        ours=1;
         if(vh_lv.created++<8u) vh_log(v==1u?"created a future tank (record, guns 2)":
                                       v==2u?"created a truck (record, gunner seat 1)":"created a truck (record, no gun)",rec,v);
     } else if(v) vh_log("a story vehicle record changed before its create: left as filled (record, variant)",rec,v);
     original();
+    if(!ours || v!=1u) return;
+    if(!MAPMAKER_PTR_OK(obj,0x80u) || !MAPMAKER_PTR_OK(block=WORD_AT(obj+0x7Cu),VH_BLOCK_FLAGS+4u)) {
+        vh_log("tank block not found after its create: it stays closed to players (object, record)",obj,rec);
+        return;
+    }
+    was=WORD_AT(block+VH_BLOCK_FLAGS);
+    WORD_AT(block+VH_BLOCK_FLAGS)=was&~VH_NO_PLAYER;
+    if(!vh_lv.entry_logged) {
+        vh_lv.entry_logged=1;
+        fprintf(stderr,"[mapmaker] vehicles: tank open to players: block flags 0x%X -> 0x%X (story no-player bit 0x10; tracked bit %u; seats %u)\n",
+                (unsigned)was,(unsigned)(was&~VH_NO_PLAYER),(unsigned)(was&1u),
+                MAPMAKER_PTR_OK(block,0x144u)?(unsigned)WORD_AT(block+0x140u):0u);
+        fflush(stderr);
+    }
 }
 
 #ifdef TSFP_MAPMAKER_VEHICLES_TEST
