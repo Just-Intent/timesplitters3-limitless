@@ -119,3 +119,12 @@ slot*0x1000). Lists: `sub_0009E4B0` relinks per frame via `sub_0009E430`
 (pool bound 0x0009E46B drops a prop, raised cap kept). Which drop hit the
 bosses is INFERRED; the `bossroom:` line (linked K, pool use) decides.
 `test_mapmaker_bossroom.py`. Unplayed.
+
+Story props (wave 1, area `storyprops`, `pc_mapmaker_storyprops.inc`, after
+weaponset): drum 0x49 -> power cell 0x53D and fixed guns 0x32..0x34 -> prison
+gun 0xE6 (gun type 7) chosen in item options (drum: heap descriptor via a
+`sub_002F7770` copy of category 26 with +8 set; gun: `sub_000783D0` at
+0x00318A8C), saved in item record byte +0xC (stock-unused for these ids) and
+node +0x30 ('SP'), applied by the play fill (`sub_002F7790`, `sub_0033DD80`,
+preload `sub_0006C090`), paks l_64_ch / l_26_st index-only. 9 WRAPs:
+mapmaker-storyprops.md. `test_mapmaker_storyprops.py`. Unplayed.

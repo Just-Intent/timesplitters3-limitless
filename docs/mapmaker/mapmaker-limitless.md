@@ -278,6 +278,18 @@ The original game plays such a map with the same robots but shows an empty
 name in the editor. *Automated tests only.* Details:
 [story assets](mapmaker-story-assets.md) item 18.
 
+### Story props: power cells and prison guns (`LIMITS`)
+
+Select a placed **explosive drum** and open its options (as for a pickup):
+**Type: Power cell (big explosion)** turns it into story mission 1's blue
+power cell, whose blast is about twice as wide. A placed **fixed gun** has a
+new **Model** choice after its weapon: **Prison gun (mission 1)** is the
+intro's big manned turret. Place as many as you like; the choice is saved
+with the map and kept by .tsmap export. In the editor they still look like a
+drum and a MapMaker gun. The original game (or this one without the switch)
+plays them as plain drums and guns. *Automated tests only.* Details:
+[story props](mapmaker-storyprops.md).
+
 ### Clouds per map (`LIMITS`)
 
 **Map Settings** gains a **Clouds** checkbox beside the sky choice. Clouds are
