@@ -483,7 +483,7 @@ int main(void)
     CHECK(nrows==0);
     WORD_AT(0x0079094Cu)=102u;
     CALL(pc_mapmaker_realbosses_picker_end,fake,0x002C1FA5u,0,0,0,1);
-    CHECK(nrows==14 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
+    CHECK(nrows==16 && rows[0].id==150u && rows[0].flags==0x20900u && rows[0].cb==0x002C1C90u);
     CHECK(!strcmp(rows[0].label,"Giant Trophy Monster"));
     CHECK(rows[1].id==151u && rows[1].flags==0x20900u && rows[1].cb==0x002C1C90u && !strcmp(rows[1].label,"Giant Skeleton"));
     CHECK(rows[2].id==152u && rows[2].flags==0x20900u && rows[2].cb==0x002C1C90u && !strcmp(rows[2].label,"Crow Walker"));
@@ -495,7 +495,8 @@ int main(void)
     /* the story creatures (pc_mapmaker_creatures.def): rows 161..163 */
     CHECK(rows[11].id==161u && !strcmp(rows[11].label,"Catacomb Ghost") && rows[11].flags==0x20900u && rows[11].cb==0x002C1C90u);
     CHECK(rows[12].id==162u && !strcmp(rows[12].label,"SecuriDroid XP") && rows[13].id==163u && !strcmp(rows[13].label,"Mutant (Story)"));
-    CHECK(nenable==14 && enable_item==ITEM && enable_flag==0);
+    CHECK(rows[14].id==164u && !strcmp(rows[14].label,"Pit Skeleton") && rows[15].id==165u && !strcmp(rows[15].label,"Ragbug"));
+    CHECK(nenable==16 && enable_item==ITEM && enable_flag==0);
     /* pick: row 150 -> id 0x15, variant -1; other slots untouched */
     for(k=0;k<10u;k++) { WORD_AT(0x0075FD90u+k*0x1Cu)=0x40u+k;WORD_AT(0x0075FD90u+k*0x1Cu+0x14u)=k;WORD_AT(0x0075FD90u+k*0x1Cu+0x18u)=0; }
     CALL(pc_mapmaker_realbosses_pick,fake_pick,0x00077000u,0x00330000u,0,0,1);
@@ -814,6 +815,12 @@ int main(void)
         CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(5),0,0,1);
         CHECK(seen_class[1]==0 && rbs_skelf.extras==2);
         alloc_ok=1;
+        {   /* the pit skeleton carrier 0x31 is made with model 0x5E9: pc_mapmaker_pitboss.inc's, never claimed here */
+            unsigned n0=rbs_skelf.n;
+            actor(6,0x31,0x5E9,0);
+            CALL(pc_mapmaker_realbosses_ai_start,fake_ai_any,0x0015F981u,A(6),0,0,1);
+            CHECK(seen_class[0]==0x11000000u && seen_class[1]==0 && rbs_skelf.n==n0 && rbs_skelf.extras==2);
+        }
         /* princess: the mansion variant */
         k=nprincess;
         FLOAT_AT(ENT(3)+0x68u)=-12.5f;                                       /* spawn height: a lower floor */

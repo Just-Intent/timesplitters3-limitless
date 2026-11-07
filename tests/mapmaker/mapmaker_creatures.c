@@ -186,12 +186,15 @@ int main(void)
         static const uint16_t set[]={0x0C,0x2F,0x44,0x4D,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x30};   /* 0x30 in slot 12 */
         map(0x11u,set,sizeof set/sizeof set[0]);
     }
-    /* the table: three rows, as documented */
-    CHECK(CRT_KINDS==3u);
-    CHECK(kind_of(0x2Fu)==0 && kind_of(0x4Du)==1 && kind_of(0x30u)==2 && kind_of(0x17u)==CRT_KINDS && kind_of(0x59u)==CRT_KINDS);
+    /* the table: five rows, as documented (the last two: the pit fight, pc_mapmaker_pitboss.inc) */
+    CHECK(CRT_KINDS==5u);
+    CHECK(kind_of(0x2Fu)==0 && kind_of(0x4Du)==1 && kind_of(0x30u)==2 && kind_of(0x31u)==3 && kind_of(0xB0u)==4 &&
+          kind_of(0x17u)==CRT_KINDS && kind_of(0x59u)==CRT_KINDS && kind_of(0x28u)==CRT_KINDS);
     CHECK(crt_kinds[0].lo==0x50000000u && crt_kinds[0].hi==0 && crt_kinds[0].look==0x17u);
     CHECK(crt_kinds[1].lo==0x10000000u && crt_kinds[1].hi==0x4000u && crt_kinds[1].look==CRT_NO_LOOK);
     CHECK(crt_kinds[2].lo==0x10000000u && crt_kinds[2].hi==0x8000u && crt_kinds[2].look==0x59u);
+    CHECK(crt_kinds[3].lo==0x10000000u && crt_kinds[3].hi==0x20000u && crt_kinds[3].look==0x28u && crt_kinds[3].pak==crt_kinds[4].pak);
+    CHECK(crt_kinds[4].lo==0x10000000u && crt_kinds[4].hi==0x200000u && crt_kinds[4].look==CRT_NO_LOOK);
 
     /* ---- switch off: every hook is the original, nothing else --------- */
     set_env("TSFP_MAPMAKER_LIMITS",NULL);

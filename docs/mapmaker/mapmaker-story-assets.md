@@ -67,8 +67,8 @@ Mission numbers follow the story table `0x004D1AC0`: 1 intro (scene 2),
 | 4 | Cut-out targets + scoring | 0xF1..0xFA, 3,652 B each; l_63/64/65/78_ch | challenge kinds 3..5, `sub_0022E7E0`, table `[0x0075CC8C]` | none | <= 75 | medium-hard | what else `[0x7DE470]` switches | - |
 | 5 | Mission 6 electric zombies | anims 0x247/0x248 lv17_3.pak (66,768 B) | class 400:0 `sub_00282300` | none | INFERRED yes | hard (visual-only variant: cheap) | catacombs tags, pads, emitters | - |
 | 6 | Mission 6 ghosts | anims 0x249..0x24C lv17.pak (334,016 B) | class 0:40000000 `sub_002BA300`, self-contained | none | **yes** | **cheap-medium** | ghost char id (probe); shared anim ids | **wave 2: row 161 "Catacomb Ghost"** (fixture only) |
-| 7 | Mission 6 pit skeleton | lv17_4.pak (395,440 B) + l_17_st props | `sub_0029E0A0` | mansion variant ported | <= 4 (instances) | hard | coexisting with the id-0x28 routing; arena | - |
-| 8 | Mission 6 flying imps = ragbugs | char 0xB0 (chr.pak); anims 0x243..0x246 lv17_4 | class 200000:0 parks them; flock driven by the pit fight | none | <= 6 per skeleton | medium with item 7, hard alone | flock driver lives in the boss | - |
+| 7 | Mission 6 pit skeleton | lv17_4.pak (395,440 B) + l_17_st props | `sub_0029E0A0` | mansion variant ported | <= 4 (instances) | hard | coexisting with the id-0x28 routing; arena | **wave 3: row 164 "Pit Skeleton"** ([pit skeleton](mapmaker-pitboss.md); fixture only) |
+| 8 | Mission 6 flying imps = ragbugs | char 0xB0 (chr.pak); anims 0x243..0x246 lv17_4 | class 200000:0 parks them; flock driven by the pit fight | none | <= 6 per skeleton | medium with item 7, hard alone | flock driver lives in the boss | **wave 3: row 165 "Ragbug"**, flown by its pit skeleton (fixture only) |
 | 9 | Mission 7 robots = securibot 0x4D | anims 0xA22..0xA2C lv6.pak (828,752 B) | class 0x4000 `sub_0026B7A0`, no level state | none (0x5C nfrobosec is already a roster row) | yes | **medium** | picker row, lv6 mount | **wave 2: row 162 "SecuriDroid XP"** (fixture only) |
 | 10 | Mission 7 cleaning robot 0x4F | model 0x609 chr.pak; anims 0xA2C..0xA2F lv6 | INFERRED class 0x4000 family; loop sound 0x365 | none | yes | cheap-medium | which anims and class it really uses (probe) | deferred: scripted class 0x80000 (see creatures doc) |
 | 11 | Mission 7 slow-motion grenade = weapon 0x29 | gun.pak | projectile type 0xF, explosion 0x2B | hidden (item 1) | yes | cheap to offer, medium to verify | slow-motion code **not found** | **wave 1: offered**; P2 offline: no slow-time code, no level state |
@@ -319,6 +319,11 @@ instance. For pit instances:
 Reduced design: boss + gas bottle (3 hits) + optional ragbugs. Swap the
 props the boss spawns to mounted models where l_17_st is too large.
 
+**Wave 3 (2026-11-07, fixture only): [pit skeleton](mapmaker-pitboss.md).** Carrier 0x31
+(not a variant of 0x28), the fight run as in scene 17 with its block, the 34 arena
+constants moved to the spawn, l_17_st/l_17_stm kept open (index only) for the props,
+'NMME' answered by the intro anim, no hostage or timer, rim pads copied.
+
 ### 8. Mission 6 flying imps (ragbugs)
 
 - Char 0xB0, model 0x6CB.
@@ -330,6 +335,8 @@ props the boss spawns to mounted models where l_17_st is too large.
   +0x4A30.
 - Anims 0x243..0x246 in lv17_4.
 - Best done with item 7. Standalone needs a new flock driver.
+- Wave 3: its own row (0xB0), driven by the nearest Pit Skeleton (6 each); with
+  none in the map it is removed (it cannot fly alone).
 
 ### 9. Mission 7 robots (securibot)
 

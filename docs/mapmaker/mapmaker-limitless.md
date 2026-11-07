@@ -320,6 +320,24 @@ that mission's small animation file only when the set uses the creature.
 plays such a map with bots and shows an empty name in the editor. *Automated
 tests only.* Details: [story creatures](mapmaker-creatures.md).
 
+### Pit Skeleton and Ragbugs: the mission 6 boss (`LIMITS`)
+
+Two more picker rows: **Pit Skeleton** (the giant skeleton of the catacombs
+pit, a different fight from the mansion's **Giant Skeleton**) and **Ragbug**
+(its flying imps). Put the Pit Skeleton in a Story AI where its pit should
+be and up to six Ragbug Story AIs nearby, and play in Story. The skeleton
+plays its catacombs intro, then roars, breathes fire and throws, while its
+ragbugs circle and dive. It cannot be hurt: shoot the **gas bottle** it
+holds (and later sets down) until it blows; then it dies, its ragbugs
+explode, and some seconds later the skeleton is removed. The catacombs
+arena (torture rack, rim points) is moved to the skeleton's spawn point,
+facing the catacombs' way. There is no hostage and no time limit. Several
+per map (up to 4, each with its own ragbugs). A Ragbug with no Pit Skeleton
+in the map is removed at the start (it only flies with its skeleton). The
+level also loads the catacombs' prop list for the bottle and rack.
+`TSFP_MAPMAKER_CREATURES=0` plays both as ordinary bots. *Automated tests
+only.* Details: [pit skeleton](mapmaker-pitboss.md).
+
 ### Clouds per map (`LIMITS`)
 
 **Map Settings** gains a **Clouds** checkbox beside the sky choice. Clouds are
