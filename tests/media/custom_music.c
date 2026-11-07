@@ -191,7 +191,7 @@ int main(int argc, char **argv)
     CHECK(!pc_music_start("B16.wav", NULL, NULL));
     CHECK(pc_music_start("B16.wav", watch, NULL) && pc_music_playing());     /* 4410 frames: 100 ms */
     pc_music_pump(0);
-    CHECK(last_volume == pc_music_db(0.65f) && last_rate == 44100u && last_channels == 2u);
+    CHECK(last_volume == pc_music_db(1.0f) && last_rate == 44100u && last_channels == 2u);   /* full slider: 0 dB */
     CHECK(first_sample[0] == 1000 && first_sample[1] == -1000);              /* the file's first frame */
     /* 250 ms lead at 44.1 kHz = 11025 frames: the 100 ms file loops to fill it */
     CHECK(submitted_bytes / 4u >= 11025u && submitted_bytes / 4u < 11025u + 4410u);
@@ -212,7 +212,7 @@ int main(int argc, char **argv)
     CHECK(last_volume == -10000 && submits == k && pc_music_playing());
     watch_paused = 0; n = resets;
     pc_music_pump(90);
-    CHECK(resets == n + 1u && submits > k && last_volume == pc_music_db(0.65f));
+    CHECK(resets == n + 1u && submits > k && last_volume == pc_music_db(1.0f));
     watch_result = 0; n = resets;
     pc_music_pump(105);
     CHECK(!pc_music_playing() && resets == n + 1u);

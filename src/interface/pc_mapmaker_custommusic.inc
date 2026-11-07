@@ -85,6 +85,13 @@
 #define CMU_PAUSE 0x006D5EB8u               /* 1 between sub_00045AB0 (pause music) and sub_00045AF0 */
 #define CMU_LABEL_BYTES 56u
 #define CMU_PREFIX "Imported: "
+#define CMU_AWAY_TICKS 100u                 /* ~1.5 s of player steps off the play scene end the track */
+#define CMU_JINGLE_MIN_TICKS 60u            /* a jingle holds the track at least ~0.9 s ... */
+#define CMU_JINGLE_MAX_TICKS 2000u          /* ... and at most ~30 s */
+#define CMU_PLAYER_STATE 0x0064BDC0u        /* stock player 0x0064BD98 +0x28: 2 while its stream plays */
+#define CMU_PLAYING 2u
+#define CMU_RET_JINGLE_A 0x0006709Bu        /* sub_00067xxx end of match: sub_00045A00(2) ... */
+#define CMU_RET_JINGLE_B 0x000670B4u        /* ... sub_00045A00(1) (win/lose flags 0x007DE45C) */
 #define CMU_LOG_KINDS 32u
 #define CMU_LOG_EACH 8u
 #define CMU_INFO_MUSIC 0x0Eu                /* map info word: jukebox index, -1 tileset (sub_00045E60) */
@@ -101,6 +108,10 @@ static struct {
     const char *seen[CMU_LOG_KINDS];        /* log budget per message (pointer identity) */
     unsigned char seen_count[CMU_LOG_KINDS];
     unsigned offered_logged;                /* Map Settings rows: logged when the count changes */
+    char level[PC_MUSIC_NAME_MAX];          /* the track this level plays: a restart starts it again */
+    volatile int jingle;                    /* a mid-level jingle holds the track */
+    unsigned away, jingle_ticks;            /* player thread only */
+    uint32_t away_scene;
 } cmu;
 
 /* Each message has its own budget, so a message repeated by every list
@@ -235,14 +246,52 @@ static void cmu_load(uint32_t c)
 
 /* ---- play -------------------------------------------------------------- */
 /* Player thread: guest reads only. */
+/* The scene word can leave the play scene for a moment in a level (m48.err
+ * 18020: a fight, no level change); only CMU_AWAY_TICKS steps in a row end the
+ * track, and the track is held silent meanwhile. A jingle (cmu.jingle) holds
+ * it until the stock player's stream stops playing. */
 static int cmu_watch(void *context,float *gain,int *paused)
 {
-    uint32_t slider;
+    uint32_t slider,scene=WORD_AT(CMU_SCENE);
     (void)context;
-    if(WORD_AT(CMU_SCENE)!=cmu.scene) return 0;
     slider=WORD_AT(CMU_SLIDER);
     *gain=(float)(slider>CMU_SLIDER_MAX?CMU_SLIDER_MAX:slider)/(float)CMU_SLIDER_MAX;
     *paused=WORD_AT(CMU_PAUSE)!=0;
+    if(scene!=cmu.scene) {
+        if(!cmu.away++) cmu.away_scene=scene;
+        if(cmu.away>=CMU_AWAY_TICKS) {
+            fprintf(stderr,"[music] watch: the scene word left the play scene %u for %u (now %u): track ended\n",
+                    cmu.scene,cmu.away_scene,scene);
+            fflush(stderr);
+            return 0;
+        }
+        *paused=1;
+        return 1;
+    }
+    if(cmu.away) {
+        fprintf(stderr,"[music] watch: the scene word was %u for %u player steps; track kept\n",cmu.away_scene,cmu.away);
+        fflush(stderr);
+        cmu.away=0;
+    }
+    if(cmu.jingle) {
+        cmu.jingle_ticks++;
+        if(cmu.jingle_ticks<CMU_JINGLE_MIN_TICKS ||
+           (WORD_AT(CMU_PLAYER_STATE)==CMU_PLAYING && cmu.jingle_ticks<CMU_JINGLE_MAX_TICKS)) *paused=1;
+        else {
+            fprintf(stderr,"[music] watch: jingle over after %u player steps; imported track resumes\n",cmu.jingle_ticks);
+            fflush(stderr);
+            cmu.jingle=0;
+        }
+    }
+    return 1;
+}
+
+/* Starts the level's track; 1 when it plays. */
+static int cmu_play(const char *name,uint32_t scene)
+{
+    cmu.scene=scene;cmu.away=0;cmu.jingle=0;cmu.jingle_ticks=0;
+    if(!pc_music_start(name,cmu_watch,NULL)) { cmu_log("imported track did not start",pc_music_error(),0);cmu_log("the track that did not start",name,0);return 0; }
+    if(name!=cmu.level) snprintf(cmu.level,sizeof cmu.level,"%s",name);
     return 1;
 }
 
@@ -269,7 +318,9 @@ static int cmu_music(int limits)
     char map_name[PC_MUSIC_NAME_MAX];
     const char *name=NULL,*why=NULL;
     int arcade,chunk=0,own=-2;
+    if(pc_music_playing()) cmu_trace("new level music: imported track ended",ret,scene,eax,0,0,0);
     pc_music_stop();                         /* a new level music ends an imported track */
+    cmu.level[0]=0;                          /* until this level picks one */
     if(ret!=CMU_RET_MAP && ret!=CMU_RET_ARCADE) return 0;
     if(ret==CMU_RET_ARCADE) arcade=WORD_AT(CMU_ARCADE_INDEX)==0u;
     else {
@@ -300,22 +351,40 @@ static int cmu_music(int limits)
     } else if(!name) why="Arcade: no imported choice; stock music";
     if(!name) { cmu_trace(why,ret,scene,eax,chunk,own,arcade);return 0; }
     if(guest_call(sub_00045A70,0)) { cmu_log("music is switched off",name,0);return 0; }
-    cmu.scene=scene;
-    if(!pc_music_start(name,cmu_watch,NULL)) { cmu_log("imported track did not start",pc_music_error(),0);cmu_log("the track that did not start",name,0);return 0; }
+    if(!cmu_play(name,scene)) return 0;
     cmu_log(name==cmu.arcade?"Arcade: imported track":"map: imported track",name,(int)scene);
     g_eax=0;
     return 1;
 }
 
-/* WRAP sub_000289C0 (play music channel [esp+4]): a jingle channel ends the
- * imported track, as it replaces the stock level music. */
+/* WRAP sub_000289C0 (play music channel [esp+4]; its only caller is
+ * sub_00045A00, whose own return address is at [esp+0x10]). The end-of-match
+ * jingles (sub_00045A00 returning to 0x0006709B/0x000670B4) end the imported
+ * track; any other jingle channel holds it until the stock stream stops
+ * (cmu_watch), then it resumes where it was. */
 void pc_custom_music_channel(void (*original)(void))
 {
-    if(MAPMAKER_PTR_OK(g_esp,8u) && WORD_AT(g_esp+4u)!=0u && pc_music_playing()) {
-        pc_music_stop();
-        cmu_log("jingle channel: imported track ended","",(int)WORD_AT(g_esp+4u));
+    if(MAPMAKER_PTR_OK(g_esp,0x14u) && WORD_AT(g_esp+4u)!=0u && pc_music_playing()) {
+        uint32_t from=WORD_AT(g_esp+0x10u);
+        if(from==CMU_RET_JINGLE_A || from==CMU_RET_JINGLE_B) {
+            pc_music_stop();
+            cmu_log("end-of-match jingle: imported track ended","",(int)WORD_AT(g_esp+4u));
+        } else {
+            cmu.jingle_ticks=0;cmu.jingle=1;
+            cmu_log("jingle channel: imported track held until it ends","",(int)WORD_AT(g_esp+4u));
+        }
     }
     original();
+}
+
+/* WRAP sub_001CDD60 (the level restart, no args; sub_0003D440): the restart
+ * plays no level music (no sub_00045DE0), so the level's imported track
+ * starts again from its beginning. */
+void pc_custom_music_restart(void (*original)(void))
+{
+    original();
+    if(!cmu.level[0] || WORD_AT(CMU_SCENE)!=100u) return;
+    if(cmu_play(cmu.level,100u)) cmu_log("level restart: imported track started again",cmu.level,0);
 }
 
 /* WRAP sub_00071BE0: after the Arcade music rows (return 0x002C8047, the
