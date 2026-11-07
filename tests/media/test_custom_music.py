@@ -58,6 +58,16 @@ MUTATIONS = {
     'player-bad-file': ('    } else if (!pc_wav_parse(p->file, &p->info)) {', '    } else if (0) {'),
     'ini-any-name': ('    if (*name && !pc_music_name_ok(name)) return 0;\n', ''),
     'ini-other-folder': ('    strcpy(out + prefix, "pc-music.ini");', '    strcpy(out, "pc-music.ini");'),
+    'gain-unclamped': ('    if (db > PC_MUSIC_GAIN_MAX) db = PC_MUSIC_GAIN_MAX;\n', ''),
+    'gain-junk-read': ('    if (end == v || *end || !(db == db)) return 0;', '    if (end == v) return 0;'),
+    'gain-lost-on-save': ('    if (ok && has_trim) ok = fprintf(file, "gain_db=%.2f\\n", trim / 100.0) > 0;\n', ''),
+    'gain-not-read': ('    p->trim = pc_music_gain_load(NULL);', '    p->trim = 0;'),
+    'gain-voice-over-0': ('            if (volume > 0) { p->boost = volume; volume = 0; }', '            if (volume > 0) { p->boost = volume; }'),
+    'gain-cut-boosts': ('            if (volume > 0) { p->boost = volume; volume = 0; }', '            p->boost = p->trim; if (volume > 0) volume = 0;'),
+    'gain-unmutes': ('        if (slider > -10000) {         /* a silent slider', '        if (1) {         /* a silent slider'),
+    'boost-wav-skipped': ('            pc_music_boost(p->pcm, (size_t)p->pending_frames * p->out_channels, p->boost);\n', ''),
+    'boost-codec-skipped': ('            pc_music_boost(p->pcm, (size_t)got * p->out_channels, p->boost);\n', ''),
+    'boost-hard-clip': ('        if (a > PC_MUSIC_KNEE)         /* tends to full scale, never reaches it */\n', '        if (0)\n'),
 }
 
 
@@ -133,5 +143,10 @@ def test_custom_music(tmp_path, mutation):
     if mutation == 'fixed':
         assert result.returncode == 0, result.stdout + result.stderr
         assert 'custom music ok' in result.stdout
+        # once per track: the level, the trim and stock level music at the same slider
+        assert ('[music] player: level 0 + gain_db +6.00 = voice 0, samples +6.00 dB (soft clip above 75%); '
+                'stock level music at this slider: -1202..-794 (track level 50..80, 600 headroom)') in result.stderr
+        assert '[music] player: level -602 + gain_db +6.00 = voice -2, samples +0.00 dB' in result.stderr
+        assert 'the Music slider is at 0 (silent; gain_db +6.00 not applied)' in result.stderr
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
