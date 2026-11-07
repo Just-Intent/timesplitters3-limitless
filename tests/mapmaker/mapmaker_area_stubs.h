@@ -44,6 +44,7 @@ void sub_0007A270(void) {}
 void sub_000BD090(void) {}  /* roof: fall kill */
 void sub_00087310(void) {}  /* roof: room query */
 void sub_00157440(void) {}
+void sub_00157970(void) {}
 void sub_0001A010(void) {}  /* rooms: word draw buckets (sub_00086C40 reimplemented) */
 void sub_000A79B0(void) {}
 void sub_003442B0(void) {}

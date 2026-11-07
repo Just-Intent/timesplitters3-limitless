@@ -211,3 +211,59 @@ light tiles to the Objects cap (about 895 with no items): the editor stops on
 and no `DROPPED`; walk across it and watch for missing rooms or lights;
 (4) copy a large group on that map (piece pool); (5) note save/load seconds
 at 511 and at the cap.
+
+## Stage 13: room tree staging past 438 rooms (2026-11-07, crash fix)
+
+User crash, build .55, "HugeMap" (676 tiles, floor 0): loading finished, the
+first frame drew, then an access violation in `RtlAllocateHeap`
+(`sub_00383678`, called from `sub_0038209D` 0x003820B2 inside a D3D
+allocation under `sub_0001EDE0`). The heap handle it read from
+`[0x007EB4B4]` was 0x428407D0, a float. Cause: `sub_00086FC0`, which builds
+the room AABB tree at `0x00702E00` on every level load, stages one 0x1C
+record per room (word id, the room's box from record +0x10..+0x24) in
+`sub_0003D6E0(3)`. That is 3 pages of the 16 KB scratch pool `0x007E72E0`
+(4 x 0x1000, mask byte `0x006B7B00`), so 438 rooms. Rooms 439..585 spill
+into the pool's 4th page, and from room 586 on into XDK globals after it:
+the heap handle is at +0x41D4, record 601 (room 602). 511 rooms ended at
++0x37E4, inside the pool, so the stage 11 cap never reached the handle.
+(mapmaker-rooms.md wrongly said this was a 32 KB block, about 1170 rooms.)
+
+Fix: `WRAP sub_00086FC0 -> pc_mapmaker_rooms_tree` in
+`pc_mapmaker_rooms.inc` (it replaces the body). With 438 rooms or fewer
+the original runs (every story level, and old maps up to 438 tiles). Past
+that it writes the same records to `MAPMAKER_ROOMS_TREE_STAGING`
+`0x00911000` (0x7000 bytes in the extension above the light colour). It
+then makes the original builder call: `sub_00157970(0x00702E00, {count,
+4, 6}, records, n, 0x00086120)`. The tree keeps no pointer into the
+staging. n is clipped to 1023 (a compile-time check ties the block to
+`MAPMAKER_ROOMS_MAX`). The block is `room tree staging` in `ROOMS_BLOCKS`,
+and `SUB_RANGE_HIGH` now ends at `0x00918000`.
+
+Also fixed: during the bucket draw, a reader call for depth >= 0x50 now
+returns without drawing. Stock passed the unclamped walk depth to
+`sub_00086AE0`, and its readers took count bytes past `0x702DB0+0x4F`
+(the tree header). This is a latent bug in stock too, and only a portal
+walk 80 or more rooms deep reaches it.
+
+Audit (2026-11-07, static): every function that reads the room count
+`[0x7B975C]` and every caller of `sub_0003D6E0` was checked for room-bound
+writes into fixed buffers. Only this site failed. The other scratch callers
+are pinned in `SCRATCH_CALLERS` (polygon clip, animation, flare,
+AI and bone lists, and `sub_00086130` capped at 0x145 records). The tree
+builder's 14-bit leaf offsets hold about 1100 words at 1023 rooms (INFERRED:
+safe unless rooms average about 15 leaves).
+
+Tests:
+- `test_mapmaker_rooms.py`:
+  - fixture tree part: 438 rooms run the original; 439, 676 and 1023 rooms
+    are staged and checked record by record; 1024 rooms are clipped.
+  - mutations `tree-*`; `tree-staging-small` is refused at compile time.
+  - `test_room_tree_scratch_decoded`: decodes `push 3`, the 0x1C/0xB4
+    strides, the builder and its callback, the pool geometry, and the heap
+    handle read. It pins 438 and room 602, and every scratch caller.
+- `test_mapmaker_rooms_buckets.py`: `test_buckets_deep_walk` and the mutation
+  `deep-walk-stock-reader`.
+
+Not verified: the HugeMap play check (load the 676-tile map; stderr has no
+`DROPPED`; walk it). Story levels and maps up to 438 tiles take the original
+path.
