@@ -568,14 +568,14 @@ static void multi(void)
 
 static void cells_at(float px,float pz) { CALL(pc_mapmaker_crowe_cells,fake_cells,0x002901BFu,CST+4u,FB(px),FB(pz),1); }
 /* v0.4.0-mapmaker.40: one room, the boss's floor at y 4 with a lower floor
- * (y -1) beyond x 13 (columns 5, 6), a raised block (y 9) under cell 1,1, a
+ * (y -1) beyond x 13 (columns 5, 6), a raised block (y 5.2) under cell 1,1, a
  * small step (4.5) under cell 4,0 and a gap between cells 0,2 and 0,3 */
 static int ledge_floor(float x,float z,float *y)
 {
     if(x>13.0f) *y=-1.0f;
     else if(z<-31.0f && x>0.5f && x<1.5f) return 0;
     else if(x<-11.0f && z>-8.0f) *y=4.5f;
-    else if(fabsf(x+8.0f)<3.0f && fabsf(z+28.0f)<3.0f) *y=9.0f;
+    else if(fabsf(x+8.0f)<3.0f && fabsf(z+28.0f)<3.0f) *y=5.2f;
     else *y=4.0f;
     return 1;
 }
@@ -659,6 +659,21 @@ static int seam_floor(float x,float z,float *y)
     *y=4.0f;
     return 1;
 }
+/* floors at y 4 and -1; a point on the upper floor's plane (under 4.05)
+ * gets the lower one, as a point outside its tile's room would */
+static int plane_floors(float x,float top,float z,float *y)
+{
+    (void)x;(void)z;
+    *y=top-1.25f>=4.05f?4.0f:-1.0f;
+    return top>=-1.0f;
+}
+/* one floor at y 4; the finder gives no answer under cell 3,3 */
+static int hole_floor(float x,float z,float *y)
+{
+    if(fabsf(x-4.0f)<1.0f && fabsf(z+12.0f)<1.0f) return 0;
+    *y=4.0f;
+    return 1;
+}
 static void reference_floor(void)
 {
     unsigned k;
@@ -690,6 +705,23 @@ static void reference_floor(void)
     WORD_AT(a+0x20u)=0;
     CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
     CHECK(crw_inst[0].ground_ok==1 && near_eq(crw_inst[0].ground,4.0f) && crw_inst[0].off[CELL(1u,1u)] && !crw_inst[0].off[CELL(2u,3u)]);
+    /* the spawn a pad's 0.01 over its floor: probed over the plane */
+    CHECK(level_gives_class());
+    floor_of=NULL;floor_below=plane_floors;
+    SETF(ENT(0)+0x68u,4.01f);
+    WORD_AT(a+0x20u)=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    CHECK(crw_inst[0].ground_ok==1 && near_eq(crw_inst[0].ground,4.0f));
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
+    floor_below=NULL;
+    /* no floor answer under a cell (m42.err: 5-15 cells per Crowe "over a
+     * drop" and no walk): not a ledge, nothing blocked */
+    CHECK(level_gives_class());
+    floor_of=hole_floor;
+    SETF(ENT(0)+0x68u,4.0f);
+    WORD_AT(a+0x20u)=0;
+    CALL(pc_mapmaker_crowe_fight,fake_fight,0x0027DE3Eu,ENT(0),0,0,1);
+    for(k=0;k<35u;k++) CHECK(!crw_inst[0].off[k]);
     /* tile seams: no gap, nothing blocked, the walk is free */
     CHECK(level_gives_class());
     floor_of=seam_floor;nfloor=0;

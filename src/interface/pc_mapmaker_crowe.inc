@@ -206,6 +206,7 @@
 #define CRW_FLOOR_Y 0x004DCB00u         /* sub_000C3C50 result: the floor height found */
 #define CRW_RISE 1.25f                  /* the reference floor search climbs one search height at a time */
 #define CRW_RISE_N 9u                   /* ... up to 11.25 over the spawn height (two floors and more) */
+#define CRW_LIFT 0.5f                   /* probe points this far over the height asked (not on the floor's own plane) */
 #define CRW_GAP_OFF 0.25f               /* gap samples this far either side of the midpoint (not on a tile seam) */
 #define CRW_FLOOR_KEEP1 0x004DCAFCu     /* ... and the two globals it also writes (put back after the probes) */
 #define CRW_FLOOR_KEEP2 0x00733088u
@@ -636,10 +637,17 @@ static uint32_t crw_start_cell(uint32_t g,float oz,uint32_t *row,uint32_t *col)
  * the spawn on a pad (MapMaker tiles are 6 wide, pads at their centres) the
  * cells' x midpoints are exactly on tile seams (SUSPECTED: the finder's
  * point-in-room step can miss a point on a seam, which blocked the whole
- * row). */
+ * row). m42.err (.41): with the reference right (0.51) 5-15 cells per Crowe
+ * were still "over a drop or ledge" and the fight looped 4 -> 5 -> 10. So a
+ * cell is a ledge only when the finder answers with a floor more than a step
+ * from the reference; no answer is not a ledge (the room query already
+ * finds voids; the walk stop finds walls). Each blocked cell's floor is
+ * logged (6 per Crowe). Every probe point is CRW_LIFT over the height it
+ * asks about: a point on the floor's own plane (a pad is 0.01 over it) may
+ * be outside its tile's room and get the floor below (SUSPECTED). */
 static int crw_floor_y(uint32_t pt,float x,float y,float z,float *f)
 {
-    crw_setf(pt,x);crw_setf(pt+4u,y);crw_setf(pt+8u,z);
+    crw_setf(pt,x);crw_setf(pt+4u,y+CRW_LIFT);crw_setf(pt+8u,z);
     if((int32_t)guest_call(sub_000C3C50,3,pt,CRW_PROBE_UP,CRW_PROBE_R)<=0) return 0;
     *f=crw_getf(CRW_FLOOR_Y);
     return crw_sane(*f);
@@ -673,7 +681,7 @@ static int crw_gap_at(uint32_t pt,uint32_t a,uint32_t b,float ref)
 static void crw_rooms(uint32_t st,float y)
 {
     uint32_t sp=g_esp,q,pt,k,c,start=crw_lv.row*CRW_COLS+crw_lv.col,keep[3];
-    unsigned n=0,drops=0,gaps=0,r,j,steps=0;
+    unsigned n=0,drops=0,gaps=0,r,j,steps=0,unseen=0,shown=0;
     int found;
     float ref=y,ry;
     uint8_t drop[CRW_CELLS];
@@ -706,7 +714,13 @@ static void crw_rooms(uint32_t st,float y)
     if(found) {
         for(k=0;k<CRW_CELLS;k++) {
             c=st+CRW_GRID+k*CRW_CELL;
-            if(!crw_lv.off[k] && !crw_floor_at(pt,crw_getf(c+0x10u),ref,crw_getf(c+0x14u))) drop[k]=1u;
+            float f;
+            if(crw_lv.off[k]) continue;
+            if(!crw_floor_y(pt,crw_getf(c+0x10u),ref,crw_getf(c+0x14u),&f)) { unseen++;continue; }   /* no answer: not a ledge */
+            if(fabsf(f-ref)<=CRW_STEP) continue;
+            drop[k]=1u;
+            if(shown++<6u) fprintf(stderr,"[mapmaker] crowe: split Crowe %d cell %u,%u over a floor at %.2f (reference %.2f): blocked\n",
+                                   (int)(crw_i-crw_inst),(unsigned)(k/CRW_COLS),(unsigned)(k%CRW_COLS),(double)f,(double)ref);
         }
         for(r=0;r<CRW_ROWS;r++)
             for(j=0;j<CRW_COLS;j++) {
@@ -730,8 +744,8 @@ static void crw_rooms(uint32_t st,float y)
                       (int)(crw_i-crw_inst),(double)ref,(double)y,steps?"found above the spawn":"under the spawn");
     else fprintf(stderr,"[mapmaker] crowe: split Crowe %d reference floor none (spawn height %.2f): no height check\n",
                  (int)(crw_i-crw_inst),(double)y);
-    fprintf(stderr,"[mapmaker] crowe: split Crowe %d arena: %u of %u cells in no room at its height, %u over a drop or ledge, %u gaps between cells (blocked)\n",
-            (int)(crw_i-crw_inst),n,CRW_CELLS,drops,gaps);
+    fprintf(stderr,"[mapmaker] crowe: split Crowe %d arena: %u of %u cells in no room at its height, %u over a drop or ledge, %u gaps between cells (blocked); %u with no floor answer (not blocked)\n",
+            (int)(crw_i-crw_inst),n,CRW_CELLS,drops,gaps,unseen);
     fflush(stderr);
 }
 /* Move the arena grid so the boss's start cell is centred on the spawn point
