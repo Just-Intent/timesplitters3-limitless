@@ -1,7 +1,7 @@
 [Uplink throw tests and policy](native-uplink.md#throw-impulse).
 [Vietnam performance checks](network-performance.md).
 
-[Save-folder checks](save-locations.md): storage, picker ownership/mutation, copy/restore/UI tests; both builds include SaveLocations.cs, [MapTransfer](map-transfer.md).
+[Save-folder checks](save-locations.md): storage, picker ownership, copy/restore/UI tests; both builds use SaveLocations.cs, [MapTransfer](map-transfer.md) (1023).
 [Tools](developer-tools-integration.md).
 
 Developer Tools inline-warning coverage: [launcher](launcher.md).
