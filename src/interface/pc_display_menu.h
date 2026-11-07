@@ -92,6 +92,7 @@ void pc_display_mapmaker_limits(void (*original)(void));
 int pc_mapmaker_area_enabled(const char *area,const char *hook);
 /* MapMaker capacity area hooks (begin) */
 void pc_mapmaker_pads_group_node(void (*original)(void));
+void pc_mapmaker_pads_group_route(void (*original)(void));
 void pc_mapmaker_pads_pad_node(void (*original)(void));
 void pc_mapmaker_pads_cover_topup(void (*original)(void));
 void pc_mapmaker_container_frontend_init(void (*original)(void));
@@ -135,6 +136,7 @@ void pc_mapmaker_editor_sai_point(void (*original)(void));
 void pc_mapmaker_rooms_tree(void (*original)(void));
 void pc_mapmaker_rooms_query(void (*original)(void));
 void pc_mapmaker_rooms_compile(void (*original)(void));
+void pc_mapmaker_rooms_portal_link(void (*original)(void));
 void pc_mapmaker_rooms_piece(void (*original)(void));
 void pc_mapmaker_rooms_props(void (*original)(void));
 void pc_mapmaker_rooms_light_reset(void (*original)(void));

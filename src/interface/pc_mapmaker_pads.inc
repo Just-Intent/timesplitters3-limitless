@@ -117,3 +117,5 @@ void pc_mapmaker_pads_cover_topup(void (*original)(void))
     }
     original();
 }
+
+#include "pc_mapmaker_astar.inc"          /* WRAP sub_0009B540: the group route search in C */

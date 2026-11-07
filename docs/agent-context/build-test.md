@@ -159,9 +159,9 @@ CI: `runtime-patches.yml` scopes runtime/launcher/Linux/issue/texture jobs.
 Only `PR validation` is required; `ci-pr-gate.py` fails closed. Launcher builds
 run once; standalone checks are manual-only. Worker uses this gate. Plan tests
 scope/gate/worker; host suites unchanged. Native Windows45m/Mac30m; upgrades30m.
-MM restart/skelvis/bossroom `-bosses`; Disco/props/tank/creatures: `test_mapmaker_<x>.py`; tiles: rooms/limits.
+MM restart/skelvis/bossroom `-bosses`; Disco/props/tank/creatures/portals/astar: `test_mapmaker_<x>.py`; tiles: rooms/limits.
 
-`test_push_gather.py`: full original-reference gathering, fresh bytes, failures,
+`test_push_gather.py`: original-reference gathering, fresh bytes, failures,
 guard pages, large buffers and32-bit wrapping. Both native CI hosts run it.
 See [pushed-array checks and timing scope](vertex-expand.md#pushed-array-gathering).
 
@@ -302,7 +302,7 @@ composition/cleanup through240, slow/pause/jitter/live switches and old-path
 controls. Scale tests use real matrix helpers; allocation/draws are absent.
 `native_character_trace.c` tests copied status3 update pairs, identity/frame/
 scene guards, removal, invalid/unreadable values and8192row/8MiB bounds. The
-original scale fixture also runs with tracing enabled and a failed file open;
+original scale fixture runs with tracing enabled and a failed file open;
 stdout/behavior stay identical and open failure is latched. The clock fixture
 matches production's manual TLS include order so missing register declarations
 fail locally. Paired matrices surround126029->120AB0, after timer advancement;
@@ -322,7 +322,7 @@ these checks don't certify live varying forcing or rendered-material parity.
 
 `tests/gameplay/test_native_vehicle_timing.py` runs portable byte-load, physics-scope,
 partition and lowering contracts on both CI hosts. With the verified private US
-XBE it also lifts the original dispatcher, spring/linear/rest routines, rigid
+XBE it lifts the original dispatcher, spring/linear/rest routines, rigid
 clock/solver/integrator, publisher, bounds, sleep/wake, camera and driver at
 60/120/144/180/240.
 Private-XBE skips on CI don't certify those routines on Mac.
