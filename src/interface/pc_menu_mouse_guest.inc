@@ -47,6 +47,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
 #include "pc_mapmaker_skelvis.inc"   /* skeleton draw log; hooks in rooms, openview, tank, bigdraw, realbosses */
+#include "pc_mapmaker_bossroom.inc"  /* giant bosses drawn through the camera's room (called by rooms buckets) */
 /* MapMaker capacity area includes (begin) */
 #include "pc_mapmaker_memory.inc"
 #include "pc_mapmaker_pads.inc"

@@ -109,3 +109,12 @@ Per-pass reason, state changes only, 60 lines a level + summaries every 600
 passes; grep `[mapmaker] skelvis:` (formats in mapmaker-realbosses.md
 "Skeleton visibility log"). `test_mapmaker_skelvis.py` (fixture +
 `mapmaker_skelvis.expected`, mutations, decode). Unplayed.
+
+Boss camera room (.46 m46.err: all hidden passes "not reached", drawn only
+while the camera room was in the boss list): `pc_mapmaker_bossroom.inc`, first
+in `pc_mapmaker_rooms_buckets` (no new WRAP), appends each giant boss with a
+reached listed room to a copy of the camera room's prop list (`0x008D4000` +
+slot*0x1000). Lists: `sub_0009E4B0` relinks per frame via `sub_0009E430`
+(pool bound 0x0009E46B drops a prop, raised cap kept). Which drop hit the
+bosses is INFERRED; the `bossroom:` line (linked K, pool use) decides.
+`test_mapmaker_bossroom.py`. Unplayed.
