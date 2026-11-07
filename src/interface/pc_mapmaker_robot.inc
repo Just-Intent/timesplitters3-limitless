@@ -86,8 +86,10 @@
  *  - hold (in the handler wrapper, before the original): the robot is moved
  *    by its animation's root motion in the dispatcher (sub_0015F0D0, call
  *    0x0027DE12), not by its pads, and its attack states walk on with no
- *    goal; when its room (+0x34) changed through an opening lower than it,
- *    its previous position and room are put back.
+ *    goal; when its move since the last frame passes (near its feet) through
+ *    a doorway portal whose opening is lower than it, its previous position
+ *    is put back (.45: geometric; its room +0x34 is traced at its eye and does
+ *    not change at a low doorway).
  *  - music (sub_000462B0(track)): its death sets the music track to 0 every
  *    frame until the event (0x002944D4); dropped in scene 100.
  *  - event (sub_002274C0): when its death animation has ended the robot fires
@@ -203,8 +205,13 @@
 #define RBT_STACK_GAP 0.3f              /* a stacked portal starts this close to the top of the one below */
 #define RBT_STACK_PLANE 0.3f            /* ... and lies this close to its vertical plane */
 #define RBT_ENT_POS 0x64u               /* entity: x/y/z (sub_0015F0D0 0x0015F861..0x0015F871) */
-#define RBT_ENT_ROOM 0x34u              /* entity: room, set from the position by sub_0015AB80 (0x0015F889) */
+#define RBT_ENT_ROOM 0x34u              /* entity: room, traced at its eye by sub_0015AB80 (0x0015F6C5, 0x0015F889) */
 #define RBT_HOLD_JUMP 6.0f              /* a move farther than this in one frame is a teleport/restart: kept */
+#define RBT_HOLD_KNEE 1.0f              /* .45: a doorway crossing is tested this far above its feet */
+#define RBT_AI_EYE 0xAF8u               /* actor: the eye point the room trace starts from next frame (sub_0015AB80) */
+#define RBT_EYE_MODEL 0x10u             /* [entity+4] +0x10 -> +0x34: the eye height sub_0015AB80 adds (+0.65) */
+#define RBT_EYE_OFF 0x34u
+#define RBT_EYE_ADD 0.65f               /* [0x0047CFE0] */
 #define RBT_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define RBT_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -222,11 +229,12 @@ static struct { uint32_t state, record, actor, statics[RBT_STATICS_N]; int remov
  * links (CSR) and the opening each link crosses. Per robot: its height,
  * the pads it can reach, the substitute for an unreachable goal and the
  * hop distances to its goal. */
-static struct { uint32_t pads, links; unsigned npads, nlinks, built, crossings, told, stacked; uint32_t *off, *adj; float *open, *stack; } rbt_nav;
+typedef struct { uint32_t id, pt, r0, r1; unsigned nv, axis; float nx, ny, nz, d, x0, x1, y0, y1, z0, z1; } rbt_wall_t;
+static struct { uint32_t pads, links; unsigned npads, nlinks, built, crossings, told, stacked, nwalls, walls_built; uint32_t *off, *adj; float *open, *stack; rbt_wall_t *walls; } rbt_nav;
 static struct {
     float height, hold[3];
     uint32_t from, goal_for, goal_sub, dist_for, hold_room;
-    unsigned blocked, reached, subs, steers, logged, holds;
+    unsigned blocked, reached, subs, steers, logged, holds, passes, eye_told;
     int built, dist_ok, hold_ok;
     uint8_t reach[RBT_PAD_MAX];
     uint16_t dist[RBT_PAD_MAX];
@@ -301,7 +309,7 @@ static float rbt_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)
 static int rbt_sane(float f) { return f==f && f>-100000.0f && f<100000.0f; }
 static void rbt_nav_free(void)
 {
-    free(rbt_nav.off);free(rbt_nav.adj);free(rbt_nav.open);free(rbt_nav.stack);
+    free(rbt_nav.off);free(rbt_nav.adj);free(rbt_nav.open);free(rbt_nav.stack);free(rbt_nav.walls);
     memset(&rbt_nav,0,sizeof rbt_nav);
 }
 static int16_t rbt_room(uint32_t pad) { return (int16_t)RBT_H(WORD_AT(RBT_PADS)+pad*RBT_PAD_SIZE+0xAu); }
@@ -613,34 +621,140 @@ static void rbt_swapped(void (*original)(void),uint32_t ent)
  * robot is not moved by its pads. The dispatcher moves it just before this
  * handler (sub_0015F0D0, call 0x0027DE12): the current animation's root
  * motion ([entity+4] +0xFC..) turned by its facing (+0x70), a collision move
- * (sub_000D9230, 0x0015F850), the position stored (0x0015F861..0x0015F871)
- * and its room +0x34 set again from it (sub_0015AB80, 0x0015F889). Every
- * state from 2 to 5 keeps the walk cycle (0x808) playing, and the attack
- * states 3-5 (straight-line distance to the player, 0x002939E9..0x00293A3C)
- * call no walk goal, so it walks on through a doorway wherever it faces.
- * Each frame, before the handler: when its room changed through an opening
- * lower than it (rbt_pair_open nearest the move), the previous position and
- * room are put back. A move of more than RBT_HOLD_JUMP in one frame
- * (teleport, restart), a room joined by no portal or an unknown room is kept. */
+ * (sub_000D9230, 0x0015F47A; on a pad route 0x0015F850), the position stored
+ * (0x0015F697..0x0015F6B4; 0x0015F861..0x0015F871) and its room +0x34 set
+ * again (sub_0015AB80, 0x0015F6C5; 0x0015F889). Every state from 2 to 5
+ * keeps the walk cycle (0x808) playing, and the attack states 3-5
+ * (straight-line distance to the player, 0x002939E9..0x00293A3C) call no
+ * walk goal, so it walks on through a doorway wherever it faces.
+ *
+ * v0.4.0-mapmaker.45 "still walked through one floor opening": the .44 hold
+ * waited for the room +0x34 to change, and for the robot it does not.
+ * sub_0015AB80 traces the room at its EYE: from the last eye point (actor
+ * +0xAF8..+0xB00) to its position + [[entity+4]+0x10]+0x34 + 0.65
+ * (0x0015ADA9..0x0015AE24), through a portal only when that segment passes
+ * inside the portal polygon (sub_00088430: plane sides 0x0008856F..0x00088597,
+ * edge tests 0x00088760..0x00088798). A giant's eye is above a one-floor
+ * doorway, so its room stays the old one while its feet walk through.
+ * So the hold is geometric: each frame, the move since the last frame,
+ * RBT_HOLD_KNEE above its feet, against every doorway portal (rbt_walls):
+ * when it passes inside one whose stacked opening (rbt_stacked) is lower
+ * than it, the previous position (and room, if it changed) are put back and
+ * the next eye trace starts there. A move of more than RBT_HOLD_JUMP in one
+ * frame (teleport, restart) is kept. */
+static float rbt_wv(const rbt_wall_t *w,unsigned v,unsigned c) { return rbt_getf(w->pt+0x18u+(v%w->nv)*0xCu+c*4u); }
+static float rbt_absf(float f) { return f<0.0f?-f:f; }
+/* The doorway portals (at least RBT_WALL_MIN tall): plane and bounds, once per level. */
+static int rbt_walls_build(void)
+{
+    uint32_t pmax=WORD_AT(RBT_PORTAL_COUNT),id;
+    unsigned v;
+    rbt_portal_t p;
+    if(rbt_nav.walls_built) return rbt_nav.walls!=0;
+    rbt_nav.walls_built=1;
+    if(pmax>RBT_PORTAL_MAX || !(rbt_nav.walls=(rbt_wall_t *)malloc((pmax+1u)*sizeof(rbt_wall_t)))) return 0;
+    for(id=0;id<=pmax;id++) {
+        rbt_wall_t *w=&rbt_nav.walls[rbt_nav.nwalls];
+        float len,ax,ay,az;
+        if(!rbt_portal(id,&p) || p.hi-p.lo<RBT_WALL_MIN || p.nv<3u) continue;
+        w->id=id;w->pt=p.pt;w->nv=p.nv;w->r0=p.r0;w->r1=p.r1;
+        w->nx=w->ny=w->nz=0.0f;w->x0=w->z0=1.0e9f;w->x1=w->z1=-1.0e9f;w->y0=p.lo;w->y1=p.hi;
+        for(v=0;v<p.nv;v++) {                          /* Newell's normal (either winding) */
+            float x=rbt_wv(w,v,0),y=rbt_wv(w,v,1),z=rbt_wv(w,v,2),bx=rbt_wv(w,v+1u,0),by=rbt_wv(w,v+1u,1),bz=rbt_wv(w,v+1u,2);
+            w->nx+=(y-by)*(z+bz);w->ny+=(z-bz)*(x+bx);w->nz+=(x-bx)*(y+by);
+            if(x<w->x0) w->x0=x;
+            if(x>w->x1) w->x1=x;
+            if(z<w->z0) w->z0=z;
+            if(z>w->z1) w->z1=z;
+        }
+        len=(float)sqrt((double)(w->nx*w->nx+w->ny*w->ny+w->nz*w->nz));
+        if(!(len>1.0e-6f) || !rbt_sane(len)) continue;
+        w->nx/=len;w->ny/=len;w->nz/=len;
+        w->d=w->nx*rbt_wv(w,0,0)+w->ny*rbt_wv(w,0,1)+w->nz*rbt_wv(w,0,2);
+        ax=rbt_absf(w->nx);ay=rbt_absf(w->ny);az=rbt_absf(w->nz);
+        w->axis=ax>=ay && ax>=az?0u:(ay>=az?1u:2u); /* the polygon is tested with this axis dropped */
+        rbt_nav.nwalls++;
+    }
+    return 1;
+}
+/* Point q (in w's plane) inside w's polygon (even-odd, projected). */
+static int rbt_in_wall(const rbt_wall_t *w,const float q[3])
+{
+    unsigned u=w->axis==0u?1u:0u,t=w->axis==2u?1u:2u,v,j,in=0;
+    for(v=0,j=w->nv-1u;v<w->nv;j=v++) {
+        float pu=rbt_wv(w,v,u),pt=rbt_wv(w,v,t),ju=rbt_wv(w,j,u),jt=rbt_wv(w,j,t);
+        if((pt>q[t])!=(jt>q[t]) && q[u]<(ju-pu)*(q[t]-pt)/(jt-pt)+pu) in^=1u;
+    }
+    return (int)in;
+}
+/* The doorway portal the move a -> b passes through with the lowest stacked
+ * opening (*open), or -1 (no portal passed). */
+static int rbt_cross(const float a[3],const float b[3],float *open)
+{
+    unsigned i;
+    int best=-1;
+    *open=RBT_OPEN;
+    if(!rbt_walls_build()) return -1;
+    for(i=0;i<rbt_nav.nwalls;i++) {
+        const rbt_wall_t *w=&rbt_nav.walls[i];
+        float da,db,t,q[3],o;
+        if((a[0]<w->x0-0.01f && b[0]<w->x0-0.01f) || (a[0]>w->x1+0.01f && b[0]>w->x1+0.01f) ||
+           (a[1]<w->y0-0.01f && b[1]<w->y0-0.01f) || (a[1]>w->y1+0.01f && b[1]>w->y1+0.01f) ||
+           (a[2]<w->z0-0.01f && b[2]<w->z0-0.01f) || (a[2]>w->z1+0.01f && b[2]>w->z1+0.01f)) continue;
+        da=w->nx*a[0]+w->ny*a[1]+w->nz*a[2]-w->d;
+        db=w->nx*b[0]+w->ny*b[1]+w->nz*b[2]-w->d;
+        if((da>0.0f)==(db>0.0f)) continue;             /* the same side of its plane */
+        t=da/(da-db);
+        q[0]=a[0]+t*(b[0]-a[0]);q[1]=a[1]+t*(b[1]-a[1]);q[2]=a[2]+t*(b[2]-a[2]);
+        if(!rbt_in_wall(w,q)) continue;                /* through the wall beside it */
+        rbt_nav_build();                               /* the stacked-opening cache */
+        o=rbt_stacked(w->id);
+        if(best<0 || o<*open) { best=(int)i;*open=o; }
+    }
+    return best;
+}
+/* Once per robot and level: where its room is traced (the .45 cause). */
+static void rbt_eye_tell(unsigned k,uint32_t ent)
+{
+    uint32_t m=WORD_AT(ent+4u),e;
+    float eye=-1.0f;
+    if(MAPMAKER_PTR_OK(m,RBT_EYE_MODEL+4u) && MAPMAKER_PTR_OK(e=WORD_AT(m+RBT_EYE_MODEL),RBT_EYE_OFF+4u)) eye=rbt_getf(e+RBT_EYE_OFF)+RBT_EYE_ADD;
+    fprintf(stderr,"[mapmaker] robot: giant robot %u (height %.2f): its room is traced %.2f above its feet; doorways are tested %.2f above them\n",
+            k,(double)rbt_walk[k].height,(double)(rbt_sane(eye)?eye:-1.0f),(double)RBT_HOLD_KNEE);
+    fflush(stderr);
+}
 static void rbt_hold(unsigned k,uint32_t ent)
 {
-    uint32_t room=WORD_AT(ent+RBT_ENT_ROOM),i;
-    float pos[3],d=0.0f,open=0.0f;
+    uint32_t room=WORD_AT(ent+RBT_ENT_ROOM),i,a;
+    float pos[3],from[3],to[3],d=0.0f,open;
+    int w;
     for(i=0;i<3u;i++) { pos[i]=rbt_getf(ent+RBT_ENT_POS+i*4u);if(!rbt_sane(pos[i])) return; }
-    if(rbt_inst[k].removed || !rbt_room_ok(room)) return;
-    if(rbt_walk[k].hold_ok && room!=rbt_walk[k].hold_room) {
-        for(i=0;i<3u;i++) d+=(pos[i]-rbt_walk[k].hold[i])*(pos[i]-rbt_walk[k].hold[i]);
-        if(!rbt_walk[k].height) rbt_walk[k].height=rbt_height(ent);
-        if(d<=RBT_HOLD_JUMP*RBT_HOLD_JUMP &&
-           (open=rbt_pair_open(rbt_walk[k].hold_room,room,(pos[0]+rbt_walk[k].hold[0])*0.5f,(pos[2]+rbt_walk[k].hold[2])*0.5f))<rbt_walk[k].height-RBT_FIT_SLACK) {
-            memcpy((void *)((uintptr_t)(ent+RBT_ENT_POS)+g_xbox_mem_offset),rbt_walk[k].hold,sizeof rbt_walk[k].hold);
-            WORD_AT(ent+RBT_ENT_ROOM)=rbt_walk[k].hold_room;
-            if(rbt_walk[k].holds++<4u) {
-                fprintf(stderr,"[mapmaker] robot: giant robot %u held in room %u: the opening to room %u is %.2f, lower than it (%.2f)\n",
-                        k,(unsigned)rbt_walk[k].hold_room,(unsigned)room,(double)open,(double)rbt_walk[k].height);
+    if(rbt_inst[k].removed) return;                    /* removed: left alone */
+    if(!rbt_walk[k].height) rbt_walk[k].height=rbt_height(ent);
+    if(!rbt_walk[k].eye_told) { rbt_walk[k].eye_told=1;rbt_eye_tell(k,ent); }
+    if(rbt_walk[k].hold_ok) {
+        for(i=0;i<3u;i++) { from[i]=rbt_walk[k].hold[i];to[i]=pos[i];d+=(pos[i]-from[i])*(pos[i]-from[i]); }
+        from[1]+=RBT_HOLD_KNEE;to[1]+=RBT_HOLD_KNEE;
+        if(d>0.0f && d<=RBT_HOLD_JUMP*RBT_HOLD_JUMP && (w=rbt_cross(from,to,&open))>=0) {
+            const rbt_wall_t *p=&rbt_nav.walls[w];
+            if(open<rbt_walk[k].height-RBT_FIT_SLACK) {
+                memcpy((void *)((uintptr_t)(ent+RBT_ENT_POS)+g_xbox_mem_offset),rbt_walk[k].hold,sizeof rbt_walk[k].hold);
+                if(room!=rbt_walk[k].hold_room && rbt_room_ok(rbt_walk[k].hold_room)) WORD_AT(ent+RBT_ENT_ROOM)=rbt_walk[k].hold_room;
+                if(MAPMAKER_PTR_OK(a=WORD_AT(ent+RBT_ENT_AI),RBT_ACTOR))   /* the next eye trace starts back there too */
+                    for(i=0;i<3u;i++) { float e=rbt_getf(a+RBT_AI_EYE+i*4u)-(pos[i]-rbt_walk[k].hold[i]);if(rbt_sane(e)) memcpy((void *)((uintptr_t)(a+RBT_AI_EYE+i*4u)+g_xbox_mem_offset),&e,4); }
+                if(rbt_walk[k].holds++<4u) {
+                    fprintf(stderr,"[mapmaker] robot: giant robot %u held at (%.2f, %.2f, %.2f): it walked into portal %u (rooms %u-%u), opening %.2f, lower than it (%.2f); its room read %u, kept %u\n",
+                            k,(double)rbt_walk[k].hold[0],(double)rbt_walk[k].hold[1],(double)rbt_walk[k].hold[2],(unsigned)p->id,(unsigned)p->r0,(unsigned)p->r1,
+                            (double)open,(double)rbt_walk[k].height,(unsigned)room,(unsigned)WORD_AT(ent+RBT_ENT_ROOM));
+                    fflush(stderr);
+                }
+                return;
+            }
+            if(rbt_walk[k].passes++<4u) {
+                fprintf(stderr,"[mapmaker] robot: giant robot %u passed portal %u (rooms %u-%u), opening %.2f, at (%.2f, %.2f, %.2f); its room %u -> %u\n",
+                        k,(unsigned)p->id,(unsigned)p->r0,(unsigned)p->r1,(double)open,(double)pos[0],(double)pos[1],(double)pos[2],(unsigned)rbt_walk[k].hold_room,(unsigned)room);
                 fflush(stderr);
             }
-            return;
         }
     }
     rbt_walk[k].hold_ok=1;rbt_walk[k].hold_room=room;

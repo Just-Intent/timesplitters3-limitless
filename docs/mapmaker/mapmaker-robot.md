@@ -95,7 +95,7 @@ forward from its spawn point). 2-5 walk and attacks (projectiles through
 | `sub_001C8540` | `pc_mapmaker_robot_anims` | after the original: when the map's custom set (index 0x11; slots 1-10 in map-info chunk 0x00C77668, 11-20 in the sets chunk 0x00C776F5) holds 0x42, or the container cannot be read, and lv14.pak is not mounted (`sub_00062260`; the split Crowe area may already have mounted it) and two of the 30 mount slots stay free: `sub_0005A130(lv14.pak)`, the stock per-level anim pak call (whole file into the level heap, unmounted with the level) |
 | `sub_0025F720` | `pc_mapmaker_robot_level` | before the original: `[0x0078B0D0]` = 0 (in scene 100 it can only be an earlier level's dangling block). After: forget the previous level's robots; for such a map, when no particle block exists yet (the realbosses skeleton/walker make one), `sub_002A62C0` (32 KB); then four state blocks: each time `[0x0078B1DC]` = 0 and `sub_00292630` (a fresh 76-byte block, set by `sub_00292550`), kept while the pointer is usable. Outside any robot `[0x0078B1DC]` holds the first block |
 | `sub_0015B830` | `pc_mapmaker_robot_ai_start` | before the original: pool entry with character 0x42 (or entity model 0x5F2), lv14.pak mounted and this level's state in place: record +0/+4 = 0/0x80000, and the robot gets the next free state block (its statics start at 0). Beyond the blocks made (four) a robot keeps the MapMaker class (logged). The same record again (restart) keeps its block |
-| `sub_00293730` | `pc_mapmaker_robot_handler` | the robot's AI (dispatcher 0x0027DE18, entity arg 1): runs with that robot's globals (see Several robots); before it, the hold (.44) puts back a robot that walked through an opening lower than it |
+| `sub_00293730` | `pc_mapmaker_robot_handler` | the robot's AI (dispatcher 0x0027DE18, entity arg 1): runs with that robot's globals (see Several robots); before it, the hold (.44, geometric since .45) puts back a robot that walked through an opening lower than it |
 | `sub_00294520` | `pc_mapmaker_robot_message` | its messages (0x0027D447, entity arg 1): same |
 | `sub_002926B0` | `pc_mapmaker_robot_callback` | the slot-2 callback its door entry installs (0x002938EE, entity arg 1): same |
 | `sub_002936C0` | `pc_mapmaker_robot_damage` | its damage callback (0x00293923, hit record arg 1, entity at +0): same |
@@ -282,6 +282,56 @@ one tall room on both sides or on one side; slabs on the other side do not) and 
 the restored position; kept: teleports, no room, after the restart reset or a
 respawn, removed robots, other entities, mission 10, three open floors, a
 one-floor robot), mutations `stack-*` and `hold-*`.
+
+### The room follows the eye: a geometric hold (v0.4.0-mapmaker.45)
+
+User report (.44): "Giant robots still walked through one floor opening." No
+.44 log was available.
+
+Cause (CONFIRMED, decode, `test_room_traced_at_the_eye`): the .44 hold waited
+for the room +0x34 to change, and at a low doorway it does not. The ordinary
+root-motion walk (actor +0x2C without 0x10000; the pad route at 0x0015F6D2 is
+the other branch) moves the robot with `sub_000D9230` at 0x0015F47A, stores
+the position at 0x0015F697..0x0015F6B4 and calls `sub_0015AB80(entity, 0)` at
+0x0015F6C5. That traces the room from the last eye point (actor
++0xAF8..+0xB00) to the position's y + `[[entity+4]+0x10]+0x34` + 0.65
+(`[0x0047CFE0]`, 0x0015AD96..0x0015ADA1) with `sub_00088430` (0x0015AE24),
+which moves to the next room only when that segment crosses a portal's plane
+(normal +8, 0x0008851C..0x00088597) inside its polygon (edge tests
+0x00088760..0x00088798). A giant's eye is far above a one-floor (5) doorway,
+so the eye segment hits the wall above it, the room stays the old one while
+the feet walk through, and the hold never ran. (The robot's actual eye height
+is model data: INFERRED above 5; the new log line prints it.) Assumptions 2-4
+of the report were checked: the only stores are +0x64/+0x68/+0x6C (and the eye
+point, now put back too); the jump skip only covers more than 6 units a
+frame.
+
+Fix: `rbt_hold` no longer uses rooms. Once per level `rbt_walls_build` lists
+every portal at least 1 unit tall (doorways; floor openings skipped) with its
+plane (Newell normal from its vertices, either winding) and bounds. Each frame
+the move from the previous position to the new one, `RBT_HOLD_KNEE` (1.0)
+above the feet, is tested against them (`rbt_cross`): sides of the plane
+change and the crossing point lies inside the polygon (even-odd, projected).
+When the lowest stacked opening (`rbt_stacked`) of a portal passed is lower
+than height - 0.25, the previous position is written back, the room too when
+it changed, and the actor's eye point is moved back by the same amount (the
+next room trace starts there). Through a tall enough opening, nothing changes.
+Unknown rooms no longer skip the test; teleports (more than 6) still do.
+
+Logs (per robot and level): `giant robot k (height h): its room is traced e
+above its feet; doorways are tested 1.00 above them` (e = -1 when the model
+data cannot be read); at most 4 `giant robot k held at (x, y, z): it walked
+into portal p (rooms a-b), opening o, lower than it (h); its room read r, kept
+s` and 4 `giant robot k passed portal p (rooms a-b), opening o, at (x, y, z);
+its room r -> s`. A held line with r equal to s confirms the eye cause.
+
+INFERRED (playtest): that the robot's centre passes inside the doorway's
+portal polygon (portals are the door outlines), and that knee height is
+inside every MapMaker doorway. Tests: `hold()` adds the room unchanged (the
+.45 case), no room known, beside the doorway, a floor above, a triangular
+portal (outside the polygon inside its bounds, then through it the other
+way) and the eye point put back; mutations `hold-room-change-only`,
+`hold-eye-*`, `cross-*`.
 
 ## Several robots
 

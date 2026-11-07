@@ -538,15 +538,31 @@ static void hold(void)
     place(ENT(3),2.0f,1u);tick(ENT(3),__LINE__);
     place(ENT(3),3.0f,1u);tick(ENT(3),__LINE__);
     CHECK(seen_x==3.0f && FLOAT_AT(ENT(3)+0x64u)==3.0f);       /* inside its room: free */
+    SETF(A(3)+0xAF8u,6.0f);SETF(A(3)+0xAFCu,12.0f);SETF(A(3)+0xB00u,5.0f);   /* the eye the room trace saw */
     place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
     CHECK(FLOAT_AT(ENT(3)+0x64u)==3.0f && FLOAT_AT(ENT(3)+0x6Cu)==5.0f && WORD_AT(ENT(3)+0x34u)==1u);
     CHECK(seen_x==3.0f && seen_room==1u && rbt_walk[0].holds==1u);   /* its AI sees it back */
+    CHECK(FLOAT_AT(A(3)+0xAF8u)==3.0f && FLOAT_AT(A(3)+0xAFCu)==12.0f && FLOAT_AT(A(3)+0xB00u)==5.0f);   /* next trace from there */
     place(ENT(3),7.0f,2u);tick(ENT(3),__LINE__);
     CHECK(FLOAT_AT(ENT(3)+0x64u)==3.0f && rbt_walk[0].holds==2u);
+    /* v0.4.0-mapmaker.45: its room traced at its eye stays 1 through the doorway: held all the same */
+    place(ENT(3),6.0f,1u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==3.0f && WORD_AT(ENT(3)+0x34u)==1u && rbt_walk[0].holds==3u);
+    place(ENT(3),5.5f,0u);tick(ENT(3),__LINE__);               /* no room known: held too */
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==3.0f && rbt_walk[0].holds==4u);
+    /* beside the doorway (the wall's portal spans z 0..10): free */
+    place(ENT(3),3.0f,1u);SETF(ENT(3)+0x6Cu,15.0f);tick(ENT(3),__LINE__);
+    place(ENT(3),6.0f,1u);SETF(ENT(3)+0x6Cu,15.0f);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f && rbt_walk[0].holds==4u);
+    /* a floor above (y 6): the one-floor portal is below it, free */
+    place(ENT(3),3.0f,1u);SETF(ENT(3)+0x68u,6.0f);tick(ENT(3),__LINE__);
+    place(ENT(3),6.0f,1u);SETF(ENT(3)+0x68u,6.0f);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f && rbt_walk[0].holds==4u);
+    place(ENT(3),2.0f,1u);tick(ENT(3),__LINE__);               /* back on its floor (a jump: kept) */
     place(ENT(3),40.0f,2u);tick(ENT(3),__LINE__);              /* a teleport: kept */
     CHECK(FLOAT_AT(ENT(3)+0x64u)==40.0f && WORD_AT(ENT(3)+0x34u)==2u);
-    place(ENT(3),3.0f,0u);tick(ENT(3),__LINE__);               /* no room: left alone */
-    CHECK(FLOAT_AT(ENT(3)+0x64u)==3.0f && rbt_walk[0].hold_room==2u);
+    place(ENT(3),3.0f,0u);tick(ENT(3),__LINE__);               /* back again: kept */
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==3.0f && rbt_walk[0].holds==4u);
     /* the restart puts it back at its spawn: no previous position */
     in_room1(__LINE__);
     CALL(pc_mapmaker_robot_reset,fake,0x0015E7B6u,0,0,0,1);
@@ -577,13 +593,33 @@ static void hold(void)
     stacked_level(3,0,0,0);
     place(ENT(3),3.0f,1u);tick(ENT(3),__LINE__);
     place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
-    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f && rbt_walk[0].hold_room==2u && !rbt_walk[0].holds);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f && rbt_walk[0].hold_room==2u && !rbt_walk[0].holds && rbt_walk[0].passes==1u);
     /* a robot of one floor: through the one-floor doorway */
     stacked_level(1,0,0,0);
     SETF(ENT(3)+0x1ACu,2.0f);SETF(ENT(3)+0x1C4u,2.0f);
     place(ENT(3),3.0f,1u);tick(ENT(3),__LINE__);
     place(ENT(3),6.0f,2u);tick(ENT(3),__LINE__);
     CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f);
+    /* a triangular opening (5,0,0) (5,5,0) (5,5,10): through its plane inside
+     * its bounds but outside it (z 9, knee height 1): free; inside (z 1): held */
+    stacked_level(1,0,0,0);
+    HALF_AT(MPORT+0x14u)=3u;
+    place(ENT(3),3.0f,1u);SETF(ENT(3)+0x6Cu,9.0f);tick(ENT(3),__LINE__);
+    place(ENT(3),6.0f,1u);SETF(ENT(3)+0x6Cu,9.0f);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f && !rbt_walk[0].holds);
+    place(ENT(3),6.0f,1u);SETF(ENT(3)+0x6Cu,1.0f);tick(ENT(3),__LINE__);   /* a jump there: kept */
+    place(ENT(3),3.0f,1u);SETF(ENT(3)+0x6Cu,1.0f);tick(ENT(3),__LINE__);   /* the other way through it */
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==6.0f && rbt_walk[0].holds==1u);
+    /* a diagonal doorway (5,0)-(10,10): a move beside it inside its bounds is
+     * free (its line would meet the portal farther on); through it: held */
+    stacked_level(1,0,0,0);
+    SETF(MPORT+0x30u,10.0f);SETF(MPORT+0x38u,10.0f);SETF(MPORT+0x3Cu,10.0f);SETF(MPORT+0x44u,10.0f);
+    SETF(MPORT+0x20u,0.0f);SETF(MPORT+0x2Cu,0.0f);
+    place(ENT(3),6.0f,1u);tick(ENT(3),__LINE__);
+    place(ENT(3),7.0f,1u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==7.0f && !rbt_walk[0].holds);
+    place(ENT(3),9.0f,1u);tick(ENT(3),__LINE__);
+    CHECK(FLOAT_AT(ENT(3)+0x64u)==7.0f && rbt_walk[0].holds==1u);
 }
 static void statics(uint32_t a,uint32_t b,uint32_t c) { WORD_AT(STAT)=a;WORD_AT(STAT+4u)=b;WORD_AT(STAT+8u)=c; }
 #define STATICS_ARE(a,b,c) (WORD_AT(STAT)==(a) && WORD_AT(STAT+4u)==(b) && WORD_AT(STAT+8u)==(c))

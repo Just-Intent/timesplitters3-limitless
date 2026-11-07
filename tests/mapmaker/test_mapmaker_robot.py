@@ -151,16 +151,21 @@ MUTATIONS = {
     'stack-highest-portal': ('(d<=best+0.01f && p.lo<best_lo)', '(d<=best+0.01f && p.lo>best_lo)'),
     'hold-none': ('    if((k=rbt_find(ent))>=0) rbt_hold((unsigned)k,ent);\n', ''),
     'hold-after-ai': ('    if((k=rbt_find(ent))>=0) rbt_hold((unsigned)k,ent);\n    rbt_swapped(original,ent);', '    rbt_swapped(original,ent);\n    if((k=rbt_find(ent))>=0) rbt_hold((unsigned)k,ent);'),
-    'hold-room-kept': ('            WORD_AT(ent+RBT_ENT_ROOM)=rbt_walk[k].hold_room;\n', ''),
-    'hold-pos-kept': ('            memcpy((void *)((uintptr_t)(ent+RBT_ENT_POS)+g_xbox_mem_offset),rbt_walk[k].hold,sizeof rbt_walk[k].hold);\n', ''),
-    'hold-teleport': ('        if(d<=RBT_HOLD_JUMP*RBT_HOLD_JUMP &&\n', '        if(\n'),
-    'hold-removed': ('    if(rbt_inst[k].removed || !rbt_room_ok(room)) return;', '    if(!rbt_room_ok(room)) return;'),
-    'hold-no-room-check': ('    if(rbt_inst[k].removed || !rbt_room_ok(room)) return;', '    if(rbt_inst[k].removed) return;'),
+    'hold-room-kept': ('                if(room!=rbt_walk[k].hold_room && rbt_room_ok(rbt_walk[k].hold_room)) WORD_AT(ent+RBT_ENT_ROOM)=rbt_walk[k].hold_room;\n', ''),
+    'hold-pos-kept': ('                memcpy((void *)((uintptr_t)(ent+RBT_ENT_POS)+g_xbox_mem_offset),rbt_walk[k].hold,sizeof rbt_walk[k].hold);\n', ''),
+    'hold-teleport': ('d>0.0f && d<=RBT_HOLD_JUMP*RBT_HOLD_JUMP && (w=', 'd>0.0f && (w='),
+    'hold-removed': ('    if(rbt_inst[k].removed) return;                    /* removed: left alone */\n', ''),
     'hold-restart-kept': ('        rbt_walk[k].hold_ok=0;                         /* back at its spawn point */\n', ''),
     'hold-respawn-kept': ('        rbt_walk[k].hold_ok=0;                         /* (re)spawned: no previous position */\n', ''),
-    'hold-follows': ('            return;\n        }\n    }\n    rbt_walk[k].hold_ok=1;', '        }\n    }\n    rbt_walk[k].hold_ok=1;'),
-    'hold-no-slack': ('<rbt_walk[k].height-RBT_FIT_SLACK) {\n            memcpy', '<rbt_walk[k].height+1.0f) {\n            memcpy'),
-    'goal-unused-links': ('        if(!(WORD_AT(l)&RBT_LINK_USED) || (a=WORD_AT(l+4u))>=np || (b=WORD_AT(l+8u))>=np || a==b) continue;\n        o=', '        if((a=WORD_AT(l+4u))>=np || (b=WORD_AT(l+8u))>=np || a==b) continue;\n        o='),
+    'hold-follows': ('                return;\n            }\n            if(rbt_walk[k].passes', '            }\n            if(rbt_walk[k].passes'),
+    'hold-no-slack': ('            if(open<rbt_walk[k].height-RBT_FIT_SLACK) {', '            if(open<rbt_walk[k].height+1.0f) {'),
+    # v0.4.0-mapmaker.45: the room is traced at the eye; the hold is geometric
+    'hold-room-change-only': ('    if(rbt_walk[k].hold_ok) {\n        for(i=0;i<3u;i++) { from', '    if(rbt_walk[k].hold_ok && room!=rbt_walk[k].hold_room) {\n        for(i=0;i<3u;i++) { from'),
+    'hold-eye-kept': ('                    for(i=0;i<3u;i++) { float e=rbt_getf(a+RBT_AI_EYE+i*4u)-(pos[i]-rbt_walk[k].hold[i]);if(rbt_sane(e)) memcpy', '                    for(i=0;i<0u;i++) { float e=rbt_getf(a+RBT_AI_EYE+i*4u)-(pos[i]-rbt_walk[k].hold[i]);if(rbt_sane(e)) memcpy'),
+    'hold-eye-height': ('#define RBT_HOLD_KNEE 1.0f', '#define RBT_HOLD_KNEE 6.0f'),
+    'cross-no-polygon': ('        if(!rbt_in_wall(w,q)) continue;                /* through the wall beside it */\n', ''),
+    'cross-same-side': ('        da=w->nx*a[0]+w->ny*a[1]+w->nz*a[2]-w->d;\n        db=w->nx*b[0]+w->ny*b[1]+w->nz*b[2]-w->d;\n        if((da>0.0f)==(db>0.0f)) continue;', '        da=w->nx*a[0]+w->ny*a[1]+w->nz*a[2]-w->d;\n        db=w->nx*b[0]+w->ny*b[1]+w->nz*b[2]-w->d;\n        if(0) continue;'),
+    'cross-unstacked': ('        o=rbt_stacked(w->id);\n', '        o=w->y1-w->y0;\n'),
 }
 
 
@@ -534,4 +539,31 @@ def test_root_motion_move_before_handler():
         assert ('imm', 0x808) in a[push].ops and target(a[site]) == 0x0005F460
     inc = INC.read_text(encoding='utf-8')
     for k in ('RBT_ENT_POS 0x64u', 'RBT_ENT_ROOM 0x34u'):
+        assert '#define ' + k in inc, k
+
+
+def test_room_traced_at_the_eye():
+    """v0.4.0-mapmaker.45: the room +0x34 follows the robot's EYE, not its
+    feet. The root-motion walk (no 0x10000 pad route) moves it with
+    sub_000D9230 at 0x0015F47A, stores the position (0x0015F697..0x0015F6B4)
+    and calls sub_0015AB80(entity, 0) at 0x0015F6C5. That traces from the
+    last eye point (actor +0xAF8..+0xB00) to position y + [[entity+4]+0x10]
+    +0x34 + 0.65 through sub_00088430, which changes room only when the
+    segment crosses a portal's plane inside its polygon. A giant's eye is
+    above a one-floor doorway, so the .44 room-change hold never ran."""
+    a = by_address()
+    rd = xbe_reader()
+    assert ('imm', 0x10000) in a[0x0015F21A].ops and target(a[0x0015F221]) == 0x0015F6D2   # pad route elsewhere
+    assert target(a[0x0015F47A]) == 0x000D9230 and target(a[0x0015F6C5]) == 0x0015AB80
+    assert mem(a[0x0015F697])[0][1] == 'ebp' and [mem(a[s])[0][4] for s in (0x0015F6A9, 0x0015F6B4)] == [0x68, 0x6C]
+    # sub_0015AB80, arg 0: the eye y = +0x68 + [[entity+4]+0x10]+0x34 + [0x0047CFE0]
+    assert mem(a[0x0015AD96])[0][4] == 4 and mem(a[0x0015AD99])[0][4] == 0x10 and mem(a[0x0015AD9C])[0][4] == 0x34
+    assert mem(a[0x0015ADA1])[0][4] == 0x0047CFE0 and abs(struct.unpack('<f', rd(0x0047CFE0, 4))[0] - 0.65) < 1e-6
+    assert [mem(a[s])[0][4] for s in (0x0015AD4B, 0x0015AD64, 0x0015AD72)] == [0xAF8, 0xAFC, 0xB00]
+    assert target(a[0x0015AE24]) == 0x00088430
+    # sub_00088430: plane sides of start and end, then the edge test of the crossing point
+    assert mem(a[0x0008853F])[0][4] == 8 and mem(a[0x0008851C])[0][4] == 4   # (start - vertex 0) . normal +8
+    assert a[0x00088798].mnemonic == 'ja' and target(a[0x00088798]) == 0x000887DE
+    inc = INC.read_text(encoding='utf-8')
+    for k in ('RBT_AI_EYE 0xAF8u', 'RBT_EYE_MODEL 0x10u', 'RBT_EYE_OFF 0x34u', 'RBT_EYE_ADD 0.65f'):
         assert '#define ' + k in inc, k
