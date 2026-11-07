@@ -124,7 +124,7 @@ image constants that only it reads, so it can be moved.
 | `sub_0028E770` -> `pc_mapmaker_crowe_part` | return 0x0028ECF1, scene 100: only the stock explosion `sub_000EFBD0(0x20, 0x17, state+0x2BFC+part*0x5C, 0, 0, 0, 0, 1)` for parts 0..2, no prop; the original is not run |
 | `sub_002275F0` -> `pc_mapmaker_crowe_event` | return 0x002923A8: level marker 0 is the map's own logic marker: dropped |
 | `sub_002AB1B0` -> `pc_mapmaker_crowe_eggs` | return 0x00291E84 (its only call, 0x00291E7F), inside this boss's fight in scene 100: the egg drop is skipped (cdecl `ret`; the fight pops its six arguments) - see [Eggs](#eggs-the-v040-mapmaker28-crash); the egg's hazard slot (argument 1) keeps its cell (arguments 5, 6) for 120 fight calls, unless that slot's egg is still out - see [No walk](#no-walk-the-v040-mapmaker31-playtest) |
-| `sub_001CDD60` -> `pc_mapmaker_crowe_restart` | the pause menu's level restart (no level init): before the original, when this level had Crowes, forget them as a new level does (outside statics back, `[0x0075F5E8]` 0) and let the AI start give every restarted Crowe new blocks, the first one included - see [Restart](#restart-from-the-pause-menu) |
+| `sub_001CDD60` -> `pc_mapmaker_crowe_restart` | the pause menu's level restart (no level init): before the original, the outside statics back and `[0x0075F5E8]` 0; after it, in scene 100, every Crowe keeps its Level heap blocks and record and sets them up again in place (no allocation) - see [Restart](#restart-from-the-pause-menu) |
 | `sub_002A9D00` -> `pc_mapmaker_crowe_cells` | return 0x002901BF or 0x00290E67 (the fight's cell lookups), argument 1 = this boss's state + 4: after the original (which clears every cell's +0x24 and blocks the eggs in flight), each kept egg blocks its cell and the cells above, below, left and right of it (+0x24 = 1), as a live egg does; the off cells, the cells beyond an off cell in line with the boss and the cells ahead of a stopped walk are blocked too; a player in no cell (arguments 2, 3) gets the nearest cell in a room as +0x1190/+0x1194 |
 | `sub_00126560` -> `pc_mapmaker_crowe_fx` | return 0x001CEE8C: after the original, `sub_0028D710` with this level's state, until the boss is removed (then nothing it draws can stay frozen) |
 | `sub_0014CC80` -> `pc_mapmaker_crowe_hud` | focus on this boss: cleared for the stock bar, restored after (Boss Off = no health; Boss bar = the bosses area's; Sub-boss = the meter) |
@@ -464,17 +464,28 @@ Found by the Khallos work: the pause menu's restart (`sub_0003D440`, flag
 `[0x006B7AA8]`) calls `sub_001CDAF0` and then `sub_001CDD60`, never
 `sub_001CDB80`, so `sub_0025F720` (only called from `sub_0015E7C0` at
 0x0015E818, which only `sub_001CDB80` calls) and the level hook do not run
-(CONFIRMED, test `test_restart_runs_no_level_init`). `sub_001CDD60` sets up
-level memory again first (`sub_0003E740`, INFERRED). Stock resets the scene
-14 Crowe in place (`sub_0025F6A0` -> `sub_0028D0C0`). Before: the restarted
-Crowes came back with the same records and kept their old blocks (state,
-particles: level memory), already relocated, with the last fight's cells,
-target and statics; the `m31.err` restarts show AI starts with no new level
-line and no `state allocated`. Now `pc_mapmaker_crowe_restart` forgets them
-before the original and each restarted Crowe gets new blocks at its AI start
-and relocates again (log `level restart: split Crowe blocks forgotten`).
-Other areas with per-level blocks (realbosses walkers/skeletons, robot,
-tank) are not handled here.
+(CONFIRMED, test `test_restart_runs_no_level_init`). Stock resets the scene
+14 Crowe in place (`sub_0025F6A0` -> `sub_0028D0C0`). Before .31: the restarted
+Crowes came back with the same records and kept their old blocks, already
+relocated, with the last fight's cells, target and statics (`m31.err`: AI
+starts with no new level line and no `state allocated`).
+
+Corrected 2026-11-06 (CONFIRMED, `test_mapmaker_restart_heap.py`): the
+restart's `sub_0003E740(3)` frees only heap 0 (`sub_0003E240`: `[0x006B8388]`);
+the Crowe blocks (`sub_0028D6D0`: effect blocks and state, `sub_002A62C0`:
+particles) are Level heap (heap 1, `[0x006B837C]`), which the restart never
+resets. The .31 fix forgot them and gave each Crowe new ones at its AI start:
+about 60 KB (100 KB with one player) of Level heap used up per Crowe per
+restart. Now `pc_mapmaker_crowe_restart` puts the outside values back before
+the original; after it, in scene 100, each Crowe keeps its blocks and record,
+forgets the run (relocation, eggs, walls, death) and sets its blocks up again
+in place (`crw_again`: effect count/blocks from its copy, every block zeroed,
+`sub_0028D0C0`, then its particle block). One whose blocks are not usable,
+and those after it, are dropped (bot behaviour). The AI start finds them by
+record; they relocate again. Log `level restart: split Crowe blocks set up
+again in place`. Fixture: four Crowes, their blocks poisoned, set up again
+with no allocation, restarted twice, an unusable effect count and state,
+scene 14 and none; mutations `restart-*`, `again-*`. Unplayed.
 
 ## Wrappers for the integrator
 
@@ -502,7 +513,7 @@ WRAP sub_0028DA10 -> pc_mapmaker_crowe_think       (new; entity slot 2 callback)
 WRAP sub_0028F730 -> pc_mapmaker_crowe_hit         (new; entity hit callback +0x19C)
 WRAP sub_002AB1B0 -> pc_mapmaker_crowe_eggs        (new after v0.4.0-mapmaker.28; return-address test first)
 WRAP sub_002A9D00 -> pc_mapmaker_crowe_cells       (new after v0.4.0-mapmaker.31; return-address test first, 2 calls per Crowe frame)
-WRAP sub_001CDD60 -> pc_mapmaker_crowe_restart     (new after v0.4.0-mapmaker.31; layer with khallos_restart, either order; before the original)
+WRAP sub_001CDD60 -> pc_mapmaker_crowe_restart     (new after v0.4.0-mapmaker.31; layer with khallos_restart, either order; around the original)
 ```
 
 Each layer: `if(pc_mapmaker_area_enabled("crowe","pc_mapmaker_crowe_<x>"))
