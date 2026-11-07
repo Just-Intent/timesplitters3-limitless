@@ -89,6 +89,18 @@ MUTATIONS = {
                               '    } else if(v) vh_log("a story vehicle record changed before its create: left as filled (record, variant)",rec,v);'),
     'create-unchecked-record': (' && WORD_AT(rec+0x24u)==vh_kind[v-1u].def && WORD_AT(rec+8u)==vh_kind[v-1u].model) {', ') {'),
     'create-no-34': ('WORD_AT(rec+0x34u)=vh_kind[v-1u].r34;', ';'),
+    'lift-none': ('        VH_F(g_ebp+VH_REC_Y)+=lift;\n', ''),
+    'lift-wrong-field': ('#define VH_REC_Y 0x10u', '#define VH_REC_Y 0x14u'),
+    'lift-no-gap': ('#define VH_FLOOR_GAP 0.01f', '#define VH_FLOOR_GAP 0.0f'),
+    'lift-tank-depth': ('6u,3u,0u,-2.365f,"future tank"}', '6u,3u,0u,-0.935f,"future tank"}'),
+    'lift-truck-depth': ('{7u},1u,1u,1u,-0.935f,"truck"}', '{7u},1u,1u,1u,0.0f,"truck"}'),
+    'lift-no-override': ('f>=VH_LIFT_MIN && f<=VH_LIFT_MAX) vh.lift[t]=f;', 'f>=VH_LIFT_MIN && f<=VH_LIFT_MAX) ;'),
+    'lift-unbounded': ('f>=VH_LIFT_MIN && f<=VH_LIFT_MAX) vh.lift[t]=f;', 'f>=VH_LIFT_MIN) vh.lift[t]=f;'),
+    'lift-one-switch': ('        unsigned t=v==1u?0u:1u;\n        float lift=vh_lift(v);', '        unsigned t=0u;\n        float lift=vh_lift(v);'),
+    'entry-kept-closed': ('    WORD_AT(block+VH_BLOCK_FLAGS)=was&~VH_NO_PLAYER;\n', ''),
+    'entry-all-flags': ('    WORD_AT(block+VH_BLOCK_FLAGS)=was&~VH_NO_PLAYER;\n', '    WORD_AT(block+VH_BLOCK_FLAGS)=0;\n'),
+    'entry-every-vehicle': ('    if(!ours || v!=1u) return;\n', '    if(!ours) return;\n'),
+    'entry-stock-vehicles': ('    if(!ours || v!=1u) return;\n', '    if(v>1u) return;\n'),
 }
 
 
@@ -132,6 +144,10 @@ def test_mapmaker_vehicles(tmp_path, mutation):
         assert '[mapmaker] vehicles: created a future tank' in err
         assert '[mapmaker] vehicles: story vehicle models not read this level: it stays the theme vehicle' in err
         assert '[mapmaker] vehicles: saved story vehicles (items, records) (0x3, 0x4)' in err
+        assert '[mapmaker] vehicles: tank spawn height: record y +2.375 (model base y -2.365)' in err
+        assert '[mapmaker] vehicles: truck spawn height: record y +0.945 (model base y -0.935)' in err
+        assert 'tank spawn height: record y +1.500 (model base y -2.365) (TSFP_MAPMAKER_TANK_LIFT)' in err
+        assert '[mapmaker] vehicles: tank open to players: block flags 0x17 -> 0x7 (story no-player bit 0x10; tracked bit 1; seats 2)' in err
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 
@@ -331,6 +347,24 @@ def test_seat_anims_and_pool():
     assert ('imm', 4) in a[0x0017F340].ops and ('imm', 0x970) in a[0x0017F33A].ops
 
 
+def test_tank_no_player_flag():
+    """Def 2 +0xA8 = 0x17 is copied to the block's +0x58 (0x00182B51); bit 0x10 refuses
+    a player in the enterable test (0x0017A27E, used by the nearest-vehicle scan
+    sub_0017C6A0), the use prompt (0x0017D1E8), the exit (0x0017DAFB) and the tick
+    (0x0017ECD6); bit 0 is the tracked bit. The truck (4) and the buggies (0x24) lack
+    it. Entering a seat with anim id 0 skips the anim (0x0017C985)."""
+    a = by_address()
+    rd = xbe()
+    assert [u32(rd, 0x004E84A8 + k * 0xD8 + 0xA8) for k in (0, 2, 3, 5)] == [4, 0x17, 0x24, 0x24]
+    for x in (0x0017A27E, 0x0017D1E8, 0x0017DAFB, 0x0017ECD6):
+        assert a[x].mnemonic == 'test' and 0x58 in disp(a[x]) and ('imm', 0x10) in a[x].ops, hex(x)
+    tests = [i.address for i in decoded() if i.mnemonic == 'test' and 0x58 in disp(i) and ('imm', 0x10) in i.ops
+             and 0x00164000 <= i.address < 0x00183000]
+    assert sorted(tests) == [0x0017A27E, 0x0017D1E8, 0x0017DAFB, 0x0017ECD6]
+    assert '0x17a260' in a[0x0017C6C4].text and 0x140 in disp(a[0x0017A288])
+    assert a[0x0017C983].mnemonic == 'test' and '0x17ca5d' in a[0x0017C985].text and '0x5f460' in a[0x0017C9C6].text
+
+
 def test_scene5_gates_left_alone():
     """The death handler (gibs, explosions) and the impact hook run their story parts
     only in scene 5; in scene 100 both do nothing, as for the stock buggies."""
@@ -385,6 +419,41 @@ def _textures(data):
         ids.append(struct.unpack_from('<I', data, off + 4)[0] & 0xFFFFFF)
         off += 16
     return ids
+
+
+def _base_y(data):
+    """Lowest y of the model's position rows ({x, y, z, 0xFFFFFFE0}, 12 or more in a row)."""
+    ys, o = [], 0
+    while o + 16 <= len(data):
+        s, n = o, 0
+        while o + 16 <= len(data):
+            x, y, z, t = struct.unpack_from('<3fI', data, o)
+            if t != 0xFFFFFFE0 or not all(abs(v) < 40 for v in (x, y, z)):
+                break
+            n += 1
+            o += 16
+        if n >= 12:
+            ys += [struct.unpack_from('<f', data, s + 16 * i + 4)[0] for i in range(n)]
+        else:
+            o = s + 4
+    return min(ys)
+
+
+def test_spawn_heights():
+    """The stock MapMaker vehicles stand on their origin (lowest vertex y 0), the
+    truck's wheels reach y -0.935 and the tank's tracks y -2.365: the lifts."""
+    if not (GAME / 'stream/lv5/prop1.pak').exists():
+        pytest.skip('game paks not available locally')
+    props = _props()
+    base = lambda pak, m: _base_y(_body(GAME / pak, _model(props[m][1])))
+    for pak, m in (('stream/lv100/tileset/tileset1.pak', 0x894), ('stream/lv100/tileset/tileset2.pak', 0x893),
+                   ('stream/lv100/tileset/tileset3.pak', 0x892)):
+        assert abs(base(pak, m)) < 1e-3, hex(m)
+    assert abs(base('stream/lv4/prop3.pak', 7) + 0.935) < 1e-3
+    assert abs(base('stream/lv5/prop1.pak', 0xB) + 2.365) < 1e-3
+    src = INC.read_text(encoding='utf-8')
+    assert '6u,3u,0u,-2.365f,"future tank"}' in src and '{7u},1u,1u,1u,-0.935f,"truck"}' in src
+    assert '{7u,0xEu},2u,2u,1u,-0.935f,' in src
 
 
 def test_story_vehicle_records():

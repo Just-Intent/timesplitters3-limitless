@@ -141,7 +141,11 @@ null test); WRAP `sub_00182A20` (0x0006E949, also the restart) writes the
 story record fields +0x28..+0x34. Stream paks lv5/prop1, lv4/prop3 mounted
 index-only (textures inside). Category 35 is no longer raised (4-block pool
 `sub_001806B0`, unchecked pop); restable row Vehicles. 9 WRAPs:
-mapmaker-vehicles.md. `test_mapmaker_vehicles.py`. Unplayed.
+mapmaker-vehicles.md. `test_mapmaker_vehicles.py`. .61: all sank (record y
+at the pad, models below their origin: truck -0.935, tank -2.365; the fill
+hook now lifts by that + 0.01, `TSFP_MAPMAKER_TANK_LIFT`/`_TRUCK_LIFT`) and
+the tank refused players (block +0x58 bit 0x10 from def +0xA8, tested at
+0x0017A27E/D1E8/DAFB/ECD6; the create hook clears it). Fix unplayed.
 
 Tank TNT (.55, CONFIRMED, `test_tnt_on_the_stunned_tank`): a sticky explosive
 going off (`sub_000F0430`) calls `sub_00228B50` (story mode, 0x000F049A), which
