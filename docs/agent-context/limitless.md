@@ -490,7 +490,7 @@ realbosses level); included after realbosses.inc. Picker rows 153/154/155 are a
 walker intro skips mission 13's SPC1/SPC2 trigger in `_fx` (see area docs).
 Boss areas/skies/open air/set slots: [boss notes](limitless-bosses.md); [.tsmap](map-transfer.md). Anim slots
 (940, .34 crash): `pc_mapmaker_animslots.inc` in worm_register, mapmaker-animslots.md. MM sandstorm
-draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; music pause: custom-music.md.
+draw (.32: grain/haze WRAPs sub_00154FE0/sub_0011A930, fog row 7): mapmaker-sky-music.md; music restart: custom-music.md.
 Pak mount table, restart heap (heap 0; bosses reuse): [boss notes](limitless-bosses.md).
 `tests/mapmaker/test_mapmaker_paktable.py`.
 Skeleton fire (mapmaker.17): `_fx` also draws the scene-1 particle branch

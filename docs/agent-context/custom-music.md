@@ -21,7 +21,8 @@ wrappers patch, not edited here):
 
 | WRAP | handler | why |
 |---|---|---|
-| `sub_000289C0` | `pc_custom_music_channel` | a jingle channel (1/2) ends the imported track |
+| `sub_000289C0` | `pc_custom_music_channel` | jingle channel 1/2: end-of-match (sub_00045A00 returns `0x0006709B`/`0x000670B4`, at `[esp+0x10]`) ends the track; any other holds it until the stock player (`[0x0064BDC0]` != 2, after >= 60 steps, at most 2000) |
+| `sub_001CDD60` | `pc_custom_music_restart` | **new (2026-11-07)**: a level restart calls no `sub_00045DE0`; the level's track (`cmu.level`) starts again |
 | `sub_00071BE0` | `pc_custom_music_arcade_rows` | Arcade rows after the 58 stock rows (return `0x002C8047`, `ebx` 0) |
 | `sub_002C71C0` | `pc_custom_music_arcade_show` | item 0xE shows the imported row |
 | `sub_002C7430` | `pc_custom_music_arcade_store` | imported row -> `pc-music.ini`, stock fields row 0 |
@@ -52,6 +53,10 @@ Existing wrappers reused: `sub_00078590` (rows), `sub_003006C0` (compile),
   2026-11-07 the map's chunk plays when limits, scene 100 and the map's own
   word -1 hold, even over a stock setup pick (logged); an imported Arcade
   choice comes first and a missing one falls through to the map's track.
+- Watch: a scene word off the play scene holds the track; 100 steps in a
+  row (~1.5 s) end it (m48.err 18020 ended mid-fight on a blip). Logs
+  `watch: ... track kept|ended`, `jingle over`, `new level music`. Level
+  `PC_MUSIC_LEVEL` 1.0: full slider = 0 dB (0.65 was quiet in .48).
 - Logs: budget per message (8 each, 32 kinds); the Map Settings offer line
   only when its count changes. Before this one 48-line budget was spent by
   list builds (m45b.err: 48 offer lines, then nothing), hiding every play
