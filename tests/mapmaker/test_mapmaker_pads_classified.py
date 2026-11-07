@@ -1,7 +1,8 @@
 """Every pad-handle constant in the game's code is patched (pads.json) or reviewed.
 
-Layout B (docs/mapmaker/mapmaker-pads.md) moves the runtime pad handles 0x209E..0x20B1 to
-0x4740..0x4753 and keeps the cover base 0x1F40. pads.json was first checked
+Layout C (docs/mapmaker/mapmaker-pads.md, 2026-11-07) moves the runtime pad handles
+0x209E..0x20B1 (Layout B: 0x4740..) to 0x7800..0x7813 and the cover base 0x1F40 to
+0x4000, so regular handles reach 0x3FFF. pads.json was first checked
 against the text listing, which drops instructions whose byte column is elided;
 this scan decodes all game code with the lifter's decoder instead, any length.
 """
@@ -26,10 +27,9 @@ KEPT = reviewed("""
 002B0363 movsx eax,[eax-0x413D8]: eax was just reloaded from [0x715F38], so it is a fixed stray read before the runtime pool, not runtime[h].owner; rewriting would only move it
 """)
 
-# Cover handle base 0x1F40: Layout B keeps it (cover = 0x1F40 + index). These
-# decode/encode cover handles exactly as before. The 13 pad-id threshold compares
-# (cmp id,0x1F40; jle; call sub_0009CCA0) are rewritten to 0x2328 in pads.json
-# (pads-idthreshold-*), so they are table sites, not listed here.
+# Cover handle base 0x1F40: Layout C moves it to 0x4000 (pads-coverbase-*, every
+# one of these is a table site). The 13 pad-id threshold compares (cmp id,0x1F40;
+# jle; call sub_0009CCA0) are rewritten to 0x2328 (pads-idthreshold-*).
 COVER_BASE = reviewed("""
 0009A40B add eax,0x1F40: cover index -> handle (sub_0009A3C0)
 0009A43D cmp eax,0x1F40: handle >= cover base (sub_0009A420 decoder)
@@ -76,7 +76,6 @@ COVER_BASE = reviewed("""
 0033BED2 add eax,-0x1F40: cover handle -> index (sub_0033BDC0)
 0033EFB5 cmp eax,0x1F40: handle >= cover base (sub_0033EF90)
 0033EFC9 add eax,-0x1F40: cover handle -> index (sub_0033EF90)
-003BC6EC cmp eax,0x1F40: handle >= cover base (sub_003BC6D0)
 """)
 
 # 0x1F40 that is not a pad handle at all.
@@ -88,6 +87,7 @@ NOT_HANDLE = reviewed("""
 00194F95 lea ecx,[edi+ebx*8+0x1F40]: array at +0x1F40 of another struct (stride 8, sub_00194DB0)
 00388D57 mov [ebp-0x10],0x1F40: library code (0x0038xxxx), a local of 8000
 00389486 mov word [esi+0x2C],0x1F40: library code, word field 8000
+003BC6EC cmp eax,0x1F40: network library (sub_003BC6D0): the big-endian 16-bit port at [ebx+2] compared with 8000, not a pad handle
 """)
 
 
@@ -106,13 +106,15 @@ def test_every_pad_handle_constant_is_classified():
     found = candidate_sites()
     by_address = {i.address: i for i in decoded() if i.address in found}
     assert not unclassified(found, table, KEPT, COVER_BASE, NOT_HANDLE)
-    # the reviewed lists describe real sites and never hide a patched one
+    # the reviewed lists describe real sites; the kept and foreign ones are never patched
     for name, group in (('kept', KEPT), ('cover base', COVER_BASE), ('not a handle', NOT_HANDLE)):
         assert set(group) <= set(found), (name, sorted(hex(a) for a in set(group) - set(found)))
+    for name, group in (('kept', KEPT), ('not a handle', NOT_HANDLE)):
         assert not set(group) & table, name
-    # every runtime-range constant (not the kept cover base) is rewritten
-    moved = {a for a, s in found.items() if a not in KEPT and a not in COVER_BASE and a not in NOT_HANDLE}
+    assert set(COVER_BASE) <= table and len(COVER_BASE) == 45
+    # every handle constant except the kept and foreign ones is rewritten
+    moved = {a for a, s in found.items() if a not in KEPT and a not in NOT_HANDLE}
     assert moved <= table
-    thresholds = {a for a in moved if 0x1F40 in [v for k, v in by_address[a].values()]}
-    assert len(thresholds) == 13 and len(moved - thresholds) == 88
+    thresholds = {a for a in moved - set(COVER_BASE) if 0x1F40 in [v for k, v in by_address[a].values()]}
+    assert len(thresholds) == 13 and len(moved - thresholds - set(COVER_BASE)) == 88
     assert 0x002B0456 in moved                     # folded runtime[h - base].flags
