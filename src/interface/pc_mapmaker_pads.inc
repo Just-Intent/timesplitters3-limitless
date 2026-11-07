@@ -24,12 +24,16 @@
  *    set up to 16 cover pads with no bound (the "+60 at load"): in scene 100
  *    it is skipped when the cover count plus the 16 - n pads it would add
  *    passes the cover capacity (10,240 with the pools on, else stock 1280).
+ *  - pc_mapmaker_pads_stitch wraps sub_0009DC70 (the stitcher): with the
+ *    pools on, in scene 100, it cuts the stitch table where the next link
+ *    would pass the link pool (MAPMAKER_POOL_LINKS), then runs the original.
  * All three are cdecl and their callers ignore eax, so returning without
  * calling the original is a plain guest ret.
  *
  * Requires the includer's WORD_AT, guest_writable, g_esp and, from
  * pc_mapmaker_limits.inc, mapmaker_limits, mapmaker_limits_read,
- * MAPMAKER_LIMIT_COVER, MAPMAKER_POOL_COVER and MAPMAKER_POOL_PADS. */
+ * MAPMAKER_LIMIT_COVER, MAPMAKER_POOL_COVER, MAPMAKER_POOL_PADS,
+ * MAPMAKER_POOL_LINKS and MAPMAKER_PTR_OK. */
 #ifndef MAPMAKER_STACK_OK
 /* Hot hooks check the guest stack with this instead of guest_writable,
  * whose VirtualQuery made a 186-piece map's AI setup take 13 minutes. */
@@ -62,7 +66,7 @@ typedef char mapmaker_pads_regular_ids[(MAPMAKER_PADS_REGULAR_ID+MAPMAKER_POOL_P
 typedef char mapmaker_pads_cover_sizes[(MAPMAKER_LIMIT_COVER+MAPMAKER_PADS_SPARE<=MAPMAKER_PADS_COVER_RANGE &&
                                         MAPMAKER_POOL_COVER>=MAPMAKER_PADS_COVER_RANGE)?1:-1];
 
-static struct { uint32_t group_refused, pad_refused, cover_refused; } mapmaker_pads;
+static struct { uint32_t group_refused, pad_refused, cover_refused, stitch_refused; } mapmaker_pads;
 
 /* An A* pool is full when its free list (dword head, -1 = empty) is empty and
  * its bump counter has reached capacity: the original would take node
@@ -114,6 +118,48 @@ void pc_mapmaker_pads_cover_topup(void (*original)(void))
         mapmaker_pads.cover_refused++;
         MAPMAKER_GUEST_RET();
         return;
+    }
+    original();
+}
+
+/* WRAP sub_0009DC70 (stitcher, scene 100; called once per load from
+ * sub_0009DEB0 0x0009DEDD): for each of the [0x007B677C] 6-byte entries
+ * {u16 pad id a, u16 pad id b, u8 flags} of the table [0x007B6774] whose two
+ * pads are active (pad +4 bit 0), it appends a link at [0x007B6660] with no
+ * bound (0x0009DCDB..0x0009DD19), then calls sub_0009CD00 (teleporter and
+ * door links) and clears the count. The editor counts half the side slots
+ * (pc_mapmaker_limits.inc), which a map of mismatched doorways can pass; so
+ * with the pools on the table is cut at the first entry that would take the
+ * link pool past MAPMAKER_POOL_LINKS (those doorways get no AI link instead
+ * of writing past the pool). Entries whose pads cannot be read count as
+ * appending. */
+void pc_mapmaker_pads_stitch(void (*original)(void))
+{
+    uint32_t n,table,pads,links,room,added=0,i;
+    if(WORD_AT(0x0079094Cu)!=100u) { original(); return; }
+    mapmaker_limits_read();
+    if(!mapmaker_limits.pools) { original(); return; }
+    n=WORD_AT(0x007B677Cu);table=WORD_AT(0x007B6774u);pads=WORD_AT(0x00715F2Cu);links=WORD_AT(0x007B6660u);
+    room=links<MAPMAKER_POOL_LINKS?MAPMAKER_POOL_LINKS-links:0u;
+    if((int32_t)n<=0 || n<=room) { original(); return; }     /* every entry fits */
+    for(i=0;i<n;i++) {
+        uint32_t e=table+i*6u,a,b,ok=1;
+        if(MAPMAKER_PTR_OK(e,4)) {
+            a=(WORD_AT(e)&0xFFFFu)-0x3E9u;b=(WORD_AT(e)>>16)-0x3E9u;
+            if(a<MAPMAKER_POOL_PADS && b<MAPMAKER_POOL_PADS && MAPMAKER_PTR_OK(pads+a*32u+4u,4) &&
+               MAPMAKER_PTR_OK(pads+b*32u+4u,4))
+                ok=(WORD_AT(pads+a*32u+4u)&1u) && (WORD_AT(pads+b*32u+4u)&1u);
+        }
+        if(!ok) continue;
+        if(added==room) break;
+        added++;
+    }
+    if(i<n) {
+        mapmaker_pads.stitch_refused+=n-i;
+        fprintf(stderr,"[mapmaker] pads: link pool full (%u of %u): %u doorway entries not stitched\n",
+                (unsigned)(links+added),(unsigned)MAPMAKER_POOL_LINKS,(unsigned)(n-i));
+        fflush(stderr);
+        WORD_AT(0x007B677Cu)=i;
     }
     original();
 }

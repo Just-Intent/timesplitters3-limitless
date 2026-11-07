@@ -113,6 +113,36 @@ int main(void)
     WORD_AT(0x0079094Cu)=102;
     CHECK(ran(pc_mapmaker_pads_cover_topup));
 
+    /* ---- stitcher sub_0009DC70: table [0x007B6774] x [0x007B677C], links [0x007B6660] ---- */
+    {
+        uint32_t i,table=0x00380000u,pads=0x00390000u;
+        WORD_AT(0x0079094Cu)=100;
+        WORD_AT(0x007B6774u)=table;WORD_AT(0x00715F2Cu)=pads;
+        for(i=0;i<8;i++) WORD_AT(pads+i*32u+4u)=i==5u?0u:1u;          /* pad 5 inactive */
+        for(i=0;i<6;i++) {                                            /* entries (i, i+1); 4 and 5 touch pad 5 */
+            unsigned char *e=(unsigned char *)memory+table+i*6u;
+            e[0]=(unsigned char)((0x3E9u+i)&0xFF);e[1]=(unsigned char)((0x3E9u+i)>>8);
+            e[2]=(unsigned char)((0x3EAu+i)&0xFF);e[3]=(unsigned char)((0x3EAu+i)>>8);e[4]=0;e[5]=0;
+        }
+        WORD_AT(0x007B677Cu)=6;WORD_AT(0x007B6660u)=100;              /* far below the pool */
+        CHECK(ran(pc_mapmaker_pads_stitch) && WORD_AT(0x007B677Cu)==6u);
+        WORD_AT(0x007B6660u)=32512u-6u;                               /* 6 entries fit exactly */
+        CHECK(ran(pc_mapmaker_pads_stitch) && WORD_AT(0x007B677Cu)==6u && !mapmaker_pads.stitch_refused);
+        WORD_AT(0x007B677Cu)=6;WORD_AT(0x007B6660u)=32512u-4u;       /* 4 append (entries 0..3), 4 and 5 add none */
+        CHECK(ran(pc_mapmaker_pads_stitch) && WORD_AT(0x007B677Cu)==6u && !mapmaker_pads.stitch_refused);
+        WORD_AT(0x007B677Cu)=6;WORD_AT(0x007B6660u)=32512u-3u;       /* the 4th appending entry is cut */
+        CHECK(ran(pc_mapmaker_pads_stitch) && WORD_AT(0x007B677Cu)==3u && mapmaker_pads.stitch_refused==3u);
+        WORD_AT(0x007B677Cu)=6;WORD_AT(0x007B6660u)=40000u;          /* already past: nothing */
+        CHECK(ran(pc_mapmaker_pads_stitch) && WORD_AT(0x007B677Cu)==0u);
+        set_env("TSFP_MAPMAKER_POOLS","0");                          /* stock pools: original as is */
+        WORD_AT(0x007B677Cu)=6;
+        CHECK(ran(pc_mapmaker_pads_stitch) && WORD_AT(0x007B677Cu)==6u);
+        set_env("TSFP_MAPMAKER_POOLS",NULL);
+        WORD_AT(0x0079094Cu)=53;                                      /* story levels: original as is */
+        CHECK(ran(pc_mapmaker_pads_stitch) && WORD_AT(0x007B677Cu)==6u);
+        WORD_AT(0x007B6660u)=0;WORD_AT(0x007B677Cu)=0;WORD_AT(0x0079094Cu)=100;
+    }
+
     /* The editor limit and pool agree with the handle range. */
     CHECK(MAPMAKER_LIMIT_COVER==MAPMAKER_PADS_COVER_RANGE-MAPMAKER_PADS_SPARE);
     CHECK(MAPMAKER_POOL_COVER>=MAPMAKER_PADS_COVER_RANGE);

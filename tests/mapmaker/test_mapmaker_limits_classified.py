@@ -120,3 +120,63 @@ def test_piece_pool_has_no_other_users():
     for e in table('items'):
         if e['id'].startswith('mm-piece-pool-'):
             assert by_address[int(e['address'], 16)].hex == e['original_hex'], e['id']
+
+
+# ---- links: stitches counted from the catalogue (2026-11-07) ---------------
+def _xbe_bytes():
+    import sys
+    import pytest
+    from mapmaker_decoded import _private
+    xbe = _private() / 'game/default.xbe'
+    recomp = _private().parent / 'external/ts3FPrecomp'
+    if not xbe.is_file() or not (recomp / 'tools/recomp/config.py').is_file():
+        pytest.skip('needs the private XBE and external/ts3FPrecomp')
+    sys.path.insert(0, str(recomp))
+    from tools.recomp import config
+    config.configure_from_xbe(str(xbe))
+    data = xbe.read_bytes()
+
+    def read(va, n=4):
+        o = config.va_to_file_offset(va)
+        return int.from_bytes(data[o:o + n], 'little')
+    return read
+
+
+def test_stitch_pipeline_contract():
+    by = {i.address: i for i in decoded()}
+
+    def insn(a, mnemonic, text):
+        assert by[a].mnemonic == mnemonic and by[a].text == text, (hex(a), by[a].mnemonic, by[a].text)
+
+    # sub_0009A7A0 drops a stitch pair whose reverse is already in the table
+    insn(0x0009AEB4, 'mov', 'bp, word ptr [edx]')
+    insn(0x0009AEB7, 'cmp', 'bp, word ptr [eax]')
+    insn(0x0009AEBC, 'mov', 'bp, word ptr [edx + 2]')
+    insn(0x0009AEC0, 'cmp', 'bp, word ptr [eax - 2]')
+    # sub_0009DC70 appends one link per active entry, unbounded, then the teleporter links
+    insn(0x0009DCEE, 'mov', 'dword ptr [0x7b6660], edx')
+    insn(0x0009DD4E, 'call', '0x9cd00')
+    # the stitcher's only caller (wrapped by pc_mapmaker_pads_stitch)
+    callers = {i.address for i in decoded() if i.call and ('imm', 0x0009DC70) in i.ops}
+    assert callers == {0x0009DEDD}, sorted(hex(a) for a in callers)
+    # the catalogue connection count: 0x00529554 + tile' * 0x140 = row(tile) + 0x14
+    insn(0x00311C0B, 'mov', 'eax, dword ptr [ebp + 0x529554]')
+
+
+def test_catalogue_side_slots():
+    rd = _xbe_bytes()
+    slots = {}
+    for n in range(1, 46):
+        cat, row = 0x00529510 + (n - 1) * 0x140, 0x00529400 + n * 0x140
+        assert rd(cat) == n and cat + 0x30 == row
+        count = rd(row + 0x14)
+        assert count == rd(cat + 0x44) and count <= 40
+        entries = [(rd(row + 0x18 + k * 6, 1), rd(row + 0x18 + k * 6 + 4, 1)) for k in range(count)]
+        slots[n] = sum(s for t, s in entries if 1 <= t <= 4)
+        assert slots[n] <= 32                        # MAPMAKER_LINK_SLOTS_MAX: the level record's 32 entries
+    assert (rd(0x00529400 + 17 * 0x140), rd(0x00529408 + 17 * 0x140), slots[17]) == (9, 29, 12)
+    assert (rd(0x00529408 + 14 * 0x140), slots[14]) == (46, 24)
+    assert (rd(0x00529408 + 42 * 0x140), slots[42]) == (46, 24)
+    assert max(slots.values()) == 24
+    # half of any tile's side slots stays within the stock table of 16 stitch entries per piece
+    assert all((s + 1) // 2 <= 16 for s in slots.values())

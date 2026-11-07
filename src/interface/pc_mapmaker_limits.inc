@@ -82,16 +82,25 @@
 #define MAPMAKER_POOL_COVER 10496u    /* 10240 cover handles + 256 guard */
 /* Links (2026-11-02; 12000 template links before, pool 16,336): the A*
  * nodes and routes hold link indices as int16, so the scene-100 pool is fixed
- * at 32,512 entries (indices < 32,767). Play adds 16 stitch links per piece
- * (sub_0009DC70, table of 16 per piece from sub_0009A0F0) and teleporter and
- * door links (sub_0009CD00, the 256 slack), so the editor limits template
- * links + 16 per piece to 32,256: 511 pieces of the heaviest tile (46 links)
- * need 23,506 + 8,176 = 31,682, and 1024 pieces fit with up to 15 links each
- * (docs/mapmaker/mapmaker-pads.md). */
+ * at 32,512 entries (indices < 32,767). Play adds stitch links between
+ * neighbouring pieces (sub_0009DC70, one per entry of the stitch table) and
+ * teleporter and door links (sub_0009CD00, the 256 slack), so the editor
+ * limits template links + stitch links to 32,256.
+ * Stitches (2026-11-07, was a flat 16 per piece): the writer's neighbour pass
+ * (sub_002FC680 -> sub_00333BA0) stores one pad pair per slot of each side
+ * connection point (catalogue +0x44 count, 6-byte entries at +0x48: byte 0
+ * type 1..4 = side, byte 4 = slots) that meets a neighbour, so a piece lists
+ * at most its tile's side slots; the loader (sub_0009A7A0, 0x0009AEA0..)
+ * drops a pair whose reverse is already listed, so a doorway between two
+ * pieces is one link, not two. The editor counts half the side slots of all
+ * pieces (rounded up): tile 17 (3 x 3, 29 links, 12 slots) costs 35 instead
+ * of 45 and the heaviest tile (46 links, 24 slots) 58 instead of 62. Pieces
+ * that meet with different widths can add a little more; the slack takes it
+ * and pc_mapmaker_pads_stitch stops stitching at the pool. */
 #define MAPMAKER_POOL_LINKS 32512u
-#define MAPMAKER_LINK_STITCH 16u
 #define MAPMAKER_LINK_SLACK 256u
-#define MAPMAKER_LIMIT_LINKS (MAPMAKER_POOL_LINKS-MAPMAKER_LINK_SLACK)  /* template + 16 per piece */
+#define MAPMAKER_LIMIT_LINKS (MAPMAKER_POOL_LINKS-MAPMAKER_LINK_SLACK)  /* template + stitch links */
+#define MAPMAKER_LINK_SLOTS_MAX 32u   /* per piece: the level record holds 32 stitch entries (+0x30..+0xF0) */
 /* Pad groups (2026-11-02, was 600): measured 1.5 per piece, so 511 pieces
  * need about 770. Group ids are int16 (pad+8), the group A* node pool is
  * bounded (pc_mapmaker_pads.inc, 8192 nodes) and the group table is sized by
@@ -106,7 +115,8 @@
  * binds before pieces or items (it did at 895 - items with the 1023-slot
  * pool of the slot << 22 encoding). The editor piece pool is 2048 nodes
  * (items.json), so a copy of every placed piece still fits. Heavy tiles stop
- * on links (521), pads (549) or the memory estimate (386 at scale 8). */
+ * on pads (549; links at 556) or the memory estimate (386 at scale 8); tile
+ * 17 (9 pads, 35 links) on pads at 853. */
 #define MAPMAKER_LIMIT_PIECES 1023u
 #define MAPMAKER_LIMIT_SUB 500u      /* items incl. free objects; node pool 5300 (items.json) */
 #define MAPMAKER_LIMIT_MEMORY 2048000u
@@ -237,7 +247,25 @@ void pc_display_mapmaker_pools(void (*original)(void))
 }
 
 /* ---- editor limits ---------------------------------------------------- */
-typedef struct MapMakerTotals { uint32_t cost[3], pieces, sub; } MapMakerTotals;
+/* cost[]: pads, cover pads, template links; slots: side connection slots
+ * (stitch pairs the pieces can list, before the loader's reverse-pair drop). */
+typedef struct MapMakerTotals { uint32_t cost[3], pieces, sub, slots; } MapMakerTotals;
+/* Side connection slots of a tile row: the catalogue entry of tile N is
+ * row(N) - 0x30 (its +0 is N), so its connection count +0x44 is row + 0x14
+ * and the 6-byte entries +0x48 start at row + 0x18 (sub_00311C00 reads
+ * 0x00529554 + N' * 0x140, sub_002FC680 the same through the piece). */
+static uint32_t mapmaker_row_slots(uint32_t row)
+{
+    uint32_t n,k,slots=0;
+    if(!MAPMAKER_PTR_OK(row+0x14u,4)) return 0;
+    n=WORD_AT(row+0x14u);
+    if(n>40u || !MAPMAKER_PTR_OK(row+0x18u,n*6u+4u)) return 0;   /* stock tiles: at most 10 */
+    for(k=0;k<n;k++) {
+        uint32_t e=WORD_AT(row+0x18u+k*6u),slot=WORD_AT(row+0x18u+k*6u+4u)&0xFFu;
+        if((e&0xFFu)>=1u && (e&0xFFu)<=4u) slots+=slot;            /* types 1..4: the four sides */
+    }
+    return slots<MAPMAKER_LINK_SLOTS_MAX?slots:MAPMAKER_LINK_SLOTS_MAX;
+}
 static void mapmaker_list_totals(uint32_t piece,MapMakerTotals *t)
 {
     unsigned i,j;
@@ -248,6 +276,7 @@ static void mapmaker_list_totals(uint32_t piece,MapMakerTotals *t)
         if(MAPMAKER_PTR_OK(tp,4) && WORD_AT(tp)<1024u) {
             uint32_t row=0x00529400u+WORD_AT(tp)*0x140u;
             if(MAPMAKER_PTR_OK(row,12)) { t->cost[0]+=WORD_AT(row);t->cost[1]+=WORD_AT(row+4);t->cost[2]+=WORD_AT(row+8); }
+            t->slots+=mapmaker_row_slots(row);
         }
         sub=WORD_AT(piece+0x3c);
         for(j=0;sub && j<4096 && MAPMAKER_PTR_OK(sub,0x18);j++,sub=WORD_AT(sub+0x14))
@@ -278,10 +307,16 @@ static uint32_t mapmaker_placed_memory(uint32_t piece)
     }
     return mapmaker_budget_apply(total);
 }
-/* Links a list costs in play: its template links and the stitch links. */
+/* Links placed + held content costs in play: template links and one stitch
+ * link per pair of facing slots (half the side slots, rounded up). */
+static uint32_t mapmaker_link_total(const MapMakerTotals *p,const MapMakerTotals *h)
+{
+    return p->cost[2]+h->cost[2]+(p->slots+h->slots+1u)/2u;
+}
 static uint32_t mapmaker_link_cost(const MapMakerTotals *t)
 {
-    return t->cost[2]+MAPMAKER_LINK_STITCH*t->pieces;
+    static const MapMakerTotals none;
+    return mapmaker_link_total(t,&none);
 }
 /* Which limits placed + held content passes (0: placement allowed). */
 enum { MAPMAKER_CAP_PADS=1u, MAPMAKER_CAP_COVER=2u, MAPMAKER_CAP_LINKS=4u, MAPMAKER_CAP_PIECES=8u,
@@ -298,7 +333,7 @@ static unsigned mapmaker_limits_over(const MapMakerTotals *p,const MapMakerTotal
     unsigned over=0;
     if(p->cost[0]+h->cost[0]>MAPMAKER_LIMIT_PADS) over|=MAPMAKER_CAP_PADS;
     if(p->cost[1]+h->cost[1]>MAPMAKER_LIMIT_COVER) over|=MAPMAKER_CAP_COVER;
-    if(mapmaker_link_cost(p)+mapmaker_link_cost(h)>MAPMAKER_LIMIT_LINKS) over|=MAPMAKER_CAP_LINKS;
+    if(mapmaker_link_total(p,h)>MAPMAKER_LIMIT_LINKS) over|=MAPMAKER_CAP_LINKS;
     if(p->pieces+h->pieces>MAPMAKER_LIMIT_PIECES) over|=MAPMAKER_CAP_PIECES;
     if(memory>MAPMAKER_LIMIT_MEMORY) over|=MAPMAKER_CAP_MEMORY;
     if(groups>MAPMAKER_LIMIT_GROUPS) over|=MAPMAKER_CAP_GROUPS;
@@ -319,7 +354,7 @@ static void mapmaker_limits_log(unsigned over,const MapMakerTotals *p,const MapM
     fprintf(stderr,"[MAPMAKER] placement refused:");
     if(over&MAPMAKER_CAP_PADS) fprintf(stderr," pads %u of %u;",(unsigned)(p->cost[0]+h->cost[0]),MAPMAKER_LIMIT_PADS);
     if(over&MAPMAKER_CAP_COVER) fprintf(stderr," cover pads %u of %u;",(unsigned)(p->cost[1]+h->cost[1]),MAPMAKER_LIMIT_COVER);
-    if(over&MAPMAKER_CAP_LINKS) fprintf(stderr," links %u of %u;",(unsigned)(mapmaker_link_cost(p)+mapmaker_link_cost(h)),
+    if(over&MAPMAKER_CAP_LINKS) fprintf(stderr," links %u of %u;",(unsigned)mapmaker_link_total(p,h),
                                         (unsigned)MAPMAKER_LIMIT_LINKS);
     if(over&MAPMAKER_CAP_GROUPS) fprintf(stderr," pad groups %d of %d;",(int)groups,MAPMAKER_LIMIT_GROUPS);
     if(over&MAPMAKER_CAP_PIECES) fprintf(stderr," pieces %u of %u;",(unsigned)(p->pieces+h->pieces),MAPMAKER_LIMIT_PIECES);
