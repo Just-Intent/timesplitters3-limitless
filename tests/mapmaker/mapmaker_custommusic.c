@@ -176,7 +176,7 @@ static int imported_rows(void)
 int main(int argc,char **argv)
 {
     char ini[4200],name[80];
-    int k;
+    int k,n;
     if(argc<3) return 2;
     g_xbox_mem_offset=(uintptr_t)memory;
     WORD_AT(0x007844A8u)=ED;WORD_AT(0x00784014u)=C;
@@ -246,21 +246,44 @@ int main(int argc,char **argv)
     WORD_AT(0x0064BDC0u)=3u;
     CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0u && pc_music_playing());
     WORD_AT(0x005236BCu)=8u;pc_music_pump(10);
-    CHECK(volume_now==pc_music_db(0.5f*0.65f) && submits>0u);
+    CHECK(volume_now==pc_music_db(0.5f) && submits>0u);                     /* slider 8/16, full = 0 dB */
     WORD_AT(0x006D5EB8u)=1u;pc_music_pump(20);                              /* sub_00045AB0: music paused */
     CHECK(volume_now==-10000 && pc_music_playing());
     WORD_AT(0x006D5EB8u)=0u;
-    hook(pc_custom_music_channel,plain_original,0x0003D000u,0u,0,0,0);       /* channel 0: keeps playing */
-    CHECK(pc_music_playing());
-    hook(pc_custom_music_channel,plain_original,0x0003D000u,1u,0,0,0);       /* a jingle ends it */
+    WORD_AT(ESP0+0x10u)=0x00046421u;                                         /* sub_00045A00 from a mid-level caller */
+    hook(pc_custom_music_channel,plain_original,0x00045A22u,0u,0,0,0);       /* channel 0: keeps playing */
+    CHECK(pc_music_playing() && !cmu.jingle);
+    /* a mid-level jingle holds the track while the stock stream plays, then it resumes */
+    hook(pc_custom_music_channel,plain_original,0x00045A22u,2u,0,0,0);
+    CHECK(pc_music_playing() && cmu.jingle);
+    WORD_AT(0x0064BDC0u)=2u;k=(int)submits;
+    for(n=0;n<80;n++) pc_music_pump(100u+(unsigned)n);
+    CHECK(pc_music_playing() && cmu.jingle && (int)submits==k && volume_now==-10000);
+    WORD_AT(0x0064BDC0u)=3u;pc_music_pump(200);pc_music_pump(210);
+    CHECK(pc_music_playing() && !cmu.jingle && (int)submits>k);
+    /* the end-of-match jingle ends it */
+    WORD_AT(ESP0+0x10u)=0x0006709Bu;
+    hook(pc_custom_music_channel,plain_original,0x00045A22u,2u,0,0,0);
     CHECK(!pc_music_playing());
+    WORD_AT(ESP0+0x10u)=0;
+    /* a level restart starts the level's track again; a level without one stays stock */
+    hook(pc_custom_music_restart,plain_original,0x0003D4E1u,0,0,0,0);
+    CHECK(pc_music_playing());
     CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0u && pc_music_playing());
-    WORD_AT(0x0079094Cu)=0x53u;pc_music_pump(30);                            /* back to the menus */
+    /* a moment off the play scene keeps the track (held); a lasting one ends it */
+    k=(int)submits;
+    WORD_AT(0x0079094Cu)=0u;for(n=0;n<20;n++) pc_music_pump(300u+(unsigned)n);
+    CHECK(pc_music_playing() && (int)submits==k);
+    WORD_AT(0x0079094Cu)=100u;pc_music_pump(330);pc_music_pump(340);
+    CHECK(pc_music_playing() && (int)submits>k);
+    WORD_AT(0x0079094Cu)=0x53u;for(n=0;n<99;n++) pc_music_pump(400u+(unsigned)n);   /* back to the menus */
+    CHECK(pc_music_playing());
+    pc_music_pump(500);
     CHECK(!pc_music_playing());
     /* the scene changes between the start and the player's first step: nothing is submitted */
     WORD_AT(0x0079094Cu)=100u;k=(int)submits;
     CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0u && pc_music_playing());
-    WORD_AT(0x0079094Cu)=101u;pc_music_pump(40);
+    WORD_AT(0x0079094Cu)=101u;for(n=0;n<100;n++) pc_music_pump(600u+(unsigned)n);
     CHECK(!pc_music_playing() && (int)submits==k);
     WORD_AT(0x0079094Cu)=100u;
     /* paused before the first sound: held, then plays on resume */
@@ -274,6 +297,8 @@ int main(int argc,char **argv)
     CHECK(music(0x00045FBCu,7u)==0u && pc_music_playing());
     setH(INFO(C)+0x0E,4);                                                    /* the map's own stock row */
     CHECK(music(0x00045FBCu,4u)==4u && !pc_music_playing());
+    hook(pc_custom_music_restart,plain_original,0x0003D4E1u,0,0,0,0);       /* stock level: restart plays no import */
+    CHECK(!pc_music_playing());
     setH(INFO(C)+0x0E,-1);
     WORD_AT(0x0079094Cu)=101u;                                               /* not the play scene */
     CHECK(music(0x00045FBCu,0xFFFFFFFFu)==0xFFFFFFFFu && !pc_music_playing());

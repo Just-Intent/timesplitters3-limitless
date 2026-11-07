@@ -54,7 +54,7 @@ MUTATIONS = {
     'player-resume-no-reset': ('    if (p->paused) { p->paused = 0; p->submitted_frames = 0; p->base_ms = now; PC_MUSIC_RESET(); }',
                                '    if (p->paused) { p->paused = 0; }'),
     'player-watch-ignored': ('    if (!p->watch(p->context, &gain, &paused)) { p->why', '    if (!p->watch(p->context, &gain, &paused) && 0) { p->why'),
-    'player-level': ('#define PC_MUSIC_LEVEL 0.65f', '#define PC_MUSIC_LEVEL 1.0f'),
+    'player-level': ('#define PC_MUSIC_LEVEL 1.0f', '#define PC_MUSIC_LEVEL 0.65f'),
     'player-bad-file': ('    } else if (!pc_wav_parse(p->file, &p->info)) {', '    } else if (0) {'),
     'ini-any-name': ('    if (*name && !pc_music_name_ok(name)) return 0;\n', ''),
     'ini-other-folder': ('    strcpy(out + prefix, "pc-music.ini");', '    strcpy(out, "pc-music.ini");'),

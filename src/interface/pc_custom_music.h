@@ -26,7 +26,7 @@
 #define PC_MUSIC_NAME_MAX 64u        /* file name bytes with the NUL: what a map stores */
 #define PC_MUSIC_LABEL_MAX 40u
 #define PC_MUSIC_SLOT 273u           /* RECOMP_AUDIO_SLOT_MUSIC */
-#define PC_MUSIC_LEVEL 0.65f         /* the stock tracks' own level (0x00535858: 60..70 of 100) */
+#define PC_MUSIC_LEVEL 1.0f          /* full Music slider = 0 dB (0.65 sounded quiet next to stock music, .48) */
 
 typedef struct PcMusicList {
     unsigned count;
@@ -433,7 +433,7 @@ static int pc_music_step(PcMusicPlayer *p, uint64_t now)
     int paused = 0, rounds;
     uint64_t played = 0, ahead_frames;
     uint32_t queued = 0;
-    if (!p->watch(p->context, &gain, &paused)) { p->why = "the game ended it (scene changed or stopped)"; return 0; }
+    if (!p->watch(p->context, &gain, &paused)) { p->why = "the watch ended it (see its [music] watch line)"; return 0; }
     if (PC_MUSIC_DISCONTINUITY()) { p->submitted_frames = 0; p->base_ms = now; }
     {
         int32_t volume = paused ? -10000 : pc_music_db(gain * PC_MUSIC_LEVEL);
