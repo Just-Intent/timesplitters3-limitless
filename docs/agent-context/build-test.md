@@ -615,8 +615,9 @@ self-test recognizes Auto; physical Retina/multi-display checks need Mac.
 The historical controls-only fixture in `test_patch_updates.py` excludes
 `-auto-display.patch` until the complete-stack migration installs its display,
 cutscene and fullscreen-effect prerequisites. It then asserts effective-size
-hooks in the migrated title and renderer, preservation of local edits, and
-idempotent reapplication. Fresh/current-stack tests still apply the Auto patch.
+hooks in the migrated title and renderer, local-edit preservation and
+idempotent reapplication. Fresh/current-stack tests apply the Auto patch.
+Mac-network subset: no `-meter-story-chain`.
 
 ## Crane vignette validation (#221)
 
