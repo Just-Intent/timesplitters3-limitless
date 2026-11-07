@@ -548,7 +548,9 @@ int main(void)
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,161u,0,0,0)==0x5242002Fu);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,162u,0,0,0)==0x5242004Du);
     CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,163u,0,0,0)==0x52420030u);
-    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,164u,0,0,1)==0);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,164u,0,0,0)==0x52420031u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,165u,0,0,0)==0x524200B0u);
+    CHECK(CALL(pc_mapmaker_realbosses_row_text,fake,0x002C0907u,166u,0,0,1)==0);
     {   /* the ported bosses' rows: names, pick, row lookups and previews */
         uint32_t s=CALL(pc_mapmaker_realbosses_text,fake,0x00077000u,0x52420012u,0,0,0);
         CHECK(s && !strcmp((const char *)((uintptr_t)s+g_xbox_mem_offset),"Castle Tank"));

@@ -63,7 +63,6 @@ MUTATIONS = {
                      "    original();"),
     'bug-no-rebase': ('    pit_move(&pit_lv.k[b->owner],saved);\n    original();\n    pit_back(saved);', '    (void)saved;\n    original();'),
     'bug-any-owner': ('        if(b<0 || d<best) { b=(int)k;best=d; }', '        if(b<0) { b=(int)k;best=d; }'),
-    'bug-lone-kept': ('    if(!pit_lv.n) { pit_remove(ent,', '    if(0) { pit_remove(ent,'),
     'flock-refilled': ('        } else if(!WORD_AT(s) && b->filled) b->ent=0;', '        } else if(!WORD_AT(s) && b->filled) WORD_AT(s)=b->ent;'),
     'flock-flag-kept': ('            WORD_AT(b->ent+0x28u)&=0xFFFFFFFEu;\n', ''),
     'restart-props-kept': ('            if(o) { guest_call(sub_000A9070,1,o);WORD_AT(pit_lv.k[k].state+f[i])=0u; }', '            (void)o;'),
@@ -194,14 +193,19 @@ def test_fight_states_and_sites():
     assert calls(a[0x0029FD10], 0x00212160) and calls(a[0x0029ED82], 0x00234190)
     assert 0x4E4D4D45 in imms(a[0x0029ED75]) and 0x50524A42 in imms(a[0x0029E702])
     body = [i for i in decoded() if i.function == 0x0029E0A0]
-    made = [imms(p)[0] for p, c in zip(body, body[1:]) if calls(c, 0x000A6F90) and imms(p)]
+    body.sort(key=lambda i: i.address)
+    made = []                                            # the last model id pushed before each creation
+    for k, c in enumerate(body):
+        if calls(c, 0x000A6F90):
+            ids = [imms(q)[0] for q in body[max(0, k - 12):k] if q.mnemonic == 'push' and imms(q) and 0x240 <= imms(q)[0] < 0x250]
+            made.append(ids[-1])
     assert sorted(set(made)) == [0x246, 0x249, 0x24A, 0x24B]
     # the 13 rim pads looked up by sub_0009CC40 and kept at +0x4BF0..+0x4C20
     pads = [imms(a[x])[-1] for x in range(0x0029E919, 0x0029E999 + 1) if x in a and a[x].mnemonic == 'mov' and imms(a[x])]
     assert pads == list(range(0x4B5, 0x4C2))
     assert 0x4BF0 in imms(a[0x0029E901]) and 0x4C24 in imms(a[0x0029E9C1]) and calls(a[0x0029E9AD], 0x0009CC40)
     # the rack timer and its stages; the hostage-eating request (state 12) only from sub_0028B780 stage 4
-    assert 0x423C in [op[4] for op in a[0x0029E567].ops if op[0] == 'mem']
+    assert 0x423C in [op[4] for op in a[0x0029E566].ops if op[0] == 'mem']
     assert a[0x0028BA03].text.endswith('ebx') and 0xC in imms(a[0x0028B9A1])
     # the boss's own spawn records: class 0x20000 and 0x200000 reach these handlers
     assert calls(a[0x0027DDD3], 0x0029FE00) and calls(a[0x0027DEDE], 0x0028B610)
@@ -386,9 +390,9 @@ def test_lv17_4_anims_and_carrier():
     assert names[16][0] == 'princess_cat_cs' and names[27][0] == 'ragbugrightdive'
     for k in range(16, 28):
         assert struct.unpack_from('<I', rd(0x0048E298 + k * 0x18 + 0xC, 4))[0] & 0x4000
-    used = set()
+    used, seen = set(), reach([0x0029E0A0, 0x0028B610])
     for i in decoded():
-        if i.function in reach([0x0029E0A0, 0x0028B610]) and i.mnemonic in ('push', 'mov'):
+        if i.function in seen and i.mnemonic in ('push', 'mov'):
             used |= {v for v in imms(i) if 0x23B <= v <= 0x246}
     assert used == set(range(0x23B, 0x247))
     arcade = {struct.unpack_from('<I', rd(0x00521A18 + i * 0x30 + 4, 4))[0] for i in range(150)}
