@@ -339,6 +339,77 @@ static void low_door(void)
     call(pc_mapmaker_robot_goal,fake_goal,0x00293D27u,ENT(3),5u,0,1,__LINE__);
     CHECK(seen_goal==5u);
 }
+/* v0.4.0-mapmaker.42 report: "Robots still walked through a one-floor
+ * opening". MapMaker floors are 5 apart; the robot's real box top is 14.51
+ * (its model radius 6.5 + centre 8.01, the user's .41 log). Its hall (room 1,
+ * pads 0-2 in a line) opens to room 2 (pads 3-4) by a one-floor door
+ * (4.5, links 0-3 and 1-3) and, at the far end, a three-floor opening (15, link 2-4).
+ * The stock route to the far end of its own room is free to cut through the
+ * door, so the robot is given one link it fits through at a time. */
+static void one_floor_door_map(int tall)
+{
+    static const float xz[5][2]={{0,0},{0,8},{0,16},{10,0},{10,16}};
+    static const int16_t rooms[5]={1,1,1,2,2};
+    static const uint32_t links[6][2]={{0,1},{1,3},{1,2},{0,3},{2,4},{3,4}};
+    uint32_t k;
+    memset((void *)((uintptr_t)MPADS+g_xbox_mem_offset),0,0x10000u);
+    WORD_AT(0x00715F2Cu)=MPADS;WORD_AT(0x007B6664u)=5u;
+    for(k=0;k<5u;k++) {
+        uint32_t pd=MPADS+k*0x20u;
+        WORD_AT(pd)=0x3E9u+k;BYTE_AT(pd+4u)=1u;HALF_AT(pd+0xAu)=(uint16_t)rooms[k];
+        SETF(pd+0xCu,xz[k][0]);SETF(pd+0x10u,0.0f);SETF(pd+0x14u,xz[k][1]);
+    }
+    WORD_AT(0x00715F30u)=MLINKS;WORD_AT(0x007B6660u)=6u;
+    for(k=0;k<6u;k++) { WORD_AT(MLINKS+k*0x14u)=0x10010u;WORD_AT(MLINKS+k*0x14u+4u)=links[k][0];WORD_AT(MLINKS+k*0x14u+8u)=links[k][1]; }
+    if(!tall) WORD_AT(MLINKS+4u*0x14u)=0;                     /* no link 2-4 */
+    WORD_AT(0x007B975Cu)=2u;WORD_AT(0x00708788u)=MRECS;WORD_AT(0x0070878Cu)=MPTRS;WORD_AT(0x007B9754u)=1u;
+    portal(0,1,2,5.0f,-1.0f,5.0f,1.0f,4.5f);                   /* one floor */
+    portal(1,2,1,5.0f,15.0f,5.0f,17.0f,15.0f);                 /* three floors */
+    for(k=1;k<=2u;k++) { WORD_AT(MRECS+k*0xB4u+4u)=MLISTS+k*0x40u;WORD_AT(MLISTS+k*0x40u)=2u;WORD_AT(MLISTS+k*0x40u+4u)=0u;WORD_AT(MLISTS+k*0x40u+8u)=1u; }
+}
+static float link_open(uint32_t a,uint32_t b)
+{
+    uint32_t e;
+    for(e=rbt_nav.off[a];e<rbt_nav.off[a+1u];e++) if(rbt_nav.adj[e]==b) return rbt_nav.open[e];
+    return -1.0f;                                              /* not a link: the stock route picks the way */
+}
+static void one_floor_door(void)
+{
+    static const uint32_t route[]={1,2,4,3};
+    uint32_t at=0,k;
+    one_floor_door_map(1);
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,8.01f);SETF(ENT(3)+0x1C4u,6.5f);
+    for(k=0;k<4u;k++) {
+        goal_at(at,3,1,__LINE__);
+        if(seen_goal!=route[k] || link_open(at,seen_goal)<rbt_walk[0].height-RBT_FIT_SLACK) {
+            fprintf(stderr,"%s:%d: hop %u from pad %u: goal %u (opening %.2f) not pad %u\n",__FILE__,__LINE__,k,at,seen_goal,(double)link_open(at,seen_goal),route[k]);
+            failures++;
+            break;
+        }
+        at=seen_goal;
+    }
+    CHECK(rbt_walk[0].height>14.5f && rbt_walk[0].height<14.52f && rbt_walk[0].reached==5u && rbt_walk[0].blocked==4u && rbt_nav.told);
+    CHECK(rbt_nav.crossings==3u && link_open(0,3)==4.5f && link_open(1,3)==4.5f && link_open(2,4)==15.0f);
+    CHECK(seen_goal_slot==3u);
+    goal_at(1,4,1,__LINE__);                                  /* the door is as short a way as the hall: not it */
+    CHECK(seen_goal==2u);
+    /* only the one-floor door: it waits at the pad nearest the player, one link at a time */
+    one_floor_door_map(0);
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,8.01f);SETF(ENT(3)+0x1C4u,6.5f);
+    goal_at(2,3,1,__LINE__);
+    CHECK(seen_goal==1u && seen_goal_slot==1u && rbt_walk[0].reached==3u && !rbt_walk[0].reach[3]);
+    goal_at(1,3,1,__LINE__);
+    CHECK(seen_goal==0u);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==0u);                                      /* it stays at the door */
+    /* the same door for a robot of one floor: through it */
+    robot_level(1,__LINE__);
+    SETF(ENT(3)+0x1ACu,2.0f);SETF(ENT(3)+0x1C4u,2.0f);
+    goal_at(0,3,1,__LINE__);
+    CHECK(seen_goal==3u);
+}
 static void statics(uint32_t a,uint32_t b,uint32_t c) { WORD_AT(STAT)=a;WORD_AT(STAT+4u)=b;WORD_AT(STAT+8u)=c; }
 #define STATICS_ARE(a,b,c) (WORD_AT(STAT)==(a) && WORD_AT(STAT+4u)==(b) && WORD_AT(STAT+8u)==(c))
 
@@ -644,6 +715,7 @@ int main(void)
     CHECK(seen_focus==0);
 
     low_door();
+    one_floor_door();
 
     if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }
     printf("mapmaker robot ok\n");
