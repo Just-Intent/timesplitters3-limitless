@@ -1,8 +1,11 @@
 /* Asset-free contract for src/interface/pc_mapmaker_tilesets.inc (the hidden
  * Abstract tileset, index 0): the Map Settings row is added only with
  * TSFP_MAPMAKER_LIMITS=1, in the editor, after the stock Virtual row of
- * sub_003133E0, with value 0 and the stock text; in play an Abstract map
+ * sub_003133E0, with value 0 and the stock text, right after the Disco row
+ * (value 6, label "Disco" made once in guest heap); in play an Abstract map
  * mounts pak/arcade/l_102.pak whole on the level heap before its tileset pak
+ * and then pak/arcademem/l_102m.pak index-only (its tile textures; without it
+ * the map still plays as Abstract)
  * (any switch state), from a path below the guest stack, once; when that is
  * impossible the map plays as Lab (getter argument, header word +0xA and
  * [0x00784020]); every hook leaves esp as the original would and other
