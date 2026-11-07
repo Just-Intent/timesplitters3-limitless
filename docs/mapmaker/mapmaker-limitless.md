@@ -78,7 +78,7 @@ are not in the launcher.
 | Bots per MapMaker Arcade match (local play) | 10 (16 characters) | 20 (24 characters) |
 | Logic operations / nodes / records | 30 / 130 / 100 | 120 / 520 / 400 |
 | Free-standing objects | 40 / 30 / 100 | 160 / 120 / 400 |
-| Pads / pad links / pad groups | 2400 / 4400 / 300 | 7680 / 32256 / 1024 |
+| Pads / cover pads / pad links / pad groups | 2400 / 1024 / 4400 / 300 | 16128 / 14080 / 32256 / 2047 |
 | Engine objects (tiles + items + 128 kept for characters and explosions) | 550 | 2047 |
 | Map file | 32 KB | 512 KB |
 | Memory budget meter | 1x | 8x |
@@ -90,14 +90,18 @@ it. *Automated tests only.*
 **Tiles past 511 (2026-11-07, not yet tested in game).** The tile limit is
 1023. Every tile is also one engine object; since 2026-11-07 the game has
 room for 2047 of those (it was 1023), so 1023 tiles and all 500 items fit
-together and tiles no longer use up the item budget. Heavy tiles (many pads
-and links) stop earlier on Pads (about 549), and typical maps near 680
-tiles on Pad groups. Since 2026-11-07 the Links count is what the map really
-uses: one link per doorway between two tiles instead of 16 per tile, so a
-full grid of 3x3 rooms (tile 17) stops on Pads at 853 tiles instead of on
-Links at about 716. If a map ever needs more doorway links than the game
-has room for, the extra doorways get no AI path (logged) instead of
-corrupting memory. *Automated tests only.* Saving and loading large maps should be
+together and tiles no longer use up the item budget. The Links count is
+what the map really uses: one link per doorway between two tiles instead of
+16 per tile. Since the pads update (2026-11-07) Pads (16,128), Cover pads
+(14,080) and Pad groups (2047) no longer stop a full grid: Links (32,256)
+are now the first limit for tiles with many links. A full grid of 3x3 rooms
+(tile 17) stops on Links at about 921 tiles (it stopped on Pads at 853), the
+heaviest tiles at about 556; 3x3 tiles with fewer links, such as tiles 12,
+13, 23, 26, 27, 29 and 30, fill all 1023. If a map ever needs more doorway
+links than the game has room for, the extra doorways get no AI path (logged)
+instead of corrupting memory. Maps with more than 8000 pads or more than
+1024 pad groups need this build: older Limitless builds would overflow their
+pad memory, and the original game cannot open maps that large at all. *Automated tests only.* Saving and loading large maps should be
 quicker: the editor no longer re-measures every tile for each
 item. Every edit still recomputes the map. Old maps load as before, and
 System Link with other builds is unaffected.

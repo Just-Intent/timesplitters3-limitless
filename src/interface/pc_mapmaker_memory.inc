@@ -123,7 +123,7 @@ static void mapmaker_memory_check(uint32_t caller,uint32_t size,uint32_t heap,in
 #ifndef MAPMAKER_GUEST_RET
 #define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
 #endif
-#define MAPMAKER_NAV_BYTES 0x01000000u        /* objects 1.52 + bodies 1.2 + pools 1.59 MB + matrix 9.4 MB at 1535 groups */
+#define MAPMAKER_NAV_BYTES 0x01000000u        /* objects 1.52 + bodies 1.2 + pools 2.36 MB + matrix up to 4.2 MB (1024 groups; above that it is lazy, pc_mapmaker_pads.inc) */
 #define MAPMAKER_NAV_MATRIX_RET 0x00275F95u   /* sub_00275F70: call sub_0003DFA0 at 0x00275F90 */
 #define MAPMAKER_NAV_GROUPS 0x007B666Cu       /* group count in play, read by sub_00275F70 */
 #define MAPMAKER_NAV_SCENE 100u

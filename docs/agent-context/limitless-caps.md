@@ -8,7 +8,17 @@ and fixtures only; nothing here was built or played by the agent that wrote
 it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
 46 links, 42,427 B memory estimate.
 
-## Regular pads (2026-11-02)
+## Regular pads (2026-11-02; Layout C 2026-11-07)
+
+2026-11-07: 16,384 regular handles (0..0x3FFF), cover 0x4000.. (14,336),
+runtime 0x7800..; regular pads 8000.. get ids 0x5B29.. above the cover ids,
+every older id is unchanged (maps of at most 8000 regular pads are written
+as before). Editor 16,128 pads, 14,080 cover; pools 2.36 MB of the nav
+block. Nine new WRAPs (`pc_mapmaker_pads.inc`, area pads), 45 new
+`pads-coverbase-*` rows and `pads-regid-0009a37e`; the 88 runtime rows are
+now `pads-layoutc-*`. Pit skeleton rim pads follow the pool's tail.
+Contract, map-file compatibility and tests: [pads](../mapmaker/mapmaker-pads.md)
+"Layout C". The 2026-11-02 state:
 
 - `config/guest-code-patches/pads.json` `pads-idthreshold-*`: the 13
   `cmp id,0x1F40; jle; call sub_0009CCA0` compares now use 0x2328, so pad ids
@@ -48,12 +58,21 @@ it. Heaviest stock tile (rows 0..45 of `0x00529400`): 14 pads, 14 cover pads,
   drop, append, sole caller, catalogue offset; XBE slots per tile, max 24),
   mutations in `test_mapmaker_limits.py` / `test_mapmaker_pads.py`.
 
-## Pad groups (2026-11-02)
+## Pad groups (2026-11-02; 2047 since 2026-11-07)
 
-- `MAPMAKER_LIMIT_GROUPS` 600 -> 1024 (editor global groups `[0x00762CB8]`).
-  Matrix 4.2 MB at 1024; load time of N x N route searches unmeasured.
-- Tests: `mapmaker_limits.c` (1024 allowed, 1025 refused, 767 for 511
-  pieces), mutations `groups-*`.
+- `MAPMAKER_LIMIT_GROUPS` 600 -> 1024 -> 2047 (editor global groups
+  `[0x00762CB8]`). Above 1024 groups the distance matrix of `sub_00275F70`
+  is replaced by entries computed on first read from the load-time link
+  state (new `WRAP sub_00275F70 -> pc_mapmaker_pads_group_matrix`,
+  `WRAP sub_00275F40 -> pc_mapmaker_pads_group_distance`; contract in
+  [pads](../mapmaker/mapmaker-pads.md) "Group distances"). Up to 1024 the
+  stock matrix (4.2 MB, N x N searches at load, time unmeasured).
+- Measured: mixed maps 1.5 groups per piece; the .66 grid of 936 tile-17
+  pieces stayed under 1024 (<= 1.1 per piece); 568 tile-14 pieces under 1024
+  (<= 1.8). Per-tile group counts live in the pak tile models (not decoded).
+- Tests: `mapmaker_limits.c` (2047 allowed, 2048 refused, 1535 and 2046),
+  mutations `groups-*`; `mapmaker_pads.c` lazy matrix, `test_mapmaker_padids.py`
+  (original builder vs lazy reader in the emulator).
 
 ## Engine objects (2026-11-02; 2047 since 2026-11-07, see "Engine object handles 2047")
 
@@ -333,12 +352,12 @@ What binds past 511, ranked (for 1023 pieces; heaviest tile 14 pads, 46 links):
 | # | cap | where | now | 1023 pieces need | cost / status |
 | --- | --- | --- | --- | --- | --- |
 | 1 | engine object handles | pool `[0x0072F5E8]`, handle slot << 21 (`handles.json`, 167 decodes) | 1023 -> **2047** | 1023 + items + 128 | done: 1651 at the piece and item caps; +2.15 MB Level heap |
-| 2 | pad groups | `[0x00762CB8]`, matrix `sub_00275F70` (N+1) x N x 4 in the 6 MB nav block | 1024 | ~1,535 (1.5/piece) | binds ~680 pieces; 1,536 groups = 9.4 MB matrix and 2.4 M route searches at load |
-| 3 | regular pads (ids <= 0x2328) | `pads.json` thresholds; regular handles < cover base 0x1F40 | 7,680 | 14 K heavy, 9.2 K tile 17 | 549 heavy, 853 tile 17: binds first since links are counted (2026-11-07); past 8000 the cover handle base and cover ids (0x2329) move |
-| 4 | links (int16 A* indices) | `MAPMAKER_POOL_LINKS` 32,512 | 32,256 (template + half side slots) | 59 K heavy, 36 K tile 17 | 556 heavy, 921 tile 17 (was 521 / 716 at 16 per piece); past 32,767 the int16 node/route sites need widening |
+| 2 | links (int16 A* indices) | `MAPMAKER_POOL_LINKS` 32,512 | 32,256 (template + half side slots) | 59 K heavy, 36 K tile 17 | **binds first now**: 556 heavy, 921 tile 17 (fewer-link 3x3 tiles 12/13/23/26/27/29/30 reach 1023); past 32,767 the int16 node/route sites need widening (partial inventory in [pads](../mapmaker/mapmaker-pads.md)) |
+| 3 | pad groups | `[0x00762CB8]`; matrix dense up to 1024, lazy above (`pc_mapmaker_pads_group_matrix`) | 1024 -> **2047** | ~1,535 (1.5/piece mixed), <= 1.1 tile 17 | done 2026-11-07; group A* pool 8192 nodes cuts very long searches |
+| 4 | regular pads | Layout C handles 0..0x3FFF; ids 0x3E9.. then 0x5B29.. (`pc_mapmaker_pads.inc`) | 7,680 -> **16,128** | 14,322 heavy, 9,207 tile 17 | done 2026-11-07; at the link cap at most 10,878 (tile 34) |
 | 5 | memory estimate | scale 8, 16.4 MB | 2,048,000 x 8 | | 386 heaviest-memory, 1,960 light |
 | 6 | Level heap in play | arena 47 MB (+16 MB by `TSFP_MAPMAKER_ARENA_MB`) | unmeasured | ~30-48 KB per tile with content (two maps) | real limit for heavy content; probe flag 32 |
-| 7 | cover pads | 10,240 handles | 9,984 | 14 K heavy | 713 heavy |
+| 7 | cover pads | 14,336 handles at 0x4000 | 9,984 -> **14,080** | 14,322 heavy (+60 start points) | 1005 heavy; at the link cap at most 9,207 |
 | 8 | portal flags | stack 0x4000 (`MAPMAKER_ROOMS_PORTALS`) | 16,383 | ~14 per piece | ~1,170 average; the compile guard drops pieces past it |
 | 9 | light records per room group | pool 500 / (rooms / 16) | ~7 per 16 rooms | | quality only (sparser lights), unmeasured |
 | 10 | editor piece pool | `0x00302FF0`, `0x00307C43/4F/61` | 1024 -> **2048** (items.json, +72 KB editor) | 1023 placed + a copy of all + 1 | done; a group copy past the pool wrote through a null node (`sub_002F9920`) |
