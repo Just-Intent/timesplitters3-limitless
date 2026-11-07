@@ -500,6 +500,33 @@ start had no frame for 60 s; play lagged near many enemies.
   `test_mapmaker_memory.py` (`nav-unaligned`, `nav-objects-not-registered`),
   `test_mapmaker_objects.py` (physics through `mapmaker_objects_take`).
 
+### After .66 (2026-11-07): view lag toward many Story AI
+
+- Measured (`logs/m66.err`, HugeMap): the swap lines give 28-77 ms "rest of
+  frame" per frame in play; between two light-spread lines 458,752 calls
+  over about 1,290 frames: about 356 calls and 540,000 object slots per
+  frame (1,513 slots per call). Native, that is a few ms of the 50 ms.
+- Not indexed: `sub_000A1DC0` (the caller) also runs `sub_000A0C50`, which
+  can destroy objects (`sub_0009E330`) and runs per-object callbacks, so
+  objects change room, type or slot between calls of one frame; a per-room
+  list built once per frame would differ from the walk. An exact index needs
+  hooks on every writer of object +0x34/+0x20 and the count (not done).
+- Ray step (CONFIRMED in code; share INFERRED): `sub_00088430` tests every
+  portal of a room per step; `sub_000888A0` steps up to 100 rooms for each
+  of the five light rays of every drawn object (`sub_0008CC20` from
+  `sub_00094A00`) and for AI sight (20 callers), `sub_00088950` and 10 more
+  call it directly. New `WRAP sub_00088430 -> pc_mapmaker_rooms_ray_step`
+  (`pc_mapmaker_roomray.inc`, area rooms): the same function in host code
+  (same float steps and tests, rooms.json bound 0x3FF, outputs written the
+  same way). `TSFP_MAPMAKER_ROOM_RAY=0` runs the original. stderr: `[mapmaker]
+  room ray steps: n steps, m portal tests` (first, then every 2^20th).
+- Tests: `test_mapmaker_portals.py` `test_guest_ray_steps_match` (the
+  original 0x00088430..0x0008889F in the emulator on the joined fixture
+  grid: same room, hit and rest for 3 x 400 steps; inward wall normals so
+  rays cross) and 5 mutations it must catch; `test_rays` in the fixture.
+- Next check: a `RECOMP_SAMPLE` profile while looking at the AI group, to
+  name the remaining hot functions (animation, AI think, collision).
+
 ## What bounded 511 pieces (cap 511, 2026-11-02; see above for 1023)
 
 `MAPMAKER_LIMIT_PIECES` is 511 ([rooms](limitless-rooms.md) stage 11; the

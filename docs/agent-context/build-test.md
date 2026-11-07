@@ -600,7 +600,7 @@ Profile typing and Enter were confirmed by the user with isolated Test Lab saves
 
 ## Auto display regression checks
 
-`test_pc_display_modes.py` also compiles shared Auto policy through stub SDL
+`test_pc_display_modes.py` compiles shared Auto policy through stub SDL
 snapshots on Windows and Mac; this tests policy, not Cocoa or actual atomics.
 The Windows-specific fixture compiles the model against deterministic
 monitor/window adapters: secondary fullscreen desktop size, windowed resize,

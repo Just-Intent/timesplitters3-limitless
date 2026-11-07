@@ -188,7 +188,7 @@ compile the whole include chain take link stubs from
 runtime pad handles 0x4740.., bounded A*/stitch, group route A* in C `pc_mapmaker_astar.inc`, caps and
 big-map speed: [caps](limitless-caps.md), A* pool 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
-`objects` (2047 `handles.json`, 768 pickups, 4096 props, 2048 bodies (nav block), pool guard: [caps](limitless-caps.md)), `editor`, `rooms` (1023, `level.json` frame, word buckets, stride 0x5000, tree: [rooms](limitless-rooms.md), portal passes, light spread in C) and `actors` (64 characters / 63 AI
+`objects` (2047 `handles.json`, 768 pickups, 4096 props, 2048 bodies (nav block), pool guard: [caps](limitless-caps.md)), `editor`, `rooms` (1023, `level.json` frame, word buckets, stride 0x5000, tree: [rooms](limitless-rooms.md), portal passes, light, rays in C) and `actors` (64 characters / 63 AI
 in a local MapMaker story map instead of 20, 72 object slots kept free; live list moved to
 0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
 `actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;
