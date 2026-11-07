@@ -255,6 +255,50 @@ round the skeleton matches a flock whose bugs dive and explode at different
 times. The .62 release only adds one launch at state 6. The phase lines show
 what each bug does.
 
+## Playtest .68: camera broken, bottle still at the feet (fixed after .68)
+
+User report (.68): "Pit skeleton is now even more glitched out and messes up
+my camera view. Didn't fix bottle at all." `m68.err`: `pose computed ...
+(0x1, 0x0)` (view slot 0, the player's camera); traces with the bottle at
+the feet (y 0.6-2.7) in state 1 and at NaN in states 4-7; no bottle hit line
+in the whole run; ragbugs 0, 1, 3, then 4 4 4 for good.
+
+Causes:
+- **Camera** (CONFIRMED by the decode, INFERRED as the symptom): the .66
+  pose call `sub_000A1B80(boss)` works on the view slot being set up
+  (`[0x007B0CC0]+0x214`); from the AI frame that is slot 0, the player's
+  camera, so the draw's per-view state was disturbed. And it did not help:
+  the bone point stayed at the feet or NaN.
+- **Ragbugs stuck in phase 4** (CONFIRMED by the decode): the dive takes its
+  target from the rim pad indices (+0x4BF0, 0x0028B08F) through
+  `sub_0009A420`, which sends indices 0x1F40..0x243F (scene 100) to the
+  cover pool and returns 0 when `sub_0009A330` refuses the pad. The .62-.66
+  pads lived in a heap block whose index from the pad table was past 0x1F40:
+  no target, so the bugs hovered in their dive.
+- **No hits**: the bottle sat at the feet inside the collision hull 0x249,
+  which has no damage callback, so shots hit the hull as a plain prop (the
+  .66 "easily destroyed" object at the base).
+
+Fixes:
+- The pose call is gone.
+- The bottle is put at the mouth after every fight frame (states 1..13):
+  11 over the boss's feet and 2.5 ahead along its yaw (+0x70; forward
+  (sin, 0, cos), +z at the fight's yaw 0, from the .66 eye bandage at 12.35
+  up and 2.27 ahead), facing as the boss. A NaN tilt is cleared, and no NaN
+  position is kept. Log: `gas bottle held at the mouth (x, y, z)`, plus a
+  note when the fight's bone point was NaN.
+- The hull gets the bottle's damage callback `0x0028C2F0` (+0x19C). Its hits
+  count a quarter of a bottle hit (`gas bottle hit through the body`), so
+  body shots wear the bottle down slowly and the bottle itself is the weak
+  spot (8 health: type-0x21 hits 2.667, others 0.8 x damage).
+- The rim pads go in the pad pool's last entries (index 8000 - 13 x
+  (skeleton)), below 0x1F40, written each frame. When the map's own pads
+  reach them, they are skipped and logged.
+
+Not verified: whether a mouth 11 up and 2.5 ahead matches the model on screen
+(INFERRED from the .66 bandage), the yaw sign for a turned boss, and whether
+the bottle at the mouth is hit outside the hull.
+
 ## Restart
 
 The restart keeps the Level heap (limitless-bosses.md), so the blocks are
