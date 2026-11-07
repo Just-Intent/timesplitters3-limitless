@@ -246,7 +246,7 @@ static int cmu_music(int limits)
     if(pc_music_find(&cmu.list,name)<0) { cmu_log("imported track is missing; stock music",name,0);return 0; }
     if(guest_call(sub_00045A70,0)) { cmu_log("music is switched off",name,0);return 0; }
     cmu.scene=scene;
-    if(!pc_music_start(name,cmu_watch,NULL)) { cmu_log("imported track did not start (not a playable WAV?)",name,0);return 0; }
+    if(!pc_music_start(name,cmu_watch,NULL)) { cmu_log("imported track did not start (not a playable WAV or MP3?)",name,0);return 0; }
     cmu_log(arcade && name==cmu.arcade?"Arcade: imported track":"map: imported track",name,(int)scene);
     g_eax=0;
     return 1;

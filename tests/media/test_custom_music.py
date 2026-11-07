@@ -1,5 +1,6 @@
 """Imported music host layer (src/interface/pc_custom_music.h): the fixture
-tests/media/custom_music.c with WAV files written here, plus mutations that the
+tests/media/custom_music.c with WAV and fake-decoder (.mp3) files written here
+(the real MP3 adapter is tests/media/test_music_codec.py), plus mutations that the
 fixture must catch. No game data and no audio device are used."""
 import os
 import struct
@@ -20,11 +21,19 @@ MUTATIONS = {
     'list-missing-kept': ('    for (k = 0; k < list->count; k++) list->present[k] = 0;\n', ''),
     'find-missing': ('        if (list->present[k] && !pc_music_casecmp(list->name[k], name)) return (int)k;',
                      '        if (!pc_music_casecmp(list->name[k], name)) return (int)k;'),
-    'name-any-extension': ('    if (pc_music_casecmp(name + n - 4, ".wav")) return 0;\n', ''),
+    'name-any-extension': ('    if (pc_music_kind(name) == PC_MUSIC_KIND_NONE) return 0;\n', ''),
+    'name-mp3-refused': ('    if (!pc_music_casecmp(name + n - 4, ".mp3")) return PC_MUSIC_KIND_CODEC;\n', ''),
+    'mp3-listed-without-decoder': ('    if (pc_music_kind(name) == PC_MUSIC_KIND_CODEC && !pc_music_codec_available()) return;\n', ''),
+    'mp3-read-as-wav': ('    if (pc_music_kind(name) == PC_MUSIC_KIND_CODEC) {\n        uint32_t rate', '    if (0) {\n        uint32_t rate'),
+    'mp3-rate-unchecked': ('            rate < 8000u || rate > 192000u || channels < 1u', '            channels < 1u'),
+    'mp3-no-loop': ('                if (!pc_music_codec_rewind(p->codec)) return 0;\n', '                return 0;\n'),
+    'mp3-error-ignored': ('            if (got <= 0 || got > (long)PC_MUSIC_CHUNK_FRAMES) return 0;',
+                          '            if (got < 0) { pc_music_codec_rewind(p->codec); got = pc_music_codec_read(p->codec, p->pcm, PC_MUSIC_CHUNK_FRAMES); }\n            if (got <= 0 || got > (long)PC_MUSIC_CHUNK_FRAMES) return 0;'),
     'name-path': ("        if (c < 0x20 || c == 0x7F || c == '/' || c == '\\\\' || c == ':') return 0;",
                   '        if (c < 0x20 || c == 0x7F) return 0;'),
     'name-too-long': ('    if (n < 5 || n >= PC_MUSIC_NAME_MAX ||', '    if (n < 5 || n > PC_MUSIC_NAME_MAX ||'),
-    'label-extension': ('    if (n >= 4 && !pc_music_casecmp(name + n - 4, ".wav")) n -= 4;\n', ''),
+    'label-extension': ('    if (pc_music_kind(name) != PC_MUSIC_KIND_NONE) n -= 4;\n', ''),
+    'label-mp3-extension': ('    if (pc_music_kind(name) != PC_MUSIC_KIND_NONE) n -= 4;', '    if (pc_music_kind(name) == PC_MUSIC_KIND_WAV) n -= 4;'),
     'wav-any-codec': ('            else if (tag != 1) return 0;\n', ''),
     'wav-no-extensible': ('            if (tag == 0xFFFE && size >= 40) tag = pc_wav_u16(fmt + 24);   /* extensible: sub-format */\n', ''),
     'wav-no-pad': ('        pos += 8u + (uint64_t)size + (size & 1u);', '        pos += 8u + (uint64_t)size;'),
@@ -46,8 +55,7 @@ MUTATIONS = {
                                '    if (p->paused) { p->paused = 0; }'),
     'player-watch-ignored': ('    if (!p->watch(p->context, &gain, &paused)) return 0;', '    p->watch(p->context, &gain, &paused);'),
     'player-level': ('#define PC_MUSIC_LEVEL 0.65f', '#define PC_MUSIC_LEVEL 1.0f'),
-    'player-bad-file': ('    if (!(p->file = pc_music_open(dir, name)) || !pc_wav_parse(p->file, &p->info)) {',
-                        '    if (!(p->file = pc_music_open(dir, name))) {'),
+    'player-bad-file': ('    } else if (!pc_wav_parse(p->file, &p->info)) {', '    } else if (0) {'),
     'ini-any-name': ('    if (*name && !pc_music_name_ok(name)) return 0;\n', ''),
     'ini-other-folder': ('    strcpy(out + prefix, "pc-music.ini");', '    strcpy(out, "pc-music.ini");'),
 }
@@ -82,6 +90,13 @@ def write_folder(folder, other):
     wav(folder / 'g_list.wav', 44100, 2, 16, 400, extra=b'LIST' + struct.pack('<I', 3) + b'abc\0')
     wav(folder / 'h_adpcm.wav', 44100, 2, 16, 400, tag=0x69)
     wav(folder / 'i_truncated.wav', 44100, 2, 16, 250, size=0xFFFFFFF0)
+    def fake(rate, channels, frames, fail_at=0):           # tests/media/custom_music.c's decoder input
+        return b'FAKE' + struct.pack('<IIII', rate, channels, frames, fail_at)
+    (folder / 'z_fake.mp3').write_bytes(fake(32000, 2, 1000))
+    (folder / 'z_broken.mp3').write_bytes(fake(44100, 2, 100000, 600))
+    (folder / 'z_bad.mp3').write_bytes(b'ID3 not a decodable stream at all')
+    (folder / 'z_slow.mp3').write_bytes(fake(4000, 1, 1000))
+    (folder / 'z_empty.mp3').write_bytes(fake(44100, 2, 0))
     (folder / 'notes.txt').write_text('not music')
     (folder / 'sub.wav').mkdir()                      # a folder named like a track
     wav(other / 'aaa.wav', 44100, 2, 16, 100)

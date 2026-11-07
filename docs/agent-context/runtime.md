@@ -19,6 +19,8 @@ are retained; no live voice is evicted to admit another sound. See
 [audio lifecycle tests](audio-buffers.md). Guest Release remains unchanged.
 `media/0059-custom-music-voice.patch` adds output slot 273
 (`RECOMP_AUDIO_SLOT_MUSIC`) for [imported music](custom-music.md).
+`media/2160-custom-music-codec.patch` (pinned after 2140-native-online in
+`patch_records`) adds the title's MP3 adapter TU `pc_music_codec.c`.
 
 `media/0057-dsound-format-and-tail-recovery.patch` includes rate/alignment in
 buffer identity, retains raw source size while clocking complete frames, and
