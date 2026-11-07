@@ -989,6 +989,9 @@ void pc_mapmaker_bigdraw_rect(void (*original)(void)) { original(); }
 void pc_mapmaker_skelvis_frustum(void (*original)(void)) { original(); }
 void pc_mapmaker_tilesets_menu_row(void (*original)(void)) { original(); }
 void pc_mapmaker_tilesets_play_pak(void (*original)(void)) { original(); }
+void pc_mapmaker_disco_textures(void (*original)(void)) { original(); }
+void pc_mapmaker_disco_menu_close(void (*original)(void)) { original(); }
+void pc_mapmaker_disco_stream(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
 void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }

@@ -34,9 +34,20 @@ static int failures, esp_errors;
 #define ESP0 0x00600000u
 #define TEXT_BASE 0x00400000u
 #define PAK_PATH "pak/arcade/l_102.pak"
-static int rows, mounts, lookups, texts, mount_fails, already;
-static uint32_t row_text[8], row_value[8], mount_args[3], call_esp_min;
-static int string_below_frame;
+#define TEX_PATH "pak/arcademem/l_102m.pak"
+static int rows, mounts, lookups, texts, mount_fails, tex_fails, already, tex_already;
+static uint32_t row_text[8], row_value[8], mount_args[3], tex_args[3], call_esp_min;
+static int string_below_frame, tex_below_frame, mount_order_bad;
+static uint32_t heap_next=0x00700000u;
+static int heap_fail;
+uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment)
+{
+    uint32_t p=heap_next;
+    (void)alignment;
+    if(heap_fail) return 0;
+    heap_next+=(bytes+15u)&~15u;
+    return p;
+}
 static void note_esp(void) { if(g_esp<call_esp_min) call_esp_min=g_esp; }
 /* A guest-side model of the calls the hooks make. */
 static uint32_t guest_call(void (*f)(void),int n,...)
@@ -53,15 +64,24 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         if(rows<8) { row_text[rows]=v[0];row_value[rows]=v[1]; }
         rows++;
     } else if(f==sub_00062260) {
+        int tex=!strcmp((const char *)memory+v[0],TEX_PATH);
         lookups++;
-        r=already?3u:0xFFFFFFFFu;
-        if(strcmp((const char *)memory+v[0],PAK_PATH)) { fprintf(stderr,"lookup of a wrong path\n");failures++; }
+        r=(tex?tex_already:already)?3u:0xFFFFFFFFu;
+        if(!tex && strcmp((const char *)memory+v[0],PAK_PATH)) { fprintf(stderr,"lookup of a wrong path\n");failures++; }
     } else if(f==sub_000622D0) {
+        int tex=!strcmp((const char *)memory+v[0],TEX_PATH);
         mounts++;
-        mount_args[0]=v[0];mount_args[1]=v[1];mount_args[2]=v[2];
-        if(strcmp((const char *)memory+v[0],PAK_PATH)) { fprintf(stderr,"mount of a wrong path\n");failures++; }
-        string_below_frame=v[0]+sizeof PAK_PATH<=ESP0 && g_esp<=v[0];
-        if(mount_fails) r=0xFFFFFFFFu; else { r=WORD_AT(0x006D7880u);WORD_AT(0x006D7880u)++;already=1; }
+        if(tex) {
+            tex_args[0]=v[0];tex_args[1]=v[1];tex_args[2]=v[2];
+            tex_below_frame=v[0]+sizeof TEX_PATH<=ESP0 && g_esp<=v[0];
+            if(!already) mount_order_bad=1;            /* textures only after the tiles' pak */
+            if(mount_fails || tex_fails) r=0xFFFFFFFFu; else { r=WORD_AT(0x006D7880u);WORD_AT(0x006D7880u)++;tex_already=1; }
+        } else {
+            mount_args[0]=v[0];mount_args[1]=v[1];mount_args[2]=v[2];
+            if(strcmp((const char *)memory+v[0],PAK_PATH)) { fprintf(stderr,"mount of a wrong path\n");failures++; }
+            string_below_frame=v[0]+sizeof PAK_PATH<=ESP0 && g_esp<=v[0];
+            if(mount_fails) r=0xFFFFFFFFu; else { r=WORD_AT(0x006D7880u);WORD_AT(0x006D7880u)++;already=1; }
+        }
     } else { fprintf(stderr,"unexpected guest call\n");failures++; }
     return r;                                         /* the real guest_call restores every register */
 }
@@ -142,18 +162,26 @@ int main(void)
     row(TS_RET_MENU_ROW,0x00410000u,5u);              /* not the editor */
     CHECK(originals==1 && rows==0);
     WORD_AT(0x0079094Cu)=102u;
+    heap_fail=1;
+    row(TS_RET_MENU_ROW,0x00410000u,5u);              /* no memory for the label: no Disco row */
+    CHECK(originals==1 && texts==1 && rows==1 && row_value[0]==0u);
+    heap_fail=0;
     row(TS_RET_MENU_ROW,0x00410000u,5u);              /* after the Virtual row */
-    CHECK(originals==1 && texts==1 && rows==1);
-    CHECK(row_text[0]==TEXT_BASE+0xAAFu && row_value[0]==0u);
+    CHECK(originals==1 && texts==1 && rows==2);
+    CHECK(row_value[0]==6u && row_text[0]>=0x00700000u && !strcmp((const char *)memory+row_text[0],"Disco"));
+    CHECK(row_text[1]==TEXT_BASE+0xAAFu && row_value[1]==0u);
     CHECK(g_eax==0x00350000u);                        /* the original's result */
     CHECK(WORD_AT(IMAGE)==0x17Du);                    /* Lab's image for Abstract */
-    WORD_AT(0x0052CF38u)=0x123u;                      /* no text: no row */
+    v=row_text[0];
+    row(TS_RET_MENU_ROW,0x00410000u,5u);              /* the label is made once */
+    CHECK(rows==2 && row_text[0]==v);
+    WORD_AT(0x0052CF38u)=0x123u;                      /* no text: no Abstract row */
     row(TS_RET_MENU_ROW,0x00410000u,5u);
-    CHECK(originals==1 && rows==0);
+    CHECK(originals==1 && rows==1 && row_value[0]==6u);
     WORD_AT(0x0052CF38u)=0xAAFu;
     WORD_AT(IMAGE)=0x180u;                            /* an image already there is kept */
     row(TS_RET_MENU_ROW,0x00410000u,5u);
-    CHECK(rows==1 && WORD_AT(IMAGE)==0x180u);
+    CHECK(rows==2 && WORD_AT(IMAGE)==0x180u);
     WORD_AT(IMAGE)=0u;
 
     /* ---- play: stock tilesets and other callers are untouched ---- */
@@ -172,14 +200,19 @@ int main(void)
     set_env("TSFP_MAPMAKER_LIMITS",NULL);
     make_container(0);already=0;
     path(TS_RET_PAK_PATH,0);
-    CHECK(originals==1 && seen_arg==0u && lookups==1 && mounts==1);
+    CHECK(originals==1 && seen_arg==0u && lookups==2 && mounts==2);
     CHECK(mount_args[1]==1u && mount_args[2]==1u);   /* read whole, level heap */
-    CHECK(string_below_frame);
-    CHECK(WORD_AT(0x006D7880u)==8u && WORD_AT(0x00784020u)==0u && (WORD_AT(INFO+0x08)>>16)==0u);
+    CHECK(tex_args[1]==0u && tex_args[2]==1u);       /* its textures' pak: index-only */
+    CHECK(string_below_frame && tex_below_frame && !mount_order_bad);
+    CHECK(WORD_AT(0x006D7880u)==9u && WORD_AT(0x00784020u)==0u && (WORD_AT(INFO+0x08)>>16)==0u);
     CHECK(WORD_AT(IMAGE)==0x17Du);
     CHECK(g_eax==0x0049FA94u);
     path(TS_RET_PAK_PATH,0);                          /* mounted already: not again */
-    CHECK(originals==1 && seen_arg==0u && lookups==1 && mounts==0 && WORD_AT(0x006D7880u)==8u);
+    CHECK(originals==1 && seen_arg==0u && lookups==2 && mounts==0 && WORD_AT(0x006D7880u)==9u);
+    already=0;tex_already=0;tex_fails=1;WORD_AT(0x006D7880u)=8u;make_container(0);
+    path(TS_RET_PAK_PATH,0);                          /* no textures pak: still Abstract (untextured) */
+    CHECK(originals==1 && mounts==2 && seen_arg==0u && (WORD_AT(INFO+0x08)>>16)==0u && WORD_AT(0x00784020u)==0u);
+    tex_fails=0;tex_already=0;
 
     /* ---- play: no mount possible -> the map plays as Lab ---- */
     set_env("TSFP_MAPMAKER_LIMITS","1");
@@ -192,7 +225,7 @@ int main(void)
     path(TS_RET_PAK_PATH,0);                          /* the mount table is too full */
     CHECK(originals==1 && mounts==0 && seen_arg==1u && (WORD_AT(INFO+0x08)>>16)==1u && WORD_AT(0x00784020u)==1u);
     WORD_AT(0x006D7880u)=56u;make_container(0);
-    path(TS_RET_PAK_PATH,0);                          /* 22 + 8 still fits */
+    path(TS_RET_PAK_PATH,0);                          /* 56 + 8 still fits; then no room for l_102m */
     CHECK(originals==1 && mounts==1 && seen_arg==0u && (WORD_AT(INFO+0x08)>>16)==0u);
     already=0;WORD_AT(0x006D7880u)=7u;mount_fails=1;
     make_container(0);WORD_AT(0x00784014u)=0u;         /* no container: still Lab, no crash */

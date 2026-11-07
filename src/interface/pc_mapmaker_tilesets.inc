@@ -26,11 +26,13 @@
  * Hooks:
  *  - menu_row (WRAP sub_00071800): with TSFP_MAPMAKER_LIMITS=1, in the editor
  *    (scene 102), after the stock Virtual row (value 5, return 0x0031354A)
- *    append "Abstract" (text 0xAAF, value 0) the stock way.
+ *    append "Disco" (value 6, the Virtual variant of pc_mapmaker_disco.inc;
+ *    label in guest heap) and "Abstract" (text 0xAAF, value 0) the stock way.
  *  - play_pak (WRAP sub_00338170, single caller 0x000628ED): for a map whose
  *    tileset is 0, mount l_102.pak first exactly as the stock tileset paks
  *    are (sub_000622D0(path, 1, 1): read whole, level heap, unmounted by the
- *    stock teardown sub_00062720). Not gated: stock maps never have tileset 0,
+ *    stock teardown sub_00062720), then its tile textures' pak
+ *    arcademem/l_102m.pak index-only. Not gated: stock maps never have tileset 0,
  *    and an Abstract map must not be played without it. If the mount is not
  *    possible (mount table near its 30 entries, file missing) the map plays
  *    as Lab, whose props and music Abstract shares: header +0xA,
@@ -41,7 +43,7 @@
  * (mapmaker_container_over_stock), so a stock game refuses it instead of
  * loading a map it cannot play; System Link loads only the stock tier.
  * Requires the includer's WORD_AT, guest_call, g_eax, g_esp,
- * g_xbox_mem_offset and mapmaker_limits/mapmaker_limits_read and
+ * g_xbox_mem_offset, xbox_HeapAlloc and mapmaker_limits/mapmaker_limits_read and
  * MAPMAKER_PTR_OK (pc_mapmaker_limits.inc). */
 #include <stdio.h>
 #include <string.h>
@@ -63,11 +65,18 @@
 #define TS_MOUNT_KEEP 8u                   /* l_100, gun, chr, overlay and spare after us */
 #define TS_CONTAINER_MAX 0x00080000u
 #define TS_PAK_LEN 21u
+#define TS_TEX_PAK_LEN 25u
+#define TS_DISCO_ROW 6u                    /* MAPMAKER_VARIANT_ROW (pc_mapmaker_sky.inc) */
 static const char ts_editor_pak[TS_PAK_LEN]="pak/arcade/l_102.pak";
+static const char ts_editor_textures[TS_TEX_PAK_LEN]="pak/arcademem/l_102m.pak";
 
 extern void sub_0003D7B0(void),sub_00071800(void),sub_000622D0(void),sub_00062260(void);
+extern uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment);
 
-static struct { unsigned long long rows, mounts, fallbacks, logged; } ts_state;
+static struct {
+    unsigned long long rows, mounts, fallbacks, logged, disco_rows, textures;
+    uint32_t disco_text;                   /* guest: "Disco" */
+} ts_state;
 
 static int ts_on(void)
 {
@@ -100,6 +109,17 @@ static uint32_t ts_info(uint32_t c)
     return 0;
 }
 
+/* The Disco row's label, copied once into guest memory; 0 without memory. */
+static uint32_t ts_disco_text(void)
+{
+    static const char label[]="Disco";
+    uint32_t p;
+    if(ts_state.disco_text) return ts_state.disco_text;
+    if(!(p=xbox_HeapAlloc((uint32_t)sizeof label,4u))) { ts_log("no memory for the Disco row label",0,0);return 0; }
+    memcpy((void *)((uintptr_t)p+g_xbox_mem_offset),label,sizeof label);
+    return ts_state.disco_text=p;
+}
+
 /* WRAP sub_00071800 (menu: add a list row; cdecl text, value). */
 void pc_mapmaker_tilesets_menu_row(void (*original)(void))
 {
@@ -109,6 +129,10 @@ void pc_mapmaker_tilesets_menu_row(void (*original)(void))
     original();
     if(value!=TS_LAST_STOCK_ROW || !ts_on() || WORD_AT(TS_SCENE)!=102u) return;
     eax=g_eax;
+    if(ts_disco_text()) {                                /* the Disco variant of Virtual */
+        guest_call(sub_00071800,2,ts_state.disco_text,TS_DISCO_ROW);
+        if(!ts_state.disco_rows++) ts_log("Disco (Virtual variant) offered in Map Settings",TS_DISCO_ROW,WORD_AT(TS_CURRENT));
+    }
     text=guest_call(sub_0003D7B0,1,WORD_AT(TS_TABLE+TS_ABSTRACT*TS_STRIDE));
     if(text) {
         guest_call(sub_00071800,2,text,TS_ABSTRACT);
@@ -118,26 +142,42 @@ void pc_mapmaker_tilesets_menu_row(void (*original)(void))
     g_eax=eax;
 }
 
-/* Mount l_102.pak like the stock tileset paks; 1 when it is mounted. */
-static int ts_mount_editor_pak(void)
+/* Mount a pak from a path below the guest stack: whole on the level heap as
+ * the stock tileset paks (whole 1) or index-only as chr.pak (whole 0); 1
+ * when it is mounted. */
+static int ts_mount_pak(const char *pak,uint32_t len,uint32_t whole)
 {
     uint32_t s,mounted=0,esp=g_esp;
     int ok;
     if(!MAPMAKER_PTR_OK(esp-0x400u,0x400u)) return 0;
     s=(esp-64u)&~3u;                                     /* the path, below the guest stack */
-    memcpy((void *)((uintptr_t)s+g_xbox_mem_offset),ts_editor_pak,TS_PAK_LEN);
+    memcpy((void *)((uintptr_t)s+g_xbox_mem_offset),pak,len);
     g_esp=s;                                             /* calls run below the string */
     if((int32_t)guest_call(sub_00062260,1,s)!=-1) ok=1;  /* already mounted */
     else if((mounted=WORD_AT(TS_MOUNTS))+TS_MOUNT_KEEP>TS_MOUNT_MAX) {
-        ts_log("pak mount table too full for l_102.pak",mounted,TS_MOUNT_MAX);
+        ts_log(whole?"pak mount table too full for l_102.pak":"pak mount table too full for l_102m.pak",mounted,TS_MOUNT_MAX);
         ok=0;
-    } else if((int32_t)guest_call(sub_000622D0,3,s,1u,1u)>=0) ok=1;
+    } else if((int32_t)guest_call(sub_000622D0,3,s,whole,1u)>=0) ok=1;
     else {
-        ts_log("pak/arcade/l_102.pak did not mount",mounted,0);
+        ts_log(whole?"pak/arcade/l_102.pak did not mount":"pak/arcademem/l_102m.pak did not mount",mounted,0);
         ok=0;
     }
     g_esp=esp;
     return ok;
+}
+/* Mount l_102.pak like the stock tileset paks; 1 when it is mounted. Its tile
+ * models' 87 textures are only in the editor's memory pak l_102m.pak, which
+ * play (scene 100 mounts arcademem/l_100m.pak, sub_00062610(scene, 1) at
+ * 0x0006289E) never mounts: it is mounted index-only too (its 24 names shared
+ * with l_100m and 31 with gun.pak are byte-identical). Without it the map
+ * still plays, its tiles untextured. */
+static int ts_mount_editor_pak(void)
+{
+    if(!ts_mount_pak(ts_editor_pak,TS_PAK_LEN,1u)) return 0;
+    if(ts_mount_pak(ts_editor_textures,TS_TEX_PAK_LEN,0u)) {
+        if(!ts_state.textures++) ts_log("Abstract map: mounted pak/arcademem/l_102m.pak for its tile textures",WORD_AT(TS_MOUNTS),0);
+    } else ts_log("Abstract map without l_102m.pak; its tiles have no textures",WORD_AT(TS_MOUNTS),0);
+    return 1;
 }
 
 /* WRAP sub_00338170 (tileset index -> stream pak path; cdecl, one argument). */
