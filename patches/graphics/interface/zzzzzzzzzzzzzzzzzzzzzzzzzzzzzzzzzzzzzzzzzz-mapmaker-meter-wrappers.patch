@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4127 @@
+@@ -1911,6 +1911,4138 @@
      sub_002FA720_gen();
  #endif
  }
@@ -676,6 +676,17 @@
 +    else sub_00332330_gen();
 +#else
 +    sub_00332330_gen();
++#endif
++}
++
++extern void sub_00115F50_gen(void);
++void sub_00115F50(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("rooms","pc_mapmaker_rooms_light_spread")) pc_mapmaker_rooms_light_spread(sub_00115F50_gen);
++    else sub_00115F50_gen();
++#else
++    sub_00115F50_gen();
 +#endif
 +}
 +
