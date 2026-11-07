@@ -41,7 +41,13 @@
  * sub_0008A780 sets its own; xmm1/2/6 enter pass 3 as 0, FLT_MAX, -FLT_MAX in
  * both).
  *
- * Requires the includer's WORD_AT, guest_writable and g_esp. */
+ * Requires the includer's WORD_AT, MAPMAKER_PTR_OK (pc_mapmaker_limits.inc; fixtures
+ * fall back to guest_writable) and g_esp. */
+#ifndef MAPMAKER_PTR_OK
+#define MAPMAKER_PTR_OK(p,n) guest_writable((uint32_t)(p),(size_t)(n))
+#endif
+/* Pointer checks here run per list step: never guest_writable (a VirtualQuery
+ * each call in the game), only the range test of pc_mapmaker_limits.inc. */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -108,9 +114,9 @@ static void mapmaker_portals_measure(mapmaker_portal *p,uint32_t ptr,float pos_m
     int k,cnt;
     memset(p,0,sizeof *p);
     p->ptr=ptr;
-    if(!guest_writable(ptr,0x18u)) return;
+    if(!MAPMAKER_PTR_OK(ptr,0x18u)) return;
     cnt=mapmaker_portals_count16(ptr+0x14u);
-    if(cnt>0 && !guest_writable(ptr+0x18u,(size_t)cnt*12u)) return;
+    if(cnt>0 && !MAPMAKER_PTR_OK(ptr+0x18u,(size_t)cnt*12u)) return;
     p->ok=1;
     p->n[0]=mapmaker_portals_f(ptr+8u);p->n[1]=mapmaker_portals_f(ptr+0xCu);p->n[2]=mapmaker_portals_f(ptr+0x10u);
     p->mn[0]=p->mn[1]=p->mn[2]=pos_max;
@@ -160,16 +166,16 @@ static int mapmaker_portals_join_test(const mapmaker_portal *i,const mapmaker_po
 static uint32_t mapmaker_portals_list(int32_t k)
 {
     uint32_t at=WORD_AT(MAPMAKER_PORTALS_RECORDS)+(uint32_t)k*0xB4u+0xB8u;
-    return guest_writable(at,4u)?WORD_AT(at):0u;
+    return MAPMAKER_PTR_OK(at,4u)?WORD_AT(at):0u;
 }
 static void mapmaker_portals_replace(int32_t rooms,uint32_t from,uint32_t to)
 {
     int32_t k,n,e;
     for(k=0;k<rooms;k++) {
         uint32_t list=mapmaker_portals_list(k);
-        if(!guest_writable(list,4u)) continue;
+        if(!MAPMAKER_PTR_OK(list,4u)) continue;
         n=mapmaker_portals_i(list);
-        if(n>0 && !guest_writable(list,4u+(size_t)n*4u)) continue;
+        if(n>0 && !MAPMAKER_PTR_OK(list,4u+(size_t)n*4u)) continue;
         for(e=0;e<n;e++) if(WORD_AT(list+4u+4u*(uint32_t)e)==from) WORD_AT(list+4u+4u*(uint32_t)e)=to;
     }
 }
@@ -179,9 +185,9 @@ static int mapmaker_portals_remove(int32_t rooms,uint32_t id)
     int found=0;
     for(k=0;k<rooms;k++) {
         uint32_t list=mapmaker_portals_list(k);
-        if(!guest_writable(list,4u)) continue;
+        if(!MAPMAKER_PTR_OK(list,4u)) continue;
         n=mapmaker_portals_i(list);
-        if(n<=0 || !guest_writable(list,4u+(size_t)n*4u)) continue;
+        if(n<=0 || !MAPMAKER_PTR_OK(list,4u+(size_t)n*4u)) continue;
         for(m=0;m<n && WORD_AT(list+4u+4u*(uint32_t)m)!=id;m++) {}
         if(m==n) continue;
         if(m<n-1) memmove((char *)((uintptr_t)list+4u+4u*(uint32_t)m+g_xbox_mem_offset),
@@ -237,7 +243,7 @@ static void mapmaker_portals_merge(const uint32_t *ptr,const uint32_t *list,int 
     for(m=0;m<n;m++) {
         uint32_t e=ptr[list[m]];
         int cnt=mapmaker_portals_count16(e+0x14u);
-        if(cnt>0 && !guest_writable(e+0x18u,(size_t)cnt*12u)) continue;
+        if(cnt>0 && !MAPMAKER_PTR_OK(e+0x18u,(size_t)cnt*12u)) continue;
         for(k=0;k<cnt;k++) {
             uint32_t v=e+0x18u+12u*(uint32_t)k;
             float x=mapmaker_portals_f(v),y=mapmaker_portals_f(v+4u),z=mapmaker_portals_f(v+8u);
@@ -293,17 +299,17 @@ static uint32_t mapmaker_portals_state(const uint32_t *ptr,uint32_t count,int32_
     int32_t k,n,e;
 #define MAPMAKER_PORTALS_MIX(w) do { uint32_t w_=(w); int b_; for(b_=0;b_<4;b_++) { h^=(w_>>(8*b_))&0xFFu;h*=16777619u; } } while(0)
     for(p=1;p<=count;p++) {
-        if(!guest_writable(ptr[p],0x18u)) { MAPMAKER_PORTALS_MIX(0xFFFFFFFFu);continue; }
+        if(!MAPMAKER_PTR_OK(ptr[p],0x18u)) { MAPMAKER_PORTALS_MIX(0xFFFFFFFFu);continue; }
         MAPMAKER_PORTALS_MIX(WORD_AT(ptr[p]));MAPMAKER_PORTALS_MIX(WORD_AT(ptr[p]+4u));
         MAPMAKER_PORTALS_MIX(WORD_AT(ptr[p]+8u));MAPMAKER_PORTALS_MIX(WORD_AT(ptr[p]+0xCu));
         MAPMAKER_PORTALS_MIX(WORD_AT(ptr[p]+0x10u));MAPMAKER_PORTALS_MIX(flags[p]);
     }
     for(k=0;k<rooms;k++) {
         uint32_t list=mapmaker_portals_list(k);
-        if(!guest_writable(list,4u)) continue;
+        if(!MAPMAKER_PTR_OK(list,4u)) continue;
         n=mapmaker_portals_i(list);
         MAPMAKER_PORTALS_MIX((uint32_t)n);
-        if(n>0 && guest_writable(list,4u+(size_t)n*4u))
+        if(n>0 && MAPMAKER_PTR_OK(list,4u+(size_t)n*4u))
             for(e=0;e<n;e++) MAPMAKER_PORTALS_MIX(WORD_AT(list+4u+4u*(uint32_t)e));
     }
 #undef MAPMAKER_PORTALS_MIX
@@ -337,7 +343,7 @@ static void mapmaker_portals_link(uint32_t frame)
     clock_t start=clock();
     mapmaker_portals.builds++;
     mapmaker_portals.pending=0;
-    if(count<=0 || (uint32_t)count>=MAPMAKER_PORTALS_MAX || !guest_writable(table,((size_t)count+1u)*4u)) {
+    if(count<=0 || (uint32_t)count>=MAPMAKER_PORTALS_MAX || !MAPMAKER_PTR_OK(table,((size_t)count+1u)*4u)) {
         fprintf(stderr,"[mapmaker] portal links: %d portals, nothing to join\n",(int)count);
         return;
     }
@@ -419,7 +425,7 @@ out_of_memory:
     }
     /* 2. removal (0x0008B38E) */
     for(p=1;p<=(uint32_t)count;p++) {
-        if(!guest_writable(ptr[p],8u)) continue;
+        if(!MAPMAKER_PTR_OK(ptr[p],8u)) continue;
         if(mapmaker_portals_i(ptr[p])>=0 && mapmaker_portals_i(ptr[p]+4u)>=0) continue;
         if(rooms>0 && mapmaker_portals_remove(rooms,p)) { flags[p]=0;removed++; }
     }
@@ -430,7 +436,7 @@ out_of_memory:
         for(p=1;p<=(uint32_t)count;p++) {
             int32_t a,b;
             pos[p]=-1;
-            if(!guest_writable(ptr[p],8u)) continue;
+            if(!MAPMAKER_PTR_OK(ptr[p],8u)) continue;
             a=mapmaker_portals_i(ptr[p]);b=mapmaker_portals_i(ptr[p]+4u);
             if(a<0 || b<0) continue;
             keys[nk].key=a<b?((unsigned long long)(uint32_t)a<<32|(uint32_t)b):((unsigned long long)(uint32_t)b<<32|(uint32_t)a);
@@ -444,7 +450,7 @@ out_of_memory:
             int32_t a,b;
             float ny;
             int n=1;
-            if(!guest_writable(P,0x18u)) continue;
+            if(!MAPMAKER_PTR_OK(P,0x18u)) continue;
             ny=mapmaker_portals_f(P+0xCu);
             if(ny>wall || wall_neg>ny || mapmaker_portals_count16(P+0x14u)!=4) continue;
             a=mapmaker_portals_i(P);b=mapmaker_portals_i(P+4u);
@@ -462,7 +468,7 @@ out_of_memory:
             int32_t a,b;
             float ny;
             int n=1;
-            if(!guest_writable(P,0x18u)) continue;
+            if(!MAPMAKER_PTR_OK(P,0x18u)) continue;
             ny=mapmaker_portals_f(P+0xCu);
             if(ny>wall || wall_neg>ny || mapmaker_portals_count16(P+0x14u)!=4) continue;
             a=mapmaker_portals_i(P);b=mapmaker_portals_i(P+4u);
@@ -470,7 +476,7 @@ out_of_memory:
             list[0]=p;
             for(q=p+1u;q<=(uint32_t)count;q++) {
                 int32_t e,f;
-                if(!guest_writable(ptr[q],8u)) continue;
+                if(!MAPMAKER_PTR_OK(ptr[q],8u)) continue;
                 e=mapmaker_portals_i(ptr[q]);
                 if(e<0) continue;
                 f=mapmaker_portals_i(ptr[q]+4u);
@@ -482,7 +488,7 @@ out_of_memory:
             groups++;absorbed+=(unsigned long long)(n-1);
         }
     /* the flag bytes as the original leaves them (nothing reads them later) */
-    if(guest_writable(frame+MAPMAKER_PORTALS_FLAGS,MAPMAKER_PORTALS_FLAG_BYTES))
+    if(MAPMAKER_PTR_OK(frame+MAPMAKER_PORTALS_FLAGS,MAPMAKER_PORTALS_FLAG_BYTES))
         for(p=0;p<=(uint32_t)count && p<MAPMAKER_PORTALS_FLAG_BYTES;p++)
             *(uint8_t *)((uintptr_t)frame+MAPMAKER_PORTALS_FLAGS+p+g_xbox_mem_offset)=p?flags[p]:1u;
     mapmaker_portals.pairs+=pairs;mapmaker_portals.dropped+=dropped;mapmaker_portals.removed+=removed;

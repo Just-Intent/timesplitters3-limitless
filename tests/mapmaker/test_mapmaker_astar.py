@@ -43,7 +43,7 @@ MUTATIONS = {
     'mask-ignored': ('if(!(flags&0x10000u) || (flags&WORD_AT(MAPMAKER_ASTAR_MASK))) continue;', 'if(!(flags&0x10000u)) continue;'),
     'near-pad-swapped': ('if(mapmaker_astar_group(to_pad)==group) { near_pad=to_pad;to_pad=(int32_t)WORD_AT(L+8u); }',
                          'if(mapmaker_astar_group(to_pad)==group) { near_pad=(int32_t)WORD_AT(L+8u); }'),
-    'route-skips-goal': ('        if(guest_writable(route,2u)) mapmaker_astar_set_w(route,goal);\n        count=1;max--;', '        count=0;'),
+    'route-skips-goal': ('        if(MAPMAKER_PTR_OK(route,2u)) mapmaker_astar_set_w(route,goal);\n        count=1;max--;', '        count=0;'),
     'route-ignores-max': ('while(esi>=0 && max>0 && mapmaker_astar_node_ok(esi)) {', 'while(esi>=0 && mapmaker_astar_node_ok(esi)) {'),
     'goal-f-kept': ('            WORD_AT(MAPMAKER_ASTAR_GOAL_F)=WORD_AT(n+0xCu);\n', ''),
     'pop-no-closed': ('        WORD_AT(MAPMAKER_ASTAR_CLOSED)=(uint32_t)node;\n', ''),

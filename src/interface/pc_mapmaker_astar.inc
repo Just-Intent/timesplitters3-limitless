@@ -27,7 +27,13 @@
  * =2 walks every list (no counts) for comparison. stderr: the first two
  * searches and then every 4096th, with totals.
  *
- * Requires the includer's WORD_AT, guest_writable and g_esp, g_eax. */
+ * Requires the includer's WORD_AT, MAPMAKER_PTR_OK (pc_mapmaker_limits.inc; fixtures
+ * fall back to guest_writable) and g_esp, g_eax. */
+#ifndef MAPMAKER_PTR_OK
+#define MAPMAKER_PTR_OK(p,n) guest_writable((uint32_t)(p),(size_t)(n))
+#endif
+/* Pointer checks here run per list step: never guest_writable (a VirtualQuery
+ * each call in the game), only the range test of pc_mapmaker_limits.inc. */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,13 +80,13 @@ static int16_t mapmaker_astar_w(uint32_t a) { return (int16_t)*(uint16_t *)((uin
 static void mapmaker_astar_set_w(uint32_t a,int32_t v) { *(uint16_t *)((uintptr_t)a+g_xbox_mem_offset)=(uint16_t)v; }
 static float mapmaker_astar_f(uint32_t a) { float f; uint32_t w=WORD_AT(a); memcpy(&f,&w,4); return f; }
 static uint32_t mapmaker_astar_bits(float f) { uint32_t w; memcpy(&w,&f,4); return w; }
-static int mapmaker_astar_node_ok(int32_t i) { return i>=0 && guest_writable(mapmaker_astar_node(i),16u); }
+static int mapmaker_astar_node_ok(int32_t i) { return i>=0 && MAPMAKER_PTR_OK(mapmaker_astar_node(i),16u); }
 
 /* group of a pad (movsx word pad+8) */
 static int32_t mapmaker_astar_group(int32_t pad)
 {
     uint32_t a=WORD_AT(MAPMAKER_ASTAR_PADS)+(uint32_t)pad*0x20u+8u;
-    return guest_writable(a,2u)?mapmaker_astar_w(a):-1;
+    return MAPMAKER_PTR_OK(a,2u)?mapmaker_astar_w(a):-1;
 }
 
 /* membership counts (one generation per search) */
@@ -237,7 +243,7 @@ static int32_t mapmaker_astar_expand(int32_t pad,int32_t parent,uint32_t g_bits)
     memcpy(&gpar,&g_bits,4);
     mapmaker_astar.expansions++;
     grp=WORD_AT(WORD_AT(MAPMAKER_ASTAR_GROUPS)+(uint32_t)group*4u);
-    if(!guest_writable(grp,8u)) return mapmaker_astar_goal((int32_t)WORD_AT(MAPMAKER_ASTAR_GOAL_GROUP));
+    if(!MAPMAKER_PTR_OK(grp,8u)) return mapmaker_astar_goal((int32_t)WORD_AT(MAPMAKER_ASTAR_GOAL_GROUP));
     list=grp+WORD_AT(grp)*4u+0x18u;
     n=(int32_t)WORD_AT(grp+4u);
     for(k=0;k<n;k++) {
@@ -245,7 +251,7 @@ static int32_t mapmaker_astar_expand(int32_t pad,int32_t parent,uint32_t g_bits)
         uint32_t L=links+(uint32_t)id*0x14u,flags,np,tp,target;
         float dx,dy,dz,c,g_new,f;
         double s,a,b,e,h;
-        if(!guest_writable(L,0x14u)) continue;
+        if(!MAPMAKER_PTR_OK(L,0x14u)) continue;
         flags=WORD_AT(L);
         if(!(flags&0x10000u) || (flags&WORD_AT(MAPMAKER_ASTAR_MASK))) continue;
         to_pad=(int32_t)WORD_AT(L+4u);
@@ -321,12 +327,12 @@ static uint32_t mapmaker_astar_search(int32_t start,int32_t target,uint32_t rout
     if(mapmaker_astar.expansions-(unsigned long long)before>mapmaker_astar.max_expansions)
         mapmaker_astar.max_expansions=mapmaker_astar.expansions-(unsigned long long)before;
     if(max>0) {
-        if(guest_writable(route,2u)) mapmaker_astar_set_w(route,goal);
+        if(MAPMAKER_PTR_OK(route,2u)) mapmaker_astar_set_w(route,goal);
         count=1;max--;
     }
     while(esi>=0 && max>0 && mapmaker_astar_node_ok(esi)) {
         uint32_t n=mapmaker_astar_node(esi);
-        if(guest_writable(route+2u*(uint32_t)count,2u)) mapmaker_astar_set_w(route+2u*(uint32_t)count,mapmaker_astar_w(n+6u));
+        if(MAPMAKER_PTR_OK(route+2u*(uint32_t)count,2u)) mapmaker_astar_set_w(route+2u*(uint32_t)count,mapmaker_astar_w(n+6u));
         esi=mapmaker_astar_w(n+2u);
         count++;max--;
     }
@@ -348,7 +354,7 @@ void pc_mapmaker_pads_group_route(void (*original)(void))
     uint32_t start,target,route,max;
     clock_t t0;
     int mode=mapmaker_astar_mode();
-    if(!mode || !MAPMAKER_STACK_OK(20) || !guest_writable(WORD_AT(MAPMAKER_ASTAR_PADS),0x20u)) { original();return; }
+    if(!mode || !MAPMAKER_STACK_OK(20) || !MAPMAKER_PTR_OK(WORD_AT(MAPMAKER_ASTAR_PADS),0x20u)) { original();return; }
     start=WORD_AT(g_esp+4u);target=WORD_AT(g_esp+8u);route=WORD_AT(g_esp+12u);max=WORD_AT(g_esp+16u);
     mapmaker_astar.walk_all=mode==2;
     t0=clock();

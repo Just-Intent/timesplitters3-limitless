@@ -51,6 +51,9 @@ void sub_003442B0(void) {}
 void sub_00086AE0(void) {}
 void sub_00344350(void) {}
 void sub_00087720(void) {}  /* rooms: view room list (sub_000897D0) */
+void sub_00094250(void) {}  /* rooms: room light spread (sub_00115F50 reimplemented) */
+void sub_00094290(void) {}
+void sub_00356800(void) {}
 void sub_00300670(void) {}
 void sub_0031BB60(void) {}
 void sub_003C85D4(void) {}

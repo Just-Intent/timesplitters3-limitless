@@ -159,7 +159,7 @@ CI: `runtime-patches.yml` scopes runtime/launcher/Linux/issue/texture jobs.
 Only `PR validation` is required; `ci-pr-gate.py` fails closed. Launcher builds
 run once; standalone checks are manual-only. Worker uses this gate. Plan tests
 scope/gate/worker; host suites unchanged. Native Windows45m/Mac30m; upgrades30m.
-MM restart/skelvis/bossroom:-bosses; Disco/props/cars/tank/creatures/portals/astar:test_mapmaker_<x>; tiles/links:limits+pads.
+MM restart/skelvis/bossroom:-bosses; Disco/props/cars/tank/creatures/portals/astar/roomlight:test_mapmaker_<x>; tiles/links:limits+pads.
 
 `test_push_gather.py`: original-reference gathering, fresh bytes, failures,
 guard pages, large buffers and32-bit wrapping. Both native CI hosts run it.
@@ -476,7 +476,7 @@ missing-store mutation fails. Private-XBE cases skip CI. `display_memory.c`
 tests real host protection/bounds, multi-page spans and the production display
 adapter; retaining its snapshot across calls must fail. Win guard is included.
 `guest_span.c` checks private/mapped pages, permission changes, cold/cross-page
-fallback and released mappings. Windows also checks failed page queries
+fallback and released mappings. Windows checks failed page queries
 and disabled-fast-path/write-permission/page-boundary negative controls.
 Registered projection/cutscene suites cover both hosts; query savings alone
 do not establish FPS improvement.
@@ -513,7 +513,7 @@ link and do not restore the removed enhancement issue form. The existing Windows
 empty diagnostics payload and unchanged bug-report round trip. These run in the
 already registered issue-form and launcher workflows; native Mac builds consume
 the same `DiagnosticIssueDraft.cs` URL policy.
-The mocked version-refresh PR creation check also verifies that the generated
+The mocked version-refresh PR creation check verifies that the generated
 description preserves Ideas routing instead of referring to a removed form.
 Version-only bumps use launcher release-policy, compatibility and both-host
 package checks without LFS hydration. They do not prove publication.
