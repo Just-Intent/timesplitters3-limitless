@@ -123,7 +123,7 @@ remain separate checks.
 callback mutations. Fast results and finite fallback results are bit-exact;
 fallback arithmetic destinations allow quiet-NaN payload variation (also seen
 with fast entry disabled). Rejected inputs leave all bits/FP flags unchanged.
-Fixtures/mutations (+triggers/floors) run on both hosts; US-body tests need the XBE.
+Fixtures/mutations (+triggers/floor) run on both hosts; US-body tests need the XBE.
 Camera/mothership/spawn/rigid fixtures include the shared helper.
 
 Crash capture/heartbeat and bounded Windows sharing retries: `test_crash_capture.py`.
