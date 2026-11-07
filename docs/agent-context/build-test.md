@@ -79,7 +79,7 @@ Isolated gameplay: `tools/testing/testing_profile.py --play --seconds 120` (Wind
 `tools/testing/test-native-mac.py --unlocked-profile --seconds 120` (Mac), with .venv.
 Root AGENTS owns assets/isolation/storage. Build, startup and gameplay are
 different evidence; unavailable hardware/private data remain validation gaps.
-For movement input changes, sampler and guest-only fixtures do not prove
+For movement input changes, sampler and guest-only fixtures don't prove
 gameplay speed. Use an isolated Story run and compare actual player-position
 displacement for straight and diagonal travel. Mouse capture checks should
 also cover focus loss, stale held buttons, menu return and a clip released by
@@ -171,7 +171,7 @@ eligibility and exact whole/catch-up fallback. Ten-minute native240 time totals
 must be bit-equal to Original60; per-frame float addition fails this precision
 check. Independent missing-scope and missing-pause-guard controls fail. The public
 clock fixture covers dispatcher/restoration on both CI hosts. Private US XBE
-cases skip without the asset; they do not establish physical Mac gameplay.
+cases skip without the asset; they don't establish physical Mac gameplay.
 Copied numeric-policy fixtures must resolve all relative helper includes,
 including `pc_native_statistics_guest.h`, before mutation compilation.
 
@@ -184,8 +184,8 @@ presence semantics, decoding/reporting, and repeated-lookup/executor mutations.
 
 `test_window_theme.py`: menu drawing, mnemonics, inserted/reordered rows (#333).
 
-[Audio tests](audio-buffers.md): timing, gain, buffer/device recovery and beta
-ON/OFF compatibility with XAudio/SDL doubles.
+[Audio tests](audio-buffers.md): timing, gain, buffer/device recovery, beta
+ON/OFF via XAudio/SDL doubles; [music](custom-music.md).
 
 `test_controller_profile.py`: devices/maps/disconnect and SDL virtual input;
 physical pads/Mac gameplay remain unverified.
@@ -213,10 +213,10 @@ every cadence phase at normal/quarter speed, retaining the legacy missed-event
 control. Keep references/tolerances and verify rate coverage when extending.
 Mouse cadence/surface math cover240; math is not live water. Mounted/terminal
 tests check permissions, bounded queries, 125..8000Hz input and clock/cache/consume
-mutations. Private-XBE skips do not establish Mac execution of lifted routines.
+mutations. Private-XBE skips don't establish Mac execution of lifted routines.
 
 `test_sample_chains.py`: depth/saturation/counts and mutation controls on both
-hosts; Mac does not execute Windows stack walking.
+hosts; Mac doesn't execute Windows stack walking.
 Runner timing includes16ms test-input polling; normal play does not. Its
 `replay_tick` file opens are harness overhead.
 
@@ -228,7 +228,7 @@ Windows `test-online-bot-motion.py`: isolated 0/120/180/240 peers.
 Results transitions: `--post-results-seconds`/`--inspect-results-tabs`/`--rematch`.
 `--require-rematch-results` compares round-two results after reset checks.
 `test_network_bot_results.py`: US routines and AI mutations.
-Async reads do not measure latency.
+Async reads don't measure latency.
 
 Dual-host `test_launcher_release.py` / `test_publish_release.py` cover
 Stable/alpha baselines, pagination/completeness, notes and scope/merge/rename/
@@ -258,7 +258,7 @@ mixed pieces and untouched rejection. `native_surface_cache.c` executes original
 normal/quarter speed and pause, checking U/V velocity/travel against a closed
 form authored recurrence. Independent mutations remove damping, force or travel
 normalization; GPU calls remain spies. Force-table sampling is controlled, so
-these checks do not certify live varying forcing or rendered-material parity.
+these checks don't certify live varying forcing or rendered-material parity.
 
 ### Native vehicle integration and diagnostic checks
 
@@ -267,7 +267,7 @@ partition and lowering contracts on both CI hosts. With the verified private US
 XBE it also lifts the original dispatcher, spring/linear/rest routines, rigid
 clock/solver/integrator, publisher, bounds, sleep/wake, camera and driver at
 60/120/144/180/240.
-Private-XBE skips on CI do not certify those routines on Mac.
+Private-XBE skips on CI don't certify those routines on Mac.
 
 - `native_rigid_motion.c` checks forces, drag, quaternion/position publication,
   controlled support contacts, RNG isolation and secondary-step boundaries at
@@ -294,7 +294,7 @@ Private-XBE skips on CI do not certify those routines on Mac.
 - `native_spawn_motion.c` executes original joint-history and spawn routines
   through real velocity/momentum setters. Check all carried-clock phases,
   signed/rotated inheritance, missing history/allocation and pause. The legacy
-  mutation fails at native120; controlled services do not certify live models.
+  mutation fails at native120; controlled services don't certify live models.
 - `native_vehicle_actor_impact.c` connects original velocity publication to
   queued actor contact, impact and suspension helpers. Old division/gate-only
   mutations fail; geometry/effect callbacks are controlled.
