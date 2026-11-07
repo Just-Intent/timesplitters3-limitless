@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1037,6 +1037,3760 @@
+@@ -1037,6 +1037,3770 @@
      sub_002FA720_gen();
  #endif
  }
@@ -2619,13 +2619,23 @@
 +#endif
 +}
 +
-+void sub_001CDD60(void)
++static void sub_001CDD60_layer6(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_restart")) pc_mapmaker_bosses_restart(sub_001CDD60_layer5);
 +    else sub_001CDD60_layer5();
 +#else
 +    sub_001CDD60_layer5();
++#endif
++}
++
++void sub_001CDD60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("music","pc_custom_music_restart")) pc_custom_music_restart(sub_001CDD60_layer6);
++    else sub_001CDD60_layer6();
++#else
++    sub_001CDD60_layer6();
 +#endif
 +}
 +
