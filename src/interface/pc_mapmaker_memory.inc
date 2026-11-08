@@ -89,6 +89,66 @@ static void mapmaker_memory_check(uint32_t caller,uint32_t size,uint32_t heap,in
         fflush(stderr);
     }
 }
+/* ---- Level heap use by caller (scene 100) -------------------------------
+ * Every heap-1 allocation of a MapMaker level is summed by its caller (the
+ * caller of sub_0003E0B0 for aligned ones, not 0x0003E0FB), from the Level
+ * heap reset on. The biggest consumers are printed when the heap first runs
+ * out, when its free count first drops below MAPMAKER_MEMORY_LOW, and for
+ * the previous level at the next reset:
+ *   [mapmaker] level heap by caller (why): free F; 0x...: n KB in k, ...
+ * Log only. */
+#define MAPMAKER_MEMORY_CALLERS 128u
+#define MAPMAKER_MEMORY_TOP 16u
+#define MAPMAKER_MEMORY_LOW 0x00200000
+static struct {
+    struct { uint32_t caller,count; unsigned long long bytes; } c[MAPMAKER_MEMORY_CALLERS];
+    unsigned n,aligned_depth;
+    unsigned long long other,total;
+    int active,low_reported,full_reported;
+} mapmaker_memory_use;
+static void mapmaker_memory_use_add(uint32_t caller,int32_t bytes)
+{
+    unsigned i;
+    if(!mapmaker_memory_use.active || bytes<=0) return;
+    mapmaker_memory_use.total+=(unsigned long long)bytes;
+    for(i=0;i<mapmaker_memory_use.n;i++)
+        if(mapmaker_memory_use.c[i].caller==caller) { mapmaker_memory_use.c[i].bytes+=(unsigned long long)bytes;mapmaker_memory_use.c[i].count++;return; }
+    if(mapmaker_memory_use.n<MAPMAKER_MEMORY_CALLERS) {
+        mapmaker_memory_use.c[mapmaker_memory_use.n].caller=caller;
+        mapmaker_memory_use.c[mapmaker_memory_use.n].bytes=(unsigned long long)bytes;
+        mapmaker_memory_use.c[mapmaker_memory_use.n].count=1;
+        mapmaker_memory_use.n++;
+    } else mapmaker_memory_use.other+=(unsigned long long)bytes;
+}
+static void mapmaker_memory_use_report(const char *why)
+{
+    unsigned shown[MAPMAKER_MEMORY_TOP],k,i,m=0;
+    if(!mapmaker_memory_use.n) return;
+    fprintf(stderr,"[mapmaker] level heap by caller (%s): free %d, %llu KB taken since the reset;",why,
+            (int)(int32_t)WORD_AT(MAPMAKER_MEMORY_SHARED_FREE),mapmaker_memory_use.total>>10);
+    for(k=0;k<MAPMAKER_MEMORY_TOP;k++) {
+        int best=-1;
+        for(i=0;i<mapmaker_memory_use.n;i++) {
+            unsigned j;int used=0;
+            for(j=0;j<m;j++) if(shown[j]==i) used=1;
+            if(!used && (best<0 || mapmaker_memory_use.c[i].bytes>mapmaker_memory_use.c[(unsigned)best].bytes)) best=(int)i;
+        }
+        if(best<0) break;
+        shown[m++]=(unsigned)best;
+        fprintf(stderr," 0x%08X: %llu KB in %u,",mapmaker_memory_use.c[best].caller,mapmaker_memory_use.c[best].bytes>>10,
+                mapmaker_memory_use.c[best].count);
+    }
+    if(mapmaker_memory_use.other) fprintf(stderr," others %llu KB",mapmaker_memory_use.other>>10);
+    fputc('\n',stderr);
+    fflush(stderr);
+}
+static void mapmaker_memory_use_reset(void)
+{
+    if(mapmaker_memory_use.active) mapmaker_memory_use_report("previous level");
+    memset(&mapmaker_memory_use,0,sizeof mapmaker_memory_use);
+    mapmaker_memory_use.active=WORD_AT(MAPMAKER_MEMORY_SCENE)==100u;
+}
+
 /* ---- nav block --------------------------------------------------------- */
 /* The AI navigation data of a MapMaker map is CPU-only (pads, links, per-pad
  * AI data, cover and runtime pads, the group distance matrix), and at 511
@@ -215,6 +275,7 @@ static uint32_t mapmaker_nav_objects(uint32_t bytes,uint32_t align)
 void pc_mapmaker_memory_level_reset(void (*original)(void))
 {
     original();
+    mapmaker_memory_use_reset();
     mapmaker_nav.used=0;mapmaker_nav.reported=0;
     mapmaker_nav.resets++;
 #ifdef MAPMAKER_POOL_SOURCE
@@ -239,6 +300,34 @@ static int mapmaker_nav_matrix(uint32_t caller,uint32_t size,uint32_t heap)
     return 1;
 }
 
+/* The play build's CPU-only room and portal tables (sub_0008A780: room
+ * records, portal pointers, the per-id flags, the two per-room word tables,
+ * portal bounds and per-room light records; their return addresses below)
+ * from the nav block in scene 100, as the matrix (heap 1, zeroed). Not the
+ * piece entries (0x0008A83E: freed by the same function) nor the per-piece
+ * type arrays [0x00708780]/[0x00708784] (contents not reviewed). */
+static const uint32_t mapmaker_nav_build_rets[]={
+    0x0008ABFFu,   /* [0x00708788] room records, rooms x 0xB4 */
+    0x0008AC1Bu,   /* [0x0070878C] portal pointers */
+    0x0008BA6Du,   /* [0x007B977C] per-id flag bytes */
+    0x0008BA89u,   /* [0x0070383C] rooms x 4 */
+    0x0008BAA8u,   /* [0x00708778] portal bounds, portals x 0x28 */
+    0x0008BACAu,   /* [0x007B9784] rooms x 4 */
+    0x0008BAE5u    /* [0x007AC87C] rooms x 0x1C */
+};
+static int mapmaker_nav_build_table(uint32_t caller,uint32_t size,uint32_t heap)
+{
+    uint32_t p;
+    unsigned i;
+    if(heap!=1u || WORD_AT(MAPMAKER_MEMORY_SCENE)!=MAPMAKER_NAV_SCENE || !mapmaker_objects_source) return 0;
+    for(i=0;i<sizeof mapmaker_nav_build_rets/sizeof mapmaker_nav_build_rets[0] && mapmaker_nav_build_rets[i]!=caller;i++) {}
+    if(i==sizeof mapmaker_nav_build_rets/sizeof mapmaker_nav_build_rets[0]) return 0;
+    p=mapmaker_objects_source(size,16u);           /* off with TSFP_MAPMAKER_NAV_OBJECTS=0 */
+    if(!p) return 0;
+    g_eax=p;
+    MAPMAKER_GUEST_RET();
+    return 1;
+}
 static void mapmaker_memory_guard(void (*original)(void),unsigned heap_arg)
 {
     uint32_t caller=0,size=0,heap=0xFFFFFFFFu;
@@ -248,9 +337,24 @@ static void mapmaker_memory_guard(void (*original)(void),unsigned heap_arg)
         caller=WORD_AT(g_esp);size=WORD_AT(g_esp+4u);heap=WORD_AT(g_esp+4u+4u*heap_arg);
     }
     if(heap_arg==1u && mapmaker_nav_matrix(caller,size,heap)) return;
+    if(heap_arg==1u && mapmaker_nav_build_table(caller,size,heap)) return;
     pool=mapmaker_memory_pool(heap);
     if(pool>=0) before=(int32_t)WORD_AT(pool?MAPMAKER_MEMORY_ETERNAL_FREE:MAPMAKER_MEMORY_SHARED_FREE);
+    if(heap_arg==2u) mapmaker_memory_use.aligned_depth++;
     original();
+    if(heap_arg==2u) mapmaker_memory_use.aligned_depth--;
+    if(heap==1u && pool==0 && (heap_arg==2u || !mapmaker_memory_use.aligned_depth)) {
+        int32_t after=(int32_t)WORD_AT(MAPMAKER_MEMORY_SHARED_FREE);
+        mapmaker_memory_use_add(caller,before-after);
+        if(mapmaker_memory_use.active && after<MAPMAKER_MEMORY_LOW && !mapmaker_memory_use.low_reported) {
+            mapmaker_memory_use.low_reported=1;
+            mapmaker_memory_use_report("free below 2 MB");
+        }
+        if(mapmaker_memory_use.active && after<0 && !mapmaker_memory_use.full_reported) {
+            mapmaker_memory_use.full_reported=1;
+            mapmaker_memory_use_report("heap full");
+        }
+    }
     mapmaker_memory_check(caller,size,heap,before);
 }
 /* sub_0003DFA0(size, heap), cdecl, plain ret: the original pops. */

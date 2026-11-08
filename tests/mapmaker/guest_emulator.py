@@ -240,10 +240,10 @@ class Emu:
                 else:
                     v = self.val(i, 1)
                 self.put(i, 0, v)
-            elif m in ('add', 'sub', 'cmp'):
+            elif m in ('add', 'adc', 'sub', 'cmp'):
                 a, b = self.val(i, 0), self.val(i, 1) & ((1 << (8 * w)) - 1)
-                if m == 'add':
-                    r = a + b
+                if m in ('add', 'adc'):
+                    r = a + b + (1 if m == 'adc' and self.cf else 0)
                     mask = (1 << (8 * w)) - 1
                     self.zf = r & mask == 0
                     self.sf = bool(r & (1 << (8 * w - 1)))
@@ -353,6 +353,9 @@ class Emu:
             elif m == 'cvtsi2ss':
                 v = self.val(i, 1)
                 self.x[self.xreg(i, 0)][0] = np.float32(v - (1 << 32) if v & 0x80000000 else v)
+            elif m == 'cvttss2si':
+                f = float(self.xmm_src(i, 1))
+                self.put(i, 0, (int(f) if f == f and -2**31 <= f < 2**31 else 0x80000000) & 0xFFFFFFFF)
             elif m == 'lahf':
                 ah = (0x80 if self.sf else 0) | (0x40 if self.zf else 0) | (0x04 if self.pf else 0) | 0x02 | (0x01 if self.cf else 0)
                 self.reg_put('ah', ah)
@@ -369,6 +372,13 @@ class Emu:
                     self.st.append(self.st[-1 - self.sti(i, 0)])
                 else:
                     self.st.append(self.fmem(i, 0))
+            elif m in ('fild', 'fimul'):
+                v = self.r32(self.addr(i, 0))                      # dword integer, exact in a double
+                v = float(v - (1 << 32) if v & 0x80000000 else v)
+                if m == 'fild':
+                    self.st.append(v)
+                else:
+                    self.st[-1] = self.st[-1] * v
             elif m in ('fadd', 'fsub', 'fmul'):
                 if i.operands[0].type == x.X86_OP_MEM:
                     b = self.fmem(i, 0)

@@ -603,4 +603,6 @@ void pc_mapmaker_pads_group_distance(void (*original)(void))
     MAPMAKER_FP_PUSH(v);
     MAPMAKER_GUEST_RET();
 }
+#include "pc_mapmaker_nearpad.inc"        /* WRAP sub_0009BCF0: the nearest pad in host code */
+#include "pc_mapmaker_randpad.inc"        /* WRAP sub_0006A8B0: the random pad in a ring in host code */
 #include "pc_mapmaker_astar.inc"          /* WRAP sub_0009B540: the group route search in C */
