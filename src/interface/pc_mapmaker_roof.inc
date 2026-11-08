@@ -142,6 +142,10 @@ static struct {
 static struct {
     uint8_t mode[MAPMAKER_ROOF_PLAY_PIECES];  /* per piece record, in record order */
     uint32_t mask[MAPMAKER_ROOF_PLAY_PIECES]; /* the record's +8, checked against the build */
+    uint32_t place[MAPMAKER_ROOF_PLAY_PIECES];/* the record's +0 tile id (low 16 bits) | +4 x,z,floor,rotation (log) */
+    uint32_t where[MAPMAKER_ROOF_PLAY_PIECES];
+    uint16_t room_piece[MAPMAKER_ROOF_ROOMS]; /* room index -> piece record + 1 (0: unknown) */
+    uint8_t seen_two[MAPMAKER_ROOF_ROOMS];    /* two-sided geometry drawn at least once (log) */
     unsigned pieces, next, rooms, bounded, unbounded;
     int building, kill, low, high, armed_logged;
     float kill_y, out_y;                       /* below kill_y: dead; below out_y for OUT_FRAMES: dead */
@@ -160,6 +164,7 @@ static struct {
     unsigned long long query_fail, outside_logs;
     unsigned ticks, fall_logs, player_logs;
     unsigned long long builds, mismatch, beyond, malformed, kills, rejected, hidden_logs, falls, twosided_logs;
+    unsigned twosided_frames;                  /* views since the two-sided marks were made (log) */
 } mapmaker_roof_play;
 extern void sub_000BD090(void),sub_00087310(void);
 
@@ -439,6 +444,23 @@ void pc_mapmaker_roof_format(void (*original)(void))
  * clears the side bits of a bounded room's geometry instance for the call and
  * puts them back. A stock game plays the tile as No roof (walls drawn). */
 
+/* "tile T at x,z floor f rotation r" of piece record k (log only). */
+static const char *mapmaker_roof_piece_text(unsigned k)
+{
+    static char text[64];
+    uint32_t w;
+    if(k>=mapmaker_roof_play.pieces) return "no piece";
+    w=mapmaker_roof_play.where[k];
+    snprintf(text,sizeof text,"tile %u at %d,%d floor %d rotation %u",(unsigned)mapmaker_roof_play.place[k],
+             (int)(int8_t)(w&0xFFu),(int)(int8_t)(w>>8&0xFFu),(int)(int8_t)(w>>16&0xFFu),(unsigned)(w>>24&3u));
+    return text;
+}
+static const char *mapmaker_roof_room_text(uint32_t room)
+{
+    unsigned k=room-1u<MAPMAKER_ROOF_ROOMS?mapmaker_roof_play.room_piece[room-1u]:0u;
+    return k?mapmaker_roof_piece_text(k-1u):"no piece";
+}
+
 static int mapmaker_roof_play_record(uint32_t record,void *ctx)
 {
     uint32_t mark=WORD_AT(record+0x24u)>>16;
@@ -451,6 +473,7 @@ static int mapmaker_roof_play_record(uint32_t record,void *ctx)
     if(k>=MAPMAKER_ROOF_PLAY_PIECES) return 0;
     mapmaker_roof_play.mode[k]=(uint8_t)(mode==MAPMAKER_ROOF_OPEN_BOUNDED || mode==MAPMAKER_ROOF_OPEN_AIR?mode:0u);
     mapmaker_roof_play.mask[k]=WORD_AT(record+8u);
+    mapmaker_roof_play.place[k]=WORD_AT(record)&0xFFFFu;mapmaker_roof_play.where[k]=WORD_AT(record+4u);
     if(mode==MAPMAKER_ROOF_OPEN_BOUNDED) mapmaker_roof_play.bounded++;
     mapmaker_roof_play.pieces=k+1u;
     return 1;
@@ -471,6 +494,9 @@ void pc_mapmaker_roof_play(void (*original)(void))
     mapmaker_roof_play.open_rooms=0;mapmaker_roof_play.generation++;
     memset(mapmaker_roof_play.twosided,0,sizeof mapmaker_roof_play.twosided);
     mapmaker_roof_play.twosided_rooms=0;
+    memset(mapmaker_roof_play.room_piece,0,sizeof mapmaker_roof_play.room_piece);
+    memset(mapmaker_roof_play.seen_two,0,sizeof mapmaker_roof_play.seen_two);
+    mapmaker_roof_play.twosided_logs=0;mapmaker_roof_play.twosided_frames=0;
     memset(mapmaker_roof_play.out,0,sizeof mapmaker_roof_play.out);
     memset(mapmaker_roof_play.below,0,sizeof mapmaker_roof_play.below);
     memset(mapmaker_roof_play.noroom,0,sizeof mapmaker_roof_play.noroom);
@@ -538,8 +564,9 @@ void pc_mapmaker_roof_rooms(void (*original)(void))
     if(WORD_AT(build+0x44u)!=mapmaker_roof_play.mask[k] && mapmaker_roof_play.mismatch++<4u)
         fprintf(stderr,"[mapmaker] roof: room build entry %u mask 0x%08X, its record's +8 0x%08X\n",k,
                 WORD_AT(build+0x44u),mapmaker_roof_play.mask[k]);
-    if(mapmaker_roof_play.mode[k]!=MAPMAKER_ROOF_OPEN_BOUNDED && mapmaker_roof_play.mode[k]!=MAPMAKER_ROOF_OPEN_AIR) return;
     base=WORD_AT(build+0x28u);count=WORD_AT(build+0x14u);
+    for(j=0;(int32_t)count>0 && j<count && base+j<MAPMAKER_ROOF_ROOMS;j++) mapmaker_roof_play.room_piece[base+j]=(uint16_t)(k+1u);
+    if(mapmaker_roof_play.mode[k]!=MAPMAKER_ROOF_OPEN_BOUNDED && mapmaker_roof_play.mode[k]!=MAPMAKER_ROOF_OPEN_AIR) return;
     for(j=0;(int32_t)count>0 && j<count;j++) {
         if(base+j>=MAPMAKER_ROOF_ROOMS) { mapmaker_roof_play.beyond++;break; }
         if(!mapmaker_roof_play.open[base+j]) mapmaker_roof_play.open_rooms++;
@@ -550,8 +577,8 @@ void pc_mapmaker_roof_rooms(void (*original)(void))
     }
     if(mapmaker_roof_play.mode[k]==MAPMAKER_ROOF_OPEN_BOUNDED && mapmaker_roof_play.hidden_logs<64u) {
         mapmaker_roof_play.hidden_logs++;
-        fprintf(stderr,"[mapmaker] roof: bounded piece %u: rooms %u..%u (mask 0x%08X)\n",k,base+1u,base+count,
-                mapmaker_roof_play.mask[k]);
+        fprintf(stderr,"[mapmaker] roof: bounded piece %u: rooms %u..%u (mask 0x%08X, %s)\n",k,base+1u,base+count,
+                mapmaker_roof_play.mask[k],mapmaker_roof_piece_text(k));
     }
 }
 
@@ -569,6 +596,19 @@ static void mapmaker_roof_count_hidden(uint32_t inst,uint32_t mask,uint32_t hide
         m=WORD_AT(first+i*MAPMAKER_ROOF_NODE+0x5Cu);
         if(m && (m&mask) && !(m&mask&~hide)) (*hidden)++;
     }
+}
+
+/* " 0x..." per node mask (+0x5C), the first 24 nodes (log only). */
+static void mapmaker_roof_node_masks(uint32_t inst,char *out,size_t size)
+{
+    uint32_t header=WORD_AT(inst+4u),n,i,first;
+    size_t at=0;
+    out[0]=0;
+    if(!MAPMAKER_PTR_OK(header,4u) || (n=WORD_AT(header))>MAPMAKER_ROOF_NODES_MAX ||
+       !MAPMAKER_PTR_OK(first=header-n*MAPMAKER_ROOF_NODE,n*MAPMAKER_ROOF_NODE)) return;
+    for(i=0;i<n && i<24u && at+12u<size;i++)
+        at+=(size_t)snprintf(out+at,size-at," 0x%X",WORD_AT(first+i*MAPMAKER_ROOF_NODE+0x5Cu));
+    if(i<n && at+5u<size) snprintf(out+at,size-at," ...");
 }
 
 /* WRAP sub_0008F6B0 (draw one model instance: inst, pass, layer; cdecl).
@@ -619,8 +659,19 @@ void pc_mapmaker_roof_draw(void (*original)(void))
                     room,hidden,total,mask);
         }
     }
-    if(two && !(flags&MAPMAKER_ROOF_TWO_SIDED) && mapmaker_roof_play.twosided_logs++<8u)
-        fprintf(stderr,"[mapmaker] roof: room %u drawn two-sided (seen across open air)\n",room);
+    if(two && !mapmaker_roof_play.seen_two[room-1u]) {
+        mapmaker_roof_play.seen_two[room-1u]=1;
+        if(mapmaker_roof_play.twosided_logs++<96u) {
+            /* nodes the instance mask leaves out (a wall the piece's own mask drops) */
+            unsigned total,masked;
+            char nodes[24u*11u+8u];
+            mapmaker_roof_count_hidden(inst,0xFFFFFFFFu,~mask,&total,&masked);
+            mapmaker_roof_node_masks(inst,nodes,sizeof nodes);
+            fprintf(stderr,"[mapmaker] roof: room %u drawn two-sided (seen across open air): %s, %s, mask 0x%08X, prop flags 0x%08X, %u of %u nodes masked out%s; node masks%s\n",
+                    room,mapmaker_roof_room_text(room),mapmaker_roof_play.open[room-1u]?"open":"closed",mask,flags,masked,total,
+                    hide?" (bounded: side nodes hidden as well)":"",nodes);
+        }
+    }
     if(two && (flags&MAPMAKER_ROOF_TWO_SIDED)) two=0;           /* already two-sided: nothing to undo */
     if(hide) WORD_AT(inst+0x30u)=mask&~hide;
     if(two) WORD_AT(prop+0x28u)=flags|MAPMAKER_ROOF_TWO_SIDED;
