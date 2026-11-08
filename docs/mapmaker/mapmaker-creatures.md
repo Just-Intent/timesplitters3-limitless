@@ -22,7 +22,7 @@ ported bosses' 150..160):
 | row | label | stores | made with | AI class (hi:lo) | anims |
 |---|---|---|---|---|---|
 | 159 | Prometheus SK/8 | 0x62 | its own (rocket robot 0x633) | 0:0x10000004 -> `sub_0027F8E0` case 4 -> `sub_00283730` | animrb.pak (every level's), whole |
-| 160 | Prometheus SD/7 | 0x36 | its own (guard robot 0x5F8) | 0:0x10000004, as SK/8 | animrb.pak, whole |
+| 160 | Prometheus SD/7 | 0x36 | its own (guard robot 0x5F8) | none: the MapMaker bot AI (after .73) | animrb.pak, whole |
 | 161 | Catacomb Ghost | 0x2F | the zombie 0x17's models | 0:0x50000000 -> `sub_002BA300` | lv17.pak 0x249..0x24C |
 | 162 | SecuriDroid XP | 0x4D | its own (chrs/securibot 0x607) | 0x4000:0x10000000 -> `sub_0026B7A0` | lv6.pak 0xA22..0xA2C |
 | 163 | Mutant (Story) | 0x30 | the mutant 0x59's models | 0x8000:0x10000000 -> `sub_00264A10` | lv22.pak 0x76B..0x770 |
@@ -286,3 +286,67 @@ failing test (sight, muzzle) in the robot handler, and the aim point if the
 floor shots miss.
 
 Integrator note (2026-11-07): `WRAP sub_001BB5C0 -> pc_mapmaker_creatures_robot_fire` is not generated. Upstream already defines `sub_001BB5C0` (network bot shot / kill feed) and the generated story-chain rename for it does not apply in the staged patch run, so the fire-call count stays 0 in game; the muzzle-hit and sight counts still log.
+
+## The .73 log: far fire poses, no sight, editor weapon 0x16
+
+Log (build .73): "Prometheus SK/8 #2: fire pose ended without a rocket
+(squared distance 15926.9 at its start, 1000 frames, 870 without sight, 0 fire
+calls, 0 muzzle hits, built-in weapon 0x43)", and two more at squared
+distances 15336.8 and 2338.9 (126 and 48 units) with built-in weapon 0x16.
+"fire calls" was always 0: `sub_001BB5C0` is defined by the runtime
+(`recomp_manual.c`) and that hook was never wired.
+
+**Causes (CONFIRMED, `test_far_fire_pose_is_the_advance`,
+`test_sight_table_and_update`, `test_editor_weapon_replaces_the_rocket`).**
+- *Far fire poses.* The 100 / 289 limits are only state 1's. State 0 sends a
+  target at 17 units or more to state 3, which walks with the advance-fire
+  pose 0x9A7 at any distance (0x002838C5..0x002838F5, 0x00283AF6). That is the
+  stock Machine Wars advance: firing while walking, rockets only when the
+  weapon gates pass.
+- *Weapon 0x16.* MapMaker writes the Story AI's editor weapon (chunk +0x26)
+  to spawn record +0x18 (0x0024205A..0x00242155). The AI start takes the
+  built-in weapon +0x94 from that list when it is not -1
+  (0x0015B878..0x0015B889), so an armed SK/8 lost its rocket launcher 0x43.
+  The class-4 robot path fires only 0x42/0x43 (0x002B9145..0x002B9153), so
+  it then fired nothing at all.
+- *SD/7.* It has no built-in weapon in any case, so class 4 never fires for it.
+- *Sight.* `sub_0015E120(ai, 0)` reads the pair table `[0x0074C368]`, which
+  `sub_0025FB70` updates for one AI per frame (index `[0x007A3500]`) with a
+  ray `sub_00088C60` (return 0x00260134) from the AI's collision object
+  toward the target's eye; the pair is visible when the ray returns the
+  target. Why it fails about 90% of the time for the SK/8 is **not known**
+  (INFERRED candidates: the ray's start/eye point on the tall robot model,
+  MapMaker geometry in between, or the per-frame turn order).
+
+**Fixes.**
+- SK/8 (`crt_builtin`): at the AI start the record's weapon list +0x18 is
+  set to -1 when an editor weapon was chosen, so it always gets its rocket
+  launcher 0x43 (logged: "editor weapon ignored: the story robot fires only
+  its built-in weapon"). A weapon given in the editor cannot be fired by the
+  robot code.
+- SD/7: its row has no story class any more (class 0:0 = keep MapMaker's bot
+  class), so it fights as a bot and fires the weapon given in the editor (as
+  before .58; logged "keeps the MapMaker bot AI"). Its picker row and anims
+  are unchanged.
+- Log: the fire log now counts fire events 0x200 (`sub_00061570`, as the
+  weapon code asks) and muzzle tests (the muzzle ray's calls, which mean
+  `sub_001BB5C0` reached its projectile path) instead of the unwired fire
+  calls. A new log-only WRAP on `sub_0025FB70` marks the robot's sight turn;
+  its sight rays (return 0x00260134) are counted, and after 64 the robot
+  logs once how many reached a player, hit something else (the last
+  object and its type +0x20) or hit nothing, with its y, eye height +0xBB8
+  and height +0x1AC.
+
+**Not done:** the SK/8's sight and therefore its rocket launches. The next
+log names what the sight ray hits; the fix then goes there (the eye point, or
+a robot-specific sight). Gating the advance-fire pose on sight was not done:
+swapping the pose under the robot handler restarts its state 3 every frame.
+
+WRAPs after .73 (log only):
+
+```
+WRAP sub_0025FB70 -> pc_mapmaker_creatures_robot_sight  (sight update of one AI per frame, no args)
+WRAP sub_00088C60 -> pc_mapmaker_creatures_robot_muzzle (as before; now also its return 0x00260134)
+WRAP sub_002B8F90 -> pc_mapmaker_creatures_robot_weapon (as before)
+(no WRAP on sub_001BB5C0: the runtime defines it)
+```
