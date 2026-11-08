@@ -300,8 +300,8 @@ the Machine Wars robot behaviour: the SK/8 fires its own rockets without a
 weapon (until .58 it only played its firing pose). The preview shows their
 Arcade look-alikes. Since .73 the SK/8 keeps its rocket launcher even when
 you give it a weapon, and the SD/7 fights as a normal bot with the weapon you
-give it. Known: the SK/8 still often walks in its firing pose without a
-rocket (it does not see you); stderr says why. `TSFP_MAPMAKER_CREATURES=0` plays them as bots. The
+give it. Since .75 an SK/8 that cannot see you walks without its firing
+pose, and its view is no longer blocked by its own body; stderr says when. `TSFP_MAPMAKER_CREATURES=0` plays them as bots. The
 original game plays such a map with bots and shows an empty name in the
 editor. *Automated tests only.* Details:
 [story creatures](mapmaker-creatures.md#the-prometheus-robots-rows-159160-after-the-v040-mapmaker58-report).

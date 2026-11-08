@@ -115,6 +115,32 @@ static uint32_t vis_hits[64];
 static unsigned vis_n;
 static void fake_vray(void) { g_eax=vis_hits[vis_n++%64u];g_esp+=4u; }
 static void fake_oray(void) { g_eax=0x00570000u;g_esp+=4u; }
+/* a ray that first meets a character body (while it collides), then the player */
+static uint32_t body_obj=0x00590000u,far_obj=0x005A0000u;
+static unsigned bray_calls;
+static int far_first;
+static void fake_bray(void)
+{
+    bray_calls++;
+    if(far_first) g_eax=far_obj;
+    else g_eax=(WORD_AT(body_obj+0x28u)&0x20u)?body_obj:0x00570000u;
+    g_esp+=4u;
+}
+static void fake_bsight(void)
+{
+    uint32_t sp=g_esp;
+    g_esp-=4u;WORD_AT(g_esp)=0x00260134u;
+    pc_mapmaker_creatures_robot_muzzle(fake_bray);
+    CHECK(g_esp==sp);
+    g_esp+=4u;
+}
+/* sub_00283730: the pose row it sees */
+static uint32_t seen_row[8];
+static void fake_pose(void)
+{
+    memcpy(seen_row,(const void *)((uintptr_t)(0x00520838u+2u*0x20u)+g_xbox_mem_offset),sizeof seen_row);
+    g_esp+=4u;
+}
 static void fake_sight(void)
 {
     uint32_t sp=g_esp;
@@ -462,6 +488,46 @@ int main(void)
             HALF_AT(POOL+14u*0xEA0u+0x48u)=0x2Fu;
             CALL(pc_mapmaker_creatures_robot_sight,fake_sight,0x0015E9A3u,0,0);
             CHECK(crt_rb.r[0].rays==64u && crt_rb.seeing==0 && crt_rb.n==1u);
+            /* the robot's own body in the way: passed through, its collidable bit back after */
+            WORD_AT(0x007A3500u)=13u;
+            FLOAT_AT(ent+0x64u)=10.0f;FLOAT_AT(ent+0x6Cu)=20.0f;
+            WORD_AT(body_obj+0x20u)=8u;WORD_AT(body_obj+0x28u)=0x00000121u;FLOAT_AT(body_obj+0x64u)=11.0f;FLOAT_AT(body_obj+0x6Cu)=21.0f;
+            WORD_AT(far_obj+0x20u)=8u;WORD_AT(far_obj+0x28u)=0x20u;FLOAT_AT(far_obj+0x64u)=16.0f;FLOAT_AT(far_obj+0x6Cu)=20.0f;
+            bray_calls=0;
+            CALL(pc_mapmaker_creatures_robot_sight,fake_bsight,0x0015E9A3u,0,0);
+            CHECK(bray_calls==2u && crt_rb.r[0].player==41u && WORD_AT(body_obj+0x28u)==0x00000121u && crt_rb.r[0].body==1u);
+            far_first=1;bray_calls=0;                                            /* a character 6 units away: a real blocker */
+            CALL(pc_mapmaker_creatures_robot_sight,fake_bsight,0x0015E9A3u,0,0);
+            CHECK(bray_calls==1u && crt_rb.r[0].other==21u && WORD_AT(far_obj+0x28u)==0x20u);
+            far_first=0;
+            WORD_AT(body_obj+0x28u)=0x00000101u;bray_calls=0;                    /* not collidable: the ray never stops there anyway */
+            CALL(pc_mapmaker_creatures_robot_sight,fake_bsight,0x0015E9A3u,0,0);
+            CHECK(bray_calls==1u && crt_rb.r[0].player==42u);
+            WORD_AT(POOL)=body_obj;WORD_AT(body_obj+0x28u)=0x00000121u;bray_calls=0;   /* the player next to it: seen, not skipped */
+            CALL(pc_mapmaker_creatures_robot_sight,fake_bsight,0x0015E9A3u,0,0);
+            CHECK(bray_calls==1u && crt_rb.r[0].player==43u);
+            WORD_AT(POOL)=0x00570000u;
+        }
+        /* the pose row: the non-firing poses while it cannot see, for the handler call only */
+        {
+            uint32_t row=0x00520838u+2u*0x20u;
+            static const uint32_t stock[8]={0x99Eu,0x9A0u,0x9A7u,0x9A7u,0x9A2u,0xFFFFFFFFu,0xFFFFFFFFu,0x9A5u};
+            memcpy((void *)((uintptr_t)row+g_xbox_mem_offset),stock,sizeof stock);
+            sight=0;
+            CALL(pc_mapmaker_creatures_robot_pose,fake_pose,0x0027FAA5u,ent,0);
+            CHECK(seen_row[2]==0x9A6u && seen_row[3]==0x9A6u && seen_row[7]==0x99Eu && seen_row[0]==0x99Eu && seen_row[4]==0x9A2u);
+            CHECK(!memcmp((const void *)((uintptr_t)row+g_xbox_mem_offset),stock,sizeof stock) && crt_rb.r[0].hold==1u);
+            sight=1;
+            CALL(pc_mapmaker_creatures_robot_pose,fake_pose,0x0027FAA5u,ent,0);
+            CHECK(seen_row[2]==0x9A7u && seen_row[7]==0x9A5u);
+            sight=0;
+            {
+                uint32_t other=actor(15,0x2Fu),e3=0x00563000u;                    /* not the rocket robot */
+                WORD_AT(e3+0x7Cu)=other;
+                CALL(pc_mapmaker_creatures_robot_pose,fake_pose,0x0027FAA5u,e3,0);
+                CHECK(seen_row[2]==0x9A7u);
+            }
+            sight=1;
         }
         /* not a class-4 robot row (a ghost): untouched, no sight test */
         {
