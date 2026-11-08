@@ -348,6 +348,46 @@ around it, circle and patrol a ring about 10 out and 5 up. They dive at a
 player who comes under the ring, and they explode when shot. More rise at
 each later launch.
 
+## Playtest .75: no bottle in the mouth, something floating, body hits (fixed after .75)
+
+User report (.75): "Imp creatures working well now, but pit skeleton is not.
+Pit skeleton still doesn't have barrel visible in mouth, has an object
+floating above him that doesn't need to be there, and takes damage when shot
+anywhere on his body." `m75.err`: the hull hidden; the bottle "held at the
+mouth (117.00, 11.51, 413.50)" (the fixed estimate), once over a NaN bone
+point; the rack made at (117.52, 22.99, 410.31); hits through the body.
+
+Causes:
+- **Body hits**: the .68 quarter share on the hull (by design then; the user
+  wants only the bottle).
+- **The floating object**: the torture rack 0x246, 22.5 over the spawn (the
+  catacombs hostage rack). There is no hostage in MapMaker.
+- **Not in the mouth**: the 11 up / 2.5 ahead estimate does not match the
+  model. The real point is bone 0x29's (CONFIRMED: 0x0029E46E..0x0029E500).
+  It needs bone matrices posed for the frame; the fight's frame reads stale
+  ones (and the .66 pose call broke the camera).
+
+Fixes:
+- The hull's damage callback is now `0x0028B5F0` (the ragbug's, which only
+  sets health 1.0): body shots do nothing and the hull is never destroyed.
+  Only the bottle (`0x0028C2F0`) hurts the skeleton. Still hidden.
+- The rack is hidden the same way as the hull (`sub_000942B0(instance, 8)`);
+  the fight keeps it for its stages. Log `hostage rack 0x246 hidden`.
+- New chain on `sub_0008F950` (the model draw, already wrapped for
+  `pc_mapmaker_probe_prop_draw`) -> `pc_mapmaker_pitboss_draw`. After the
+  draw, for a pit skeleton's instance, bone 0x29's point is computed exactly
+  as the fight does: skeleton `[anim+4]`, entry (0x29 - first word) x 0xC8,
+  midpoint of segment `[entry+0xAC]`, matrix `[anim+0x10]` + int8
+  `[entry+0x49]` x 0x40, transformed as `sub_00151E80`. It is cached when
+  finite and at least 3 over the feet. The bottle then sits there for up to
+  30 fight frames after a draw; otherwise it falls back to the estimate. Log
+  on each change: `gas bottle at bone 0x29 of the last draw (x, y, z), h over
+  its feet` or `... at the head estimate (not drawn lately) ...`.
+
+Not verified: that the matrices after the draw are the world ones the story
+reads (INFERRED: the story fight reads the same array in its own frame, and
+the catacombs boss is drawn every frame).
+
 ## Restart
 
 The restart keeps the Level heap (limitless-bosses.md), so the blocks are
