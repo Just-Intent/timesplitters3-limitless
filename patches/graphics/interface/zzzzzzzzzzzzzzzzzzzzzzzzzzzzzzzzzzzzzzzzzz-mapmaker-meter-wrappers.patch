@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4501 @@
+@@ -1911,6 +1911,4511 @@
      sub_002FA720_gen();
  #endif
  }
@@ -3506,13 +3506,23 @@
 +}
 +
 +extern void sub_00045670_gen(void);
-+void sub_00045670(void)
++static void sub_00045670_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_sound_load")) pc_mapmaker_khallos_sound_load(sub_00045670_gen);
 +    else sub_00045670_gen();
 +#else
 +    sub_00045670_gen();
++#endif
++}
++
++void sub_00045670(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_sound_load")) pc_mapmaker_pitboss_sound_load(sub_00045670_layer0);
++    else sub_00045670_layer0();
++#else
++    sub_00045670_layer0();
 +#endif
 +}
 +
