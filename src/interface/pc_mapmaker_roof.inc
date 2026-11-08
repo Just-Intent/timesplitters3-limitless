@@ -90,8 +90,6 @@
 #define MAPMAKER_ROOF_SIDES 0x00FFFFFFu         /* side banks only: hidden from the draw of bounded rooms */
 #define MAPMAKER_ROOF_MARK 0x5200u              /* record word +0x26: 0x5200 | mode */
 #define MAPMAKER_ROOF_RET_VIEW 0x0032FEC4u      /* editor 3D view: sub_002FC680 at 0x0032FEBF */
-#define MAPMAKER_ROOF_MASK_FROM 0x002FC680u     /* sub_002FC680 .. (its sub_002F8780 calls 0x002FC810..0x002FD74F) */
-#define MAPMAKER_ROOF_MASK_TO 0x002FD92Au
 #define MAPMAKER_ROOF_RECORD 0x28u
 #define MAPMAKER_ROOF_SLOTS 4096u               /* > the 2048-piece pool (items.json) */
 #define MAPMAKER_ROOF_CONTAINER_MAX 0x00080000u
@@ -137,8 +135,7 @@ static struct {
     uint8_t mode[MAPMAKER_ROOF_SLOTS];
     unsigned keys, marked;
     uint32_t suffixed;             /* guest string: a flagged tile's name + its flag */
-    unsigned long long mismatch, unmatched, restored, full, carried, freed, sealed;
-    int solid_only;                /* sub_002FC680 runs for a closed piece: open-air neighbours do not connect */
+    unsigned long long mismatch, unmatched, restored, full, carried, freed;
 } mapmaker_roof;
 
 /* Play time data for bounded open-air rooms (map build sub_0008A780). */
@@ -229,48 +226,10 @@ static void mapmaker_roof_forget_all(void)
 void pc_mapmaker_roof_mask(void (*original)(void))
 {
     uint32_t piece=mapmaker_roof.marked && MAPMAKER_STACK_OK(8u)?WORD_AT(g_esp+4u):0u,ret=piece?WORD_AT(g_esp):0u;
-    unsigned mode=piece?mapmaker_roof_mode(piece):0u;
-    int outer=mapmaker_roof.solid_only;
-    /* a closed piece (unmarked or No roof) on a map with open-air pieces: its
-     * walls toward them stay (pc_mapmaker_roof_link) */
-    if(piece && (!mode || mode==MAPMAKER_ROOF_OPEN_ROOF)) {
-        mapmaker_limits_read();
-        mapmaker_roof.solid_only=mapmaker_limits.limits;
-    }
-    original();
-    mapmaker_roof.solid_only=outer;
-    if(!piece || !mode || !mapmaker_roof_editor()) return;
-    g_eax&=~(ret==MAPMAKER_ROOF_RET_VIEW?mapmaker_roof_shown(mode):mapmaker_roof_clear(mode));
-}
-
-/* WRAP sub_002F8780 (editor: does the neighbour piece have a connection
- * point that meets this one? cdecl (neighbour piece, x, z, y, type, length);
- * returns its index or -1). sub_002FC680 sets a side's wall bit when no
- * neighbour connects (0x002FD17D..0x002FD20D) and clears it, opening the
- * side, when one does. .77 report: a closed tile beside Open air pieces
- * showed only its floor and ceiling from outside ("floating plates"): every
- * side met an open-air neighbour, so the closed tile had no wall there and
- * the open-air tile none either (bounded: hidden; unbounded: removed). While
- * the mask of a closed piece is built, a side connection (types 1..4) to an
- * Open air (bounded or unbounded) neighbour counts as no connection, so the
- * closed piece keeps that wall, drawn and solid (the saved mask, +8, is what
- * play draws and collides with; a stock game plays it the same). The
- * open-air piece's own mask is unchanged. One flag test per call
- * otherwise; only calls from sub_002FC680 (by return address). */
-void pc_mapmaker_roof_link(void (*original)(void))
-{
-    uint32_t ret,neighbour,type;
     unsigned mode;
-    if(mapmaker_roof.solid_only && MAPMAKER_STACK_OK(0x1Cu) && (ret=WORD_AT(g_esp))>MAPMAKER_ROOF_MASK_FROM &&
-       ret<MAPMAKER_ROOF_MASK_TO && (neighbour=WORD_AT(g_esp+4u))!=0 && (type=WORD_AT(g_esp+0x14u))>=1u && type<=4u &&
-       ((mode=mapmaker_roof_mode(neighbour))==MAPMAKER_ROOF_OPEN_AIR || mode==MAPMAKER_ROOF_OPEN_BOUNDED)) {
-        if(mapmaker_roof.sealed++<4u)
-            fprintf(stderr,"[mapmaker] roof: a closed tile keeps its wall toward an open-air tile (side %u)\n",(unsigned)type);
-        g_eax=0xFFFFFFFFu;
-        MAPMAKER_GUEST_RET();
-        return;
-    }
     original();
+    if(!piece || !(mode=mapmaker_roof_mode(piece)) || !mapmaker_roof_editor()) return;
+    g_eax&=~(ret==MAPMAKER_ROOF_RET_VIEW?mapmaker_roof_shown(mode):mapmaker_roof_clear(mode));
 }
 
 /* WRAP sub_002FC470 (vertical bits only: piece). */

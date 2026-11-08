@@ -61,16 +61,6 @@ MUTATIONS = {
     'items-not-skipped': ('for(at=r+length,k=0;k<items;k++) {', 'for(at=r+length,k=items;k<items;k++) {'),
     'item-size-fixed': ('bytes=((WORD_AT(at+0x14u)&0xFFu)*4u+0x1Bu)&~3u;', 'bytes=MAPMAKER_ROOF_ITEM_MIN;'),
     'item-count-wrong-word': ('items=WORD_AT(r+0x1Cu)>>16', 'items=WORD_AT(r+0x1Cu)&0xFFFFu'),
-    # A closed tile keeps its walls toward open-air tiles (.77).
-    'seal-off': ('        g_eax=0xFFFFFFFFu;\n        MAPMAKER_GUEST_RET();\n        return;\n    }\n    original();\n}', '    }\n    original();\n}'),
-    'seal-no-ret': ('        g_eax=0xFFFFFFFFu;\n        MAPMAKER_GUEST_RET();\n        return;', '        g_eax=0xFFFFFFFFu;\n        return;'),
-    'seal-any-caller': ('(ret=WORD_AT(g_esp))>MAPMAKER_ROOF_MASK_FROM &&\n       ret<MAPMAKER_ROOF_MASK_TO &&', '(ret=WORD_AT(g_esp))!=0 &&'),
-    'seal-vertical': ('>=1u && type<=4u &&', '>=1u && type<=6u &&'),
-    'seal-no-roof-neighbour': ('((mode=mapmaker_roof_mode(neighbour))==MAPMAKER_ROOF_OPEN_AIR || mode==MAPMAKER_ROOF_OPEN_BOUNDED)', '(mode=mapmaker_roof_mode(neighbour))!=0'),
-    'seal-unbounded-only': ('((mode=mapmaker_roof_mode(neighbour))==MAPMAKER_ROOF_OPEN_AIR || mode==MAPMAKER_ROOF_OPEN_BOUNDED)', '(mode=mapmaker_roof_mode(neighbour))==MAPMAKER_ROOF_OPEN_AIR'),
-    'seal-open-pieces': ('    if(piece && (!mode || mode==MAPMAKER_ROOF_OPEN_ROOF)) {', '    if(piece) {'),
-    'seal-without-limits': ('        mapmaker_roof.solid_only=mapmaker_limits.limits;', '        mapmaker_roof.solid_only=1;'),
-    'seal-sticks': ('    mapmaker_roof.solid_only=outer;\n', ''),
     # Open air (bounded): walls saved (collision), hidden from the editor view and the play draw.
     'bounded-saves-no-walls': ('mode==MAPMAKER_ROOF_OPEN_ROOF || mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_CEILING:0u',
                                'mode==MAPMAKER_ROOF_OPEN_ROOF?MAPMAKER_ROOF_CEILING:mode?MAPMAKER_ROOF_AIR:0u'),
@@ -395,7 +385,7 @@ def test_wrappers_documented():
     doc = (ROOT / 'docs/mapmaker/mapmaker-sky.md').read_text(encoding='utf-8')
     text = ROOF.read_text(encoding='utf-8')
     for target, name in (('002FC680', 'mask'), ('002FC470', 'reduced'), ('00307FD0', 'piece_new'),
-                         ('002F8780', 'link'), ('002FEBF0', 'reset'), ('003006C0', 'compile'), ('00301A90', 'load'),
+                         ('002FEBF0', 'reset'), ('003006C0', 'compile'), ('00301A90', 'load'),
                          ('002F95E0', 'move'), ('00308120', 'copy'),
                          ('00308480', 'piece_free'), ('00151030', 'format'),
                          ('0008A780', 'play'), ('00085710', 'rooms'),
@@ -430,23 +420,3 @@ def test_cull_none_flag_sites():
     tests = {i.address for i in insns if i.mnemonic == 'test' and any(op[0] == 'mem' and op[4] == 0x28 for op in i.ops)
              and ('imm', 0x40000) in i.ops}
     assert tests == {0x0008F815, 0x0008F8D4, 0x000A6045, 0x000D84E6}, sorted(map(hex, tests))
-
-
-def test_neighbour_link_sites():
-    """sub_002FC680 asks sub_002F8780(neighbour [editor+0x2F80], x, z, y,
-    type, length) per connection point; -1 (jl) sets the side's wall bit
-    (0x002FD17F -> 0x002FD1F3..0x002FD20D), >= 0 opens the side. All of its
-    neighbour tests lie inside the function, so the link hook can tell them
-    by return address."""
-    import re
-    from mapmaker_decoded import decoded
-    insns = decoded()
-    at = {i.address: i for i in insns}
-    sites = {i.address for i in insns if i.call and any(op == ('imm', 0x002F8780) for op in i.ops)}
-    inside = {a for a in sites if 0x002FC680 < a < 0x002FD92A}
-    assert inside and min(inside) == 0x002FC810 and max(inside) == 0x002FD74F, sorted(map(hex, inside))
-    assert {at[a].function for a in inside} == {0x002FC680}
-    assert at[0x002FD16D].text == 'ecx, dword ptr [eax + 0x2f80]'
-    assert 'jl' in at[0x002FD17F].mnemonic
-    assert int(re.search(r'0x([0-9a-f]+)', at[0x002FD17F].text).group(1), 16) == 0x002FD1F3
-    assert at[0x002FD20D].text == 'dword ptr [esp + 0x14], eax'
