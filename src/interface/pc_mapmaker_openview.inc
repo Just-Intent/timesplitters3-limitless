@@ -45,9 +45,10 @@
  * faces, so a closed tile seen across open air showed its floor and
  * ceiling (front faces from outside, at eye level between them) through
  * its culled walls; and a tile beside the area with no portal into it was
- * not drawn at all. Every touched room is marked two-sided
- * (mapmaker_roof_play.twosided), and pc_mapmaker_roof_draw draws its
- * geometry without back-face culling. Rooms beyond a
+ * not drawn at all. On a map with open air every room is marked two-sided
+ * (mapmaker_roof_play.twosided; until .75 only the touched rooms, which left
+ * a building across the field one-sided), and pc_mapmaker_roof_draw draws
+ * its geometry without back-face culling. Rooms beyond a
  * closed tile's doorway stay as the stock walk left them; open areas joined
  * by no portal (an island across a gap) are not reached. Closed tiles away
  * from open air, other scenes and story levels: stock. The room id width,
@@ -218,14 +219,15 @@ static void mapmaker_openview_build(uint32_t n)
     }
     mapmaker_openview.groups=g;mapmaker_openview.touched_total=at;
     mapmaker_openview.ready=g?1:-1;
-    /* every room drawn across open air is drawn two-sided (pc_mapmaker_roof_draw) */
+    /* On a map with open air every room is drawn two-sided
+     * (pc_mapmaker_roof_draw): any tile can be seen from outside across the
+     * open air, also one that touches no open room (a separate building
+     * across the field, .75 report: "walls and floor now not showing from
+     * outside"), and from inside the extra back faces stay behind the front
+     * faces. The touched sets still decide which rooms are widened. */
     memset(mapmaker_roof_play.twosided,0,sizeof mapmaker_roof_play.twosided);
     mapmaker_roof_play.twosided_rooms=0;
-    for(r=0;r<at;r++) {
-        uint32_t room=mapmaker_openview.touched[r];
-        if(room<1u || room>MAPMAKER_ROOF_ROOMS || mapmaker_roof_play.twosided[room-1u]) continue;
-        mapmaker_roof_play.twosided[room-1u]=1;mapmaker_roof_play.twosided_rooms++;
-    }
+    if(g) for(r=1;r<=n && r<=MAPMAKER_ROOF_ROOMS;r++) { mapmaker_roof_play.twosided[r-1u]=1;mapmaker_roof_play.twosided_rooms++; }
     mapmaker_openview.peak=mapmaker_openview.peak_logs=0;
     if(mapmaker_openview.build_logs<32u) {
         mapmaker_openview.build_logs++;

@@ -143,9 +143,9 @@ prop `+0x28` bit 0x40000 for the call on rooms `mapmaker_roof_play.twosided`
 (filled by openview), so the stock pass-0 cull-none path
 (`0x0008F805..0x0008F822`, restore `0x0008F8C4..0x0008F8E4`) draws their
 inward-facing walls from outside too; `test_cull_none_flag_sites`.
-Diagnostics after the .73 one-walled report (log only; `room_piece`,
-`seen_two`): per-room tile, mask, prop flags and node masks, closed rooms
-per area, rooms never drawn; open rooms touching by box join one area (mapmaker-sky.md).
+After .73 (`room_piece`, `seen_two`): logs of per-room tile, mask, prop
+flags, node masks, closed rooms per area, rooms never drawn; open rooms
+touching by box join one area; with open air all rooms 2-sided (mapmaker-sky.md).
 
 ### MapMaker level memory budget (opt-in)
 
