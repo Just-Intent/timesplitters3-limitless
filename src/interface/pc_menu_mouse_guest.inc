@@ -90,6 +90,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_pitboss.inc"
 #include "pc_mapmaker_tilesets.inc"
 #include "pc_mapmaker_restable.inc"
+#include "pc_mapmaker_logic.inc"       /* action Delay (area logic) */
 #include "pc_mapmaker_panel.inc"      /* debug panel reading (no hook; pc_developer_guest_frame) */
 /* MapMaker capacity area includes (end) */
 
@@ -1138,6 +1139,11 @@ void pc_custom_music_arcade_rows(void (*original)(void)) { original(); }
 void pc_custom_music_arcade_show(void (*original)(void)) { original(); }
 void pc_custom_music_arcade_store(void (*original)(void)) { original(); }
 void pc_custom_music_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_setup(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_fire(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_rows(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_done(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_actions(void (*original)(void)) { original(); }
 /* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}

@@ -93,7 +93,15 @@ above.
 ```powershell
 .venv\Scripts\python.exe tools\testing\map_report.py "Backups\Maps\Fort Island.tsmap"
 .venv\Scripts\python.exe tools\testing\map_report.py private\saves      # every map in a save folder
+.venv\Scripts\python.exe tools\testing\map_report.py --logic "Backups\Maps\Fort Island.tsmap"
 ```
+
+A map with logic gets a `logic:` line (operations, actions, how many have a
+[Delay](mapmaker-limitless.md#logic-delay-on-actions-limits)). `--logic` also
+prints every operation in plain words, for example `operation 3 "Wave 1":
+when Wave 1 start timer Reaches 0m 05 seconds -> Spawn New Enemy 1, ...`
+(triggers joined by "and"/"or", "NOT" in front of an inverted trigger, and
+"(after 5 s)" on a delayed action).
 
 It accepts a `.tsmap` export (from the launcher's Saves page), an
 `anicemap.mkr` save file, one map's save directory, or a whole save folder. It

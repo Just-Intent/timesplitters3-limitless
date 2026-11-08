@@ -10,7 +10,10 @@ The game's report also checks navigation (pads, links, separate areas and
 Story AI reachability); pads come from the tile templates inside the game,
 so this offline check cannot do that part.
 
-    python tools/testing/map_report.py <file-or-folder> [...]
+    python tools/testing/map_report.py [--logic] <file-or-folder> [...]
+
+--logic also prints every logic operation in plain words (triggers, actions
+and their Delay).
 
 Exit status: 0 no problems, 1 problems found, 2 a file could not be read.
 Never writes anything.
@@ -119,7 +122,7 @@ def s8(v):
 def scan(body, used, report):
     """Walk the chunks as the loaders do; collect what the report needs."""
     m = {'name': '', 'tileset': None, 'pieces': [], 'items': 0, 'category': [0] * len(CATEGORY_STOCK), 'ai': [],
-         'logic': [], 'open': [0, 0, 0, 0], 'header_pieces': None}
+         'logic': [], 'nodes': [], 'ops': [], 'open': [0, 0, 0, 0], 'header_pieces': None}
     offset, end = 8, used
     for _ in range(0x40000):
         if offset + 8 > end:
@@ -150,6 +153,10 @@ def scan(body, used, report):
                             'pads': [u16(chunk, 0x44 + 4 * k) for k in range(count)]})
         elif t == tag(0x6F) and size >= 0x8C:
             m['logic'].append(chunk)
+        elif t == tag(0x6D) and size >= 0xB4:
+            m['nodes'].append(chunk)
+        elif t == tag(0x6E) and size >= 0x220:
+            m['ops'].append(chunk)
         elif t in (tag(0x73), tag(0x74), tag(0x75)):
             limit = {tag(0x73): 0x4B00, tag(0x74): 2000, tag(0x75): 3000}[t]
             if size > limit:
@@ -192,6 +199,66 @@ def pieces(chunk, m, report):
                 m['category'][ITEM_CATEGORY[item]] += 1
             at += size
         r = at
+
+
+# Logic (docs/agent-context/limitless-logic.md): node 0x6D (0xB4: +0 kind 0 op /
+# 1 trigger / 2 action, +4 subject, +8 verb, +0x20 name, +0xA4 op of an op's own
+# node), op 0x6E (0x220: +4 kind, +0x50 triggers at +0x54 (4 B), +0x7C modes
+# (bit 0 NOT, the first trigger's bit 1 = any of), +0x88 actions at +0x8C,
+# +0x154 + 4k the action's Delay in tenths of a second, +0x21C objective).
+OP_SLOTS = 50
+
+
+def delay_text(tenths):
+    """As pc_mapmaker_logic.inc's logic_format: none, 0.5 s, 5 s, 1 min."""
+    if not tenths:
+        return 'none'
+    if tenths % 600 == 0:
+        return f'{tenths // 600} min'
+    if tenths % 10:
+        return f'{tenths // 10}.{tenths % 10} s'
+    return f'{tenths // 10} s'
+
+
+def node_name(node):
+    raw = node[0x20:0xA4].split(bytes(1), 1)[0]
+    return raw.decode('latin-1').strip() or f'(kind {u16(node, 0)} subject {u16(node, 4)} verb {u16(node, 8)})'
+
+
+def operations(m):
+    """[{index, name, kind, objective, any, triggers [(name, not)], actions [(name, tenths)]}]"""
+    nodes, out = m['nodes'], []
+    header = {}
+    for node in nodes:
+        if struct.unpack_from('<i', node, 0)[0] == 0:
+            header.setdefault(struct.unpack_from('<i', node, 0xA4)[0], node)
+
+    def named(index):
+        return node_name(nodes[index]) if 0 <= index < len(nodes) else f'(node {index + 1}, not in the map)'
+    for i, op in enumerate(m['ops']):
+        nt = min(max(struct.unpack_from('<i', op, 0x50)[0], 0), 10)
+        na = min(max(struct.unpack_from('<i', op, 0x88)[0], 0), OP_SLOTS)
+        modes = op[0x7C:0x7C + nt]
+        out.append({
+            'index': i, 'name': node_name(header[i]) if i in header else '',
+            'kind': op[4], 'objective': struct.unpack_from('<i', op, 0x21C)[0] == 1,
+            'any': bool(modes and modes[0] & 2),
+            'triggers': [(named(struct.unpack_from('<i', op, 0x54 + 4 * k)[0]), bool(modes[k] & 1)) for k in range(nt)],
+            'actions': [(named(struct.unpack_from('<i', op, 0x8C + 4 * k)[0]), u16(op, 0x154 + 4 * k)) for k in range(na)],
+        })
+    return out
+
+
+def logic_lines(m):
+    """The map's logic in plain words, one operation per line."""
+    lines = []
+    for op in operations(m):
+        what = ' (objective)' if op['objective'] else ' (award)' if op['kind'] == 1 else ''
+        when = (' or ' if op['any'] else ' and ').join(('NOT ' if neg else '') + name for name, neg in op['triggers'])
+        do = ', '.join(name + (f' (after {delay_text(d)})' if d else '') for name, d in op['actions'])
+        lines.append(f'operation {op["index"] + 1}{" " + chr(34) + op["name"] + chr(34) if op["name"] else ""}{what}: '
+                     f'when {when or "(no trigger)"} -> {do or "(no action)"}')
+    return lines
 
 
 def check(body, used, label='map'):
@@ -262,6 +329,12 @@ def check(body, used, label='map'):
     lines = [f'"{m["name"] or "unnamed"}" ({label}), {total} tiles, {m["items"]} items, {len(ai)} Story AI '
              f'({bosses} boss{"" if bosses == 1 else "es"}), {len(logic)} logic entries']
     lines.append('navigation: checked only in the game (pads come from the tile templates)')
+    ops = operations(m)
+    if ops:
+        acts = [d for op in ops for _, d in op['actions']]
+        delayed = [d for d in acts if d]
+        lines.append(f'logic: {len(ops)} operations, {len(acts)} actions, {len(delayed)} with a Delay'
+                     + (f' ({delay_text(min(delayed))}..{delay_text(max(delayed))}; Story maps only)' if delayed else ''))
     if any(m['open'][1:]):
         lines.append(f'open tiles: {m["open"][1]} no roof, {m["open"][2]} open air (unbounded: falling off the map kills), '
                      f'{m["open"][3]} open air (bounded)')
@@ -281,11 +354,15 @@ def check(body, used, label='map'):
     return lines, len(report.problems)
 
 
-def report_file(path):
+def read_map(path):
     data = Path(path).read_bytes()
     if data[:8] == b'TSFPMAP1':
         _, data = unpack_tsmap(data)
-    body, used = body_of(data)
+    return body_of(data)
+
+
+def report_file(path):
+    body, used = read_map(path)
     return check(body, used, Path(path).name)
 
 
@@ -303,6 +380,7 @@ def files(target):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('paths', nargs='+', help='.tsmap or anicemap.mkr file, a save directory or a save folder')
+    parser.add_argument('--logic', action='store_true', help='also print every logic operation in plain words')
     args = parser.parse_args(argv)
     status = 0
     for target in args.paths:
@@ -320,6 +398,10 @@ def main(argv=None):
             print(f'{path}:')
             for line in lines:
                 print('  map report: ' + line)
+            if args.logic:
+                body, used = read_map(path)
+                for line in logic_lines(scan(body, used, Report())) or ['no logic operations']:
+                    print('  logic: ' + line)
             if problems and status == 0:
                 status = 1
     return status
