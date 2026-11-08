@@ -446,19 +446,20 @@ int main(void)
     CALL(pc_mapmaker_pitboss_ragbug,fake_ragbug,0x0027DEE3u,WORD_AT(b3),0);
     CHECK(pit_lv.bug[1].owner==0 && pit_lv.bug[2].owner==0 && pit_lv.bug[2].slot==1 && near(bug_park,-12.73f+15.8f));
     WORD_AT(st1+0x4BCCu)=0x00454000u;HALF_AT(0x00454000u+0x94u)=0x249u;WORD_AT(0x00454000u+4u)=0x00455000u;   /* its collision hull */
+    WORD_AT(st1+0x4BD8u)=0x00456000u;WORD_AT(0x00456000u+4u)=0x00457000u;   /* its hostage rack */
     hold_intro=1;                                       /* still in its intro (state 1): the flock waits */
     CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
     CHECK(launches==0u && pit_lv.k[0].released);       /* every ragbug joined: noted, not launched */
-    CHECK(hides==1u && (BYTE_AT(0x00455000u+0x1F6u)&8u));   /* the hull hidden as the story's slot 4 does, once */
+    CHECK(hides==2u && (BYTE_AT(0x00455000u+0x1F6u)&8u) && (BYTE_AT(0x00457000u+0x1F6u)&8u));   /* the hull hidden as the story's slot 4 does, once */
     hold_intro=0;
     CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
     CHECK(WORD_AT(st1+0x4A30u)==WORD_AT(b2) && WORD_AT(st1+0x4A74u)==WORD_AT(b3) && WORD_AT(WORD_AT(b2)+0x28u)==0xFEu);
     /* the fight proper: no launch of ours (story timing: state 10 only), the hull stays hidden */
-    CHECK(launches==0u && WORD_AT(st1+0x4A54u)==0u && WORD_AT(st1+0x4270u)==0x00452000u && hides==1u && constants_stock());
+    CHECK(launches==0u && WORD_AT(st1+0x4A54u)==0u && WORD_AT(st1+0x4270u)==0x00452000u && hides==2u && constants_stock());
     CHECK(BYTE_AT(0x00452000u+0x30u)==2u && WORD_AT(0x00452000u+0x38u)==12u && WORD_AT(0x00452000u+0x3Cu)==13u && WORD_AT(0x00452000u+0x34u)==12u);
     /* the bottle at the mouth: 11 over the feet, 2.5 ahead (yaw 0: +z), whatever the fight wrote; the hull has its callback */
     CHECK(near(FLOAT_AT(0x00452000u+0x64u),4.0f) && near(FLOAT_AT(0x00452000u+0x68u),13.0f) && near(FLOAT_AT(0x00452000u+0x6Cu),-3.5f));
-    CHECK(WORD_AT(0x00454000u+0x19Cu)==0x0028C2F0u);
+    CHECK(WORD_AT(0x00454000u+0x19Cu)==0x0028B5F0u);   /* the hull: the ragbug's health reset, no damage */
     {   /* a NaN bone point and a turned boss: still a finite mouth, no NaN left */
         uint32_t o=0x00452000u;
         memset((void *)((uintptr_t)(o+0x64u)+g_xbox_mem_offset),0xFF,12u);FLOAT_AT(o+0xC0u)=FLOAT_AT(o+0x64u);
@@ -475,9 +476,26 @@ int main(void)
         FLOAT_AT(st1+0x4274u)=8.0f;
         CALL(pc_mapmaker_pitboss_bottle_damage,dmg,0x000BB63Au,0x00446000u,0);
         CHECK(FLOAT_AT(st1+0x4274u)==8.0f-2.6667f && orig_state==st1);
-        WORD_AT(0x00446000u)=0x00454000u;                /* a hit on the hull: a quarter */
-        CALL(pc_mapmaker_pitboss_bottle_damage,dmg,0x000BB63Au,0x00446000u,0);
-        CHECK(near(FLOAT_AT(st1+0x4274u),8.0f-2.6667f-2.6667f*0.25f) && orig_state==st1);
+    }
+    {   /* the boss drawn: bone 0x29's point (segment midpoint through its matrix) is where the bottle goes */
+        uint32_t def=0x00472000u,entry=def+(0x29u-0x20u)*0xC8u,seg=0x00473000u,m=0x00471000u+2u*0x40u,o=0x00452000u;
+        unsigned i;
+        WORD_AT(0x00470000u+4u)=def;WORD_AT(def)=0x20u;WORD_AT(entry+0xACu)=seg;BYTE_AT(entry+0x49u)=2u;
+        FLOAT_AT(seg)=0.f;FLOAT_AT(seg+4u)=10.f;FLOAT_AT(seg+8u)=0.f;FLOAT_AT(seg+0xCu)=0.f;FLOAT_AT(seg+0x10u)=12.f;FLOAT_AT(seg+0x14u)=0.f;
+        for(i=0;i<16u;i++) FLOAT_AT(m+i*4u)=(i%5u)?0.f:1.f;
+        FLOAT_AT(m+0x30u)=4.f;FLOAT_AT(m+0x34u)=2.f;FLOAT_AT(m+0x38u)=-5.f;
+        CALL(pc_mapmaker_pitboss_draw,fake_plain,0x000A28D9u,0x00470000u,0);
+        CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
+        CHECK(near(FLOAT_AT(o+0x64u),4.f) && near(FLOAT_AT(o+0x68u),13.f) && near(FLOAT_AT(o+0x6Cu),-5.f));
+        FLOAT_AT(m+0x34u)=-9.f;                          /* a pose at the feet (the stale case): not taken */
+        pit_lv.k[0].bone_at=0;
+        CALL(pc_mapmaker_pitboss_draw,fake_plain,0x000A28D9u,0x00470000u,0);
+        CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
+        CHECK(near(FLOAT_AT(o+0x68u),13.f) && near(FLOAT_AT(o+0x6Cu),-3.5f));   /* the estimate */
+        FLOAT_AT(m+0x34u)=2.f;WORD_AT(0x00475000u+4u)=def;WORD_AT(0x00475000u+0x10u)=0x00471000u;
+        CALL(pc_mapmaker_pitboss_draw,fake_plain,0x000A28D9u,0x00475000u,0);   /* another model, posed: nothing */
+        CHECK(!pit_lv.k[0].bone_at);
+        WORD_AT(0x00470000u+4u)=0x00470000u;           /* back as before */
     }
     {   /* a map whose own pads reach the pool's tail: the rim pads are not written over them */
         WORD_AT(0x007B6664u)=MAPMAKER_POOL_PADS-10u;WORD_AT(st1+0x4BF0u)=0xFFFFFFFFu;

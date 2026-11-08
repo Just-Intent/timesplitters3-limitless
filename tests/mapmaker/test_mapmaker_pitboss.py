@@ -72,8 +72,12 @@ MUTATIONS = {
     'mouth-not-held': ('        pit_mouth(k,ent,st);\n', ''),
     'mouth-no-ahead': ('    x=pit_getf(ent+PIT_ENT_POS)+PIT_MOUTH_AHEAD*pit_sin(yaw);', '    x=pit_getf(ent+PIT_ENT_POS);'),
     'mouth-nan-tilt-kept': ('    if(!pit_finite(pit_getf(b+0xC0u))) pit_setf(b+0xC0u,0.0f);\n', ''),
-    'hull-no-callback': ('WORD_AT(h+0x19Cu)!=PIT_BOTTLE_CB) WORD_AT(h+0x19Cu)=PIT_BOTTLE_CB;', '0) WORD_AT(h+0x19Cu)=PIT_BOTTLE_CB;'),
-    'hull-full-share': ('before-(before-after)*PIT_BODY_SHARE', 'after'),
+    'hull-hurts': ('#define PIT_HULL_CB 0x0028B5F0u', '#define PIT_HULL_CB 0x0028C2F0u'),
+    'rack-shown': ('    pit_hide(k,PIT_ST_RACK,', '    if(0) pit_hide(k,PIT_ST_RACK,'),
+    'draw-not-cached': ('    memcpy(pit_lv.k[k].bone,b,sizeof b);\n', ''),
+    'draw-any-height': ('    if(b[1]<pit_getf(pit_lv.k[k].ent+PIT_ENT_POS+4u)+PIT_BONE_MIN) return;\n', ''),
+    'draw-any-model': ('WORD_AT(pit_lv.k[k].ent+PIT_ENT_ANIM)==inst);k++) {}', '1);k++) {}'),
+    'bone-no-midpoint': ('(pit_getf(seg+0xCu+i*4u)-pit_getf(seg+i*4u))*0.5f;', '0.f;'),
     'rooms-not-given': ('        pit_props_rooms(k,ent);\n', ''),
     'rooms-no-room-id': ('        WORD_AT(o+0x34u)=WORD_AT(ent+0x38u);\n', ''),
     'restart-props-kept': ('            if(o) { guest_call(sub_000A9070,1,o);WORD_AT(pit_lv.k[k].state+f[i])=0u; }', '            (void)o;'),
@@ -132,7 +136,9 @@ def test_mapmaker_pitboss(tmp_path, mutation):
         assert 'released together' not in err
         assert 'pose computed' not in err
         assert 'pit skeleton 1: gas bottle held at the mouth (4.00, 13.00, -3.50)' in err
-        assert 'pit skeleton 1: gas bottle hit through the body (type 0x21' in err
+        assert 'pit skeleton 1: gas bottle at the head estimate (not drawn lately) (4.00, 13.00, -3.50), 11.00 over its feet' in err
+        assert 'pit skeleton 1: gas bottle at bone 0x29 of the last draw (4.00, 13.00, -5.00), 11.00 over its feet' in err
+        assert 'hostage rack 0x246 hidden' in err
         assert 'pit skeleton 1: gas bottle hit (type 0x21, kind 0x0, amount 1.00): health 8.00 -> 5.33' in err
         assert 'pit skeleton 1: ragbug 0 phase 0 at (3.00, 2.00, -5.00), boss state 1' in err
         assert 'pit skeleton 1 trace: state 1, boss (4.00, 2.00, -6.00) rooms 0, bottle 0x0, health 0.00, ragbug phases -1 -1 -1 -1 -1 -1' in err
@@ -146,7 +152,7 @@ def test_wiring():
     guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
     header = (ROOT / 'src/interface/pc_display_menu.h').read_text(encoding='utf-8')
     hooks = re.findall(r'^void (pc_mapmaker_pitboss_\w+)\(void \(\*original\)\(void\)\)', INC.read_text(encoding='utf-8'), re.M)
-    assert len(hooks) == 22
+    assert len(hooks) == 23
     for h in hooks:
         assert 'void %s(void (*original)(void));' % h in header, h
         assert 'void %s(void (*original)(void)) { original(); }' % h in guest, h
@@ -259,6 +265,14 @@ def test_fight_states_and_sites():
     # bug (0x0028B1D1); a bug explodes (6) when its health is 1.0, which its damage callback sets (sub_0028B5F0)
     assert 0x004760CC in [op[4] for op in a[0x0028B1D1].ops if op[0] == 'mem'] and 5 in imms(a[0x0028B236])
     assert 6 in imms(a[0x0028AF55]) and 0x00475C78 in [op[4] for op in a[0x0028AF31].ops if op[0] == 'mem']
+    # the bottle's bone point, as pit_bone_point copies it: bone 0x29 - the skeleton's first word, entries of
+    # 0xC8, segment [entry + 0xAC] at its midpoint (0.5), matrix [anim + 0x10] + int8 [entry + 0x49] * 0x40
+    assert 0x29 in imms(a[0x0029E47E]) and 0xC8 in imms(a[0x0029E485])
+    assert 0xAC in [op[4] for op in a[0x0029E48D].ops if op[0] == 'mem'] and 0x49 in [op[4] for op in a[0x0029E4EE].ops if op[0] == 'mem']
+    assert 0x00475CD4 in [op[4] for op in a[0x0029E476].ops if op[0] == 'mem'] and calls(a[0x0029E500], 0x00151E80)
+    assert 0x10 in [op[4] for op in a[0x0029E4F2].ops if op[0] == 'mem']
+    # the model draw's first argument is the instance ([esp + 0x14] after 4 pushes), the one the bone matrices hang off
+    assert a[0x0008F954].text.endswith('[esp + 0x14]') and a[0x0008F958].text.endswith('[edi]')
     # the boss's own spawn records: class 0x20000 and 0x200000 reach these handlers
     assert calls(a[0x0027DDD3], 0x0029FE00) and calls(a[0x0027DEDE], 0x0028B610)
     gen = [i for i in decoded() if i.function == 0x0029FE00]
