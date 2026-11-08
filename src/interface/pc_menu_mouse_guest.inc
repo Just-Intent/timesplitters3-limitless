@@ -89,6 +89,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_pitboss.inc"
 #include "pc_mapmaker_tilesets.inc"
 #include "pc_mapmaker_restable.inc"
+#include "pc_mapmaker_panel.inc"      /* debug panel reading (no hook; pc_developer_guest_frame) */
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in

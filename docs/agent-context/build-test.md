@@ -20,13 +20,7 @@ Mac storage tests: see launcher.md.
 [Kill feed](../development/arcade-kill-feed.md)
 # Build/tests ([MSAA](smaa.md))
 
-`test_controller_profile.py` now executes the real native key/pad guards and
-runtime key dispatcher, requiring neutral gameplay keys during freecam while
-raw camera keys remain held. Its shared sampler fixture tests blocked/resumed
-automatic and assigned pads for both host defines. Existing parser, ownership,
-disconnect and focus cases remain; its current shared settings action constants
-are included explicitly. The suite already runs in runtime-patches CI, alongside
-the Developer Tools flight/mouse fixture. Patch-order tail gains2630 after2620.
+MapMaker debug panel tests (runtime-patches CI): `tests/diagnostics/test_debug_panel.py` (model all hosts; Windows compiles `pc_debug.c` with stubs for the store/toggle log; mutations) and `tests/mapmaker/test_mapmaker_panel.py` (guest reading). Tail gains2640. Controller profile: [continuation](build-test-continuation.md#controller-profile-guards).
 
 `tests/input/test_developer_tools.py` already runs in runtime-patches CI. Its
 sidebar fixture now clicks drawn tab/dock centers at 1x/1.5x/2x drawable ratios,

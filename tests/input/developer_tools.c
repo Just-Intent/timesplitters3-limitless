@@ -64,6 +64,12 @@ void pc_debug_set(const PcDebugOptions *v) {debug=*v;}
 int pc_debug_config_save(const PcDebugOptions *v,char *error,size_t n) {(void)v;(void)error;(void)n;return 1;}
 void pc_debug_clear(void) {}
 void pc_debug_snapshot(PcDebugSnapshot *snapshot) {memset(snapshot,0,sizeof *snapshot);}
+static unsigned panel_lines_given;
+unsigned pc_debug_panel_text(char text[][PC_DEBUG_PANEL_LINE],unsigned max) {
+    unsigned n=panel_lines_given<max?panel_lines_given:max;
+    for(unsigned i=0;i<n;i++)snprintf(text[i],PC_DEBUG_PANEL_LINE,i?"Panel row %u":"MapMaker debug (Shift+F9)",i);
+    return n;
+}
 static float observed_audio_speed;
 static void audio_speed(float value) {observed_audio_speed=value;}
 static void frame(void) {test_time+=16;pc_developer_frame();}
@@ -92,6 +98,14 @@ int main(void) {
     pc_developer_toggle();assert(!pc_developer_open());frame();
     dev_key=0x72;assert(pc_developer_set_enabled(1));
     assert(!pc_developer_open() && pc_developer_lines(840,620,lines,PC_DEVELOPER_MAX_DRAW)==0);
+    /* MapMaker debug panel: box + one mono label per line while closed. */
+    panel_lines_given=3;
+    assert(pc_developer_lines(840,620,lines,PC_DEVELOPER_MAX_DRAW)==4 && lines[0].kind==PC_DEVELOPER_BOX);
+    assert(lines[1].kind==PC_DEVELOPER_LABEL && lines[1].font_face==PC_FONT_MONO && strstr(lines[1].text,"MapMaker debug"));
+    assert(lines[3].y>lines[2].y && lines[2].y>lines[1].y && lines[0].height>=3*lines[1].height);
+    assert(pc_developer_lines(840,620,lines,PC_DEVELOPER_MAX_DRAW)==4 && strstr(lines[3].text,"Panel row 2")); /* cached */
+    assert(pc_developer_lines(840,620,lines,2)==2);
+    panel_lines_given=0;assert(pc_developer_lines(840,620,lines,PC_DEVELOPER_MAX_DRAW)==0);
     char name[104];pc_developer_shortcut_name(name,sizeof name);assert(strstr(name,"Key 114"));
     key(0x70);assert(!pc_developer_open());key(0x72);assert(pc_developer_open());
     key(0x72);assert(!pc_developer_open());dev_key=0x70;

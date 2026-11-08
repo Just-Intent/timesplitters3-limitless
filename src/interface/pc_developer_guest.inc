@@ -4,6 +4,8 @@
 #include "pc_developer.h"
 extern void sub_000D2DE0(void),sub_001519E0(void),sub_00153270(void),sub_00152260(void);
 extern void sub_0006BB90(void),sub_0025EF80(void),sub_000653B0(void),sub_00067450(void);
+/* MapMaker debug panel reading (pc_mapmaker_panel.inc), 4 times a second. */
+void pc_mapmaker_panel_guest_tick(void);
 /* The bookmark stores inventory and the authored checkpoint INDEX, not a
  * captured position. Original 25EC30 resolves that index through 6BB90 on
  * respawn. Original 25F010/25F0C0 restore checkpoint-indexed scripts as well.
@@ -140,6 +142,7 @@ void pc_developer_draw_body(void)
 void pc_developer_guest_frame(void)
 {
     pc_developer_video_guest_tick();
+    pc_mapmaker_panel_guest_tick();
     pc_developer_lobby_guest();
     developer_refill_ammo();
     static unsigned handled;

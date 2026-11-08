@@ -582,9 +582,42 @@ void pc_developer_frame(void) {
     }
     InterlockedExchange(&shortcut_blocked,capture_action>=0||edit_number);memcpy(previous,keys,sizeof previous);
 }
+/* MapMaker debug panel (show_mapmaker_panel, Shift+F9): the shared lines of
+ * pc_debug_panel_text in mono text over a translucent box below the frame
+ * counter, while the sidebar is closed. The text changes at most four times
+ * a second, so text fitting and the canvas re-rasterize at most that often. */
+static unsigned developer_panel_lines(unsigned width,unsigned height,PcDeveloperLine *out,unsigned capacity) {
+    static char shown[PC_DEBUG_PANEL_LINES][PC_DEBUG_PANEL_LINE];
+    static PcDeveloperLine laid[PC_DEBUG_PANEL_LINES+1];
+    static unsigned shown_count,shown_width,shown_height;
+    char text[PC_DEBUG_PANEL_LINES][PC_DEBUG_PANEL_LINE];
+    unsigned count=pc_debug_panel_text(text,PC_DEBUG_PANEL_LINES),i;
+    if(!count||capacity<2)return 0;
+    if(count>capacity-1)count=capacity-1;
+    if(count!=shown_count||width!=shown_width||height!=shown_height||memcmp(text,shown,count*sizeof text[0])) {
+        float scale=fminf(2.f,fmaxf(.75f,(float)height/720.f));
+        float px=13.f*scale,row=18.f*scale,pad=8.f*scale,x=10.f*scale,y=44.f*scale;
+        float w=fminf((float)width-2.f*x,820.f*scale);
+        memset(laid,0,sizeof laid);
+        laid[0].kind=PC_DEVELOPER_BOX;laid[0].x=x;laid[0].y=y;laid[0].width=w;
+        laid[0].height=count*row+2.f*pad;laid[0].color=0x101418d0u;laid[0].radius=6.f*scale;
+        for(i=0;i<count;i++) {
+            PcDeveloperLine *l=&laid[1+i];
+            l->kind=PC_DEVELOPER_LABEL;l->x=x+pad;l->y=y+pad+i*row;l->width=w-2.f*pad;l->height=row;
+            l->color=i?UI_TEXT:UI_ACCENT;l->font_px=px;l->font_weight=i?400:600;l->font_face=PC_FONT_MONO;
+            pc_developer_font_fit_spaced(text[i],px,l->font_weight,PC_FONT_MONO,0,l->width,l->text,sizeof l->text);
+        }
+        memcpy(shown,text,count*sizeof text[0]);
+        shown_count=count;shown_width=width;shown_height=height;
+    }
+    memcpy(out,laid,(count+1)*sizeof *out);
+    return count+1;
+}
 unsigned pc_developer_lines(unsigned width,unsigned height,PcDeveloperLine *out,unsigned capacity) {
     if(!out||!capacity||width<100||height<100)return 0;
     if(!pc_developer_open()) {
+        unsigned panel=developer_panel_lines(width,height,out,capacity);
+        if(panel)return panel;
         /* Preserve the dormant named disclaimer without putting it back in the
          * lobby. Player availability is rendered by the native wrench path. */
         if(!lobby_disclaimer_enabled)return 0;

@@ -164,3 +164,27 @@ Physics: [checks](build-test-details.md#guest-physical-state-regression).
 GPU asserts stay on; AO logs scene/pixel failures.
 
 Local-player tests: controls-options.md.
+
+### FFmpeg pin (2026-10-31)
+
+`tools/build/fetch-video.ps1` downloads the BtbN month-end build
+`autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-shared-8.1.zip`
+(SHA-256 `3e47bda1…6811a`, also recorded by `tools/release/package-release.py`). The
+previous pin named BtbN's daily-rebuilt `latest` asset; month-end builds are retained. Without
+`third_party/ffmpeg/include` the runtime builds without `XMV_HAVE_FFMPEG`
+(no XMV movie playback), so fetch FFmpeg before a release build.
+
+A `--local-preview` package of a compile-only (unsealed) build gets its
+`Support/Online/network-build.json` stamp written into the staged copy only
+(`local_preview: true`); `build/windows/generated` stays unsealed and
+BUILD.json keeps `network_sealed: false`.
+
+## Controller profile guards
+
+`test_controller_profile.py` now executes the real native key/pad guards and
+runtime key dispatcher, requiring neutral gameplay keys during freecam while
+raw camera keys remain held. Its shared sampler fixture tests blocked/resumed
+automatic and assigned pads for both host defines. Existing parser, ownership,
+disconnect and focus cases remain; its current shared settings action constants
+are included explicitly. The suite already runs in runtime-patches CI, alongside
+the Developer Tools flight/mouse fixture. Patch-order tail gains2630 after2620.

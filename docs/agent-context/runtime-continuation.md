@@ -46,6 +46,10 @@ Ordinal81 repair/test: [next-packet ABI](kernel-objects.md#guest-next-packet-abi
 
 Request allocation/ownership through0218: [contracts](kernel-objects.md#original-request-storage-and-initialization).
 
+0360 streaming patch: Keep this patch LF on disk before refreshing its index. A CRLF working copy
+produced a different hash/target spelling from the normalized Git blob; the
+Linux CI context check exposed it. Runtime behavior was unaffected.
+
 ## Profile early-access hooks
 
 See [Unlock Content](unlock-content.md) for the shared menu, profile extension,

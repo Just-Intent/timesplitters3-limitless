@@ -440,6 +440,37 @@ These are on without any switch:
 
 Planned, not yet merged: mouse-wheel zoom for weapon scopes.
 
+## Debug panel (Shift+F9)
+
+A text panel in the top-left corner, below the frame counter, with live
+numbers for testing big maps. Press **Shift+F9** during play to show or hide
+it (plain F9 still toggles the frame counter), or tick
+**Show MapMaker debug panel** in the Debug settings (F12, or Developer Tools →
+Settings → Debug) to have it on at start. It is off by default and hidden while the Developer Tools
+sidebar is open. The numbers refresh four times a second:
+
+- **Frame:** the average frame time and rate, split into *work* (game and draw
+  submission), *present* (the host showing the frame), *swap* (the game's own
+  Swap call) and *wait* (time spent waiting for the next 60 Hz tick). Little
+  or no wait means the frame is too slow.
+- **Draws:** draw calls per frame by kind (UP, indexed UP, vertex buffer,
+  indexed vertex buffer) and texture binds per frame.
+- **Scene line:** the scene number (100 = MapMaker play), live characters of
+  64 (players included), AI slots of 63 (30 outside local MapMaker Story) and
+  engine objects in use of the pool.
+- **Pads, cover, links, groups** loaded for the map, of the Limitless pools.
+- **Rooms** of the map build (of 1023), rooms visible from the current view,
+  the camera's room and room-tree queries per second.
+- **Level heap free**, the AI navigation block in use and its size, fallbacks
+  to the Level heap and allocations made while the heap was overrun.
+- **Player** position.
+
+Each Shift+F9 press also writes the panel to the log as one line starting
+`[PC-DEBUG] MapMaker panel:` (at most once a second), so a playtest log shows
+what was on screen. "--" means a number is not available yet (no frame drawn,
+not in a map). The legacy OpenGL renderer on older Macs shows the panel
+without the frame split and draw counts.
+
 ## Bug fixes (always on)
 
 - System Link: malformed map fragments and turret or death-effect messages that

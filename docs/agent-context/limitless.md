@@ -147,6 +147,19 @@ inward-facing walls from outside too; `test_cull_none_flag_sites`.
 form one area; open air: all rooms 2-sided; closed-wall link (.79)
 reverted (mapmaker-sky.md).
 
+### MapMaker debug panel (Shift+F9)
+
+Option `show_mapmaker_panel` (`pc_debug_options.def`, default off).
+`src/interface/pc_mapmaker_panel.inc` (last include, no WRAP) reads fixed
+counters every 250 ms from `pc_developer_guest_frame`: characters
+`[0x0074C37C]`, AI `[0x007A2958]`, objects `[0x007B4FAC]-[0x007B65B8]` of
+`[0x0072F5E4]`, pads/cover/links/groups `0x007B6664/65C0/6660/666C`, rooms
+`[0x007B975C]` + visible rectangles (scene 100), camera room
+`view+0x2A0`, player entity `+0x64`, Level free `[0x006B8384]`, nav block,
+overruns, room queries; read-only. Store, render reading,
+keys: [systems](systems.md#mapmaker-debug-panel). Tests:
+`test_mapmaker_panel.py`, `tests/diagnostics/test_debug_panel.py`.
+
 ### MapMaker level memory budget (opt-in)
 
 `TSFP_MAPMAKER_MEMORY_SCALE=N` (2..8; anything else = off; 8 when
@@ -913,19 +926,7 @@ artwork/test run, and records BUILD.json `preview` (validated false) plus a
 README warning. It is never a published release. Tests:
 `tests/launcher/package_launcher.py`, `tests/launcher/test_make_local_release.py`.
 
-### FFmpeg pin (2026-10-31)
-
-`tools/build/fetch-video.ps1` downloads the BtbN month-end build
-`autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-shared-8.1.zip`
-(SHA-256 `3e47bda1…6811a`, also recorded by `tools/release/package-release.py`). The
-previous pin named BtbN's daily-rebuilt `latest` asset; month-end builds are retained. Without
-`third_party/ffmpeg/include` the runtime builds without `XMV_HAVE_FFMPEG`
-(no XMV movie playback), so fetch FFmpeg before a release build.
-
-A `--local-preview` package of a compile-only (unsealed) build gets its
-`Support/Online/network-build.json` stamp written into the staged copy only
-(`local_preview: true`); `build/windows/generated` stays unsealed and
-BUILD.json keeps `network_sealed: false`.
+FFmpeg pin, preview stamp: [continuation](build-test-continuation.md#ffmpeg-pin-2026-10-31).
 
 Launcher MapMaker switches (2026-10-31): `tests/launcher/launcher_settings.cs` (run by
 `tools/build/build-launcher.ps1 -Test --settings`) and the Mac `NativeTests.cs` cover the

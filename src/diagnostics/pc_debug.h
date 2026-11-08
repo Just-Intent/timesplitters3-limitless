@@ -6,6 +6,7 @@
 typedef void *HWND;
 #endif
 #include <stddef.h>
+#include "pc_debug_panel.h"
 
 #define PC_DEBUG_COMMAND 0x7e21
 #define PC_DEBUG_TIMER 0x7e30
@@ -84,6 +85,16 @@ void pc_debug_latency(int mode, double milliseconds, unsigned peers);
 const char *pc_debug_watermark(void);
 int pc_debug_overlay(char *text, size_t bytes, const char *cap);
 void pc_debug_snapshot(PcDebugSnapshot *snapshot);
+/* MapMaker debug panel (show_mapmaker_panel; pc_debug_panel.h). Render
+ * thread: one reading per presented frame. Game thread: due() then publish()
+ * of a value-only reading. Presentation thread: the cached panel lines (0
+ * while the option is off), refreshed at most every 250 ms. The toggle
+ * (Shift+F9) also writes one rate-limited snapshot line to stderr. */
+void pc_debug_render(const PcDebugRender *render);
+int pc_debug_mapmaker_due(void);
+void pc_debug_mapmaker_publish(const PcDebugMapmaker *reading);
+unsigned pc_debug_panel_text(char lines[][PC_DEBUG_PANEL_LINE], unsigned max);
+void pc_debug_toggle_mapmaker(void);
 /* Log polling and clearing run on the window thread, never the render thread. */
 void pc_debug_poll(void);
 void pc_debug_clear(void);

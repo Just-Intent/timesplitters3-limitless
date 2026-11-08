@@ -860,6 +860,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-136 | Launcher MapMaker settings tab | Awaiting validation |
 | MAC-137 | MapMaker map export/import (.tsmap) | Awaiting validation |
 | MAC-138 | Imported music (MapMaker and Arcade) | Awaiting validation |
+| MAC-139 | MapMaker debug panel (Shift+F9) | Awaiting validation |
 
 ### MAC-126 - Launcher Discord community button
 
@@ -10345,4 +10346,31 @@ and Windows/Linux host acceptance remain unverified.
   NativeTests (music cases); import/remove from the Mac launcher; play a map
   and an Arcade level with an imported track; `tests/input/test_menu_mouse.py`
   and the `-fsyntax-only` menu compile; Music past 16 in the pause menu.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-139 — MapMaker debug panel (Shift+F9)
+
+- **Status:** Awaiting validation
+- **PC behavior:** Off by default. The Debug option "Show MapMaker debug panel"
+  or Shift+F9 during play shows a text panel (frame split, draws and texture
+  binds per frame, characters/AI/engine objects, pads/cover/links/groups,
+  rooms, Level heap and nav block, player position) refreshed four times a
+  second; each Shift+F9 also logs one `[PC-DEBUG] MapMaker panel:` line.
+- **PC source:** Branch `debug-overlay` (uncommitted to main); shared
+  `src/diagnostics/pc_debug_panel.h`, `pc_debug.c`, `pc_debug_options.def`,
+  `src/interface/pc_mapmaker_panel.inc`, `pc_developer_sidebar.inc`,
+  `pc_developer_guest.inc`; Windows key in
+  `patches/diagnostics/2640-mapmaker-debug-panel.patch`.
+- **PC validation:** Fixture tests only (`tests/diagnostics/test_debug_panel.py`,
+  `tests/mapmaker/test_mapmaker_panel.py`, `tests/input/test_developer_tools.py`);
+  not built or played.
+- **Existing Mac support:** Shared code. The SDL adapter (`src/native/input_sdl.c`)
+  maps Shift+F9 and its self-test covers it; the panel uses the shared sidebar
+  canvas drawn by both the RHI and legacy GL adapters; the option appears in
+  the Cocoa Debug dialog through the shared definition list.
+- **Mac adaptation needed:** None expected. Legacy GL has no HLE renderer
+  reading, so the frame split and draw counts show "--" there.
+- **Mac acceptance checks:** Native build; `--test` SDL input self-test;
+  `tests/diagnostics/test_debug_panel.py` model case on macOS; Shift+F9 in a
+  MapMaker map shows the panel and logs the line; option persists in the Cocoa dialog.
 - **Mac implementation and evidence:** Pending; no Apple Silicon host available.
