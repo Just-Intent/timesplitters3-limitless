@@ -74,8 +74,12 @@ MUTATIONS = {
     'mouth-nan-tilt-kept': ('    if(!pit_finite(pit_getf(b+0xC0u))) pit_setf(b+0xC0u,0.0f);\n', ''),
     'hull-hurts': ('#define PIT_HULL_CB 0x0028B5F0u', '#define PIT_HULL_CB 0x0028C2F0u'),
     'rack-shown': ('    pit_hide(k,PIT_ST_RACK,', '    if(0) pit_hide(k,PIT_ST_RACK,'),
+    'draw-any-place': ('    if(!pit_near_head(pit_lv.k[k].ent,b,PIT_BONE_MIN)) return;', '    if(0) return;'),
+    'eye-ignored': ('    if(k->eye_ok) { x=k->eye[0];y=k->eye[1];z=k->eye[2]; }\n    else if(', '    if('),
+    'eye-anywhere': ('            if(pit_near_head(ent,eye,PIT_EYE_MIN)) {', '            if(1) {'),
+    'sound-any-id': ('(id!=PIT_SND_FIRE && id!=PIT_SND_ROAR) || ', ''),
+    'sound-any-scene': ('(id!=PIT_SND_FIRE && id!=PIT_SND_ROAR) || WORD_AT(PIT_SCENE)!=100u || ', '(id!=PIT_SND_FIRE && id!=PIT_SND_ROAR) || '),
     'draw-not-cached': ('    memcpy(pit_lv.k[k].bone,b,sizeof b);\n', ''),
-    'draw-any-height': ('    if(b[1]<pit_getf(pit_lv.k[k].ent+PIT_ENT_POS+4u)+PIT_BONE_MIN) return;\n', ''),
     'draw-any-model': ('WORD_AT(pit_lv.k[k].ent+PIT_ENT_ANIM)==inst);k++) {}', '1);k++) {}'),
     'bone-no-midpoint': ('(pit_getf(seg+0xCu+i*4u)-pit_getf(seg+i*4u))*0.5f;', '0.f;'),
     'rooms-not-given': ('        pit_props_rooms(k,ent);\n', ''),
@@ -138,10 +142,12 @@ def test_mapmaker_pitboss(tmp_path, mutation):
         assert 'pit skeleton 1: gas bottle held at the mouth (4.00, 13.00, -3.50)' in err
         assert 'pit skeleton 1: gas bottle at the head estimate (not drawn lately) (4.00, 13.00, -3.50), 11.00 over its feet' in err
         assert 'pit skeleton 1: gas bottle at bone 0x29 of the last draw (4.00, 13.00, -5.00), 11.00 over its feet' in err
-        assert 'hostage rack 0x246 hidden' in err
+        assert 'pit skeleton 1: gas bottle at the eye bandage, 1.8 lower (4.30, 12.20, -3.70), 10.20 over its feet' in err
+        assert 'pit skeleton 1 drawn: bone 0x29 through its post-draw matrix (4.00, 13.00, -5.00), boss at (4.00, 2.00, -6.00)' in err
+        assert "the pit skeleton's level-17 sound is loaded in this map (sound, load) (0x56C, 0x4)" in err
         assert 'pit skeleton 1: gas bottle hit (type 0x21, kind 0x0, amount 1.00): health 8.00 -> 5.33' in err
         assert 'pit skeleton 1: ragbug 0 phase 0 at (3.00, 2.00, -5.00), boss state 1' in err
-        assert 'pit skeleton 1 trace: state 1, boss (4.00, 2.00, -6.00) rooms 0, bottle 0x0, health 0.00, ragbug phases -1 -1 -1 -1 -1 -1' in err
+        assert 'pit skeleton 1 trace: state 1, boss (4.00, 2.00, -6.00) rooms 0, bottle 0x0, health 0.00, draws boss 0 bottle 0 bandage 0, ragbug phases -1 -1 -1 -1 -1 -1' in err
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
 
@@ -152,7 +158,7 @@ def test_wiring():
     guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
     header = (ROOT / 'src/interface/pc_display_menu.h').read_text(encoding='utf-8')
     hooks = re.findall(r'^void (pc_mapmaker_pitboss_\w+)\(void \(\*original\)\(void\)\)', INC.read_text(encoding='utf-8'), re.M)
-    assert len(hooks) == 23
+    assert len(hooks) == 24
     for h in hooks:
         assert 'void %s(void (*original)(void));' % h in header, h
         assert 'void %s(void (*original)(void)) { original(); }' % h in guest, h

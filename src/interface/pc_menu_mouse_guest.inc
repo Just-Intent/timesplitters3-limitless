@@ -1031,6 +1031,7 @@ void pc_mapmaker_pitboss_bottle_damage(void (*original)(void)) { original(); }
 void pc_mapmaker_pitboss_fire_type(void (*original)(void)) { original(); }
 void pc_mapmaker_pitboss_smoke_type(void (*original)(void)) { original(); }
 void pc_mapmaker_pitboss_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_sound_load(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_rows(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_close(void (*original)(void)) { original(); }
 void pc_mapmaker_bosses_delete(void (*original)(void)) { original(); }

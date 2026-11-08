@@ -158,6 +158,7 @@ void sub_0028C560(void) { seen_msg_state=WORD_AT(0x0078B1ECu);g_eax=0xFFFFFFFFu;
 static unsigned originals;
 static uint32_t orig_state;
 static void fake_plain(void) { originals++;orig_state=WORD_AT(0x0078B1ECu);g_esp+=4u; }
+static void fake_zero(void) { originals++;g_eax=0;g_esp+=4u; }
 static void fake_damage(void) { uint32_t st=WORD_AT(0x0078B1ECu);originals++;orig_state=st;FLOAT_AT(st+0x4274u)-=2.6667f;g_esp+=4u; }
 static float bug_park;
 static void fake_ragbug(void) { originals++;bug_park=FLOAT_AT(0x0049F390u);g_esp+=4u; }
@@ -495,7 +496,26 @@ int main(void)
         FLOAT_AT(m+0x34u)=2.f;WORD_AT(0x00475000u+4u)=def;WORD_AT(0x00475000u+0x10u)=0x00471000u;
         CALL(pc_mapmaker_pitboss_draw,fake_plain,0x000A28D9u,0x00475000u,0);   /* another model, posed: nothing */
         CHECK(!pit_lv.k[0].bone_at);
+        /* the eye bandage at the head: the mouth 1.8 under it, ahead of the drawn bone and the estimate */
+        WORD_AT(st1+0x4BDCu)=0x00458000u;FLOAT_AT(0x00458000u+0x64u)=4.3f;FLOAT_AT(0x00458000u+0x68u)=14.0f;FLOAT_AT(0x00458000u+0x6Cu)=-3.7f;
+        CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
+        CHECK(near(FLOAT_AT(o+0x64u),4.3f) && near(FLOAT_AT(o+0x68u),12.2f) && near(FLOAT_AT(o+0x6Cu),-3.7f));
+        FLOAT_AT(0x00458000u+0x68u)=2.5f;                /* back at the feet (not posed): the last good eye point stays */
+        CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
+        CHECK(near(FLOAT_AT(o+0x68u),12.2f));
+        FLOAT_AT(0x00458000u+0x64u)=40.f;FLOAT_AT(0x00458000u+0x68u)=20.f;pit_lv.k[0].eye_ok=0;   /* far off: not the head */
+        CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
+        CHECK(!pit_lv.k[0].eye_ok);
+        WORD_AT(st1+0x4BDCu)=0;
         WORD_AT(0x00470000u+4u)=0x00470000u;           /* back as before */
+    }
+    {   /* the level-17 roar and fire attack load in this map; other sounds stay stock */
+        CHECK(CALL(pc_mapmaker_pitboss_sound_load,fake_zero,0x0002787Fu,0x56Cu,0)==4u);
+        CHECK(CALL(pc_mapmaker_pitboss_sound_load,fake_zero,0x0002787Fu,0x56Du,0)==4u);
+        CHECK(CALL(pc_mapmaker_pitboss_sound_load,fake_zero,0x0002787Fu,0x56Eu,0)==0u);
+        WORD_AT(0x0079094Cu)=17u;
+        CHECK(CALL(pc_mapmaker_pitboss_sound_load,fake_zero,0x0002787Fu,0x56Cu,0)==0u);   /* stock mission 6 loads it itself */
+        WORD_AT(0x0079094Cu)=100u;
     }
     {   /* a map whose own pads reach the pool's tail: the rim pads are not written over them */
         WORD_AT(0x007B6664u)=MAPMAKER_POOL_PADS-10u;WORD_AT(st1+0x4BF0u)=0xFFFFFFFFu;
