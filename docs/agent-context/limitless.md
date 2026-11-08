@@ -237,8 +237,7 @@ stock builds refuse it. Decoder checks:
 `tests/mapmaker/test_mapmaker_limits_classified.py`; fixtures
 `tests/mapmaker/test_mapmaker_memory.py`.
 
-risks in `docs/mapmaker/mapmaker-actors.md`).
-Editor capacity follows `TSFP_MAPMAKER_LIMITS=1`. `sky` (no table; not yet
+`sky` (no table; not yet
 wired) adds a per-map cloud layer with `TSFP_MAPMAKER_LIMITS=1`: a "Clouds"
 checkbox after the stock sky row of Map Settings (the 11-sky choice itself is
 stock, editor `+0x220` -> info `+0x10`), stored as info flag 0x40000, applied
@@ -506,7 +505,8 @@ bounds (`sub_00352DF0`), the `sub_0006D0B0` return-address overwrite
 (`sub_003596F0`), network death-effect bounds (`sub_00357D70`), the arcade
 mode 1 bot goal read (`sub_002B0320`), and a bounds-only map validator: the
 editor loader refuses a bad map the stock way, and level setup
-(`sub_0006D7A0`) hides bad chunks for that call. With
+(`sub_0006D7A0`) hides bad chunks for that call, then logs the
+[map report](limitless-report.md) (`pc_mapmaker_report.inc`). With
 `TSFP_MAPMAKER_LIMITS=1` in scene 100 story mode the HUD turret icons scan
 the whole gun pool (`sub_00349E40`/`sub_00349970`). Tests:
 `tests/mapmaker/test_mapmaker_bugfix.py`, `tests/mapmaker/test_mapmaker_validate.py`.

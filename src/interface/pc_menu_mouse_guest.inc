@@ -54,6 +54,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_pads.inc"
 #include "pc_mapmaker_container.inc"
 #include "pc_mapmaker_objects.inc"
+#include "pc_mapmaker_report.inc"    /* map report at level start, called by the validator */
 #include "pc_mapmaker_validate.inc"
 #include "pc_mapmaker_editor.inc"
 #include "pc_mapmaker_rooms.inc"
