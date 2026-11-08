@@ -57,7 +57,7 @@ def test_sizer_allocations_match_the_wrapper():
     text = OBJECTS.read_text(encoding='utf-8')
     for size in ('0x2E80u', '0xBAu', '0x6D60u', '(n+0x60u)<<9', '(n+0x60u)<<5', '(n+0x60u)*2u'):
         assert size in text, size
-    assert text.count('guest_call(sub_0003E0B0,3,0x40u,') == 6
+    assert text.count('mapmaker_objects_take(') >= 6 and text.count(',0x40u);') >= 6   # 64-aligned bodies via mapmaker_objects_take (nav block or Level heap, .61)
     callers = [i.address for i in insns if i.call and ('imm', SIZER) in i.ops]
     assert callers == [0x001CDC0C]                        # level init, after the object pools
 
