@@ -16,7 +16,7 @@ INC = ROOT / 'src/interface/pc_mapmaker_openview.inc'
 ROOF = ROOT / 'src/interface/pc_mapmaker_roof.inc'
 
 M = '[mapmaker] openview: '
-R = '[mapmaker] roof: bounded piece 1: rooms 3..3 (mask 0x01000000)'
+R = '[mapmaker] roof: bounded piece 1: rooms 3..3 (mask 0x01000000, tile 0 at 0,0 floor 0 rotation 0)'
 EXPECTED = '\n'.join([
     R,
     'phase roof',
@@ -137,9 +137,15 @@ def test_mapmaker_openview(tmp_path, mutation):
     result = subprocess.run([str(exe)], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, timeout=60)
     output = result.stdout.replace('\r\n', '\n')
+    # the per-room diagnostic lines (closed rooms beside an area) are checked apart
+    closed = [line for line in output.split('\n') if line.startswith(M + 'area ')]
+    output = '\n'.join(line for line in output.split('\n') if not line.startswith(M + 'area '))
     if mutation == 'fixed':
         assert result.returncode == 0, output
         assert output == EXPECTED, output
+        assert M + ('area 1: closed room 9 (tile 0 at 0,0 floor 0 rotation 0, mask 0x01000000) beside open room 1 '
+                    '(tile 0 at 0,0 floor 0 rotation 0) by a portal') in closed, closed
+        assert any(line.endswith('by its box') for line in closed), closed
     else:
         assert result.returncode != 0 or output != EXPECTED, f'{mutation} was not detected'
 

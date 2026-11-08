@@ -74,6 +74,7 @@
 #define OPENVIEW_BOX 0x10u               /* room record: min xyz +0x10, max xyz +0x1C (sub_000873F0) */
 #define OPENVIEW_TOUCH 0.5f              /* boxes this close count as touching (tiles share faces) */
 #define OPENVIEW_FAR 100000.0f           /* larger coordinates: not a usable box */
+#define OPENVIEW_UNSEEN_VIEWS 600u       /* views after a build before the never-drawn rooms are logged */
 #define OPENVIEW_H(a) (*(int16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define OPENVIEW_F(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
@@ -87,7 +88,7 @@ static struct {
     uint16_t stamp[MAPMAKER_ROOF_ROOMS];         /* group mark + 1 per room */
     float box[MAPMAKER_ROOF_ROOMS][6];           /* room r-1: min xyz, max xyz (this build) */
     uint8_t has_box[MAPMAKER_ROOF_ROOMS];
-    unsigned build_logs, peak_logs, peak;
+    unsigned build_logs, peak_logs, peak, closed_logs, unseen_logged;
     unsigned long long frames, widened, added, overflow;
 } mapmaker_openview;
 
@@ -130,6 +131,23 @@ static int mapmaker_openview_touch(const float *a,const float *b)
            b[1]-OPENVIEW_TOUCH<=a[4] && a[2]-OPENVIEW_TOUCH<=b[5] && b[2]-OPENVIEW_TOUCH<=a[5];
 }
 
+/* The room's mask from its piece record (log only). */
+static uint32_t mapmaker_openview_room_mask(uint32_t room)
+{
+    unsigned k=room-1u<MAPMAKER_ROOF_ROOMS?mapmaker_roof_play.room_piece[room-1u]:0u;
+    return k && k-1u<mapmaker_roof_play.pieces?mapmaker_roof_play.mask[k-1u]:0u;
+}
+/* One line per closed room drawn across open air (first 96 per build). */
+static void mapmaker_openview_closed_log(uint32_t room,unsigned area,uint32_t open,const char *how)
+{
+    char beside[64];
+    if(mapmaker_openview.closed_logs>=96u || mapmaker_openview.build_logs>=32u) return;
+    mapmaker_openview.closed_logs++;
+    snprintf(beside,sizeof beside,"%s",mapmaker_roof_room_text(open));
+    fprintf(stderr,"[mapmaker] openview: area %u: closed room %u (%s, mask 0x%08X) beside open room %u (%s) by %s\n",area+1u,
+            (unsigned)room,mapmaker_roof_room_text(room),mapmaker_openview_room_mask(room),(unsigned)open,beside,how);
+}
+
 static void mapmaker_openview_build(uint32_t n)
 {
     static uint32_t queue[MAPMAKER_ROOF_ROOMS];
@@ -137,6 +155,7 @@ static void mapmaker_openview_build(uint32_t n)
     unsigned at=0,g=0,r,portals=0;
     memset(mapmaker_openview.stamp,0,sizeof mapmaker_openview.stamp);   /* 0: no group yet */
     mapmaker_openview.groups=mapmaker_openview.touched_total=mapmaker_openview.open=mapmaker_openview.beside=0;
+    mapmaker_openview.closed_logs=mapmaker_openview.unseen_logged=0;
     for(r=1;r<=n;r++) mapmaker_openview.has_box[r-1u]=(uint8_t)mapmaker_openview_box(r,mapmaker_openview.box[r-1u]);
     for(r=1;r<=n;r++) {
         unsigned head=0,tail=0,i,k,first=at,mark,o;
@@ -165,6 +184,7 @@ static void mapmaker_openview_build(uint32_t n)
                 if(mapmaker_roof_play.open[o-1u] || mapmaker_openview.stamp[o-1u]==mark) continue;
                 if(at>=OPENVIEW_TOUCHED) { mapmaker_openview.overflow++;break; }
                 mapmaker_openview.stamp[o-1u]=(uint16_t)mark;mapmaker_openview.touched[at++]=(uint16_t)o;
+                mapmaker_openview_closed_log(o,g,queue[i],"a portal");
             }
         }
         /* closed rooms whose box touches a member's box, portal or not */
@@ -177,6 +197,7 @@ static void mapmaker_openview_build(uint32_t n)
             if(at>=OPENVIEW_TOUCHED) { mapmaker_openview.overflow++;break; }
             mapmaker_openview.stamp[o-1u]=(uint16_t)mark;mapmaker_openview.touched[at++]=(uint16_t)o;
             mapmaker_openview.beside++;
+            mapmaker_openview_closed_log(o,g,queue[i],"its box");
         }
         mapmaker_openview.group_first[g]=(uint16_t)first;
         g++;
@@ -268,6 +289,22 @@ void pc_mapmaker_openview_walk(void (*original)(void))
     }
     if((int32_t)WORD_AT(view+OPENVIEW_DEEPEST)<deepest) WORD_AT(view+OPENVIEW_DEEPEST)=(uint32_t)deepest;
     mapmaker_openview.frames++;mapmaker_openview.widened+=widened;mapmaker_openview.added+=added;
+    /* After a while: which rooms drawn across open air never drew their geometry */
+    if(++mapmaker_roof_play.twosided_frames==OPENVIEW_UNSEEN_VIEWS && !mapmaker_openview.unseen_logged) {
+        unsigned r,count=0,shown=0;
+        mapmaker_openview.unseen_logged=1;
+        for(r=1;r<=n;r++) if(mapmaker_roof_play.twosided[r-1u] && !mapmaker_roof_play.seen_two[r-1u]) count++;
+        fprintf(stderr,"[mapmaker] openview: after %u views, %u of %u rooms drawn across open air never drew their geometry\n",
+                OPENVIEW_UNSEEN_VIEWS,count,mapmaker_roof_play.twosided_rooms);
+        for(r=1;r<=n && shown<24u;r++)
+            if(mapmaker_roof_play.twosided[r-1u] && !mapmaker_roof_play.seen_two[r-1u]) {
+                int32_t d=(int32_t)WORD_AT(base+r*12u);
+                shown++;
+                fprintf(stderr,"[mapmaker] openview: room %u never drawn (%s, %s, depth now %d)\n",r,mapmaker_roof_room_text(r),
+                        mapmaker_roof_play.open[r-1u]?"open":"closed",(int)d);
+            }
+        fflush(stderr);
+    }
     if(widened>mapmaker_openview.peak && mapmaker_openview.peak_logs<4u) {
         mapmaker_openview.peak=widened;mapmaker_openview.peak_logs++;
         fprintf(stderr,"[mapmaker] openview: %u rooms widened across open air (%u not reached by the portal walk), camera room %u\n",
