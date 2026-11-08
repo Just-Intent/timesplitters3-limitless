@@ -144,8 +144,8 @@ prop `+0x28` bit 0x40000 for the call on rooms `mapmaker_roof_play.twosided`
 (`0x0008F805..0x0008F822`, restore `0x0008F8C4..0x0008F8E4`) draws their
 inward-facing walls from outside too; `test_cull_none_flag_sites`.
 .73+: per-room logs (`room_piece`, `seen_two`); open rooms touching by box
-form one area; open air: all rooms 2-sided; `sub_002F8780` (_link): closed
-tiles keep walls toward open air (mapmaker-sky.md).
+form one area; open air: all rooms 2-sided; closed-wall link (.79)
+reverted (mapmaker-sky.md).
 
 ### MapMaker level memory budget (opt-in)
 
