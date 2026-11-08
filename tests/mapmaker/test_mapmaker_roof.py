@@ -27,30 +27,16 @@ MUTATIONS = {
     'roof-clears-walls': ('mode==MAPMAKER_ROOF_OPEN_ROOF || mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_CEILING:0u',
                           'mode==MAPMAKER_ROOF_OPEN_ROOF?MAPMAKER_ROOF_AIR:mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_CEILING:0u'),
     'reduced-untouched': ('    g_eax&=~MAPMAKER_ROOF_CEILING;\n}', '}'),
-    'table-not-restored': ('    WORD_AT(last+4u)=list;WORD_AT(last+8u)=count;\n', ''),
-    'one-entry': ('    WORD_AT(last+4u)=mapmaker_roof.list;WORD_AT(last+8u)=count+2u;',
-                  '    WORD_AT(last+4u)=mapmaker_roof.list;WORD_AT(last+8u)=count+1u;'),
-    'first-category': ('    last=table+(rows-1u)*12u;', '    last=table;'),
-    'always-full-table': ('    rows=WORD_AT(editor+0x200u)?8u:3u;', '    rows=8u;'),
-    'any-add-site': ('    if(ret!=MAPMAKER_ROOF_RET_MENU_ADD) return;', '    if(!mapmaker_roof.building) return;'),
-    'counts-wrong': ('mapmaker_roof.first=before+count;', 'mapmaker_roof.first=before;'),
-    'item-by-id': ('    return item==mapmaker_roof.item[0]?', '    return item?MAPMAKER_ROOF_OPEN_AIR:item==mapmaker_roof.item[0]?'),
-    'preview-not-restored': ('        mapmaker_roof_preview_restore();\n        mapmaker_roof.preview_inst=0;', '        mapmaker_roof.preview_inst=0;'),
-    'preview-not-open': ('    WORD_AT(inst+0x30u)=mapmaker_roof.preview_applied;\n}', '}'),
-    'pick-sees-open-preview': ('WORD_AT(mapmaker_roof.preview_inst+0x30u)=mapmaker_roof.preview_saved;swapped=1;', 'swapped=1;'),
-    'pick-not-marked': ('    mapmaker_roof_set(piece,mode);\n    if(mapmaker_roof.placed', '    if(mapmaker_roof.placed'),
     'no-record-mark': ('        WORD_AT(record+0x24u)=(WORD_AT(record+0x24u)&0xFFFFu)|(MAPMAKER_ROOF_MARK|mode)<<16;\n', ''),
     'record-mask-kept': ('        WORD_AT(record+8u)&=~mapmaker_roof_clear(mode);\n', ''),
     'record-size-lost': ('(WORD_AT(record+0x24u)&0xFFFFu)|(MAPMAKER_ROOF_MARK|mode)<<16', '(MAPMAKER_ROOF_MARK|mode)<<16'),
     'no-order-check': ('|| WORD_AT(record)!=WORD_AT(*piece+0x10u)) {', ') {'),
     'load-ignored': ('    if(mapmaker_limits.limits) mapmaker_roof_records(c,mapmaker_roof_match,NULL);', ''),
-    'load-any-mode': ("(mode!=MAPMAKER_ROOF_OPEN_ROOF && mode!=MAPMAKER_ROOF_OPEN_AIR)", '(mode==0u)'),
     'load-no-position': ('(int32_t)FLOAT_AT(piece+4u)!=(int8_t)(xyz>>8&0xFFu) ||', ''),
     'reset-keeps': ('    if(mapmaker_roof.keys) mapmaker_roof_forget_all();\n', ''),
     'reused-keeps': ('    if(mapmaker_roof.marked && mapmaker_roof_mode(g_eax)) mapmaker_roof_set(g_eax,0);\n', ''),
     'record-size-unchecked': ('            if(length<MAPMAKER_ROOF_RECORD || length>end-r) return -1;\n', '            if(!length) return -1;\n'),
     'pops-return': ('    original();\n    if(!c) return;', '    original();g_esp+=4u;\n    if(!c) return;'),
-    'no-list-silent': ('        if(mapmaker_roof.no_list++<4u)', '        if(0)'),
     # The mark follows the copy the editor makes when placing / picking up.
     'move-not-carried': ('void pc_mapmaker_roof_move(void (*original)(void))\n{\n    mapmaker_roof_carry();',
                          'void pc_mapmaker_roof_move(void (*original)(void))\n{'),
@@ -61,28 +47,16 @@ MUTATIONS = {
     'compile-editor-only': ('    mapmaker_limits_read();\n    if(!mapmaker_limits.limits) return;\n    piece=',
                             '    if(!mapmaker_roof_editor()) return;\n    piece='),
     'compile-without-limits': ('    mapmaker_limits_read();\n    if(!mapmaker_limits.limits) return;\n    piece=', '    piece='),
-    # Names.
-    'text-any-caller': ('    if(ret==MAPMAKER_ROOF_RET_CAPTION) mode=', '    if(1) mode='),
-    'text-any-id': (' || WORD_AT(g_esp+4u)!=MAPMAKER_ROOF_NAME_TEXT) { original();return; }', ') { original();return; }'),
-    'text-names-swapped': ('mapmaker_roof.labels+(mode-1u)*', 'mapmaker_roof.labels+(2u-mode)*'),
-    'text-no-ret': ('    g_eax=mapmaker_roof.labels+(mode-1u)*MAPMAKER_ROOF_LABEL_BYTES;\n    MAPMAKER_GUEST_RET();',
-                    '    g_eax=mapmaker_roof.labels+(mode-1u)*MAPMAKER_ROOF_LABEL_BYTES;'),
-    'text-in-play': (' || !mapmaker_roof_editor()) { original();return; }\n    g_eax=', ') { original();return; }\n    g_eax='),
-    'caption-not-reset': ('    mapmaker_roof.preview_mode=mode;\n', ''),
-    'piece-name-ignored': ('    else if(ret==MAPMAKER_ROOF_RET_PIECE_NAME', '    else if(0'),
-    # Grid label and list numbers (v0.4.0-mapmaker.7 report).
-    'hover-not-named': ('    else if(ret==MAPMAKER_ROOF_RET_HOVER', '    else if(0'),
-    'hover-no-held': ('((piece=WORD_AT(editor+0x2F18u))!=0 || (piece=WORD_AT(editor+0x2F7Cu))!=0)',
-                      '(piece=WORD_AT(editor+0x2F18u))!=0'),
+    # Grid label: a flagged tile's name gets its flag (the 46/47 presets are gone).
+    'hover-no-held': ('    if(!(piece=WORD_AT(editor+0x2F18u))) piece=WORD_AT(editor+0x2F7Cu);\n', '    piece=WORD_AT(editor+0x2F18u);\n'),
+    'label-in-play': ('    return piece && mapmaker_roof_editor()?mapmaker_roof_mode(piece):0u;', '    return piece?mapmaker_roof_mode(piece):0u;'),
+    'label-wrong-tail': ('    tail=mapmaker_roof_tails[mode-1u];', '    tail=mapmaker_roof_tails[mode%3u];'),
+    'load-unknown-mode': ('    if((mark&0xFF00u)!=MAPMAKER_ROOF_MARK || !mapmaker_roof_known(mode)) return 1;',
+                          '    if((mark&0xFF00u)!=MAPMAKER_ROOF_MARK || !mode) return 1;'),
     'format-any-caller': ('WORD_AT(g_esp)==MAPMAKER_ROOF_RET_HOVER_FORMAT &&', ''),
     'format-any-format': ('       WORD_AT(g_esp+4u)==MAPMAKER_ROOF_HOVER_FORMAT && ', '       '),
-    'format-stock-number': ('        WORD_AT(g_esp+8u)=MAPMAKER_ROOF_NUMBER+mode-1u;', '        (void)mode;'),
     'format-pops-twice': ('        mapmaker_roof_suffix(mode);\n    original();',
                           '        mapmaker_roof_suffix(mode);\n    original();g_esp+=4u;'),
-    'numbers-off-by-one': ('#define MAPMAKER_ROOF_NUMBER 46u', '#define MAPMAKER_ROOF_NUMBER 45u'),
-    'caption-stock-number': ('        g_eax=MAPMAKER_ROOF_NUMBER+mode-1u;', '        (void)mode;'),
-    'caption-numbers-unnumbered': ('       (int32_t)g_eax>=0 && ', '       '),
-    'caption-any-caller': ('WORD_AT(g_esp)==MAPMAKER_ROOF_RET_CAPTION_DRAW &&', ''),
     # Records carry the piece's items after the pads (play -> editor round trip).
     'items-not-skipped': ('for(at=r+length,k=0;k<items;k++) {', 'for(at=r+length,k=items;k<items;k++) {'),
     'item-size-fixed': ('bytes=((WORD_AT(at+0x14u)&0xFFu)*4u+0x1Bu)&~3u;', 'bytes=MAPMAKER_ROOF_ITEM_MIN;'),
@@ -118,12 +92,22 @@ MUTATIONS = {
     'rooms-wrong-base': ('mapmaker_roof_play.hide[base+j]=MAPMAKER_ROOF_SIDES;', 'mapmaker_roof_play.hide[j]=MAPMAKER_ROOF_SIDES;'),
     'rooms-one-room': ('    for(j=0;(int32_t)count>0 && j<count;j++) {', '    for(j=0;(int32_t)count>0 && j<1u;j++) {'),
     'rooms-not-reset': ('    memset(mapmaker_roof_play.hide,0,sizeof mapmaker_roof_play.hide);\n', ''),
-    'draw-any-scene': (' || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY || !MAPMAKER_STACK_OK(8u) ||', ' || !MAPMAKER_STACK_OK(8u) ||'),
+    'draw-any-scene': (' || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY ||\n       !MAPMAKER_STACK_OK(8u) ||', ' ||\n       !MAPMAKER_STACK_OK(8u) ||'),
     'draw-any-prop': ('    if(WORD_AT(prop+4u)!=inst || (WORD_AT(prop+0x94u)&0xFFFFu)!=MAPMAKER_ROOF_ROOM_MODEL+room) {',
                       '    if(WORD_AT(prop+4u)!=inst) {'),
-    'draw-room-off-by-one': ('!(hide=mapmaker_roof_play.hide[room-1u])', '!(hide=mapmaker_roof_play.hide[room])'),
-    'draw-not-restored': ('    if(WORD_AT(inst+0x30u)==(mask&~hide)) WORD_AT(inst+0x30u)=mask;\n', ''),
-    'draw-not-hidden': ('    WORD_AT(inst+0x30u)=mask&~hide;\n', ''),
+    'draw-room-off-by-one': ('hide=mapmaker_roof_play.hide[room-1u];', 'hide=mapmaker_roof_play.hide[room];'),
+    'twosided-room-off-by-one': ('two=mapmaker_roof_play.twosided[room-1u];', 'two=mapmaker_roof_play.twosided[room];'),
+    'draw-not-restored': ('    if(hide && WORD_AT(inst+0x30u)==(mask&~hide)) WORD_AT(inst+0x30u)=mask;\n', ''),
+    'draw-not-hidden': ('    if(hide) WORD_AT(inst+0x30u)=mask&~hide;\n', ''),
+    # Rooms seen across open air: geometry drawn without back-face culling.
+    'twosided-off': ('    if(two) WORD_AT(prop+0x28u)=flags|MAPMAKER_ROOF_TWO_SIDED;\n', ''),
+    'twosided-not-restored': ('    if(two) WORD_AT(prop+0x28u)&=~MAPMAKER_ROOF_TWO_SIDED;\n', ''),
+    'twosided-clears-stock': ('    if(two && (flags&MAPMAKER_ROOF_TWO_SIDED)) two=0;', ''),
+    'twosided-wrong-bit': ('#define MAPMAKER_ROOF_TWO_SIDED 0x00040000u', '#define MAPMAKER_ROOF_TWO_SIDED 0x00020000u'),
+    'twosided-needs-bounded': ('    if(!(mapmaker_roof_play.rooms || mapmaker_roof_play.twosided_rooms) ||', '    if(!mapmaker_roof_play.rooms ||'),
+    'twosided-not-reset': ('    memset(mapmaker_roof_play.twosided,0,sizeof mapmaker_roof_play.twosided);\n    mapmaker_roof_play.twosided_rooms=0;\n', ''),
+    'twosided-any-prop': ('    if(WORD_AT(prop+4u)!=inst || (WORD_AT(prop+0x94u)&0xFFFFu)!=MAPMAKER_ROOF_ROOM_MODEL+room) {',
+                          '    if(WORD_AT(prop+4u)!=inst || (hide && (WORD_AT(prop+0x94u)&0xFFFFu)!=MAPMAKER_ROOF_ROOM_MODEL+room)) {'),
     # Open air (unbounded): kill height below the lowest floor.
     'kill-any-map': ('        mapmaker_roof_play.kill=mapmaker_roof_play.unbounded!=0;', '        mapmaker_roof_play.kill=1;'),
     'kill-bounded-too': ('    if(mode==MAPMAKER_ROOF_OPEN_AIR) mapmaker_roof_play.unbounded++;', '    if(mode) mapmaker_roof_play.unbounded++;'),
@@ -402,10 +386,37 @@ def test_wrappers_documented():
     text = ROOF.read_text(encoding='utf-8')
     for target, name in (('002FC680', 'mask'), ('002FC470', 'reduced'), ('00307FD0', 'piece_new'),
                          ('002FEBF0', 'reset'), ('003006C0', 'compile'), ('00301A90', 'load'),
-                         ('00316B50', 'menu_init'), ('000792B0', 'menu_add'), ('00316920', 'menu_hover'),
-                         ('00316500', 'menu_pick'), ('002F95E0', 'move'), ('00308120', 'copy'),
-                         ('00308480', 'piece_free'), ('0003D7B0', 'text'), ('00151030', 'format'),
-                         ('0032D9F0', 'caption'), ('0008A780', 'play'), ('00085710', 'rooms'),
+                         ('002F95E0', 'move'), ('00308120', 'copy'),
+                         ('00308480', 'piece_free'), ('00151030', 'format'),
+                         ('0008A780', 'play'), ('00085710', 'rooms'),
                          ('0008F6B0', 'draw'), ('0003C440', 'tick')):
         assert f'WRAP sub_{target} -> pc_mapmaker_roof_{name}' in doc, name
         assert f'void pc_mapmaker_roof_{name}(void (*original)(void))' in text, name
+    # The tile-8 palette presets 46/47 were removed (user, 2026-11-07): no
+    # palette, text or caption hook is left anywhere.
+    header = (ROOT / 'src/interface/pc_display_menu.h').read_text(encoding='utf-8')
+    guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
+    for name in ('menu_init', 'menu_add', 'menu_hover', 'menu_pick', 'text', 'caption'):
+        for place in (doc, text, header, guest):
+            assert f'pc_mapmaker_roof_{name}(' not in place and f'pc_mapmaker_roof_{name}\n' not in place, name
+
+
+def test_cull_none_flag_sites():
+    """sub_0008F6B0 draws pass 0 with render state 6 (cull mode) 0 when the
+    prop has +0x28 bit 0x40000 (or its model +0x28 bit 0x20000), and puts the
+    saved mode back after; the room draw sub_000A2900 culls 0x900, or 0x901
+    for mirrored rooms; the bit's only other readers are not draw code."""
+    from mapmaker_decoded import decoded
+    insns = decoded()
+    at = {i.address: i for i in insns}
+    assert at[0x0008F805].text == 'ebp, ebp' and at[0x0008F809].text == 'edx, dword ptr [ebx + 0x24]'
+    assert at[0x0008F815].text == 'dword ptr [ebx + 0x28], 0x40000'
+    assert at[0x0008F81E].ops[0] == ('imm', 0) and at[0x0008F820].ops[0] == ('imm', 6)
+    assert at[0x0008F822].ops[0][1] == 0x00021450
+    assert at[0x0008F8D4].text == 'dword ptr [ebx + 0x28], 0x40000' and at[0x0008F8E4].ops[0][1] == 0x00021450
+    assert at[0x0008F6B9].text == 'ebx, dword ptr [esi]'                     # ebx = [inst] = the prop
+    assert ('imm', 0x901) in at[0x000A29C2].ops and at[0x000A29C9].ops[0][1] == 0x00021450
+    assert ('imm', 0x900) in at[0x000A29B7].ops and at[0x000A29AF].ops[0][1] == 0x00021440
+    tests = {i.address for i in insns if i.mnemonic == 'test' and any(op[0] == 'mem' and op[4] == 0x28 for op in i.ops)
+             and ('imm', 0x40000) in i.ops}
+    assert tests == {0x0008F815, 0x0008F8D4, 0x000A6045, 0x000D84E6}, sorted(map(hex, tests))

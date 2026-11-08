@@ -3,7 +3,8 @@
  * any placed tile opens a menu to flag it No roof or Open air, instead of
  * selecting it. The flags are the roof area's per-piece marks
  * (pc_mapmaker_roof.inc: mask, save word +0x26, load match, copy/move), which
- * already work for every tile id; the 46/47 palette entries stay for old maps.
+ * already work for every tile id (the 46/47 tile-8 palette presets were
+ * removed on 2026-11-07; maps that used them load with these flags).
  * Second request (2026-11-01): Open air is split into Open air (bounded:
  * invisible walls keep you from falling off the edge) and Open air
  * (unbounded: falling off the edge is possible and kills the player).
