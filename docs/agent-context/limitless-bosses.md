@@ -192,3 +192,6 @@ After .68 (camera broken): that pose call is gone (it posed the view slot 0
 camera); the bottle is held 11 up, 2.5 ahead of the boss; the hull hits
 count a quarter; the rim pads live in the pad pool's tail (dives need index
 < 0x1F40, sub_0009A420).
+After .73: the collision hull 0x249 is hidden as the story's slot 4 does
+(`sub_000942B0(instance, 8)`, the draw skips +0x1F6 & 8); no early ragbug
+release (story state-10 launches; bugs dive near the rim ring, explode when shot).
