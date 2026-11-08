@@ -619,7 +619,7 @@ static void mapmaker_roof_node_masks(uint32_t inst,char *out,size_t size)
  * 0x000A6F4F reads it; +0x96 is another word, 0x000A6897) and +4 = inst
  * (sub_00085CC0 0x00085D6B..0x00085DD0).
  * Bounded room: its side nodes are left out of this draw (inst+0x30).
- * Two-sided room (an open-air room or a room beside one, marked by
+ * Two-sided room (every room of a map with open air, marked by
  * pc_mapmaker_openview.inc): room geometry is single-sided and faces into
  * the room (the stock room draw sub_000A2900 culls clockwise faces, 0x900,
  * or counter-clockwise ones for mirrored rooms, 0x901, render state 6,
