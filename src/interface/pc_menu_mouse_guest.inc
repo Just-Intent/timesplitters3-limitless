@@ -54,7 +54,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_pads.inc"
 #include "pc_mapmaker_container.inc"
 #include "pc_mapmaker_objects.inc"
-#include "pc_mapmaker_report.inc"    /* map report at level start, called by the validator */
+#include "pc_mapmaker_report.inc"
 #include "pc_mapmaker_validate.inc"
 #include "pc_mapmaker_editor.inc"
 #include "pc_mapmaker_rooms.inc"
@@ -90,8 +90,8 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_mapmaker_pitboss.inc"
 #include "pc_mapmaker_tilesets.inc"
 #include "pc_mapmaker_restable.inc"
-#include "pc_mapmaker_logic.inc"       /* action Delay (area logic) */
-#include "pc_mapmaker_panel.inc"      /* debug panel reading (no hook; pc_developer_guest_frame) */
+#include "pc_mapmaker_logic.inc"
+#include "pc_mapmaker_panel.inc"
 /* MapMaker capacity area includes (end) */
 
 /* Every area hook is reached through this gate (generated wrappers in

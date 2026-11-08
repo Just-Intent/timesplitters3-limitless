@@ -507,7 +507,6 @@ void pc_custom_music_arcade_rows(void (*original)(void));
 void pc_custom_music_arcade_show(void (*original)(void));
 void pc_custom_music_arcade_store(void (*original)(void));
 void pc_custom_music_restart(void (*original)(void));
-/* logic (pc_mapmaker_logic.inc): action Delay */
 void pc_mapmaker_logic_setup(void (*original)(void));
 void pc_mapmaker_logic_fire(void (*original)(void));
 void pc_mapmaker_logic_rows(void (*original)(void));

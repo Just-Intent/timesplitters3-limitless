@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4511 @@
+@@ -1911,6 +1911,4565 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1332,13 +1332,23 @@
 +#endif
 +}
 +
-+void sub_000784A0(void)
++static void sub_000784A0_layer1(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("bosses","pc_mapmaker_bosses_rows")) pc_mapmaker_bosses_rows(sub_000784A0_layer0);
 +    else sub_000784A0_layer0();
 +#else
 +    sub_000784A0_layer0();
++#endif
++}
++
++void sub_000784A0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("logic","pc_mapmaker_logic_rows")) pc_mapmaker_logic_rows(sub_000784A0_layer1);
++    else sub_000784A0_layer1();
++#else
++    sub_000784A0_layer1();
 +#endif
 +}
 +
@@ -4507,6 +4517,50 @@
 +    else sub_002C7430_gen();
 +#else
 +    sub_002C7430_gen();
++#endif
++}
++
++extern void sub_0033AA80_gen(void);
++void sub_0033AA80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("logic","pc_mapmaker_logic_setup")) pc_mapmaker_logic_setup(sub_0033AA80_gen);
++    else sub_0033AA80_gen();
++#else
++    sub_0033AA80_gen();
++#endif
++}
++
++extern void sub_0033CF80_gen(void);
++void sub_0033CF80(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("logic","pc_mapmaker_logic_fire")) pc_mapmaker_logic_fire(sub_0033CF80_gen);
++    else sub_0033CF80_gen();
++#else
++    sub_0033CF80_gen();
++#endif
++}
++
++extern void sub_00328BF0_gen(void);
++void sub_00328BF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("logic","pc_mapmaker_logic_done")) pc_mapmaker_logic_done(sub_00328BF0_gen);
++    else sub_00328BF0_gen();
++#else
++    sub_00328BF0_gen();
++#endif
++}
++
++extern void sub_00324B60_gen(void);
++void sub_00324B60(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("logic","pc_mapmaker_logic_actions")) pc_mapmaker_logic_actions(sub_00324B60_gen);
++    else sub_00324B60_gen();
++#else
++    sub_00324B60_gen();
 +#endif
 +}
  
