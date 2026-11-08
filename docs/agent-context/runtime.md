@@ -916,10 +916,6 @@ bound across frames see arrivals and queue-full retries without rebinding every
 draw. The streaming patch must follow 0350-texture-toggle.patch, which creates this
 binding helper. The texture runtime fixture compiles that actual patched helper.
 
-Keep this patch LF on disk before refreshing its index. A CRLF working copy
-produced a different hash/target spelling from the normalized Git blob; the
-Linux CI context check exposed it. Runtime behavior was unaffected.
-
 Future Perfect reaches host_Swap from its HLE shadow frame boundary. A pump in
 dev_Present alone does not run for that path. Keep the completion call in the
 common resolve function, after the skipped-Swap guard; tests execute both actual
@@ -980,6 +976,7 @@ capture adapters. It is diagnostic instrumentation, not a fix for #410. See
 [crash evidence](crash-evidence.md) for capture scope and platform limits.
 
 `2630-buffered-stderr.patch`: title stderr buffered while the crash helper runs.
+`2640-mapmaker-debug-panel.patch`: overlay-frame Shift+F9 and the panel's renderer reading ([systems](systems.md#mapmaker-debug-panel)).
 
 Allocation-history hook details: [crash evidence](crash-evidence.md). The shared
 allocator observer is diagnostic-only; backing allocation ownership and guest

@@ -884,3 +884,26 @@ The Settings tab now has independent Input Settings / Video Settings categories.
 `pc_video_sidebar_ui.inc` owns drafts/selectors; `pc_video_sidebar.inc` consumes
 value-only mailbox requests on the guest frame, using existing display/graphics
 setters and native subtitle persistence. See the continuation for contracts.
+
+## MapMaker debug panel
+
+`show_mapmaker_panel` ("Show MapMaker debug panel", default off, persisted by
+the shared `pc_debug_options.def` model, so every settings dialog lists it).
+Shift+F9 toggles it in memory (Windows: the HLE overlay frame's F9 edge with
+`GetAsyncKeyState(VK_SHIFT)`, patch 2640; SDL: `e->key.mod&SDL_KMOD_SHIFT` in
+`input_sdl.c`, covered by its self-test); plain F9 stays the FPS counter.
+`src/diagnostics/pc_debug_panel.h` holds value-only readings, per-frame
+rates and the line format; `pc_debug.c` stores them under `debug_lock`:
+`pc_debug_render` (render thread, one HLE reading per frame: cumulative UP/
+indexed-UP/VB/indexed-VB draws, `hle_d3d8_texture_binds`, and the 5 s swap
+timing window, whose restart is handled), `pc_debug_mapmaker_due/publish`
+(game thread, `pc_mapmaker_panel.inc`), refresh at most every 250 ms, and
+`pc_debug_panel_text` (presentation thread, 0 lines while off).
+`developer_panel_lines` in `pc_developer_sidebar.inc` draws them as a box plus
+mono labels when the sidebar is closed (re-fitted only when text changes), on
+RHI and legacy GL (GL lacks the HLE reading: frame split/draws show "--").
+Frame split: work = rest - present, present, swap, wait (gate). Each toggle
+logs one `[PC-DEBUG] MapMaker panel:` line, at most once a second, not under
+`TSFP_DEBUG_QUIET=1`. Tests: `tests/diagnostics/test_debug_panel.py` (model on
+all hosts, Windows store, 10 mutations, wiring), `developer_tools.c` panel
+lines. Guest reading: [limitless](limitless.md#mapmaker-debug-panel-shiftf9).

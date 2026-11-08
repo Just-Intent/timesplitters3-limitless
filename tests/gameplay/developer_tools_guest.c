@@ -31,6 +31,7 @@ static int multiplayer_tools;
 int pc_developer_tools_allowed(void) {return !(WORD_AT(0x76b0fc)&&WORD_AT(0x76b108))||multiplayer_tools;}
 void pc_developer_lobby_guest(void) {}
 void pc_developer_video_guest_tick(void) {}
+void pc_mapmaker_panel_guest_tick(void) {}
 void pc_controls_apply_mouse(uint32_t player,uint32_t camera,ptrdiff_t offset)
 {assert(player==0x4000&&camera==0x2000&&offset==g_xbox_mem_offset);}
 static int guest_writable(uint32_t address,size_t bytes) {return address>=0x1000&&address<sizeof memory&&bytes<=sizeof memory-address;}

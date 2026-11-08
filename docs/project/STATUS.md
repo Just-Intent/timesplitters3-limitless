@@ -26,6 +26,23 @@ passed (Smart App Control blocks rerun); the historical Mac-network upgrade
 fixture skips the story-chain patch with the story patches.
 Not run: gameplay, Mac/Linux builds, full MapMaker mutation sweeps.
 
+## MapMaker debug panel, Shift+F9 (2026-11-08, not built or played)
+
+Branch `debug-overlay` from `4c5cb965`; Windows 11 x64, MSVC x64 fixtures only.
+New: Debug option `show_mapmaker_panel` and Shift+F9 (Windows overlay frame,
+patch 2640; SDL adapter) show a panel of frame split, draws/texture binds per
+frame, characters/AI/engine objects, pads/cover/links/groups, rooms (visible,
+camera room, room queries/s), Level heap/nav block and player position; each
+toggle logs one `[PC-DEBUG] MapMaker panel:` line (at most once a second).
+Validation: `tests/diagnostics/test_debug_panel.py` (model + Windows store,
+10 mutations, wiring), `tests/mapmaker/test_mapmaker_panel.py` (fixed + 10
+mutations), `test_developer_tools.py` input cases, `test_menu_mouse.py`,
+`test_debug_settings_model.py`, `test_mapmaker_restable.py`; the 2640 patch
+applies (and reverses) on the current patched runtime files. Not run here:
+`test_fov_settings.py` and the original-routine developer cases (they need
+the runtime checkout inside this worktree). Unverified: game build on both
+hosts, the panel on screen, its numbers against a real map, Mac fixtures.
+
 ## MapMaker Disco tileset variant and Abstract tile textures (2026-11-07, not built or played)
 
 Branch `disco-variant` from `c0b951a1`; Windows 11 x64, MSVC x64 fixtures only.

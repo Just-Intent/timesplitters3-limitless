@@ -332,7 +332,11 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
         if(typing) { atomic_store(&keys[vk],0);if(down)pc_prompts_keyboard();return; }
         if(vk){atomic_store(&keys[vk],down);reload_key_event(vk,down);}
         if(down && !e->key.repeat)pc_prompts_keyboard();
-        if(down && !e->key.repeat && e->key.scancode==SDL_SCANCODE_F9){pc_debug_toggle_fps();return;}
+        if(down && !e->key.repeat && e->key.scancode==SDL_SCANCODE_F9){
+            /* Shift+F9: MapMaker debug panel (shared with the Windows overlay frame). */
+            if(e->key.mod&SDL_KMOD_SHIFT)pc_debug_toggle_mapmaker();else pc_debug_toggle_fps();
+            return;
+        }
         if(down && !e->key.repeat && e->key.scancode==SDL_SCANCODE_F12 && window){
             tsfp_native_settings_release_input(window);tsfp_native_crash_inhibit(1);pc_debug_show(NULL);tsfp_native_crash_inhibit(0);return;
         }
@@ -609,6 +613,9 @@ int tsfp_native_input_test(void) {
     pc_debug_get(&debug_now);ok &= debug_now.show_fps==!debug_before.show_fps;
     e.type=SDL_EVENT_KEY_UP;e.key.repeat=false;tsfp_native_input_event(&e,NULL);
     pc_debug_get(&debug_now);ok &= debug_now.show_fps==!debug_before.show_fps;
+    e.type=SDL_EVENT_KEY_DOWN;e.key.mod=SDL_KMOD_LSHIFT;tsfp_native_input_event(&e,NULL);
+    pc_debug_get(&debug_now);ok &= debug_now.show_fps==!debug_before.show_fps && debug_now.show_mapmaker_panel==!debug_before.show_mapmaker_panel;
+    e.type=SDL_EVENT_KEY_UP;tsfp_native_input_event(&e,NULL);e.key.mod=0;
     pc_debug_set(&debug_before);
     e.type=SDL_EVENT_KEY_DOWN;e.key.scancode=SDL_SCANCODE_DOWN;tsfp_native_input_event(&e,NULL);
     recomp_bindings_sample(0,&pad);ok &= !!(pad.wButtons&XBOX_GAMEPAD_DPAD_DOWN);

@@ -1,0 +1,53 @@
+--- a/src/hle/hle_d3d8.c
++++ b/src/hle/hle_d3d8.c
+@@ -2102,7 +2102,11 @@
+     f11_was_down = f11;
+     if (f9 && !f9_was_down) {
+ #ifdef TSFP_PC_CONTROLS
+-        pc_debug_toggle_fps();
++        /* Shift+F9: the MapMaker debug panel (src/diagnostics/pc_debug.c). */
++        if (GetAsyncKeyState(VK_SHIFT) & 0x8000)
++            pc_debug_toggle_mapmaker();
++        else
++            pc_debug_toggle_fps();
+ #else
+         enabled = !enabled;
+ #endif
+@@ -2158,6 +2162,26 @@
+     }
+ 
+ #ifdef TSFP_PC_CONTROLS
++    {
++        /* The MapMaker debug panel's renderer reading: counters this file
++         * already keeps for its five-second reports; pc_debug takes the
++         * differences (src/diagnostics/pc_debug_panel.h). */
++        extern unsigned long hle_d3d8_texture_binds(void);
++        PcDebugRender render;
++        memset(&render, 0, sizeof render);
++        render.draws_up = g_draws_up;
++        render.draws_indexed_up = g_draws_indexed_up;
++        render.draws_vb = g_draws_vb;
++        render.draws_indexed_vb = g_draws_indexed_vb;
++        render.texture_binds = hle_d3d8_texture_binds();
++        render.swap_frames = g_swap_timed;
++        render.gate_ticks = g_swap_gate_ticks;
++        render.swap_ticks = g_swap_body_ticks;
++        render.rest_ticks = g_swap_frame_ticks;
++        render.present_ticks = g_swap_present_ticks;
++        render.ticks_per_second = qpf.QuadPart;
++        pc_debug_render(&render);
++    }
+     enabled = pc_debug_overlay(line, line_size, xbox_Nv2aFlipGateModeName());
+     d3d8_overlay_set_counter(pc_counter_enabled());
+ #endif
+--- a/src/hle/hle_d3d8_texture.c
++++ b/src/hle/hle_d3d8_texture.c
+@@ -145,6 +145,8 @@
+ 
+ static unsigned long g_bound_count, g_uploads, g_reuploads, g_skip_type,
+                      g_skip_cube, g_skip_format, g_skip_range, g_skip_create;
++/* Host texture binds since start, for the PC MapMaker debug panel. */
++unsigned long hle_d3d8_texture_binds(void) { return g_bound_count; }
+ 
+ typedef struct {
+     uint32_t fmt, width, height, levels, guest_pitch;

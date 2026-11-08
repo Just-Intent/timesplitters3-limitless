@@ -189,4 +189,8 @@ void sub_0010E730(void) {}  /* khallos: the jet emitter's position */
 void sub_001D2350(void) {} void sub_001DA990(void) {} void sub_001DAAB0(void) {} void sub_00378400(void) {} void sub_0005B980(void) {}
 /* tilesets (pc_mapmaker_tilesets.inc: pak mount) */
 void sub_000622D0(void) {}
+/* debug panel reading (pc_mapmaker_panel.inc; store in pc_debug.c) */
+struct PcDebugMapmaker;
+int pc_debug_mapmaker_due(void) { return 0; }
+void pc_debug_mapmaker_publish(const struct PcDebugMapmaker *reading) { (void)reading; }
 #endif

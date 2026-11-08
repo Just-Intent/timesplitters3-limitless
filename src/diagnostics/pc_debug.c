@@ -87,6 +87,98 @@ void pc_debug_toggle_fps(void)
     AcquireSRWLockExclusive(&debug_lock); options.show_fps = !options.show_fps; ReleaseSRWLockExclusive(&debug_lock);
 }
 
+/* ---- MapMaker debug panel (pc_debug_panel.h) ---- */
+static PcDebugRender panel_render, panel_render_mark;
+static unsigned long long panel_render_frames;
+static PcDebugMapmaker panel_mapmaker, panel_mapmaker_mark;
+static ULONGLONG panel_refreshed, panel_published, panel_logged;
+static char panel_lines[PC_DEBUG_PANEL_LINES][PC_DEBUG_PANEL_LINE];
+static unsigned panel_count;
+
+/* Caller holds debug_lock exclusively. */
+static void panel_refresh_locked(ULONGLONG now)
+{
+    PcDebugPanelRates rates;
+    pc_debug_panel_rates(&panel_render_mark,&panel_render,&panel_mapmaker_mark,&panel_mapmaker,&rates);
+    panel_count=pc_debug_panel_format(&rates,&panel_mapmaker,stats.fps,stats.frame_ms,panel_lines,PC_DEBUG_PANEL_LINES);
+    panel_render_mark=panel_render;
+    panel_mapmaker_mark=panel_mapmaker;
+    panel_refreshed=now;
+}
+
+void pc_debug_render(const PcDebugRender *render)
+{
+    ULONGLONG now;
+    if(!render) return;
+    now=GetTickCount64();
+    AcquireSRWLockExclusive(&debug_lock);
+    panel_render=*render;
+    panel_render.frames=++panel_render_frames;
+    if(now-panel_refreshed>=PC_DEBUG_PANEL_REFRESH_MS) panel_refresh_locked(now);
+    ReleaseSRWLockExclusive(&debug_lock);
+}
+
+int pc_debug_mapmaker_due(void)
+{
+    ULONGLONG now=GetTickCount64();
+    int due;
+    AcquireSRWLockShared(&debug_lock);
+    due=now-panel_published>=PC_DEBUG_PANEL_REFRESH_MS;
+    ReleaseSRWLockShared(&debug_lock);
+    return due;
+}
+
+void pc_debug_mapmaker_publish(const PcDebugMapmaker *reading)
+{
+    ULONGLONG now;
+    if(!reading) return;
+    now=GetTickCount64();
+    AcquireSRWLockExclusive(&debug_lock);
+    panel_mapmaker=*reading;
+    panel_mapmaker.valid=1;
+    panel_mapmaker.at_ms=now;
+    panel_published=now;
+    ReleaseSRWLockExclusive(&debug_lock);
+}
+
+unsigned pc_debug_panel_text(char lines[][PC_DEBUG_PANEL_LINE], unsigned max)
+{
+    unsigned count=0,i;
+    ULONGLONG now=GetTickCount64();
+    AcquireSRWLockExclusive(&debug_lock);
+    if(options.show_mapmaker_panel) {
+        /* Hosts without the HLE overlay frame (legacy GL) refresh here. */
+        if(now-panel_refreshed>=PC_DEBUG_PANEL_REFRESH_MS) panel_refresh_locked(now);
+        count=panel_count<max?panel_count:max;
+        for(i=0;i<count;i++) memcpy(lines[i],panel_lines[i],PC_DEBUG_PANEL_LINE);
+    }
+    ReleaseSRWLockExclusive(&debug_lock);
+    return count;
+}
+
+void pc_debug_toggle_mapmaker(void)
+{
+    char line[PC_DEBUG_PANEL_LINES*PC_DEBUG_PANEL_LINE];
+    int log=0,shown;
+    ULONGLONG now=GetTickCount64();
+    AcquireSRWLockExclusive(&debug_lock);
+    options.show_mapmaker_panel=!options.show_mapmaker_panel;
+    shown=options.show_mapmaker_panel;
+    /* The render thread keeps the lines current; a fresh refresh here would
+     * average over almost no frames. */
+    if(!panel_count || now-panel_refreshed>=PC_DEBUG_PANEL_REFRESH_MS) panel_refresh_locked(now);
+    /* A playtest log keeps what was on screen; once a second at most. */
+    if(!pc_debug_output_quiet() && (!panel_logged || now-panel_logged>=PC_DEBUG_PANEL_LOG_MS)) {
+        panel_logged=now;log=1;
+        pc_debug_panel_snapshot(panel_lines,panel_count,line,sizeof line);
+    }
+    ReleaseSRWLockExclusive(&debug_lock);
+    if(log) {
+        fprintf(stderr,"%s (panel %s)\n",line,shown?"shown":"hidden");
+        fflush(stderr);
+    }
+}
+
 void pc_debug_init(HWND window)
 {
     PcDebugOptions value;
