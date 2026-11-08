@@ -297,6 +297,17 @@ int main(void)
     set_box(8,15.6f,0,0,20,5,5);                        /* 0.6 away: not */
     play_build();call();
     CHECK(unseen(8) && mapmaker_openview.beside==1u && two_sided("111111101"));
+    /* the island 6 (open, no portal to the area) a floor up and beside room 3:
+     * its box joins it to the area, so it and its closed neighbour 7 get the
+     * area's whole viewport (.73 report: walls beyond another area clipped) */
+    set_box(8,100,0,0,105,5,5);set_box(6,15,5,0,20,10,5);
+    play_build();call();
+    CHECK(room_is(6,1,0,0,640,480) && room_is(7,1,0,0,640,480) && mapmaker_openview.joined==1u);
+    CHECK(mapmaker_openview.groups==1u);
+    set_box(6,15.6f,5.6f,0,20,10,5);                    /* 0.6 away: its own area again */
+    play_build();call();
+    CHECK(unseen(6) && unseen(7) && mapmaker_openview.joined==0u && mapmaker_openview.groups==2u);
+    set_box(6,200,0,0,205,5,5);
     /* no boxes again for the next phase */
     {
         uint32_t r;

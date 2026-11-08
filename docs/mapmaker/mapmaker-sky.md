@@ -928,7 +928,7 @@ floor and ceiling all show; walk into a closed tile: its inside looks as
 before; repeat from inside a closed tile looking out across the field;
 bounded tiles still hide their walls; 2-4 player split screen; frame rate.
 
-### One-walled pieces next to open air (.73 report, open)
+### One-walled pieces next to open air (.73 report)
 
 User report (golgotha map): "I can see the walls for corner pieces that are
 adjacent to unbounded tiles, but I cannot see the walls for the other
@@ -976,3 +976,46 @@ Diagnostics added (no behaviour change):
 
 Next playtest: the same map, look at a one-walled piece and a corner piece
 from the open area, then send `game.err`. Compare the two pieces' lines.
+
+User clarification: "The one walled pieces are set to closed, but their
+walls should be visible beyond the 3x3 open air bounded pieces in front of
+them. Currently, the wall is invisible, and you just see the floor of the
+piece beyond."
+
+Cause (INFERRED; the .74 logs above confirm or refute it). The open-view
+areas were joined only by portals between open rooms. The golgotha log has
+3 areas (`209 open-air rooms in 3 areas`): floors of open tiles stacked
+above each other, or joined only through closed tiles, have no open-to-open
+portal. Each area gives its touched rooms the union of its own visible
+rooms' rectangles. An area that does not hold the camera is seen only
+through the stock walk's portal rectangles, and those are one floor high.
+Every prop of a room is scissored to its rectangle (`sub_000862C0`). So a
+closed tile beyond that area kept its floor, which lies inside the portal
+rectangle, and lost its wall above it. The two-sided draw does not help
+with clipping.
+
+Ruled out (decode of the neighbour mask `sub_002FC680`): coincident-wall
+hiding. A side wall bit is set only for a connection point (kind 0/1) whose
+neighbour cell (`sub_002F8140` side flag, `sub_002F8780` match) does not
+connect (`0x002FD137..0x002FD20D`). Kind 2/3 entries add bits
+unconditionally. Mirror tiles (catalogue `+0x12` bit 0) reflect the bits.
+Decoration bits come from catalogue `+0x108`. A side without connection
+points gets no bit, so a closed tile's solid wall is never removed by an
+open neighbour, and the bounded hide only affects bounded rooms. New room
+props start with `+0x28` = 0x1161/0x1061 (`0x000A6A7F`), not 0x20000000, so
+the mirrored per-node 0x901 is not set on room geometry.
+
+Fix: `mapmaker_openview_build` joins two open rooms into one area when their
+boxes touch (same 0.5 margin as the closed-room test), as well as by portal.
+The whole open structure then gets one rectangle, the whole viewport when
+the camera stands on it, and so does every closed room beside it. Log
+`openview: N open-air rooms joined their area by box (no open portal between
+them)`. Cost: at most open rooms x rooms box tests once per build; the draw
+covers more rooms (still depth-tested and culled per prop). Fixture: the
+island room 6, a floor up beside room 3, joins area 1; 0.6 away it does
+not. Mutations: `no-box-join`, `box-join-closed-too`.
+
+Playtest (.75): golgotha, from each floor's walkway look at the closed
+one-walled pieces beyond the bounded tiles, on the same floor and on floors
+above and below: walls show. The build line should read `in 1 area`, with a
+`joined their area by box` line.
