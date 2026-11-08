@@ -2066,6 +2066,14 @@
       ]
     },
     {
+      "name": "2630-buffered-stderr.patch",
+      "path": "patches/diagnostics/2630-buffered-stderr.patch",
+      "sha256": "ed8fe11bcc4999957843c6875899ad03e23005b16768e0ed5fe8d3cf53fba492",
+      "targets": [
+        "titles/futureperfect/src/main.c"
+      ]
+    },
+    {
       "name": "independent-canonical-frame-fixtures.patch",
       "path": "patches/compiler/independent-canonical-frame-fixtures.patch",
       "sha256": "b5cbcffcb9d9c8d3c0d6a13564f82498d657646ce426180e2697a57b9228be5e",

@@ -10,9 +10,73 @@ static HANDLE mapping, request, done, ready, helper;
 static PcCrashGuestCapture guest_capture;
 static LPTOP_LEVEL_EXCEPTION_FILTER previous_filter;
 
+/* Buffered stderr (after .77). Unbuffered stderr goes to the pipe or file
+ * in several WriteFile calls per formatted line (fprintf -> fwrite -> flush
+ * in the profile), and a profiled HugeMap frame spent 11% of the game
+ * thread in NtWriteFile. Now stderr has a 64 KB buffer and this flusher thread
+ * empties it every PC_LOG_FLUSH_MS, so a hang or the in-game Debug panel
+ * still sees the log within that time. The crash filter asks the flusher
+ * for one more flush (and waits a bounded time) before signalling the
+ * helper, so the crashing thread itself still touches no stdio; at exit
+ * the flusher stops before the CRT's own final flush. Without the helper
+ * (no filter to flush at a crash) stderr stays unbuffered.
+ * TSFP_LOG_UNBUFFERED=1 keeps the old unbuffered stderr. */
+#define PC_LOG_FLUSH_MS 100
+#define PC_LOG_CRASH_FLUSH_MS 500
+static char log_buffer[64 * 1024];
+static HANDLE log_request, log_done, log_thread;
+static volatile LONG log_buffered, log_stop;
+static DWORD WINAPI log_flusher(void *unused)
+{
+    (void)unused;
+    while (!InterlockedCompareExchange(&log_stop, 0, 0)) {
+        DWORD woke = WaitForSingleObject(log_request, PC_LOG_FLUSH_MS);
+        fflush(stderr);
+        if (woke == WAIT_OBJECT_0) SetEvent(log_done);
+    }
+    return 0;
+}
+static void log_buffer_stop(void)
+{
+    if (!log_thread) return;
+    InterlockedExchange(&log_stop, 1);
+    SetEvent(log_request);
+    WaitForSingleObject(log_thread, 2000);
+}
+int pc_crash_buffer_log(void)
+{
+    const char *off = getenv("TSFP_LOG_UNBUFFERED");
+    if (log_buffered) return 1;
+    /* Only with the crash helper armed: its filter flushes before a capture. */
+    if (!packet || (off && !strcmp(off, "1"))) return 0;
+    log_request = CreateEventW(NULL, FALSE, FALSE, NULL);
+    log_done = CreateEventW(NULL, FALSE, FALSE, NULL);
+    if (log_request && log_done && !setvbuf(stderr, log_buffer, _IOFBF, sizeof log_buffer)) {
+        log_thread = CreateThread(NULL, 64 * 1024, log_flusher, NULL, 0, NULL);
+        if (log_thread) {
+            InterlockedExchange(&log_buffered, 1);
+            atexit(log_buffer_stop);
+            return 1;
+        }
+        setvbuf(stderr, NULL, _IONBF, 0);       /* nothing was written into the buffer yet */
+    }
+    if (log_request) CloseHandle(log_request);
+    if (log_done) CloseHandle(log_done);
+    log_request = log_done = NULL;
+    return 0;
+}
+/* From the crash filter: the flusher writes what is buffered. Bounded, so a
+ * crash while some thread holds the stderr lock still reaches the helper. */
+static void log_flush_for_crash(void)
+{
+    if (!InterlockedCompareExchange(&log_buffered, 0, 0) || !log_thread) return;
+    SetEvent(log_request);
+    WaitForSingleObject(log_done, PC_LOG_CRASH_FLUSH_MS);
+}
+
 static LONG WINAPI fatal_exception(EXCEPTION_POINTERS *ep)
 {
-    if (!packet) return EXCEPTION_EXECUTE_HANDLER;
+    if (!packet) { log_flush_for_crash(); return EXCEPTION_EXECUTE_HANDLER; }
     if (InterlockedCompareExchange(&packet->entered, 1, 0)) {
         /* Another faulting thread must not terminate the process while the
          * helper is capturing the first thread's exception and memory. */
@@ -24,6 +88,7 @@ static LONG WINAPI fatal_exception(EXCEPTION_POINTERS *ep)
     packet->exception.ExceptionRecord = NULL;
     packet->context = *ep->ContextRecord;
     if (guest_capture) guest_capture(&packet->guest);
+    log_flush_for_crash();
     MemoryBarrier();
     SetEvent(request);
     /* No stdio, symbol lookup, heap allocation or game locks on this thread. */

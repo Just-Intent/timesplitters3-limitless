@@ -49,10 +49,17 @@ static BOOL CALLBACK init(PINIT_ONCE unused, PVOID parameter, PVOID *context)
 }
 #endif
 
+/* Asked for every texture stage of every draw (after .77: about 1% of a
+ * HugeMap frame in the one-time-init call and the locked read). Once
+ * configured, an x64 aligned volatile read is enough: toggles are rare and
+ * a draw that sees the old mode for one frame is harmless. */
 int tsfp_texture_is_4k(void)
 {
 #ifdef _WIN32
+    static volatile LONG configured;
+    if(configured) return (int)enabled;
     InitOnceExecuteOnce(&once,init,NULL,NULL);
+    InterlockedExchange(&configured,1);
 #else
     pthread_once(&once,configure);
 #endif

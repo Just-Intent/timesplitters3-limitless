@@ -221,8 +221,9 @@ class Emu:
                 if m == 'jmp' or self.taken(m):
                     nxt = i.operands[0].imm
             elif m == 'call':
+                target = i.operands[0].imm if i.operands[0].type == x.X86_OP_IMM else self.val(i, 0)
                 self.push(nxt)
-                nxt = i.operands[0].imm
+                nxt = target
             elif m == 'ret':
                 nxt = self.pop()
                 if i.operands:

@@ -324,6 +324,12 @@ static void lights(void)
 int main(void)
 {
     uint32_t i,r,n,fresh,old;
+    /* these cases fake the guest walk; mapmaker_roomquery.c checks the host walk */
+#ifdef _WIN32
+    _putenv("TSFP_MAPMAKER_ROOM_QUERY=0");
+#else
+    setenv("TSFP_MAPMAKER_ROOM_QUERY","0",1);
+#endif
     g_xbox_mem_offset=(uintptr_t)memory;
     WORD_AT(0x00708788u)=RECORDS;
 

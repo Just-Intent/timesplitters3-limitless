@@ -65,9 +65,12 @@ def crash_client(tmp_path):
     if sys.platform != 'win32': pytest.skip('Windows crash adapter')
     compiler, environment = native_compiler(tmp_path)
     driver = tmp_path / 'driver.c'
-    driver.write_text('#include "pc_crash.h"\n'
+    driver.write_text('#include "pc_crash.h"\n#include <stdio.h>\n#include <string.h>\n'
                       'int main(int argc,char **argv) { if (!pc_crash_init(0)) return 4; '
                       'pc_capture_allocation(1,0x10000,4096); pc_capture_allocation(257,0x10000,4096); pc_capture_model(0x811ee970,15,123); pc_capture_gameplay(4,4,0,0,0,0); pc_capture_gameplay(4,4,0,1,2,0); '
+                      'if(argc>1 && !strcmp(argv[1],"buffered")) { int on=pc_crash_buffer_log(); '
+                      'fprintf(stderr,"buffered %d\\n",on); Sleep(400); fprintf(stderr,"last line before the crash\\n"); '
+                      '*(volatile int *)0=1; return 0; } '
                       'if(argc>1) { pc_crash_watchdog_start(); Sleep(15000); return 0; } '
                       'return pc_crash_test_command("--tsfp-crash-test=concurrent"); }\n')
     for sources, name, libraries in [
@@ -108,6 +111,27 @@ def test_simultaneous_unhandled_exceptions_wait_for_dump(crash_client):
                                    str(tmp_path), 'tsfp_crash_test_site'], capture_output=True,
                                   text=True, timeout=20)
         assert resolved.returncode == 0, resolved.stdout + resolved.stderr
+
+
+@pytest.mark.parametrize('unbuffered', [False, True])
+def test_buffered_log_reaches_crash_report(crash_client, unbuffered):
+    """stderr buffered with the flusher (pc_crash_buffer_log): a line printed
+    just before a crash still reaches the report's log tail."""
+    tmp_path,environment=crash_client
+    area=tmp_path/('unbuffered' if unbuffered else 'buffered')
+    log=tmp_path/(area.name+'.err')
+    environment.update(TSFP_CRASH_DIR=str(area),TSFP_CAPTURE_SESSION='c'*32,RECOMP_LOG_FILE=str(log))
+    if unbuffered:environment['TSFP_LOG_UNBUFFERED']='1'
+    with open(log,'wb') as err:
+        crashed=subprocess.run([str(tmp_path/'driver.exe'),'buffered'],cwd=tmp_path,env=environment,
+                               stdout=subprocess.DEVNULL,stderr=err,timeout=20)
+    assert crashed.returncode==0xC0000005
+    text=log.read_text(errors='replace')
+    assert ('buffered 0' if unbuffered else 'buffered 1') in text
+    assert 'last line before the crash' in text
+    reports=list(area.glob('crash-*/report.json'))
+    assert len(reports)==1
+    assert 'last line before the crash' in (reports[0].parent/'game-log-tail.txt').read_text(errors='replace')
 
 
 def test_helper_heartbeat_and_death(crash_client):
