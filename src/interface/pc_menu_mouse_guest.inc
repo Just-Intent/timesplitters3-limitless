@@ -860,14 +860,9 @@ void pc_mapmaker_roof_piece_new(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_reset(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_compile(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_load(void (*original)(void)) { original(); }
-void pc_mapmaker_roof_menu_init(void (*original)(void)) { original(); }
-void pc_mapmaker_roof_menu_add(void (*original)(void)) { original(); }
-void pc_mapmaker_roof_menu_hover(void (*original)(void)) { original(); }
-void pc_mapmaker_roof_menu_pick(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_move(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_copy(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_piece_free(void (*original)(void)) { original(); }
-void pc_mapmaker_roof_text(void (*original)(void)) { original(); }
 void pc_mapmaker_roof_format(void (*original)(void)) { original(); }
 void pc_mapmaker_tileflags_tiles(void (*original)(void)) { original(); }
 void pc_mapmaker_tileflags_build(void (*original)(void)) { original(); }
@@ -884,7 +879,6 @@ void pc_mapmaker_skymusic_level(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_weather_load(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_weather_start(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_music(void (*original)(void)) { original(); }
-void pc_mapmaker_roof_caption(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_sky_built(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_weather_frame(void (*original)(void)) { original(); }
 void pc_mapmaker_skymusic_weather_list(void (*original)(void)) { original(); }

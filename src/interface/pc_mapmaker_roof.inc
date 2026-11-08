@@ -13,18 +13,13 @@
  * i.e. bits 0..23 are the wall/doorway nodes of the 4 sides; bits 26..31 come
  * from attached decorations (0x002FD8F4..0x002FD917).
  *
- * With TSFP_MAPMAKER_LIMITS=1, in the editor (scene 102):
- * - the last tile category of the palette (sub_00316B50 reads the 12-byte
- *   category tables 0x0052DAC0 (8 rows, editor +0x200 set) / 0x0052DB20
- *   (3 rows) only at 0x00316C1E/0x00316C26) gets two more entries while the
- *   menu is built: tile MAPMAKER_ROOF_BASE_TILE as "Open roof" and as "Open
- *   air". The table is restored right after the build. The items are told
- *   apart by pointer (sub_000792B0 returns the item; the menu's highlighted
- *   item is +0x198 and +0x18C its data +0x14, 0x00077061..0x0007706A);
- * - picking one (sub_00316500, which creates the held piece at editor
- *   +0x2F7C, 0x0031659E) marks that editor piece; the hover preview
- *   (sub_00316920 sets the palette instance mask at 0x00316AF8..0x00316B16)
- *   shows the same mask;
+ * With TSFP_MAPMAKER_LIMITS=1, in the editor (scene 102), a piece is marked
+ * from the tile roof menu (right click, pc_mapmaker_tileflags.inc), any
+ * tile id. The two tile-8 palette presets this file used to add ("46. Small
+ * Open (No Roof)", "47. Small Open (Open Air)") were removed (user request
+ * 2026-11-07, "not needed now that we have the tile flag"): they were
+ * always stock tile 8 plus a mark, so maps that used them load as tile 8
+ * with the same flag (load match below) and play unchanged;
  * - for marked pieces sub_002FC680 returns the mask without 0x02000000 (open
  *   roof) or without 0x02FFFFFF (open air: ceiling and all side nodes; the
  *   floor bit 24 and decorations stay), and sub_002FC470 without 0x02000000,
@@ -48,18 +43,10 @@
  *   copy; both pass the mark on. sub_00308480 (free one piece; sub_00308560
  *   frees a held list through it) forgets it. Before this, only the held
  *   piece was marked and every placed tile was a plain tile 8;
- * - names: the palette caption (0x0032E5CF, tile [palette+0x90]), the tile
- *   label over the grid (0x00311718: piece editor +0x2F18 under the cursor,
- *   else the held piece +0x2F7C) and the selected piece's name (sub_00317C40,
- *   0x00317C5B) read the tile name text (catalogue +8, tile 8 = 0x0A3F
- *   "Small Open") through sub_0003D7B0; for an open entry/piece the hook
- *   returns "Small Open (No Roof)" / "Small Open (Open Air)". The number in
- *   front is the catalogue's +4 (tiles 1..45 in palette order): the caption
- *   draws "%d. " (0x0049F838, sub_0032D9F0; -1 = none in the 3-category
- *   palette), the grid label "%d.%s" (0x0049F7C0, sub_00151030). The stock
- *   formats are kept and the open entries get 46 / 47: "46. Small Open (No
- *   Roof)" in the palette, "46.Small Open (No Roof)" over the grid (stock
- *   "1.Small Open"); the selected piece's name has no number in stock either.
+ * - the grid label over a flagged piece (sub_00151030("%d.%s", number,
+ *   name) at 0x00311724) gets " (No Roof)" / " (Open Air, Unbounded)" /
+ *   " (Open Air, Bounded)" after the stock name; the number stays the
+ *   tile's own (catalogue +4, 1..45);
  * - piece records are 0x28 bytes + pads*8 (word +0x24) + the piece's items
  *   (word +0x1E of them, each (byte +0x14 * 4 + 0x1B) & ~3 bytes); a walk
  *   that skipped only +0x24 stopped at the first piece carrying items (a
@@ -95,7 +82,6 @@
 #define MAPMAKER_GUEST_RET() (g_esp+=4u) /* see pc_mapmaker_limits.inc */
 #endif
 
-#define MAPMAKER_ROOF_BASE_TILE 8u              /* 1x1, four sides + up (connections 0x00528F48) */
 #define MAPMAKER_ROOF_OPEN_ROOF 1u              /* No roof */
 #define MAPMAKER_ROOF_OPEN_AIR 2u               /* Open air (unbounded): no walls, no wall collision */
 #define MAPMAKER_ROOF_OPEN_BOUNDED 3u           /* Open air (bounded): walls not drawn, collision kept */
@@ -105,27 +91,17 @@
 #define MAPMAKER_ROOF_MARK 0x5200u              /* record word +0x26: 0x5200 | mode */
 #define MAPMAKER_ROOF_RET_VIEW 0x0032FEC4u      /* editor 3D view: sub_002FC680 at 0x0032FEBF */
 #define MAPMAKER_ROOF_RECORD 0x28u
-#define MAPMAKER_ROOF_CATS_FULL 0x0052DAC0u     /* 8 x {text, list, count} */
-#define MAPMAKER_ROOF_CATS_BASIC 0x0052DB20u    /* 3 x {text, list, count} */
-#define MAPMAKER_ROOF_RET_MENU_ADD 0x00316C84u  /* sub_00316B50 -> sub_000792B0 */
-#define MAPMAKER_ROOF_LIST_MAX 32u
 #define MAPMAKER_ROOF_SLOTS 4096u               /* > the 2048-piece pool (items.json) */
 #define MAPMAKER_ROOF_CONTAINER_MAX 0x00080000u
 #define MAPMAKER_ROOF_LIST_STEPS 4096u
-#define MAPMAKER_ROOF_NAME_TEXT 0x0A3Fu         /* catalogue[8] +8 (0x00529F18): "Small Open" */
-#define MAPMAKER_ROOF_RET_CAPTION 0x0032E5D4u   /* palette caption, sub_0003D7B0 at 0x0032E5CF */
-#define MAPMAKER_ROOF_RET_PIECE_NAME 0x00317C60u /* sub_00317C40: name of piece editor +0x2F18 */
-#define MAPMAKER_ROOF_LABEL_BYTES 40u
-#define MAPMAKER_ROOF_RET_HOVER 0x0031171Du      /* tile label: sub_0003D7B0 at 0x00311718 */
 #define MAPMAKER_ROOF_RET_HOVER_FORMAT 0x00311729u /* sub_00151030("%d.%s", number, name) at 0x00311724 */
 #define MAPMAKER_ROOF_HOVER_FORMAT 0x0049F7C0u   /* "%d.%s" */
-#define MAPMAKER_ROOF_RET_CAPTION_DRAW 0x0032E5E3u /* sub_0032D9F0 (eax number, ecx name) at 0x0032E5DE */
-#define MAPMAKER_ROOF_NUMBER 46u                /* stock tiles are numbered 1..45 (catalogue +4) */
 #define MAPMAKER_ROOF_SUFFIX_BYTES 64u
 #define MAPMAKER_ROOF_ITEM_MIN 0x18u           /* item sub-record: (count byte +0x14 * 4 + 0x1B) & ~3 */
 #define MAPMAKER_ROOF_SCENE_PLAY 100u
 #define MAPMAKER_ROOF_ROOMS 1024u               /* per-room tables (rooms.json: 1024 entries) */
 #define MAPMAKER_ROOF_ROOM_MODEL 0x907u         /* room r is drawn by a prop of model 0x907 + r */
+#define MAPMAKER_ROOF_TWO_SIDED 0x00040000u     /* prop +0x28: sub_0008F6B0 draws pass 0 with cull mode 0 */
 #define MAPMAKER_ROOF_PLAY_PIECES 2048u
 #define MAPMAKER_ROOF_BUILD_SIZE 0x48u          /* reads +0x14 rooms, +0x28 first room, +0x44 mask */
 #define MAPMAKER_ROOF_FLOOR_HEIGHT 5.0f         /* play y = record floor byte +6 * [0x004760CC] */
@@ -152,23 +128,14 @@
 #define MAPMAKER_ROOF_BODY_HIGH 1.5f             /* the hazard kill compares it with the floor) */
 #define MAPMAKER_ROOF_BODY_HALF 0.3f
 #define MAPMAKER_ROOF_QUERY_OUT 8u               /* room ids returned at most */
-/* Palette entries 46 / 47 (tile 8 presets). Bounded has no palette entry. */
-static const char mapmaker_roof_names[2][MAPMAKER_ROOF_LABEL_BYTES]={"Small Open (No Roof)","Small Open (Open Air, Unbounded)"};
 static const char mapmaker_roof_tails[3][24]={" (No Roof)"," (Open Air, Unbounded)"," (Open Air, Bounded)"};
 
 static struct {
     uint32_t key[MAPMAKER_ROOF_SLOTS];
     uint8_t mode[MAPMAKER_ROOF_SLOTS];
     unsigned keys, marked;
-    /* palette */
-    uint32_t list;                 /* guest buffer for the patched category list */
-    int building;
-    uint32_t ordinal, first, item[2];
-    uint32_t preview_inst, preview_saved, preview_applied;
-    unsigned preview_mode;         /* open entry highlighted in the palette */
-    uint32_t labels;               /* guest strings, 2 x MAPMAKER_ROOF_LABEL_BYTES */
-    uint32_t suffixed;             /* guest string: another tile's name + its flag */
-    unsigned long long placed, mismatch, unmatched, restored, full, no_list, carried, freed;
+    uint32_t suffixed;             /* guest string: a flagged tile's name + its flag */
+    unsigned long long mismatch, unmatched, restored, full, carried, freed;
 } mapmaker_roof;
 
 /* Play time data for bounded open-air rooms (map build sub_0008A780). */
@@ -182,6 +149,8 @@ static struct {
     uint8_t shown[MAPMAKER_ROOF_ROOMS];        /* room's hidden-node count logged in this build */
     uint8_t open[MAPMAKER_ROOF_ROOMS];         /* open-air room (bounded or unbounded), by room index */
     unsigned open_rooms, generation;           /* open[] count; play builds seen (pc_mapmaker_openview.inc) */
+    uint8_t twosided[MAPMAKER_ROOF_ROOMS];     /* room drawn without back-face culling (filled by openview) */
+    unsigned twosided_rooms;                   /* twosided[] count */
     uint8_t out[MAPMAKER_ROOF_SLOTS_FALL];     /* ticks below out_y: live-list slots, then human players */
     uint8_t below[MAPMAKER_ROOF_SLOTS_FALL];   /* "below the lowest floor" logged */
     float last_y[MAPMAKER_ROOF_SLOTS_FALL];    /* y at the last once-a-second log */
@@ -190,7 +159,7 @@ static struct {
     uint32_t query;                            /* guest scratch: box (6 floats) + room ids */
     unsigned long long query_fail, outside_logs;
     unsigned ticks, fall_logs, player_logs;
-    unsigned long long builds, mismatch, beyond, malformed, kills, rejected, hidden_logs, falls;
+    unsigned long long builds, mismatch, beyond, malformed, kills, rejected, hidden_logs, falls, twosided_logs;
 } mapmaker_roof_play;
 extern void sub_000BD090(void),sub_00087310(void);
 
@@ -200,7 +169,7 @@ static uint32_t mapmaker_roof_clear(unsigned mode)
     return mode==MAPMAKER_ROOF_OPEN_AIR?MAPMAKER_ROOF_AIR:
            mode==MAPMAKER_ROOF_OPEN_ROOF || mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_CEILING:0u;
 }
-/* Bits that are not drawn (editor 3D view, palette preview). */
+/* Bits that are not drawn (editor 3D view). */
 static uint32_t mapmaker_roof_shown(unsigned mode)
 {
     return mode==MAPMAKER_ROOF_OPEN_BOUNDED?MAPMAKER_ROOF_AIR:mapmaker_roof_clear(mode);
@@ -417,147 +386,12 @@ void pc_mapmaker_roof_load(void (*original)(void))
     if(mapmaker_limits.limits) mapmaker_roof_records(c,mapmaker_roof_match,NULL);
 }
 
-/* ---- palette ------------------------------------------------------------ */
+/* ---- grid label --------------------------------------------------------- */
 
-/* WRAP sub_00316B50 (tile menu build). */
-void pc_mapmaker_roof_menu_init(void (*original)(void))
-{
-    uint32_t editor,table,last,list,count,rows,i,before=0;
-    if(!mapmaker_roof_editor() || !MAPMAKER_PTR_OK(editor=WORD_AT(0x007844A8u),0x204u)) { original();return; }
-    rows=WORD_AT(editor+0x200u)?8u:3u;                     /* 0x00316B55..0x00316B6F */
-    table=rows==8u?MAPMAKER_ROOF_CATS_FULL:MAPMAKER_ROOF_CATS_BASIC;
-    last=table+(rows-1u)*12u;
-    list=WORD_AT(last+4u);count=WORD_AT(last+8u);
-    for(i=0;i+1u<rows;i++) before+=WORD_AT(table+i*12u+8u);
-    if(count>MAPMAKER_ROOF_LIST_MAX || !MAPMAKER_PTR_OK(list,count*4u)) { original();return; }
-    if(!mapmaker_roof.list && !(mapmaker_roof.list=xbox_HeapAlloc((MAPMAKER_ROOF_LIST_MAX+2u)*4u,4u))) {
-        if(mapmaker_roof.no_list++<4u) fprintf(stderr,"[mapmaker] roof: no memory for the Open roof/Open air entries\n");
-        original();
-        return;
-    }
-    if(!mapmaker_roof.labels) {
-        uint32_t p=xbox_HeapAlloc(2u*MAPMAKER_ROOF_LABEL_BYTES,4u);
-        if(p && MAPMAKER_PTR_OK(p,2u*MAPMAKER_ROOF_LABEL_BYTES)) {
-            memcpy((void *)((uintptr_t)p+g_xbox_mem_offset),mapmaker_roof_names,sizeof mapmaker_roof_names);
-            mapmaker_roof.labels=p;
-        } else if(mapmaker_roof.no_list++<4u) fprintf(stderr,"[mapmaker] roof: no memory for the tile names; they show as Small Open\n");
-    }
-    for(i=0;i<count;i++) WORD_AT(mapmaker_roof.list+i*4u)=WORD_AT(list+i*4u);
-    WORD_AT(mapmaker_roof.list+count*4u)=MAPMAKER_ROOF_BASE_TILE;
-    WORD_AT(mapmaker_roof.list+count*4u+4u)=MAPMAKER_ROOF_BASE_TILE;
-    mapmaker_roof.item[0]=mapmaker_roof.item[1]=0;mapmaker_roof.preview_mode=0;
-    mapmaker_roof.ordinal=0;mapmaker_roof.first=before+count;mapmaker_roof.building=1;
-    WORD_AT(last+4u)=mapmaker_roof.list;WORD_AT(last+8u)=count+2u;
-    original();
-    WORD_AT(last+4u)=list;WORD_AT(last+8u)=count;
-    mapmaker_roof.building=0;
-}
-
-/* WRAP sub_000792B0 (menu: add a custom item, returns it). Every menu calls
- * it; it acts only during the tile menu build, for its own call site. */
-void pc_mapmaker_roof_menu_add(void (*original)(void))
-{
-    uint32_t ret=mapmaker_roof.building && MAPMAKER_STACK_OK(4u)?WORD_AT(g_esp):0u,k;
-    original();
-    if(ret!=MAPMAKER_ROOF_RET_MENU_ADD) return;
-    k=mapmaker_roof.ordinal++-mapmaker_roof.first;
-    if(k<2u) mapmaker_roof.item[k]=g_eax;
-}
-
-static unsigned mapmaker_roof_item_mode(uint32_t menu)
-{
-    uint32_t item;
-    if(!MAPMAKER_PTR_OK(menu,0x19Cu) || !(item=WORD_AT(menu+0x198u))) return 0;
-    if(WORD_AT(menu+0x18Cu)!=MAPMAKER_ROOF_BASE_TILE) return 0;
-    return item==mapmaker_roof.item[0]?MAPMAKER_ROOF_OPEN_ROOF:item==mapmaker_roof.item[1]?MAPMAKER_ROOF_OPEN_AIR:0u;
-}
-static void mapmaker_roof_preview_restore(void)
-{
-    uint32_t inst=mapmaker_roof.preview_inst;
-    if(inst && MAPMAKER_PTR_OK(inst,0x34u) && WORD_AT(inst+0x30u)==mapmaker_roof.preview_applied)
-        WORD_AT(inst+0x30u)=mapmaker_roof.preview_saved;
-}
-
-/* WRAP sub_00316920 (tile menu: highlight changed, argument the menu). */
-void pc_mapmaker_roof_menu_hover(void (*original)(void))
-{
-    uint32_t menu=MAPMAKER_STACK_OK(8u)?WORD_AT(g_esp+4u):0u,palette,prop,inst,now;
-    unsigned mode;
-    original();
-    if(!menu || !(mapmaker_roof.item[0]|mapmaker_roof.item[1]) || !mapmaker_roof_editor()) return;
-    mode=mapmaker_roof_item_mode(menu);
-    mapmaker_roof.preview_mode=mode;
-    if(!mode) {
-        mapmaker_roof_preview_restore();
-        mapmaker_roof.preview_inst=0;
-        return;
-    }
-    palette=WORD_AT(0x00778D34u);
-    if(!MAPMAKER_PTR_OK(palette,0x88u) || !MAPMAKER_PTR_OK(prop=WORD_AT(palette+0x84u),8u) ||
-       !MAPMAKER_PTR_OK(inst=WORD_AT(prop+4u),0x34u)) return;
-    now=WORD_AT(inst+0x30u);
-    if(inst!=mapmaker_roof.preview_inst || now!=mapmaker_roof.preview_applied) mapmaker_roof.preview_saved=now;
-    mapmaker_roof.preview_inst=inst;
-    mapmaker_roof.preview_applied=mapmaker_roof.preview_saved&~mapmaker_roof_shown(mode);
-    WORD_AT(inst+0x30u)=mapmaker_roof.preview_applied;
-}
-
-/* WRAP sub_00316500 (tile menu: pick, creates the held piece). The stock
- * code derives the new piece's +0x44 from the preview mask (0x00316573..
- * 0x0031657A), so the stock preview value is put back for the call. */
-void pc_mapmaker_roof_menu_pick(void (*original)(void))
-{
-    uint32_t menu=MAPMAKER_STACK_OK(8u)?WORD_AT(g_esp+4u):0u,editor,piece;
-    unsigned mode=0;
-    int swapped=0;
-    if(menu && (mapmaker_roof.item[0]|mapmaker_roof.item[1]) && mapmaker_roof_editor()) mode=mapmaker_roof_item_mode(menu);
-    if(mode && mapmaker_roof.preview_inst && MAPMAKER_PTR_OK(mapmaker_roof.preview_inst,0x34u) &&
-       WORD_AT(mapmaker_roof.preview_inst+0x30u)==mapmaker_roof.preview_applied) {
-        WORD_AT(mapmaker_roof.preview_inst+0x30u)=mapmaker_roof.preview_saved;swapped=1;
-    }
-    original();
-    if(swapped) WORD_AT(mapmaker_roof.preview_inst+0x30u)=mapmaker_roof.preview_applied;
-    if(!mode || !MAPMAKER_PTR_OK(editor=WORD_AT(0x007844A8u),0x2F80u)) return;
-    piece=WORD_AT(editor+0x2F7Cu);
-    if(!MAPMAKER_PTR_OK(piece,0x48u) || WORD_AT(piece+0x10u)!=MAPMAKER_ROOF_BASE_TILE) return;
-    mapmaker_roof_set(piece,mode);
-    if(mapmaker_roof.placed++<4u)
-        fprintf(stderr,"[mapmaker] roof: %s tile picked\n",mode==MAPMAKER_ROOF_OPEN_AIR?"open air (unbounded)":"open roof");
-}
-
-/* WRAP sub_0003D7B0 (text id -> string, cdecl, one argument). Runs for
- * every text lookup: without names or for any other id it is one compare.
- * Only the tile 8 name, and only for the palette caption of a highlighted
- * open entry or the name of a selected open piece. */
-void pc_mapmaker_roof_text(void (*original)(void))
-{
-    uint32_t ret,piece,editor;
-    unsigned mode=0;
-    if(!mapmaker_roof.labels || !MAPMAKER_STACK_OK(8u) || WORD_AT(g_esp+4u)!=MAPMAKER_ROOF_NAME_TEXT) { original();return; }
-    ret=WORD_AT(g_esp);
-    if(ret==MAPMAKER_ROOF_RET_CAPTION) mode=mapmaker_roof.preview_mode;
-    else if(ret==MAPMAKER_ROOF_RET_PIECE_NAME && MAPMAKER_PTR_OK(editor=WORD_AT(0x007844A8u),0x2F1Cu) &&
-            (piece=WORD_AT(editor+0x2F18u))!=0) mode=mapmaker_roof_mode(piece);
-    else if(ret==MAPMAKER_ROOF_RET_HOVER && MAPMAKER_PTR_OK(editor=WORD_AT(0x007844A8u),0x2F80u) &&
-            ((piece=WORD_AT(editor+0x2F18u))!=0 || (piece=WORD_AT(editor+0x2F7Cu))!=0)) mode=mapmaker_roof_mode(piece);
-    if((mode!=MAPMAKER_ROOF_OPEN_ROOF && mode!=MAPMAKER_ROOF_OPEN_AIR) || !mapmaker_roof_editor()) { original();return; }
-    g_eax=mapmaker_roof.labels+(mode-1u)*MAPMAKER_ROOF_LABEL_BYTES;
-    MAPMAKER_GUEST_RET();
-}
-
-/* Which label a guest string is (0: none). Only the text hook hands them out. */
-static unsigned mapmaker_roof_label_mode(uint32_t s)
-{
-    if(!mapmaker_roof.labels) return 0;
-    return s==mapmaker_roof.labels?MAPMAKER_ROOF_OPEN_ROOF:
-           s==mapmaker_roof.labels+MAPMAKER_ROOF_LABEL_BYTES?MAPMAKER_ROOF_OPEN_AIR:0u;
-}
-
-/* Any other flagged tile (set from the right-click roof menu,
- * pc_mapmaker_tileflags.inc), and a bounded tile 8 (it has no palette entry
- * and keeps the stock name): the grid label's name gets " (No Roof)" /
- * " (Open Air, Unbounded)" / " (Open Air, Bounded)" in a heap copy; the
- * number stays the tile's own. */
+/* A flagged tile (set from the right-click roof menu,
+ * pc_mapmaker_tileflags.inc; tile 8 included): the grid label's name gets
+ * " (No Roof)" / " (Open Air, Unbounded)" / " (Open Air, Bounded)" in a heap
+ * copy; the number stays the tile's own. */
 static unsigned mapmaker_roof_hover_mode(void)
 {
     uint32_t editor=WORD_AT(0x007844A8u),piece;
@@ -584,30 +418,14 @@ static void mapmaker_roof_suffix(unsigned mode)
 
 /* WRAP sub_00151030 (sprintf into a static buffer, cdecl). The tile label
  * over the grid (0x0031171D..0x00311724) prints "%d.%s" with the tile's
- * number (catalogue +4, 1..45) and name; for an open piece's label the
- * number becomes 46 / 47, the next numbers of the list. One compare per call
- * while no label exists. */
+ * number (catalogue +4, 1..45) and name; a flagged piece's name gets its
+ * flag. One compare per call while no tile is flagged. */
 void pc_mapmaker_roof_format(void (*original)(void))
 {
     unsigned mode;
-    if(mapmaker_roof.labels && MAPMAKER_STACK_OK(16u) && WORD_AT(g_esp)==MAPMAKER_ROOF_RET_HOVER_FORMAT &&
-       WORD_AT(g_esp+4u)==MAPMAKER_ROOF_HOVER_FORMAT && (mode=mapmaker_roof_label_mode(WORD_AT(g_esp+12u)))!=0)
-        WORD_AT(g_esp+8u)=MAPMAKER_ROOF_NUMBER+mode-1u;
-    else if(mapmaker_roof.marked && MAPMAKER_STACK_OK(16u) && WORD_AT(g_esp)==MAPMAKER_ROOF_RET_HOVER_FORMAT &&
-            WORD_AT(g_esp+4u)==MAPMAKER_ROOF_HOVER_FORMAT && (mode=mapmaker_roof_hover_mode())!=0)
+    if(mapmaker_roof.marked && MAPMAKER_STACK_OK(16u) && WORD_AT(g_esp)==MAPMAKER_ROOF_RET_HOVER_FORMAT &&
+       WORD_AT(g_esp+4u)==MAPMAKER_ROOF_HOVER_FORMAT && (mode=mapmaker_roof_hover_mode())!=0)
         mapmaker_roof_suffix(mode);
-    original();
-}
-
-/* WRAP sub_0032D9F0 (draw "%d. " + name: eax number or -1, ecx name, cdecl
- * stack arguments). The palette caption (0x0032E5DE) passes catalogue +4 in
- * the 8-category palette and -1 (no number) in the 3-category one. */
-void pc_mapmaker_roof_caption(void (*original)(void))
-{
-    unsigned mode;
-    if(mapmaker_roof.labels && MAPMAKER_STACK_OK(4u) && WORD_AT(g_esp)==MAPMAKER_ROOF_RET_CAPTION_DRAW &&
-       (int32_t)g_eax>=0 && (mode=mapmaker_roof_label_mode(g_ecx))!=0)
-        g_eax=MAPMAKER_ROOF_NUMBER+mode-1u;
     original();
 }
 
@@ -651,6 +469,8 @@ void pc_mapmaker_roof_play(void (*original)(void))
     memset(mapmaker_roof_play.shown,0,sizeof mapmaker_roof_play.shown);
     memset(mapmaker_roof_play.open,0,sizeof mapmaker_roof_play.open);
     mapmaker_roof_play.open_rooms=0;mapmaker_roof_play.generation++;
+    memset(mapmaker_roof_play.twosided,0,sizeof mapmaker_roof_play.twosided);
+    mapmaker_roof_play.twosided_rooms=0;
     memset(mapmaker_roof_play.out,0,sizeof mapmaker_roof_play.out);
     memset(mapmaker_roof_play.below,0,sizeof mapmaker_roof_play.below);
     memset(mapmaker_roof_play.noroom,0,sizeof mapmaker_roof_play.noroom);
@@ -752,29 +572,44 @@ static void mapmaker_roof_count_hidden(uint32_t inst,uint32_t mask,uint32_t hide
 }
 
 /* WRAP sub_0008F6B0 (draw one model instance: inst, pass, layer; cdecl).
- * Runs for every drawn instance: without bounded rooms, or outside MapMaker
- * play, it is one counter test and one scene read. A room's geometry is the
- * prop [inst] with +0x34 = room (1-based, dword, 0x00085D9F), the 16-bit
- * model id +0x94 = 0x907 + room (word: 0x000A69E3 stores it, 0x000A6F4F
- * reads it; +0x96 is another word, 0x000A6897) and +4 = inst
- * (sub_00085CC0 0x00085D6B..0x00085DD0). */
+ * Runs for every drawn instance: without bounded or two-sided rooms, or
+ * outside MapMaker play, it is one counter test and one scene read. A room's
+ * geometry is the prop [inst] with +0x34 = room (1-based, dword, 0x00085D9F),
+ * the 16-bit model id +0x94 = 0x907 + room (word: 0x000A69E3 stores it,
+ * 0x000A6F4F reads it; +0x96 is another word, 0x000A6897) and +4 = inst
+ * (sub_00085CC0 0x00085D6B..0x00085DD0).
+ * Bounded room: its side nodes are left out of this draw (inst+0x30).
+ * Two-sided room (an open-air room or a room beside one, marked by
+ * pc_mapmaker_openview.inc): room geometry is single-sided and faces into
+ * the room (the stock room draw sub_000A2900 culls clockwise faces, 0x900,
+ * or counter-clockwise ones for mirrored rooms, 0x901, render state 6,
+ * 0x000A29AD..0x000A29C9), so a tile seen from outside across open air
+ * showed the floor and ceiling through walls that were culled. The stock
+ * sub_0008F6B0 sets render state 6 (cull mode) to 0 for pass 0 when the
+ * prop has +0x28 bit 0x40000 and puts the old mode back after its nodes
+ * (0x0008F805..0x0008F822, 0x0008F8C4..0x0008F8E4); the hook sets that bit
+ * for the call only. The bit's other readers (0x000A6045 in sub_000A5F40,
+ * 0x000D84E6 in sub_000D84C0) are not reached from the draw. */
 void pc_mapmaker_roof_draw(void (*original)(void))
 {
-    uint32_t inst,prop,room,hide,mask;
-    if(!mapmaker_roof_play.rooms || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY || !MAPMAKER_STACK_OK(8u) ||
-       !MAPMAKER_PTR_OK(inst=WORD_AT(g_esp+4u),0x34u) || !MAPMAKER_PTR_OK(prop=WORD_AT(inst),0x98u) ||
-       (room=WORD_AT(prop+0x34u))-1u>=MAPMAKER_ROOF_ROOMS || !(hide=mapmaker_roof_play.hide[room-1u])) { original();return; }
+    uint32_t inst,prop,room,hide,mask,flags;
+    int two;
+    if(!(mapmaker_roof_play.rooms || mapmaker_roof_play.twosided_rooms) || WORD_AT(0x0079094Cu)!=MAPMAKER_ROOF_SCENE_PLAY ||
+       !MAPMAKER_STACK_OK(8u) || !MAPMAKER_PTR_OK(inst=WORD_AT(g_esp+4u),0x34u) || !MAPMAKER_PTR_OK(prop=WORD_AT(inst),0x98u) ||
+       (room=WORD_AT(prop+0x34u))-1u>=MAPMAKER_ROOF_ROOMS) { original();return; }
+    hide=mapmaker_roof_play.hide[room-1u];two=mapmaker_roof_play.twosided[room-1u];
+    if(!hide && !two) { original();return; }
     if(WORD_AT(prop+4u)!=inst || (WORD_AT(prop+0x94u)&0xFFFFu)!=MAPMAKER_ROOF_ROOM_MODEL+room) {
-        /* another prop in a bounded room (expected), or a geometry prop the
-         * checks do not recognise: the first few are logged */
+        /* another prop in the room (expected), or a geometry prop the checks
+         * do not recognise: the first few are logged */
         if(mapmaker_roof_play.rejected++<6u)
-            fprintf(stderr,"[mapmaker] roof: draw in bounded room %u not the room geometry (prop 0x%08X +4 0x%08X inst 0x%08X model 0x%04X)\n",
-                    room,prop,WORD_AT(prop+4u),inst,WORD_AT(prop+0x94u)&0xFFFFu);
+            fprintf(stderr,"[mapmaker] roof: draw in %s room %u not the room geometry (prop 0x%08X +4 0x%08X inst 0x%08X model 0x%04X)\n",
+                    hide?"bounded":"two-sided",room,prop,WORD_AT(prop+4u),inst,WORD_AT(prop+0x94u)&0xFFFFu);
         original();
         return;
     }
-    mask=WORD_AT(inst+0x30u);
-    if(!mapmaker_roof_play.shown[room-1u]) {
+    mask=WORD_AT(inst+0x30u);flags=WORD_AT(prop+0x28u);
+    if(hide && !mapmaker_roof_play.shown[room-1u]) {
         unsigned total,hidden;
         mapmaker_roof_play.shown[room-1u]=1;
         mapmaker_roof_count_hidden(inst,mask,hide,&total,&hidden);
@@ -784,9 +619,14 @@ void pc_mapmaker_roof_draw(void (*original)(void))
                     room,hidden,total,mask);
         }
     }
-    WORD_AT(inst+0x30u)=mask&~hide;
+    if(two && !(flags&MAPMAKER_ROOF_TWO_SIDED) && mapmaker_roof_play.twosided_logs++<8u)
+        fprintf(stderr,"[mapmaker] roof: room %u drawn two-sided (seen across open air)\n",room);
+    if(two && (flags&MAPMAKER_ROOF_TWO_SIDED)) two=0;           /* already two-sided: nothing to undo */
+    if(hide) WORD_AT(inst+0x30u)=mask&~hide;
+    if(two) WORD_AT(prop+0x28u)=flags|MAPMAKER_ROOF_TWO_SIDED;
     original();
-    if(WORD_AT(inst+0x30u)==(mask&~hide)) WORD_AT(inst+0x30u)=mask;
+    if(hide && WORD_AT(inst+0x30u)==(mask&~hide)) WORD_AT(inst+0x30u)=mask;
+    if(two) WORD_AT(prop+0x28u)&=~MAPMAKER_ROOF_TWO_SIDED;
 }
 
 /* ---- play: falling off an Open air (unbounded) tile -------------------------

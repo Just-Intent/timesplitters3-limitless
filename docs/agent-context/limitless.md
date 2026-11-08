@@ -118,36 +118,31 @@ summary per map build. Independent of `TSFP_MAPMAKER_LIMITS`; the Test Lab
 runner strips it with the other `TSFP_*` variables. Fixture
 `tests/mapmaker/test_mapmaker_skymask.py`.
 
-MapMaker Open roof / Open air tiles (`src/interface/pc_mapmaker_roof.inc`, area `sky`,
-include after `pc_mapmaker_skymask.inc`; `TSFP_MAPMAKER_LIMITS=1`, editor
-only): `pc_mapmaker_roof_menu_init` (`sub_00316B50`) appends tile 8 twice to
-the last tile category (tables `0x0052DAC0`/`0x0052DB20`) for the duration of
-the build and restores the table; the two items are identified by pointer
-(`sub_000792B0` from `0x00316C84`). Picking one (`sub_00316500`) marks the
-held editor piece (`+0x2F7C`). Placing/picking up copies the 0x48-byte
-piece into a new one (`sub_003037A0`, `sub_00307EC0` + `rep movsd`), so
-`sub_002F95E0(old,new)` (move) and `sub_00308120(src,dst)` (copy) pass the
-mark on and `sub_00308480` (free) forgets it; without them placed tiles
-were plain tile 8 (v0.4.0-mapmaker.5 bug). `sub_0003D7B0` answers tile 8's
-name (text 0x0A3F) at `0x0032E5D4` (palette caption) / `0x0031171D` (grid
-label: piece `+0x2F18`, else held) / `0x00317C60` (selected piece) with
-"Small Open (No Roof)"/"(Open Air)"; `pc_mapmaker_roof_caption`
-(`sub_0032D9F0` from `0x0032E5DE`, eax) and `pc_mapmaker_roof_format`
-(`sub_00151030` from `0x00311724`, "%d.%s") make the number (catalogue +4,
-stock 1..45) 46/47 for those labels. `sub_002FC680`
-then drops `0x02000000` (open
-roof) or `0x02FFFFFF` (open air, floor bit 24 kept) and `sub_002FC470` drops
-`0x02000000`. The rebuild hook (`sub_003006C0`) stores record word `+0x26` =
-`0x5201`/`0x5202` and the open `+8` (any scene); records are 0x28 + pads*8
-(`+0x24`) + items (`+0x1E`, `(byte +0x14*4+0x1B)&~3` each): skipping only
-`+0x24` lost the marks after a start point, so the editor reload after a play
-(`sub_00302A60` -> `sub_00301A90` at `0x00303076`, new pointers) closed every
-tile (v0.4.0-mapmaker.7 bug); play reads `+8` as is (`0x0008A91D`, no
-recompute); the load hook (`sub_00301A90`: play return, Load map, undo)
-matches marks back to pieces; `sub_00307FD0` and `sub_002FEBF0` forget marks. The map
-stays a stock map (tile 8 + mask), so a stock game plays it open. Notes, WRAP
-lines and test steps: `docs/mapmaker/mapmaker-sky.md` "Open-air tiles". Fixture
-`tests/mapmaker/test_mapmaker_roof.py`.
+MapMaker roof flags (`src/interface/pc_mapmaker_roof.inc`, area `sky`, include
+after `pc_mapmaker_skymask.inc`; `TSFP_MAPMAKER_LIMITS=1`, editor only): a
+piece is marked from the tile roof menu (below). The tile-8 palette presets
+46/47 and their palette/text/caption hooks were removed (user, 2026-11-07);
+maps that used them are tile 8 + mark, so they load flagged. Placing/picking
+up copies the 0x48-byte piece (`sub_003037A0`, `sub_00307EC0` + `rep movsd`),
+so `sub_002F95E0(old,new)` (move) and `sub_00308120(src,dst)` (copy) pass the
+mark on and `sub_00308480` (free) forgets it (v0.4.0-mapmaker.5 bug).
+`pc_mapmaker_roof_format` (`sub_00151030` from `0x00311724`, "%d.%s") appends
+the flag to a flagged piece's grid label. `sub_002FC680` then drops
+`0x02000000` (No roof) or `0x02FFFFFF` (open air, floor bit 24 kept) and
+`sub_002FC470` drops `0x02000000`. The rebuild hook (`sub_003006C0`) stores
+record word `+0x26` = `0x5201`/`0x5202`/`0x5203` and the open `+8` (any
+scene); records are 0x28 + pads*8 (`+0x24`) + items (`+0x1E`, `(byte
++0x14*4+0x1B)&~3` each): skipping only `+0x24` lost the marks after a start
+point (v0.4.0-mapmaker.7 bug); play reads `+8` as is (`0x0008A91D`); the load
+hook (`sub_00301A90`: play return, Load map, undo) matches marks back to
+pieces; `sub_00307FD0` and `sub_002FEBF0` forget marks. A stock game plays
+the map open. Notes, WRAP lines and test steps: `docs/mapmaker/mapmaker-sky.md`
+"Open-air tiles". Fixture `tests/mapmaker/test_mapmaker_roof.py`.
+Two-sided draw (2026-11-07): `pc_mapmaker_roof_draw` (`sub_0008F6B0`) sets
+prop `+0x28` bit 0x40000 for the call on rooms `mapmaker_roof_play.twosided`
+(filled by openview), so the stock pass-0 cull-none path
+(`0x0008F805..0x0008F822`, restore `0x0008F8C4..0x0008F8E4`) draws their
+inward-facing walls from outside too; `test_cull_none_flag_sites`.
 
 ### MapMaker level memory budget (opt-in)
 
@@ -763,7 +758,7 @@ The sky area wraps the editor neighbour-mask builders (`sub_002FC680`,
 (`sub_00316B50`, `sub_000792B0`, `sub_00316920`, `sub_00316500`), piece
 move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`), text
 (`sub_0003D7B0`, chained with realbosses) and tile numbers (`sub_00151030`,
-`sub_0032D9F0`) for the Open roof / Open air tiles (`src/interface/pc_mapmaker_roof.inc`); compile, load and reset add a further
+`sub_0032D9F0`) for the Open roof / Open air tiles (`src/interface/pc_mapmaker_roof.inc`; the palette, text and caption hooks were removed on 2026-11-07); compile, load and reset add a further
 layer to their existing chains. Contract: `docs/mapmaker/mapmaker-sky.md`.
 Its hook on `sub_002F8B40` (return 0x0030723F, Story AI mode) answers -1 while
 a Story AI is held, the value `[editor+0x2F20]` already has for "no point under
@@ -791,12 +786,12 @@ The sets area (20-slot custom character set) wraps the set screen, store, play c
 Realbosses (giant trophy monster) wraps the picker, text, model request, anim mount `sub_001C8540` and AI start `sub_0015B830`; its HUD layer sits inside bosses.
 Realbosses wraps `sub_0013A400` (Story overhead meter; skipped only for the real trophy monster at return 0x0014D264).
 Sets wraps `sub_002D2C70` (match start; editor Test map bots from slots 1-10), chained with the story character hook.
-Sky wraps piece move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`) to carry open-roof marks, and text `sub_0003D7B0` (+realbosses).
+Sky wraps piece move/copy/free (`sub_002F95E0`, `sub_00308120`, `sub_00308480`) to carry open-roof marks (its text layer on `sub_0003D7B0` is gone).
 Bosses wraps `sub_0014D1F0` (HUD per viewport) to draw Sub-boss overhead meters via `sub_0013A400` before the stock loop.
 `matchbots.json` moves the 26 live per-actor reads to a 64-entry mirror at 0x00904000 and the rank table to 0x00904100 (every scene); the matchbots area fills them.
-The weaponset area (20 slots; list shows hidden 0x29/0x2F/0x38: `sub_001CD9D0`) wraps the play set `sub_0006BD30`, pickup slot/veto/spawn and weapon set screen functions, and chains compile/load/reset, `sub_0003D7B0` and `sub_00078590`; roof wraps the label format `sub_00151030` and caption `sub_0032D9F0`.
+The weaponset area (20 slots; list shows hidden 0x29/0x2F/0x38: `sub_001CD9D0`) wraps the play set `sub_0006BD30`, pickup slot/veto/spawn and weapon set screen functions, and chains compile/load/reset, `sub_0003D7B0` and `sub_00078590`; roof wraps the label format `sub_00151030`.
 Realbosses adds the giant skeleton: story level init `sub_0025F720`, `sub_0029FE00` variant, `sub_002875F0` emerge, `sub_00287E20` throw and level events `sub_002274C0` (death event dropped).
-bigdraw `sub_000862C0`: bosses on the whole view; skelvis logs; bossroom: bosses in camera room list. openview: walk `sub_00089B90`: open-air areas unclipped (mapmaker-sky.md).
+bigdraw `sub_000862C0`: bosses on the whole view; skelvis logs; bossroom: bosses in camera room list. openview: walk `sub_00089B90`: open-air areas unclipped; rooms touching them by portal or box (record +0x10/+0x1C) drawn, two-sided (mapmaker-sky.md).
 camera wraps actor update `sub_00246000`: a switch-held camera (mode 0x80, D8/C14 reciprocal) runs with stock skip bit data+8 bit 0 (0x002460E5), so the sweep stops; the walk logs what each view reaches. Test `test_mapmaker_camera.py`; mapmaker-camera.md (4:3 frame fixed in shared pc_display_ui.inc, test_camera_widescreen.py; ~10-floor view open).
 
 ## Build and test (extends [build-test.md](build-test.md))
@@ -818,10 +813,10 @@ stock sky data against the local XBE and skips that check without it.
 switch `TSFP_MAPMAKER_ROOM_MASK_CLEAR`) compares the exact stderr text and
 runs 15 mutations; its decoder check of the per-room mask table's references
 skips without the private XBE. Both are in the native CI list, as is
-`tests/mapmaker/test_mapmaker_roof.py` (fixture `tests/mapmaker/mapmaker_roof.c`, the Open
-roof / Open air palette tiles: 55 mutations including place -> save ->
-play +8 -> reload, play -> editor -> copy -> play with items and labels
-46/47; its XBE data, copy-site, record word +0x26, label-site
+`tests/mapmaker/test_mapmaker_roof.py` (fixture `tests/mapmaker/mapmaker_roof.c`, the roof
+flags: mutations including place -> save ->
+play +8 -> reload, play -> editor -> copy -> play with items and flag
+labels, two-sided draws; its XBE data, copy-site, record word +0x26, label-site
 and hook-site decoder checks skip without the private XBE). The MapMaker
 pointer, memory budget and stage A limits fixtures
 (`tests/mapmaker/test_mapmaker_pointer.py`, `tests/mapmaker/test_mapmaker_budget.py`,
