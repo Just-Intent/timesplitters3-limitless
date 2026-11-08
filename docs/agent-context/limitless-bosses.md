@@ -195,3 +195,6 @@ count a quarter; the rim pads live in the pad pool's tail (dives need index
 After .73: the collision hull 0x249 is hidden as the story's slot 4 does
 (`sub_000942B0(instance, 8)`, the draw skips +0x1F6 & 8); no early ragbug
 release (story state-10 launches; bugs dive near the rim ring, explode when shot).
+After .75: only the bottle hurts it (hull callback 0x0028B5F0); the rack is
+hidden; the bottle sits at bone 0x29's point read after the boss's model draw
+(chain on sub_0008F950 -> pc_mapmaker_pitboss_draw), else the estimate.

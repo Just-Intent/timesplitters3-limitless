@@ -137,8 +137,10 @@
 #define PIT_ENT_YAW 0x70u               /* entity yaw (radians); the fight sets 0 at its start (0x0029EA49) */
 #define PIT_MOUTH_UP 11.0f              /* the mouth over the boss's feet (m66: eye bandage 12.35 up, 2.27 ahead) */
 #define PIT_MOUTH_AHEAD 2.5f
-#define PIT_BODY_SHARE 0.25f            /* a hit on the boss's collision hull counts a quarter of a bottle hit */
-#define PIT_BOTTLE_CB 0x0028C2F0u       /* the bottle's damage callback (object +0x19C) */
+#define PIT_HULL_CB 0x0028B5F0u         /* the hull's damage callback: the ragbug's (sets health 1.0): no damage, never destroyed */
+#define PIT_BONE 0x29u                  /* the bottle's bone (0x0029E47E) */
+#define PIT_BONE_FRESH 30u              /* fight frames a drawn bone point stays in use */
+#define PIT_BONE_MIN 3.0f               /* a drawn mouth this far over the feet at least, else not trusted */
 #define PIT_ST_PADS 0x4BF0u             /* 13 pad indices (sub_0009CC40 of 0x4B5..0x4C1) */
 #define PIT_PADS_N 13u
 #define PIT_PAD_TABLE 0x00715F2Cu       /* -> pads, 0x20 each (+0 id, +4 1, +8 0x1A, +0xC x/y/z, +0x18 yaw) */
@@ -231,7 +233,8 @@ typedef struct {
     float dx, dy, dz;
     int placed, started, ready, released;
     uint32_t props[4];                  /* the props last seen (bottle, collision, rack, bandage): logged when made */
-    unsigned no_bottle, traces, hits, frames, mouthed, forwarded, pads_full, hidden;
+    unsigned no_bottle, traces, hits, frames, mouthed, pads_full, hidden, bone_at, bone_src;
+    float bone[3];
     uint8_t bug_phase[6];
     uint8_t boss;
     unsigned bugs, moves, last;
@@ -702,12 +705,22 @@ static void pit_flock_note(PitInst *k);
  * untextured, as well as the correct size and textured near the head": the
  * hull drawn at the boss's feet, the bottle at the mouth). After each fight
  * frame the same call hides it; it still takes hits (bottle callback). */
-static void pit_hull(PitInst *k)
+/* Playtest .75 ("an object floating above him that doesn't need to be there"):
+ * the torture rack 0x246 hangs 22.5 over the spawn (the catacombs hostage
+ * rack, m75.err "rack 0x246 made ... at (117.52, 22.99, 410.31)"); a MapMaker
+ * map has no hostage, so it is hidden the same way. The fight still keeps it
+ * (its stages and slot 2 read it). */
+static void pit_hide(PitInst *k,uint32_t field,const char *what)
 {
-    uint32_t h=WORD_AT(k->state+PIT_ST_COLL),inst;
+    uint32_t h=WORD_AT(k->state+field),inst;
     if(!h || !MAPMAKER_PTR_OK(h,0x200u) || !MAPMAKER_PTR_OK(inst=WORD_AT(h+4u),0x200u) || (PIT_B(inst+0x1F6u)&8u)) return;
     guest_call(sub_000942B0,2,inst,8u);
-    if(!k->hidden++) pit_log("collision hull 0x249 hidden as the story's slot 4 does (skeleton, hull)",(uint32_t)(k-pit_lv.k)+1u,h);
+    if(k->hidden++<2u) pit_log(what,(uint32_t)(k-pit_lv.k)+1u,h);
+}
+static void pit_hull(PitInst *k)
+{
+    pit_hide(k,PIT_ST_COLL,"collision hull 0x249 hidden as the story's slot 4 does (skeleton, hull)");
+    pit_hide(k,PIT_ST_RACK,"hostage rack 0x246 hidden (no hostage in MapMaker) (skeleton, rack)");
 }
 /* WRAP sub_0029FE00 (cdecl entity; class 0x20000): the pit fight for a pit
  * skeleton, with its block, statics and arena swapped in. The lifted fight
@@ -796,13 +809,15 @@ static void pit_props_rooms(PitInst *k,uint32_t ent)
  * (0x0029E46E..0x0029E517 then 0x0029E5EE..0x0029E6FC every frame) from the
  * boss's world bone matrices, which a MapMaker boss does not have posed when
  * the fight runs (they come from the draw, sub_000A1B80 per view). After each
- * fight frame (states 1..13) the bottle is put at PIT_MOUTH_UP over the
- * boss's feet and PIT_MOUTH_AHEAD in front of it (yaw +0x70: forward = (sin,
- * 0, cos), +z at the fight's yaw 0 as the .66 eye bandage showed), facing as
- * the boss; a NaN yaw or tilt is cleared. Nothing the fight wrote stays NaN.
- * The collision hull 0x249 gets the bottle's damage callback (stock: none,
- * so hits destroyed it as a plain prop, .66 "easily destroyed"); its hits
- * count PIT_BODY_SHARE of a bottle hit (pc_mapmaker_pitboss_bottle_damage). */
+ * fight frame (states 1..13) the bottle is put at bone 0x29's point as the
+ * boss's last model draw left it (pc_mapmaker_pitboss_draw, after .75: the
+ * fixed estimate was not at the mouth), or, when it was not drawn in the last
+ * PIT_BONE_FRESH frames, at PIT_MOUTH_UP over its feet and PIT_MOUTH_AHEAD in
+ * front (yaw +0x70: forward (sin, 0, cos)); facing as the boss; a NaN yaw or
+ * tilt is cleared. Nothing the fight wrote stays NaN. The collision hull 0x249
+ * gets the ragbug's health-reset callback 0x0028B5F0 (stock: none, so hits
+ * destroyed it as a plain prop, .66): shots on the body do nothing (.75: the
+ * user wants only the bottle to hurt it; the .68 quarter share is gone). */
 static int pit_finite(float f) { return f==f && f>-1.0e6f && f<1.0e6f; }
 static float pit_sin(float a)
 {
@@ -813,19 +828,73 @@ static float pit_sin(float a)
     for(t=x,r=x,i=1;i<8;i++) { t*=-x*x/(float)((2*i)*(2*i+1));r+=t; }
     return r;
 }
+/* The bottle's bone point as the story computes it (0x0029E46E..0x0029E500):
+ * the model skeleton [anim+4] entry (0x29 - its first word) * 0xC8, the midpoint
+ * of its segment [entry+0xAC] (+0..+0xB), through bone matrix [anim+0x10] +
+ * int8 [entry+0x49] * 0x40 (sub_00151E80: x*m0 + y*m4 + z*m8 + m12). Read
+ * right after the boss's model draw (chained on sub_0008F950, the model draw:
+ * sub_000A1B80 posed it there for the view drawn), never in the fight frame,
+ * whose matrices were stale or NaN (playtests .62-.75). */
+static int pit_bone_point(uint32_t ac,float out[3])
+{
+    uint32_t def,entry,seg,m;
+    int32_t first;
+    float p[3],q[3];
+    unsigned i;
+    if(!MAPMAKER_PTR_OK(ac,0x20u) || !MAPMAKER_PTR_OK(def=WORD_AT(ac+4u),4u) || !(m=WORD_AT(ac+0x10u))) return 0;
+    first=(int32_t)WORD_AT(def);
+    entry=def+(uint32_t)(((int32_t)PIT_BONE-first)*0xC8);
+    if(!MAPMAKER_PTR_OK(entry,0xC8u) || !MAPMAKER_PTR_OK(seg=WORD_AT(entry+0xACu),0x18u)) return 0;
+    m+=(uint32_t)((int32_t)*(int8_t *)((uintptr_t)(entry+0x49u)+g_xbox_mem_offset)*0x40);
+    if(!MAPMAKER_PTR_OK(m,0x40u)) return 0;
+    for(i=0;i<3u;i++) p[i]=pit_getf(seg+i*4u)+(pit_getf(seg+0xCu+i*4u)-pit_getf(seg+i*4u))*0.5f;
+    for(i=0;i<3u;i++) q[i]=p[0]*pit_getf(m+i*4u)+p[1]*pit_getf(m+0x10u+i*4u)+p[2]*pit_getf(m+0x20u+i*4u)+pit_getf(m+0x30u+i*4u);
+    for(i=0;i<3u;i++) if(!pit_finite(q[i])) return 0;
+    for(i=0;i<3u;i++) out[i]=q[i];
+    return 1;
+}
+/* WRAP sub_0008F950 (cdecl model instance, pass, layer; the model draw), chained
+ * with pc_mapmaker_probe_prop_draw: after the original, for a pit skeleton's
+ * instance, cache bone 0x29's point (trusted when PIT_BONE_MIN over its feet). */
+void pc_mapmaker_pitboss_draw(void (*original)(void))
+{
+    uint32_t inst=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0u;
+    unsigned k;
+    float b[3];
+    original();
+    if(!pit_lv.n || !inst) return;
+    for(k=0;k<pit_lv.n && !(pit_lv.k[k].ent && WORD_AT(pit_lv.k[k].ent+PIT_ENT_ANIM)==inst);k++) {}
+    if(k==pit_lv.n || WORD_AT(PIT_SCENE)!=100u || !pit_bone_point(inst,b)) return;
+    if(b[1]<pit_getf(pit_lv.k[k].ent+PIT_ENT_POS+4u)+PIT_BONE_MIN) return;
+    memcpy(pit_lv.k[k].bone,b,sizeof b);
+    pit_lv.k[k].bone_at=pit_lv.k[k].frames+1u;        /* 0: never */
+}
 static void pit_mouth(PitInst *k,uint32_t ent,uint32_t st)
 {
     uint32_t b=WORD_AT(k->state+PIT_ST_BOTTLE),h=WORD_AT(k->state+PIT_ST_COLL);
     float yaw=pit_getf(ent+PIT_ENT_YAW),x,y,z;
     int was_nan;
-    if(h && MAPMAKER_PTR_OK(h,0x200u) && WORD_AT(h+0x19Cu)!=PIT_BOTTLE_CB) WORD_AT(h+0x19Cu)=PIT_BOTTLE_CB;
+    if(h && MAPMAKER_PTR_OK(h,0x200u) && WORD_AT(h+0x19Cu)!=PIT_HULL_CB) WORD_AT(h+0x19Cu)=PIT_HULL_CB;
     if(!b || !MAPMAKER_PTR_OK(b,0x200u) || st<1u || st>=PIT_DEATH) return;
     if(!pit_finite(yaw)) yaw=0.0f;
     was_nan=!pit_finite(pit_getf(b+0x64u)) || !pit_finite(pit_getf(b+0x68u)) || !pit_finite(pit_getf(b+0x6Cu));
-    x=pit_getf(ent+PIT_ENT_POS)+PIT_MOUTH_AHEAD*pit_sin(yaw);
-    y=pit_getf(ent+PIT_ENT_POS+4u)+PIT_MOUTH_UP;
-    z=pit_getf(ent+PIT_ENT_POS+8u)+PIT_MOUTH_AHEAD*pit_sin(yaw+1.57079633f);
+    if(k->bone_at && k->frames+1u-k->bone_at<=PIT_BONE_FRESH) { x=k->bone[0];y=k->bone[1];z=k->bone[2]; }
+    else {                                               /* not drawn lately: the estimate */
+        x=pit_getf(ent+PIT_ENT_POS)+PIT_MOUTH_AHEAD*pit_sin(yaw);
+        y=pit_getf(ent+PIT_ENT_POS+4u)+PIT_MOUTH_UP;
+        z=pit_getf(ent+PIT_ENT_POS+8u)+PIT_MOUTH_AHEAD*pit_sin(yaw+1.57079633f);
+    }
     if(!pit_finite(x) || !pit_finite(y) || !pit_finite(z)) return;
+    {
+        unsigned src=k->bone_at && k->frames+1u-k->bone_at<=PIT_BONE_FRESH?1u:2u;
+        if(src!=k->bone_src && k->hits<1000u) {
+            k->bone_src=src;
+            fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: gas bottle at %s (%.2f, %.2f, %.2f), %.2f over its feet\n",
+                    (unsigned)(k-pit_lv.k)+1u,src==1u?"bone 0x29 of the last draw":"the head estimate (not drawn lately)",
+                    (double)x,(double)y,(double)z,(double)(y-pit_getf(ent+PIT_ENT_POS+4u)));
+            fflush(stderr);
+        }
+    }
     pit_setf(b+0x64u,x);pit_setf(b+0x68u,y);pit_setf(b+0x6Cu,z);
     pit_setf(b+PIT_ENT_YAW,yaw);pit_setf(b+0xC4u,yaw);
     if(!pit_finite(pit_getf(b+0xC0u))) pit_setf(b+0xC0u,0.0f);
@@ -922,16 +991,10 @@ void pc_mapmaker_pitboss_bottle_damage(void (*original)(void))                  
     uint32_t r=pit_arg(),o=r && MAPMAKER_PTR_OK(r,0x2Cu)?WORD_AT(r):0u;
     PitInst *k=pit_lv.n?pit_owner(o):0;
     float before=k?pit_getf(k->state+PIT_ST_HEALTH):0.f;
-    int body=k && o==WORD_AT(k->state+PIT_ST_COLL);
     pit_run(original,o);
-    if(body) {                                           /* the hull: a quarter of the bottle's loss */
-        float after=pit_getf(k->state+PIT_ST_HEALTH);
-        if(pit_finite(after) && after<before) pit_setf(k->state+PIT_ST_HEALTH,before-(before-after)*PIT_BODY_SHARE);
-        if(!k->forwarded++) pit_log("hits on the pit skeleton's body count a quarter of a gas bottle hit (skeleton, hull)",(uint32_t)(k-pit_lv.k)+1u,o);
-    }
     if(k && k->hits++<16u) {                            /* each hit on the bottle: type, kind, amount, health (8 at the start) */
-        fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: gas bottle %s (type 0x%X, kind 0x%X, amount %.2f): health %.2f -> %.2f\n",
-                (unsigned)(k-pit_lv.k)+1u,body?"hit through the body":"hit",(unsigned)WORD_AT(r+0x14u),(unsigned)WORD_AT(r+0x24u),(double)pit_getf(r+0x20u),
+        fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: gas bottle hit (type 0x%X, kind 0x%X, amount %.2f): health %.2f -> %.2f\n",
+                (unsigned)(k-pit_lv.k)+1u,(unsigned)WORD_AT(r+0x14u),(unsigned)WORD_AT(r+0x24u),(double)pit_getf(r+0x20u),
                 (double)before,(double)pit_getf(k->state+PIT_ST_HEALTH));
         fflush(stderr);
     }
