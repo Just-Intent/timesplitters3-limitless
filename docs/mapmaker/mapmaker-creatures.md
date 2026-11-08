@@ -350,3 +350,54 @@ WRAP sub_00088C60 -> pc_mapmaker_creatures_robot_muzzle (as before; now also its
 WRAP sub_002B8F90 -> pc_mapmaker_creatures_robot_weapon (as before)
 (no WRAP on sub_001BB5C0: the runtime defines it)
 ```
+
+## The .75 log: the sight ray hits a character at the robot
+
+User (.75): "Prometheus robots repeating firing animation continuously, even
+when not firing." Log: "SK/8 #2: sight rays: 1 reached a player, 60 hit
+something else (last 0x142A5A0, type 8), 3 hit nothing; robot y 0.50, eye
++0xBB8 2.60, height +0x1AC 1.25"; #3: 0 / 64 (0x142B428, type 8); #1 one
+rocket in 1540 frames (1490 without sight).
+
+**Cause (CONFIRMED part, `test_sight_ray_excludes_only_the_entity`).** The
+sight update hides only the updating AI's entity from its own ray: bits 0x60
+of the entity's +0x28 are cleared around the ray (0x0025FF14..0x0025FF21,
+restored at 0x00260175 / 0x002601E9), and the ray skips objects without 0x20
+(0x000A35F4, 0x000A7B67) or with a type in its mask 0x2410270. The SK/8's
+ray starts at its eye 2.6 units up and almost always hits a type-8
+(character) object first, a different one for each robot. INFERRED: the
+robot's own body or a part (a second character object of the tall model),
+which that exclusion misses. The log says which next time ("own entity").
+With no sight the weapon never fires, while state 3 keeps walking in its
+advance-fire pose and states 1/2 hold the fire-still pose.
+
+**Fix.**
+- Sight: when the robot's sight ray (return 0x00260134) stops at a collidable
+  character within 2.5 units (x/z) of the robot that is not a player, the
+  ray is repeated with that object's 0x20 bit cleared (at most three such
+  objects, all put back after the call). Logged once per robot: "sight ray
+  passes through a character at its own body (0x..., own entity yes/no)". A
+  character farther away still blocks the view. A player next to the robot
+  is seen as before.
+- Poses: a new WRAP on the robot handler `sub_00283730` checks the weapon
+  code's sight test `sub_0015E120(ai, 0)` first. Without sight, the type-2
+  pose row (0x00520838 + 2*0x20) holds the non-firing poses for that call
+  only: advance-fire 0x9A7 becomes advance 0x9A6 (+8/+0xC) and fire still
+  0x9A5 becomes attack idle 0x99E (+0x1C). The handler's own "is it playing"
+  tests read the same row, so its states stay consistent; the row is put
+  back after. Logged once per robot: "no sight of its target: poses without
+  firing". With sight it walks and fires as in Machine Wars.
+
+WRAPs after .75:
+
+```
+WRAP sub_00283730 -> pc_mapmaker_creatures_robot_pose   (new; the class-4 robot handler, per robot frame)
+WRAP sub_00088C60 -> pc_mapmaker_creatures_robot_muzzle (as before; its sight-ray branch now repeats the ray past the robot's body)
+WRAP sub_0025FB70 -> pc_mapmaker_creatures_robot_sight  (as before)
+WRAP sub_002B8F90 -> pc_mapmaker_creatures_robot_weapon (as before)
+```
+
+**Unverified (playtest):** that the blocker is the robot's own body (log
+line "own entity"), that the SK/8 then sees and fires at a visible player,
+and that switching poses when sight comes and goes looks acceptable (a
+"stand to advance" step may play when sight returns).

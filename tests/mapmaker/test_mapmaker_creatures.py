@@ -57,11 +57,18 @@ MUTATIONS = {
     'rb-sight-any-ray': ('    if(ret!=CRT_RET_SIGHT || !crt_rb.seeing) { original();return; }', '    if(!crt_rb.seeing) { original();return; }'),
     'rb-sight-any-ai': ('    if(!crt_rb.n || turn>=0x100u || crt_rb_kind(pool+turn*CRT_ACTOR)>=CRT_KINDS || !crt_play())', '    if(!crt_rb.n || turn>=0x100u || !crt_play())'),
     'rb-player-is-other': ('    else if(crt_rb_player(g_eax)) crt_rb.r[i].player++;\n', ''),
+    'body-not-restored': ('        while(ns) { ns--;WORD_AT(skip[ns]+0x28u)=keep[ns]; }', '        (void)keep;'),
+    'body-any-distance': ('    return dx*dx+dz*dz<CRT_BODY_R*CRT_BODY_R;', '    return 1;'),
+    'body-skips-player': ('while(g_eax && ns<CRT_BODY_MAX && !crt_rb_player(g_eax) && crt_rb_body(g_eax,ent)) {', 'while(g_eax && ns<CRT_BODY_MAX && crt_rb_body(g_eax,ent)) {'),
+    'body-no-retry': ('            g_esp=sp;\n            original();\n        }', '            g_esp=sp;\n            g_esp+=4u;\n        }'),
+    'pose-not-restored': ('    memcpy((void *)((uintptr_t)row+g_xbox_mem_offset),keep,sizeof keep);', '    (void)0;'),
+    'pose-with-sight': ('       guest_call(sub_0015E120,2,ai,0u)) { original();return; }\n    memcpy(keep', '       0) { original();return; }\n    memcpy(keep'),
+    'pose-fire-still-kept': ('    if(keep[7]==CRT_FIRE_STILL) WORD_AT(row+0x1Cu)=CRT_ATTACK_IDLE;', ''),
     'sk8-keeps-editor-weapon': ('            CRT_H(rec+CRT_REC_WEAPONS)=0xFFFFu;', '            (void)0;'),
     'sk8-any-builtin': ('static int crt_builtin(uint32_t id) { return id==0x62u; }', 'static int crt_builtin(uint32_t id) { return id!=0u; }'),
     'no-class-overrides-anyway': ('    else if(!crt_kinds[k].lo && !crt_kinds[k].hi) {', '    else if(0) {'),
     'rb-no-sight-test': ('        if(!guest_call(sub_0015E120,2,ai,0u)) crt_rb.r[i].blind++;', '        crt_rb.r[i].blind++;'),
-    'rb-sight-mode-1': ('guest_call(sub_0015E120,2,ai,0u)', 'guest_call(sub_0015E120,2,ai,1u)'),
+    'rb-sight-mode-1': ('        if(!guest_call(sub_0015E120,2,ai,0u)) crt_rb.r[i].blind++;', '        if(!guest_call(sub_0015E120,2,ai,1u)) crt_rb.r[i].blind++;'),
     'rb-no-level-reset': ('    memset(&crt_rb,0,sizeof crt_rb);                   /* robot fire log: per level */\n', ''),
 }
 DEF_MUTATIONS = {
@@ -134,6 +141,8 @@ def test_mapmaker_creatures(tmp_path, mutation):
         assert ('Prometheus SK/8 #1: sight rays: 40 reached a player, 20 hit something else (last 0x0, type -1), 4 hit nothing') in err
         assert 'Prometheus SK/8: editor weapon ignored: the story robot fires only its built-in weapon' in err
         assert 'Prometheus SD/7: keeps the MapMaker bot AI (row without a story class)' in err
+        assert 'Prometheus SK/8 #1: sight ray passes through a character at its own body (0x590000, own entity no)' in err
+        assert 'Prometheus SK/8 #1: no sight of its target: poses without firing (advance 0x9A6, idle 0x99E)' in err
         assert 'Prometheus SK/8 #1: fire pose launched a rocket (squared distance 30.0' in err
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
@@ -174,7 +183,7 @@ def test_rows_and_wiring():
     guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
     header = (ROOT / 'src/interface/pc_display_menu.h').read_text(encoding='utf-8')
     assert '#include "pc_mapmaker_creatures.inc"' in guest
-    for hook in ('anims', 'request', 'create', 'ai_start', 'robot_weapon', 'robot_muzzle', 'robot_sight'):  # robot_fire: not wrapped (upstream defines sub_001BB5C0)
+    for hook in ('anims', 'request', 'create', 'ai_start', 'robot_weapon', 'robot_muzzle', 'robot_sight', 'robot_pose'):  # robot_fire: not wrapped (upstream defines sub_001BB5C0)
         assert f'void pc_mapmaker_creatures_{hook}(void (*original)(void));' in header
         assert f'void pc_mapmaker_creatures_{hook}(void (*original)(void)) {{ original(); }}' in guest
     assert not (ROOT / 'config/guest-code-patches/creatures.json').exists()
@@ -619,3 +628,29 @@ def test_editor_weapon_replaces_the_rocket():
     assert a[0x0015B878].ops[1][4] == 0x18 and a[0x0015B889].ops[0][4] == 0x94
     src = INC.read_text(encoding='utf-8')
     assert 'static int crt_builtin(uint32_t id) { return id==0x62u; }' in src
+
+
+def test_sight_ray_excludes_only_the_entity():
+    """sub_0025FB70 hides the updating AI from its own sight ray by clearing bits 0x60 of its entity's +0x28 (0x0025FF14,
+    stored at 0x0025FF21, put back at 0x00260175 / 0x002601E9); the ray (sub_00088C60 -> sub_00088950) skips objects
+    without 0x20 in +0x28 (0x000A35F4, 0x000A7B67) and objects whose +0x20 type is in its mask 0x2410270 (0x000A3602).
+    A type-8 (character) object of the robot other than that entity is not hidden: the .75 log's blocker."""
+    a = by_address()
+    assert 0xFFFFFF9F in imms(a[0x0025FF14]) and a[0x0025FF21].ops[0][4] == 0x28
+    assert a[0x00260175].ops[0][4] == 0x28 and a[0x002601E9].ops[0][4] == 0x28
+    assert 0x20 in imms(a[0x000A35F4]) and a[0x000A35F4].ops[0][4] == 0x28 and 0x20 in imms(a[0x000A7B67])
+    assert a[0x000A3602].ops[0][4] == 0x20 and target(a[0x00088C95]) == 0x00088950
+    assert 8 & 0x2410270 == 0
+    src = INC.read_text(encoding='utf-8')
+    assert '#define CRT_COLLIDES 0x20u' in src and '#define CRT_TYPE_CHARACTER 8u' in src
+
+
+def test_rocket_pose_row():
+    """The SK/8's pose row (type 2): advance-fire 0x9A7 at +8/+0xC, fire still 0x9A5 at +0x1C, attack idle 0x99E at +0;
+    its non-firing advance is 0x9A6 (bigbotrocketadv, no 0x100000)."""
+    rd = xbe()
+    row = struct.unpack('<8I', rd(0x00520838 + 2 * 0x20, 32))
+    assert row[0] == 0x99E and row[2] == row[3] == 0x9A7 and row[7] == 0x9A5
+    src = INC.read_text(encoding='utf-8')
+    for k, v in (('CRT_ADV_FIRE', 0x9A7), ('CRT_ADV', 0x9A6), ('CRT_FIRE_STILL', 0x9A5), ('CRT_ATTACK_IDLE', 0x99E)):
+        assert '#define %s 0x%Xu' % (k, v) in src
