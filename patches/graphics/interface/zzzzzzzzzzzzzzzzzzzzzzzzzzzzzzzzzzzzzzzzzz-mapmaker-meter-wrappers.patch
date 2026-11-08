@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4490 @@
+@@ -1911,6 +1911,4501 @@
      sub_002FA720_gen();
  #endif
  }
@@ -4299,6 +4299,17 @@
 +    else sub_00088C60_gen();
 +#else
 +    sub_00088C60_gen();
++#endif
++}
++
++extern void sub_00283730_gen(void);
++void sub_00283730(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("creatures","pc_mapmaker_creatures_robot_pose")) pc_mapmaker_creatures_robot_pose(sub_00283730_gen);
++    else sub_00283730_gen();
++#else
++    sub_00283730_gen();
 +#endif
 +}
 +
