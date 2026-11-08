@@ -39,9 +39,13 @@
  * (+0x18 -1, as MapMaker writes). MapMaker's bot class 0x01000000
  * (sub_0026EFC0) never reaches the robot code: the rocket robot looped its
  * fire pose and fired nothing (v0.4.0-mapmaker.58 report). animrb.pak is
- * mounted and registered by every MapMaker level (whole table). */
+ * mounted and registered by every MapMaker level (whole table).
+ * After .73: the SD/7 has no built-in weapon and class 4 fires nothing else
+ * (0x002B9145..0x002B9153), so its row keeps the MapMaker bot AI (class 0:0 =
+ * no override), which fires the weapon given in the editor. The SK/8 keeps
+ * class 4 and its rocket launcher even when given a weapon (ai_start). */
 MAPMAKER_CREATURE(159u,0x62u,0xFFu,0xAAu,"Prometheus SK/8",0x10000004u,0x00000000u,0x0047E65Cu,"animrb",0x0048F240u,0x15u,0u,21u,0)
-MAPMAKER_CREATURE(160u,0x36u,0xFFu,0xA9u,"Prometheus SD/7",0x10000004u,0x00000000u,0x0047E65Cu,"animrb",0x0048F240u,0x15u,0u,21u,0)
+MAPMAKER_CREATURE(160u,0x36u,0xFFu,0xA9u,"Prometheus SD/7",0x00000000u,0x00000000u,0x0047E65Cu,"animrb",0x0048F240u,0x15u,0u,21u,0)
 /* Mission 6 ghosts: the catacombs' GHT1..GHT7 records are zombies 0x17, 0x18,
  * 0x23, 0x2A with class 0:0x50000000 -> sub_002BA300 (no level state);
  * ghostidle/trap/attack/death 0x249..0x24C. Carrier 0x2F (soldiermodel_talk

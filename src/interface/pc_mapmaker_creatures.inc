@@ -221,40 +221,46 @@ static int crt_look_ready(uint32_t look)
 }
 
 /* ---- Prometheus robots: why a fire pose launches a rocket or not (log only) ----
- * After the .66 playtest ("the rocket shooting animation begins when they are
- * well out of range and not actually firing rockets; when close they fire but
- * can easily miss you if standing in place"). CONFIRMED by decode
- * (test_mapmaker_creatures.py, robot fire tests):
- *  - the robot handler sub_00283730 only chooses poses: in state 1 a fire pose
- *    (type 2 = 0x62: bigbotrocketadvfire 0x9A7 / bigbotrocket 0x9A5) when the
- *    squared distance AI +0xAF4 is below 100 (0x004785C8, 10 units), or one
- *    time in three below 289 (0x0049F33C, 17 units);
+ * CONFIRMED by decode (test_mapmaker_creatures.py, robot fire tests):
+ *  - the robot handler sub_00283730 only chooses poses. State 0 sends a
+ *    target nearer than 17 units (squared distance AI +0xAF4 < 289,
+ *    0x0049F33C) to state 2 (fire still: SK/8 bigbotrocket 0x9A5) and any
+ *    farther one to state 3, which advances with the advance-fire pose
+ *    (0x9A7) at any distance (the .73 log's 126 / 48 unit poses); state 1
+ *    picks a fire pose below 100 (10 units) or one time in three below 289;
  *  - the built-in weapon (+0x94 0x42/0x43, or +0x2BC) is fired by
- *    sub_002B8F90, run for every AI each frame by sub_001B8C40: while the
- *    current anim's slot word has 0x100000 (a fire pose), with the ammo state
- *    of sub_001B9340, sight sub_0015E120(ai, 0) and the pose's fire event
- *    0x200 (sub_00061570), it calls sub_001BB5C0, whose projectile path first
- *    casts a 4-unit ray from the muzzle (sub_00088C60, return 0x001BC420; a
- *    hit = no rocket);
- *  - the aim point (+0xB88..) of 0x62 is the target's feet - 0.2 (0x000D87A0)
- *    when it is more than 5 units away and not above the robot.
- * The SD/7 has no built-in weapon (+0x94 0): sub_002B8F90 returns at
- * 0x002B9153; it only fires a weapon given in the editor.
- * These hooks log, once per robot and event kind per level, each fire pose's
- * outcome: launched (sub_001BB5C0 called and no muzzle hit) or declined, with
- * the squared distance at the pose's start, frames without sight, muzzle
- * hits and fire calls. Nothing is changed. */
+ *    sub_002B8F90 (every AI each frame, from sub_001B8C40) while the current
+ *    anim's slot word has 0x100000 (a fire pose), with the ammo state of
+ *    sub_001B9340, sight sub_0015E120(ai, 0) (the pair table [0x0074C368],
+ *    one byte per AI pair) and the pose's fire event 0x200 (sub_00061570);
+ *    then sub_001BB5C0 (defined by the runtime, not wrapped), whose projectile
+ *    path casts a 4-unit muzzle ray (sub_00088C60, return 0x001BC420);
+ *  - the pair table is written by sub_0025FB70, one AI per frame in turn
+ *    (index [0x007A3500]): a ray sub_00088C60 (return 0x00260134, flags
+ *    0x2410270) from the AI's collision object toward the target's eye; the
+ *    pair is visible when the ray's result is the target entity.
+ * These hooks log per robot, once per outcome kind per level, each fire
+ * pose's end (squared distance at its start, frames, frames without sight,
+ * fire events 0x200 seen, muzzle tests and hits: a pose "launched" when it
+ * had a muzzle test without a hit) and, once per robot, what the first
+ * blocked sight rays hit. */
 #define CRT_RB_MAX 16u
 #define CRT_SLOT_WORD2 0x007DE664u      /* second slot word per anim slot: 0x100000 = a fire pose */
 #define CRT_FIRE_POSE 0x100000u
+#define CRT_FIRE_EVENT 0x200u           /* sub_002B8F90 at 0x002B97F1: sub_00061570(actor, 0x200) */
 #define CRT_ANIM_CUR 0xD4u              /* animation controller (entity +4): current anim id */
 #define CRT_AI_DIST2 0xAF4u             /* squared distance to the target */
 #define CRT_AI_BUILTIN 0x94u
 #define CRT_RET_MUZZLE 0x001BC420u      /* sub_001BB5C0: call sub_00088C60 at 0x001BC41B */
-extern void sub_0015E120(void);
+#define CRT_RET_SIGHT 0x00260134u       /* sub_0025FB70: call sub_00088C60 at 0x0026012F */
+#define CRT_SIGHT_TURN 0x007A3500u      /* the AI whose sight is updated this frame */
+#define CRT_POOL 0x007356D8u            /* -> AI pool, 0xEA0 per entry, +0 entity */
+#define CRT_HUMANS 0x00790950u          /* the first pool slots are the players */
+extern void sub_0015E120(void),sub_00061570(void);
 static struct {
-    uint32_t ai, cur;                    /* cur: the AI inside sub_002B8F90 now (0 none) */
-    struct { uint32_t ai; unsigned pose, frames, blind, calls, hits, launched, declined, logged; float dist2; } r[CRT_RB_MAX];
+    uint32_t cur, seeing;                /* the AI inside sub_002B8F90 / sub_0025FB70 now (0 none) */
+    struct { uint32_t ai; unsigned pose, frames, blind, events, tests, hits, launched, declined, logged;
+             unsigned rays, clear, player, other, told; float dist2; } r[CRT_RB_MAX];
     unsigned n;
 } crt_rb;
 static unsigned crt_rb_of(uint32_t ai)
@@ -272,32 +278,39 @@ static int crt_rb_pose(uint32_t ent)
     return (WORD_AT(CRT_SLOT_WORD2+slot*8u)&CRT_FIRE_POSE)!=0;
 }
 static float crt_getf(uint32_t a) { float f;memcpy(&f,(const void *)((uintptr_t)a+g_xbox_mem_offset),4);return f; }
+/* A class-4 robot row's index for this AI, or CRT_KINDS. */
+static unsigned crt_rb_kind(uint32_t ai)
+{
+    unsigned k;
+    if(!MAPMAKER_PTR_OK(ai,CRT_ACTOR) || (k=crt_kind_of(CRT_H(ai+CRT_ACTOR_CHAR)))>=CRT_KINDS ||
+       (crt_kinds[k].lo&0x1FFFu)==0u) return CRT_KINDS;
+    return k;
+}
 static void crt_rb_end(unsigned i,unsigned k)
 {
-    int launched=crt_rb.r[i].calls>crt_rb.r[i].hits;
+    int launched=crt_rb.r[i].tests>crt_rb.r[i].hits;
     unsigned *n=launched?&crt_rb.r[i].launched:&crt_rb.r[i].declined;
     if((*n)++>=2u || crt_rb.r[i].logged>=8u) return;
     crt_rb.r[i].logged++;
     fprintf(stderr,"[mapmaker] creatures: %s #%u: fire pose %s (squared distance %.1f at its start, %u frames, %u without sight, "
-            "%u fire calls, %u muzzle hits, built-in weapon 0x%X)\n",crt_kinds[k].label,i+1u,
+            "%u fire events, %u muzzle tests, %u muzzle hits, built-in weapon 0x%X)\n",crt_kinds[k].label,i+1u,
             launched?"launched a rocket":"ended without a rocket",(double)crt_rb.r[i].dist2,crt_rb.r[i].frames,
-            crt_rb.r[i].blind,crt_rb.r[i].calls,crt_rb.r[i].hits,(unsigned)WORD_AT(crt_rb.r[i].ai+CRT_AI_BUILTIN));
+            crt_rb.r[i].blind,crt_rb.r[i].events,crt_rb.r[i].tests,crt_rb.r[i].hits,(unsigned)WORD_AT(crt_rb.r[i].ai+CRT_AI_BUILTIN));
     fflush(stderr);
 }
 
 /* WRAP sub_002B8F90 (cdecl actor: built-in weapon update, every AI, every frame). */
 void pc_mapmaker_creatures_robot_weapon(void (*original)(void))
 {
-    uint32_t ent,ai,id;
+    uint32_t ent,ai;
     unsigned k,i;
     int pose;
-    if(!MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(ent=WORD_AT(g_esp+4u),0x100u) || !MAPMAKER_PTR_OK(ai=WORD_AT(ent+0x7Cu),CRT_ACTOR) ||
-       (k=crt_kind_of(id=CRT_H(ai+CRT_ACTOR_CHAR)))>=CRT_KINDS || (crt_kinds[k].lo&0x1FFFu)==0u ||   /* the class-4 robot rows */
-       !crt_play() || crt.optout) { original();return; }
+    if(!MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(ent=WORD_AT(g_esp+4u),0x100u) ||
+       (k=crt_rb_kind(ai=WORD_AT(ent+0x7Cu)))>=CRT_KINDS || !crt_play() || crt.optout) { original();return; }
     if((i=crt_rb_of(ai))>=CRT_RB_MAX) { original();return; }
     pose=crt_rb_pose(ent);
     if(pose && !crt_rb.r[i].pose) {                    /* a fire pose starts */
-        crt_rb.r[i].frames=crt_rb.r[i].blind=crt_rb.r[i].calls=crt_rb.r[i].hits=0;
+        crt_rb.r[i].frames=crt_rb.r[i].blind=crt_rb.r[i].events=crt_rb.r[i].tests=crt_rb.r[i].hits=0;
         crt_rb.r[i].dist2=crt_getf(ai+CRT_AI_DIST2);
     }
     if(!pose && crt_rb.r[i].pose) crt_rb_end(i,k);
@@ -305,26 +318,56 @@ void pc_mapmaker_creatures_robot_weapon(void (*original)(void))
     if(pose) {
         crt_rb.r[i].frames++;
         if(!guest_call(sub_0015E120,2,ai,0u)) crt_rb.r[i].blind++;   /* the weapon code's own sight test (mode 0: no target change) */
+        if(guest_call(sub_00061570,2,ent,CRT_FIRE_EVENT)) crt_rb.r[i].events++;   /* the pose's fire event, as 0x002B97F7 asks */
     }
     crt_rb.cur=ai;
     original();
     crt_rb.cur=0;
 }
-/* WRAP sub_001BB5C0 (cdecl actor, hand, ...: an AI fires its weapon). */
-void pc_mapmaker_creatures_robot_fire(void (*original)(void))
+/* WRAP sub_0025FB70 (no args: the sight update of AI [0x007A3500], one per frame). */
+void pc_mapmaker_creatures_robot_sight(void (*original)(void))
 {
-    unsigned i;
-    if(crt_rb.cur && MAPMAKER_STACK_OK(8) && MAPMAKER_PTR_OK(WORD_AT(g_esp+4u),0x100u) &&
-       WORD_AT(WORD_AT(g_esp+4u)+0x7Cu)==crt_rb.cur && (i=crt_rb_of(crt_rb.cur))<CRT_RB_MAX) crt_rb.r[i].calls++;
+    uint32_t pool=WORD_AT(CRT_POOL),turn=WORD_AT(CRT_SIGHT_TURN);
+    if(!crt_rb.n || turn>=0x100u || crt_rb_kind(pool+turn*CRT_ACTOR)>=CRT_KINDS || !crt_play()) { original();return; }
+    crt_rb.seeing=pool+turn*CRT_ACTOR;
     original();
+    crt_rb.seeing=0;
 }
-/* WRAP sub_00088C60 (collision ray; hot: return-address test first). */
+/* Is this entity a player's (the first pool slots)? */
+static int crt_rb_player(uint32_t ent)
+{
+    uint32_t pool=WORD_AT(CRT_POOL),n=WORD_AT(CRT_HUMANS),k;
+    for(k=0;k<n && k<8u;k++) if(ent && WORD_AT(pool+k*CRT_ACTOR)==ent) return 1;
+    return 0;
+}
+/* WRAP sub_00088C60 (collision ray; hot: return-address tests first). The
+ * robot's muzzle test in sub_001BB5C0 and its sight ray in sub_0025FB70. */
 void pc_mapmaker_creatures_robot_muzzle(void (*original)(void))
 {
     unsigned i;
-    if(!crt_rb.cur || !MAPMAKER_STACK_OK(4) || WORD_AT(g_esp)!=CRT_RET_MUZZLE) { original();return; }
+    uint32_t ret=MAPMAKER_STACK_OK(4)?WORD_AT(g_esp):0u;
+    if(ret==CRT_RET_MUZZLE && crt_rb.cur) {
+        original();
+        if((i=crt_rb_of(crt_rb.cur))<CRT_RB_MAX) { crt_rb.r[i].tests++;if(g_eax) crt_rb.r[i].hits++; }
+        return;
+    }
+    if(ret!=CRT_RET_SIGHT || !crt_rb.seeing) { original();return; }
     original();
-    if(g_eax && (i=crt_rb_of(crt_rb.cur))<CRT_RB_MAX) crt_rb.r[i].hits++;
+    if((i=crt_rb_of(crt_rb.seeing))>=CRT_RB_MAX) return;
+    crt_rb.r[i].rays++;
+    if(!g_eax) crt_rb.r[i].clear++;
+    else if(crt_rb_player(g_eax)) crt_rb.r[i].player++;
+    else crt_rb.r[i].other++;
+    if(crt_rb.r[i].rays==64u && !crt_rb.r[i].told++) {
+        unsigned k=crt_rb_kind(crt_rb.seeing);
+        uint32_t ent=WORD_AT(crt_rb.seeing);
+        fprintf(stderr,"[mapmaker] creatures: %s #%u: sight rays: %u reached a player, %u hit something else (last 0x%X, type %d), "
+                "%u hit nothing; robot y %.2f, eye +0xBB8 %.2f, height +0x1AC %.2f\n",k<CRT_KINDS?crt_kinds[k].label:"",i+1u,
+                crt_rb.r[i].player,crt_rb.r[i].other,(unsigned)g_eax,MAPMAKER_PTR_OK(g_eax,0x24u)?(int)WORD_AT(g_eax+0x20u):-1,
+                crt_rb.r[i].clear,MAPMAKER_PTR_OK(ent,0x1B0u)?(double)crt_getf(ent+0x68u):0.0,
+                (double)crt_getf(crt_rb.seeing+0xBB8u),MAPMAKER_PTR_OK(ent,0x1B0u)?(double)crt_getf(ent+0x1ACu):0.0);
+        fflush(stderr);
+    }
 }
 
 /* WRAP sub_001C8540 (the level's anim paks; sub_001CA2F0 registers the names next). */
@@ -389,6 +432,14 @@ void pc_mapmaker_creatures_create(void (*original)(void))
     if(!crt.made[k]++) crt_log("made with the look's models (character, object)",k,crt_kinds[k].look,g_eax);
 }
 
+/* Story robots whose only weapon is built in: the AI start (0x0015B87C) takes
+ * +0x94 from the record's weapon list +0x18 when it is not -1 (MapMaker
+ * writes the Story AI's editor weapon there, 0x0024205A..0x00242155), else
+ * the built-in one (0x62: rocket launcher 0x43 at 0x0015B927). Class 4's
+ * robot path fires only 0x42/0x43 (sub_002B8F90, 0x002B9145..0x002B9153). */
+#define CRT_REC_WEAPONS 0x18u
+static int crt_builtin(uint32_t id) { return id==0x62u; }
+
 /* WRAP sub_0015B830 (cdecl AI pool entry): give a creature its story class. */
 void pc_mapmaker_creatures_ai_start(void (*original)(void))
 {
@@ -401,7 +452,13 @@ void pc_mapmaker_creatures_ai_start(void (*original)(void))
     if(crt.optout) { if(!crt.refused[k]++) crt_log("TSFP_MAPMAKER_CREATURES=0: keeps the bot AI",k,a,0); }
     else if(!crt_mounted(crt_kinds[k].pak)) { if(!crt.refused[k]++) crt_log("anim pak not mounted: keeps the bot AI",k,a,0); }
     else if((ok=crt_anims(k,&of))<of) { if(!crt.refused[k]++) crt_log("anims not registered (resolved, kept): keeps the bot AI",k,ok,of); }
+    else if(!crt_kinds[k].lo && !crt_kinds[k].hi) { if(!crt.refused[k]++) crt_log("keeps the MapMaker bot AI (row without a story class)",k,a,0); }
     else {
+        if(crt_builtin(crt_kinds[k].id) && CRT_H(rec+CRT_REC_WEAPONS)!=0xFFFFu) {
+            if(!crt.made[k]++) crt_log("editor weapon ignored: the story robot fires only its built-in weapon (weapon list, record)",k,
+                                       CRT_H(rec+CRT_REC_WEAPONS),rec);
+            CRT_H(rec+CRT_REC_WEAPONS)=0xFFFFu;      /* the AI start then gives 0x62 its rocket launcher 0x43 (0x0015B927) */
+        }
         WORD_AT(rec)=crt_kinds[k].lo;WORD_AT(rec+4u)=crt_kinds[k].hi;
         if(!crt.started[k]++) {
             fprintf(stderr,"[mapmaker] creatures: %s (character 0x%X) gets its story AI, class 0x%X:0x%08X, %u of %u anims from %s.pak\n",
