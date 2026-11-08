@@ -471,6 +471,19 @@ what was on screen. "--" means a number is not available yet (no frame drawn,
 not in a map). The legacy OpenGL renderer on older Macs shows the panel
 without the frame split and draw counts.
 
+## Map report (always on)
+
+Each time a MapMaker map starts, the game writes a short map report to its log
+(`game.err`): tile, item, Story AI, logic, pad and link counts against their
+limits (with a "near limit" line above 90%), and up to 20 problems with the
+grid position to look at, such as a Story AI that is not placed, a logic entry
+pointing at a deleted tile, a lone teleporter, overlapping tiles, or an area
+the AI cannot walk to. Checks that can be wrong are marked "possible problem".
+Nothing is shown on screen. `tools/testing/map_report.py` checks a saved or
+exported map the same way without starting the game (everything except the
+pad checks). Details and a sample: [mapmaker-report.md](mapmaker-report.md).
+Not built or run in game yet.
+
 ## Bug fixes (always on)
 
 - System Link: malformed map fragments and turret or death-effect messages that

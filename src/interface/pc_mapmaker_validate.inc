@@ -50,7 +50,9 @@
  *   There is no stock refusal at that point, so a bad chunk is hidden (tag 0,
  *   skipped by every walker) for the call; a bad header hides the header and
  *   every piece chunk (their count comes from it); a malformed walk ends the
- *   map there (end tag). Tags are put back afterwards.
+ *   map there (end tag). Tags are put back afterwards. Before that, the
+ *   map report (pc_mapmaker_report.inc, when included first) logs counts,
+ *   caps and problems of the map just set up.
  *
  * Requires the includer's WORD_AT, guest_writable, guest_call,
  * g_xbox_mem_offset; calls sub_00333700 / sub_002FDF50 (a tile's pad
@@ -288,15 +290,22 @@ void pc_mapmaker_validate_level(void (*original)(void))
     MapMakerValidate v;
     MapMakerValidateEdit *edits=NULL;
     unsigned n=0,i;
-    uint32_t container,span;
+    uint32_t container,span,problems;
     if(!guest_writable(0x0079094Cu,4) || WORD_AT(0x0079094Cu)!=100u || WORD_AT(0x006F32ECu) ||
        !(container=WORD_AT(0x00784014u)) || !(span=mapmaker_validate_span(container))) {
         original();
         return;
     }
-    mapmaker_validate_walk(&v,container,span,MAPMAKER_VALIDATE_LEVEL,&edits,&n);
+    problems=mapmaker_validate_walk(&v,container,span,MAPMAKER_VALIDATE_LEVEL,&edits,&n);
     for(i=0;i<n;i++) WORD_AT(edits[i].address)=edits[i].value;
     original();
+#ifdef PC_MAPMAKER_REPORT_INC
+    /* The map report (pc_mapmaker_report.inc) reads the map while the
+     * refused chunks are still hidden. */
+    mapmaker_report_level(container,span,problems);
+#else
+    (void)problems;
+#endif
     while(n--) if(WORD_AT(edits[n].address)==edits[n].value) WORD_AT(edits[n].address)=edits[n].old;
     free(edits);
 }
