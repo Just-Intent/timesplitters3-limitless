@@ -945,37 +945,18 @@ walls on sides with no neighbour, which Open air (bounded) hides by design
 (invisible wall, collision kept). They are not a back-face problem: the
 open-view set and the two-sided draw already cover those rooms.
 
-What the log cannot show: the tile ids and node masks of the closed pieces
-and of the bounded pieces after the first 64, and which drawn rooms keep a
-wall node masked out. With no tile ids, it is not yet confirmed whether the
-"one-walled pieces" are bounded tiles whose single wall is hidden on
-purpose, or closed tiles whose wall node is masked out by their own saved
-mask. The catalogue does have 1x1 one-wall tiles (14 and 38: three side
-connection points) and 1x1 corners (1 and 37: two). Checked statically and
-ruled out:
-- Translucent passes: the bucket reader `sub_000865E0` already draws them
-  with cull mode 0 (`0x000865EE`).
-- The cull-none path: it works in pass 0 for every room geometry prop.
-  `sub_0008F5E0` forces 0x901 per node only for props with `+0x28` bit
-  0x20000000 (mirrored: scale -1 at `0x000A1602`); whether room props ever
-  have it is unknown, so the new log prints the prop flags.
+Ruled out statically: translucent passes (the bucket reader `sub_000865E0`
+draws them with cull mode 0, `0x000865EE`), and the cull-none path (it works
+in pass 0; `sub_0008F5E0` forces 0x901 per node only for mirrored props,
+`+0x28` bit 0x20000000, scale -1 at `0x000A1602`).
 
-Diagnostics added (no behaviour change):
-- `roof: bounded piece K: rooms ... (mask M, tile T at x,z floor f
-  rotation r)`: the piece record's tile id and place.
-- `roof: room R drawn two-sided (seen across open air): tile ..., open|closed,
-  mask M, prop flags F, N of T nodes masked out; node masks ...`: the first
-  96 rooms per build, with the first 24 node masks (`+0x5C`). A wall that
-  stays invisible shows here as a node whose mask has no bit in M (or as
-  flag 0x20000000).
-- `openview: area A: closed room R (tile ..., mask M) beside open room S
-  (tile ...) by a portal|its box`: the first 96 per build.
-- `openview: after 600 views, N of T rooms drawn across open air never drew
-  their geometry` and up to 24 `room R never drawn (tile ..., depth now D)`
-  lines.
-
-Next playtest: the same map, look at a one-walled piece and a corner piece
-from the open area, then send `game.err`. Compare the two pieces' lines.
+Diagnostics added (log only): the tile id and place on the bounded piece
+lines; `roof: room R drawn two-sided ...` (the first 96 rooms per build:
+tile, open/closed, mask, prop flags, nodes masked out, the first 24 node
+masks `+0x5C`); `openview: area A: closed room R ... beside open room S ...
+by a portal|its box` (the first 96); `openview: after 600 views, N of T
+rooms ... never drew their geometry` and up to 24 `room R never drawn`
+lines.
 
 User clarification: "The one walled pieces are set to closed, but their
 walls should be visible beyond the 3x3 open air bounded pieces in front of
@@ -1019,3 +1000,37 @@ Playtest (.75): golgotha, from each floor's walkway look at the closed
 one-walled pieces beyond the bounded tiles, on the same floor and on floors
 above and below: walls show. The build line should read `in 1 area`, with a
 `joined their area by box` line.
+
+### Buildings across the field drawn one-sided (.75 report)
+
+User: "Walls and floor now not showing from outside." Seen from outside, a
+3x3 structure in the open area showed only its far wall and one side
+panel. Its near walls and floor were missing, so you looked into it.
+
+`logs/m75.err` (ignored): 331 pieces. The 10 new ones (rooms 322..331, tile
+8) form the structure, and the camera stood in two of them (327, 331). The
+build line reads `209 open-air rooms in 1 area; ... 324 two-sided` with
+`185 open-air rooms joined their area by box`, so the box join worked, and
+`0 of 324 ... never drew their geometry`. 331 - 324 = 7 rooms were not
+two-sided. Only rooms in an area's touched set were marked: open rooms and
+closed rooms beside one by portal or box. The structure's other tiles touch
+no open room, so the stock walk drew them one-sided. From outside, their
+near walls and their floor (seen from below) are back faces, which is
+exactly the screenshot. The box join did not cause it. It can only add
+rooms to the touched sets, never remove them, and these rooms touch no open
+room under either rule. The structure is new in .75 and was not on the .74
+map. The many `11 of 15 nodes masked out` lines are the closed tile 16 tower
+pieces. They are stacked tiles whose up/down connection points meet, so
+they have no floor or ceiling between floors (bits 24/25 clear), and they
+keep the walls of their unconnected sides. That is stock behaviour.
+
+Fix: on a map with open air (at least one area), every room is marked
+two-sided, not only the touched ones. From inside a closed room the extra
+back faces stay behind the front faces (depth test), so only overdraw is
+added. The touched sets still decide which rooms are widened and given a
+depth. Fixture: every room two-sided on such a map; mutations
+`not-two-sided`, `two-sided-open-only`, `two-sided-kept`.
+
+Playtest (.76): the same structure from outside, from every side and from
+above and below: all walls and the floor show. Inside it: no change. Also
+recheck the closed one-walled pieces beyond the bounded tiles (.75 box join).
