@@ -214,7 +214,8 @@ farther ones wait for a free place.
 | Boss, Sub-boss bar | no | yes, while alive (any distance, like stock) |
 | real story boss (trophy monster, skeleton), Boss Off | none | hidden ([real bosses](mapmaker-realbosses.md)) |
 | real story boss, Boss bar | the Boss bar | hidden |
-| real story boss, Sub-boss bar | none | its stock meter |
+| real story boss, Sub-boss bar | none | the meter over its top (after .68; its stock meter skipped) |
+| Khallos rider / tank / mothership, Sub-boss bar | none | the meter over the chair or prop that holds the health (after .68) |
 
 - The meter is the stock MapMaker story overhead meter `sub_0013A400`
   (CONFIRMED by decode, `test_overhead_meter_draw_contract`): cdecl
@@ -246,6 +247,47 @@ farther ones wait for a free place.
   +0x38, +0x54; INFERRED head). No cheap model-height field was found, so
   no extra lift is applied.
 - Health x2..x8 and the stronger health levels apply to Sub-boss AIs too.
+
+### Every boss type (stabilization after v0.4.0-mapmaker.68)
+
+User list: "Ensure that sub-boss health bar actually appears above each boss
+type when selected. Right now, it only appears above the giant trophy
+monster."
+
+- CONFIRMED (decode 0x0013A661..0x0013A7E3): the meter's x/z are the
+  entity's origin and its height is one pose matrix's y (matrix
+  `[[inst+0x8C]+0x18]`, +0x34) plus entity +0x68, 0.4..0.6 over it. The
+  trophy monster's matrix is on its back. INFERRED from the report: on the
+  other giants it is inside the model on its centre line, and the depth test
+  hides the meter.
+- CONFIRMED (code): a Khallos rider's health is his chair's
+  (`bos_bar_proxy`), and the tank and mothership remove their AI for a prop
+  (`bos_bar_extra`). So no meter could reach them.
+
+Fix (`pc_mapmaker_bosses_meters`):
+
+- The lift: the model's top is the highest corner of every node box (node
+  i at `[inst+4] - n*0xC8 + i*0xC8`, n = `[[inst+4]]`, box pointer +0xAC
+  min/max, matrix byte +0x49, the y row +0x04/+0x14/+0x24/+0x34 of
+  `sub_00151E80`; as the mansion fight's hand point 0x0029CFA4..). For the
+  call the entity's +0x68 is raised so the meter's lowest edge is
+  `BOS_METER_CLEAR` (0.3) over that top, never lowered, then put back
+  exactly. No node table or an unusable matrix: the stock height.
+- Actors with a +0x268 record (trophy monster, giant skeleton, Crow walker,
+  split Crowe, pit skeleton) are drawn here too and listed while the
+  original runs. `pc_mapmaker_realbosses_meter` (the innermost layer of the
+  stock loop's call, return 0x0014D264) skips a listed actor, so there is one
+  meter. With the `realbosses` area off the stock one would show as well.
+- A proxied Boss AI (Khallos) and the props of `bos_bar_extra` get the meter
+  on the entity that holds the health, with a stand-in actor (heap, zeroed:
+  +0 the entity, +0xC68 fade block 0 = fade 1, `sub_0011F780`).
+- Log, once per entity and level: `Sub-boss meter of NAME (entity E, model
+  M): top T, stock meter at P, lifted L`.
+
+Fixture: lift (box, a box turned on its side, the stock matrix over the
+top, a matrix past the node count, an unusable index, no nodes), a record
+listed only while the original runs, the Khallos chair and its death, a
+tank prop, Boss-bar and unset AIs; mutations `meter-*`. Not built or played.
 
 ## Stronger health
 
