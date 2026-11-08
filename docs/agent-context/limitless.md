@@ -20,8 +20,8 @@ Tests: `tests/mapmaker/`, `tests/compiler/test_guest_code_patches.py`,
 `tests/input/test_scope_wheel.py`. Mac follow-up: MAC-131 and later.
 <!-- packet:end -->
 
-Fork-specific subsystem notes, kept out of the shared size-capped guides so
-upstream merges stay clean. Each part names the shared guide it extends.
+Fork-only notes, kept out of the size-capped shared guides. Each part names
+the shared guide it extends.
 MapMaker player/contract docs live in `docs/mapmaker/`; measured results in
 `docs/project/STATUS.md`; Mac follow-up in `docs/project/MAC_PORT_BACKLOG.md`
 (MAC-131 and later).
@@ -519,7 +519,7 @@ bounds (`sub_00352DF0`), the `sub_0006D0B0` return-address overwrite
 mode 1 bot goal read (`sub_002B0320`), and a bounds-only map validator: the
 editor loader refuses a bad map the stock way, and level setup
 (`sub_0006D7A0`) hides bad chunks for that call, then logs the
-[map report](limitless-report.md) (`pc_mapmaker_report.inc`, raised item caps). With
+[map report](limitless-report.md) (`pc_mapmaker_report.inc`, raised item caps); [logic Delay](limitless-logic.md). With
 `TSFP_MAPMAKER_LIMITS=1` in scene 100 story mode the HUD turret icons scan
 the whole gun pool (`sub_00349E40`/`sub_00349970`). Tests:
 `tests/mapmaker/test_mapmaker_bugfix.py`, `tests/mapmaker/test_mapmaker_validate.py`.

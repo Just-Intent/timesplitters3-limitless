@@ -44,7 +44,7 @@ are not in the launcher.
 
 | Switch | Default | What it does | Tested |
 | --- | --- | --- | --- |
-| `TSFP_MAPMAKER_LIMITS=1` | Off | The main switch: the raised editor limits below, sixteen floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, the Clouds checkbox and the open-sky tiles. | See each feature below |
+| `TSFP_MAPMAKER_LIMITS=1` | Off | The main switch: the raised editor limits below, sixteen floors and the 80x80 grid, any unlocked character in MapMaker Story, Story AI duplicates and linked copies, the Clouds checkbox, the open-sky tiles and the Delay row on logic actions. | See each feature below |
 | `TSFP_MAPMAKER_OVERLAP=1` | Off | Tiles can be placed over other tiles. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_STACK_ITEMS=1` | Off | Several items can share one grid cell. | Checked in game (2026-10-31) |
 | `TSFP_MAPMAKER_MEMORY_SCALE=2..8` | 8 with `LIMITS` | How far the editor's memory estimate is relaxed. Lower it if large maps run short of memory. | Used in the capacity play test |
@@ -421,6 +421,41 @@ peers without this build simply see Virtual. If the Disco game file is missing i
 Virtual and the log says so. *Automated tests only.* Details:
 [Disco variant](mapmaker-disco-variant.md).
 
+### Logic: Delay on actions (`LIMITS`)
+
+Any action can now wait before it happens. In the logic editor, open an
+action that is already ticked in an operation. Below its usual settings
+there is a new row, **Delay: none**. Each press moves it to the next step:
+0.5 s, 1 s, 2 s, 3 s, 5 s, 10 s, 15 s, 30 s, 1 min, then back to none. The
+row shows the new value at once, and Done closes the screen as before.
+
+- The delay belongs to the action. If several operations use the same
+  action, they all wait the same time.
+- The wait starts when the operation fires. Other actions of the same
+  operation still happen at once, and the operation can fire again while an
+  action is waiting.
+- A new action gets the row once it exists: create it, tick it in an
+  operation, then open it again. An action that no operation uses shows
+  "Delay: add to an operation first".
+- Delays work in **Story** maps. In other map types, and in the original
+  game, the action happens immediately (the map still loads and plays).
+- Up to 256 actions can wait at the same time. Past that, an action happens
+  at once and the log says so once.
+
+Example: "when switch A and switch B are both on, open door C, then spawn
+wave 2 after 5 s". Make one operation with the triggers *Switch A First
+Activation* and *Switch B First Activation* (all of them). Give it the
+actions *Unlock Door C* and *Spawn New Enemy ...*, and set Delay: 5 s on the
+spawn actions. Without this feature, the same needs a timer and a second
+operation.
+
+`tools/testing/map_report.py --logic <map>` prints every operation of a saved
+or exported map in plain words, including delays. Each level start logs one
+`[mapmaker] logic:` line with the number of delayed actions. If the row does
+not appear, set `TSFP_MAPMAKER_LOGIC_TRACE=1` for one editor session and
+send `game.err`. *Automated tests only: not built or played yet.* Details:
+[limitless-logic.md](../agent-context/limitless-logic.md).
+
 ## Mouse controls
 
 These are on without any switch:
@@ -481,7 +516,7 @@ pointing at a deleted tile, a lone teleporter, overlapping tiles, or an area
 the AI cannot walk to. Checks that can be wrong are marked "possible problem".
 Nothing is shown on screen. `tools/testing/map_report.py` checks a saved or
 exported map the same way without starting the game (everything except the
-pad checks). Details and a sample: [mapmaker-report.md](mapmaker-report.md).
+pad checks); `--logic` also prints the map's logic in plain words. Details and a sample: [mapmaker-report.md](mapmaker-report.md).
 Not built or run in game yet.
 
 ## Bug fixes (always on)

@@ -507,6 +507,12 @@ void pc_custom_music_arcade_rows(void (*original)(void));
 void pc_custom_music_arcade_show(void (*original)(void));
 void pc_custom_music_arcade_store(void (*original)(void));
 void pc_custom_music_restart(void (*original)(void));
+/* logic (pc_mapmaker_logic.inc): action Delay */
+void pc_mapmaker_logic_setup(void (*original)(void));
+void pc_mapmaker_logic_fire(void (*original)(void));
+void pc_mapmaker_logic_rows(void (*original)(void));
+void pc_mapmaker_logic_done(void (*original)(void));
+void pc_mapmaker_logic_actions(void (*original)(void));
 /* MapMaker capacity area hooks (end) */
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction);
 void pc_display_menu_character_draw(void (*original)(void));
