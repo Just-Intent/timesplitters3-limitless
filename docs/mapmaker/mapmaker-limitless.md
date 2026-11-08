@@ -382,6 +382,9 @@ moved or copied, after playing and returning to the editor, and in saved
 maps. In play, open tiles show the sky and let weather in. From an open-air
 tile you see the tiles around it whole: their walls, floors and ceilings,
 also from outside and from tiles with no doorway into the open area.
+A Normal (or No roof) tile keeps its walls on sides that face an open-air
+tile, so it looks closed from the open area. You cannot walk into it from
+that side; to make an entrance, put a Normal or No roof tile between them.
 
 The two extra palette tiles **46. Small Open (No Roof)** and **47. Small
 Open (Open Air)** are gone; the Roof menu does the same for any tile. Maps
