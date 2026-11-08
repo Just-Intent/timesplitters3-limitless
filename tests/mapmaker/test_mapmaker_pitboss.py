@@ -66,11 +66,9 @@ MUTATIONS = {
     'bug-any-owner': ('        if(b<0 || d<best) { b=(int)k;best=d; }', '        if(b<0) { b=(int)k;best=d; }'),
     'flock-refilled': ('        } else if(!WORD_AT(s) && b->filled) b->ent=0;', '        } else if(!WORD_AT(s) && b->filled) WORD_AT(s)=b->ent;'),
     'flock-flag-kept': ('            WORD_AT(b->ent+0x28u)&=0xFFFFFFFEu;\n', ''),
-    'release-never': ('    if(k->released || !k->bugs) return;', '    if(1) return;'),
-    'release-once-only-one': ('    guest_call(sub_0028A0A0,1,ent);guest_call(sub_0028A0A0,1,ent);', '    guest_call(sub_0028A0A0,1,ent);'),
-    'release-no-arena': ('    pit_move(k,saved);\n    guest_call(sub_0028A0A0', '    (void)saved;\n    guest_call(sub_0028A0A0'),
-    'release-every-frame': ('    k->released=1;\n', ''),
-    'release-before-fight': ('if(st>=PIT_FIGHT && st<PIT_DEATH) pit_release(k,ent);', 'pit_release(k,ent);'),
+    'hull-shown': ('        pit_hull(k);\n', ''),
+    'hull-hidden-every-frame': ('|| (PIT_B(inst+0x1F6u)&8u)) return;', ') return;'),
+    'flock-noted-early': ('    if(waiting) return;\n', ''),
     'mouth-not-held': ('        pit_mouth(k,ent,st);\n', ''),
     'mouth-no-ahead': ('    x=pit_getf(ent+PIT_ENT_POS)+PIT_MOUTH_AHEAD*pit_sin(yaw);', '    x=pit_getf(ent+PIT_ENT_POS);'),
     'mouth-nan-tilt-kept': ('    if(!pit_finite(pit_getf(b+0xC0u))) pit_setf(b+0xC0u,0.0f);\n', ''),
@@ -129,12 +127,14 @@ def test_mapmaker_pitboss(tmp_path, mutation):
         assert '[mapmaker] pitboss: prop model 0x249: not loaded, file read, textures left to its creation' in err
         assert '[mapmaker] pitboss: prop model 0x24B: not loaded, file read, textures registered by the load pass' in err
         assert 'pit skeleton 1: gas bottle 0x24A made (object 0x452000, model 0x24A, 0 listed rooms, first 0) at (12.12, 0.00, 0.00)' in err
-        assert 'pit skeleton 1: flock complete, 2 ragbugs released together (0 left parked, 0 still joining)' in err
+        assert "pit skeleton 1: flock complete, 2 ragbugs parked; they rise at the fight's launches (state 10)" in err
+        assert 'collision hull 0x249 hidden as the story' in err
+        assert 'released together' not in err
         assert 'pose computed' not in err
         assert 'pit skeleton 1: gas bottle held at the mouth (4.00, 13.00, -3.50)' in err
         assert 'pit skeleton 1: gas bottle hit through the body (type 0x21' in err
         assert 'pit skeleton 1: gas bottle hit (type 0x21, kind 0x0, amount 1.00): health 8.00 -> 5.33' in err
-        assert 'pit skeleton 1: ragbug 0 phase 1 at (3.00, 2.00, -5.00), boss state 6' in err
+        assert 'pit skeleton 1: ragbug 0 phase 0 at (3.00, 2.00, -5.00), boss state 1' in err
         assert 'pit skeleton 1 trace: state 1, boss (4.00, 2.00, -6.00) rooms 0, bottle 0x0, health 0.00, ragbug phases -1 -1 -1 -1 -1 -1' in err
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
@@ -249,6 +249,16 @@ def test_fight_states_and_sites():
     assert 0x1F40 in imms(a[0x0009A43D]) and 0x2440 in imms(a[0x0009A45B]) and 0x64 in imms(a[0x0009A44B])
     assert 0x00715F2C in [op[4] for op in a[0x0009A47D].ops if op[0] == 'mem'] and calls(a[0x0009A48B], 0x0009A330)
     assert 0x3E9 in imms(a[0x0009A376]) and 0x2329 in imms(a[0x0009A37E])
+    # the hull is hidden in the story by its slot-4 callback: sub_0028C540 -> sub_000942B0(instance, 8) sets
+    # instance +0x1F6 |= 8, and the prop draw sub_000A2740 skips such a prop (0x000A2829/0x000A28C7)
+    assert calls(a[0x0028C54A], 0x000942B0) and 8 in imms(a[0x0028C547])
+    assert 0x1F6 in [op[4] for op in a[0x000942B9].ops if op[0] == 'mem']
+    for x in (0x000A2829, 0x000A28C7):
+        assert a[x].function == 0x000A2740 and 8 in imms(a[x]) and 0x1F6 in [op[4] for op in a[x].ops if op[0] == 'mem']
+    # the ragbugs: phase 4 patrols the rim pads and turns to 5 (dive) only for a player within 5 (squared, x/z) of the
+    # bug (0x0028B1D1); a bug explodes (6) when its health is 1.0, which its damage callback sets (sub_0028B5F0)
+    assert 0x004760CC in [op[4] for op in a[0x0028B1D1].ops if op[0] == 'mem'] and 5 in imms(a[0x0028B236])
+    assert 6 in imms(a[0x0028AF55]) and 0x00475C78 in [op[4] for op in a[0x0028AF31].ops if op[0] == 'mem']
     # the boss's own spawn records: class 0x20000 and 0x200000 reach these handlers
     assert calls(a[0x0027DDD3], 0x0029FE00) and calls(a[0x0027DEDE], 0x0028B610)
     gen = [i for i in decoded() if i.function == 0x0029FE00]

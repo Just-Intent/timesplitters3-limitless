@@ -131,7 +131,6 @@
 #define PIT_FLOCK_STRIDE 0x44u
 #define PIT_FLOCK_ACTIVE 0x24u           /* slot +0x24: launched (sub_0028A0A0 sets 1) */
 #define PIT_FIGHT 6u                    /* fight states 6..13: the rack is up, the fight proper */
-#define PIT_RELEASE_WAIT 300u           /* frames a release waits for ragbugs still joining */
 #define PIT_ROOMS 0x30u                 /* prop: int8 listed rooms, +0x38 up to 10 ids */
 #define PIT_TRACE_EVERY 120u            /* frames between trace lines (60 a second) */
 #define PIT_TRACES 24u
@@ -169,7 +168,7 @@
 #define PIT_B(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 #define PIT_H(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
 
-extern void sub_0028A0A0(void);
+extern void sub_000942B0(void);
 extern void sub_0029E0A0(void),sub_0028C560(void),sub_00287E00(void),sub_00287860(void),sub_0015DDA0(void),
     sub_00059DD0(void),sub_000A9070(void),sub_000622D0(void),sub_00062260(void),sub_000A5E40(void),
     sub_000631C0(void),sub_00096220(void);
@@ -232,7 +231,7 @@ typedef struct {
     float dx, dy, dz;
     int placed, started, ready, released;
     uint32_t props[4];                  /* the props last seen (bottle, collision, rack, bandage): logged when made */
-    unsigned no_bottle, waited, traces, hits, frames, mouthed, forwarded, pads_full;
+    unsigned no_bottle, traces, hits, frames, mouthed, forwarded, pads_full, hidden;
     uint8_t bug_phase[6];
     uint8_t boss;
     unsigned bugs, moves, last;
@@ -694,7 +693,22 @@ static void pit_mouth(PitInst *k,uint32_t ent,uint32_t st);
  * called from the AI frame it disturbed that view, and the bone point was
  * still at the feet or NaN (m68.err). Removed: the mouth is placed by
  * pit_mouth below instead. */
-static void pit_release(PitInst *k,uint32_t ent);
+static void pit_flock_note(PitInst *k);
+/* The collision hull 0x249 is never drawn in the story: its slot-4 callback
+ * sub_0028C540 calls sub_000942B0(model instance, 8), which sets instance
+ * +0x1F6 bit 8, and the prop draw sub_000A2740 skips a prop whose instance
+ * has it (0x000A2829, 0x000A28C7). That slot is not run in MapMaker play
+ * (playtest .73: "appears both at the base of the skeleton very large and
+ * untextured, as well as the correct size and textured near the head": the
+ * hull drawn at the boss's feet, the bottle at the mouth). After each fight
+ * frame the same call hides it; it still takes hits (bottle callback). */
+static void pit_hull(PitInst *k)
+{
+    uint32_t h=WORD_AT(k->state+PIT_ST_COLL),inst;
+    if(!h || !MAPMAKER_PTR_OK(h,0x200u) || !MAPMAKER_PTR_OK(inst=WORD_AT(h+4u),0x200u) || (PIT_B(inst+0x1F6u)&8u)) return;
+    guest_call(sub_000942B0,2,inst,8u);
+    if(!k->hidden++) pit_log("collision hull 0x249 hidden as the story's slot 4 does (skeleton, hull)",(uint32_t)(k-pit_lv.k)+1u,h);
+}
 /* WRAP sub_0029FE00 (cdecl entity; class 0x20000): the pit fight for a pit
  * skeleton, with its block, statics and arena swapped in. The lifted fight
  * pops the caller's return address, as the stock tail jump. */
@@ -728,7 +742,8 @@ void pc_mapmaker_pitboss_princess(void (*original)(void))
         pit_props(k);
         pit_props_rooms(k,ent);
         pit_mouth(k,ent,st);
-        if(st>=PIT_FIGHT && st<PIT_DEATH) pit_release(k,ent);
+        pit_flock_note(k);
+        pit_hull(k);
         pit_trace(k,ent,st);
     }
 }
@@ -852,32 +867,19 @@ static void pit_trace(PitInst *k,uint32_t ent,uint32_t st)
     fflush(stderr);
 }
 
-/* The flock all at once (playtest .62: the ragbugs "seemed to appear randomly
- * around the pit skeleton one at a time"): the stock launch sub_0028A0A0
- * (state 10) puts up to 3 parked bugs on the flight circle per call. Once the
- * fight proper runs (state 6+) and every placed ragbug has joined a flock (or
- * 5 s passed), it is called twice with this instance's block and arena, so
- * all its ragbugs (6 at most) leave the park together. Once per fight. */
-static void pit_release(PitInst *k,uint32_t ent)
+/* Playtest .73 (the .62 release reverted): the ragbugs rose at state 6, before
+ * the story would launch them. Stock launches up to 3 parked bugs each time
+ * the fight passes state 10 (sub_0028A0A0 at 0x0029F647), after a fire attack
+ * and raise; that is the only launch now. The flock is logged once complete. */
+static void pit_flock_note(PitInst *k)
 {
-    unsigned i,waiting=0,parked=0,flying=0;
-    PitSave s;
-    float saved[PIT_REBASE_N];
+    unsigned i,waiting=0;
     if(k->released || !k->bugs) return;
     for(i=0;i<pit_lv.nbugs;i++) if(pit_lv.bug[i].owner<0 && pit_lv.bug[i].record) waiting++;
-    if(waiting && k->waited++<PIT_RELEASE_WAIT) return;
+    if(waiting) return;
     k->released=1;
-    pit_in(k,&s);
-    pit_move(k,saved);
-    guest_call(sub_0028A0A0,1,ent);guest_call(sub_0028A0A0,1,ent);
-    pit_back(saved);pit_out(&s);
-    for(i=0;i<PIT_BUGS;i++) {
-        uint32_t sl=k->state+PIT_ST_FLOCK+i*PIT_FLOCK_STRIDE;
-        if(!WORD_AT(sl)) continue;
-        if(WORD_AT(sl+PIT_FLOCK_ACTIVE)) flying++; else parked++;
-    }
-    fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: flock complete, %u ragbugs released together (%u left parked, %u still joining)\n",
-            (unsigned)(k-pit_lv.k)+1u,flying,parked,waiting);
+    fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: flock complete, %u ragbugs parked; they rise at the fight's launches (state 10)\n",
+            (unsigned)(k-pit_lv.k)+1u,k->bugs);
     fflush(stderr);
 }
 
