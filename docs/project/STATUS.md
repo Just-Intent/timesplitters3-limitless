@@ -1,3 +1,18 @@
+## MapMaker map report at level start and offline map checker (2026-11-08, not built or played)
+
+Branch `map-validator` from `mapmaker-recon` `4c5cb965`; Windows 11 x64, MSVC
+x64 fixtures only. New: `src/interface/pc_mapmaker_report.inc`, called by the
+existing level-setup validator hook (no new WRAP), logs one bounded map report
+(counts vs caps, near-limit line, at most 20 problems with grid positions);
+`tools/testing/map_report.py` checks `.tsmap`/`anicemap.mkr` files offline.
+Validation: `tests/mapmaker/test_mapmaker_report.py` (fixed + 35 mutations,
+cap and wiring checks), `test_map_report_tool.py` (incl. the item-category
+table against the private XBE), `test_mapmaker_validate.py`, menu-mouse whole
+chain. The offline checker ran on the ignored probe saves (`private/test-saves/
+mapmaker-probe`): unplaced Story AI and a lone teleporter were reported.
+Unverified: game build, the in-game report text and grid positions, cover-pad
+owner tracing in play, Mac. Details: `docs/mapmaker/mapmaker-report.md`.
+
 ## Upstream sync to v0.5.3+ (`db029630`) (2026-11-07, built, not played)
 
 Branch `upstream-sync-2` from fork `main`/`mapmaker-recon` `8ba2dc43` merges
