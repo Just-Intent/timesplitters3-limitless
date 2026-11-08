@@ -217,7 +217,7 @@ int main(void)
     CHECK(unseen(5) && unseen(6) && unseen(7) && unseen(8));
     CHECK(WORD_AT(VIEW+0xD28u)==1u);
     CHECK(checksum_outside()==before);
-    CHECK(two_sided("111101101"));                  /* the areas and their portal neighbours */
+    CHECK(two_sided("111111111"));                  /* every room of a map with open air */
     call();CHECK(room_is(3,1,0,0,640,480));          /* same every frame */
     puts("phase inside");fflush(stdout);fflush(stderr);
 
@@ -274,7 +274,7 @@ int main(void)
     no_walk();sees(1,0,0,0,640,480);WORD_AT(VIEW+0x2A0u)=1u;
     call();
     CHECK(room_is(5,1,0,0,640,480) && unseen(8));
-    CHECK(two_sided("111111101"));
+    CHECK(two_sided("111111111"));
     CHECK(mapmaker_openview.beside==1u);
     set_box(8,15,0,0,20,5,5);FLOAT_AT(RECORDS+8u*0xB4u+0x14u)=strtof("nan",NULL);   /* NaN: no box */
     play_build();call();
@@ -296,7 +296,7 @@ int main(void)
     CHECK(room_is(8,1,0,0,640,480) && mapmaker_openview.beside==2u && two_sided("111111111"));
     set_box(8,15.6f,0,0,20,5,5);                        /* 0.6 away: not */
     play_build();call();
-    CHECK(unseen(8) && mapmaker_openview.beside==1u && two_sided("111111101"));
+    CHECK(unseen(8) && mapmaker_openview.beside==1u && two_sided("111111111"));
     /* the island 6 (open, no portal to the area) a floor up and beside room 3:
      * its box joins it to the area, so it and its closed neighbour 7 get the
      * area's whole viewport (.73 report: walls beyond another area clipped) */
