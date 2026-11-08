@@ -222,7 +222,7 @@ unlike the boss bars. It is a stock MapMaker story feature, not a boss bar
 
 | WRAP | what it does |
 |---|---|
-| `sub_0013A400` -> `pc_mapmaker_realbosses_meter` | return 0x0014D264 only: for an actor whose record ai_start noted (the real boss) and whose character is 0x15 or entity model 0x5BE, in scene 100 story, skip the draw (`MAPMAKER_GUEST_RET`, logged once) unless its Story AI chose the Sub-boss bar; everything else the original |
+| `sub_0013A400` -> `pc_mapmaker_realbosses_meter` | return 0x0014D264 only: for an actor whose record ai_start noted (the real boss) and whose character is 0x15 or entity model 0x5BE, in scene 100 story, skip the draw (`MAPMAKER_GUEST_RET`, logged once) unless its Story AI chose the Sub-boss bar; everything else the original. After .68 first: an actor the bosses area drew this pass (`bos_meter_owned`, any boss type) gets no stock draw ([bosses: Health display](mapmaker-bosses.md#health-display)) |
 
 The +0x268 record stays: `sub_0014CC80` and the damage flash `sub_0014D3A0`
 read it. With `TSFP_MAPMAKER_REAL_BOSS=0` (bot class) the creature never gets
@@ -433,6 +433,78 @@ INFERRED: the stretching came from the same mismatch (the body drawn at height
 recurs, wait more than 60 s before closing the game so the hang watchdog
 writes a report, and send the throw lines.
 
+### Same floor and one floor up, both (stabilization after v0.4.0-mapmaker.68)
+
+User list: "giant skeletons not being able to aim correctly at player if
+player is positioned on the same floor and/or one floor above them."
+
+- CONFIRMED (decode, `test_fire_breath_and_throw_sites`): the throw's
+  projectile 0x34 (table `0x004DEB28 + 0x34*0x40`: update `sub_000E8AD0`,
+  an effect only; move `sub_000ED7C0`, direction x speed x dt) flies
+  straight, no arc. `sub_000EA9C0` first tries an instant trace
+  (`sub_000E0CE0`) from the origin.
+- CONFIRMED (`m50.err`): besides the hands lowered to 4.5, two throws left
+  from a hand under the player's floor (-3.0 and -2.9 for a player on 0.5,
+  dir y +0.10). That line starts in the room below and meets the slab.
+- INFERRED: the stock aim at the feet. Mission 5 throws from about 10 over
+  the courtyard, steeply down through the body. From a hand 4 over the feet
+  the line is shallow and reaches the floor where the player stands. The
+  .42-.44 "same floor" case kept that aim.
+
+Fix (`rbs_skel_low` / `rbs_skel_aim`): for every target on or over the
+boss's reference floor (more than `RBS_SKEL_UP` under it keeps the stock
+aim), the origin moves into the target's room, at least
+`RBS_SKEL_HAND_LOW` (1) and at most `RBS_SKEL_HAND` (4) over its feet, x/z
+the hand's, and the aim is the body (`RBS_SKEL_BODY` 1.5 over the feet,
+the climb held at 60 degrees). Logs: `shot starts in the target's room:
+hand A -> B`, `aims at its target's body`. Fixture: m44/m50 hands, own
+floor, jump, two floors up, a floor under, 2.25 under; mutations
+`aim-under-floor-body`, `aim-ref-spawn`, `hand-*`. Unplayed.
+
+### The fire breath (stabilization after v0.4.0-mapmaker.68)
+
+User list: "Skeleton fire-breathing animation not working, and they appear
+to have dark smoke coming from their heads until I get close to them. Looks
+like the same smoke that comes out of the splitter crows."
+
+CONFIRMED (decode, `test_fire_breath_and_throw_sites`):
+
+- The breath is fight states 3..5 (`princess_raise_up` 0x1A3,
+  `princess_raise_attack1` 0x1A4, `princess_raise_react` 0x1A5), the attack
+  it uses at range. Close up it melees in state 2 (no breath), which is why
+  the smoke stopped when the player came near.
+- While the head bones (matrices 10 and 11) open the jaw, `sub_0028C640`
+  (each fight frame, 0x0029D056) adds flame points to a 500-entry ring at
+  state +0 (0x20 each; cursor +0x3E80, count +0x3E84) with `sub_00288AB0`.
+  It burns players near a flame (`sub_00289120`) and lights the two effect
+  emitters made at the fight start (state +0x3E8C / +0x3E90, templates
+  0x0076DCD0 / 0x0076DB78, `sub_001D5E70` at 0x0029D3EA).
+- Those emitters place each new flame with the shape callback `sub_00288BD0`
+  (registered once, `sub_00378400` at 0x0029D3D5). The effect system calls
+  it outside the fight as callback(emitter, out, default, index)
+  (`sub_003784F0` -> `sub_00378480`, 0x003784DF). It picks a random live
+  ring point of `[0x0078B1EC]`. Outside a swap that is the first ("home")
+  skeleton, so skeletons 2-4 had their flames made at the first one's ring,
+  or at the world origin while that ring was empty (count 0: out 0, 0, 0).
+- What stayed at the head is the fight's own particle block
+  (`sub_002A6650` at matrix 10 in states 3-5, drawn by `rbs_skel_fire`):
+  texture 0x303 `firesmoke` (resource `0x004D2D50 + id*0x18`, name +0xC)
+  with colours of a few per cent (`sub_002A7F30`: red 0.2k, green about k,
+  blue about k x life^2 for k 4..11, alpha 96 x life). That is smoke, the same
+  particle code and draw (blend mode 1) the split Crowe uses.
+
+Fix: new WRAP `sub_00288BD0` -> `pc_mapmaker_realbosses_skel_flames`: in
+scene 100 the emitter that asks is matched to a skeleton's +0x3E8C/+0x3E90
+and that skeleton is swapped in around the original. Any other emitter: stock
+(logged once). The head smoke itself is stock. Logs: `giant skeleton N fire
+breath: flames placed from its own flame ring (L live, emitter E)`, once per
+skeleton. Fixture: three skeletons, each emitter, an unknown emitter, none,
+mission 5, inside another skeleton's fight; mutations `flames-*`.
+INFERRED, needs a playtest: a single skeleton was already routed, so if
+skeleton 1's breath also shows only smoke, the next log line says whether
+its emitters ask at all (no `flames placed` line) and how many flames are
+live.
+
 ### Fire and spawn diagnostics (after v0.4.0-mapmaker.18)
 
 User report (mapmaker.17): the skeleton's fire breath "didn't land, and I
@@ -633,8 +705,9 @@ CONFIRMED (decode, `test_several_per_map_entries`):
 | walker | heartbeat, fight-state log, wake-up, roar and guns per walker (logs say `Crow walker N`). One WELL stand-in per walker. The end of a walker's death removes that walker |
 | skeleton | floor height, throw and fire per skeleton |
 
-Not routed (INFERRED, visual only): `sub_00288BD0` always sees the first skeleton's state. Its
-particles for the other skeletons may be placed from the first one's values. Memory: about 51 KB per
+Not routed until .68: `sub_00288BD0` saw the first skeleton's state, so the other skeletons'
+breath flames were placed at the first one's (CONFIRMED after .68, [the fire
+breath](#the-fire-breath-stabilization-after-v040-mapmaker68); now routed by its emitter). Memory: about 51 KB per
 skeleton and 59 KB per walker of the level heap. The new wrappers are under
 [Integrator notes](#integrator-notes).
 
@@ -864,6 +937,13 @@ WRAP sub_00299140 -> pc_mapmaker_realbosses_walk_slot      (new; walker slot 2)
 WRAP sub_00298F60 -> pc_mapmaker_realbosses_walk_slot      (new; walker slot 3: the same hook for both)
 ```
 
+Added after v0.4.0-mapmaker.68 (the skeleton's fire breath):
+
+```
+WRAP sub_00288BD0 -> pc_mapmaker_realbosses_skel_flames    (new; the breath emitters' shape callback, called by the effect system
+                                                            through sub_00378480 0x003784DF; no other wrapper of it)
+```
+
 Each swaps the boss's instance in around the original and runs the original
 unchanged for anything else (no instance for the entity, another scene, the
 switch off). No new guest calls, so no new link stubs. Order with other
@@ -945,6 +1025,20 @@ callers test `MAPMAKER_SKELVIS`). No extension memory.
    removed`, `Crow walker level event dropped`), logic markers unchanged.
    A second Crow walker AI fights as a bot (`only one Crow walker per map`).
    Mission 13 still plays stock.
+10. Stabilization after .68, aim: place two or more Giant Skeletons; stand on
+    the skeletons' floor, then one floor up, both standing still and moving.
+    Throws should hit in both places; stderr `shot starts in the target's
+    room: hand A -> B` and `aims at its target's body` (4 each per skeleton).
+11. Fire breath: stand far from three or four skeletons until they rear up
+    (raise attack). Each should breathe its own flames from its head, not
+    only dark smoke; stderr `giant skeleton N fire breath: flames placed from
+    its own flame ring` once per skeleton. Walking into a flame hurts.
+12. Sub-boss meter: give each ported boss (giant skeleton, trophy monster,
+    Crow walker, split Crowe, giant robot, castle tank, Khallos, worm,
+    mothership, pit skeleton) the Boss flag with Health display: Sub-boss
+    bar. A meter should float over the top of each one, not inside it; stderr
+    `Sub-boss meter of NAME (entity E, model M): top T, stock meter at P,
+    lifted L` once per boss. No boss shows two meters.
 
 ## Late instances at the AI start (v0.4.0-mapmaker.27)
 

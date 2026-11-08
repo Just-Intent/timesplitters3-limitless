@@ -279,6 +279,7 @@ void pc_mapmaker_realbosses_fx(void (*original)(void));
 void pc_mapmaker_realbosses_face(void (*original)(void));
 void pc_mapmaker_realbosses_create(void (*original)(void));
 void pc_mapmaker_realbosses_skel_slot(void (*original)(void));
+void pc_mapmaker_realbosses_skel_flames(void (*original)(void));
 void pc_mapmaker_realbosses_walk_fight(void (*original)(void));
 void pc_mapmaker_realbosses_walk_message(void (*original)(void));
 void pc_mapmaker_realbosses_walk_damage(void (*original)(void));

@@ -117,7 +117,9 @@
  * Health display (bosses area row, Story AI chunk +0x29 bit 2), per real boss:
  * Boss Off = no health shown (no bottom bar, meter hidden); Boss bar = the bosses
  * area's bottom bar, meter hidden; Sub-boss bar = no bottom bar (focus
- * cleared for the stock call, bosses draws none), the stock meter kept.
+ * cleared for the stock call, bosses draws none) and the bosses area's
+ * meter, lifted over the model; since .68 its stock draw is skipped
+ * (bos_meter_owned, pc_mapmaker_bosses.inc).
  *
  * The giant skeleton of story mission 5 (the mansion boss, "Princess" in the
  * code; CONFIRMED, tests/mapmaker/test_mapmaker_realbosses.py): character id
@@ -155,8 +157,10 @@
  *    instance or another area's boss keeps its blocks; RBS_FX goes through
  *    the one holder of pc_mapmaker_bossfx.inc, which the split Crowe shares,
  *    so any nesting of the two areas is safe. Outside, [0x0078B1EC]
- *    is the first one: its particle-type callback sub_00288BD0 (one shared
- *    entry, sub_00378400) is called with no entity and uses it.
+ *    is the first one. The fire breath's shape callback sub_00288BD0 (one
+ *    shared entry, sub_00378400) is called by the effect system with the
+ *    asking emitter: since .68 (skel_flames) the skeleton owning that emitter
+ *    (state +0x3E8C/+0x3E90) is swapped in around it.
  *  - ai_start: each giant skeleton gets a free instance and record +0/+4 =
  *    0/0x20000 when lv1_6.pak is mounted; one more than the map prepared
  *    keeps the MapMaker class (logged, counted).
@@ -412,7 +416,7 @@ int pc_mapmaker_area_enabled(const char *area,const char *hook);
 static struct {
     int read, optout;
     uint32_t label, skel_label, walk_label, well[RBS_INST_MAX], extra_label[RBS_EXTRA_MAX];
-    unsigned logged, meters;
+    unsigned logged, meters, meters_owned;
     struct { uint32_t record; uint8_t boss; } real[RBS_REAL_MAX];
 } rbs;
 /* The giant skeletons and Crow walkers of this level, one per placed Story AI
@@ -425,7 +429,7 @@ static struct {
 typedef char rbs_fx_is_the_shared_window[(RBS_FX==MAPMAKER_FX && RBS_FX_SIZE==MAPMAKER_FX_SIZE)?1:-1];
 typedef struct {
     uint32_t state, parts, record;
-    unsigned throws, skipped, fire, aimed, lowered;
+    unsigned throws, skipped, fire, aimed, lowered, flames;
     float floor, ground, pad;           /* first-fight-frame height (its body's height); the real floor under it; height at its AI start */
     int floor_set, ground_set, pad_set;          /* ground_set: 1 under the spawn, 2 above it, -1 none found (the spawn height) */
     MapmakerFx fx;
@@ -439,7 +443,7 @@ typedef struct {
 static RbsSkel rbs_skels[RBS_INST_MAX];
 static RbsWalk rbs_walks[RBS_INST_MAX];
 /* n: instances with a state this level; cur: the one swapped in (0 = none). */
-static struct { unsigned n, extras, events, deaths; RbsSkel *cur; } rbs_skelf;
+static struct { unsigned n, extras, events, deaths, other_flames; RbsSkel *cur; } rbs_skelf;
 static struct { unsigned n, extras, events, seen; RbsWalk *cur; } rbs_walkf;
 /* What a swap replaced: the boss pointer (an inner entry of the same
  * instance keeps it), the instance that was current and the statics' holder. */
@@ -894,7 +898,7 @@ static void rbs_walk_out(RbsWalk *w,const RbsSave *s)
  * statics RBS_FX as they were, keeps its own copy, and the statics are put
  * back after, so a robot or split Crowe area keeps its own particle block.
  * The boss pointers are left on the first instance ("home"): code that no
- * entity routes (the skeleton's particle callback sub_00288BD0) uses it. */
+ * entity routes uses it (sub_00288BD0 is routed by its emitter since .68). */
 static uint8_t rbs_fx_base[RBS_FX_SIZE];       /* the statics at this level's init: late instances start from them */
 void pc_mapmaker_realbosses_level(void (*original)(void))
 {
@@ -1147,7 +1151,7 @@ void pc_mapmaker_realbosses_restart(void (*original)(void))
     anims=rbs_anims_again(&missed);
     if(anims || missed)
         rbs_log("level restart: mansion boss anims mapped again (the restart unmaps every 0x4000 anim) (mapped, not mapped)",anims,missed);
-    rbs_skelf.extras=rbs_skelf.events=rbs_skelf.deaths=0;
+    rbs_skelf.extras=rbs_skelf.events=rbs_skelf.deaths=rbs_skelf.other_flames=0;
     rbs_walkf.extras=rbs_walkf.events=rbs_walkf.seen=0;
     if(WORD_AT(RBS_SCENE)!=100u || (!rbs_skelf.n && !rbs_walkf.n)) return;
     mapmaker_fx_forget(rbs_skels,sizeof rbs_skels);mapmaker_fx_forget(rbs_walks,sizeof rbs_walks);
@@ -1300,8 +1304,8 @@ void pc_mapmaker_realbosses_risen(void (*original)(void))
  * of a player one floor up (about 5 units) starts below that floor and meets
  * its edge or underside. For a target more than RBS_SKEL_UP over the boss's
  * own floor, the aim point is raised by RBS_SKEL_BODY (its body, not its
- * feet) and the climb is held to RBS_SKEL_PITCH (about 60 degrees). Targets
- * on the boss's floor keep the stock aim (from a lowered hand: rbs_skel_low).
+ * feet) and the climb is held to RBS_SKEL_PITCH (about 60 degrees). (Since
+ * .68 targets on the boss's own floor get the same body aim: rbs_skel_low.)
  *
  * v0.4.0-mapmaker.42 ("they don't hit me if I stand in place on the same
  * floor"): "over the boss's floor" is measured from its real floor, the
@@ -1310,11 +1314,11 @@ void pc_mapmaker_realbosses_risen(void (*original)(void))
  * fight at its first aim: from its noted spawn height, then, when no floor
  * is within a step there, climbing one search height at a time up to 11.25
  * over it (a first-frame height under the floor, as rising from the ground).
- * None found: the spawn height. A target is a floor up only more than
- * RBS_SKEL_UP (half a 5-unit floor) over that floor. */
+ * None found: the spawn height. A target more than RBS_SKEL_UP (half a
+ * 5-unit floor) under that floor keeps the stock aim. */
 #define RBS_SKEL_TARGET 0x4164u        /* state: target points, 12 bytes each */
 #define RBS_SKEL_TARGET_I 0x4158u      /* state: which one (0/1) */
-#define RBS_SKEL_UP 2.5f               /* a target this far over the boss's real floor is a floor up */
+#define RBS_SKEL_UP 2.5f               /* a target this far under the boss's real floor is a floor down */
 #define RBS_FINDER_UP 0x3FA00000u      /* 1.25: the floor finder's search height, as the pad snap */
 #define RBS_FINDER_R 0x3DCCCCCDu       /* 0.1: its radius */
 #define RBS_FLOOR_Y 0x004DCB00u        /* the finder's floor height; it also writes the two below */
@@ -1366,17 +1370,35 @@ static void rbs_skel_ground(RbsSkel *k,uint32_t ent)
  * hand in the room, which is why throws from "one floor above" hit (.42).
  * Mission 5's courtyard has open sky. So a hand more than RBS_SKEL_HAND over
  * the target's feet is moved straight down to that height, under the
- * ceiling of the target's floor, before the aim (stock or raised) is taken
- * from it; not for a target under the boss's floor (RBS_SKEL_UP). */
-#define RBS_SKEL_HAND 4.0f             /* a shot starts at most this far over the target's feet */
-static int rbs_skel_low(RbsSkel *k,uint32_t shot,float *o,const float *d)
+ * ceiling of the target's floor, before the aim is taken from it; not for a
+ * target under the boss's floor (RBS_SKEL_UP).
+ *
+ * After v0.4.0-mapmaker.68 (stabilization list: "not able to aim correctly at
+ * player if player is positioned on the same floor and/or one floor above"):
+ * - m50.err also has throws from a hand under the target's floor (-3.0 and
+ *   -2.9 for a player on 0.5, dir y +0.10): that line starts in the room
+ *   below and crosses the slab. A hand less than RBS_SKEL_HAND_LOW over the
+ *   target's feet now moves up to that height, into the target's room.
+ * - The projectile (type 0x34: table 0x004DEB28 + 0x34*0x40, update
+ *   sub_000E8AD0, move sub_000ED7C0) flies straight from the origin, no arc.
+ *   Mission 5 throws from about 10 over the courtyard, steeply down through
+ *   the player's body to the feet. From a hand lowered to 4 over the feet,
+ *   the stock aim at the feet is a shallow line that reaches the floor just
+ *   where the player stands (INFERRED: the floor is hit before the legs).
+ *   So every target on or over the boss's floor gets the body aim
+ *   (RBS_SKEL_BODY over its feet), not only a target a floor up; a target
+ *   under the boss's floor keeps the stock aim. */
+#define RBS_SKEL_HAND 4.0f             /* a shot starts at most this far over the target's feet ... */
+#define RBS_SKEL_HAND_LOW 1.0f         /* ... and at least this far (in the target's room, not under its floor) */
+static int rbs_skel_low(RbsSkel *k,uint32_t shot,float *o,const float *d)   /* a target on or over its floor */
 {
     float y=o[1];
-    if(!(o[1]-d[1]>RBS_SKEL_HAND) || d[1]-k->ground<-RBS_SKEL_UP) return 0;
-    o[1]=d[1]+RBS_SKEL_HAND;
+    if(o[1]-d[1]>RBS_SKEL_HAND) o[1]=d[1]+RBS_SKEL_HAND;
+    else if(o[1]-d[1]<RBS_SKEL_HAND_LOW) o[1]=d[1]+RBS_SKEL_HAND_LOW;
+    else return 0;
     rbs_setf(shot+4u,o[1]);
     if(k->lowered++<4u) {
-        fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u shot starts under the target's ceiling: hand %.1f -> %.1f for a target at %.1f (its floor %.1f)\n",
+        fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u shot starts in the target's room: hand %.1f -> %.1f for a target at %.1f (its floor %.1f)\n",
                 (unsigned)(k-rbs_skels)+1u,(double)y,(double)o[1],(double)d[1],(double)k->ground);
         fflush(stderr);
     }
@@ -1387,7 +1409,6 @@ static void rbs_skel_aim(RbsSkel *k,uint32_t st,uint32_t ent)
     uint32_t shot=st+RBS_SKEL_SHOT,i=WORD_AT(st+RBS_SKEL_TARGET_I),t;
     float o[3],d[3],h,len;
     unsigned j;
-    int low;
     if(!k->floor_set || i>1u) return;
     if(!k->ground_set) rbs_skel_ground(k,ent);
     t=st+RBS_SKEL_TARGET+i*12u;
@@ -1395,16 +1416,9 @@ static void rbs_skel_aim(RbsSkel *k,uint32_t st,uint32_t ent)
         o[j]=rbs_getf(shot+j*4u);d[j]=rbs_getf(t+j*4u);
         if(!rbs_sane(o[j]) || !rbs_sane(d[j])) return;
     }
-    low=rbs_skel_low(k,shot,o,d);
-    if(!(d[1]-k->ground>RBS_SKEL_UP)) {                /* the boss's floor: the stock aim ... */
-        if(!low) return;
-        d[0]-=o[0];d[1]-=o[1];d[2]-=o[2];              /* ... taken again from the lowered hand */
-        len=rbs_sqrt((d[0]*d[0]+d[1]*d[1]+d[2]*d[2]));
-        if(!(len>0.001f)) return;
-        for(j=0;j<3u;j++) rbs_setf(shot+0xCu+j*4u,d[j]/len);
-        return;
-    }
-    d[0]-=o[0];d[1]+=RBS_SKEL_BODY-o[1];d[2]-=o[2];
+    if(d[1]-k->ground<-RBS_SKEL_UP) return;            /* under the boss's floor: the stock aim */
+    rbs_skel_low(k,shot,o,d);                          /* the origin in the target's room */
+    d[0]-=o[0];d[1]+=RBS_SKEL_BODY-o[1];d[2]-=o[2];    /* at its body, on any floor from its own up */
     h=rbs_sqrt((d[0]*d[0]+d[2]*d[2]));
     len=rbs_sqrt((h*h+d[1]*d[1]));
     if(!(len>0.001f)) return;
@@ -1416,7 +1430,7 @@ static void rbs_skel_aim(RbsSkel *k,uint32_t st,uint32_t ent)
     }
     for(j=0;j<3u;j++) rbs_setf(shot+0xCu+j*4u,d[j]);
     if(k->aimed++<4u) {
-        fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u aims at a target a floor up (%.1f over its floor %.1f): dir (%.2f, %.2f, %.2f)\n",
+        fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u aims at its target's body (%.1f over its floor %.1f): dir (%.2f, %.2f, %.2f)\n",
                 (unsigned)(k-rbs_skels)+1u,(double)(rbs_getf(t+4u)-k->ground),(double)k->ground,(double)d[0],(double)d[1],(double)d[2]);
         fflush(stderr);
     }
@@ -1474,6 +1488,62 @@ void pc_mapmaker_realbosses_skel_slot(void (*original)(void))
     rbs_skel_in(k,&s);
     original();
     rbs_skel_out(k,&s);
+}
+
+/* The fire breath (stabilization list after v0.4.0-mapmaker.68: "fire-
+ * breathing animation not working, and they appear to have dark smoke coming
+ * from their heads until I get close"). CONFIRMED (decode): the breath is
+ * fight states 3..5 (princess_raise_up 0x1A3 / princess_raise_attack1
+ * 0x1A4 / princess_raise_react 0x1A5, the attack it uses at range). While
+ * the head bones (matrices 10/11) open the jaw, sub_0028C640 (every fight
+ * frame, 0x0029D056) adds flame points to the state's 500-entry ring (state
+ * +0, 0x20 each; cursor +0x3E80, live count +0x3E84) with sub_00288AB0,
+ * burns players near a flame (sub_00289120) and lights the two effect
+ * emitters made at the fight start (state +0x3E8C / +0x3E90, templates
+ * 0x0076DCD0 / 0x0076DB78, sub_001D5E70 0x0029D3EA). Those emitters place
+ * every new flame particle with the shape callback sub_00288BD0 (registered
+ * once by sub_00378400, 0x0029D3D5; called by sub_00378480 as
+ * callback(emitter, out, default, index)), which picks a random live ring
+ * point of [0x0078B1EC]. It runs from the effect system, outside the fight,
+ * so it saw the "home" (first) skeleton's ring: every other skeleton's
+ * flames were made at the first one's ring, or at the world origin when that
+ * ring was empty (its count 0: out = 0,0,0). What was left at the head was
+ * the fight's own dark particle block (sub_002A6650 at bone matrix 10, the
+ * shared particle draw with texture 0x303 "firesmoke" and colours of a few
+ * per cent: smoke, drawn by rbs_skel_fire). Close up the fight melees (state
+ * 2, no breath), so the smoke stopped. Fix: the emitter that asks is one of a
+ * skeleton's two (+0x3E8C/+0x3E90): that skeleton is swapped in around the
+ * callback. Any other emitter: stock. */
+#define RBS_SKEL_FLAME_A 0x3E8Cu        /* state: the breath's two effect emitters (sub_00378530 writes both) */
+#define RBS_SKEL_FLAME_B 0x3E90u
+#define RBS_SKEL_FLAMES 0x3E84u         /* state: live flame points in the ring */
+void pc_mapmaker_realbosses_skel_flames(void (*original)(void))
+{
+    RbsSkel *k=0;
+    RbsSave s;
+    uint32_t e;
+    unsigned i;
+    if(!rbs_skelf.n || !MAPMAKER_STACK_OK(8) || !(e=WORD_AT(g_esp+4u)) || WORD_AT(RBS_SCENE)!=100u) { original();return; }
+    for(i=0;i<rbs_skelf.n && !k;i++)
+        if(rbs_skels[i].record && rbs_skels[i].state && MAPMAKER_PTR_OK(rbs_skels[i].state,RBS_SKEL_STATE_SIZE) &&
+           (WORD_AT(rbs_skels[i].state+RBS_SKEL_FLAME_A)==e || WORD_AT(rbs_skels[i].state+RBS_SKEL_FLAME_B)==e)) k=&rbs_skels[i];
+    if(!k) {
+        if(!rbs_skelf.other_flames++) {
+            fprintf(stderr,"[mapmaker] realbosses: giant skeleton fire breath: shape callback for emitter 0x%X of no skeleton (stock; %u skeletons)\n",
+                    (unsigned)e,rbs_skelf.n);
+            fflush(stderr);
+        }
+        original();
+        return;
+    }
+    rbs_skel_in(k,&s);
+    original();
+    rbs_skel_out(k,&s);
+    if(!k->flames++) {
+        fprintf(stderr,"[mapmaker] realbosses: giant skeleton %u fire breath: flames placed from its own flame ring (%u live, emitter 0x%X)\n",
+                (unsigned)(k-rbs_skels)+1u,(unsigned)WORD_AT(k->state+RBS_SKEL_FLAMES),(unsigned)e);
+        fflush(stderr);
+    }
 }
 
 /* The Crow walker's death animation has ended: remove it (sub_0015DDA0, the
@@ -1945,6 +2015,16 @@ void pc_mapmaker_realbosses_meter(void (*original)(void))
 {
     uint32_t a,ent,rec;
     unsigned k;
+#ifdef BOS_METER_OWNED
+    /* the innermost layer of the stock loop's call: a Sub-boss actor the
+     * bosses area drew already this pass (lifted over its model) gets no
+     * second, stock meter; any boss type (split Crowe and pit skeleton too) */
+    if(MAPMAKER_STACK_OK(8) && WORD_AT(g_esp)==RBS_RET_METER && bos_meter_owned(WORD_AT(g_esp+4u))) {
+        if(!rbs.meters_owned++) rbs_log("overhead health meter: the stock draw of a Sub-boss meter the bosses area drew is skipped",WORD_AT(g_esp+4u),0);
+        MAPMAKER_GUEST_RET();
+        return;
+    }
+#endif
     if(!rbs.real[0].record || !MAPMAKER_STACK_OK(8) || WORD_AT(g_esp)!=RBS_RET_METER) { original();return; }
     a=WORD_AT(g_esp+4u);
     if(!MAPMAKER_PTR_OK(a,RBS_ACTOR) || !MAPMAKER_PTR_OK(ent=WORD_AT(a),0x100u)) { original();return; }

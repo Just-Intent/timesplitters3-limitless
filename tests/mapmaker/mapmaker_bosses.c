@@ -52,7 +52,7 @@ static struct { uint32_t text, value; } items[16];
 typedef struct { uint32_t esi, edi, text, frac, out, esp, margin, smooth[3]; char label[32]; } Bar;
 static Bar bar, blog[8];                         /* bar = first call of a frame */
 static unsigned nmeters;                         /* sub_0013A400(actor, 0, 0x7F, 0x6E) calls */
-static struct { uint32_t a, b, c, d, esp; } meter;
+static struct { uint32_t a, b, c, d, esp, ent; float y; } meter;
 /* bar_model: sub_00139740's drain rule (0x001398B8..0x00139AAF), fill = the
  * solid length 1 - (damage - drain x fade) it passes to sub_00130400. */
 static int bar_model;
@@ -79,6 +79,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     else if(f==sub_00071800) { if(nitems<16) { items[nitems].text=x[0];items[nitems].value=x[1]; } nitems++; }
     else if(f==sub_0013A400) {                    /* overhead meter: cdecl (actor, 0, 0x7F, 0x6E) */
         meter.a=x[0];meter.b=x[1];meter.c=x[2];meter.d=x[3];meter.esp=g_esp;nmeters++;
+        meter.ent=WORD_AT(x[0]);meter.y=FLOAT_AT(meter.ent+0x68u);   /* the height it is drawn at */
         g_esi=g_edi=g_ebx=0xDEADu;
     }
     else if(f==sub_00139740) {                    /* esi = HUD block, edi = entity; (text, fraction, int *) */
@@ -343,7 +344,8 @@ static int near(float a,float b) { return a>b-0.002f && a<b+0.002f; }
 static int margin_ok(unsigned k,unsigned slot,unsigned step) { return k<nlog && blog[k].margin==20u+slot*step; }
 /* sub_0014D1F0's fake: the meters must be drawn before it (its loop runs first) */
 static unsigned meters_at_orig;
-static void fake_meters(void) { orig_calls++;meters_at_orig=nmeters;g_esp+=4u; }
+static int owned_at_orig;
+static void fake_meters(void) { orig_calls++;meters_at_orig=nmeters;owned_at_orig=bos_meter_owned(A(5));g_esp+=4u; }
 static unsigned meters_frame(void)
 {
     nmeters=0;meters_at_orig=99;orig_calls=0;memset(&meter,0,sizeof meter);
@@ -816,8 +818,67 @@ int main(void)
         CHECK(nlog==2 && FLOAT_AT(ENT(5)+0x1D8u)==2.0f);           /* health x2 still applies */
         CHECK(meters_frame()==1 && meter.a==A(5) && meter.b==0 && meter.c==0x7Fu && meter.d==0x6Eu);
         CHECK(meter.esp==ESP0);                                     /* pushed below the return address */
-        WORD_AT(ENT(5)+0x268u)=0x1234u;CHECK(meters_frame()==0);  /* a record: the stock loop draws it */
-        WORD_AT(ENT(5)+0x268u)=0;
+        CHECK(meter.ent==ENT(5) && meter.y==0.0f && !owned_at_orig);   /* no node table: the stock height */
+        /* after .68: a record (the real story bosses, split Crowe, pit
+         * skeleton): drawn here too and listed while the original runs, so the
+         * stock loop's own call is skipped (realbosses meter hook) */
+        WORD_AT(ENT(5)+0x268u)=0x1234u;CHECK(meters_frame()==1 && meter.a==A(5) && owned_at_orig==1);
+        CHECK(!bos_meter_owned(A(5)));                              /* only while the original runs */
+        WORD_AT(ENT(5)+0x268u)=0;CHECK(meters_frame()==1 && !owned_at_orig);
+        /* the lift: node 0 (matrix 0 at y 5, box y 0..2) tops the model at 7;
+         * the stock meter stands on matrix 1 (y 3): lifted 7 + 0.3 - (3 + 0.4) */
+        {
+            uint32_t inst=WORD_AT(ENT(5)+4u),hdr=0x00530200u,first=hdr-2u*0xC8u,mats=WORD_AT(inst+0x10u),y0;
+            WORD_AT(inst+4u)=hdr;WORD_AT(hdr)=2u;
+            memset((uint8_t *)memory+first,0,2u*0xC8u);
+            *((uint8_t *)memory+first+0x49u)=0u;WORD_AT(first+0xACu)=0x00540000u;
+            setf(0x00540000u,-1.0f);setf(0x00540004u,0.0f);setf(0x00540008u,-1.0f);
+            setf(0x0054000Cu,1.0f);setf(0x00540010u,2.0f);setf(0x00540014u,1.0f);
+            *((uint8_t *)memory+first+0xC8u+0x49u)=1u;WORD_AT(first+0xC8u+0xACu)=0;
+            memset((uint8_t *)memory+mats,0,0x80u);
+            setf(mats+0x00u,1.0f);setf(mats+0x14u,1.0f);setf(mats+0x28u,1.0f);setf(mats+0x34u,5.0f);
+            setf(mats+0x40u,1.0f);setf(mats+0x54u,1.0f);setf(mats+0x68u,1.0f);setf(mats+0x74u,3.0f);
+            WORD_AT(WORD_AT(inst+0x8Cu)+0x18u)=1u;
+            setf(ENT(5)+0x68u,-4.5f);y0=WORD_AT(ENT(5)+0x68u);
+            CHECK(meters_frame()==1 && near(meter.y,-4.5f+3.9f) && WORD_AT(ENT(5)+0x68u)==y0);
+            /* a box turned on its side (the y row picks z): its top is z's maximum */
+            setf(mats+0x14u,0.0f);setf(mats+0x24u,1.0f);
+            CHECK(meters_frame()==1 && near(meter.y,-4.5f+2.9f));
+            setf(mats+0x14u,1.0f);setf(mats+0x24u,0.0f);
+            /* the stock matrix already over the top: not lowered */
+            setf(mats+0x74u,9.0f);CHECK(meters_frame()==1 && meter.y==-4.5f);setf(mats+0x74u,3.0f);
+            /* a node whose matrix is past the node count: left out */
+            setf(mats+0xB4u,50.0f);                                  /* matrix 2 (none) would top it at 52 */
+            *((uint8_t *)memory+first+0x49u)=2u;CHECK(meters_frame()==1 && meter.y==-4.5f);
+            *((uint8_t *)memory+first+0x49u)=0u;setf(mats+0xB4u,0.0f);
+            /* an unusable stock matrix index: the stock height */
+            WORD_AT(WORD_AT(inst+0x8Cu)+0x18u)=0x1000u;CHECK(meters_frame()==1 && meter.y==-4.5f);
+            WORD_AT(WORD_AT(inst+0x8Cu)+0x18u)=1u;
+            WORD_AT(hdr)=0u;CHECK(meters_frame()==1 && meter.y==-4.5f);   /* no nodes */
+            WORD_AT(hdr)=2u;
+            CHECK(bos_play.meter_logs==1u && bos_play.meter_log[0]==ENT(5));   /* logged once */
+            /* a Khallos rider: the meter is on his chair (its health), a stand-in actor */
+            meter_model(44);WORD_AT(ENT(44)+4u)=WORD_AT(ENT(5)+4u);
+            setf(ENT(44)+0x68u,1.0f);setf(ENT(44)+0x1D8u,60.0f);setf(ENT(44)+0x1CCu,30.0f);
+            proxy_from=ENT(5);proxy_to=ENT(44);bos_bar_proxy=test_proxy;
+            CHECK(meters_frame()==1 && meter.ent==ENT(44) && meter.a!=A(5) && WORD_AT(meter.a)==ENT(44));
+            CHECK(WORD_AT(meter.a+0xC68u+4u)==0u && near(meter.y,1.0f+3.9f) && FLOAT_AT(ENT(44)+0x68u)==1.0f);
+            setf(ENT(44)+0x1CCu,-1.0f);CHECK(meters_frame()==0);setf(ENT(44)+0x1CCu,30.0f);   /* the chair is down */
+            proxy_to=0;CHECK(meters_frame()==1 && meter.a==A(5));      /* not seated: his own */
+            bos_bar_proxy=0;
+            /* the tank / mothership: the prop of a removed Sub-boss AI, a stand-in actor */
+            extra_n=1;extra_ent[0]=ENT(43);extra_id[0]=R+8u+1u;
+            meter_model(43);setf(ENT(43)+0x68u,2.0f);setf(ENT(43)+0x1D8u,50.0f);setf(ENT(43)+0x1CCu,50.0f);
+            bos_bar_extra_add(test_extra);
+            CHECK(meters_frame()==2 && meter.ent==ENT(43) && WORD_AT(meter.a)==ENT(43) && meter.y==2.0f);
+            WORD_AT(meter.a+0xC6Cu)=0x10u;                          /* left from another use: zeroed again */
+            CHECK(meters_frame()==2 && WORD_AT(meter.a+0xC6Cu)==0u && WORD_AT(meter.a)==ENT(43));
+            setf(ENT(43)+0x1CCu,0.0f);CHECK(meters_frame()==1);setf(ENT(43)+0x1CCu,50.0f);   /* destroyed */
+            extra_id[0]=R+0u+1u;CHECK(meters_frame()==1);             /* its AI has the Boss bar */
+            extra_id[0]=R+1u+1u;CHECK(meters_frame()==1);             /* its AI has no Boss setting */
+            extra_n=0;bos_bar_extra[0]=0;
+            WORD_AT(inst+4u)=0;setf(ENT(5)+0x68u,0.0f);
+        }
         setf(ENT(5)+0x1CCu,0.0f);CHECK(meters_frame()==0);setf(ENT(5)+0x1CCu,2.0f);   /* dead */
         WORD_AT(PLAYER+0x14u)=ENT(5);CHECK(meters_frame()==0);WORD_AT(PLAYER+0x14u)=ENT(0);
         WORD_AT(ENT(5)+4u)=0;CHECK(meters_frame()==0);meter_model(5);   /* no model instance */
