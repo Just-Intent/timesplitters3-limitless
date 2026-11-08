@@ -81,7 +81,7 @@
 static struct {
     unsigned generation, rooms, portals;   /* what the groups were built for */
     int ready;                             /* groups built (0: rebuild; -1: nothing to do) */
-    unsigned groups, touched_total, open, beside;
+    unsigned groups, touched_total, open, beside, joined;
     uint16_t group_first[MAPMAKER_ROOF_ROOMS+1u]; /* touched[group_first[g]..group_first[g+1]) */
     uint16_t members[MAPMAKER_ROOF_ROOMS+1u];     /* member count of group g: first entries are its open rooms */
     uint16_t touched[OPENVIEW_TOUCHED];          /* room ids (words: rooms past 255) */
@@ -155,6 +155,7 @@ static void mapmaker_openview_build(uint32_t n)
     unsigned at=0,g=0,r,portals=0;
     memset(mapmaker_openview.stamp,0,sizeof mapmaker_openview.stamp);   /* 0: no group yet */
     mapmaker_openview.groups=mapmaker_openview.touched_total=mapmaker_openview.open=mapmaker_openview.beside=0;
+    mapmaker_openview.joined=0;
     mapmaker_openview.closed_logs=mapmaker_openview.unseen_logged=0;
     for(r=1;r<=n;r++) mapmaker_openview.has_box[r-1u]=(uint8_t)mapmaker_openview_box(r,mapmaker_openview.box[r-1u]);
     for(r=1;r<=n;r++) {
@@ -169,6 +170,17 @@ static void mapmaker_openview_build(uint32_t n)
             for(i=0;i<k;i++)
                 if(mapmaker_roof_play.open[next[i]-1u] && !mapmaker_openview.stamp[next[i]-1u]) {
                     mapmaker_openview.stamp[next[i]-1u]=(uint16_t)mark;queue[tail++]=next[i];
+                }
+            /* open rooms whose box touches this one join the area, portal or
+             * not: a floor above or below, or open tiles joined only through a
+             * closed tile, are seen across the open air too (otherwise their
+             * area keeps the small portal rectangles it is seen through, and
+             * the walls around it are clipped above its floor) */
+            if(!mapmaker_openview.has_box[m-1u]) continue;
+            for(o=1;o<=n;o++)
+                if(mapmaker_roof_play.open[o-1u] && !mapmaker_openview.stamp[o-1u] && mapmaker_openview.has_box[o-1u] &&
+                   mapmaker_openview_touch(mapmaker_openview.box[m-1u],mapmaker_openview.box[o-1u])) {
+                    mapmaker_openview.stamp[o-1u]=(uint16_t)mark;queue[tail++]=o;mapmaker_openview.joined++;
                 }
         }
         if(at+tail>OPENVIEW_TOUCHED) { mapmaker_openview.overflow++;break; }
@@ -220,6 +232,9 @@ static void mapmaker_openview_build(uint32_t n)
         fprintf(stderr,"[mapmaker] openview: %u open-air rooms in %u area%s; %u rooms drawn across them at most (%u portals read, %u rooms, %u beside by box, %u two-sided)%s\n",
                 mapmaker_openview.open,g,g==1u?"":"s",at,portals,(unsigned)n,mapmaker_openview.beside,mapmaker_roof_play.twosided_rooms,
                 mapmaker_openview.overflow?"; TOO MANY, some left stock":"");
+        if(mapmaker_openview.joined)
+            fprintf(stderr,"[mapmaker] openview: %u open-air rooms joined their area by box (no open portal between them)\n",
+                    mapmaker_openview.joined);
         fflush(stderr);
     }
 }
