@@ -5,7 +5,7 @@ Each area's full wrapper list and history is in its `docs/mapmaker/mapmaker-<are
 
 More boss areas (2026-11-01): `khallos` (id 0x33 chair prop 0x376; .28 WRAP sub_00045670),
 `worm` (0x2C), `mothership` (0x75 prop 0x539); rows 156-158 in `rbs_extra`
-(159/160 Prometheus SK/8 0x62, SD/7 0x36: creatures.def rows, class 4 after .58, fire log after .66); wrapper
+(159/160 Prometheus SK/8 0x62, SD/7 0x36: creatures.def rows, SK/8 class 4 (.58), fire/sight log (.66/.73), SD/7 bot AI (.73)); wrapper
 lists in each mapmaker-<area>.md. Sky area adds `pc_mapmaker_skymusic.inc` (extra
 sky/sand/music, +mem paks, MM sand grains, .32 grain/haze alpha + fog row 7; mapmaker-sky-music.md) and roof play/rooms/draw/tick hooks
 for bounded vs unbounded open air (mapmaker-sky.md). Bot set pane = 20-row scroll

@@ -50,9 +50,16 @@ MUTATIONS = {
     'start-no-hi': ('WORD_AT(rec)=crt_kinds[k].lo;WORD_AT(rec+4u)=crt_kinds[k].hi;', 'WORD_AT(rec)=crt_kinds[k].lo;'),
     'start-after-original': ('            fflush(stderr);\n        }\n    }\n    original();\n}', '            fflush(stderr);\n        }\n    }\n}'),
     'start-any-char': ('(k=crt_kind_of(CRT_H(a+CRT_ACTOR_CHAR)))>=CRT_KINDS', '(k=0)>=CRT_KINDS'),
-    'rb-any-row': ("(crt_kinds[k].lo&0x1FFFu)==0u ||   /* the class-4 robot rows */", "0 ||"),
-    'rb-muzzle-any-call': ('WORD_AT(g_esp)!=CRT_RET_MUZZLE) { original();return; }', '0) { original();return; }'),
-    'rb-launch-ignores-hits': ('    int launched=crt_rb.r[i].calls>crt_rb.r[i].hits;', '    int launched=crt_rb.r[i].calls>0u;'),
+    'rb-any-row': ('       (crt_kinds[k].lo&0x1FFFu)==0u) return CRT_KINDS;', '       0) return CRT_KINDS;'),
+    'rb-muzzle-any-call': ('    if(ret==CRT_RET_MUZZLE && crt_rb.cur) {', '    if(crt_rb.cur) {'),
+    'rb-launch-ignores-hits': ('    int launched=crt_rb.r[i].tests>crt_rb.r[i].hits;', '    int launched=crt_rb.r[i].tests>0u;'),
+    'rb-no-fire-event': ('        if(guest_call(sub_00061570,2,ent,CRT_FIRE_EVENT)) crt_rb.r[i].events++;', '        crt_rb.r[i].events+=0u;'),
+    'rb-sight-any-ray': ('    if(ret!=CRT_RET_SIGHT || !crt_rb.seeing) { original();return; }', '    if(!crt_rb.seeing) { original();return; }'),
+    'rb-sight-any-ai': ('    if(!crt_rb.n || turn>=0x100u || crt_rb_kind(pool+turn*CRT_ACTOR)>=CRT_KINDS || !crt_play())', '    if(!crt_rb.n || turn>=0x100u || !crt_play())'),
+    'rb-player-is-other': ('    else if(crt_rb_player(g_eax)) crt_rb.r[i].player++;\n', ''),
+    'sk8-keeps-editor-weapon': ('            CRT_H(rec+CRT_REC_WEAPONS)=0xFFFFu;', '            (void)0;'),
+    'sk8-any-builtin': ('static int crt_builtin(uint32_t id) { return id==0x62u; }', 'static int crt_builtin(uint32_t id) { return id!=0u; }'),
+    'no-class-overrides-anyway': ('    else if(!crt_kinds[k].lo && !crt_kinds[k].hi) {', '    else if(0) {'),
     'rb-no-sight-test': ('        if(!guest_call(sub_0015E120,2,ai,0u)) crt_rb.r[i].blind++;', '        crt_rb.r[i].blind++;'),
     'rb-sight-mode-1': ('guest_call(sub_0015E120,2,ai,0u)', 'guest_call(sub_0015E120,2,ai,1u)'),
     'rb-no-level-reset': ('    memset(&crt_rb,0,sizeof crt_rb);                   /* robot fire log: per level */\n', ''),
@@ -64,7 +71,7 @@ DEF_MUTATIONS = {
     'mutant-look': ('MAPMAKER_CREATURE(163u,0x30u,0x59u,', 'MAPMAKER_CREATURE(163u,0x30u,0xFFu,'),
     'ghost-pak': ('0x0049D968u,"lv17"', '0x0049DA84u,"lv17"'),
     'sk8-bot-class': ('"Prometheus SK/8",0x10000004u', '"Prometheus SK/8",0x11000000u'),
-    'sd7-bot-class': ('"Prometheus SD/7",0x10000004u', '"Prometheus SD/7",0x01000000u'),
+    'sd7-story-class': ('"Prometheus SD/7",0x00000000u', '"Prometheus SD/7",0x10000004u'),
     'sk8-row-moved': ('MAPMAKER_CREATURE(159u,0x62u', 'MAPMAKER_CREATURE(166u,0x62u'),
     'animrb-partial': ('"Prometheus SK/8",0x10000004u,0x00000000u,0x0047E65Cu,"animrb",0x0048F240u,0x15u,0u,21u,0)',
                        '"Prometheus SK/8",0x10000004u,0x00000000u,0x0047E65Cu,"animrb",0x0048F240u,0x15u,1u,10u,0)'),
@@ -121,9 +128,12 @@ def test_mapmaker_creatures(tmp_path, mutation):
         assert "Catacomb Ghost: made with the look's models (character, object) (0x17, 0x777000)" in err
         assert "Mutant (Story): requested the look's models (0x613, 0x614)" in err
         assert ('Prometheus SK/8 #1: fire pose ended without a rocket (squared distance 250.0 at its start, 5 frames, '
-                '5 without sight, 0 fire calls, 0 muzzle hits, built-in weapon 0x43)') in err
+                '5 without sight, 0 fire events, 0 muzzle tests, 0 muzzle hits, built-in weapon 0x43)') in err
         assert ('Prometheus SK/8 #1: fire pose ended without a rocket (squared distance 64.0 at its start, 1 frames, '
-                '0 without sight, 1 fire calls, 1 muzzle hits, built-in weapon 0x43)') in err
+                '0 without sight, 1 fire events, 1 muzzle tests, 1 muzzle hits, built-in weapon 0x43)') in err
+        assert ('Prometheus SK/8 #1: sight rays: 40 reached a player, 20 hit something else (last 0x0, type -1), 4 hit nothing') in err
+        assert 'Prometheus SK/8: editor weapon ignored: the story robot fires only its built-in weapon' in err
+        assert 'Prometheus SD/7: keeps the MapMaker bot AI (row without a story class)' in err
         assert 'Prometheus SK/8 #1: fire pose launched a rocket (squared distance 30.0' in err
     else:
         assert result.returncode != 0, f'{mutation} was not detected'
@@ -164,7 +174,7 @@ def test_rows_and_wiring():
     guest = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
     header = (ROOT / 'src/interface/pc_display_menu.h').read_text(encoding='utf-8')
     assert '#include "pc_mapmaker_creatures.inc"' in guest
-    for hook in ('anims', 'request', 'create', 'ai_start', 'robot_weapon', 'robot_muzzle'):  # robot_fire: not wrapped (upstream defines sub_001BB5C0)
+    for hook in ('anims', 'request', 'create', 'ai_start', 'robot_weapon', 'robot_muzzle', 'robot_sight'):  # robot_fire: not wrapped (upstream defines sub_001BB5C0)
         assert f'void pc_mapmaker_creatures_{hook}(void (*original)(void));' in header
         assert f'void pc_mapmaker_creatures_{hook}(void (*original)(void)) {{ original(); }}' in guest
     assert not (ROOT / 'config/guest-code-patches/creatures.json').exists()
@@ -299,6 +309,8 @@ def test_classes_reach_their_handlers():
     assert a[0x0015B9A3].ops[1][4] == 0 and a[0x0015B9A5].ops[0][4] == 0x10 and a[0x0015B9AB].ops[0][4] == 0x14
     assert 0x11000000 in imms(a[0x002421A7]) and 0 in imms(a[0x002421AD])
     for x in rows():
+        if not x['lo'] and not x['hi']:                    # no story class: the MapMaker bot AI (SD/7 after .73)
+            continue
         site, handler = PIT_ROWS[x['label']] if x['label'] in PIT_ROWS else HANDLERS[x['label']][:2]
         if x['hi'] == 0 and x['lo'] & 0x1FFF:              # the small classes: sub_0027F8E0 (see the robot test)
             assert a[site].call and target(a[site]) == handler and a[site].function == 0x0027F8E0
@@ -567,3 +579,43 @@ def test_robot_fire_gates():
     src = INC.read_text(encoding='utf-8')
     assert '#define CRT_RET_MUZZLE 0x001BC420u' in src and '#define CRT_FIRE_POSE 0x100000u' in src
 
+
+# ---- after the .73 log (fire pose at 126 / 48 units, sight ~10%, built-in weapon 0x16) ----
+
+def test_far_fire_pose_is_the_advance():
+    """State 0 sends a target at squared distance >= 289 to state 3 (0x002838C5..0x002838F5: 289 at 0x0049F33C,
+    ecx 2 below, 3 above unless record +0x58 & 0x800000), and state 3 (0x00283AF6) advances with the row's +0x8 /
+    +0xC pose, the SK/8's advance-fire 0x9A7 (a fire pose): the robot walks and fires from any distance."""
+    rd = xbe()
+    a = by_address()
+    assert a[0x002838C5].ops[1][4] == 0x0049F33C and 3 in imms(a[0x002838EE]) and 2 in imms(a[0x002838F5])
+    tb = struct.unpack('<7I', rd(0x00283EB4, 28))
+    assert tb[0] == 0x002838C5 and tb[3] == 0x00283AF6
+    row = struct.unpack('<8I', rd(0x00520838 + 2 * 0x20, 32))
+    assert row[2] == 0x9A7 and a[0x00283B13].ops[1][4] == 0x00520840     # state 3 checks the advance-fire pose
+
+
+def test_sight_table_and_update():
+    """sub_0015E120(ai, 0) reads the pair table [0x0074C368] (sub_00012FA0 -> sub_0015BD00: 12-byte pair entries,
+    byte +0 visible); sub_0025FB70 (from sub_0015E830, 0x0015E99E) updates one AI per frame, index [0x007A3500],
+    with a ray sub_00088C60 returning to 0x00260134 (flags 0x2410270), visible when it returns the target entity."""
+    a = by_address()
+    assert target(a[0x00012FAA]) == 0x0015BD00 and a[0x0015BD1A].ops[1][4] == 0x0074C368
+    assert target(a[0x0015E99E]) == 0x0025FB70 and a[0x0025FB73].ops[1][4] == 0x007A3500
+    assert target(a[0x0026012F]) == 0x00088C60 and 0x2410270 in imms(a[0x00260114])
+    assert a[0x00260143].mnemonic == 'cmp'
+    src = INC.read_text(encoding='utf-8')
+    assert '#define CRT_RET_SIGHT 0x00260134u' in src and '#define CRT_SIGHT_TURN 0x007A3500u' in src
+
+
+def test_editor_weapon_replaces_the_rocket():
+    """MapMaker writes the Story AI's editor weapon (chunk +0x26, when sub_0033E6C0 accepts it) to spawn record +0x18,
+    else -1 (0x0024205A..0x00242155); the AI start takes +0x94 from that weapon list when it is not -1
+    (0x0015B878..0x0015B889) and gives 0x62 its rocket launcher 0x43 only otherwise. So an armed SK/8 lost its
+    rocket (the .73 log's built-in weapon 0x16); the creatures area drops the list for it."""
+    a = by_address()
+    assert a[0x0024205A].ops[1][4] == 0x26 and target(a[0x0024205F]) == 0x0033E6C0
+    assert a[0x00242155].ops[0][4] == 0x18
+    assert a[0x0015B878].ops[1][4] == 0x18 and a[0x0015B889].ops[0][4] == 0x94
+    src = INC.read_text(encoding='utf-8')
+    assert 'static int crt_builtin(uint32_t id) { return id==0x62u; }' in src

@@ -27,6 +27,7 @@ void sub_00062260(void) { g_ecx=3; }
 void sub_000A5E40(void) { g_ecx=4; }
 void sub_000631C0(void) { g_ecx=5; }
 void sub_0015E120(void) { g_ecx=6; }
+void sub_00061570(void) { g_ecx=7; }
 
 #define ESP0 0x00600000u
 #define CONT 0x00100000u
@@ -43,6 +44,7 @@ static uint32_t mounted_paths[8],requests[16];
 static unsigned nmounted,nmounts,nrequests,originals;
 static int mount_fails,models_read,sight=1;
 static unsigned sight_calls;
+static int fire_event;
 static uint32_t guest_call(void (*f)(void),int n,...)
 {
     va_list a;
@@ -62,6 +64,7 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     } else if(f==sub_000A5E40) { CHECK(n==1);if(nrequests<16u) requests[nrequests]=x[0]; nrequests++; }
     else if(f==sub_000631C0) r=models_read?REQ_READ:REQ_NONE;
     else if(f==sub_0015E120) { CHECK(n==2 && x[1]==0u);sight_calls++;r=(uint32_t)sight; }
+    else if(f==sub_00061570) { CHECK(n==2 && x[1]==0x200u);r=(uint32_t)fire_event; }
     return r;
 }
 #include "pc_mapmaker_budget.inc"
@@ -107,15 +110,31 @@ static void fake_fire(void)
     CHECK(g_esp==sp);
     g_esp+=4u;
 }
+/* sub_0025FB70: one sight ray per call, results from a list (0 = nothing hit) */
+static uint32_t vis_hits[64];
+static unsigned vis_n;
+static void fake_vray(void) { g_eax=vis_hits[vis_n++%64u];g_esp+=4u; }
+static void fake_oray(void) { g_eax=0x00570000u;g_esp+=4u; }
+static void fake_sight(void)
+{
+    uint32_t sp=g_esp;
+    g_esp-=4u;WORD_AT(g_esp)=0x0025FF00u;                /* another ray of the update: not counted */
+    pc_mapmaker_creatures_robot_muzzle(fake_oray);
+    CHECK(g_esp==sp);
+    g_esp-=4u;WORD_AT(g_esp)=0x00260134u;
+    pc_mapmaker_creatures_robot_muzzle(fake_vray);
+    CHECK(g_esp==sp);
+    g_esp+=4u;
+}
 static void fake_weapon(void)
 {
     uint32_t sp=g_esp,ent=WORD_AT(g_esp+4u);
     weapon_calls++;
-    if(fire_now) {
-        g_esp-=12u;WORD_AT(g_esp)=0x002B984Bu+5u;WORD_AT(g_esp+4u)=ent;WORD_AT(g_esp+8u)=0;
-        pc_mapmaker_creatures_robot_fire(fake_fire);
-        CHECK(g_esp==sp-8u);
-        g_esp=sp;
+    (void)ent;
+    if(fire_now) {                                      /* sub_001BB5C0 (not wrapped: the runtime defines it) */
+        g_esp-=4u;WORD_AT(g_esp)=0x002B9850u;
+        fake_fire();
+        CHECK(g_esp==sp);
     }
     g_esp+=4u;
 }
@@ -232,7 +251,7 @@ int main(void)
           kind_of(0x17u)==CRT_KINDS && kind_of(0x59u)==CRT_KINDS && kind_of(0x28u)==CRT_KINDS);
     CHECK(kind_of(0xAAu)==CRT_KINDS && kind_of(0xA9u)==CRT_KINDS);           /* the Arcade twins stay stock */
     CHECK(crt_kinds[SK8].lo==0x10000004u && crt_kinds[SK8].hi==0 && crt_kinds[SK8].look==CRT_NO_LOOK && crt_kinds[SK8].row==159u);
-    CHECK(crt_kinds[SD7].lo==0x10000004u && crt_kinds[SD7].hi==0 && crt_kinds[SD7].look==CRT_NO_LOOK && crt_kinds[SD7].row==160u);
+    CHECK(crt_kinds[SD7].lo==0 && crt_kinds[SD7].hi==0 && crt_kinds[SD7].look==CRT_NO_LOOK && crt_kinds[SD7].row==160u);   /* bot AI */
     CHECK(crt_kinds[SK8].pak==0x0047E65Cu && crt_kinds[SK8].first==0 && crt_kinds[SK8].n==crt_kinds[SK8].count);
     CHECK(crt_kinds[GHOST].lo==0x50000000u && crt_kinds[GHOST].hi==0 && crt_kinds[GHOST].look==0x17u);
     CHECK(crt_kinds[SECB].lo==0x10000000u && crt_kinds[SECB].hi==0x4000u && crt_kinds[SECB].look==CRT_NO_LOOK);
@@ -354,8 +373,9 @@ int main(void)
     CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
     CHECK(seen_class[0]==0x10000000u && seen_class[1]==0x4000u);
     a=actor(5,0x30u);
+    HALF_AT(RECS+5u*0x100u+0x18u)=2u;                         /* an editor weapon: kept (no built-in weapon row) */
     CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
-    CHECK(seen_class[0]==0x10000000u && seen_class[1]==0x8000u);
+    CHECK(seen_class[0]==0x10000000u && seen_class[1]==0x8000u); CHECK(HALF_AT(RECS+5u*0x100u+0x18u)==2u);
     a=actor(6,0x59u);                                         /* the Arcade Freak: stock */
     CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
     CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);
@@ -379,9 +399,12 @@ int main(void)
         anim_map_row(SK8,0x43u);                                /* the whole animrb table (shared with SD/7) */
         CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
         CHECK(seen_class[0]==0x10000004u && seen_class[1]==0);
+        CHECK(HALF_AT(RECS+9u*0x100u+0x18u)==0xFFFFu);          /* its editor weapon list dropped: the rocket launcher */
         a=actor(10,0x36u);
+        HALF_AT(RECS+10u*0x100u+0x18u)=3u;
         CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
-        CHECK(seen_class[0]==0x10000004u && seen_class[1]==0);
+        CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);   /* SD/7: the bot AI and its editor weapon */
+        CHECK(HALF_AT(RECS+10u*0x100u+0x18u)==3u);
         a=actor(11,0x62u);                                      /* several per map */
         CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
         CHECK(seen_class[0]==0x10000004u);
@@ -416,7 +439,7 @@ int main(void)
         WORD_AT(ctl+0xD4u)=0x9A2u;
         CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);   /* the pose ends: logged */
         /* pose 2: sight, one fire call, the muzzle ray hits */
-        WORD_AT(ctl+0xD4u)=0x9A7u;sight=1;FLOAT_AT(ai+0xAF4u)=64.0f;fire_now=1;muzzle_hit=1;
+        WORD_AT(ctl+0xD4u)=0x9A7u;sight=1;FLOAT_AT(ai+0xAF4u)=64.0f;fire_now=1;muzzle_hit=1;fire_event=1;
         CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
         fire_now=0;
         WORD_AT(ctl+0xD4u)=0x9A2u;CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
@@ -424,7 +447,22 @@ int main(void)
         WORD_AT(ctl+0xD4u)=0x9A7u;fire_now=1;muzzle_hit=0;FLOAT_AT(ai+0xAF4u)=30.0f;
         CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
         WORD_AT(ctl+0xD4u)=0x9A2u;fire_now=0;CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
-        CHECK(crt_rb.n==1u && crt_rb.r[0].launched==1u && crt_rb.r[0].declined==2u);
+        CHECK(crt_rb.n==1u && crt_rb.r[0].launched==1u && crt_rb.r[0].declined==2u && crt_rb.r[0].events==1u && crt_rb.r[0].tests==1u);
+        fire_event=0;
+        /* the sight update: one robot's rays counted, the first 64 summed up once */
+        {
+            unsigned j;
+            WORD_AT(0x007356D8u)=POOL;WORD_AT(0x00790950u)=1u;WORD_AT(POOL)=0x00570000u;WORD_AT(ai)=ent;
+            WORD_AT(0x00580000u+0x20u)=3u;
+            for(j=0;j<64u;j++) vis_hits[j]=j<40u?0x00570000u:j<60u?0x00580000u:0u;
+            WORD_AT(0x007A3500u)=13u;
+            for(j=0;j<64u;j++) CALL(pc_mapmaker_creatures_robot_sight,fake_sight,0x0015E9A3u,0,0);
+            CHECK(crt_rb.r[0].rays==64u && crt_rb.r[0].player==40u && crt_rb.r[0].other==20u && crt_rb.r[0].clear==4u && crt_rb.r[0].told==1u);
+            WORD_AT(0x007A3500u)=14u;                                          /* a ghost's turn: not counted */
+            HALF_AT(POOL+14u*0xEA0u+0x48u)=0x2Fu;
+            CALL(pc_mapmaker_creatures_robot_sight,fake_sight,0x0015E9A3u,0,0);
+            CHECK(crt_rb.r[0].rays==64u && crt_rb.seeing==0 && crt_rb.n==1u);
+        }
         /* not a class-4 robot row (a ghost): untouched, no sight test */
         {
             uint32_t other=actor(14,0x2Fu),e2=0x00562000u;
