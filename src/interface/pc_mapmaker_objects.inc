@@ -294,7 +294,7 @@ void pc_mapmaker_objects_twin_pool(void (*original)(void))
     save_registers(&r);
     WORD_AT(0x0070AAD8u)=MAPMAKER_OBJECTS_TWINS;
     bytes=((MAPMAKER_OBJECTS_TWINS<<9)+15u)&~15u;
-    p=guest_call(sub_0003DFA0,2,bytes,1u);
+    p=mapmaker_objects_take(bytes,16u);          /* nav block in scene 100 */
     WORD_AT(0x0070AADCu)=p;
     WORD_AT(0x007B67D0u)=0;WORD_AT(0x007B6984u)=0;
     mapmaker_objects_clear(p,bytes);
