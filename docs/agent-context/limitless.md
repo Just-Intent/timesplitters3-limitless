@@ -519,7 +519,7 @@ bounds (`sub_00352DF0`), the `sub_0006D0B0` return-address overwrite
 mode 1 bot goal read (`sub_002B0320`), and a bounds-only map validator: the
 editor loader refuses a bad map the stock way, and level setup
 (`sub_0006D7A0`) hides bad chunks for that call, then logs the
-[map report](limitless-report.md) (`pc_mapmaker_report.inc`). With
+[map report](limitless-report.md) (`pc_mapmaker_report.inc`, raised item caps). With
 `TSFP_MAPMAKER_LIMITS=1` in scene 100 story mode the HUD turret icons scan
 the whole gun pool (`sub_00349E40`/`sub_00349970`). Tests:
 `tests/mapmaker/test_mapmaker_bugfix.py`, `tests/mapmaker/test_mapmaker_validate.py`.
