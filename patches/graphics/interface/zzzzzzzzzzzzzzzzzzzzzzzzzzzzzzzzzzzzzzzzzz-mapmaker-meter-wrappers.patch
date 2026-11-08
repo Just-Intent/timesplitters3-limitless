@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4480 @@
+@@ -1911,6 +1911,4490 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1799,13 +1799,23 @@
 +}
 +
 +extern void sub_0008F950_gen(void);
-+void sub_0008F950(void)
++static void sub_0008F950_layer0(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_probe_prop_draw")) pc_mapmaker_probe_prop_draw(sub_0008F950_gen);
 +    else sub_0008F950_gen();
 +#else
 +    sub_0008F950_gen();
++#endif
++}
++
++void sub_0008F950(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pitboss","pc_mapmaker_pitboss_draw")) pc_mapmaker_pitboss_draw(sub_0008F950_layer0);
++    else sub_0008F950_layer0();
++#else
++    sub_0008F950_layer0();
 +#endif
 +}
 +
