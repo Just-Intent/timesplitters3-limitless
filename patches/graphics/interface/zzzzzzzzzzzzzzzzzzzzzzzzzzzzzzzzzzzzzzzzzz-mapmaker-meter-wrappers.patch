@@ -1,6 +1,6 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4501 @@
+@@ -1911,6 +1911,4436 @@
      sub_002FA720_gen();
  #endif
  }
@@ -1841,50 +1841,6 @@
 +#endif
 +}
 +
-+extern void sub_00316B50_gen(void);
-+void sub_00316B50(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_menu_init")) pc_mapmaker_roof_menu_init(sub_00316B50_gen);
-+    else sub_00316B50_gen();
-+#else
-+    sub_00316B50_gen();
-+#endif
-+}
-+
-+extern void sub_000792B0_gen(void);
-+void sub_000792B0(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_menu_add")) pc_mapmaker_roof_menu_add(sub_000792B0_gen);
-+    else sub_000792B0_gen();
-+#else
-+    sub_000792B0_gen();
-+#endif
-+}
-+
-+extern void sub_00316920_gen(void);
-+void sub_00316920(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_menu_hover")) pc_mapmaker_roof_menu_hover(sub_00316920_gen);
-+    else sub_00316920_gen();
-+#else
-+    sub_00316920_gen();
-+#endif
-+}
-+
-+extern void sub_00316500_gen(void);
-+void sub_00316500(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_menu_pick")) pc_mapmaker_roof_menu_pick(sub_00316500_gen);
-+    else sub_00316500_gen();
-+#else
-+    sub_00316500_gen();
-+#endif
-+}
-+
 +extern void sub_002F95E0_gen(void);
 +void sub_002F95E0(void)
 +{
@@ -1915,67 +1871,6 @@
 +    else sub_00308480_gen();
 +#else
 +    sub_00308480_gen();
-+#endif
-+}
-+
-+extern void sub_0003D7B0_gen(void);
-+static void sub_0003D7B0_layer0(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_text")) pc_mapmaker_roof_text(sub_0003D7B0_gen);
-+    else sub_0003D7B0_gen();
-+#else
-+    sub_0003D7B0_gen();
-+#endif
-+}
-+
-+static void sub_0003D7B0_layer1(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_text")) pc_mapmaker_realbosses_text(sub_0003D7B0_layer0);
-+    else sub_0003D7B0_layer0();
-+#else
-+    sub_0003D7B0_layer0();
-+#endif
-+}
-+
-+static void sub_0003D7B0_layer2(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_text")) pc_mapmaker_tank_text(sub_0003D7B0_layer1);
-+    else sub_0003D7B0_layer1();
-+#else
-+    sub_0003D7B0_layer1();
-+#endif
-+}
-+
-+static void sub_0003D7B0_layer3(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_text")) pc_mapmaker_khallos_text(sub_0003D7B0_layer2);
-+    else sub_0003D7B0_layer2();
-+#else
-+    sub_0003D7B0_layer2();
-+#endif
-+}
-+
-+static void sub_0003D7B0_layer4(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_text")) pc_mapmaker_mothership_text(sub_0003D7B0_layer3);
-+    else sub_0003D7B0_layer3();
-+#else
-+    sub_0003D7B0_layer3();
-+#endif
-+}
-+
-+void sub_0003D7B0(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_title")) pc_mapmaker_weaponset_title(sub_0003D7B0_layer4);
-+    else sub_0003D7B0_layer4();
-+#else
-+    sub_0003D7B0_layer4();
 +#endif
 +}
 +
@@ -2231,17 +2126,6 @@
 +#endif
 +}
 +
-+extern void sub_0032D9F0_gen(void);
-+void sub_0032D9F0(void)
-+{
-+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
-+    if(pc_mapmaker_area_enabled("sky","pc_mapmaker_roof_caption")) pc_mapmaker_roof_caption(sub_0032D9F0_gen);
-+    else sub_0032D9F0_gen();
-+#else
-+    sub_0032D9F0_gen();
-+#endif
-+}
-+
 +extern void sub_0011D2C0_gen(void);
 +void sub_0011D2C0(void)
 +{
@@ -2381,6 +2265,57 @@
 +    else sub_002BE300_gen();
 +#else
 +    sub_002BE300_gen();
++#endif
++}
++
++extern void sub_0003D7B0_gen(void);
++static void sub_0003D7B0_layer0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("realbosses","pc_mapmaker_realbosses_text")) pc_mapmaker_realbosses_text(sub_0003D7B0_gen);
++    else sub_0003D7B0_gen();
++#else
++    sub_0003D7B0_gen();
++#endif
++}
++
++static void sub_0003D7B0_layer1(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("tank","pc_mapmaker_tank_text")) pc_mapmaker_tank_text(sub_0003D7B0_layer0);
++    else sub_0003D7B0_layer0();
++#else
++    sub_0003D7B0_layer0();
++#endif
++}
++
++static void sub_0003D7B0_layer2(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_text")) pc_mapmaker_khallos_text(sub_0003D7B0_layer1);
++    else sub_0003D7B0_layer1();
++#else
++    sub_0003D7B0_layer1();
++#endif
++}
++
++static void sub_0003D7B0_layer3(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("mothership","pc_mapmaker_mothership_text")) pc_mapmaker_mothership_text(sub_0003D7B0_layer2);
++    else sub_0003D7B0_layer2();
++#else
++    sub_0003D7B0_layer2();
++#endif
++}
++
++void sub_0003D7B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("weaponset","pc_mapmaker_weaponset_title")) pc_mapmaker_weaponset_title(sub_0003D7B0_layer3);
++    else sub_0003D7B0_layer3();
++#else
++    sub_0003D7B0_layer3();
 +#endif
 +}
 +
