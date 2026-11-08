@@ -141,6 +141,12 @@
 #define PIT_BONE 0x29u                  /* the bottle's bone (0x0029E47E) */
 #define PIT_BONE_FRESH 30u              /* fight frames a drawn bone point stays in use */
 #define PIT_BONE_MIN 3.0f               /* a drawn mouth this far over the feet at least, else not trusted */
+#define PIT_NEAR 8.0f                   /* ... and within this of the boss across (x/z): a world point */
+#define PIT_EYE_MIN 6.0f                /* the eye bandage counts once this far over the feet */
+#define PIT_EYE_TO_MOUTH 1.8f           /* the mouth under the eye bandage (.66/.77: eye 12.35 up, 2.27 ahead) */
+#define PIT_SND_FIRE 0x56Cu             /* SFX_PRINCESS_PIT_FIREATTACK: sounddata flags 0x11000044, level 17 only */
+#define PIT_SND_ROAR 0x56Du             /* SFX_PRINCESS_PIT_ROAR, 0x11000044 */
+#define PIT_SND_LOAD 4u                 /* sub_00045670's "load it this level" */
 #define PIT_ST_PADS 0x4BF0u             /* 13 pad indices (sub_0009CC40 of 0x4B5..0x4C1) */
 #define PIT_PADS_N 13u
 #define PIT_PAD_TABLE 0x00715F2Cu       /* -> pads, 0x20 each (+0 id, +4 1, +8 0x1A, +0xC x/y/z, +0x18 yaw) */
@@ -235,6 +241,9 @@ typedef struct {
     uint32_t props[4];                  /* the props last seen (bottle, collision, rack, bandage): logged when made */
     unsigned no_bottle, traces, hits, frames, mouthed, pads_full, hidden, bone_at, bone_src;
     float bone[3];
+    unsigned drawn_bottle, drawn_bandage, drawn_boss, raw_logged, eye_logged;
+    float eye[3];
+    int eye_ok;
     uint8_t bug_phase[6];
     uint8_t boss;
     unsigned bugs, moves, last;
@@ -798,7 +807,7 @@ static void pit_props_rooms(PitInst *k,uint32_t ent)
     if(n<=0 || n>10) return;
     for(i=0;i<3u;i++) {
         uint32_t o=WORD_AT(k->state+f[i]);
-        if(!o || !MAPMAKER_PTR_OK(o,0x100u) || *(int8_t *)((uintptr_t)(o+PIT_ROOMS)+g_xbox_mem_offset)>0) continue;
+        if(!o || !MAPMAKER_PTR_OK(o,0x100u) || (i && *(int8_t *)((uintptr_t)(o+PIT_ROOMS)+g_xbox_mem_offset)>0)) continue;   /* the bottle: always */
         *(int8_t *)((uintptr_t)(o+PIT_ROOMS)+g_xbox_mem_offset)=n;
         for(j=0;j<(unsigned)n;j++) WORD_AT(o+0x38u+j*4u)=WORD_AT(ent+0x38u+j*4u);
         WORD_AT(o+0x34u)=WORD_AT(ent+0x38u);
@@ -835,6 +844,13 @@ static float pit_sin(float a)
  * right after the boss's model draw (chained on sub_0008F950, the model draw:
  * sub_000A1B80 posed it there for the view drawn), never in the fight frame,
  * whose matrices were stale or NaN (playtests .62-.75). */
+/* A point near the boss's head: finite, within PIT_NEAR across and at least
+ * 'up' over its feet (rejects the model-local/camera points of .77). */
+static int pit_near_head(uint32_t ent,const float *b,float up)
+{
+    float dx=b[0]-pit_getf(ent+PIT_ENT_POS),dz=b[2]-pit_getf(ent+PIT_ENT_POS+8u),dy=b[1]-pit_getf(ent+PIT_ENT_POS+4u);
+    return pit_finite(b[0]) && pit_finite(b[1]) && pit_finite(b[2]) && dx*dx+dz*dz<=PIT_NEAR*PIT_NEAR && dy>=up && dy<30.0f;
+}
 static int pit_bone_point(uint32_t ac,float out[3])
 {
     uint32_t def,entry,seg,m;
@@ -863,9 +879,24 @@ void pc_mapmaker_pitboss_draw(void (*original)(void))
     float b[3];
     original();
     if(!pit_lv.n || !inst) return;
+    for(k=0;k<pit_lv.n;k++) {                          /* the props' draws, for the trace (.77: no bottle seen) */
+        uint32_t st=pit_lv.k[k].state;
+        if(!st) continue;
+        if(WORD_AT(st+PIT_ST_BOTTLE) && WORD_AT(WORD_AT(st+PIT_ST_BOTTLE)+4u)==inst) pit_lv.k[k].drawn_bottle++;
+        if(WORD_AT(st+PIT_ST_BANDAGE) && WORD_AT(WORD_AT(st+PIT_ST_BANDAGE)+4u)==inst) pit_lv.k[k].drawn_bandage++;
+    }
     for(k=0;k<pit_lv.n && !(pit_lv.k[k].ent && WORD_AT(pit_lv.k[k].ent+PIT_ENT_ANIM)==inst);k++) {}
     if(k==pit_lv.n || WORD_AT(PIT_SCENE)!=100u || !pit_bone_point(inst,b)) return;
-    if(b[1]<pit_getf(pit_lv.k[k].ent+PIT_ENT_POS+4u)+PIT_BONE_MIN) return;
+    pit_lv.k[k].drawn_boss++;
+    if(pit_lv.k[k].raw_logged<4u) {                     /* what the post-draw matrices give (.77: (8.32, 6.44, 3.33), not world) */
+        pit_lv.k[k].raw_logged++;
+        fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u drawn: bone 0x29 through its post-draw matrix (%.2f, %.2f, %.2f), boss at (%.2f, %.2f, %.2f), view slot %u\n",
+                k+1u,(double)b[0],(double)b[1],(double)b[2],(double)pit_getf(pit_lv.k[k].ent+PIT_ENT_POS),
+                (double)pit_getf(pit_lv.k[k].ent+PIT_ENT_POS+4u),(double)pit_getf(pit_lv.k[k].ent+PIT_ENT_POS+8u),
+                MAPMAKER_PTR_OK(WORD_AT(0x007B0CC0u),0x218u)?(unsigned)WORD_AT(WORD_AT(0x007B0CC0u)+0x214u):0xFFu);
+        fflush(stderr);
+    }
+    if(!pit_near_head(pit_lv.k[k].ent,b,PIT_BONE_MIN)) return;   /* world points only: near the boss, over its feet */
     memcpy(pit_lv.k[k].bone,b,sizeof b);
     pit_lv.k[k].bone_at=pit_lv.k[k].frames+1u;        /* 0: never */
 }
@@ -878,7 +909,16 @@ static void pit_mouth(PitInst *k,uint32_t ent,uint32_t st)
     if(!b || !MAPMAKER_PTR_OK(b,0x200u) || st<1u || st>=PIT_DEATH) return;
     if(!pit_finite(yaw)) yaw=0.0f;
     was_nan=!pit_finite(pit_getf(b+0x64u)) || !pit_finite(pit_getf(b+0x68u)) || !pit_finite(pit_getf(b+0x6Cu));
-    if(k->bone_at && k->frames+1u-k->bone_at<=PIT_BONE_FRESH) { x=k->bone[0];y=k->bone[1];z=k->bone[2]; }
+    {   /* the eye bandage: attached to the head by the engine (sub_000A2C00), so it follows the head's pose */
+        uint32_t e=WORD_AT(k->state+PIT_ST_BANDAGE);
+        float eye[3];
+        if(e && MAPMAKER_PTR_OK(e,0x100u)) {
+            eye[0]=pit_getf(e+0x64u);eye[1]=pit_getf(e+0x68u);eye[2]=pit_getf(e+0x6Cu);
+            if(pit_near_head(ent,eye,PIT_EYE_MIN)) { k->eye[0]=eye[0];k->eye[1]=eye[1]-PIT_EYE_TO_MOUTH;k->eye[2]=eye[2];k->eye_ok=1; }
+        }
+    }
+    if(k->eye_ok) { x=k->eye[0];y=k->eye[1];z=k->eye[2]; }
+    else if(k->bone_at && k->frames+1u-k->bone_at<=PIT_BONE_FRESH) { x=k->bone[0];y=k->bone[1];z=k->bone[2]; }
     else {                                               /* not drawn lately: the estimate */
         x=pit_getf(ent+PIT_ENT_POS)+PIT_MOUTH_AHEAD*pit_sin(yaw);
         y=pit_getf(ent+PIT_ENT_POS+4u)+PIT_MOUTH_UP;
@@ -886,11 +926,11 @@ static void pit_mouth(PitInst *k,uint32_t ent,uint32_t st)
     }
     if(!pit_finite(x) || !pit_finite(y) || !pit_finite(z)) return;
     {
-        unsigned src=k->bone_at && k->frames+1u-k->bone_at<=PIT_BONE_FRESH?1u:2u;
+        unsigned src=k->eye_ok?3u:k->bone_at && k->frames+1u-k->bone_at<=PIT_BONE_FRESH?1u:2u;
         if(src!=k->bone_src && k->hits<1000u) {
             k->bone_src=src;
             fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: gas bottle at %s (%.2f, %.2f, %.2f), %.2f over its feet\n",
-                    (unsigned)(k-pit_lv.k)+1u,src==1u?"bone 0x29 of the last draw":"the head estimate (not drawn lately)",
+                    (unsigned)(k-pit_lv.k)+1u,src==3u?"the eye bandage, 1.8 lower":src==1u?"bone 0x29 of the last draw":"the head estimate (not drawn lately)",
                     (double)x,(double)y,(double)z,(double)(y-pit_getf(ent+PIT_ENT_POS+4u)));
             fflush(stderr);
         }
@@ -930,7 +970,8 @@ static void pit_trace(PitInst *k,uint32_t ent,uint32_t st)
         fprintf(stderr," at (%.2f, %.2f, %.2f) model 0x%X rooms %d room %u damage cb 0x%X",(double)pit_getf(b+0x64u),(double)pit_getf(b+0x68u),
                 (double)pit_getf(b+0x6Cu),(unsigned)PIT_H(b+0x94u),(int)*(int8_t *)((uintptr_t)(b+PIT_ROOMS)+g_xbox_mem_offset),
                 (unsigned)WORD_AT(b+0x34u),(unsigned)WORD_AT(b+0x19Cu));
-    fprintf(stderr,", health %.2f, ragbug phases %d %d %d %d %d %d\n",(double)pit_getf(k->state+PIT_ST_HEALTH),
+    fprintf(stderr,", health %.2f, draws boss %u bottle %u bandage %u, ragbug phases %d %d %d %d %d %d\n",(double)pit_getf(k->state+PIT_ST_HEALTH),
+            k->drawn_boss,k->drawn_bottle,k->drawn_bandage,
             (int)k->bug_phase[0]-1,(int)k->bug_phase[1]-1,(int)k->bug_phase[2]-1,(int)k->bug_phase[3]-1,
             (int)k->bug_phase[4]-1,(int)k->bug_phase[5]-1);
     fflush(stderr);
@@ -950,6 +991,22 @@ static void pit_flock_note(PitInst *k)
     fprintf(stderr,"[mapmaker] pitboss: pit skeleton %u: flock complete, %u ragbugs parked; they rise at the fight's launches (state 10)\n",
             (unsigned)(k-pit_lv.k)+1u,k->bugs);
     fflush(stderr);
+}
+
+/* WRAP sub_00045670 (cdecl sound id -> nonzero when this level loads it; called
+ * only by the level's sound load sub_00027700, after the pak mounts), chained
+ * with pc_mapmaker_khallos_sound_load. The pit fight's roar and fire attack
+ * are level-17 sounds (sounddata flag 4, level byte 0x11), never loaded in
+ * scene 100 (playtest .77: "the skeleton had no audio"). Loaded when the
+ * map's set holds the pit skeleton. Its death 0x568 and the mansion princess
+ * sounds have no level flag (loaded everywhere). */
+void pc_mapmaker_pitboss_sound_load(void (*original)(void))
+{
+    uint32_t id=MAPMAKER_STACK_OK(8)?WORD_AT(g_esp+4u):0xFFFFFFFFu;
+    original();
+    if(g_eax || !pit_lv.want || (id!=PIT_SND_FIRE && id!=PIT_SND_ROAR) || WORD_AT(PIT_SCENE)!=100u || !pit_on()) return;
+    g_eax=PIT_SND_LOAD;
+    pit_log("the pit skeleton's level-17 sound is loaded in this map (sound, load)",id,PIT_SND_LOAD);
 }
 
 /* WRAP sub_0028D0A0 (cdecl entity, message, a, b): stock sends every scene

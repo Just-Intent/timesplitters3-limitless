@@ -388,6 +388,48 @@ Not verified: that the matrices after the draw are the world ones the story
 reads (INFERRED: the story fight reads the same array in its own frame, and
 the catacombs boss is drawn every frame).
 
+## Playtest .77: still no bottle in the mouth, no audio (after .77)
+
+User report (.77): "Barrel is not in its mouth, and the skeleton had no
+audio." Screenshots: the skeleton's open mouth, no bottle anywhere.
+`m77.err`: one `gas bottle at bone 0x29 of the last draw (8.32, 6.44, 3.33),
+5.93 over its feet` with the boss at (117.00, 0.51, 411.00), then the
+estimate (117.00, 11.51, 413.50) for the rest of the fight. The eye bandage
+was made at (117.01, 12.86, 413.27) in the second run (12.35 up, 2.27
+ahead).
+
+Causes:
+- **The post-draw bone point is not a world point** (CONFIRMED by the log):
+  (8.32, 6.44, 3.33) is near the origin, not near the boss (model-local or
+  camera space). The .75 check only tested its height, so it took it once;
+  every other draw gave points under the 3-unit floor.
+- **The bottle was not seen even at the estimate.** INFERRED: the estimate
+  is near the head, so the bottle was not drawn at all. Not settled: the new
+  draw counters show whether the model draw ever runs for it.
+- **No audio** (CONFIRMED, decode + `sound/sounddata`): the pit's roar
+  `0x56D` `SFX_PRINCESS_PIT_ROAR` and fire attack `0x56C`
+  `SFX_PRINCESS_PIT_FIREATTACK` carry flag 4 with level byte 0x11.
+  `sub_00045670` loads such a sound only in scene 17, so in scene 100 they
+  return -1. The death `0x568` and the mansion princess sounds have no level
+  flag. The same cause as the Khallos chair's (.28).
+
+Fixes:
+- The mouth now comes first from the **eye bandage**. The engine attaches it
+  to the head (`sub_000A2C00`), so it follows the head's pose; the mouth is
+  1.8 under it. It is used once it is at least 6 over the feet and within 8
+  across, and the last good point is kept. Then a post-draw bone point,
+  only if near the boss (within 8 across, 3..30 up). Last, the estimate.
+  Log on each change: `gas bottle at the eye bandage, 1.8 lower (...)`.
+- The bottle always takes the boss's listed rooms and room (it hangs at its
+  head).
+- Diagnostics: the first 4 boss draws log the raw post-draw bone point,
+  the boss position and the view slot. The trace counts the draws of the
+  boss, bottle and bandage instances (`draws boss B bottle N bandage M`).
+- Sound: new chain `WRAP sub_00045670 -> pc_mapmaker_pitboss_sound_load`
+  (with `pc_mapmaker_khallos_sound_load`). It answers 4 ("load") for
+  `0x56C`/`0x56D` in a scene-100 map whose set holds the pit skeleton. Log
+  `the pit skeleton's level-17 sound is loaded in this map`.
+
 ## Restart
 
 The restart keeps the Level heap (limitless-bosses.md), so the blocks are
