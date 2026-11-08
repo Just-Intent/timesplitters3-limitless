@@ -720,6 +720,8 @@ void pc_display_mapmaker_pools(void (*original)(void)) { original(); }
 void pc_display_mapmaker_limits(void (*original)(void)) { original(); }
 int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)area;(void)hook;return 1; }
 /* MapMaker capacity area stubs (begin) */
+void pc_mapmaker_pads_nearest(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_random(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_cover_lookup(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_pointer(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_runtime_new(void (*original)(void)) { original(); }
@@ -730,8 +732,6 @@ void pc_mapmaker_pads_editor_item_pads(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_group_matrix(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_group_distance(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_group_route(void (*original)(void)) { original(); }
-void pc_mapmaker_pads_nearest(void (*original)(void)) { original(); }
-void pc_mapmaker_pads_random(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_stitch(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_group_node(void (*original)(void)) { original(); }
 void pc_mapmaker_pads_pad_node(void (*original)(void)) { original(); }

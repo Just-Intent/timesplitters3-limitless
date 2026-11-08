@@ -1,12 +1,34 @@
 --- a/titles/futureperfect/src/recomp_manual.c
 +++ b/titles/futureperfect/src/recomp_manual.c
-@@ -1911,6 +1911,4458 @@
+@@ -1911,6 +1911,4480 @@
      sub_002FA720_gen();
  #endif
  }
 +
 +/* MapMaker capacity areas (src/pc_mapmaker_<area>.inc, research/capacity-raise-plan.md).
 + * Each hook acts only in MapMaker contexts and otherwise runs the original. */
++extern void sub_0009BCF0_gen(void);
++void sub_0009BCF0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_nearest")) pc_mapmaker_pads_nearest(sub_0009BCF0_gen);
++    else sub_0009BCF0_gen();
++#else
++    sub_0009BCF0_gen();
++#endif
++}
++
++extern void sub_0006A8B0_gen(void);
++void sub_0006A8B0(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    if(pc_mapmaker_area_enabled("pads","pc_mapmaker_pads_random")) pc_mapmaker_pads_random(sub_0006A8B0_gen);
++    else sub_0006A8B0_gen();
++#else
++    sub_0006A8B0_gen();
++#endif
++}
++
 +extern void sub_0009A3C0_gen(void);
 +void sub_0009A3C0(void)
 +{
