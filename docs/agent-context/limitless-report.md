@@ -47,3 +47,10 @@ Tests: `tests/mapmaker/test_mapmaker_report.py` (fixture
 compiles it in the whole chain with `windows.h` (no identifiers `near`/`far`:
 they are macros there). Not built or played; no Mac-specific part (shared
 include chain).
+
+After .81 (2026-11-08): item categories are measured against the raised
+maxima when the limits are on. The editor raises the `0x00524BE0` table only
+while it runs, so in play it held stock values and HugeMap reported 126
+weapons "over the cap of 32". `MAPMAKER_REPORT_RAISED` looks the address up in
+`mapmaker_categories` (pc_mapmaker_limits.inc); the fixture supplies its own.
+The overlap line now says "1 tile shares".
