@@ -172,8 +172,9 @@ robot, an unknown room, other callers and entities), the `goal-*`
 mutations and the decode test `test_walk_goal_and_pad_graph`.
 
 Health display, as the other real bosses: Boss Off = no health shown; Boss
-bar = the bosses area's bottom bar; Sub-boss bar = nothing (the robot has no
-overhead meter). The handler sets health 55 in state 0; the bosses area
+bar = the bosses area's bottom bar; Sub-boss bar = the bosses area's meter
+(no +0x268 record, so `pc_mapmaker_bosses_meters` draws it; lifted over its top
+since .68, [bosses](mapmaker-bosses.md#every-boss-type-stabilization-after-v040-mapmaker68)). The handler sets health 55 in state 0; the bosses area
 rescales a maximum the game set again (bosses.inc), so its multiplier still
 applies (INFERRED from that rule).
 

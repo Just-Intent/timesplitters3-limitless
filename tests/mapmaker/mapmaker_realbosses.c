@@ -195,6 +195,10 @@ static uint32_t guest_call(void (*f)(void),int n,...)
 }
 #include "pc_mapmaker_budget.inc"
 #include "pc_mapmaker_limits.inc"
+/* pc_mapmaker_bosses.inc's list of Sub-boss meters it drew this pass */
+#define BOS_METER_OWNED 1
+static uint32_t meter_owned;
+static int bos_meter_owned(uint32_t a) { return a && a==meter_owned; }
 #include "pc_mapmaker_realbosses.inc"
 /* the first giant skeleton / Crow walker (the single-boss cases below) */
 #define rbs_skel (rbs_skels[0])
@@ -646,6 +650,14 @@ int main(void)
     pak_mounted=0;
     actor(0,0x15,0x5BE,1);
     CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* no real boss noted yet */
+    /* a Sub-boss actor the bosses area drew this pass (bos_meter_owned): no
+     * stock meter, whatever its boss type, real boss noted or not */
+    meter_owned=A(2);
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(2),0,0x7Fu,0);
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D269u,A(2),0,0x7Fu,1);  /* another caller: ours */
+    CALL(pc_mapmaker_realbosses_meter,fake,0x0014D264u,A(0),0,0x7Fu,1);  /* not listed */
+    CHECK(rbs.meters_owned==1u);
+    meter_owned=0;
     CALL(pc_mapmaker_realbosses_ai_start,fake_ai,0x0015F981u,A(0),0,0,1);   /* no anims: bot */
     CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);
     pak_mounted=1;
@@ -910,7 +922,9 @@ int main(void)
         CHECK(nshot==1 && seen_scene==100u);
         /* aim at a target a floor up (v0.4.0-mapmaker.40): the boss at -12.5,
          * its hand at -8.5 (below the floor above), the player's feet ~5 up at
-         * -7.5, 10 ahead: aimed at its body, not into the floor's edge */
+         * -7.5, 10 ahead: aimed at its body from inside its room (after .68:
+         * a hand under the target's feet + 1 starts there), not into the
+         * floor's edge */
         {
             uint32_t st=SKST,t=SKST+0x4164u+12u;
             float hx=1.0f,hy=-8.5f,hz=2.0f,dy;
@@ -921,34 +935,44 @@ int main(void)
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
             dy=FLOAT_AT(st+0x413Cu+0x10u);
             CHECK(seen_scene==1u && WORD_AT(st+0x4160u)==1u && rbs_skel.aimed==1u);
-            CHECK(near(dy,2.5f/rbs_sqrt(2.5f*2.5f+100.0f)) && near(FLOAT_AT(st+0x413Cu+0x14u),10.0f/rbs_sqrt(2.5f*2.5f+100.0f)));
-            CHECK(near(FLOAT_AT(st+0x413Cu+0xCu),0.0f) && FLOAT_AT(st+0x413Cu+4u)==hy);   /* the hand stays the origin */
+            CHECK(near(dy,0.5f/rbs_sqrt(100.25f)) && near(FLOAT_AT(st+0x413Cu+0x14u),10.0f/rbs_sqrt(100.25f)));
+            CHECK(near(FLOAT_AT(st+0x413Cu+0xCu),0.0f) && near(FLOAT_AT(st+0x413Cu+4u),-6.5f));   /* raised into its room */
+            CHECK(FLOAT_AT(st+0x413Cu)==hx && FLOAT_AT(st+0x413Cu+8u)==hz);                      /* x/z: the hand's */
             /* steeply overhead: the climb held at about 60 degrees, a unit vector */
-            FLOAT_AT(t)=hx+1.0f;FLOAT_AT(t+4u)=-2.0f;FLOAT_AT(t+8u)=hz;WORD_AT(st+0x4160u)=0;
+            FLOAT_AT(t)=hx+0.1f;FLOAT_AT(t+4u)=-2.0f;FLOAT_AT(t+8u)=hz;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
             CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),0.866f) && near(FLOAT_AT(st+0x413Cu+0xCu),0.5f) && near(FLOAT_AT(st+0x413Cu+0x14u),0.0f));
-            /* the boss's own floor: the stock aim, untouched */
+            /* the boss's own floor (.68): its body too, from the hand (3.5 over the feet: kept) */
             FLOAT_AT(t)=hx;FLOAT_AT(t+4u)=-12.0f;FLOAT_AT(t+8u)=hz+10.0f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-3.5f/rbs_sqrt(3.5f*3.5f+100.0f)) && rbs_skel.aimed==2u);
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-2.0f/rbs_sqrt(104.0f)) && rbs_skel.aimed==3u && FLOAT_AT(st+0x413Cu+4u)==hy);
+            /* 2.25 under its floor (-14.75): still at its body, from under its ceiling */
+            FLOAT_AT(t+4u)=-14.75f;WORD_AT(st+0x4160u)=0;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            CHECK(rbs_skel.aimed==4u && near(FLOAT_AT(st+0x413Cu+4u),-10.75f) && near(FLOAT_AT(st+0x413Cu+0x10u),-2.5f/rbs_sqrt(106.25f)));
+            /* a floor under its floor (-17.5): the stock aim at the feet, untouched */
+            FLOAT_AT(t+4u)=-17.5f;WORD_AT(st+0x4160u)=0;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-9.0f/rbs_sqrt(181.0f)) && rbs_skel.aimed==4u && FLOAT_AT(st+0x413Cu+4u)==hy);
             /* still aiming (phase 0 kept): nothing changed */
             WORD_AT(st+0x4160u)=0;FLOAT_AT(t+4u)=-7.5f;
             CALL(pc_mapmaker_realbosses_throw,fake_scene,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.aimed==2u && near(FLOAT_AT(st+0x413Cu+0x10u),-3.5f/rbs_sqrt(3.5f*3.5f+100.0f)));
+            CHECK(rbs_skel.aimed==4u && near(FLOAT_AT(st+0x413Cu+0x10u),-9.0f/rbs_sqrt(181.0f)));
             CHECK(rbs_skel.ground_set==-1 && rbs_skel.ground==-12.5f);   /* no floor map: the spawn height */
             WORD_AT(st+0x4158u)=0;WORD_AT(st+0x4160u)=2u;WORD_AT(A(3)+0x9DCu)=8u;
         }
         /* v0.4.0-mapmaker.42 ("they don't hit me if I stand in place on the
          * same floor"): its first-frame height -9.49 under the floor it fights
-         * on (0.5; another floor at -20): the reference is the floor above,
-         * same-floor targets keep the stock aim */
+         * on (0.5; another floor at -20): the reference is the floor above.
+         * After .68 same-floor targets get the body aim from their room too
+         * (the straight 0x34 shot at the feet from 4 over them met the floor) */
         {
             uint32_t st=SKST,t=SKST+0x4164u+12u;
             float hx=1.0f,hy=1.2f,hz=2.0f,dx,dy,dz,y;
             unsigned n;
             aim_hand=0x00601000u;FLOAT_AT(aim_hand)=hx;FLOAT_AT(aim_hand+4u)=hy;FLOAT_AT(aim_hand+8u)=hz;
             FLOAT_AT(ENT(3)+0x64u)=hx;FLOAT_AT(ENT(3)+0x6Cu)=hz;
-            rbs_skel.floor=-9.49f;rbs_skel.ground_set=0;rbs_skel.aimed=0;rbs_skel.pad_set=0;
+            rbs_skel.floor=-9.49f;rbs_skel.ground_set=0;rbs_skel.aimed=0;rbs_skel.pad_set=0;rbs_skel.lowered=0;
             skel_floor_map=1;skel_floors[0]=0.5f;skel_floors[1]=-20.0f;nfinder=0;
             WORD_AT(0x004DCB00u)=0x1111u;WORD_AT(0x004DCAFCu)=0x2222u;WORD_AT(0x00733088u)=0x3333u;
             WORD_AT(st+0x4158u)=1u;FLOAT_AT(t)=hx;FLOAT_AT(t+4u)=0.5f;FLOAT_AT(t+8u)=hz+10.0f;
@@ -956,48 +980,55 @@ int main(void)
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
             CHECK(rbs_skel.ground_set==2 && near(rbs_skel.ground,0.5f) && nfinder>=2u);
             CHECK(WORD_AT(0x004DCB00u)==0x1111u && WORD_AT(0x004DCAFCu)==0x2222u && WORD_AT(0x00733088u)==0x3333u);
-            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-0.7f/rbs_sqrt(0.49f+100.0f)) && rbs_skel.aimed==0);   /* stock */
-            /* a little over that floor (a step, a jump): still stock; the floor is found once */
+            /* 0.7 over the feet: from feet + 1, at its body */
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),0.5f/rbs_sqrt(100.25f)) && rbs_skel.aimed==1 && near(FLOAT_AT(st+0x413Cu+4u),1.5f));
+            CHECK(rbs_skel.lowered==1u);
+            /* a little over that floor (a jump): the same; the floor is found once */
             FLOAT_AT(t+4u)=2.7f;WORD_AT(st+0x4160u)=0;n=nfinder;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),1.5f/rbs_sqrt(2.25f+100.0f)) && rbs_skel.aimed==0 && nfinder==n);
-            /* the floor above (5.5), close (3 ahead) from a low hand: raised; the
-             * line is over its feet and under its head where it stands */
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),0.5f/rbs_sqrt(100.25f)) && rbs_skel.aimed==2 && nfinder==n);
+            CHECK(near(FLOAT_AT(st+0x413Cu+4u),3.7f));
+            /* a floor under the one it fights on (-9.5, 10 under 0.5): the stock aim */
+            FLOAT_AT(t+4u)=-9.5f;WORD_AT(st+0x4160u)=0;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            CHECK(rbs_skel.aimed==2 && FLOAT_AT(st+0x413Cu+4u)==hy && near(FLOAT_AT(st+0x413Cu+0x10u),-10.7f/rbs_sqrt(10.7f*10.7f+100.0f)));
+            /* the floor above (5.5), close (3 ahead) from a low hand: from its
+             * room, the line over its feet and under its head where it stands */
             FLOAT_AT(t+4u)=5.5f;FLOAT_AT(t+8u)=hz+3.0f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
             dx=FLOAT_AT(st+0x413Cu+0xCu);dy=FLOAT_AT(st+0x413Cu+0x10u);dz=FLOAT_AT(st+0x413Cu+0x14u);
-            y=hy+dy/rbs_sqrt(dx*dx+dz*dz)*3.0f;
-            CHECK(rbs_skel.aimed==1 && y>=5.5f && y<=7.5f);
+            y=FLOAT_AT(st+0x413Cu+4u)+dy/rbs_sqrt(dx*dx+dz*dz)*3.0f;
+            CHECK(rbs_skel.aimed==3 && near(y,7.0f) && near(FLOAT_AT(st+0x413Cu+4u),6.5f));
             /* ... and from a hand high over its floor (11.2): from under the
              * target's ceiling (5.5 + 4), straight at its body */
             hy=11.2f;FLOAT_AT(aim_hand+4u)=hy;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
             dx=FLOAT_AT(st+0x413Cu+0xCu);dy=FLOAT_AT(st+0x413Cu+0x10u);dz=FLOAT_AT(st+0x413Cu+0x14u);
             y=FLOAT_AT(st+0x413Cu+4u)+dy/rbs_sqrt(dx*dx+dz*dz)*3.0f;
-            CHECK(rbs_skel.aimed==2 && near(y,7.0f) && near(FLOAT_AT(st+0x413Cu+4u),9.5f));
+            CHECK(rbs_skel.aimed==4 && near(y,7.0f) && near(FLOAT_AT(st+0x413Cu+4u),9.5f));
             /* its spawn on its own floor (-9.49 over -9.5) under an upper floor
-             * (0.5): its own floor counts; the floor above is a floor up */
+             * (0.5): its own floor counts; a hand 1.5 over the target's feet stays */
             rbs_skel.ground_set=0;skel_floors[1]=-9.5f;hy=-8.0f;FLOAT_AT(aim_hand+4u)=hy;
             FLOAT_AT(t+4u)=-9.5f;FLOAT_AT(t+8u)=hz+10.0f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.ground_set==1 && near(rbs_skel.ground,-9.5f) && rbs_skel.aimed==2);
-            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-1.5f/rbs_sqrt(2.25f+100.0f)));
+            CHECK(rbs_skel.ground_set==1 && near(rbs_skel.ground,-9.5f) && rbs_skel.aimed==5);
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),0.0f) && FLOAT_AT(st+0x413Cu+4u)==hy);
             FLOAT_AT(t+4u)=0.5f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.aimed==3);
+            CHECK(rbs_skel.aimed==6 && near(FLOAT_AT(st+0x413Cu+4u),1.5f));
             /* m42.err: placed on the 0.5 floor (AI start 0.51), its first
              * fight frame 5 lower (-4.49) over a floor at -4.5: the placed
-             * height counts, the player on 0.5 gets the stock aim */
+             * height counts; the player on 0.5 gets the body aim */
             rbs_skel.floor=-4.49f;rbs_skel.pad=0.51f;rbs_skel.pad_set=1;rbs_skel.ground_set=0;
             skel_floors[0]=0.5f;skel_floors[1]=-4.5f;hy=1.2f;FLOAT_AT(aim_hand+4u)=hy;
             FLOAT_AT(t+4u)=0.5f;FLOAT_AT(t+8u)=hz+10.0f;WORD_AT(st+0x4160u)=0;n=rbs_skel.aimed;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.ground_set==1 && near(rbs_skel.ground,0.5f) && rbs_skel.aimed==n);
-            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-0.7f/rbs_sqrt(0.49f+100.0f)));
+            CHECK(rbs_skel.ground_set==1 && near(rbs_skel.ground,0.5f) && rbs_skel.aimed==n+1u);
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),0.5f/rbs_sqrt(100.25f)) && near(FLOAT_AT(st+0x413Cu+4u),1.5f));
             /* v0.4.0-mapmaker.44 (m43b/m44.err: placed and fighting at -4.49
              * over a -4.5 floor under a 0.5 one, the hand 6.2, 10.7 over its
              * feet; every aim at a player on 0.5, "floor one"): the shot starts
-             * under that player's ceiling (0.5 + 4), the raised aim from there */
+             * under that player's ceiling (0.5 + 4), the body aim from there */
             rbs_skel.floor=-4.49f;rbs_skel.pad=-4.49f;rbs_skel.pad_set=1;rbs_skel.ground_set=0;rbs_skel.lowered=0;
             hy=6.2f;FLOAT_AT(aim_hand+4u)=hy;
             FLOAT_AT(t+4u)=0.5f;FLOAT_AT(t+8u)=hz+10.0f;WORD_AT(st+0x4160u)=0;n=rbs_skel.aimed;
@@ -1006,35 +1037,41 @@ int main(void)
             CHECK(near(FLOAT_AT(st+0x413Cu+4u),4.5f) && FLOAT_AT(st+0x413Cu)==hx && FLOAT_AT(st+0x413Cu+8u)==hz);
             CHECK(near(FLOAT_AT(st+0x413Cu+0xCu),0.0f) && near(FLOAT_AT(st+0x413Cu+0x10u),-2.5f/rbs_sqrt(106.25f)) &&
                   near(FLOAT_AT(st+0x413Cu+0x14u),10.0f/rbs_sqrt(106.25f)));
-            /* ... the player on its own floor (-4.5): the stock aim at the
-             * feet from under the floor above (-0.5) */
+            /* ... the player on its own floor (-4.5): its body from under the
+             * floor above (-0.5) */
             FLOAT_AT(t+4u)=-4.5f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.lowered==2u && rbs_skel.aimed==n+1u && near(FLOAT_AT(st+0x413Cu+4u),-0.5f));
-            CHECK(near(FLOAT_AT(st+0x413Cu+0xCu),0.0f) && near(FLOAT_AT(st+0x413Cu+0x10u),-4.0f/rbs_sqrt(116.0f)) &&
-                  near(FLOAT_AT(st+0x413Cu+0x14u),10.0f/rbs_sqrt(116.0f)));
+            CHECK(rbs_skel.lowered==2u && rbs_skel.aimed==n+2u && near(FLOAT_AT(st+0x413Cu+4u),-0.5f));
+            CHECK(near(FLOAT_AT(st+0x413Cu+0xCu),0.0f) && near(FLOAT_AT(st+0x413Cu+0x10u),-2.5f/rbs_sqrt(106.25f)) &&
+                  near(FLOAT_AT(st+0x413Cu+0x14u),10.0f/rbs_sqrt(106.25f)));
             /* ... a jump on it (-3.0): 4 over the target */
             FLOAT_AT(t+4u)=-3.0f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.lowered==3u && near(FLOAT_AT(st+0x413Cu+4u),1.0f) && near(FLOAT_AT(st+0x413Cu+0x10u),-4.0f/rbs_sqrt(116.0f)));
-            /* ... the player two floors up (5.5): the hand is in that room, raised aim from it */
+            CHECK(rbs_skel.lowered==3u && near(FLOAT_AT(st+0x413Cu+4u),1.0f) && near(FLOAT_AT(st+0x413Cu+0x10u),-2.5f/rbs_sqrt(106.25f)));
+            /* ... the player two floors up (5.5): the hand 0.7 over its feet starts from feet + 1 */
             FLOAT_AT(t+4u)=5.5f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.aimed==n+2u && rbs_skel.lowered==3u && FLOAT_AT(st+0x413Cu+4u)==hy);
-            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),0.8f/rbs_sqrt(0.64f+100.0f)));
-            /* ... a hand low on its floor (-2.4): the stock aim, untouched */
+            CHECK(rbs_skel.aimed==n+4u && rbs_skel.lowered==4u && near(FLOAT_AT(st+0x413Cu+4u),6.5f));
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),0.5f/rbs_sqrt(100.25f)));
+            /* ... a hand low on its floor (-2.4, 2.1 over the feet): kept, at its body */
             hy=-2.4f;FLOAT_AT(aim_hand+4u)=hy;FLOAT_AT(t+4u)=-4.5f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.lowered==3u && rbs_skel.aimed==n+2u && FLOAT_AT(st+0x413Cu+4u)==hy);
-            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-2.1f/rbs_sqrt(2.1f*2.1f+100.0f)));
+            CHECK(rbs_skel.lowered==4u && rbs_skel.aimed==n+5u && FLOAT_AT(st+0x413Cu+4u)==hy);
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),-0.6f/rbs_sqrt(0.36f+100.0f)));
+            /* ... m50.err: a hand under the floor of the player on 0.5 (-3.0):
+             * moved up into that player's room (1.5) */
+            hy=-3.0f;FLOAT_AT(aim_hand+4u)=hy;FLOAT_AT(t+4u)=0.5f;WORD_AT(st+0x4160u)=0;
+            CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
+            CHECK(rbs_skel.lowered==5u && rbs_skel.aimed==n+6u && near(FLOAT_AT(st+0x413Cu+4u),1.5f));
+            CHECK(near(FLOAT_AT(st+0x413Cu+0x10u),0.5f/rbs_sqrt(100.25f)));
             /* ... a target a floor below it (-9.5): the stock aim from the hand */
             hy=6.2f;FLOAT_AT(aim_hand+4u)=hy;FLOAT_AT(t+4u)=-9.5f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.lowered==3u && FLOAT_AT(st+0x413Cu+4u)==hy && near(FLOAT_AT(st+0x413Cu+0x10u),-15.7f/rbs_sqrt(15.7f*15.7f+100.0f)));
+            CHECK(rbs_skel.lowered==5u && FLOAT_AT(st+0x413Cu+4u)==hy && near(FLOAT_AT(st+0x413Cu+0x10u),-15.7f/rbs_sqrt(15.7f*15.7f+100.0f)));
             /* ... the fire phase throws from the lowered origin */
             FLOAT_AT(t+4u)=0.5f;WORD_AT(st+0x4160u)=0;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,1);
-            CHECK(rbs_skel.lowered==4u && WORD_AT(st+0x4160u)==1u && near(FLOAT_AT(st+0x413Cu+4u),4.5f));
+            CHECK(rbs_skel.lowered==6u && WORD_AT(st+0x4160u)==1u && near(FLOAT_AT(st+0x413Cu+4u),4.5f));
             n=nshot;
             CALL(pc_mapmaker_realbosses_throw,fake_aim,0x0029D055u,ENT(3),0x00600F00u,0,0);
             CHECK(nshot==n+1u && shot_args[1]==st+0x413Cu && near(FLOAT_AT(shot_args[1]+4u),4.5f) && WORD_AT(st+0x4160u)==2u);
@@ -1437,6 +1474,31 @@ int main(void)
         CALL(pc_mapmaker_realbosses_skel_slot,fake_seen,0x000A5D20u,ENT(11),0,0,1);
         CHECK(seen_skel==SKST);                                               /* mission 5: stock */
         WORD_AT(0x0079094Cu)=100u;
+        /* the fire breath's shape callback sub_00288BD0 (after .68): called by
+         * the effect system with the asking emitter, outside every fight; the
+         * skeleton owning that emitter (state +0x3E8C / +0x3E90) is swapped in */
+        WORD_AT(SKST+0x3E8Cu)=0x00EE0000u;WORD_AT(SKST_K(1)+0x3E8Cu)=0x00EE0001u;WORD_AT(SKST_K(2)+0x3E90u)=0x00EE0002u;
+        CALL(pc_mapmaker_realbosses_skel_flames,fake_seen,0x003784E2u,0x00EE0002u,0x00600F00u,0x00600F10u,1);
+        CHECK(seen_skel==SKST_K(2) && seen_parts==SKPT_K(2) && WORD_AT(0x0078B1ECu)==SKST && fx_is(base) && rbs_skels[2].flames==1u);
+        CALL(pc_mapmaker_realbosses_skel_flames,fake_seen,0x003784E2u,0x00EE0001u,0x00600F00u,0x00600F10u,1);
+        CHECK(seen_skel==SKST_K(1) && seen_parts==SKPT_K(1) && WORD_AT(0x0078B1ECu)==SKST && fx_is(base) && rbs_skels[1].flames==1u);
+        CALL(pc_mapmaker_realbosses_skel_flames,fake_seen,0x003784E2u,0x00EE0000u,0x00600F00u,0x00600F10u,1);
+        CHECK(seen_skel==SKST && rbs_skels[0].flames==1u && rbs_skelf.other_flames==0);
+        CALL(pc_mapmaker_realbosses_skel_flames,fake_seen,0x003784E2u,0x00EE0009u,0x00600F00u,0x00600F10u,1);
+        CHECK(seen_skel==SKST && rbs_skelf.other_flames==1u);                 /* no skeleton's emitter: stock */
+        CALL(pc_mapmaker_realbosses_skel_flames,fake_seen,0x003784E2u,0u,0x00600F00u,0x00600F10u,1);
+        CHECK(seen_skel==SKST && rbs_skelf.other_flames==1u);                 /* none at all: stock, not counted */
+        WORD_AT(0x0079094Cu)=1u;
+        CALL(pc_mapmaker_realbosses_skel_flames,fake_seen,0x003784E2u,0x00EE0002u,0x00600F00u,0x00600F10u,1);
+        CHECK(seen_skel==SKST && rbs_skels[2].flames==1u);                     /* mission 5: stock */
+        WORD_AT(0x0079094Cu)=100u;
+        /* inside skeleton 2's own fight: its pointer stays, its emitter stays its own */
+        rbs_skel_in(&rbs_skels[2],&s1);
+        CALL(pc_mapmaker_realbosses_skel_flames,fake_seen,0x003784E2u,0x00EE0001u,0x00600F00u,0x00600F10u,1);
+        CHECK(seen_skel==SKST_K(1) && WORD_AT(0x0078B1ECu)==SKST_K(2) && rbs_skelf.cur==&rbs_skels[2]);
+        rbs_skel_out(&rbs_skels[2],&s1);
+        CHECK(WORD_AT(0x0078B1ECu)==SKST && fx_is(base) && !rbs_skelf.cur);
+        WORD_AT(SKST+0x3E8Cu)=0;WORD_AT(SKST_K(1)+0x3E8Cu)=0;WORD_AT(SKST_K(2)+0x3E90u)=0;
         /* nested swaps: the same instance swaps nothing, another one is put back */
         rbs_skel_in(&rbs_skels[1],&s1);
         CHECK(WORD_AT(0x0078B1ECu)==SKST_K(1) && rbs_skelf.cur==&rbs_skels[1] && s1.swapped);

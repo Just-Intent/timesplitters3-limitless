@@ -376,12 +376,13 @@ record, model and skeleton. Health display (2026-10-31): a second row
 Boss is not Off; same close-callback mechanics) sets +0x29 bit 2 (0xB4 |
 level-1; mask 0xF8). Sub-boss AIs get no bottom bar; WRAP `sub_0014D1F0` ->
 `pc_mapmaker_bosses_meters` draws `sub_0013A400(actor,0,0x7F,0x6E)` before
-the original for each living Sub-boss AI whose entity has no +0x268 record
-(one with a record is the stock loop's). Records are not created:
-`sub_0012C800` is a 17-slot bump pool reset only at 0x0014853D and +0x268
-has ~100 readers. The meter sits 0.4..0.6 units above model node
-[[[entity+4]+0x8C]+0x18] (+0x34 of its matrix), so it already follows the
-model's skeleton; no extra scaling.
+the original for each living Sub-boss AI (records are not created:
+`sub_0012C800` is a 17-slot bump pool reset only at 0x0014853D, +0x268 has
+~100 readers). .68: the meter's matrix ([[inst+0x8C]+0x18]) is inside most giants: +0x68
+lifted to the node boxes' top; record holders listed (`bos_meter_owned`,
+realbosses skips their stock draw); Khallos/tank/mothership: stand-in actor.
+Skeleton .68: WRAP `sub_00288BD0` -> `_skel_flames` (emitter owner swapped
+in); shot origin feet +1..+4, body aim (mapmaker-realbosses.md).
 
 Custom character set (area `characters`, `src/interface/pc_mapmaker_characters.inc`,
 `docs/mapmaker/mapmaker-characters.md`, `TSFP_MAPMAKER_LIMITS=1`): the Map
@@ -416,9 +417,9 @@ over every AI-list actor whose entity has a +0x268 damage record, in scene
 handler makes that record (0x002811A3), MapMaker AIs never do. WRAP
 `sub_0013A400` -> `pc_mapmaker_realbosses_meter` skips it for noted real
 bosses (char 0x15 / model 0x5BE) unless their Story AI chose the Sub-boss
-bar (then the stock meter shows and the stock bar is hidden too). No save byte; the handler cannot reach
+bar (then bosses' lifted meter; stock bar hidden). No save byte; the handler cannot reach
 `sub_002274C0` (decode call graph). `tests/mapmaker/test_mapmaker_realbosses.py`.
-Only the creature itself played (v0.4.0-mapmaker.5); the meter fix is not built.
+Creature played in .5.
 Boss Off = no health: `pc_mapmaker_realbosses_hud` clears
 the focus for the stock call for every noted real boss (Boss flag or not);
 Boss bar = bosses' bar, Sub-boss = meter, Off = nothing.
@@ -451,7 +452,7 @@ portal rects (view +0x3BC) of the visible rooms its box touches
 another tile is cut at the portal top; mission 5's arena is the camera's room.
 WRAP `sub_000862C0` -> `pc_mapmaker_bigdraw_rect`: character, model
 0x5E9/0x5BE, scene 100, switch on, non-empty rect -> whole viewport (depth
-still occludes). `tests/mapmaker/test_mapmaker_bigdraw.py`. Not built or played.
+still occludes). test_mapmaker_bigdraw.py.
 Crow walker (id 0x64, model 0x637, picker row 152 "Crow Walker", preview
 Arcade 0xA8; docs section in mapmaker-realbosses.md): anims lv81.pak
 (0x0049D9A8); level WRAP calls stock `sub_002976F0` ([0x0078B1E8] 0x64DC)
@@ -471,14 +472,12 @@ case) on a placed tile in Tiles mode (`editor+0x254` 0) with nothing held ->
 (build: one "Roof" choice Normal/No roof/Open air + stock Done) and
 `sub_003192E0` (tick: roof mark on the tile, or all selected tiles) act only
 for that descriptor (menu +4). Roof format hook suffixes any flagged tile's
-grid label. Escape/B still select. `tests/mapmaker/test_mapmaker_tileflags.py`.
-Not built or played.
+grid label. Escape/B still select. test_mapmaker_tileflags.py.
 Skeleton height (mapmaker.16 hover): fight stores +0x68 = 0 at 0x0029D06B;
 WRAP `sub_002895A0` -> `pc_mapmaker_realbosses_face` (ret 0x0029D075)
 restores the spawn height noted by `_princess`; `_throw` skips a non-finite
 aim and logs throws. Freeze after a throw: unexplained.
-mapmaker.40: _restart reallocates (restart frees level heap); 
-bs_skel_aim aims a floor up.
+.40-.44 aim fixes, now .68 (above); restart: blocks set up in place.
 Robot doors (.45): stacked one-floor portals combine; `rbt_hold` puts back knee-level moves through low ones (mapmaker-robot.md).
 Ported bosses, own areas (2026-11-01): `robot` (`pc_mapmaker_robot.inc`, id 0x42, docs/mapmaker/mapmaker-robot.md),
 `crowe` (`pc_mapmaker_crowe.inc`, id 0x46, walk stops at ledges: mapmaker-crowe.md), `tank`

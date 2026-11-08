@@ -299,8 +299,9 @@ MUTATIONS = {
     # the throw's aim at a target a floor up (v0.4.0-mapmaker.40)
     'aim-never': ('        if(WORD_AT(st+RBS_SKEL_PHASE)==1u) rbs_skel_aim(k,st,ent);   /* aimed this frame */\n', ''),
     'aim-while-aiming': ('        if(WORD_AT(st+RBS_SKEL_PHASE)==1u) rbs_skel_aim(k,st,ent);', '        rbs_skel_aim(k,st,ent);'),
-    'aim-same-floor': ('    if(!(d[1]-k->ground>RBS_SKEL_UP)) {', '    if(0) {'),
-    'aim-ref-spawn': ('    if(!(d[1]-k->ground>RBS_SKEL_UP)) {', '    if(!(d[1]-k->floor>RBS_SKEL_UP)) {'),
+    # after .68: every target on or over the boss's floor at its body; under it: stock
+    'aim-under-floor-body': ('    if(d[1]-k->ground<-RBS_SKEL_UP) return;', '    if(0) return;'),
+    'aim-ref-spawn': ('    if(d[1]-k->ground<-RBS_SKEL_UP) return;', '    if(d[1]-k->floor<-RBS_SKEL_UP) return;'),
     'aim-up-2': ('#define RBS_SKEL_UP 2.5f', '#define RBS_SKEL_UP 2.0f'),
     'ground-no-climb': ('i<=RBS_RISE_N && !found;i++)', 'i<1u && !found;i++)'),
     'ground-climb-below': ('&f) && f>h+RBS_STEP) { found=1;steps=i; }', '&f)) { found=1;steps=i; }'),
@@ -313,13 +314,28 @@ MUTATIONS = {
     'aim-no-clamp': ('    if(d[1]>RBS_SKEL_PITCH) {', '    if(0) {'),
     'aim-wrong-target': ('    t=st+RBS_SKEL_TARGET+i*12u;', '    t=st+RBS_SKEL_TARGET;'),
     # same-floor throws from under the floor above (v0.4.0-mapmaker.44)
-    'hand-not-lowered': ('    low=rbs_skel_low(k,shot,o,d);\n', '    low=0;\n'),
-    'hand-any-height': ('if(!(o[1]-d[1]>RBS_SKEL_HAND) || d[1]', 'if(d[1]'),
-    'hand-floor-below': (' || d[1]-k->ground<-RBS_SKEL_UP) return 0;', ') return 0;'),
-    'hand-over-its-floor': ('    o[1]=d[1]+RBS_SKEL_HAND;\n', '    o[1]=k->ground+RBS_SKEL_HAND;\n'),
+    'hand-not-moved': ('    rbs_skel_low(k,shot,o,d);                          /* the origin', '    /* the origin'),
+    'hand-any-height': ('    if(o[1]-d[1]>RBS_SKEL_HAND) o[1]=d[1]+RBS_SKEL_HAND;', '    if(0) o[1]=d[1]+RBS_SKEL_HAND;'),
+    'hand-over-its-floor': ('    if(o[1]-d[1]>RBS_SKEL_HAND) o[1]=d[1]+RBS_SKEL_HAND;', '    if(o[1]-d[1]>RBS_SKEL_HAND) o[1]=k->ground+RBS_SKEL_HAND;'),
     'hand-origin-kept': ('    rbs_setf(shot+4u,o[1]);\n', ''),
-    'hand-not-reaimed': ('        if(!low) return;\n', '        return;\n'),
+    # after .68: a hand under the target's floor starts in its room
+    'hand-not-raised': ('    else if(o[1]-d[1]<RBS_SKEL_HAND_LOW) o[1]=d[1]+RBS_SKEL_HAND_LOW;', '    else if(0) o[1]=d[1]+RBS_SKEL_HAND_LOW;'),
+    'hand-raised-to-feet': ('#define RBS_SKEL_HAND_LOW 1.0f', '#define RBS_SKEL_HAND_LOW 0.0f'),
+    'hand-raised-over-its-floor': ('    else if(o[1]-d[1]<RBS_SKEL_HAND_LOW) o[1]=d[1]+RBS_SKEL_HAND_LOW;',
+                                   '    else if(o[1]-d[1]<RBS_SKEL_HAND_LOW) o[1]=k->ground+RBS_SKEL_HAND_LOW;'),
     'hand-at-ceiling': ('#define RBS_SKEL_HAND 4.0f', '#define RBS_SKEL_HAND 5.5f'),
+    # the fire breath's shape callback sub_00288BD0, routed by its emitter (after .68)
+    'flames-not-routed': ('    rbs_skel_in(k,&s);\n    original();\n    rbs_skel_out(k,&s);\n    if(!k->flames++) {', '    original();\n    if(!k->flames++) {'),
+    'flames-no-restore': ('    original();\n    rbs_skel_out(k,&s);\n    if(!k->flames++) {', '    original();\n    if(!k->flames++) {'),
+    'flames-one-emitter': ('(WORD_AT(rbs_skels[i].state+RBS_SKEL_FLAME_A)==e || WORD_AT(rbs_skels[i].state+RBS_SKEL_FLAME_B)==e)',
+                           '(WORD_AT(rbs_skels[i].state+RBS_SKEL_FLAME_A)==e)'),
+    'flames-any-scene': ('!(e=WORD_AT(g_esp+4u)) || WORD_AT(RBS_SCENE)!=100u)', '!(e=WORD_AT(g_esp+4u)))'),
+    'flames-first-only': ('    for(i=0;i<rbs_skelf.n && !k;i++)\n        if(rbs_skels[i].record', '    for(i=0;i<1u && !k;i++)\n        if(rbs_skels[i].record'),
+    'flames-uncounted': ('        if(!rbs_skelf.other_flames++) {', '        if(!rbs_skelf.other_flames) {'),
+    # a Sub-boss meter the bosses area drew: no second, stock one (after .68)
+    'meter-owned-ignored': ('&& bos_meter_owned(WORD_AT(g_esp+4u))) {', '&& 0) {'),
+    'meter-owned-any-caller': ('    if(MAPMAKER_STACK_OK(8) && WORD_AT(g_esp)==RBS_RET_METER && bos_meter_owned', '    if(MAPMAKER_STACK_OK(8) && bos_meter_owned'),
+    'meter-owned-after-real': ('#ifdef BOS_METER_OWNED', '#if 0'),
     'aim-not-normalised': ('    d[0]/=len;d[1]/=len;d[2]/=len;h/=len;', '    h/=len;'),
     'restart-when-off': ('    original();\n    if(!rbs_on()) return;\n    rbs.logged=0;', '    original();\n    rbs.logged=0;'),
     'restart-keeps-log': ('    if(!rbs_on()) return;\n    rbs.logged=0;\n', '    if(!rbs_on()) return;\n'),
@@ -1094,3 +1110,41 @@ def test_prometheus_rows_data():
     for other in ('pc_mapmaker_tank.inc', 'pc_mapmaker_mothership.inc', 'pc_mapmaker_robot.inc', 'pc_mapmaker_crowe.inc'):
         body = (ROOT / 'src/interface' / other).read_text(encoding='utf-8')
         assert '0x62u' not in body and '0x36u' not in body, other
+
+
+def test_fire_breath_and_throw_sites():
+    """After .68: the fire breath's flames (the ring at state +0, cursor +0x3E80,
+    count +0x3E84) are placed by the shape callback sub_00288BD0, which the
+    effect system calls as callback(emitter, out, default, index) and which reads
+    [0x0078B1EC] itself; the two emitters are the state's +0x3E8C/+0x3E90. The
+    throw's projectile 0x34 flies straight (no gravity in its update)."""
+    a = by_address()
+    rd = xbe_reader()
+    # the callback: no entity, the skeleton pointer, the ring count; out = its 2nd argument
+    assert mem(a[0x00288BF4])[0][4] == 0x0078B1EC and mem(a[0x00288BF9])[0][4] == 0x3E84
+    assert mem(a[0x00288C3D])[0][4] == 0x3E80 and mem(a[0x00288C54])[0][4] == 0x30   # [esp+0x30]: 2nd arg after 0x28
+    # registered once (sub_00378400), the emitters made into state +0x3E8C (sub_001D5E70)
+    assert ('imm', 0x00288BD0) in a[0x0029D3D0].ops and target(a[0x0029D3D5]) == 0x00378400
+    assert ('imm', 0x3E8C) in a[0x0029D3E3].ops and target(a[0x0029D3EA]) == 0x001D5E70
+    # the effect system: sub_003784F0(emitter, out, default) -> sub_00378480(id = emitter +0x13, emitter, ...)
+    assert mem(a[0x003784FD])[0][4] == 0x13 and target(a[0x00378504]) == 0x00378480
+    assert a[0x003784DF].text == 'dword ptr [eax + 4]'                 # callback(emitter, out, default, index)
+    # the second emitter handle follows the first (handle pointer + 4)
+    assert ('imm', 0x0076DCD0) in a[0x0037858B].ops and ('imm', 0x0076DB78) in a[0x00378631].ops
+    # the breath: sub_0028C640 each fight frame, states 3..5, both emitters' intensity
+    assert target(a[0x0029D056]) == 0x0028C640
+    assert ('imm', 3) in a[0x0028C6F4].ops and ('imm', 4) in a[0x0028C6F9].ops and ('imm', 5) in a[0x0028C6FE].ops
+    assert mem(a[0x0028C75A])[0][4] == 0x3E8C and mem(a[0x0028C785])[0][4] == 0x3E90
+    assert target(a[0x0028C79A]) == 0x00289120                         # burns players near a flame
+    # the head particles: texture 0x303 "firesmoke" (resource 0x004D2D50 + id*0x18, name +0xC)
+    assert ('imm', 0x303) in a[0x0029D0B8].ops and target(a[0x0029D0D8]) == 0x002A62F0
+    name = struct.unpack('<I', rd(0x004D2D50 + 0x303 * 0x18 + 0xC, 4))[0]
+    assert rd(name, 10) == b'firesmoke\x00'
+    # projectile 0x34: update sub_000E8AD0 (an effect only), move sub_000ED7C0 (dir x speed x dt)
+    entry = rd(0x004DEB28 + 0x34 * 0x40, 0x40)
+    assert struct.unpack_from('<2I', entry, 0x30) == (0x000E8AD0, 0x000ED7C0)
+    assert [target(i) for i in decoded() if i.function == 0x000E8AD0 and i.call] == [0x00111AE0]
+    # the meter's lift reads a model node as the fight's own hand point does
+    assert ('imm', 0x29) in a[0x0029CFB4].ops and ('imm', 0xC8) in a[0x0029CFBB].ops
+    assert mem(a[0x0029CFC3])[0][4] == 0xAC and mem(a[0x0029D024])[0][4] == 0x49
+    assert [mem(a[x])[0][4] for x in (0x00151EC1, 0x00151EC6, 0x00151ED7, 0x00151EE4)] == [0x24, 0x14, 4, 0x34]
