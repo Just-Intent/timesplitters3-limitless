@@ -566,6 +566,7 @@ INFERRED.
 ### Wrappers (area `sky`)
 
     WRAP sub_002FC680 -> pc_mapmaker_roof_mask
+    WRAP sub_002F8780 -> pc_mapmaker_roof_link
     WRAP sub_002FC470 -> pc_mapmaker_roof_reduced
     WRAP sub_00307FD0 -> pc_mapmaker_roof_piece_new
     WRAP sub_002FEBF0 -> pc_mapmaker_roof_reset
@@ -928,109 +929,71 @@ floor and ceiling all show; walk into a closed tile: its inside looks as
 before; repeat from inside a closed tile looking out across the field;
 bounded tiles still hide their walls; 2-4 player split screen; frame rate.
 
-### One-walled pieces next to open air (.73 report)
+### One-walled pieces and buildings across open air (.73-.75 reports)
 
-User report (golgotha map): "I can see the walls for corner pieces that are
-adjacent to unbounded tiles, but I cannot see the walls for the other
-one-walled pieces I placed."
+- .73: on golgotha, corner pieces next to open air showed their walls but
+  one-walled pieces did not. Diagnostics added (log only): tile id and
+  place on the bounded piece lines; `roof: room R drawn two-sided ...` with
+  tile, open/closed, mask, prop flags, masked-out nodes and the first 24
+  node masks (first 96 rooms); `openview: area A: closed room R ... by a
+  portal|its box` (first 96); `after 600 views, N of T rooms ... never drew
+  their geometry`. Ruled out: translucent passes (`sub_000865E0` culls 0,
+  `0x000865EE`) and mirrored props (`+0x28` 0x20000000 makes
+  `sub_0008F5E0` force 0x901; new props start 0x1161/0x1061, `0x000A6A7F`).
+- .74/.75: areas were joined only by open-to-open portals (golgotha: 3).
+  An area without the camera kept one-floor portal rectangles, so its
+  neighbours were scissored above their floors. Open rooms whose boxes
+  touch now join one area (`openview: N open-air rooms joined their area by
+  box`; mutations `no-box-join`, `box-join-closed-too`).
+- .75 "walls and floor now not showing from outside": a new structure
+  touching no open room was drawn one-sided (324 of 331 two-sided). On a
+  map with open air every room is now two-sided; the touched sets still
+  decide widening and depth (mutations `not-two-sided`,
+  `two-sided-open-only`, `two-sided-kept`).
+- The many `11 of 15 nodes masked out` lines are stacked tile 16 pieces:
+  their up/down connection points meet, so stock leaves them no floor or
+  ceiling between floors.
 
-What the .73 log shows (`logs/m73.err`, ignored): 321 pieces, 209 Open air
-(bounded), 0 unbounded; every room is in the open-view set and two-sided
-(`321 two-sided`), only 8 by box. Pattern per floor: 16 bounded pieces, then
-8 closed ones. The 64 bounded pieces that were logged are 3x3 tiles. Their
-masks have the three slot bits of exactly one side (0x007, 0x038, 0x1C0,
-0xE00: an edge) or of two sides (0x03F, 0x1F8, 0xFC0, 0xE07: a corner),
-and the draw hides those 3 or 6 of their 15 nodes. These are the closing
-walls on sides with no neighbour, which Open air (bounded) hides by design
-(invisible wall, collision kept). They are not a back-face problem: the
-open-view set and the two-sided draw already cover those rooms.
+### Closed tiles keep their walls toward open air (.77 report)
 
-Ruled out statically: translucent passes (the bucket reader `sub_000865E0`
-draws them with cull mode 0, `0x000865EE`), and the cull-none path (it works
-in pass 0; `sub_0008F5E0` forces 0x901 per node only for mirrored props,
-`+0x28` bit 0x20000000, scale -1 at `0x000A1602`).
+User: "Section 1 still not resolved, as I can't see walls that I ought to."
+The screenshot shows a closed box with two thin plates beside it, a floor
+and a ceiling, and no walls between them.
 
-Diagnostics added (log only): the tile id and place on the bounded piece
-lines; `roof: room R drawn two-sided ...` (the first 96 rooms per build:
-tile, open/closed, mask, prop flags, nodes masked out, the first 24 node
-masks `+0x5C`); `openview: area A: closed room R ... beside open room S ...
-by a portal|its box` (the first 96); `openview: after 600 views, N of T
-rooms ... never drew their geometry` and up to 24 `room R never drawn`
-lines.
+Cause (CONFIRMED in code): the neighbour mask `sub_002FC680` opens a side
+(clears its wall bit) when the neighbour has a connection point that meets
+it (`sub_002F8780` >= 0, `0x002FD17D`). Wall bits are set only where nothing
+connects (`0x002FD1F3..0x002FD20D`). Open-air pieces keep their stock
+connection points, so a closed tile beside them is "connected" on that side
+and has no wall there. The open-air tile has none either: bounded hides it,
+unbounded removes it. A closed tile with open air on every side therefore
+shows only its floor and ceiling. The plates are such a tile. They are not
+two bounded floors, because bounded tiles have no ceiling (the No roof mask).
+In m77 the build line reads `335 two-sided`, so culling is not involved; the
+per-room diagnostics stop after 96 rooms, so the plate's own line is not in
+the log.
 
-User clarification: "The one walled pieces are set to closed, but their
-walls should be visible beyond the 3x3 open air bounded pieces in front of
-them. Currently, the wall is invisible, and you just see the floor of the
-piece beyond."
+Fix: new `WRAP sub_002F8780 -> pc_mapmaker_roof_link`. While
+`pc_mapmaker_roof_mask` builds the mask of a closed piece (unmarked or No
+roof) with `TSFP_MAPMAKER_LIMITS=1` (any scene, so the scene-100 hand-over
+rebuild too), a side connection (types 1..4) whose neighbour is Open air
+(bounded or unbounded) answers -1 (`MAPMAKER_GUEST_RET`). Only calls from
+inside `sub_002FC680` (return address) count. The closed tile keeps that
+wall in the editor view, in the saved `+8` and so in play, drawn and solid.
+A stock game plays it the same. Unchanged: the open-air piece's own mask,
+two open-air pieces joining, closed or No roof neighbours, and up/down.
+Behaviour change: a closed tile can no longer be entered from an open-air
+tile through that side, and no link joins them there. That matches the
+"closed" choice; to walk in, make the side's neighbour a closed or No roof
+tile. Maps saved before this take the new walls at their next rebuild (Play
+from the editor, or saving); playing an old save from the menu uses its
+saved masks.
 
-Cause (INFERRED; the .74 logs above confirm or refute it). The open-view
-areas were joined only by portals between open rooms. The golgotha log has
-3 areas (`209 open-air rooms in 3 areas`): floors of open tiles stacked
-above each other, or joined only through closed tiles, have no open-to-open
-portal. Each area gives its touched rooms the union of its own visible
-rooms' rectangles. An area that does not hold the camera is seen only
-through the stock walk's portal rectangles, and those are one floor high.
-Every prop of a room is scissored to its rectangle (`sub_000862C0`). So a
-closed tile beyond that area kept its floor, which lies inside the portal
-rectangle, and lost its wall above it. The two-sided draw does not help
-with clipping.
+Cost: one flag test per neighbour test, and one per mask build. The
+neighbour test runs per connection point per piece in the editor's view and
+rebuilds. There is no per-frame play cost.
 
-Ruled out (decode of the neighbour mask `sub_002FC680`): coincident-wall
-hiding. A side wall bit is set only for a connection point (kind 0/1) whose
-neighbour cell (`sub_002F8140` side flag, `sub_002F8780` match) does not
-connect (`0x002FD137..0x002FD20D`). Kind 2/3 entries add bits
-unconditionally. Mirror tiles (catalogue `+0x12` bit 0) reflect the bits.
-Decoration bits come from catalogue `+0x108`. A side without connection
-points gets no bit, so a closed tile's solid wall is never removed by an
-open neighbour, and the bounded hide only affects bounded rooms. New room
-props start with `+0x28` = 0x1161/0x1061 (`0x000A6A7F`), not 0x20000000, so
-the mirrored per-node 0x901 is not set on room geometry.
-
-Fix: `mapmaker_openview_build` joins two open rooms into one area when their
-boxes touch (same 0.5 margin as the closed-room test), as well as by portal.
-The whole open structure then gets one rectangle, the whole viewport when
-the camera stands on it, and so does every closed room beside it. Log
-`openview: N open-air rooms joined their area by box (no open portal between
-them)`. Cost: at most open rooms x rooms box tests once per build; the draw
-covers more rooms (still depth-tested and culled per prop). Fixture: the
-island room 6, a floor up beside room 3, joins area 1; 0.6 away it does
-not. Mutations: `no-box-join`, `box-join-closed-too`.
-
-Playtest (.75): golgotha, from each floor's walkway look at the closed
-one-walled pieces beyond the bounded tiles, on the same floor and on floors
-above and below: walls show. The build line should read `in 1 area`, with a
-`joined their area by box` line.
-
-### Buildings across the field drawn one-sided (.75 report)
-
-User: "Walls and floor now not showing from outside." Seen from outside, a
-3x3 structure in the open area showed only its far wall and one side
-panel. Its near walls and floor were missing, so you looked into it.
-
-`logs/m75.err` (ignored): 331 pieces. The 10 new ones (rooms 322..331, tile
-8) form the structure, and the camera stood in two of them (327, 331). The
-build line reads `209 open-air rooms in 1 area; ... 324 two-sided` with
-`185 open-air rooms joined their area by box`, so the box join worked, and
-`0 of 324 ... never drew their geometry`. 331 - 324 = 7 rooms were not
-two-sided. Only rooms in an area's touched set were marked: open rooms and
-closed rooms beside one by portal or box. The structure's other tiles touch
-no open room, so the stock walk drew them one-sided. From outside, their
-near walls and their floor (seen from below) are back faces, which is
-exactly the screenshot. The box join did not cause it. It can only add
-rooms to the touched sets, never remove them, and these rooms touch no open
-room under either rule. The structure is new in .75 and was not on the .74
-map. The many `11 of 15 nodes masked out` lines are the closed tile 16 tower
-pieces. They are stacked tiles whose up/down connection points meet, so
-they have no floor or ceiling between floors (bits 24/25 clear), and they
-keep the walls of their unconnected sides. That is stock behaviour.
-
-Fix: on a map with open air (at least one area), every room is marked
-two-sided, not only the touched ones. From inside a closed room the extra
-back faces stay behind the front faces (depth test), so only overdraw is
-added. The touched sets still decide which rooms are widened and given a
-depth. Fixture: every room two-sided on such a map; mutations
-`not-two-sided`, `two-sided-open-only`, `two-sided-kept`.
-
-Playtest (.76): the same structure from outside, from every side and from
-above and below: all walls and the floor show. Inside it: no change. Also
-recheck the closed one-walled pieces beyond the bounded tiles (.75 box join).
+Fixture (`mapmaker_roof.c`): bounded/unbounded neighbour on any side, -1;
+up/down, another caller, the open-air piece's own mask, two open-air
+pieces, a No roof neighbour, limits off, outside a mask build: stock; No
+roof pieces keep their walls too; scene 100. Mutations `seal-*` (9).

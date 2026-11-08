@@ -211,6 +211,28 @@ static uint32_t format(uint32_t ret,uint32_t fmt,uint32_t number,uint32_t name)
     g_esp=ESP0;
     return printed;
 }
+/* sub_002FC680 whose neighbour test sub_002F8780(neighbour, x, z, y, type,
+ * length) runs from return address link_ret: the stock answer is 7 (a
+ * connection point index); the mask has the wall bit only without one. */
+static uint32_t link_neighbour,link_type,link_ret=0x002FD17Au;
+static int link_result;
+static void link_original(void) { g_eax=7u;g_esp+=4u; }
+static void mask_with_link(void)
+{
+    uint32_t save=g_esp;
+    g_esp=0x00630000u;WORD_AT(g_esp)=link_ret;WORD_AT(g_esp+4)=link_neighbour;WORD_AT(g_esp+0x14)=link_type;WORD_AT(g_esp+0x18)=1u;
+    pc_mapmaker_roof_link(link_original);
+    if(g_esp!=0x00630004u) esp_errors++;
+    link_result=(int32_t)g_eax;
+    g_esp=save;g_eax=link_result<0?0xFFFFFFFFu:0xFFFFFFF8u;g_esp+=4u;
+}
+static int linked(uint32_t p,uint32_t neighbour,uint32_t type,uint32_t ret)
+{
+    link_neighbour=neighbour;link_type=type;link_ret=ret;
+    hook(pc_mapmaker_roof_mask,mask_with_link,0x00300CA9u,p,0);
+    return link_result;
+}
+
 /* ---- play ---------------------------------------------------------------- */
 /* sub_0008A780: one 0x68-byte build entry per record (rooms +0x14, first room
  * +0x28, mask +0x44 = record +8), then sub_00085710(entry) in record order. */
@@ -463,6 +485,45 @@ int main(void)
               mapmaker_roof_mode(piece(64))==MAPMAKER_ROOF_OPEN_AIR && mapmaker_roof_mode(piece(60))==0 && mapmaker_roof_mode(piece(63))==0);
         CHECK(mapmaker_roof_records(C,count_record,NULL)==5);
     }
+
+    /* ---- a closed tile keeps its walls toward open-air tiles (.77) -------- */
+    hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+    WORD_AT(0x0079094Cu)=102u;
+    make_piece(90,16,0,0,0,0,0);make_piece(91,16,3,0,0,0,0);
+    mapmaker_roof_set(piece(91),MAPMAKER_ROOF_OPEN_BOUNDED);
+    CHECK(linked(piece(90),piece(91),1u,0x002FD17Au)==-1);          /* closed beside bounded: no connection */
+    CHECK(mapmaker_roof.sealed==1u);
+    CHECK(linked(piece(90),piece(91),4u,0x002FD656u)==-1);          /* any side */
+    mapmaker_roof_set(piece(91),MAPMAKER_ROOF_OPEN_AIR);
+    CHECK(linked(piece(90),piece(91),2u,0x002FD26Bu)==-1);          /* unbounded too */
+    CHECK(linked(piece(90),piece(91),5u,0x002FD656u)==7);           /* up/down: stock */
+    CHECK(linked(piece(90),piece(91),6u,0x002FD74Fu)==7);
+    CHECK(linked(piece(90),piece(91),1u,0x0030F809u)==7);           /* another caller */
+    CHECK(linked(piece(91),piece(90),1u,0x002FD17Au)==7);           /* the open-air piece's own mask: stock */
+    mapmaker_roof_set(piece(90),MAPMAKER_ROOF_OPEN_ROOF);
+    CHECK(linked(piece(90),piece(91),1u,0x002FD17Au)==-1);          /* No roof keeps its walls as well */
+    mapmaker_roof_set(piece(90),MAPMAKER_ROOF_OPEN_BOUNDED);
+    CHECK(linked(piece(90),piece(91),1u,0x002FD17Au)==7);           /* two open-air tiles join */
+    mapmaker_roof_set(piece(90),0);
+    mapmaker_roof_set(piece(91),MAPMAKER_ROOF_OPEN_ROOF);
+    CHECK(linked(piece(90),piece(91),1u,0x002FD17Au)==7);           /* a No roof neighbour has walls: stock */
+    mapmaker_roof_set(piece(91),0);
+    mapmaker_roof_set(piece(80),MAPMAKER_ROOF_OPEN_BOUNDED);       /* something marked elsewhere */
+    CHECK(linked(piece(90),piece(91),1u,0x002FD17Au)==7);           /* closed beside closed: stock */
+    mapmaker_roof_set(piece(91),MAPMAKER_ROOF_OPEN_BOUNDED);
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);
+    CHECK(linked(piece(90),piece(91),1u,0x002FD17Au)==7);           /* limits off: stock */
+    set_env("TSFP_MAPMAKER_LIMITS","1");
+    WORD_AT(0x0079094Cu)=100u;
+    CHECK(linked(piece(90),piece(91),1u,0x002FD17Au)==-1);          /* the hand-over rebuild in scene 100 too */
+    WORD_AT(0x0079094Cu)=102u;
+    {   /* outside a mask build: stock */
+        g_esp=0x00630000u;WORD_AT(g_esp)=0x002FD17Au;WORD_AT(g_esp+4)=piece(91);WORD_AT(g_esp+0x14)=1u;
+        pc_mapmaker_roof_link(link_original);
+        CHECK(g_eax==7u && g_esp==0x00630004u);
+        g_esp=ESP0;
+    }
+    mapmaker_roof_set(piece(80),0);mapmaker_roof_set(piece(91),0);
 
     /* ---- Open air (bounded) and (unbounded) in play ---------------------- */
     hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);

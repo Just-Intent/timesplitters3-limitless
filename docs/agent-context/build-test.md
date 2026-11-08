@@ -159,7 +159,7 @@ CI: `runtime-patches.yml` scopes runtime/launcher/Linux/issue/texture jobs.
 Only `PR validation` is required; `ci-pr-gate.py` fails closed. Launcher builds
 run once; standalone checks manual-only. Worker uses it Plan tests
 scope/gate/worker; hosts unchanged. Native Win45m/Mac30m; upgrades30m.
-MM restart/skelvis/aim/meter/bossroom+pitbone:-bosses;Disco/props/car+view/tank/creature+pose/portals+rays/roof/astar/*pad/roomlight/pit:test_mapmaker_<x>;tiles:limits,pad*.
+MM restart/skelvis/aim/meter/bossroom+pitbone:-bosses;Disco/props/car+view/tank/creature+pose/portals+rays/roof/astar/*pad/roomlight/pit:test_mapmaker_<x>;tiles:limits+pad*.
 
 `test_push_gather.py`: original-ref gathering, fresh bytes, failures,
 guard pages, large buffers and32-bit wrapping. Both CI hosts run it.
