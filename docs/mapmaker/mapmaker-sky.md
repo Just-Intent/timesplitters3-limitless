@@ -927,3 +927,52 @@ floor up; stand in the field and look at each from every side: walls,
 floor and ceiling all show; walk into a closed tile: its inside looks as
 before; repeat from inside a closed tile looking out across the field;
 bounded tiles still hide their walls; 2-4 player split screen; frame rate.
+
+### One-walled pieces next to open air (.73 report, open)
+
+User report (golgotha map): "I can see the walls for corner pieces that are
+adjacent to unbounded tiles, but I cannot see the walls for the other
+one-walled pieces I placed."
+
+What the .73 log shows (`logs/m73.err`, ignored): 321 pieces, 209 Open air
+(bounded), 0 unbounded; every room is in the open-view set and two-sided
+(`321 two-sided`), only 8 by box. Pattern per floor: 16 bounded pieces, then
+8 closed ones. The 64 bounded pieces that were logged are 3x3 tiles. Their
+masks have the three slot bits of exactly one side (0x007, 0x038, 0x1C0,
+0xE00: an edge) or of two sides (0x03F, 0x1F8, 0xFC0, 0xE07: a corner),
+and the draw hides those 3 or 6 of their 15 nodes. These are the closing
+walls on sides with no neighbour, which Open air (bounded) hides by design
+(invisible wall, collision kept). They are not a back-face problem: the
+open-view set and the two-sided draw already cover those rooms.
+
+What the log cannot show: the tile ids and node masks of the closed pieces
+and of the bounded pieces after the first 64, and which drawn rooms keep a
+wall node masked out. With no tile ids, it is not yet confirmed whether the
+"one-walled pieces" are bounded tiles whose single wall is hidden on
+purpose, or closed tiles whose wall node is masked out by their own saved
+mask. The catalogue does have 1x1 one-wall tiles (14 and 38: three side
+connection points) and 1x1 corners (1 and 37: two). Checked statically and
+ruled out:
+- Translucent passes: the bucket reader `sub_000865E0` already draws them
+  with cull mode 0 (`0x000865EE`).
+- The cull-none path: it works in pass 0 for every room geometry prop.
+  `sub_0008F5E0` forces 0x901 per node only for props with `+0x28` bit
+  0x20000000 (mirrored: scale -1 at `0x000A1602`); whether room props ever
+  have it is unknown, so the new log prints the prop flags.
+
+Diagnostics added (no behaviour change):
+- `roof: bounded piece K: rooms ... (mask M, tile T at x,z floor f
+  rotation r)`: the piece record's tile id and place.
+- `roof: room R drawn two-sided (seen across open air): tile ..., open|closed,
+  mask M, prop flags F, N of T nodes masked out; node masks ...`: the first
+  96 rooms per build, with the first 24 node masks (`+0x5C`). A wall that
+  stays invisible shows here as a node whose mask has no bit in M (or as
+  flag 0x20000000).
+- `openview: area A: closed room R (tile ..., mask M) beside open room S
+  (tile ...) by a portal|its box`: the first 96 per build.
+- `openview: after 600 views, N of T rooms drawn across open air never drew
+  their geometry` and up to 24 `room R never drawn (tile ..., depth now D)`
+  lines.
+
+Next playtest: the same map, look at a one-walled piece and a corner piece
+from the open area, then send `game.err`. Compare the two pieces' lines.
