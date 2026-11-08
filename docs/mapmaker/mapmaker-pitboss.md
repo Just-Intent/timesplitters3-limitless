@@ -299,6 +299,55 @@ Not verified: whether a mouth 11 up and 2.5 ahead matches the model on screen
 (INFERRED from the .66 bandage), the yaw sign for a turned boss, and whether
 the bottle at the mouth is hit outside the hull.
 
+## Playtest .73: a second, giant untextured bottle; ragbugs (fixed after .73)
+
+User report (.73): the bottle at the mouth works (hits logged, the skeleton
+dies with the explosion in its mouth), but "it actually appears both at the
+base of the skeleton very large and untextured, as well as the correct size
+and textured but floating near the head", and "Ragbugs still not spawning
+correctly". `m73.err`: hits and body hits; ragbug phases 0 -> 1 (state 6) ->
+3 -> 4 (state 4), one bug reached 5, none 6.
+
+Causes (CONFIRMED by the decode):
+- **The giant object at the base is the collision hull 0x249**
+  (`mansionboss_collision`, made at the boss's feet, posed by its slot 2). The
+  story never draws it: its slot-4 callback `sub_0028C540` calls
+  `sub_000942B0(instance, 8)` (instance +0x1F6 |= 8), and the prop draw
+  `sub_000A2740` skips such a prop (0x000A2829, 0x000A28C7). That slot is not
+  run in MapMaker play. The bossroom and bigdraw satellite passes never
+  included 0x249.
+- **Ragbugs rose at state 6**: the .62 release, which the story does not do.
+  Stock launches up to 3 parked bugs each time the fight passes state 10.
+- **Dives**: the rim pads now resolve. Layout C regular handles are 0..0x3FFF
+  (`MAPMAKER_POOL_PADS` 16384, cover base 0x4000; `pads.json` patches
+  `sub_0009A420`/`sub_0009A330`, ids up to 0x7BE8). The pit's indices
+  16384 - 13 x (n+1) are regular handles and the ids 0x4B5..0x4C1 are valid.
+  Phase 4 is the story's patrol: each bug flies from rim pad to rim pad
+  (about 5 over the floor, a ring of radius 10 to 12 round the boss). It
+  turns to 5 (dive) only when a player is within 5 squared (2.24 m, x/z) of
+  the bug (0x0028B1D1, players [0x007B0C48] + 0x1584 each), then strikes
+  (`sub_000BA700`). It explodes (6) only when its health is 1.0, which its
+  damage callback `sub_0028B5F0` sets: **a ragbug blows up when shot**, then
+  re-parks (6 -> 0, health 2) and returns at a later launch. In the catacombs
+  the player walks the rim the bugs patrol, so dives are frequent; on a
+  MapMaker floor a player must pass under the ring.
+
+Fixes:
+- The hull is hidden after every fight frame with the same
+  `sub_000942B0(instance, 8)`, once. It still takes the body hits
+  (`gas bottle hit through the body`). Log: `collision hull 0x249 hidden as
+  the story's slot 4 does`.
+- The early release is gone: story timing (state 10 launches only). Log:
+  `flock complete, N ragbugs parked; they rise at the fight's launches
+  (state 10)`.
+- The ragbug patrol, dive and explosion are left as in the story.
+
+What the player should see: the ragbugs stay under the floor through the
+intro. After the skeleton's first fire attack and raise, up to 3 rise
+around it, circle and patrol a ring about 10 out and 5 up. They dive at a
+player who comes under the ring, and they explode when shot. More rise at
+each later launch.
+
 ## Restart
 
 The restart keeps the Level heap (limitless-bosses.md), so the blocks are

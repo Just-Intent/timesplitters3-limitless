@@ -39,7 +39,7 @@ static int failures;
 static int near(float a,float b) { return a-b<0.002f && b-a<0.002f; }
 
 /* ---- the guest functions the area calls -------------------------------- */
-void sub_0028A0A0(void),sub_000A1B80(void);
+void sub_0028A0A0(void),sub_000A1B80(void),sub_000942B0(void);
 void sub_0029E0A0(void),sub_0028C560(void),sub_00287E00(void),sub_00287860(void),sub_0015DDA0(void),
     sub_00059DD0(void),sub_000A9070(void),sub_000622D0(void),sub_00062260(void),sub_000A5E40(void),
     sub_000631C0(void),sub_00096220(void);
@@ -55,6 +55,7 @@ void sub_000631C0(void) { g_ecx=18; }
 void sub_00096220(void) { g_ecx=19; }
 void sub_0028A0A0(void) { g_ecx=20; }
 void sub_000A1B80(void) { g_ecx=21; }
+void sub_000942B0(void) { g_ecx=22; }
 
 static uint32_t heap=HEAP0,mounted[8],removed[16],deleted[16],requested[8],textured[8];
 static unsigned nmounted,nremoved,ndeleted,nrequested,ntextured,nallocs,ninits,mount_calls;
@@ -62,7 +63,7 @@ static int anim_done,alloc_fails,mount_fail;
 static uint32_t next_block=BLOCKS;
 static unsigned launches;
 static int hold_intro;
-static unsigned poses;
+static unsigned poses,hides;
 static uint32_t pose_ent,pose_bits;
 static uint32_t launch_state;
 static float launch_cx;
@@ -118,6 +119,10 @@ static uint32_t guest_call(void (*f)(void),int n,...)
         CHECK(n==1);
         poses++;pose_ent=x[0];pose_bits=HALF_AT(x[0]+0x14u);
         HALF_AT(x[0]+0x14u)|=(uint16_t)(1u<<(WORD_AT(WORD_AT(0x007B0CC0u)+0x214u)&15u));
+    }
+    else if(f==sub_000942B0) {                         /* the slot-4 hide: instance +0x1F6 |= 8 */
+        CHECK(n==2 && x[1]==8u);
+        hides++;BYTE_AT(x[0]+0x1F6u)|=(uint8_t)x[1];
     }
     else CHECK(!"unexpected guest call");
     return r;
@@ -435,19 +440,21 @@ int main(void)
     CALL(pc_mapmaker_pitboss_ragbug,fake_ragbug,0x0027DEE3u,WORD_AT(b1),0);
     CHECK(originals==1 && pit_lv.bug[0].owner==1 && pit_lv.bug[0].slot==0 && near(bug_park,-12.73f+51.8f) && constants_stock());
     CALL(pc_mapmaker_pitboss_ragbug,fake_ragbug,0x0027DEE3u,WORD_AT(b2),0);
+    WORD_AT(WORD_AT(b2)+0x28u)=0xFFu;
+    hold_intro=1;CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);hold_intro=0;
+    CHECK(!pit_lv.k[0].released);                      /* b3 has not joined yet: the flock is not complete */
     CALL(pc_mapmaker_pitboss_ragbug,fake_ragbug,0x0027DEE3u,WORD_AT(b3),0);
     CHECK(pit_lv.bug[1].owner==0 && pit_lv.bug[2].owner==0 && pit_lv.bug[2].slot==1 && near(bug_park,-12.73f+15.8f));
-    WORD_AT(WORD_AT(b2)+0x28u)=0xFFu;
-    WORD_AT(st1+0x4BCCu)=0x00454000u;HALF_AT(0x00454000u+0x94u)=0x249u;   /* its collision hull */
+    WORD_AT(st1+0x4BCCu)=0x00454000u;HALF_AT(0x00454000u+0x94u)=0x249u;WORD_AT(0x00454000u+4u)=0x00455000u;   /* its collision hull */
     hold_intro=1;                                       /* still in its intro (state 1): the flock waits */
     CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
-    CHECK(launches==0u && !pit_lv.k[0].released);
+    CHECK(launches==0u && pit_lv.k[0].released);       /* every ragbug joined: noted, not launched */
+    CHECK(hides==1u && (BYTE_AT(0x00455000u+0x1F6u)&8u));   /* the hull hidden as the story's slot 4 does, once */
     hold_intro=0;
     CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
     CHECK(WORD_AT(st1+0x4A30u)==WORD_AT(b2) && WORD_AT(st1+0x4A74u)==WORD_AT(b3) && WORD_AT(WORD_AT(b2)+0x28u)==0xFEu);
-    /* the fight proper: the flock released together, with pit 1's block and arena; once */
-    CHECK(launches==2u && launch_state==st1 && near(launch_cx,11.8f-15.8f) && constants_stock());
-    CHECK(WORD_AT(st1+0x4A54u)==1u && WORD_AT(st1+0x4A98u)==1u && WORD_AT(st1+0x4270u)==0x00452000u && pit_lv.k[0].released);
+    /* the fight proper: no launch of ours (story timing: state 10 only), the hull stays hidden */
+    CHECK(launches==0u && WORD_AT(st1+0x4A54u)==0u && WORD_AT(st1+0x4270u)==0x00452000u && hides==1u && constants_stock());
     CHECK(BYTE_AT(0x00452000u+0x30u)==2u && WORD_AT(0x00452000u+0x38u)==12u && WORD_AT(0x00452000u+0x3Cu)==13u && WORD_AT(0x00452000u+0x34u)==12u);
     /* the bottle at the mouth: 11 over the feet, 2.5 ahead (yaw 0: +z), whatever the fight wrote; the hull has its callback */
     CHECK(near(FLOAT_AT(0x00452000u+0x64u),4.0f) && near(FLOAT_AT(0x00452000u+0x68u),13.0f) && near(FLOAT_AT(0x00452000u+0x6Cu),-3.5f));
@@ -480,7 +487,7 @@ int main(void)
     }
     WORD_AT(st1+0x4A30u)=0;                             /* the death removed it */
     CALL(pc_mapmaker_pitboss_princess,fake_plain,0x0027DDD8u,e1,0);
-    CHECK(WORD_AT(st1+0x4A30u)==0 && WORD_AT(st1+0x4A74u)==WORD_AT(b3) && launches==2u);
+    CHECK(WORD_AT(st1+0x4A30u)==0 && WORD_AT(st1+0x4A74u)==WORD_AT(b3) && launches==0u);
 
     /* ---- hud and meter --------------------------------------------------- */
     WORD_AT(0x00460000u+0xFF4u)=e1;
