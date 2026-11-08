@@ -17,7 +17,7 @@ MUTATIONS = {
     'guard-unbounded': ('mapmaker_memory.lines<MAPMAKER_MEMORY_LOG_LINES', 'mapmaker_memory.lines<1000u'),
     'guard-one-pool': ('    return heap<=1u?0:heap==2u?1:-1;', '    return heap<=2u?0:-1;'),
     'guard-wrong-heap-arg': ('    mapmaker_memory_guard(original,2u);', '    mapmaker_memory_guard(original,1u);'),
-    'guard-skips-original': ('    original();\n    mapmaker_memory_check(', '    mapmaker_memory_check('),
+    'guard-skips-original': ('    original();\n    if(heap_arg==2u) mapmaker_memory_use.aligned_depth--;', '    if(heap_arg==2u) mapmaker_memory_use.aligned_depth--;'),
     'arena-default-on': ('    if(!t || !*t) return 0;', '    if(!t || !*t) return 8;'),
     'arena-unbounded': ('v>MAPMAKER_ARENA_MAX_MB) {', 'v>1000u) {'),
     'arena-no-trial': ('} else if((trial=xbox_ContiguousAlloc(size,0x1000u))==0) {', '} else if((trial=0x80001000u)==0) {'),
