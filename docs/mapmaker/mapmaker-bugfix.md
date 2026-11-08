@@ -41,6 +41,9 @@ header are not read by either loader, so they are accepted.
 
   All tags are restored afterwards.
 
+  Just before that, the same hook logs the [map report](mapmaker-report.md)
+  (`src/interface/pc_mapmaker_report.inc`), which skips the hidden chunks too.
+
 ## WRAP lines
 
     WRAP sub_00352DF0 -> pc_mapmaker_bugfix_net_fragment
