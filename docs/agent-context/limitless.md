@@ -312,7 +312,7 @@ Campaign story, Arcade Custom, challenges, System Link (modes 11..13):
 unchanged. The gate stays 0 if the hooks do not run, so `story` must not be
 switched off by `TSFP_MAPMAKER_AREA_OFF`. Tests:
 `tests/mapmaker/test_mapmaker_story_character.py`; notes mapmaker-story-character.md.
-Assets/creatures/SK8 sight, SD/7 bot: mapmaker-story-assets, limitless-bosses
+Assets/creatures/SK8 body-sight+pose: mapmaker-story-assets, limitless-bosses
 
 Story AI groups (`src/interface/pc_mapmaker_aitemplates.inc`, `docs/mapmaker/mapmaker-aitemplates.md`,
 `TSFP_MAPMAKER_LIMITS=1`): the Story AI edit screen (`sub_0031CB90`, list path

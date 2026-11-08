@@ -243,7 +243,13 @@ static int crt_look_ready(uint32_t look)
  * pose's end (squared distance at its start, frames, frames without sight,
  * fire events 0x200 seen, muzzle tests and hits: a pose "launched" when it
  * had a muzzle test without a hit) and, once per robot, what the first
- * blocked sight rays hit. */
+ * blocked sight rays hit.
+ * After .75 (60 of 64 sight rays hit a type-8 object: "repeating firing
+ * animation continuously"): sub_0025FB70 hides only the AI's entity from its
+ * ray (bits 0x60 of +0x28); a character met within CRT_BODY_R of the robot
+ * (its own body or a part) is passed through by repeating the ray with that
+ * object's collidable bit cleared, and the pose hook below shows non-firing
+ * poses while the robot cannot see its target. */
 #define CRT_RB_MAX 16u
 #define CRT_SLOT_WORD2 0x007DE664u      /* second slot word per anim slot: 0x100000 = a fire pose */
 #define CRT_FIRE_POSE 0x100000u
@@ -260,7 +266,7 @@ extern void sub_0015E120(void),sub_00061570(void);
 static struct {
     uint32_t cur, seeing;                /* the AI inside sub_002B8F90 / sub_0025FB70 now (0 none) */
     struct { uint32_t ai; unsigned pose, frames, blind, events, tests, hits, launched, declined, logged;
-             unsigned rays, clear, player, other, told; float dist2; } r[CRT_RB_MAX];
+             unsigned rays, clear, player, other, told, body, hold; float dist2; } r[CRT_RB_MAX];
     unsigned n;
 } crt_rb;
 static unsigned crt_rb_of(uint32_t ai)
@@ -333,6 +339,18 @@ void pc_mapmaker_creatures_robot_sight(void (*original)(void))
     original();
     crt_rb.seeing=0;
 }
+#define CRT_COLLIDES 0x20u            /* object +0x28: the ray tests it (0x000A35F4, 0x000A7B67) */
+#define CRT_BODY_R 2.5f               /* a character hit nearer than this (x/z) to the robot is its own body */
+#define CRT_BODY_MAX 3u
+#define CRT_TYPE_CHARACTER 8u
+static int crt_rb_body(uint32_t obj,uint32_t ent)
+{
+    float dx,dz;
+    if(!MAPMAKER_PTR_OK(obj,0x70u) || !MAPMAKER_PTR_OK(ent,0x70u) || WORD_AT(obj+0x20u)!=CRT_TYPE_CHARACTER ||
+       !(WORD_AT(obj+0x28u)&CRT_COLLIDES)) return 0;
+    dx=crt_getf(obj+0x64u)-crt_getf(ent+0x64u);dz=crt_getf(obj+0x6Cu)-crt_getf(ent+0x6Cu);
+    return dx*dx+dz*dz<CRT_BODY_R*CRT_BODY_R;
+}
 /* Is this entity a player's (the first pool slots)? */
 static int crt_rb_player(uint32_t ent)
 {
@@ -352,7 +370,28 @@ void pc_mapmaker_creatures_robot_muzzle(void (*original)(void))
         return;
     }
     if(ret!=CRT_RET_SIGHT || !crt_rb.seeing) { original();return; }
-    original();
+    {   /* the sight ray starts at the robot's eye, inside its tall body: a
+         * character hit within CRT_BODY_R of the robot (its own body/parts,
+         * .75 log: 60 of 64 rays hit a type-8 object) is passed through, its
+         * collidable bit 0x20 (the ray test, 0x000A35F4) cleared for a repeat
+         * of the same ray, as sub_0025FB70 clears it on the AI's own entity */
+        uint32_t sp=g_esp,ent=WORD_AT(crt_rb.seeing),skip[CRT_BODY_MAX]={0},keep[CRT_BODY_MAX]={0};
+        unsigned ns=0;
+        original();
+        while(g_eax && ns<CRT_BODY_MAX && !crt_rb_player(g_eax) && crt_rb_body(g_eax,ent)) {
+            skip[ns]=g_eax;keep[ns]=WORD_AT(g_eax+0x28u);
+            WORD_AT(g_eax+0x28u)=keep[ns]&~CRT_COLLIDES;
+            ns++;
+            g_esp=sp;
+            original();
+        }
+        while(ns) { ns--;WORD_AT(skip[ns]+0x28u)=keep[ns]; }
+        if((i=crt_rb_of(crt_rb.seeing))<CRT_RB_MAX && skip[0] && !crt_rb.r[i].body++) {
+            fprintf(stderr,"[mapmaker] creatures: %s #%u: sight ray passes through a character at its own body (0x%X, own entity %s)\n",
+                    crt_kinds[crt_rb_kind(crt_rb.seeing)].label,i+1u,(unsigned)skip[0],skip[0]==ent?"yes":"no");
+            fflush(stderr);
+        }
+    }
     if((i=crt_rb_of(crt_rb.seeing))>=CRT_RB_MAX) return;
     crt_rb.r[i].rays++;
     if(!g_eax) crt_rb.r[i].clear++;
@@ -366,6 +405,42 @@ void pc_mapmaker_creatures_robot_muzzle(void (*original)(void))
                 crt_rb.r[i].player,crt_rb.r[i].other,(unsigned)g_eax,MAPMAKER_PTR_OK(g_eax,0x24u)?(int)WORD_AT(g_eax+0x20u):-1,
                 crt_rb.r[i].clear,MAPMAKER_PTR_OK(ent,0x1B0u)?(double)crt_getf(ent+0x68u):0.0,
                 (double)crt_getf(crt_rb.seeing+0xBB8u),MAPMAKER_PTR_OK(ent,0x1B0u)?(double)crt_getf(ent+0x1ACu):0.0);
+        fflush(stderr);
+    }
+}
+
+/* WRAP sub_00283730 (cdecl actor: the class-4 robot handler, per robot frame).
+ * Its state 3 walks with the advance-fire pose at any distance and states 1/2
+ * hold the fire-still pose (.75: "repeating firing animation continuously,
+ * even when not firing"). While the robot cannot see its target (the weapon
+ * code's own test, sub_0015E120(ai, 0)), its type row in the pose table
+ * 0x00520838 + type*0x20 holds the non-firing poses for this call only:
+ * advance-fire 0x9A7 -> advance 0x9A6 (+8/+0xC), fire still 0x9A5 -> attack
+ * idle 0x99E (+0x1C). The handler's "is it playing" tests read the same row,
+ * so its states stay consistent; the row is put back after. */
+#define CRT_POSES 0x00520838u
+#define CRT_POSE_ROW 0x20u
+#define CRT_ROCKET_TYPE 2u              /* sub_00283730 0x002837C8..0x002837D5: 0x34 -> 0, 0x62 -> 2, else 1 */
+#define CRT_ADV_FIRE 0x9A7u
+#define CRT_ADV 0x9A6u
+#define CRT_FIRE_STILL 0x9A5u
+#define CRT_ATTACK_IDLE 0x99Eu
+void pc_mapmaker_creatures_robot_pose(void (*original)(void))
+{
+    uint32_t ent,ai,row=CRT_POSES+CRT_ROCKET_TYPE*CRT_POSE_ROW,keep[8];
+    unsigned k,i;
+    if(!MAPMAKER_STACK_OK(8) || !MAPMAKER_PTR_OK(ent=WORD_AT(g_esp+4u),0x100u) ||
+       (k=crt_rb_kind(ai=WORD_AT(ent+0x7Cu)))>=CRT_KINDS || !crt_play() || crt.optout ||
+       guest_call(sub_0015E120,2,ai,0u)) { original();return; }
+    memcpy(keep,(const void *)((uintptr_t)row+g_xbox_mem_offset),sizeof keep);
+    if(keep[2]==CRT_ADV_FIRE) WORD_AT(row+8u)=CRT_ADV;
+    if(keep[3]==CRT_ADV_FIRE) WORD_AT(row+0xCu)=CRT_ADV;
+    if(keep[7]==CRT_FIRE_STILL) WORD_AT(row+0x1Cu)=CRT_ATTACK_IDLE;
+    original();
+    memcpy((void *)((uintptr_t)row+g_xbox_mem_offset),keep,sizeof keep);
+    if((i=crt_rb_of(ai))<CRT_RB_MAX && !crt_rb.r[i].hold++) {
+        fprintf(stderr,"[mapmaker] creatures: %s #%u: no sight of its target: poses without firing (advance 0x%X, idle 0x%X)\n",
+                crt_kinds[k].label,i+1u,CRT_ADV,CRT_ATTACK_IDLE);
         fflush(stderr);
     }
 }
