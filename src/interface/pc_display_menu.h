@@ -101,6 +101,8 @@ void pc_mapmaker_pads_editor_item_pads(void (*original)(void));
 void pc_mapmaker_pads_group_matrix(void (*original)(void));
 void pc_mapmaker_pads_group_distance(void (*original)(void));
 void pc_mapmaker_pads_group_route(void (*original)(void));
+void pc_mapmaker_pads_nearest(void (*original)(void));
+void pc_mapmaker_pads_random(void (*original)(void));
 void pc_mapmaker_pads_stitch(void (*original)(void));
 void pc_mapmaker_pads_group_node(void (*original)(void));
 void pc_mapmaker_pads_pad_node(void (*original)(void));
