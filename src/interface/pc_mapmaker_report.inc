@@ -163,6 +163,24 @@ static struct {
     uint32_t areas;
 } mapmaker_report;
 
+/* The editor raises the category maxima only while it runs (pc_mapmaker_limits.inc
+ * mapmaker_categories); in play the table holds stock values again, so with the
+ * limits on a category is measured against the raised value the editor allowed. */
+#ifndef MAPMAKER_REPORT_RAISED
+#ifdef MAPMAKER_LIMIT_PIECES
+static uint32_t mapmaker_report_raised(uint32_t address,uint32_t max)
+{
+    size_t k;
+    for(k=0;k<sizeof mapmaker_categories/sizeof mapmaker_categories[0];k++)
+        if(mapmaker_categories[k].address==address && mapmaker_categories[k].raised>max) return mapmaker_categories[k].raised;
+    return max;
+}
+#define MAPMAKER_REPORT_RAISED(a,max) mapmaker_report_raised((a),(max))
+#else
+#define MAPMAKER_REPORT_RAISED(a,max) (max)
+#endif
+#endif
+
 /* Category names (docs/mapmaker/mapmaker-restable.md, pc_mapmaker_limits.inc). */
 static const char *const mapmaker_report_names[MAPMAKER_REPORT_CATEGORIES]={
     [8]="weapons",[9]="ammo",[10]="red keycards",[11]="blue keycards",[12]="yellow keycards",[13]="green keycards",
@@ -535,6 +553,7 @@ static void mapmaker_report_level(uint32_t container,uint32_t span,unsigned hidd
             if(!mapmaker_report.category[i] || !MAPMAKER_PTR_OK(a,4u)) continue;
             max=WORD_AT(a);
             if(!max || max>0x10000u) continue;
+            if(on) max=MAPMAKER_REPORT_RAISED(a,max);
             if(mapmaker_report_names[i]) snprintf(what,sizeof what,"%s",mapmaker_report_names[i]);
             else snprintf(what,sizeof what,"category %u items",i);
             mapmaker_report_cap(what,mapmaker_report.category[i],max,nearby,sizeof nearby);
@@ -573,8 +592,8 @@ static void mapmaker_report_level(uint32_t container,uint32_t span,unsigned hidd
                                         a->index+1u,a->tile+1u,b->index+1u,b->tile+1u,b->x,b->z,b->floor);
         }
         if(overlaps && mapmaker_report.overlap)
-            mapmaker_report_problem(1,"%u tile%s share a grid cell with another (OVERLAP is on; overlaps can open sky windows or cut AI paths)",
-                                    overlaps,overlaps==1u?"":"s");
+            mapmaker_report_problem(1,"%u tile%s share%s a grid cell with another (OVERLAP is on; overlaps can open sky windows or cut AI paths)",
+                                    overlaps,overlaps==1u?"":"s",overlaps==1u?"s":"");
     }
 
     /* print */

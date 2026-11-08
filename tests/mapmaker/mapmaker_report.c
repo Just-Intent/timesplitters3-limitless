@@ -29,6 +29,9 @@ static uint32_t guest_call(void (*f)(void),int n,...)
     va_end(a);
     return f==sub_00333700?pads_a(x):f==sub_002FDF50?pads_b(x):0u;
 }
+/* Raised category maxima as pc_mapmaker_limits.inc gives them (weapons 32 -> 128). */
+static uint32_t fixture_raised(uint32_t a,uint32_t max){return a==0x00524CA4u && max<128u?128u:max;}
+#define MAPMAKER_REPORT_RAISED(a,max) fixture_raised((a),(max))
 #include "pc_mapmaker_report.inc"
 #include "pc_mapmaker_validate.inc"
 
@@ -301,7 +304,7 @@ int main(void)
     m=def();m.dup_a=3;m.dup_b=9;run(&m,&n);
     EXPECT("problem: tiles #4 (tile 4) and #10 (tile 10) are both at grid 3,0 floor 0 (overlap)");
     putenv("TSFP_MAPMAKER_OVERLAP=1");run(&m,&n);
-    EXPECT("possible problem: 1 tile share a grid cell");REFUSE("(overlap)");
+    EXPECT("possible problem: 1 tile shares a grid cell");REFUSE("(overlap)");
     putenv("TSFP_MAPMAKER_OVERLAP=0");
     m=def();m.pieces=48;run(&m,&n);EXPECT("no problems found");   /* rows: same x, other z */
     m=def();m.dup_a=7;m.dup_b=9;run(&m,&n);EXPECT("no problems found");   /* same cell, other floor */
@@ -320,6 +323,12 @@ int main(void)
     WORD_AT(0x00524BE0u+35u*24u+4u)=4u;run(&m,&n);EXPECT("problem: vehicles 8 is over the cap of 4");
     WORD_AT(0x00524BE0u+35u*24u+4u)=9u;run(&m,&n);REFUSE("near limit");
     REFUSE("vehicles 8 is over");WORD_AT(0x00524BE0u+35u*24u+4u)=32u;
+    /* weapons (category 8): the table holds a stock value in play; with LIMITS the
+     * raised maximum the editor allowed applies (fixture_raised: up to 128) */
+    m=def();m.nitems=8;for(i=0;i<8u;i++) m.items[i]=0x11;WORD_AT(0x00524CA4u)=4u;
+    run(&m,&n);EXPECT("problem: weapons 8 is over the cap of 4");
+    putenv("TSFP_MAPMAKER_LIMITS=1");run(&m,&n);REFUSE("weapons 8 is over");REFUSE("near limit: weapons");
+    putenv("TSFP_MAPMAKER_LIMITS=0");WORD_AT(0x00524CA4u)=32u;
     n=ndef();n.pads=15000;m=def();run(&m,&n);EXPECT("near limit: pads 15000/16384 (91%)");
 
     /* level memory */
