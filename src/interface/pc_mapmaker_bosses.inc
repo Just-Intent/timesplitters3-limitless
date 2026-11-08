@@ -215,6 +215,7 @@ static struct {
     uint8_t sub[BOS_CAP];               /* 1: Sub-boss bar (only with a level) */
     uint16_t colour[BOS_CAP];
     uint32_t text;                      /* guest: BOS_TEXTS labels of 32 B */
+    uint32_t standin;                   /* guest: the meter's stand-in actor (bos_standin) */
     unsigned logged, dropped, bad_flags, bad_extra;
 } bos;
 
@@ -231,6 +232,8 @@ static struct {
     float range2;
     struct { uint32_t ent; unsigned why; } note[BOS_NOTES];   /* bar reasons logged this level */
     unsigned notes;
+    uint32_t meter_log[BOS_NOTES];      /* Sub-boss meters logged this level */
+    unsigned meter_logs;
 } bos_play;
 
 static void bos_log(const char *what,unsigned a,unsigned b)
@@ -812,11 +815,129 @@ void pc_mapmaker_bosses_hud(void (*original)(void))
  * thing, no state set before it) this draws the same meter for each living
  * Sub-boss AI without a record; one with a record is left to the stock loop.
  * sub_0013A400 only draws (cdecl, plain ret; reads actor +0xC68 fade, entity
- * +0x10 visibility, +0x64..+0x6C, [entity+4] +0x8C/+0x10 node matrices). */
+ * +0x10 visibility, +0x64..+0x6C, [entity+4] +0x8C/+0x10 node matrices).
+ *
+ * Every boss type (stabilization list after v0.4.0-mapmaker.68: "Ensure
+ * that sub-boss health bar actually appears above each boss type when
+ * selected. Right now, it only appears above the giant trophy monster").
+ * CONFIRMED (decode 0x0013A661..0x0013A7E3): the meter's x/z are the
+ * entity's origin, its height is the y of ONE pose matrix, [inst+0x10] +
+ * [[inst+0x8C]+0x18]*64 +0x34, plus entity +0x68, 0.4..0.6 over it. That
+ * matrix is a body part picked by the skeleton header; on the trophy monster
+ * it is on its back, on the other giant bosses it is inside the model at its
+ * centre line (INFERRED from the report: no meter seen), so the depth test
+ * hides the meter. Several bosses also never reach a meter at all: the
+ * Khallos chair holds the rider's health (bos_bar_proxy), the tank and the
+ * mothership replace their AI with a prop (bos_bar_extra). Now:
+ * - the lift: the model's top is the highest corner of every node's box
+ *   (node i at [inst+4] - n*0xC8 + i*0xC8, n = [[inst+4]], box +0xAC: min,
+ *   max; matrix byte +0x49, sub_00151E80's y row: +0x04/+0x14/+0x24/+0x34,
+ *   the mansion fight's own hand point 0x0029CFA4..0x0029D045). For the
+ *   draw the entity's +0x68 is raised so the meter's lowest edge is
+ *   BOS_METER_CLEAR over that top (never lowered), and put back exactly.
+ * - a Sub-boss AI with a record (the real story bosses, the split Crowe, the
+ *   pit skeleton) is drawn here too and listed (bos_meter_owned): the
+ *   realbosses meter hook, the innermost layer of the stock loop's call,
+ *   skips the stock draw of a listed actor, so there is one meter.
+ * - a proxied AI (Khallos) and the props of bos_bar_extra get the meter on
+ *   the entity that holds their health, with a stand-in actor (heap: +0 the
+ *   entity, +0xC68 fade block zero = fade 1, sub_0011F780).
+ * One line per entity and level: `Sub-boss meter of NAME (entity E, model
+ * M): top T, stock meter at P, lifted L`. */
+#define BOS_METER_NODE 0xC8u            /* model node stride, nodes before the header [inst+4] (sub_0008F5E0) */
+#define BOS_METER_NODES 512u
+#define BOS_METER_MATRIX 0x49u          /* node: signed byte, its pose matrix (0x0029D024) */
+#define BOS_METER_BOX 0xACu             /* node: -> min x/y/z, max x/y/z (0x0029CFC3) */
+#define BOS_METER_PART 0x18u            /* [inst+0x8C]+0x18: the matrix the stock meter stands on (0x0013A68E) */
+#define BOS_METER_LOW 0.4f              /* the meter's lowest edge over it: [0x00475CC8] 0.6 - [0x004785E4] 0.2 */
+#define BOS_METER_CLEAR 0.3f            /* our lowest edge over the model's top */
+#define BOS_METER_LIFT_MAX 60.0f
+#define BOS_ACTOR_FADE 0xC68u           /* actor: fade block read by sub_0011F780 (0x0013A429) */
+#define BOS_STANDIN_SIZE 0xCA0u
+#define BOS_METER_OWNED 1               /* realbosses: skip the stock draw of a listed actor */
+static struct { uint32_t actor[BOS_LIST_MAX]; unsigned n; int live; } bos_meter_own;
+static int bos_meter_owned(uint32_t a)
+{
+    unsigned k;
+    if(!bos_meter_own.live) return 0;
+    for(k=0;k<bos_meter_own.n;k++) if(bos_meter_own.actor[k]==a) return 1;
+    return 0;
+}
+static int bos_sane(float f) { return f>-1000.0f && f<1000.0f; }
+/* The model's top and the stock meter's matrix y, both over the entity's +0x68. */
+static int bos_meter_top(uint32_t inst,float *top,float *part)
+{
+    uint32_t hdr=WORD_AT(inst+4u),mats=WORD_AT(inst+0x10u),skel=WORD_AT(inst+0x8Cu),n,first,i,idx;
+    float best;
+    if(!MAPMAKER_PTR_OK(hdr,4u) || (n=WORD_AT(hdr))==0 || n>BOS_METER_NODES || !MAPMAKER_PTR_OK(first=hdr-n*BOS_METER_NODE,n*BOS_METER_NODE) ||
+       !MAPMAKER_PTR_OK(skel,BOS_METER_PART+4u) || (idx=WORD_AT(skel+BOS_METER_PART))>=BOS_METER_NODES ||
+       !MAPMAKER_PTR_OK(mats+idx*0x40u,0x40u) || !bos_sane(*part=bos_getf(mats+idx*0x40u+0x34u))) return 0;
+    best=*part;
+    for(i=0;i<n;i++) {
+        uint32_t node=first+i*BOS_METER_NODE,m,box;
+        int8_t mi=(int8_t)BOS_B(node+BOS_METER_MATRIX);
+        unsigned ax;
+        float y;
+        if(mi<0 || (uint32_t)mi>=n || !MAPMAKER_PTR_OK(m=mats+(uint32_t)mi*0x40u,0x40u)) continue;
+        y=bos_getf(m+0x34u);
+        if(MAPMAKER_PTR_OK(box=WORD_AT(node+BOS_METER_BOX),0x18u))
+            for(ax=0;ax<3u;ax++) {
+                float c=bos_getf(m+4u+ax*0x10u),lo=bos_getf(box+ax*4u)*c,hi=bos_getf(box+0xCu+ax*4u)*c;
+                y+=lo>hi?lo:hi;
+            }
+        if(bos_sane(y) && y>best) best=y;
+    }
+    *top=best;
+    return 1;
+}
+/* One meter over entity ent (actor a: the AI's own, or the stand-in). */
+static int bos_meter_draw(uint32_t a,uint32_t ent,uint32_t s,GuestRegisters *r)
+{
+    uint32_t inst=WORD_AT(ent+BOS_ENT_INST),y0;
+    float top=0.0f,part=0.0f,lift=0.0f;
+    unsigned k;
+    if(!MAPMAKER_PTR_OK(inst,0x90u) || !MAPMAKER_PTR_OK(WORD_AT(inst+0x8Cu),0x1Cu) || !MAPMAKER_PTR_OK(WORD_AT(inst+0x10u),0x40u)) return 0;
+    if(bos_meter_top(inst,&top,&part)) {
+        lift=top+BOS_METER_CLEAR-(part+BOS_METER_LOW);
+        if(!(lift>0.0f)) lift=0.0f;
+        if(lift>BOS_METER_LIFT_MAX) lift=BOS_METER_LIFT_MAX;
+    }
+    y0=WORD_AT(ent+BOS_ENT_POS+4u);
+    bos_setf(ent+BOS_ENT_POS+4u,bos_getf(ent+BOS_ENT_POS+4u)+lift);
+    guest_call(sub_0013A400,4,a,0u,0x7Fu,0x6Eu);
+    WORD_AT(ent+BOS_ENT_POS+4u)=y0;                    /* exactly back */
+    restore_registers(r);
+    bos_play.meters++;
+    for(k=0;k<bos_play.meter_logs && bos_play.meter_log[k]!=ent;k++) {}
+    if(k==bos_play.meter_logs && k<BOS_NOTES) {
+        bos_play.meter_log[bos_play.meter_logs++]=ent;
+        fprintf(stderr,"[mapmaker] story AI bosses: Sub-boss meter of %s (entity 0x%X, model 0x%X): top %.2f, stock meter at %.2f, lifted %.2f\n",
+                s<BOS_LEVEL_SLOTS && bos_play.name[s][0]?bos_play.name[s]:"an unnamed Story AI",(unsigned)ent,
+                (unsigned)bos_get16(ent+BOS_ENT_MODEL),(double)top,(double)part,(double)lift);
+        fflush(stderr);
+    }
+    return 1;
+}
+/* The stand-in actor for an entity that is not an AI's own (zeroed: fade 1). */
+static uint32_t bos_standin(uint32_t ent)
+{
+    if(!bos.standin) bos.standin=xbox_HeapAlloc(BOS_STANDIN_SIZE,16u);
+    if(!bos.standin || !MAPMAKER_PTR_OK(bos.standin,BOS_STANDIN_SIZE)) { bos.standin=0;return 0; }
+    memset((void *)((uintptr_t)bos.standin+g_xbox_mem_offset),0,BOS_STANDIN_SIZE);
+    WORD_AT(bos.standin)=ent;
+    return bos.standin;
+}
+static int bos_meter_alive(uint32_t ent,uint32_t pe)
+{
+    return ent!=pe && MAPMAKER_PTR_OK(ent,BOS_ENT_RECORD+4u) &&
+           bos_getf(ent+BOS_ENT_HEALTH)>0.0f && bos_getf(ent+BOS_ENT_MAX)>0.0f;
+}
 void pc_mapmaker_bosses_meters(void (*original)(void))
 {
-    uint32_t player,pe,count,humans,i;
+    uint32_t player,pe,count,humans,i,p,sa;
+    unsigned f,k;
     GuestRegisters r;
+    bos_meter_own.live=0;bos_meter_own.n=0;
     if(!bos_play.subs || !mapmaker_limits.limits || WORD_AT(BOS_SCENE)!=100u || BOS_B(BOS_MODE)!=10u
        || !MAPMAKER_STACK_OK(0x400)) { original();return; }
     player=WORD_AT(BOS_PLAYER);
@@ -826,18 +947,26 @@ void pc_mapmaker_bosses_meters(void (*original)(void))
     if(count>BOS_LIST_MAX) count=BOS_LIST_MAX;
     save_registers(&r);
     for(i=humans<count?humans:count;i<count;i++) {
-        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec),inst;
+        uint32_t a=WORD_AT(BOS_LIST+i*4u),ent=0,rec=0,s=bos_actor(a,&ent,&rec);
         if(s>=BOS_LEVEL_SLOTS || !bos_play.level[s] || !bos_play.sub[s]) continue;
-        if(ent==pe || !MAPMAKER_PTR_OK(ent,BOS_ENT_RECORD+4u) || WORD_AT(ent+BOS_ENT_RECORD)) continue;
-        if(!(bos_getf(ent+BOS_ENT_HEALTH)>0.0f) || !(bos_getf(ent+BOS_ENT_MAX)>0.0f)) continue;
-        inst=WORD_AT(ent+BOS_ENT_INST);
-        if(!MAPMAKER_PTR_OK(inst,0x90u) || !MAPMAKER_PTR_OK(WORD_AT(inst+0x8Cu),0x1Cu) || !MAPMAKER_PTR_OK(WORD_AT(inst+0x10u),0x40u)) continue;
-        guest_call(sub_0013A400,4,a,0u,0x7Fu,0x6Eu);
-        restore_registers(&r);
-        bos_play.meters++;
+        if(bos_bar_proxy && (p=bos_bar_proxy(ent))!=0 && p!=ent) {   /* a Khallos rider: his chair's health */
+            if(bos_meter_alive(p,pe) && (sa=bos_standin(p))!=0) bos_meter_draw(sa,p,s,&r);
+            continue;
+        }
+        if(!bos_meter_alive(ent,pe)) continue;
+        if(bos_meter_draw(a,ent,s,&r) && WORD_AT(ent+BOS_ENT_RECORD) && bos_meter_own.n<BOS_LIST_MAX)
+            bos_meter_own.actor[bos_meter_own.n++]=a;  /* the stock loop would draw it too */
     }
-    restore_registers(&r);
+    for(f=0;f<BOS_EXTRA_AREAS;f++)                     /* Boss AIs replaced by props */
+        for(k=0;bos_bar_extra[f] && k<BOS_EXTRA_MAX;k++) {
+            uint32_t ent=0,id=0,s;
+            if(!bos_bar_extra[f](k,&ent,&id)) break;
+            if((s=bos_slot(id))>=BOS_LEVEL_SLOTS || !bos_play.level[s] || !bos_play.sub[s] || !bos_meter_alive(ent,pe)) continue;
+            if((sa=bos_standin(ent))!=0) bos_meter_draw(sa,ent,s,&r);
+        }
+    bos_meter_own.live=1;                              /* (each draw put the registers back) */
     original();
+    bos_meter_own.live=0;
 }
 
 /* ---- creature probe (read-only) ------------------------------------------ */
