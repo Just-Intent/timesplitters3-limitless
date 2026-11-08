@@ -1106,9 +1106,9 @@ void pc_mapmaker_vehicles_textures(void (*original)(void)) { original(); }
 void pc_mapmaker_vehicles_preload_model(void (*original)(void)) { original(); }
 void pc_mapmaker_vehicles_def(void (*original)(void)) { original(); }
 void pc_mapmaker_vehicles_create(void (*original)(void)) { original(); }
+void pc_mapmaker_creatures_robot_sight(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_robot_weapon(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_robot_muzzle(void (*original)(void)) { original(); }
-void pc_mapmaker_creatures_robot_sight(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_anims(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_request(void (*original)(void)) { original(); }
 void pc_mapmaker_creatures_create(void (*original)(void)) { original(); }
