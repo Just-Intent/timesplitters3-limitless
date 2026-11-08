@@ -1,0 +1,15 @@
+--- a/titles/futureperfect/src/main.c
++++ b/titles/futureperfect/src/main.c
+@@ -557,7 +557,12 @@
+     /* Unbuffered output for immediate visibility during debugging, and so a
+      * crash keeps the tail of the log rather than losing it in a buffer. */
+     setvbuf(stdout, NULL, _IONBF, 0);
++#ifdef TSFP_PC_CONTROLS
++    /* stderr: 64 KB buffer and a 100 ms flusher thread while the crash
++     * helper is armed; its filter flushes before a capture (pc_crash.c). */
++    if (!pc_crash_buffer_log())
++#endif
+     setvbuf(stderr, NULL, _IONBF, 0);
+
+     printf("=== Timesplitters - Future Perfect - Static Recompilation ===\n");
+     printf("Loading XBE...\n");

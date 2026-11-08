@@ -704,9 +704,12 @@ int pc_story_network_replica_bounds(uint32_t entity)
 void pc_story_network_replica_clip(void (*original)(void))
 {
 #ifdef _WIN32
+    /* Every drawn object passes here (sub_000A79B0). Outside a Story network
+     * session no entity is a replica, so skip the stack-frame memory query
+     * (a QueryWorkingSetEx system call per draw on big maps, after .77). */
     const uint32_t frame=g_esp;
-    const uint32_t entity=guest_writable(frame,8u)?WORD_AT(frame+4u):0u;
-    if(pc_story_network_replica(entity)) {
+    const uint32_t entity=story_npc_session() && guest_writable(frame,8u)?WORD_AT(frame+4u):0u;
+    if(entity && pc_story_network_replica(entity)) {
         WORD_AT(entity+0x2b4u)|=0x80000000u;
     }
 #endif

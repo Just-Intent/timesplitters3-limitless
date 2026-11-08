@@ -979,6 +979,8 @@ original execution and records bounded model/node/depth history through the shar
 capture adapters. It is diagnostic instrumentation, not a fix for #410. See
 [crash evidence](crash-evidence.md) for capture scope and platform limits.
 
+`2630-buffered-stderr.patch`: title stderr buffered while the crash helper runs.
+
 Allocation-history hook details: [crash evidence](crash-evidence.md). The shared
 allocator observer is diagnostic-only; backing allocation ownership and guest
 model suballocation lifetime remain distinct concepts.

@@ -582,6 +582,50 @@ start had no frame for 60 s; play lagged near many enemies.
   `__allmul`/`__ftol` stub pair), `test_mapmaker_memory.py` (accounting,
   table redirect). Nothing was run in the game.
 
+### After .77 (2026-11-07): profile while facing the bots
+
+- Measured (`logs/prof77`, `RECOMP_SAMPLE=500` with the .77 PDB, HugeMap;
+  window = dump minus `profile-before.txt`, 49,982 game-thread samples):
+  the game thread is busy all the time (no gate wait). The leaf list is
+  spread over the stock draw and AI code; the shares below are ours to fix.
+- Symbols: dbghelp names code without a public symbol after the nearest
+  public one, so `fscanf`/`fputs` in the chains are our static helpers (in
+  `pc_mapmaker_rooms_query < fscanf < sub_00157440` it is `guest_call`;
+  under `pc_story_network_replica_clip` it is `guest_writable`).
+  `pc_mapmaker_roof_tick` wraps the frame tick `sub_0003C440`, so its
+  inclusive share is the whole frame; its own leaf time is about 0.
+- stderr, 11.0% (`NtWriteFile` under `fprintf`): unbuffered stderr to a
+  pipe/file costs several `WriteFile` calls per line (about 16 lines/s here:
+  kernel summaries, `[READ] async`, camera lines). Fix: buffered stderr while
+  the crash helper is armed (`pc_crash_buffer_log`, runtime patch
+  `2630-buffered-stderr.patch`; [systems](systems.md) "Crash breadcrumbs").
+- Room query, about 7% (`sub_00087260` 3.6% + `sub_00047560` 3.3% leaf,
+  under `sub_000873C0`/`sub_0009FBE0` room lists and `sub_00087590`
+  collision): the tree walk of `sub_00087310` now runs in host code
+  (`pc_mapmaker_roomquery.inc`: the same walk order, split arithmetic,
+  NaN handling, de-duplication flag and list words);
+  `TSFP_MAPMAKER_ROOM_QUERY=0` calls the guest walk; stderr `[mapmaker] room
+  queries: n calls, m leaves` (first, every 2^20th).
+- Per-draw memory queries, 1.8% (`QueryWorkingSetEx`/`GetSystemInfo` from
+  `guest_writable` in `pc_story_network_replica_clip`, every drawn object):
+  the frame is read only inside a Story network session (outside one no
+  entity is a replica).
+- Per-draw host settings: `pc_graphics_get` 1.0% (a 32 KB path buffer probed
+  on every call; now only on first use) and `tsfp_texture_is_4k` 0.9%
+  (one-time-init call per texture stage; now a plain flag read on Windows).
+- Not changed: `guest_vm_resolve` VirtualQuery per guest critical section
+  (`tsfp_kernel_rtl_critical`, about 0.7%; a cache would need protection
+  change tracking), `pc_controls_weapon_slots_active` VirtualQuery (0.2%),
+  the light spread (1.5%, exact walk). The rest is the stock per-character
+  draw and AI in lifted code (`sub_0008F5E0` draw tree 87% inclusive,
+  `sub_000CF370` 5.1%, `sub_0003E4E0` 3.5%) and the HLE draw path.
+- Expected: about 20% of the game thread back (11 + 6 + 1.8 + 1.9),
+  INFERRED from the shares, not measured. Tests:
+  `test_mapmaker_roomquery.py` (fixture series, 8 mutations, the original
+  walk in the emulator: same lists on 4 series, 3 mutations caught; the
+  emulator gained indirect calls), `test_crash_capture.py`
+  `test_buffered_log_reaches_crash_report`, `story_room_clip.c` (no session).
+
 ## What bounded 511 pieces (cap 511, 2026-11-02; see above for 1023)
 
 `MAPMAKER_LIMIT_PIECES` is 511 ([rooms](limitless-rooms.md) stage 11; the

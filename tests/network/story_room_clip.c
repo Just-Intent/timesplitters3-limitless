@@ -23,6 +23,9 @@ void recomp_icall_fail_log(uint32_t a){(void)a;assert(0);}
 static int guest_writable(uint32_t a,size_t n){return a>=0x1000 && a<0x800000 && n<=0x800000-a;}
 static int replica;
 int pc_story_network_replica(uint32_t entity){return replica && entity==0x20000;}
+/* the adapter asks for a Story network session before reading its frame */
+static int session=1;
+static int story_npc_session(void){return session;}
 /* PRODUCTION_REPLICA_CLIP */
 static void evaluate(int wrapped)
 {
@@ -51,6 +54,8 @@ int main(void)
     MEM8(0x20030)=0;evaluate(1);assert(MEM8(0x20030)==0);
     replica=0;MEM8(0x20030)=1;MEM32(0x202b4)=0;evaluate(1);
     assert(MEMF(0x20118)==100 && !MEM32(0x202b4));
+    /* no session: not a replica even when the entity would be one */
+    replica=1;session=0;MEM32(0x202b4)=0;evaluate(1);assert(!MEM32(0x202b4));
     free(ram);puts("PASS: original portal clipping preserved, replica cache invalidated, spatial fields unchanged");
     return 0;
 }

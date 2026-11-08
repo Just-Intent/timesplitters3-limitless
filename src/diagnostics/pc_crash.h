@@ -33,6 +33,8 @@ typedef struct PcCrashPacket {
 } PcCrashPacket;
 typedef void (*PcCrashGuestCapture)(PcCrashGuest *out);
 int pc_crash_init(PcCrashGuestCapture capture);
+/* Buffered stderr with a 100 ms flusher thread; 0 keeps it unbuffered. */
+int pc_crash_buffer_log(void);
 void pc_crash_shutdown(void);
 void pc_crash_watchdog_start(void);
 void pc_crash_watchdog_stop(void);

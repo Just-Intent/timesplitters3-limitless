@@ -122,6 +122,8 @@ static uint32_t mapmaker_rooms_cap(void)
     return MAPMAKER_ROOMS_MAX;
 }
 
+#include "pc_mapmaker_roomquery.inc"     /* the room tree walk in host code */
+
 /* ---- sub_00087310(box, out, max): rooms overlapping box ---------------- */
 extern void sub_00157440(void);
 void pc_mapmaker_rooms_query(void (*original)(void))
@@ -137,7 +139,8 @@ void pc_mapmaker_rooms_query(void (*original)(void))
     mapmaker_rooms.query_depth++;
     mapmaker_rooms_set_u16(buffer,0);
     /* the original: sub_00157440(tree 0x702E00, box min, box max, sub_00087260, &list) */
-    guest_call(sub_00157440,5,0x00702E00u,box,box+0xCu,0x00087260u,buffer);
+    if(mapmaker_rooms_query_mode()) mapmaker_rooms_tree_query(0x00702E00u,box,box+0xCu,buffer);
+    else guest_call(sub_00157440,5,0x00702E00u,box,box+0xCu,0x00087260u,buffer);
     count=mapmaker_rooms_u16(buffer);
     if(count>MAPMAKER_ROOMS_QUERY_BYTES/2u-1u) count=MAPMAKER_ROOMS_QUERY_BYTES/2u-1u;
     records=WORD_AT(0x00708788u);
