@@ -183,10 +183,10 @@ table `config/guest-code-patches/<area>.json`, C policy
 the "capacity area stubs" markers in `pc_menu_mouse_guest.inc`. Fixtures that
 compile the whole include chain take link stubs from
 `tests/mapmaker/mapmaker_area_stubs.h`. Areas: `pads` (Layout C: 16K regular, cover 0x4000..,
-runtime 0x7800.., ids past 8000, lazy groups, bounded A*/stitch, route A* in C, caps and
+runtime 0x7800.., ids past 8000, lazy groups, bounded A*/stitch, route A*/nearest/random pad in C, caps and
 big-map speed: [caps](limitless-caps.md), A* pool 0x008E0000), `container` (map container 512 KB in the runtime heap, tiered
 saves stock-identical when small, large maps refused for System Link),
-`objects` (2047 `handles.json`, 768 pickups, 4096 props, 2048 bodies (nav block), pool guard: [caps](limitless-caps.md)), `editor`, `rooms` (1023, `level.json` frame, word buckets, stride 0x5000, tree: [rooms](limitless-rooms.md), portal passes, light, rays in C) and `actors` (64 characters / 63 AI
+`objects` (2047 `handles.json`, 768 pickups, 4096 props, 2048 bodies+twins (nav block), pool guard: [caps](limitless-caps.md)), `editor`, `rooms` (1023, `level.json` frame, word buckets, stride 0x5000, tree: [rooms](limitless-rooms.md), portal passes, light, rays in C) and `actors` (64 characters / 63 AI
 in a local MapMaker story map instead of 20, 72 object slots kept free; live list moved to
 0x00900100, AI table to 0x00900200, per-id table 0x00739AA0 to 0x00900300 by
 `actors.json` + generated `actors-list.json`; 64-slot actor pool in scene 100;

@@ -34,6 +34,8 @@ below); before that it was kept.
     WRAP sub_0023F9D0 -> pc_mapmaker_pads_cover_topup
     WRAP sub_0009DC70 -> pc_mapmaker_pads_stitch
     WRAP sub_0009B540 -> pc_mapmaker_pads_group_route      (pc_mapmaker_astar.inc)
+    WRAP sub_0009BCF0 -> pc_mapmaker_pads_nearest          (pc_mapmaker_nearpad.inc, after .73)
+    WRAP sub_0006A8B0 -> pc_mapmaker_pads_random           (pc_mapmaker_randpad.inc, after .73)
     # 2026-11-07, Layout C (need regeneration; all area "pads"):
     WRAP sub_0009A3C0 -> pc_mapmaker_pads_cover_lookup
     WRAP sub_0009CCA0 -> pc_mapmaker_pads_pointer
@@ -392,6 +394,21 @@ distances computed on first use ...`, then every 4096 entries a summary.
 The group A* node pool stays 8192 (`pc_mapmaker_astar.inc`): searches that
 explore more than 8192 links (unreachable targets on the biggest maps) are
 cut short and report no route.
+
+Per-bot pad queries in host code (after .73, identical results):
+`sub_0009BCF0` (nearest enabled pad at least min away, -1; 37 callers) walks
+every pad with the original's two squared-distance orders (first of each
+group of four z^2+x^2+y^2, others x^2+y^2+z^2) and strict "nearer" test;
+`sub_0006A8B0` (random pad in a ring, the wander goal of bots/AIs:
+count/2 tries) draws with the game generator stepped exactly as
+`sub_00153B40` (state, counter, draw left in the argument slot), index
+floor(r x count / 2^32), SSE distance and the same ring/flag tests.
+`TSFP_MAPMAKER_NEAR_PAD=0` / `TSFP_MAPMAKER_RANDOM_PAD=0` run the originals.
+stderr: `[mapmaker] nearest pad: n calls, m pads tested` and `[mapmaker]
+random pad: n calls, m tries` (first call, then every 65536th). Tests:
+`test_mapmaker_nearpad.py` / `test_mapmaker_randpad.py` (fixture series and
+mutations; the original XBE code in `guest_emulator.py` must give the same
+pad, and for the picker the same draws and generator state).
 
 Tests: `tests/mapmaker/mapmaker_pads.c` (ids, search, hooks, tiles, editor
 scopes, alias, stitch, lazy matrix; their mutations in

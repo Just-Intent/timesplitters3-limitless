@@ -294,6 +294,45 @@ int main(int argc,char **argv)
     call_arena("16");
     CHECK(arena_seen==MAPMAKER_ARENA_STOCK+(16u<<20));
 
+    /* Level heap use by caller (scene 100, from the reset on), the build's
+     * CPU tables from the nav block. */
+    {
+        unsigned ran,low0,full0;
+        uint32_t p,free_now;
+        memset(&mapmaker_nav,0,sizeof mapmaker_nav);heap_full=0;heap_allocs=0;
+        WORD_AT(MAPMAKER_MEMORY_SCENE)=100;WORD_AT(MAPMAKER_MEMORY_SHARED_FREE)=3000000u;
+        call_reset();
+        CHECK(mapmaker_memory_use.active && mapmaker_memory_use.n==0);
+        call_alloc(0x00012345u,100000u,1u);call_alloc(0x00012345u,100000u,1u);
+        call_alloc(0x00054321u,50000u,1u);
+        call_aligned(0x00099999u,300000u,1u);
+        call_alloc(0x00054321u,50000u,2u);                       /* Eternal: not counted */
+        free_now=WORD_AT(MAPMAKER_MEMORY_SHARED_FREE);
+        p=call_matrix(0x0008AC1Bu,0x2000u,1u,&ran);             /* portal pointers: nav block */
+        CHECK(ran==0 && p>=0x00800000u && p<0x00800000u+MAPMAKER_NAV_BYTES && WORD_AT(MAPMAKER_MEMORY_SHARED_FREE)==free_now);
+        p=call_matrix(0x0008A83Eu,0x2000u,1u,&ran);             /* piece entries: Level heap */
+        CHECK(ran==1);
+        WORD_AT(MAPMAKER_MEMORY_SCENE)=102;
+        p=call_matrix(0x0008AC1Bu,0x2000u,1u,&ran);             /* editor: Level heap */
+        CHECK(ran==1);
+        WORD_AT(MAPMAKER_MEMORY_SCENE)=100;
+        call_reset();
+        read_log();
+        CHECK(strstr(log_text,"[mapmaker] level heap by caller (previous level): ")!=NULL);
+        CHECK(strstr(log_text," 0x00099999: 292 KB in 1, 0x00012345: 195 KB in 2,")!=NULL);
+        CHECK(strstr(log_text," 0x00054321: 48 KB in 1,")!=NULL);
+        /* free below 2 MB and heap full: reported once each */
+        low0=count("level heap by caller (free below 2 MB)");full0=count("level heap by caller (heap full)");
+        WORD_AT(MAPMAKER_MEMORY_SHARED_FREE)=2100000u;
+        call_alloc(0x00077777u,100000u,1u);
+        call_alloc(0x00077777u,100000u,1u);
+        WORD_AT(MAPMAKER_MEMORY_SHARED_FREE)=1000u;
+        call_alloc(0x00088888u,5000u,1u);
+        call_alloc(0x00088888u,5000u,1u);
+        read_log();
+        CHECK(count("level heap by caller (free below 2 MB)")==low0+1u && count("level heap by caller (heap full)")==full0+1u);
+    }
+
     fflush(stderr);
     if(failures) { read_log();fprintf(stdout,"%d failures\nlog:\n%s",failures,log_text);return 1; }
     fprintf(stdout,"mapmaker memory ok\n");

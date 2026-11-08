@@ -474,7 +474,7 @@ start had no frame for 60 s; play lagged near many enemies.
 - Remaining (not changed): nearest-pad scan `sub_0009BCF0` (O(pads), 37
   callers; per frame only for lost pads and state `sub_0027BEC0` <= 30
   frames), random-pad picker `sub_0006A8B0` (O(pads/2) RNG tries; identical
-  results need the same draws), rendering with ~650 of 676 rooms visible on
+  results need the same draws; both in host code after .73), rendering with ~650 of 676 rooms visible on
   an open grid (camera line `n of 676 rooms visible`). Not measured in the
   game: compare the two stderr lines' ms (and frame time near enemies) with
   the switches at 0.
@@ -545,6 +545,42 @@ start had no frame for 60 s; play lagged near many enemies.
   rays cross) and 5 mutations it must catch; `test_rays` in the fixture.
 - Next check: a `RECOMP_SAMPLE` profile while looking at the AI group, to
   name the remaining hot functions (animation, AI think, collision).
+
+### After .73 (2026-11-07): HugeMap Level heap, bot lag on 921-tile grids
+
+- Crash (`m73huge.err`): map start shows Level heap free 26,588,288 and the
+  nav block unused; during the load `heap full: heap 1 size 262144 caller
+  0x0003E0FB ... -20880` (20 KB short), then the AV in `sub_000DC7B0`+0x103
+  as in .59. Most of the Level heap is 0x80-aligned device data (models,
+  textures, sound) that cannot move to the CPU-only nav block; which
+  consumers grew is NOT yet measured.
+- Fix: scene-100 Level heap allocations are summed by caller (aligned ones
+  by the outer caller) from each reset; stderr `[mapmaker] level heap by
+  caller (heap full | free below 2 MB | previous level): free F, N KB taken
+  since the reset; 0x...: n KB in k, ...` names the biggest. Moved to the
+  nav block in scene 100: the seven CPU-only room/portal tables of the play
+  build `sub_0008A780` (returns 0x0008ABFF, 0x0008AC1B, 0x0008BA6D,
+  0x0008BA89, 0x0008BAA8, 0x0008BACA, 0x0008BAE5; about 0.7 MB on HugeMap)
+  and the twin pool (1.3 MB, `mapmaker_objects_take`): about 2 MB back, 100x
+  the shortfall. The nav block stays 16 MB (objects, bodies, pools, matrix,
+  tables, twins: about 11.3 MB at 1,024 groups). `TSFP_MAPMAKER_NAV_OBJECTS=0`
+  keeps them in the Level heap. If a map still runs out, raise
+  `TSFP_MAPMAKER_ARENA_MB` (contig_free_min measured 10.4 MB) and use the
+  caller line; the arena default is unchanged (`arena-default-on` test).
+- Editor Memory row unchanged: it estimates map content, while the overrun
+  comes from device data per character/prop type, unknown in the editor.
+- Bot lag (`m73grid.err`, 921 tiles of 3x3, ~16k pads), CONFIRMED in code,
+  share INFERRED: nearest pad `sub_0009BCF0` (all pads per call) and the
+  wander picker `sub_0006A8B0` (up to count/2 lifted tries with the RNG per
+  ring; `sub_002B4260` asks three rings per decision). Both now in host code
+  with identical results (`mapmaker-pads.md` "Per-bot pad queries"; switches
+  `TSFP_MAPMAKER_NEAR_PAD=0`, `TSFP_MAPMAKER_RANDOM_PAD=0`; counters on
+  stderr). Not changed: item/target searches and perception rays (rays are
+  in C since .66).
+- Tests: `test_mapmaker_nearpad.py`, `test_mapmaker_randpad.py` (guest code
+  in the emulator, which gained fild/fimul/cvttss2si/adc and an
+  `__allmul`/`__ftol` stub pair), `test_mapmaker_memory.py` (accounting,
+  table redirect). Nothing was run in the game.
 
 ## What bounded 511 pieces (cap 511, 2026-11-02; see above for 1023)
 
