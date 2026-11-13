@@ -1142,6 +1142,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-127 | Complete launcher language packs | Awaiting validation |
 | MAC-128 | Fresh weapon trigger timing (#434) | Awaiting validation |
 | MAC-129 | Optional SMAA anti-aliasing | Awaiting validation |
+| MAC-131 | Launcher MapMaker map export/import (.tsmap) | Awaiting validation |
 
 ### MAC-126 - Launcher Discord community button
 
@@ -1159,6 +1160,28 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 - **Remaining:** On native Mac, build/test the launcher and check the translated
   mark, sidebar/Home card fit, keyboard activation and browser destination. Windows
   checks do not establish native Mac execution or physical keyboard behavior.
+
+### MAC-131 - Launcher MapMaker map export/import (.tsmap)
+
+- **Status:** Awaiting validation
+- **PC behavior:** The launcher Saves page lists the MapMaker maps of the active
+  save folder, exports one to a checksummed `.tsmap` file and imports a `.tsmap`
+  as a new map (renamed on collision, CRC and signature recomputed). Import
+  refuses while the game runs, holds the save lock and backs up saves first.
+  Maps over 200 pieces or larger than the 32 KB map size are refused. See
+  [the player guide](../players/mapmaker-map-transfer.md).
+- **Shared source:** `tools/launcher/MapTransfer.cs`, `SavesPage.cs`,
+  `SaveBackups.cs`; Windows WPF dialogs in `Launcher.cs`; Avalonia storage
+  pickers in `macos/NativeWindow.cs` (also compiled by the Linux launcher).
+  Tests `tests/launcher/launcher_maps.cs` and `launcher_shared_ui.cs`. Branch
+  `launcher-map-transfer` (based on `launcher-saves-lock-fix`), uncommitted to main.
+- **Existing Mac support:** Shared model and page; `NativeLauncher.csproj` and
+  `LinuxLauncher.csproj` compile `MapTransfer.cs` and `launcher_maps.cs`.
+- **Remaining:** No further adaptation identified. On native Mac and Linux, build
+  the launcher and run its shared UI tests, then export a map with the save
+  picker and import it with the open picker. Windows checks do not establish
+  native Mac/Linux picker behavior. Loading an imported map in the game is
+  unverified on every host.
 
 ### MAC-048 - Companion vehicle zero-flag joins (#100)
 

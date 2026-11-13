@@ -1,3 +1,14 @@
+Launcher MapMaker map export/import (2026-11-13, branch launcher-map-transfer,
+based on launcher-saves-lock-fix from origin/main c25c2143; Windows 11 x64,
+.NET Framework 4.8 csc): the Saves page exports a MapMaker map to a checksummed
+`.tsmap` file and imports one as a new map after a `Before map import` backup.
+Only the game's 32 KB map size and up to 200 pieces are accepted. Windows
+`build-launcher.ps1 -Test` passes, including six `launcher_maps.cs` groups
+(name hash vectors, round trip, collisions/re-signing, damaged/over-cap refusal,
+larger-than-32 KB refusal, staging cleanup) and the Saves page map check. Not run:
+native Mac/Linux launcher builds and pickers; importing a map and loading,
+playing and re-saving it in the game.
+
 Launcher Saves page installation lock (2026-11-13, branch launcher-saves-lock-fix,
 base origin/main c25c2143): Windows Back up now/Restore/save-folder changes no
 longer wait 30 s and fail with "Another launcher is using this installation".

@@ -5,7 +5,7 @@ or [repository layout](development/repository-layout.md) for source and local fi
 
 | Task | Guides |
 | --- | --- |
-| Install and use the launcher | [Launcher](players/launcher.md), [Windows implementation](players/windows-launcher.md), [Mac launcher](players/mac-launcher.md) |
+| Install and use the launcher | [Launcher](players/launcher.md), [MapMaker map export/import](players/mapmaker-map-transfer.md), [Windows implementation](players/windows-launcher.md), [Mac launcher](players/mac-launcher.md) |
 | Configure the game | [Windows settings](players/windows-settings.md), [Mac setup and controls](players/macos.md), [high refresh rates](analysis/native-high-refresh.md) |
 | Play online | [Multiplayer](players/multiplayer.md), [Discord presence](players/discord-presence.md) |
 | Use textures | [Textures](textures/textures.md), [alpha handling](textures/texture-alpha.md), [menu textures](textures/main-menu-textures.md) |

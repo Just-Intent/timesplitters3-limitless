@@ -90,6 +90,11 @@ need a filesystem that supports sparse files. The latest 200 valid restore point
 are listed; older archive files stay in the backups folder. Backups are retained
 until you remove them; use **Open backups folder** to manage their storage.
 
+The **MapMaker maps** section exports a saved MapMaker map to a `.tsmap` file
+and imports one as a new map, so you can share maps or move them to another
+computer or save folder. Importing backs up your saves first and never replaces
+an existing map. See [MapMaker map export and import](mapmaker-map-transfer.md).
+
 ## Everyday play and updates
 
 Open **TimeSplitters Launcher.exe** and select **Play Game**. An installed game

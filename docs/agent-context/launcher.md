@@ -368,7 +368,10 @@ It records UTC/date, game version and reason, hashes metadata and nonzero 64 KiB
 blocks, omits empty regions and verifies the completed archive before publishing
 its GUID-named `.tsfpsave` file. Limits are 1,024 files, 64 GiB logical, 512 MiB
 nonempty data, 8,192 blocks and 4 MiB manifest. List shows the latest 200 valid
-archives; invalid files are retained. No import/export or automatic pruning.
+archives; invalid files are retained. No backup import/export or auto-pruning.
+The page's MapMaker maps section exports one map to a checksummed `.tsmap` and
+imports one as a new map after a `Before map import` backup, through shared
+`MapTransfer.cs` and host file pickers; see [map transfer](map-transfer.md).
 
 `Core.ApplyScope` calls `BeforeGameChange` only for game updates/repairs/rollback;
 backup failure blocks installation. Launcher self-update is excluded. Restore
