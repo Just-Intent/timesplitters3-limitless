@@ -4846,6 +4846,14 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   browsing and Select/Back/right-click cancellation; cover clipped/invisible
   portraits, focus loss, resize, stale draws and other players. Local Windows
   System Link portrait/variant selection and confirm/cancel were verified.
+  Click confirm (branch `feature/menu-mouse-confirm`, uncommitted PR): any
+  fresh left click off another portrait or footer Back confirms the previewed
+  character; a left click confirms Story and Arcade League/Challenge briefings
+  (`pc_menu_briefing.inc`); MapMaker Load map highlights then loads a clicked
+  map (`pc_menu_mapmaker_browser.inc`). Shared source in the same input hook,
+  no host adapter; it reaches Mac wherever that hook runs. Acceptance: these
+  clicks, footer Back/right-click Back and keyboard/controller unchanged;
+  untested in game on either host.
 - **Issue #115 follow-up** (`115-bug-audio-menu-sliders-cannot-be-adjusted-with-mouse-pointer`): Windows Music/Sound volume bars now
   accept click-to-set and held dragging in main and paused Audio/Video Options.
   `src/interface/pc_menu_sliders.inc` captures both original painter layouts, reuses the

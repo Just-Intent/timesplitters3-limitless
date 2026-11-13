@@ -299,3 +299,32 @@ The input fixture checks placement and live updates under denied host policy.
 
 View & HUD visibility labels are HUD & UI and Version watermark (no Show prefix);
 this wording-only refinement leaves immediate session semantics unchanged.
+
+## Menu click confirm
+
+Row/choice/slider/team helpers are `pc_menu_choices.inc`, `pc_menu_sliders.inc`
+and `pc_menu_team.inc`. Three front-end (scene 101) pages confirm on a click:
+
+- Character carousel (`pc_menu_characters.inc`): hovering or clicking another
+  portrait previews it; any other fresh left click is Select (raw 0x80),
+  footer Back stays Back, the wheel only previews. The previewed portrait is
+  drawn as the 3D model, so a second click on it was impossible.
+- Briefings (`pc_menu_briefing.inc`): Story mission (descriptor `0x005238C0`,
+  Confirm `+0x1BC` = `sub_002BEAA0`) and Arcade League/Challenge event
+  (`0x00523870`, `sub_002D5F10`) hold only flag-4 display items, so no row is
+  hit. With no highlighted row `sub_0007A7B0` calls `+0x1BC` directly; a fresh
+  left click off tabs, profile and footer prompts is delivered like the footer
+  Select (raw 0x80 plus `+0xC4`/`+0xC8` bit 0x10). Descriptor and callback must
+  both match.
+- MapMaker Load map (`pc_menu_mapmaker_browser.inc`, descriptor `0x0052EA88`,
+  files `[0x00778D38]`): its tick `sub_0032BDD0` reads Confirm before the row
+  hook `sub_00073750`, so in `pc_display_menu_mouse_input` a fresh left click on
+  a row highlights it (`sub_00076EF0`) and a click on the highlighted row is
+  Confirm. Rows flagged `+0x28 & 5` or with ids past the file count are ignored.
+
+The input hook tests tabs, profile and footer prompts first, then the browser,
+then briefings. Right-click Back, hover and wheel keep the shared rules. No
+patch or regeneration. Fixture `tests/input/menu_mouse.c`
+(`character_tests`, `map_browser_tests`, `briefing_tests`); mutations
+`footer-only-character-confirm`, `late-map-confirm`, `late-briefing-confirm`
+in `test_menu_mouse.py`. In-game checks on a stock build are pending.

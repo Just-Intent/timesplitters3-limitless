@@ -825,7 +825,7 @@ final full-stack upgrade must contain the capture pump, two-binding limit and
 weapon-slot sampling/guest hook, so both new patches are still validated.
 
 `test_keyboard_menu.py` checks capture/page release, single presses,
-cancel/focus/timeout, action coverage and sensitivity. Run with menu_mouse,
+cancel/focus/timeout, action coverage and sensitivity. Run with menu_mouse (+click confirm),
 weapon_slots and quit_menu tests. Build checks native persistence/two-slot bounds;
 launcher checks legacy four-slot import, third-slot rejection and two-slot save.
 Live checks cover main/pause access, shortcut-free capture, conflict/clear/default,

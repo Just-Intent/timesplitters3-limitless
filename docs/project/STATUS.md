@@ -1,3 +1,10 @@
+Menu click confirm (2026-11-13, branch feature/menu-mouse-confirm, base
+c25c2143): a left click confirms the previewed character, Story and Arcade
+League/Challenge briefings, and a highlighted map in MapMaker Load map. Shared
+menu input hook only, no patch. Windows `tests/input/test_menu_mouse.py`
+passes (8 cases including three new mutations). Not run in game; native Mac
+and Linux host checks not run.
+
 Control-preset rollback and high-FPS interaction repairs (2026-11-12,
 branch revert/control-presets; original base e7cb1016, reference c511f1e9 before
 PR528): removes Modern presets, profile button/axis seeding and repair,
