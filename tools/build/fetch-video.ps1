@@ -7,8 +7,10 @@ if (Test-Path -LiteralPath $destination) { throw 'FFmpeg destination exists but 
 $downloadRoot = Join-Path $root 'private\downloads'
 New-Item -ItemType Directory -Force -Path $downloadRoot | Out-Null
 $archive = Join-Path $downloadRoot 'ffmpeg.zip'
-$url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-lgpl-shared-8.1.zip'
-$expected = '1689DA96399F372CFEE985B3F2B9D74685892078059BC37764388F49E3118BDB'
+# BtbN rebuilds the moving 'latest' asset daily, so a fixed checksum cannot match
+# it for long. Month-end autobuilds are kept permanently; pin one of those.
+$url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-shared-8.1.zip'
+$expected = '3E47BDA1607740550141E37C0E49D1E5182B34699F15ADFD137EE266D346811A'
 if (!(Test-Path -LiteralPath $archive)) { Invoke-WebRequest -Uri $url -OutFile $archive }
 if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expected) {
     throw 'FFmpeg archive differs from the validated build. Review the updated release before changing the pinned checksum.'
