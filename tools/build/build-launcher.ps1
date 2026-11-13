@@ -176,7 +176,7 @@ if ($Test) {
         (Join-Path $source 'Launcher.cs'), (Join-Path (Split-Path -Parent $PSScriptRoot) 'release\ImportGame.cs'),
         (Join-Path $project 'tests\launcher\launcher_updates.cs'))
     $testArgs += $settingsSources + @($defaultControls, (Join-Path $project 'tests\launcher\launcher_crashes.cs'), (Join-Path $project 'tests\launcher\launcher_settings.cs'), (Join-Path $project 'tests\launcher\launcher_maintenance.cs'), (Join-Path $project 'tests\launcher\launcher_downloads.cs'), (Join-Path $project 'tests\launcher\launcher_news.cs'), (Join-Path $project 'tests\launcher\launcher_versions.cs'), (Join-Path $project 'tests\launcher\launcher_startup.cs'))
-    $testArgs += @((Join-Path $project 'tests\launcher\launcher_sessions.cs'), (Join-Path $project 'tests\launcher\launcher_shared_ui.cs'), (Join-Path $project 'tests\launcher\launcher_saves.cs'), (Join-Path $project 'tests\launcher\launcher_restart.cs'), (Join-Path $project 'tests\launcher\launcher_textures.cs'))
+    $testArgs += @((Join-Path $project 'tests\launcher\launcher_sessions.cs'), (Join-Path $project 'tests\launcher\launcher_shared_ui.cs'), (Join-Path $project 'tests\launcher\launcher_saves.cs'), (Join-Path $project 'tests\launcher\launcher_maps.cs'), (Join-Path $project 'tests\launcher\launcher_restart.cs'), (Join-Path $project 'tests\launcher\launcher_textures.cs'))
     $testArgs += @(('/resource:' + (Join-Path $source 'Launcher.xaml') + ',Launcher.xaml'),
         ('/resource:' + (Join-Path $Output 'launcher.ico') + ',launcher.ico')) + $bannerArguments + $logoArguments
     & $compiler @testArgs

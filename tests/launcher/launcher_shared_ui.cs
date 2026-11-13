@@ -175,6 +175,20 @@ public static class LauncherSharedUiChecks
                 }
             });
             SaveBackupChecks.Run(root,Test);
+            MapTransferChecks.Run(root,Test);
+            Test("save manager lists MapMaker maps and only exports valid ones",()=>{
+                string folder=MapTransferChecks.Fixture(root,"maps-page");string saves=Core.PathIn(folder,LauncherPlatform.Saves(folder));
+                string dir=Path.Combine(saves,"UserData","45410066",MapTransfer.DirectoryName("MapMaker: Arena"));Directory.CreateDirectory(dir);
+                File.WriteAllBytes(Path.Combine(dir,"anicemap.mkr"),MapTransferChecks.Map("Arena",12));File.WriteAllBytes(Path.Combine(dir,"SaveMeta.xbx"),System.Text.Encoding.Unicode.GetBytes("﻿Name=MapMaker: Arena\r\n"));
+                var page=new SavesPage(folder,false);var maps=Find<ComboBox>(page.View,"MapChoices");
+                Need(maps.Items.Count==1 && ((MapEntry)maps.SelectedItem).Name=="Arena" && page.ExportMap.IsEnabled,"Map list or export action missing");
+                Need(Find<TextBlock>(page.View,"MapDetails").Text.Contains("12 pieces"),"Map details missing");
+                string picked=null;page.PickMapExportFile=name=>{picked=name;return System.Threading.Tasks.Task.FromResult<string>(null);};
+                Click(page.ExportMap);Need(picked=="Arena.tsmap" && !Directory.Exists(Core.PathIn(folder,MapTransfer.ExportFolder)),"Cancelled export wrote a file");
+                Click(page.ImportMap);Need(Find<TextBlock>(page.View,"SaveManagerStatus").Text.Contains("not available"),"Import without a picker not explained");
+                var preview=new SavesPage(folder,true);Need(Find<ComboBox>(preview.View,"MapChoices").Items.Count==0,"Preview listed real maps");
+                File.WriteAllBytes(Path.Combine(dir,"anicemap.mkr"),new byte[100]);page.Reload();Need(!page.ExportMap.IsEnabled && Find<TextBlock>(page.View,"MapDetails").Text.Contains("cannot be exported"),"Damaged map offered for export");
+            });
             Test("complete language packs save, cancel, launch and restore English",()=>{
                 string folder=Path.Combine(root,"languages");Directory.CreateDirectory(folder);
                 File.WriteAllText(Path.Combine(folder,"BUILD.json"),"{\"language_packs\":true}");
