@@ -69,6 +69,24 @@ public static class SaveBackupChecks
             Need(File.ReadAllText(Core.PathIn(root,"Settings/keep.ini"))=="settings" && File.ReadAllText(Core.PathIn(root,"ISO/keep.iso"))=="ISO" && File.ReadAllText(Core.PathIn(root,"Textures/custom.dds"))=="custom texture","Save operation touched protected non-save data");
             }
         });
+        test("save work started by the launcher window reuses the lock its UI thread holds",()=>{
+            string root=Path.Combine(parent,"save-window-lock");Directory.CreateDirectory(root);Directory.CreateDirectory(Core.PathIn(root,".launcher"));
+            string saves=Saves(root);Put(saves,"profile","window progress");
+            using(var held=new ManualResetEventSlim(false))using(var release=new ManualResetEventSlim(false)) {
+                Exception owner=null;
+                var window=new Thread(()=>{try{using(LauncherPlatform.AcquireUpdateLock(root)){held.Set();release.Wait();}}catch(Exception ex){owner=ex;held.Set();}});
+                window.IsBackground=true;window.Start();
+                try {
+                    Need(held.Wait(10000) && owner==null,"Window thread could not take the installation lock");
+                    var timer=System.Diagnostics.Stopwatch.StartNew();
+                    var backup=SaveBackups.Create(root,"Manual",null,CancellationToken.None,installationLockHeld:true);
+                    Put(saves,"profile","later progress");
+                    SaveBackups.Restore(root,backup.Id,null,CancellationToken.None,null,installationLockHeld:true);
+                    Need(timer.Elapsed<TimeSpan.FromSeconds(10),"Save work waited on the window's own installation lock");
+                    Need(File.ReadAllText(Core.PathIn(saves,"profile"))=="window progress","Save work under the window lock did not restore");
+                } finally { release.Set();window.Join(10000); }
+            }
+        });
         test("save restore failures, cancellation and damaged archives keep current saves",()=>{
             string root=Path.Combine(parent,"save-failures");Directory.CreateDirectory(root);string saves=Saves(root);Directory.CreateDirectory(saves);Put(saves,"profile","original");
             var backup=SaveBackups.Create(root,"Manual",null,CancellationToken.None);Put(saves,"profile","current");Put(saves,"keep","current extra");

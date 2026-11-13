@@ -505,7 +505,7 @@ when a covered system changes without its documentation update.
 | Guest generation/wrappers | `tests/compiler/test_recomp_generation.py`, float/vehicle join tests | Regenerate using verified local XBE, build |
 | Settings/input/menu | Affected `tests/input/` suites and native C fixtures | Relevant native target, bounded isolated acceptance |
 | Renderer/shader/resources | Shared source contracts, `tests/graphics/test_renderer_host.py`, `tests/graphics/test_rhi_menu_sampling.py` | Windows WARP / Mac `tools/testing/test-rhi-mac.py`; scoped scene evidence |
-| Launcher | `python tools/ci/launcher-compatibility.py --local` | Host build/lifecycle and affected `tests/launcher/` fixtures |
+| Launcher | `python tools/ci/launcher-compatibility.py --local` | Host build/lifecycle; affected `tests/launcher/` fixtures (Saves lock: `launcher_saves.cs`) |
 | Issue automation | `tests/repository/test_issue_forms.py`, `tests/repository/test_issue_resolution.py` | Read-only fixtures, workflow checks; no posting for tests |
 
 Enhancement routing uses the Ideas contact link in the issue chooser. The existing

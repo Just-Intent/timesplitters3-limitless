@@ -372,7 +372,7 @@ namespace TimeSplitters.Launcher
             if(busy || (!previewMode && Core.GameRunning())) { SetStatus("Close the game before managing saves.");return; }
             if(settings!=null)settings.DismissPrompt();
             if(savesPage==null) {
-                savesPage=new SavesPage(root,previewMode);
+                savesPage=new SavesPage(root,previewMode,true);   /* this window holds the installation mutex */
                 savesPage.OpenFolder+=relative=>OpenFolder(relative);
                 savesPage.OpenSaveLocation+=path=>{Directory.CreateDirectory(path);Process.Start(new ProcessStartInfo(path){UseShellExecute=true});};
                 savesPage.PickSaveFolder=()=>{using(var picker=new System.Windows.Forms.FolderBrowserDialog {Description="Choose an empty folder or an existing TimeSplitters save folder."})return Task.FromResult(picker.ShowDialog()==System.Windows.Forms.DialogResult.OK?picker.SelectedPath:null);};

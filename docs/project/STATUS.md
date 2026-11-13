@@ -1,3 +1,14 @@
+Launcher Saves page installation lock (2026-11-13, branch launcher-saves-lock-fix,
+base origin/main c25c2143): Windows Back up now/Restore/save-folder changes no
+longer wait 30 s and fail with "Another launcher is using this installation".
+The WPF window holds the thread-owned installation mutex for its lifetime; the
+Saves page now passes that ownership like the Mac/Linux windows, and
+`AcquireSaveLock` skips reacquiring on every host. Windows launcher suite passes
+(`build-launcher.ps1 -Test -Rebuild`), including a new check that runs backup and
+restore on a worker while another thread holds the lock; the check fails without
+the fix. Mac/Linux behavior is unchanged (already skipped); their host suites
+were not run here. Live Windows Saves-page click-through is pending.
+
 Control-preset rollback and high-FPS interaction repairs (2026-11-12,
 branch revert/control-presets; original base e7cb1016, reference c511f1e9 before
 PR528): removes Modern presets, profile button/axis seeding and repair,

@@ -356,9 +356,13 @@ DPI and keyboard acceptance still require a native host.
 
 `SavesPage.cs` is shared WPF/Avalonia UI under `SavesHost`; both navigation adapters
 route Saves there and lock other operations while its cancellable work runs.
-`SavesPage` receives the native Mac window’s lifetime installation-lock ownership;
-its busy state serializes save work without reacquiring `mac.lock`. Standalone
-backup/restore callers still acquire the installation lock, as do Windows calls.
+`SavesPage` receives each launcher window's lifetime installation-lock ownership
+(`mac.lock`/`linux.lock`, or the Windows mutex held by the WPF UI thread); its busy
+state serializes save work, and `LauncherPlatform.AcquireSaveLock` skips
+reacquiring on every host. A Windows mutex is thread-owned, so a worker that
+asked again waited 30 s and failed with "Another launcher is using this
+installation". Standalone backup/restore callers still acquire the lock. Test:
+`launcher_saves.cs` "save work started by the launcher window reuses the lock".
 `SaveBackups.cs` archives only `LauncherPlatform.Saves(root)` into `Backups/Saves`.
 It records UTC/date, game version and reason, hashes metadata and nonzero 64 KiB
 blocks, omits empty regions and verifies the completed archive before publishing
