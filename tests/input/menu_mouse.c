@@ -638,6 +638,54 @@ static void character_tests(void)
     }
 }
 
+/* MapMaker > Load map: ordinary rows, but the browser tick (sub_0032BDD0)
+ * reads Confirm before the row hook, so the click must act in the input hook. */
+static void map_browser_tests(void)
+{
+    const uint32_t m=0x2000,files=0x9000;
+    uint32_t rows[3]={0x3000,0x3200,0x3400};
+    memset(memory,0,sizeof memory);memset(&menu_mouse,0,sizeof menu_mouse);
+    active=1;shape_w=16;shape_h=9;WORD_AT(0x76b0fc)=0;
+    WORD_AT(0x79094c)=101;WORD_AT(0x4e8cf0)=640;WORD_AT(0x4e8cf4)=480;
+    WORD_AT(0x7e71c8)=0x4000;WORD_AT(0x4000+4)=640;WORD_AT(0x4000+0x18)=480;
+    WORD_AT(m+4)=0x52ea88;WORD_AT(m+0x1b0)=3;WORD_AT(m+0x178)=rows[0];
+    FLOAT_AT(m+0xe4)=100;FLOAT_AT(m+0xe8)=70;FLOAT_AT(m+0xec)=540;FLOAT_AT(m+0xf0)=400;
+    WORD_AT(0x778d38)=files;WORD_AT(files+8)=3;
+    for(unsigned i=0;i<3;i++) {
+        uint32_t r=rows[i];
+        WORD_AT(r)=7;WORD_AT(r+4)=i<2?rows[i+1]:0;WORD_AT(r+0x14)=i;WORD_AT(r+0x28)=0x20900;
+        FLOAT_AT(r+0x78)=200;FLOAT_AT(r+0x7c)=100+40.f*i;FLOAT_AT(r+0x80)=440;FLOAT_AT(r+0x84)=140+40.f*i;
+    }
+    /* UI y = cursor.y/1.5 at 1280x720; row 1 spans 140..180. */
+    cursor=(PcMenuPointer){640,240,1280,720,1,0,0,0};
+    run(m);run(m);WORD_AT(m+0x198)=rows[0]; /* keyboard left row 0 highlighted */
+    unsigned before=selections;
+    cursor.left=1;run(m);
+    CHECK(WORD_AT(m+0x198)==rows[1] && selections==before+1);
+    CHECK(!early_action && !(early_source&0x80u) && !WORD_AT(m+0xc4)); /* highlight only */
+    run(m);CHECK(!early_action && selections==before+1); /* held press does nothing */
+    cursor.left=0;run(m);cursor.left=1;run(m);
+    CHECK(early_action==0x10 && (early_source&0x80u) && WORD_AT(m+0x198)==rows[1]);
+    CHECK(selections==before+1); /* confirm before the tick, no second row click */
+    run(m);CHECK(!early_action);
+    /* Hover still highlights through the shared row hook, without confirming. */
+    cursor.left=0;cursor.y=300;run(m);CHECK(WORD_AT(m+0x198)==rows[2] && !early_action);
+    cursor.left=1;run(m);CHECK(early_action==0x10);cursor.left=0;run(m);
+    /* Damaged (flag 1) rows, ids past the file count and other scenes are ignored. */
+    WORD_AT(rows[2]+0x28)|=1;WORD_AT(m+0x198)=rows[0];before=selections;
+    cursor.left=1;run(m);CHECK(!early_action && WORD_AT(m+0x198)==rows[0] && selections==before);
+    cursor.left=0;run(m);WORD_AT(rows[2]+0x28)&=~1u;WORD_AT(files+8)=2;
+    cursor.left=1;run(m);CHECK(!early_action); /* only the shared (late) row click */
+    cursor.left=0;run(m);WORD_AT(files+8)=3;WORD_AT(0x79094c)=102;
+    CHECK(!menu_map_browser_row(m,320,200));WORD_AT(0x79094c)=101;
+    WORD_AT(m+4)=0x52ea98;CHECK(!menu_map_browser_row(m,320,200));
+    WORD_AT(m+4)=0x52ea88;CHECK(menu_map_browser_row(m,320,200)==rows[2]);
+    CHECK(!menu_map_browser_row(m,90,200) && !menu_map_browser_row(m,320,50));
+    /* Wheel keeps the shared row navigation (the engine scrolls to the row). */
+    cursor.wheel=-1;run(m);CHECK(WORD_AT(m+0xc4)==0x20002 && !early_action);
+    cursor.wheel=0;menu_mouse.wheel_pending=0;
+}
+
 /* Story / Arcade League / Challenge briefings hold only flag-4 display items,
  * so no row is hit: a fresh left click off the footer is the menu Confirm
  * (+0x1BC callback), delivered before the tick like a footer Select. */
@@ -980,6 +1028,7 @@ int main(void)
     choice_tests();
     team_tests();
     character_tests();
+    map_browser_tests();
     briefing_tests();
     settings_owner_tests();
     puts("PASS: menu pointer mapping, selection, click lifetime and gameplay isolation");
