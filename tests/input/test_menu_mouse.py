@@ -11,7 +11,7 @@ from native_compiler import native_compiler
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.mark.parametrize('mutation', ['fixed', 'missing-source', 'hover-conflict', 'missing-slider-drag', 'missing-setting-drag'])
+@pytest.mark.parametrize('mutation', ['fixed', 'missing-source', 'hover-conflict', 'missing-slider-drag', 'missing-setting-drag', 'footer-only-character-confirm'])
 def test_menu_mouse(tmp_path, mutation):
     compiler, env = native_compiler(tmp_path)
     source = ROOT / 'tests/input/menu_mouse.c'
@@ -43,6 +43,15 @@ def test_menu_mouse(tmp_path, mutation):
         # Quoted includes resolve alongside the adapter before -I directories.
         (tmp_path / 'pc_menu_mouse_guest.inc').write_text(
             (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8'), encoding='utf-8')
+    if mutation == 'footer-only-character-confirm':
+        # The old rule: only the footer Select confirmed a previewed character.
+        characters = (ROOT / 'src/interface/pc_menu_characters.inc').read_text(encoding='utf-8')
+        rule = 'menu_mouse_press(s,footer==1?0x120u:0x80u);'
+        assert rule in characters
+        (tmp_path / 'pc_menu_characters.inc').write_text(characters.replace(
+            rule, 'if(footer==0 || footer==1) menu_mouse_press(s,footer?0x120u:0x80u);'), encoding='utf-8')
+        (tmp_path / 'pc_menu_mouse_guest.inc').write_text(
+            (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8'), encoding='utf-8')
     if os.name == 'nt':
         args = [compiler, '/nologo', '/std:c11', '/O2', '/W4',
                 '/I' + str(tmp_path), '/I' + str(ROOT / 'src'), str(source), '/Fe:' + str(exe)]
@@ -67,6 +76,10 @@ def test_menu_mouse(tmp_path, mutation):
     if mutation == 'missing-setting-drag':
         assert result.returncode != 0
         assert 'FLOAT_AT(value_address)==.25f' in result.stderr
+        return
+    if mutation == 'footer-only-character-confirm':
+        assert result.returncode != 0
+        assert 'early_source&0x80u' in result.stderr  # a click off the footer must confirm
         return
     assert result.returncode == 0, result.stdout + result.stderr
     assert 'PASS:' in result.stdout

@@ -99,8 +99,13 @@ static void menu_character_pointer(MenuMouseDispatch *s)
             s->actions=0;return;
         }
         if(x>=p->l && x<p->r && y>=p->t && y<p->b) {
+            /* Hovering or clicking another visible portrait previews it. A
+             * click on the previewed portrait is left for the caller, which
+             * confirms the previewed character on any click off the footer. */
+            if(WORD_AT(0x0078A248u)==p->group &&
+               WORD_AT(0x0078A148u+p->group*4)==p->variant) return;
             menu_character_select(p->group,p->variant);
-            s->actions=0;return; /* preview only; Select confirms */
+            s->actions=0;return;
         }
     }
 }
@@ -125,8 +130,10 @@ static void menu_character_input(MenuMouseDispatch *s)
     d3d8_display_output_shape(WORD_AT(0x004E8CF0u),WORD_AT(0x004E8CF4u),&sw,&sh);
     if((s->actions&2) && sh && pc_menu_mouse_position(s->pointer,(float)sw/sh,
         (float)WORD_AT(0x004E8CF0u),(float)WORD_AT(0x004E8CF4u),&x,&y)) {
+        /* The previewed portrait is replaced by the 3D model, so a click
+         * anywhere except Back confirms the previewed character (Select). */
         int footer=menu_mouse_footer_hit(s->menu,x,y,sw,sh);
-        if(footer==0 || footer==1) menu_mouse_press(s,footer?0x120u:0x80u);
+        menu_mouse_press(s,footer==1?0x120u:0x80u);
     }
     if(s->actions&4) menu_mouse_press(s,0x120u);
     s->actions=0;
