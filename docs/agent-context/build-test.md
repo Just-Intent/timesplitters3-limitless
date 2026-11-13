@@ -233,7 +233,7 @@ check. Independent missing-scope and missing-pause-guard controls fail. The publ
 clock fixture covers dispatcher/restoration on both CI hosts. Private US XBE
 cases skip without the asset; they do not establish physical Mac gameplay.
 Copied numeric-policy fixtures must resolve all relative helper includes,
-including `pc_native_statistics_guest.h`, before mutation compilation.
+incl. `pc_native_statistics_guest.h`, before mutation compilation.
 
 ## Choose the cheapest relevant check
 
@@ -261,7 +261,7 @@ fixtures use240/180/Original60/120, matching the strict live-cycle validator.
 
 [Online UI/layout convergence checks](multiplayer-ui.md). `test_framebuffer_sampling.py`
 checks refresh/stale copies and first-entry/any-framebuffer alias lookup against
-the original searches, including wrong-first/last mutations (Mac GL/RHI, Windows RHI).
+the original searches, incl. wrong-first/last mutations (Mac GL/RHI, Windows RHI).
 `test_trace_filter.py` compiles real trace dispatch: quiet calls, explicit
 diagnostics, budget, idle callback and bypass-removal mutation.
 
@@ -282,7 +282,7 @@ Runner timing includes16ms test-input polling; normal play does not. Its
 
 `tests/network/test_network_guest_dispatch.py` checks 20Hz snapshots rendered at
 60/120/144/180/240Hz, mixed 60..240Hz intervals, jitter/loss, wrapping, death/respawn, authority and atomic clip
-transitions, including cadence/crossfade mutations. Both CI hosts run it.
+transitions, incl. cadence/crossfade mutations. Both CI hosts run it.
 Windows `test-online-bot-motion.py`: isolated 0/120/180/240 peers.
 `--require-results`: matching records; `--short-match`: five points via menu readback.
 Results transitions: `--post-results-seconds`/`--inspect-results-tabs`/`--rematch`.
@@ -312,7 +312,7 @@ read-cache lifetimes end before/after guest calls. Captured actual scoped deltas
 support per-update growth checks; async samples and an ideal constant60 curve
 are insufficient. It is an opt-in diagnostic, not a GPU/pacing acceptance route.
 `native_material_motion.c` compares180 fractional partitions with an independent
-one-step forced/damped affine map, including weak/zero drag, slow/fast time,
+one-step forced/damped affine map, incl. weak/zero drag, slow/fast time,
 mixed pieces and untouched rejection. `native_surface_cache.c` executes original
 127500 with nonzero held forcing/drag at60/120/144/180/240 and mixed rates,
 normal/quarter speed and pause, checking U/V velocity/travel against a closed
@@ -332,21 +332,21 @@ Private-XBE skips on CI do not certify those routines on Mac.
 - `native_rigid_motion.c` checks forces, drag, quaternion/position publication,
   controlled support contacts, RNG isolation and secondary-step boundaries at
   all five rates, slow/fast/irregular time and pause. Static contacts compare an
-  independent impulse equation, including penetration escape velocity. Mutations
+  independent impulse equation, incl. penetration escape velocity. Mutations
   independently remove gates, timers, contacts, RNG and boundary corrections.
   The rigid/rigid extension independently checks 432 frictionless impulse cases:
   both masses, existing spin, three-dimensional normals and lever arms, diagonal
   and rotated world inverse-inertia tensors, approaching/separating bodies,
   Original60/native120/144/180/240 and an extra 0.7ms secondary step. It verifies
   relative point velocity and both force/torque impulses before integration,
-  including linear and world-origin angular impulse conservation. Independent
+  incl. linear and world-origin angular impulse conservation. Independent
   mutations remove the second mass or its torque response. Original166060 is
   lifted for both-body point velocity; original16DF60 damage/effect notification
   is a checked service boundary. This is distinct from full clock scheduling,
   live terrain selection and post-impact handling acceptance.
   Geometry, room/model notifications and broadphase services remain controlled.
 - `native_vehicle_driver.c` checks original `17DA00/172EE0` throttle, brake,
-  reverse/release and steering recurrence, including wheel eligibility, speed
+  reverse/release and steering recurrence, incl. wheel eligibility, speed
   clamps and ABI. `legacy-driver` and `legacy-steering` must fail independently.
 - `native_vehicle_camera.c` executes full `CA040` plus original spring/history
   helpers. Check fresh updates, aligned camera checkpoints, pause and ABI;
@@ -471,7 +471,7 @@ not be reported as a pacing improvement. Exclude a measurement window when
 another game starts during it, even if that run reports a better average.
 
 `test_decal_projection.py` checks ABI/all matrix values, zero weapon/preview
-queries and one same-region camera-source query, including split stack output.
+queries and one same-region camera-source query, incl. split stack output.
 Retained-source-snapshot mutation must fail. Local `projection_output.c` lifts
 checksum-verified US151CF0, checks 16 writes/math/bounds/stack over 48 lenses;
 missing-store mutation fails. Private-XBE cases skip CI. `display_memory.c`
@@ -579,7 +579,7 @@ enrolled. `status` includes the installed controller hash and merge mode.
 `upgrade` replaces installed source/config under the worker lock after preflight,
 preserving an existing dashboard LaunchAgent, pause and attempt history; it keeps
 one previous source/config pair. Tests cover preservation and failed-write rollback.
-A fresh install resets automatic merging to its explicit flag, including after
+A fresh install resets automatic merging to its explicit flag, incl. after
 uninstall; an in-place upgrade preserves the installed mode.
 
 A stale source is updated from main before a repair attempt so the agent sees
@@ -609,7 +609,7 @@ monitor/window adapters: secondary fullscreen desktop size, windowed resize,
 minimize/query failure, allocation rollback/retry, persistence and preview
 rollback, manual override, and Auto ratio filtering. `tests/graphics/pc_display.c` retains
 manual scene/camera/HUD tests. `test_cutscene_letterbox.py` checks effective
-output and air-lift FOV (#339), including a guard-removal mutation. With a local
+output and air-lift FOV (#339), incl. a guard-removal mutation. With a local
 US XBE it executes all four lift regions through the production camera hook.
 Launcher tests cover Auto UI/filter/save, defaults and older packages. Cocoa's
 self-test recognizes Auto; physical Retina/multi-display checks need Mac.
@@ -1043,5 +1043,6 @@ Physics: [checks](build-test-details.md#guest-physical-state-regression).
 Players: controls-options.md.
 
 Patch tests: Mac seeds omit2620/2625 until migration; Story stubs use production guards.
+FFmpeg: [pin](build-test-continuation.md#ffmpeg-pin).
 
 [PR check names and advisory summary](release-speed.md#pr-feedback-scheduling).

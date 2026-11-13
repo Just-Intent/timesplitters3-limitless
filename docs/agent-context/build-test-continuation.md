@@ -164,3 +164,12 @@ Physics: [checks](build-test-details.md#guest-physical-state-regression).
 GPU asserts stay on; AO logs scene/pixel failures.
 
 Local-player tests: controls-options.md.
+
+## FFmpeg pin
+
+`tools/build/fetch-video.ps1` downloads the BtbN month-end build
+`autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-shared-8.1.zip`
+(SHA-256 `3E47BDA1…D346811A`, also recorded in `tools/release/package-release.py`).
+The previous URL named BtbN's moving `latest` asset, which is rebuilt daily, so
+its fixed checksum stopped matching and fresh setups failed. Month-end builds
+are kept permanently. Re-pin both files together when updating FFmpeg.
