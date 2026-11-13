@@ -117,7 +117,7 @@ namespace TimeSplitters.Launcher
             DateTime created;
             Core.Require(m!=null && m.Schema==1 && m.Owner=="tsfp-save-backup" && m.Id==id &&
                 DateTime.TryParseExact(m.Created,"o",CultureInfo.InvariantCulture,DateTimeStyles.RoundtripKind,out created) &&
-                new[]{"Manual","Before game update","Before restore"}.Contains(m.Reason) && m.Game!=null && m.Game.Length<=128 &&
+                new[]{"Manual","Before game update","Before restore",MapTransfer.BackupReason}.Contains(m.Reason) && m.Game!=null && m.Game.Length<=128 &&
                 !m.Game.Any(Char.IsControl) && m.Files!=null && m.Files.Count>0 && m.Files.Count<=MaxFiles,"Unsupported save backup.");
             var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);var entries=new HashSet<string>{"backup.json","backup.sha256"};long logical=0,data=0;int blocks=0;
             foreach(var file in m.Files) {
@@ -150,10 +150,11 @@ namespace TimeSplitters.Launcher
             Directory.CreateDirectory(Core.PathIn(root,".launcher"));
             using(LauncherPlatform.AcquireSaveLock(root,installationLockHeld)) { Recover(root);return CreateLocked(root,reason,progress,token); }
         }
-        static SaveBackup CreateLocked(string root,string reason,IProgress<string> progress,CancellationToken token)
+        // Callers hold the save lock; MapTransfer.Import calls this inside its own.
+        internal static SaveBackup CreateLocked(string root,string reason,IProgress<string> progress,CancellationToken token)
         {
             Core.Require(!Core.GameRunning(),"Close the game before backing up saves.");
-            Core.Require(new[]{"Manual","Before game update","Before restore"}.Contains(reason),"Invalid backup reason.");
+            Core.Require(new[]{"Manual","Before game update","Before restore",MapTransfer.BackupReason}.Contains(reason),"Invalid backup reason.");
             string saves=SaveLocations.Resolve(root);
             if(!Directory.Exists(saves))return null;
             var names=Tree(saves,saves).Take(MaxFiles+1).ToArray();if(names.Length==0)return null;
