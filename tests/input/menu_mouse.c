@@ -638,6 +638,83 @@ static void character_tests(void)
     }
 }
 
+/* Story / Arcade League / Challenge briefings hold only flag-4 display items,
+ * so no row is hit: a fresh left click off the footer is the menu Confirm
+ * (+0x1BC callback), delivered before the tick like a footer Select. */
+static void briefing_setup(uint32_t m,uint32_t descriptor,uint32_t confirm)
+{
+    const uint32_t text=0x3000,custom=0x3200;
+    memset(memory,0,sizeof memory);memset(&menu_mouse,0,sizeof menu_mouse);
+    memset(menu_mouse_footer,0,sizeof menu_mouse_footer);
+    active=1;shape_w=16;shape_h=9;navigation=0;footer_enabled=1;WORD_AT(0x76b0fc)=0;
+    WORD_AT(0x79094c)=101;WORD_AT(0x4e8cf0)=640;WORD_AT(0x4e8cf4)=480;
+    WORD_AT(0x7e71c8)=0x4000;WORD_AT(0x4000+4)=640;WORD_AT(0x4000+0x18)=480;
+    WORD_AT(m+4)=descriptor;WORD_AT(m+0x1bc)=confirm;WORD_AT(m+0x1b0)=3;
+    WORD_AT(m+0x178)=text;WORD_AT(m+0x198)=0;
+    FLOAT_AT(m+0xe4)=100;FLOAT_AT(m+0xe8)=70;FLOAT_AT(m+0xec)=540;FLOAT_AT(m+0xf0)=400;
+    WORD_AT(text)=7;WORD_AT(text+4)=custom;WORD_AT(text+0x28)=0x20d04;
+    FLOAT_AT(text+0x78)=120;FLOAT_AT(text+0x7c)=100;FLOAT_AT(text+0x80)=520;FLOAT_AT(text+0x84)=300;
+    WORD_AT(custom)=8;WORD_AT(custom+0x28)=4;
+    FLOAT_AT(custom+0x78)=120;FLOAT_AT(custom+0x7c)=300;FLOAT_AT(custom+0x80)=520;FLOAT_AT(custom+0x84)=380;
+    for(unsigned i=0;i<4;i++) {
+        WORD_AT(m+0x128+i*16)=i;WORD_AT(m+0x12c+i*16)=0x6000+i;WORD_AT(m+0x130+i*16)=0;
+    }
+    WORD_AT(0x6000)=0x41;
+}
+static void briefing_tests(void)
+{
+    const uint32_t m=0x2000;
+    const uint32_t pages[2][2]={{0x5238c0,0x2beaa0},{0x523870,0x2d5f10}};
+    for(unsigned page=0;page<2;page++) {
+        briefing_setup(m,pages[page][0],pages[page][1]);
+        unsigned before=selections;
+        /* UI (320,200) is on the text row; (60,40) is empty background. */
+        cursor=(PcMenuPointer){640,300,1280,720,1,0,0,0};run(m);run(m);
+        cursor.left=1;run(m);
+        CHECK(early_action==0x10 && (early_source&0x80u) && (early_held&0x10));
+        CHECK(selections==before && !WORD_AT(m+0x198)); /* no row selected */
+        run(m);CHECK(!early_action && !(early_source&0x80u)); /* held press */
+        cursor.left=0;run(m);cursor.x=640+(60-320)*1.5f;cursor.y=40*1.5f;run(m);
+        cursor.left=1;run(m);CHECK(early_action==0x10 && (early_source&0x80u));
+        cursor.left=0;run(m);WORD_AT(0x76b0fc)=1;cursor.left=1;run(m);
+        CHECK(early_action==0x10 && (early_source&0x80u)); /* network pad block */
+        WORD_AT(0x76b0fc)=0;cursor.left=0;run(m);
+        /* Footer prompts keep their own actions: Back (slot 1) and the online
+         * leaderboard (slot 2) are tested before the briefing click. */
+        for(unsigned slot=1;slot<3;slot++) {
+            cursor.x=640.f+(90.f+110.f*(float)slot-320.f)*1.5f;cursor.y=438.f*1.5f;
+            run(m);capture_footer(m);cursor.left=1;run(m);
+            CHECK(early_action==(0x10u<<slot) && !(WORD_AT(m+0xc4)&0x10));
+            if(slot==1) CHECK((early_source&0x120u)==0x120u);
+            else CHECK((early_source&0x10u) && !(early_source&0x80u));
+            cursor.left=0;run(m);
+        }
+        /* Right-click stays Back through the shared row hook. */
+        cursor.x=640;cursor.y=300;cursor.right=1;run(m);
+        CHECK(!early_action && (WORD_AT(m+0xc4)&0x20) && !(WORD_AT(m+0xc4)&0x10));
+        cursor.right=0;run(m);
+        /* The wheel scrolls the text page without confirming. */
+        WORD_AT(m+0x40)=8;cursor.wheel=-1;run(m);
+        CHECK((early_held&0xf)==2 && !early_action && !(WORD_AT(m+0xc4)&0x10));
+        run(m);WORD_AT(m+0x40)=0;menu_mouse.wheel_pending=0;
+        /* Other pages and scenes keep the shared rule (flag-4 items: no click). */
+        const uint32_t others[][2]={{0x523860,0x2d5f10},{0x5238d0,0x2cad20},
+            {pages[page][0],0x2cad20},{pages[!page][0],pages[page][1]}};
+        for(unsigned n=0;n<4;n++) {
+            WORD_AT(m+4)=others[n][0];WORD_AT(m+0x1bc)=others[n][1];
+            cursor.left=0;run(m);cursor.left=1;run(m);
+            CHECK(!early_action && !(early_source&0x80u) && !(WORD_AT(m+0xc4)&0x10));
+        }
+        WORD_AT(m+4)=pages[page][0];WORD_AT(m+0x1bc)=pages[page][1];
+        for(int scene=100;scene<=102;scene+=2) {
+            WORD_AT(0x79094c)=(uint32_t)scene;CHECK(!menu_briefing_page(m));
+        }
+        WORD_AT(0x79094c)=101;CHECK(menu_briefing_page(m));
+        cursor.left=0;run(m);cursor.left=1;run(m);CHECK(early_action==0x10);
+        cursor.left=0;run(m);
+    }
+}
+
 int main(void)
 {
     const uint32_t m=0x2000,item=0x3000,v=0x4000;
@@ -903,6 +980,7 @@ int main(void)
     choice_tests();
     team_tests();
     character_tests();
+    briefing_tests();
     settings_owner_tests();
     puts("PASS: menu pointer mapping, selection, click lifetime and gameplay isolation");
     return 0;
