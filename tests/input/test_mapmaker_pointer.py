@@ -35,6 +35,19 @@ MUTATIONS = {
     'wheel-zoom-in-menus': (ADAPTER, 'if(mapmaker_pointer_context(menu)) { pc_controls_mapmaker_zoom(notches);return 1; }', 'pc_controls_mapmaker_zoom(notches);'),
     'zoom-no-cap': (POLICY, 'if (z->until > now + 1000u) z->until = now + 1000u;', ''),
     'zoom-no-reset': (POLICY, 'if (dir != z->dir || now >= z->until) { z->dir = dir; z->until = now; }', 'z->dir = dir; if (now >= z->until) z->until = now;'),
+    'pan-any-state': (ADAPTER, '(WORD_AT(editor+0x25c)&0x0C044088u) ||', ''),
+    'edge-pan-unclamped-left': (ADAPTER, 'fmaxf(-1.f,fminf(1.f,ex))*MAPMAKER_EDGE_SPEED', 'fminf(1.f,ex)*MAPMAKER_EDGE_SPEED'),
+    'pan-no-clamp': (ADAPTER, 'c=left+w*.5f; if(c<0) left-=c; else if(c>MAPMAKER_GRID) left-=c-MAPMAKER_GRID;', ''),
+    'pan-in-menus': (ADAPTER, 'if(root) mapmaker_pointer_navigate(', 'if(1) mapmaker_pointer_navigate('),
+    'rotate-lost': (ADAPTER, 'else WORD_AT(menu+0xc4)|=0x20u; /* as the shared hook', 'else (void)0; /* as the shared hook'),
+    'drag-rotates': (ADAPTER, 'if(mapmaker_pointer.right_travel<MAPMAKER_RIGHT_CLICK && guest_writable(menu,0x23c))', 'if(guest_writable(menu,0x23c))'),
+    'right-never-clears': (ADAPTER, 'if(mapmaker_pointer_right_clears()) pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_Y);\n            else ', ''),
+    'right-clears-held': (ADAPTER, '!WORD_AT(editor+0x2f7c) && ', ''),
+    'lighting-back-late': (ADAPTER, 'if(d!=0x0052DFF0u && d!=', 'if(d!='),
+    'tick-back-any-list': (ADAPTER, '    if(d!=0x0052DFF0u && d!=0x0052E000u && d!=0x0052E020u && d!=0x0052E030u && d!=0x0052E040u) return 0;\n', ''),
+    'tick-back-on-screen': (ADAPTER, ' || mapmaker_pointer_context(menu)) return 0;\n    d=', ') return 0;\n    d='),
+    'tick-back-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu)) return 0;\n    d=', 'if(!mapmaker_pointer_enabled() || mapmaker_pointer_context(menu)) return 0;\n    d='),
+    'tick-back-no-bit': (ADAPTER, '    WORD_AT(menu+0xc4)|=0x20u;\n    return 1;\n}', '    return 1;\n}'),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 
@@ -84,12 +97,18 @@ def test_pointer_wiring():
     assert 'if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y))\n        mapmaker_pointer_scroll_press(menu,x,y);' in confirm
     # Both wheel samples (dispatch and layout fallback) go to the editor first.
     assert guest.count('.wheel && mapmaker_pointer_wheel(menu,') == 2
+    # The editor screen keeps the right button (pan, rotate, clear).
+    assert '(actions&4) && !(mapmaker_pointer_enabled() && mapmaker_pointer_context(menu))' in confirm
+    # Lighting list Back: after the input read, before the tick; the late hook skips it.
+    back = 'if((s->actions&4) && mapmaker_pointer_tick_back(menu)) s->actions&=~4u;'
+    assert hook.index('s->sampled=1;') < hook.index(back) < hook.index('if(!(s->actions&2))')
     for host in HOSTS:
         text = (ROOT / host).read_text(encoding='utf-8')
         assert 'void pc_controls_mapmaker_pointer(int active)' in text
         assert 'pc_mapmaker_row_press(&mapmaker_click);' in text
         assert 'void pc_controls_mapmaker_editor(int active)' in text
         assert 'pc_mapmaker_zoom_add(&mapmaker_zoom,' in text
+        assert 'void pc_controls_mapmaker_pulse(int button)' in text
         assert 'pc_mapmaker_zoom_key(&mapmaker_zoom,' in text
         click = text.split('int pc_controls_terminal_click(void)', 1)[1].split('return down;', 1)[0]
         assert 'pc_mapmaker_click(&mapmaker_click,' in click

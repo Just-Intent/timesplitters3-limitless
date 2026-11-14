@@ -11,7 +11,7 @@ from native_compiler import native_compiler
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.mark.parametrize('mutation', ['fixed', 'missing-source', 'hover-conflict', 'missing-slider-drag', 'missing-setting-drag', 'late-map-confirm', 'late-briefing-confirm', 'footer-only-character-confirm'])
+@pytest.mark.parametrize('mutation', ['fixed', 'missing-source', 'hover-conflict', 'missing-slider-drag', 'missing-setting-drag', 'late-map-confirm', 'late-briefing-confirm', 'footer-only-character-confirm', 'late-lighting-back'])
 def test_menu_mouse(tmp_path, mutation):
     compiler, env = native_compiler(tmp_path)
     source = ROOT / 'tests/input/menu_mouse.c'
@@ -66,6 +66,12 @@ def test_menu_mouse(tmp_path, mutation):
             rule, 'if(footer==0 || footer==1) menu_mouse_press(s,footer?0x120u:0x80u);'), encoding='utf-8')
         (tmp_path / 'pc_menu_mouse_guest.inc').write_text(
             (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8'), encoding='utf-8')
+    if mutation == 'late-lighting-back':
+        # Without the input-hook Back the lighting list's tick never sees a right click.
+        adapter = (ROOT / 'src/interface/pc_menu_mouse_guest.inc').read_text(encoding='utf-8')
+        hook = 'if((s->actions&4) && mapmaker_pointer_tick_back(menu)) s->actions&=~4u;'
+        assert hook in adapter
+        (tmp_path / 'pc_menu_mouse_guest.inc').write_text(adapter.replace(hook, '(void)mapmaker_pointer_tick_back;'), encoding='utf-8')
     if os.name == 'nt':
         args = [compiler, '/nologo', '/std:c11', '/O2', '/W4',
                 '/I' + str(tmp_path), '/I' + str(ROOT / 'src'), str(source), '/Fe:' + str(exe)]
@@ -90,6 +96,10 @@ def test_menu_mouse(tmp_path, mutation):
     if mutation == 'missing-setting-drag':
         assert result.returncode != 0
         assert 'FLOAT_AT(value_address)==.25f' in result.stderr
+        return
+    if mutation == 'late-lighting-back':
+        assert result.returncode != 0
+        assert 'early_action==0x20' in result.stderr  # Back reaches the tick
         return
     if mutation == 'late-map-confirm':
         assert result.returncode != 0

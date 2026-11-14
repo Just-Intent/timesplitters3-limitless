@@ -154,6 +154,7 @@ void pc_controls_mapmaker_pointer(int active) { (void)active; }
 void pc_controls_mapmaker_row_press(void) {}
 void pc_controls_mapmaker_editor(int active) { (void)active; }
 void pc_controls_mapmaker_zoom(int notches) { (void)notches; }
+void pc_controls_mapmaker_pulse(int button) { (void)button; }
 static int tab_pointer_enabled;
 static PcMenuPointer tab_pointer;
 PcMenuPointer pc_controls_menu_hover_pointer(void) { CHECK(tab_pointer_enabled);return tab_pointer; }

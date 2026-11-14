@@ -22,6 +22,8 @@ void pc_controls_mapmaker_row_press(void);
 void pc_controls_mapmaker_editor(int active);
 /* MapMaker editor screen: wheel notches (positive up) become a short zoom hold. */
 void pc_controls_mapmaker_zoom(int notches);
+/* MapMaker editor: press a button (PC_MAPMAKER_PULSE_*) briefly. */
+void pc_controls_mapmaker_pulse(int button);
 void pc_controls_menu_mode(int active);
 int pc_controls_in_menu(void);
 PcMenuPointer pc_controls_menu_pointer(void);

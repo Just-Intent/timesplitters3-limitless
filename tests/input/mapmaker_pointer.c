@@ -30,6 +30,8 @@ static int editor_last=-1;
 static void pc_controls_mapmaker_editor(int active) { editor_last=active; }
 static int zoom_notches;
 static void pc_controls_mapmaker_zoom(int notches) { zoom_notches+=notches; }
+static int pulses_y;
+static void pc_controls_mapmaker_pulse(int button) { if(button==PC_MAPMAKER_PULSE_Y) pulses_y++; }
 static unsigned shape_w,shape_h; /* Auto output shape; 0 = the guest's 4:3 */
 static void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh)
 { *sw=shape_w?shape_w:w;*sh=shape_h?shape_h:h; }
@@ -274,6 +276,79 @@ int main(void)
     CHECK(mapmaker_pointer_wheel(MENU,-1) && zoom_notches==1);
     zoom_notches=0;
 
+    /* Pan: the game's left/top add, right/bottom recompute, centre clamp, flag. */
+#define ED 0x00320000u
+    WORD_AT(0x007844A8u)=ED;WORD_AT(ED+0x25c)=0;
+    FLOAT_AT(0x00783DD8u)=10.f;FLOAT_AT(0x00783CC0u)=10.f;   /* left, top */
+    FLOAT_AT(0x00783DE0u)=20.f;FLOAT_AT(0x00783DDCu)=15.f;   /* width, height */
+    FLOAT_AT(0x00783DD4u)=.05f;FLOAT_AT(0x00783F20u)=.05f;   /* cells per pixel */
+    CHECK(mapmaker_pointer_pan(1.f,2.f));
+    CHECK(NEAR(FLOAT_AT(0x00783DD8u),11.f) && NEAR(FLOAT_AT(0x00783CC0u),12.f) &&
+          NEAR(FLOAT_AT(0x00783DC0u),31.f) && NEAR(FLOAT_AT(0x00783DCCu),27.f) && (WORD_AT(ED+0x25c)&2u));
+    CHECK(mapmaker_pointer_pan(100.f,-100.f));               /* centre stays on the 40x40 grid */
+    CHECK(NEAR(FLOAT_AT(0x00783DD8u),30.f) && NEAR(FLOAT_AT(0x00783CC0u),-7.5f));
+    FLOAT_AT(0x00783DD8u)=10.f;FLOAT_AT(0x00783CC0u)=10.f;
+    WORD_AT(ED+0x25c)=0x00004000u;                           /* a state the editor does not pan in */
+    CHECK(!mapmaker_pointer_pan(1.f,1.f) && FLOAT_AT(0x00783DD8u)==10.f);
+    WORD_AT(ED+0x25c)=0;
+    /* Right click without a drag: the menu Back action (rotate), on release. */
+    WORD_AT(MENU+0xc4)=0;WORD_AT(ED+0x2f7c)=0x00340000u;     /* a piece is held */
+    move(300.f,200.f);game_frame();
+    cursor.right=1;game_frame();
+    CHECK(WORD_AT(MENU+0xc4)==0);                            /* not on press */
+    move(301.f,201.f);game_frame();                          /* within the click slop */
+    cursor.right=0;game_frame();
+    CHECK(WORD_AT(MENU+0xc4)==0x20u && NEAR(FLOAT_AT(0x00783DD8u),10.f));
+    WORD_AT(MENU+0xc4)=0;
+    /* ... over an empty cell with nothing held: Y (clear selection) instead. */
+    WORD_AT(ED+0x2f7c)=0;WORD_AT(ED+0x2f18)=0;pulses_y=0;
+    cursor.right=1;game_frame();cursor.right=0;game_frame();
+    CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0);
+    WORD_AT(ED+0x2f7c)=0x00340000u;                          /* holding a piece: rotate */
+    cursor.right=1;game_frame();cursor.right=0;game_frame();
+    CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0x20u);
+    WORD_AT(MENU+0xc4)=0;WORD_AT(ED+0x2f7c)=0;WORD_AT(ED+0x2f18)=0x00350000u; /* occupied cell */
+    cursor.right=1;game_frame();cursor.right=0;game_frame();
+    CHECK(pulses_y==1 && WORD_AT(MENU+0xc4)==0x20u);         /* nothing held: Back as before */
+    WORD_AT(MENU+0xc4)=0;WORD_AT(ED+0x2f18)=0;WORD_AT(ED+0x2f7c)=0x00340000u;
+    /* Right-drag on the editor screen grabs the map, and does not rotate. */
+    move(300.f,200.f);cursor.right=1;game_frame();
+    move(320.f,190.f);game_frame();                          /* +20 px right, -10 px up */
+    CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f) && NEAR(FLOAT_AT(0x00783CC0u),10.5f));
+    cursor.right=0;game_frame();
+    CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f) && WORD_AT(MENU+0xc4)==0); /* released: no pan, no rotate */
+    /* Mouse at the left edge pans left; in a menu it never pans. */
+    move(2.f,200.f);game_frame();
+    CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f-(MAPMAKER_EDGE-2.f)/MAPMAKER_EDGE*MAPMAKER_EDGE_SPEED));
+    FLOAT_AT(0x00783DD8u)=9.f;
+    move(MAPMAKER_EDGE+1.f,200.f);game_frame();             /* just inside the zone edge: no pan */
+    CHECK(FLOAT_AT(0x00783DD8u)==9.f);
+    move(630.f,200.f);game_frame();                         /* right edge pans right */
+    CHECK(FLOAT_AT(0x00783DD8u)>9.f);
+    /* Wide windows (16:9 and 21:9, Auto output): the side bars map outside
+       0..640, yet edge panning keeps its speed in both directions. */
+    {
+        static const float wins[][2]={{1920.f,1080.f},{2560.f,1080.f}};
+        for(unsigned i=0;i<2;i++) {
+            shape_w=(unsigned)wins[i][0];shape_h=(unsigned)wins[i][1];
+            cursor.width=wins[i][0];cursor.height=wins[i][1];
+            FLOAT_AT(0x00783DD8u)=9.f;cursor.x=wins[i][0]*.5f;cursor.y=wins[i][1]*.5f;game_frame();
+            CHECK(NEAR(FLOAT_AT(B+0x20),320.f) && FLOAT_AT(0x00783DD8u)==9.f); /* centre: no pan */
+            cursor.x=0.f;game_frame();                      /* window's left edge */
+            CHECK(NEAR(FLOAT_AT(B+0x20),FLOAT_AT(B+0x48)));  /* pointer held at its left bound */
+            CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f-MAPMAKER_EDGE_SPEED));
+            FLOAT_AT(0x00783DD8u)=9.f;cursor.x=wins[i][0]-1.f;game_frame();
+            CHECK(NEAR(FLOAT_AT(0x00783DD8u),9.f+MAPMAKER_EDGE_SPEED));
+        }
+        shape_w=shape_h=0;cursor.width=1280.f;cursor.height=960.f;move(320.f,240.f);game_frame();
+    }
+    FLOAT_AT(0x00783DD8u)=9.f;move(2.f,200.f);
+    WORD_AT(MENU+0x178)=0x00301000u;FLOAT_AT(0x00783DD8u)=9.f;
+    game_frame();
+    CHECK(FLOAT_AT(0x00783DD8u)==9.f);
+    WORD_AT(MENU+0x178)=0;
+    move(320.f,240.f);game_frame();
+
     /* Logic list: the active menu is its passive description panel; a click
      * that missed the panel uses the parent's rows. */
 #define PARENT 0x00330000u
@@ -308,6 +383,32 @@ int main(void)
     CHECK(mapmaker_pointer_parent_press(PANEL,330.f,110.f)!=LIST);
     WORD_AT(PANEL+4)=0;WORD_AT(PANEL+0x178)=0;
     row_presses=0;
+
+    /* Right click in the lighting list and its colour sub-lists: Back right
+     * after the input read (their tick reads it); other lists keep the shared
+     * row hook's Back (their +0x1C0 callback). */
+    {
+        static const uint32_t own[]={0x0052DFF0u,0x0052E000u,0x0052E020u,0x0052E030u,0x0052E040u};
+        static const uint32_t shared[]={0x0052DDFCu,0x0052DE0Cu,0x0052E078u,0x0052E9F8u,0x0052E9D8u,0x0052E088u,0x0052E010u,0};
+        for(unsigned i=0;i<5;i++) {
+            WORD_AT(SM+4)=own[i];WORD_AT(SM+0xc4)=0x10000u;
+            CHECK(mapmaker_pointer_tick_back(SM) && WORD_AT(SM+0xc4)==0x10020u);
+        }
+        for(unsigned i=0;i<8;i++) {
+            WORD_AT(SM+4)=shared[i];WORD_AT(SM+0xc4)=0;
+            CHECK(!mapmaker_pointer_tick_back(SM) && !WORD_AT(SM+0xc4));
+        }
+        WORD_AT(SM+4)=0x0052DFF0u;WORD_AT(SM+0xc4)=0;
+        WORD_AT(0x0079094Cu)=101;                       /* other scenes */
+        CHECK(!mapmaker_pointer_tick_back(SM) && !WORD_AT(SM+0xc4));
+        WORD_AT(0x0079094Cu)=102;
+        set_enabled("0");                               /* pointer off: original input */
+        CHECK(!mapmaker_pointer_tick_back(SM) && !WORD_AT(SM+0xc4));
+        set_enabled("1");
+        WORD_AT(MENU+4)=0x0052DFF0u;WORD_AT(MENU+0xc4)=0; /* editor screen keeps rotate/clear */
+        CHECK(!mapmaker_pointer_tick_back(MENU) && !WORD_AT(MENU+0xc4));
+        WORD_AT(MENU+4)=0;WORD_AT(SM+4)=0;
+    }
 
     /* Editor menu rows: a real A press instead of the menu confirm, scene 102 only. */
     set_enabled("0");

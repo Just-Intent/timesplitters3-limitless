@@ -19,6 +19,14 @@
  * (pc_controls_mapmaker_pointer, pc_mapmaker_pointer.h). A click on an editor
  * menu row becomes a real A press too (mapmaker_pointer_row_click).
  *
+ * Navigation (editor screen only): right-drag grabs and pans the map, and the
+ * mouse at a window edge pans like the right stick. Both apply the game's pan
+ * (sub_00309160: view left/top +=, right/bottom recomputed) and its centre
+ * clamp to the 40x40 grid (sub_002F9F70), and are skipped in the states where
+ * the editor itself does not pan (editor+0x25C & 0x0C044088). A right click
+ * without a drag keeps its meaning (rotate), clears the selection over an
+ * empty cell, and closes the lighting list (mapmaker_pointer_tick_back).
+ *
  * Menu scrollbars (tile, item and Story AI lists): A over the bar did not
  * scroll the Story AI list in game, so the scrollbar is driven directly. A
  * left press on an arrow steps the scroll target (menu+0x88) and repeats while
@@ -31,7 +39,8 @@
  * sub_00076EF0, GetTickCount64, d3d8_display_output_shape,
  * pc_menu_mouse_position, pc_controls_menu_hover_pointer,
  * pc_controls_mapmaker_pointer, pc_controls_mapmaker_row_press,
- * pc_controls_mapmaker_editor and pc_controls_mapmaker_zoom. While a menu is
+ * pc_controls_mapmaker_editor, pc_controls_mapmaker_zoom and
+ * pc_controls_mapmaker_pulse. While a menu is
  * open, toolbar clicks do nothing (A/D switch categories). */
 #include <math.h>
 #include <stdlib.h>
@@ -41,17 +50,23 @@
 #define MAPMAKER_POINTER_PLAYER 0x007BA9E0u
 #define MAPMAKER_POINTER_BLOCK 0x007BA260u
 #define MAPMAKER_POINTER_STRIDE 0x1E0u
+#define MAPMAKER_EDITOR 0x007844A8u
+#define MAPMAKER_EDGE 24.f           /* UI pixels from the canvas edge (of 640x480) */
+#define MAPMAKER_EDGE_SPEED 0.25f    /* cells per frame at the very edge */
+#define MAPMAKER_GRID 40.f           /* grid cells per axis */
+#define MAPMAKER_RIGHT_CLICK 4.f     /* less right-button travel than this is a click */
 #define MAPMAKER_SCROLL_DELAY 300u   /* ms before an arrow repeats */
 #define MAPMAKER_SCROLL_REPEAT 80u   /* ms between repeats */
 
 static struct {
     int initialized, enabled;
     int have_last, last_left, last_right;
-    float last_x, last_y;
+    float last_x, last_y, last_ux, last_uy;
     uint32_t grab_menu;  /* menu whose scrollbar the left press is driving */
     int grab_mode;       /* 1 up arrow, 2 down arrow, 3 thumb */
     float grab;          /* pointer y minus thumb top at the press */
     unsigned long long grab_next; /* next arrow repeat */
+    float right_travel;  /* UI pixels moved while the right button is held */
 } mapmaker_pointer;
 
 static int mapmaker_pointer_enabled(void)
@@ -217,6 +232,71 @@ static void mapmaker_pointer_scroll_drag(uint32_t menu,float y,int left)
         (mapmaker_pointer.grab_mode==1?-1.f:1.f)*mapmaker_scroll_step(menu));
 }
 
+/* sub_00309160 then the sub_002F9F70 centre clamp; dx/dy in grid cells. */
+static int mapmaker_pointer_pan(float dx,float dy)
+{
+    uint32_t editor;
+    float left,top,w,h,c;
+    if(!guest_writable(MAPMAKER_EDITOR,4)) return 0;
+    editor=WORD_AT(MAPMAKER_EDITOR);
+    if(!guest_writable(editor,0x260) || (WORD_AT(editor+0x25c)&0x0C044088u) ||
+       !guest_writable(0x00783CC0u,4) || !guest_writable(0x00783DC0u,4) ||
+       !guest_writable(0x00783DCCu,4) || !guest_writable(0x00783DD8u,0xc)) return 0;
+    left=FLOAT_AT(0x00783DD8u)+dx;top=FLOAT_AT(0x00783CC0u)+dy;
+    w=FLOAT_AT(0x00783DE0u);h=FLOAT_AT(0x00783DDCu);
+    if(!isfinite(left) || !isfinite(top) || !isfinite(w) || !isfinite(h) || !(w>0) || !(h>0)) return 0;
+    c=left+w*.5f; if(c<0) left-=c; else if(c>MAPMAKER_GRID) left-=c-MAPMAKER_GRID;
+    c=top+h*.5f;  if(c<0) top-=c;  else if(c>MAPMAKER_GRID) top-=c-MAPMAKER_GRID;
+    FLOAT_AT(0x00783DD8u)=left;FLOAT_AT(0x00783CC0u)=top;
+    FLOAT_AT(0x00783DC0u)=left+w;FLOAT_AT(0x00783DCCu)=top+h;
+    WORD_AT(editor+0x25c)|=2u; /* as the editor's own pan */
+    return 1;
+}
+
+/* Editor screen: right-drag grabs the map; the window edge pans. A right
+ * click without a drag keeps its original meaning (the menu Back action, which
+ * the editor uses to rotate the held piece), sent on release, except over an
+ * empty cell with no piece held, where it presses Y (clears the selection).
+ * Fields from static analysis: editor+0x2F7C held piece, +0x2F18 cell under
+ * the pointer. */
+static int mapmaker_pointer_right_clears(void)
+{
+    uint32_t editor=guest_writable(MAPMAKER_EDITOR,4)?WORD_AT(MAPMAKER_EDITOR):0u;
+    return guest_writable(editor,0x2f80) && !WORD_AT(editor+0x2f7c) && !WORD_AT(editor+0x2f18);
+}
+static void mapmaker_pointer_navigate(uint32_t menu,float x,float y,float gw,float gh,int right)
+{
+    float sx,sy,ex=0,ey=0;
+    if(right && !mapmaker_pointer.last_right) mapmaker_pointer.right_travel=0;
+    if(!right && mapmaker_pointer.last_right && mapmaker_pointer.have_last) {
+        if(mapmaker_pointer.right_travel<MAPMAKER_RIGHT_CLICK && guest_writable(menu,0x23c)) {
+            if(mapmaker_pointer_right_clears()) pc_controls_mapmaker_pulse(PC_MAPMAKER_PULSE_Y);
+            else WORD_AT(menu+0xc4)|=0x20u; /* as the shared hook's right click */
+        }
+        mapmaker_pointer.right_travel=MAPMAKER_RIGHT_CLICK;
+    }
+    if(right) {
+        if(mapmaker_pointer.have_last && mapmaker_pointer.last_right)
+            mapmaker_pointer.right_travel+=fabsf(x-mapmaker_pointer.last_ux)+fabsf(y-mapmaker_pointer.last_uy);
+        if(mapmaker_pointer.have_last && mapmaker_pointer.last_right &&
+           mapmaker_pointer.right_travel>=MAPMAKER_RIGHT_CLICK &&
+           guest_writable(0x00783DD4u,4) && guest_writable(0x00783F20u,4)) {
+            sx=FLOAT_AT(0x00783DD4u);sy=FLOAT_AT(0x00783F20u); /* cells per pixel */
+            if((x!=mapmaker_pointer.last_ux || y!=mapmaker_pointer.last_uy) && isfinite(sx) && isfinite(sy))
+                mapmaker_pointer_pan(-(x-mapmaker_pointer.last_ux)*sx,-(y-mapmaker_pointer.last_uy)*sy);
+        }
+        return;
+    }
+    if(x<MAPMAKER_EDGE) ex=-(MAPMAKER_EDGE-x)/MAPMAKER_EDGE;
+    else if(x>gw-MAPMAKER_EDGE) ex=(x-(gw-MAPMAKER_EDGE))/MAPMAKER_EDGE;
+    if(y<MAPMAKER_EDGE) ey=-(MAPMAKER_EDGE-y)/MAPMAKER_EDGE;
+    else if(y>gh-MAPMAKER_EDGE) ey=(y-(gh-MAPMAKER_EDGE))/MAPMAKER_EDGE;
+    /* Wide windows: the side bars map left of 0 / right of 640, so clamp both
+       directions to the edge speed. */
+    if(ex || ey) mapmaker_pointer_pan(fmaxf(-1.f,fminf(1.f,ex))*MAPMAKER_EDGE_SPEED,
+                                      fmaxf(-1.f,fminf(1.f,ey))*MAPMAKER_EDGE_SPEED);
+}
+
 /* The logic list keeps a passive description panel open as its child, so
  * the engine (sub_00074760) treats the panel as the active menu and the PC
  * hook only hit-tests the panel. A left press that hit nothing there presses A
@@ -269,6 +349,27 @@ static int mapmaker_pointer_row_click(void)
     return 1;
 }
 
+/* Right click in an open list is the menu Back action (+0xC4 |= 0x20). The
+ * shared hook sets it in the row layout (sub_00073750, 0x0007ADC5), which most
+ * editor lists act on there: the dispatcher calls their Back callback +0x1C0
+ * (sub_002FB090; 0x0007B1A9..0x0007B1E4). The lighting list (descriptor
+ * 0x0052DFF0, toolbar table 0x0052CD50 slot 2) and its colour sub-lists
+ * (0x0052E000, 0x0052E020, 0x0052E030, 0x0052E040) have no Back callback and
+ * no pop flag (+0x40 & 0x2000): their shared tick sub_0031AF80 reads Back
+ * itself (0x0031B172, closing via sub_0031A500), at 0x0007AD76, before the row
+ * layout, and the dispatcher clears +0xC4 each frame (0x0007AA12). So for those
+ * menus Back is set here, right after the input read, as the B button sets it.
+ * Returns 1 when it did (the shared hook must not set it again). */
+static int mapmaker_pointer_tick_back(uint32_t menu)
+{
+    uint32_t d;
+    if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu)) return 0;
+    d=WORD_AT(menu+4);
+    if(d!=0x0052DFF0u && d!=0x0052E000u && d!=0x0052E020u && d!=0x0052E030u && d!=0x0052E040u) return 0;
+    WORD_AT(menu+0xc4)|=0x20u;
+    return 1;
+}
+
 /* Called after the original sub_00073870 for every dispatched menu. */
 static void mapmaker_pointer_input(uint32_t menu)
 {
@@ -295,7 +396,9 @@ static void mapmaker_pointer_input(uint32_t menu)
     pressed=(p.left && !mapmaker_pointer.last_left) || (p.right && !mapmaker_pointer.last_right);
     if(moved || pressed) mapmaker_pointer_place(x,y);
     mapmaker_pointer_scroll_drag(menu,y,p.left);
+    if(root) mapmaker_pointer_navigate(menu,x,y,gw,gh,p.right);
     mapmaker_pointer.have_last=1;
     mapmaker_pointer.last_x=p.x;mapmaker_pointer.last_y=p.y;
+    mapmaker_pointer.last_ux=x;mapmaker_pointer.last_uy=y;
     mapmaker_pointer.last_left=p.left;mapmaker_pointer.last_right=p.right;
 }

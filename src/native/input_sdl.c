@@ -259,13 +259,17 @@ int pc_controls_accept_pad(void) {
 }
 /* MapMaker editor mouse and keys (pc_mapmaker_pointer.h), as on Windows. */
 static int mapmaker_pointer_active,mapmaker_editor;
-static int mapmaker_zoom_up_key,mapmaker_zoom_down_key;
+static int mapmaker_zoom_up_key,mapmaker_zoom_down_key,mapmaker_y_key;
+static Uint64 mapmaker_pulse_until[1];
 static PcMapMakerClick mapmaker_click;
 static PcMapMakerZoom mapmaker_zoom;
 /* Editor key policy for one polled key; down already includes menu aliases. */
 static int mapmaker_key(int vk,int down,int menu) {
     pthread_mutex_lock(&camera_lock);
     int editor=menu && mapmaker_editor && atomic_load(&focused);
+    /* MapMaker editor: a right click on an empty cell briefly presses Y. */
+    if(editor && mapmaker_y_key && vk==mapmaker_y_key &&
+       SDL_GetTicks()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_Y]) down=1;
     /* MapMaker editor screen: a wheel notch briefly holds White or Black (zoom). */
     down=pc_mapmaker_zoom_key(&mapmaker_zoom,editor,vk,
                               mapmaker_zoom_up_key,mapmaker_zoom_down_key,down,SDL_GetTicks());
@@ -418,14 +422,21 @@ void pc_controls_mapmaker_pointer(int active) {
 }
 /* Called from the guest menu hook, never while the bindings are evaluated. */
 void pc_controls_mapmaker_editor(int active) {
-    int keys[PC_ACTION_COUNT],white=0,black=0;
+    int keys[PC_ACTION_COUNT],white=0,black=0,y=0;
     if(active && pc_settings_prompt_keys(keys)) {
         white=keys[5];  /* "White button action": zoom (held), wheel up */
         black=keys[4];  /* "Black button action": zoom (held), wheel down */
+        y=keys[3];      /* "Y action": clears the tile selection */
     }
     pthread_mutex_lock(&camera_lock);
     mapmaker_editor=!!active;
-    mapmaker_zoom_up_key=white;mapmaker_zoom_down_key=black;
+    mapmaker_zoom_up_key=white;mapmaker_zoom_down_key=black;mapmaker_y_key=y;
+    pthread_mutex_unlock(&camera_lock);
+}
+void pc_controls_mapmaker_pulse(int button) {
+    if(button!=PC_MAPMAKER_PULSE_Y)return;
+    pthread_mutex_lock(&camera_lock);
+    mapmaker_pulse_until[button]=SDL_GetTicks()+PC_MAPMAKER_PULSE_MS;
     pthread_mutex_unlock(&camera_lock);
 }
 void pc_controls_mapmaker_zoom(int notches) {

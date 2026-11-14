@@ -59,7 +59,8 @@ static volatile LONG editing;
 static int menu_mode, menu_button_block;
 /* MapMaker editor mouse (pc_mapmaker_pointer.h): the editor screen owns the pointer. */
 static int mapmaker_pointer_active, mapmaker_editor;
-static int mapmaker_zoom_up_key, mapmaker_zoom_down_key;
+static int mapmaker_zoom_up_key, mapmaker_zoom_down_key, mapmaker_y_key;
+static ULONGLONG mapmaker_pulse_until[1];
 static PcMapMakerClick mapmaker_click;
 static PcMapMakerZoom mapmaker_zoom;
 static PcTextInput text_input;
@@ -595,6 +596,10 @@ int pc_controls_key_down(int key)
     if((key==VK_LBUTTON && (menu_mode || (menu_button_block&1))) ||
        (key==VK_RBUTTON && (menu_mode || (menu_button_block&2)))) down=0;
     if (key == VK_LBUTTON && pc_input_terminal_suppresses_left(&input, input.keys[VK_LBUTTON])) down = 0;
+    /* MapMaker editor: a right click on an empty cell briefly presses Y. */
+    if(menu_mode && mapmaker_editor && mapmaker_y_key && key==mapmaker_y_key &&
+       GetTickCount64()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_Y] &&
+       (replaying || GetForegroundWindow()==window_handle)) down=1;
     /* MapMaker editor screen: a wheel notch briefly holds White or Black (zoom). */
     down=pc_mapmaker_zoom_key(&mapmaker_zoom,menu_mode && mapmaker_editor &&
                               (replaying || GetForegroundWindow()==window_handle),
@@ -662,15 +667,25 @@ void pc_controls_mapmaker_pointer(int active)
  * so reading the bindings here cannot re-enter the bindings lock. */
 void pc_controls_mapmaker_editor(int active)
 {
-    int keys[PC_ACTION_COUNT], white = 0, black = 0;
+    int keys[PC_ACTION_COUNT], white = 0, black = 0, y = 0;
     if (active && pc_settings_prompt_keys(keys)) {
         white = keys[5];   /* "White button action": zoom (held), wheel up */
         black = keys[4];   /* "Black button action": zoom (held), wheel down */
+        y = keys[3];       /* "Y action": clears the tile selection */
     }
     AcquireSRWLockExclusive(&lock);
     mapmaker_editor = !!active;
     mapmaker_zoom_up_key = white;
     mapmaker_zoom_down_key = black;
+    mapmaker_y_key = y;
+    ReleaseSRWLockExclusive(&lock);
+}
+
+void pc_controls_mapmaker_pulse(int button)
+{
+    if (button != PC_MAPMAKER_PULSE_Y) return;
+    AcquireSRWLockExclusive(&lock);
+    mapmaker_pulse_until[button] = GetTickCount64() + PC_MAPMAKER_PULSE_MS;
     ReleaseSRWLockExclusive(&lock);
 }
 

@@ -59,6 +59,7 @@ static void pc_controls_mapmaker_pointer(int on) { (void)on; }
 static void pc_controls_mapmaker_row_press(void) {}
 static void pc_controls_mapmaker_editor(int on) { (void)on; }
 static void pc_controls_mapmaker_zoom(int n) { (void)n; }
+static void pc_controls_mapmaker_pulse(int b) { (void)b; }
 void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh)
 { (void)w;(void)h;*sw=shape_w;*sh=shape_h; }
 void sub_00074760(void) { mode=5; }
@@ -767,6 +768,30 @@ static void briefing_tests(void)
     }
 }
 
+/* MapMaker lighting list (0x0052DFF0) and its colour sub-lists: their tick
+ * reads Back before the row hook, so a right click is Back right after the
+ * input read; other editor lists keep the shared row hook's Back. */
+static void mapmaker_back_tests(void)
+{
+    const uint32_t m=0x2000;
+    const uint32_t lists[]={0x52dff0,0x52e000,0x52e020,0x52e030,0x52e040,0x52ddfc,0x52de0c,0x52e078};
+    for(unsigned n=0;n<8;n++) {
+        briefing_setup(m,lists[n],0);WORD_AT(0x79094c)=102;
+        cursor=(PcMenuPointer){1200,700,1280,720,1,0,0,0};run(m);run(m); /* outside the list */
+        cursor.right=1;run(m);
+        if(n<5) CHECK(early_action==0x20 && WORD_AT(m+0xc4)==0x20);
+        else CHECK(!early_action && WORD_AT(m+0xc4)==0x20);
+        run(m);CHECK(!WORD_AT(m+0xc4)); /* held: once per click */
+        cursor.right=0;run(m);
+        cursor.x=640;cursor.y=300;cursor.right=1;run(m);  /* inside: the same Back */
+        CHECK(WORD_AT(m+0xc4)==0x20 && (n<5)==(early_action==0x20));
+        cursor.right=0;run(m);
+    }
+    WORD_AT(0x79094c)=101;cursor.right=1;run(m);     /* outside MapMaker: shared rule */
+    CHECK(!early_action && WORD_AT(m+0xc4)==0x20);
+    cursor.right=0;run(m);
+}
+
 int main(void)
 {
     const uint32_t m=0x2000,item=0x3000,v=0x4000;
@@ -1034,6 +1059,7 @@ int main(void)
     character_tests();
     map_browser_tests();
     briefing_tests();
+    mapmaker_back_tests();
     settings_owner_tests();
     puts("PASS: menu pointer mapping, selection, click lifetime and gameplay isolation");
     return 0;
