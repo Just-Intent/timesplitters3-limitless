@@ -269,6 +269,7 @@
     "tests/input/test_controller_profile.py",
     "tests/input/test_weapon_slots.py",
     "tests/input/test_menu_mouse.py",
+    "tests/input/test_mapmaker_pointer.py",
     "tests/graphics/test_menu_text.py",
     "tests/graphics/test_quit_menu.py",
     "tests/graphics/test_ui_layout.py",

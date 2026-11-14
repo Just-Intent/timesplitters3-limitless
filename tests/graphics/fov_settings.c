@@ -150,6 +150,7 @@ static int controls_test_menu_active=1;
 int pc_controls_in_menu(void) {return controls_test_menu_active;}
 void pc_controls_menu_mode(int active) { (void)active; CHECK(0); }
 PcMenuPointer pc_controls_menu_pointer(void) { CHECK(0); return (PcMenuPointer){0}; }
+void pc_controls_mapmaker_pointer(int active) { (void)active; }
 static int tab_pointer_enabled;
 static PcMenuPointer tab_pointer;
 PcMenuPointer pc_controls_menu_hover_pointer(void) { CHECK(tab_pointer_enabled);return tab_pointer; }

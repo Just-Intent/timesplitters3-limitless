@@ -44,6 +44,7 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
 #include "pc_menu_sliders.inc"
 static void menu_team_arrow(unsigned direction);
 #include "pc_menu_choices.inc"
+#include "pc_mapmaker_pointer.inc"
 
 /* US Settings root 523910 uses 78AD34 for its selected profile. Native
  * menu history at 7BA264 retains that descriptor while a submenu is open.
@@ -426,6 +427,7 @@ void pc_display_menu_mouse_input(void (*original)(void))
     if(settings_owner>=0)WORD_AT(menu+0x3c)=1u | (1u<<(unsigned)settings_owner);
     original();
     if(settings_owner>=0)WORD_AT(menu+0x3c)=mask;
+    mapmaker_pointer_input(menu); /* MapMaker editor mouse; TSFP_MAPMAKER_POINTER=0 turns it off */
     menu_text_input(menu);
     if(!s || s->sampled || s->menu!=menu || !menu_mouse_context() || !guest_writable(menu,0x23c) ||
        WORD_AT(menu+0x38)!=0 || WORD_AT(menu+0x1b0)!=3) return;

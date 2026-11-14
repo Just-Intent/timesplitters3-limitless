@@ -17,6 +17,7 @@
 #include "pc_input.h"
 #include "pc_text_input.h"
 #include "pc_menu_mouse.h"
+#include "pc_mapmaker_pointer.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -394,10 +395,23 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
 }
 /* Mouse deltas reach the camera wrapper; controller stick input stays intact. */
 void tsfp_native_mouse_sample(XBOX_GAMEPAD *out) {(void)out;}
+/* MapMaker editor mouse (pc_mapmaker_pointer.h), as on Windows. */
+static int mapmaker_pointer_active;
+static PcMapMakerClick mapmaker_click;
+void pc_controls_mapmaker_pointer(int active) {
+    pthread_mutex_lock(&camera_lock);
+    mapmaker_pointer_active=!!active;
+    pthread_mutex_unlock(&camera_lock);
+}
 int pc_controls_terminal_click(void) {
     pthread_mutex_lock(&camera_lock);
-    int down=!atomic_load(&menu_active) && !(menu_button_block&1) && atomic_load(&focused) && atomic_load(&mouse_enabled) &&
-             pc_input_terminal_click(&camera_input,atomic_load(&keys[1]));
+    int menu=atomic_load(&menu_active);
+    if(!menu) mapmaker_pointer_active=0;
+    /* Always evaluated so its held-button block tracks every poll. */
+    int mapmaker=pc_mapmaker_click(&mapmaker_click,menu && mapmaker_pointer_active,atomic_load(&keys[1]));
+    int down=(!menu && !(menu_button_block&1) && atomic_load(&focused) && atomic_load(&mouse_enabled) &&
+             pc_input_terminal_click(&camera_input,atomic_load(&keys[1]))) ||
+             (mapmaker && atomic_load(&focused));
     pthread_mutex_unlock(&camera_lock);
     return down;
 }
