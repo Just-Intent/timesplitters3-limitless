@@ -328,3 +328,47 @@ patch or regeneration. Fixture `tests/input/menu_mouse.c`
 (`character_tests`, `map_browser_tests`, `briefing_tests`); mutations
 `footer-only-character-confirm`, `late-map-confirm`, `late-briefing-confirm`
 in `test_menu_mouse.py`. In-game checks on a stock build are pending.
+The MapMaker editor (scene 102) is covered in the next section.
+
+## MapMaker editor mouse
+
+`src/interface/pc_mapmaker_pointer.inc` (guest side, included by
+`pc_menu_mouse_guest.inc`) and `pc_mapmaker_pointer.h` (host policy, pure
+inline) make the stock MapMaker editor usable with mouse and keyboard. On by
+default; `TSFP_MAPMAKER_POINTER=0` restores the original input. No patch or
+regeneration: it uses the existing menu-mouse hooks and input adapters.
+
+- Pointer: `mapmaker_pointer_input` runs after the original `sub_00073870` in
+  `pc_display_menu_mouse_input` for every scene-102 menu. On mouse motion or a
+  fresh press it places the game pointer (`0x007BA260 + player*0x1E0`, player
+  `0x007BA9E0`) as `sub_00071140` + `sub_00071050` do; a still mouse leaves the
+  stick alone. The editor screen is the dispatched menu with no rows (`+0x178`)
+  and no child (`+0x170`); only it owns the left button as held A
+  (`pc_controls_mapmaker_pointer` -> `pc_mapmaker_click` in
+  `pc_controls_terminal_click`, Windows `src/input/pc_controls.c` and SDL
+  `src/native/input_sdl.c`).
+- Menus: a fresh click on a scene-102 row holds A for that press instead of
+  the menu Confirm (`mapmaker_pointer_row_click`). A press on no row tries the
+  logic panel (`0x0052E9D8`/`0x0052E9E8`) entry list, then the parent's rows,
+  then a list scrollbar (arrows repeat after 300 ms, track jumps, thumb drags;
+  target `+0x88` clamped like `sub_00073560`).
+- Wheel: both wheel samples call `mapmaker_pointer_wheel` first; it scrolls a
+  list with a scrollbar (three steps per notch) or, on the editor screen,
+  briefly holds White (up) / Black (down), read from the player's bindings.
+- Right button (editor screen): drag pans (`sub_00309160` + the 40x40 centre
+  clamp of `sub_002F9F70`, skipped when `editor+0x25C & 0x0C044088`), window
+  edges pan, a click rotates (menu Back, on release) or presses Y over an empty
+  cell with nothing held. The shared hook's right-click Back skips the editor
+  screen. Lighting list `0x0052DFF0` and colour sub-lists get Back right after
+  the input read (`mapmaker_pointer_tick_back`), since their tick reads it first.
+- Keys (`pc_controls_mapmaker_editor`, both adapters): Escape is B while an
+  editor menu is open (latched per press) and Start on the editor screen;
+  movement keys are released and strafe left/right step the toolbar as the
+  D-pad; T is the floor-up trigger (Fire is the left button there) and prompts
+  show T (`pc_controls_mapmaker_editor_active` in `pc_prompts.c`).
+
+Fixture `tests/input/mapmaker_pointer.c` with mutations and wiring checks in
+`test_mapmaker_pointer.py` (runtime-suites `native`); menu fixtures stub the
+`pc_controls_mapmaker_*` hooks, `menu_mouse.c` covers the lighting-list Back
+(`late-lighting-back`), and `developer_player_keys.c` stubs the SDL key helper.
+In-game checks on a stock build, native Mac and Linux remain pending.

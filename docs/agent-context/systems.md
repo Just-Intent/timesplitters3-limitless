@@ -363,7 +363,7 @@ See `docs/textures/textures.md` and the runtime tests for usage and failure/boun
 | Area | Start here (tracked root unless noted) | Useful checks/docs |
 | --- | --- | --- |
 | Bindings, input prompts | `src/input/pc_controls.c`, `pc_input.c`, `pc_bindings.inc`, `pc_prompts.c` | `tests/input/pc_controls.c`, `tests/input/pc_prompts.c`, `docs/players/windows-settings.md` |
-| Mouse/menu handling | `src/interface/pc_menu_mouse_guest.inc`, `pc_menu_*.inc` ([clicks](systems-continuation.md#menu-click-confirm)) | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
+| Mouse/menu handling | `src/interface/pc_menu_*.inc`, `pc_mapmaker_pointer.*` ([clicks](systems-continuation.md#menu-click-confirm)) | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
 | Auto-look / camera / cutscene | `src/gameplay/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/gameplay/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py` |
 | Display model and native UI | `src/interface/pc_display.c`, `pc_display_*.inc`, `pc_settings.c`, `src/native/` | `tests/graphics/test_pc_display_modes.py`, `test_debug_settings_model.py` |
 | GPU clear / screen copies / sampling | `src/graphics/pc_clear_rhi.inc`, `src/graphics/`, runtime `src/d3d/` | `tests/graphics/test_rhi_menu_sampling.py`, `tests/rhi/`, `docs/development/shared-platform.md` |

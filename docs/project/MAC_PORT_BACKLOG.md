@@ -4854,6 +4854,15 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   no host adapter; it reaches Mac wherever that hook runs. Acceptance: these
   clicks, footer Back/right-click Back and keyboard/controller unchanged;
   untested in game on either host.
+  MapMaker editor mouse and keys (branch `feature/mapmaker-editor-mouse`,
+  uncommitted PR; `src/interface/pc_mapmaker_pointer.inc`/`.h`): pointer, left
+  click as A, rows, scrollbars, wheel zoom/scroll, right-drag and edge pan,
+  right click rotate/clear/close, Escape as B, A/D toolbar and T floor up. The
+  guest side is shared; both `src/input/pc_controls.c` and
+  `src/native/input_sdl.c` implement the host hooks from the shared policy
+  header, so no Mac-only logic remains. Acceptance on Mac/Linux: place, drag
+  and pan with the mouse, wheel zoom, Escape closes editor menus and opens the
+  pause menu from the editor screen, T raises the floor; untested in game.
 - **Issue #115 follow-up** (`115-bug-audio-menu-sliders-cannot-be-adjusted-with-mouse-pointer`): Windows Music/Sound volume bars now
   accept click-to-set and held dragging in main and paused Audio/Video Options.
   `src/interface/pc_menu_sliders.inc` captures both original painter layouts, reuses the

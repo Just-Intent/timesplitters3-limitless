@@ -1,3 +1,14 @@
+MapMaker editor mouse and keys (2026-11-13, branch
+feature/mapmaker-editor-mouse, based on feature/menu-mouse-confirm): the editor
+pointer follows the mouse; left click is A; rows, logic panel and scrollbars
+respond to clicks; the wheel scrolls lists and zooms; right-drag/edge pan;
+right click rotates, clears and closes the lighting list; Escape is B in
+editor menus, A/D step the toolbar and T raises the floor (Windows and SDL).
+Windows `tests/input/test_mapmaker_pointer.py`, `test_menu_mouse.py`,
+`test_fov_settings.py`, `test_controller_profile.py`, `test_mounted_mouse.py`
+and `test_reload_keys.py` pass (XBE-dependent cases skipped). Not run in game;
+native Mac and Linux host checks not run.
+
 Menu click confirm (2026-11-13, branch feature/menu-mouse-confirm, base
 c25c2143): a left click confirms the previewed character, Story and Arcade
 League/Challenge briefings, and a highlighted map in MapMaker Load map. Shared
