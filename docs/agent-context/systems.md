@@ -898,7 +898,7 @@ and readback are diagnostic; they do not replace visible water or alter guest
 RNG/events. The persistent gameplay owner is separate. See the coupled-operator
 record in `docs/analysis/native-high-refresh-regressions.md` for capture details/limits.
 
-[Further contracts and validation notes](systems-continuation.md).
+[Further contracts, MapMaker, checks](systems-continuation.md).
 
 ## Developer Tools sidebar presentation
 

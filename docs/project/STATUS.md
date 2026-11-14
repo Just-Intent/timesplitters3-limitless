@@ -1,3 +1,16 @@
+MapMaker map file validation (2026-11-13, branch fix/mapmaker-map-file-validation):
+shared patch2765 wraps original 301A90 (editor map load) and 6D7A0 (scene-100
+level setup) through `src/interface/pc_mapmaker_validate.inc`. A damaged or
+crafted map is refused the loader's own corrupt-file way in the editor; at level
+setup only its out-of-bounds chunks are hidden for the call and restored after.
+Stock bounds: 32 KB container, 500 pieces per level pass. Windows MSVC:
+`tests/storage/test_mapmaker_validate.py` fixture, 36 mutation cases and wiring
+pass; instruction/tile-table checks pass against the supported private US
+executable. Shared-menu fixtures (FOV settings, quit menu, Discord, guest
+dispatch, decal, letterbox, unlock content) pass against a prepared runtime with
+this branch's stack. Not run: game build, in-game editor/Story/Arcade map loads,
+native Mac/Linux builds.
+
 Control-preset rollback and high-FPS interaction repairs (2026-11-12,
 branch revert/control-presets; original base e7cb1016, reference c511f1e9 before
 PR528): removes Modern presets, profile button/axis seeding and repair,

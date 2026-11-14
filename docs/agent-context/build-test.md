@@ -896,7 +896,7 @@ disabled state, and the actual value after closing/reopening the page (which
 reads tsfp_texture_is_4k). Capture resumed gameplay in both modes separately from
 frame-time measurements. The ineffective window command was removed.
 
-[Further contracts and validation notes](build-test-continuation.md).
+[Further contracts, MapMaker checks and validation notes](build-test-continuation.md).
 
 The source identity also hashes verified font assets and the vendored rasterizer;
 TTF inputs keep binary bytes while text files retain line-ending normalization.

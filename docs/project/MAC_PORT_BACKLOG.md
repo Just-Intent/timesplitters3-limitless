@@ -10489,3 +10489,10 @@ See [evidence](STATUS.md#2026-11-07---issue521-portal-seams).
   Original-XBE Windows CPU fixtures cover60-240/slow/pause; native Mac/Linux
   builds and live boss/U-Genix acceptance remain unverified. See STATUS and
   native-projectiles/native-script-clocks guides for scope and test boundaries.
+
+MapMaker map file validation (2026-11-13, `fix/mapmaker-map-file-validation`):
+shared patch2765 and `src/interface/pc_mapmaker_validate.inc` check MapMaker map
+containers before the original editor loader and scene-100 level setup on every
+host. The validator only reads/writes guest memory, so no Mac adapter is required.
+Windows fixture and original-instruction checks pass; native Mac build and
+in-game map loads are unverified. See STATUS.

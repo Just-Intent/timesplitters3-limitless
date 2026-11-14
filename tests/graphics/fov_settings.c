@@ -204,6 +204,7 @@ UNLOCK_STUB(sub_001CD040) UNLOCK_STUB(sub_00075E70)
 /* Other shared translation-unit hooks must not run in this display fixture. */
 int pc_weapon_slot_take(void) { CHECK(0);return 0; }
 STUB(sub_001BAA70) STUB(sub_001BA410) STUB(sub_00142820)
+STUB(sub_00333700) STUB(sub_002FDF50) /* MapMaker map validation tile pad counts */
 STUB(sub_00071B60)
 static int storage_continued,storage_chosen,storage_choose_ok,storage_scanned;
 void sub_00024EC0(void) {

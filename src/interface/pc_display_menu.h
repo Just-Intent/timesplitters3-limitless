@@ -138,6 +138,9 @@ void pc_kill_feed_hit_record(void (*original)(void));
 void pc_kill_feed_death(void (*original)(void));
 void pc_kill_feed_fire(void (*original)(void),int npc);
 void pc_kill_feed_allocate(void (*original)(void));
+/* MapMaker map validation: editor load sub_00301A90, level setup sub_0006D7A0. */
+void pc_mapmaker_validate_editor(void (*original)(void));
+void pc_mapmaker_validate_level(void (*original)(void));
 #endif
 
 void pc_graphics_world_finish(void (*original)(void));

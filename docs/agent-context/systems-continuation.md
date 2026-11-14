@@ -299,3 +299,10 @@ The input fixture checks placement and live updates under denied host policy.
 
 View & HUD visibility labels are HUD & UI and Version watermark (no Show prefix);
 this wording-only refinement leaves immediate session semantics unchanged.
+
+## MapMaker map validation
+
+`src/interface/pc_mapmaker_validate.inc` (included by `pc_display_menu.c`) refuses
+damaged or crafted MapMaker maps at editor load and hides their out-of-bounds
+chunks at the scene-100 level setup. Stock 32 KB container and 500-piece level
+frame; see [map validation](mapmaker-maps.md).

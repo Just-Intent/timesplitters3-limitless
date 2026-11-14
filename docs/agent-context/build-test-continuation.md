@@ -164,3 +164,7 @@ Physics: [checks](build-test-details.md#guest-physical-state-regression).
 GPU asserts stay on; AO logs scene/pixel failures.
 
 Local-player tests: controls-options.md.
+
+MapMaker map validation: `tests/storage/test_mapmaker_validate.py` (fixture,
+mutations, wiring, optional supported-XBE instruction checks); see
+[map validation](mapmaker-maps.md).

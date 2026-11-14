@@ -492,6 +492,7 @@ static void menu_video_click_sound(uint32_t menu,uint32_t item)
 #include "pc_audio_menu.inc"
 #include "pc_profile_accept.inc"
 #include "pc_weapon_slots_guest.inc"
+#include "pc_mapmaker_validate.inc"
 
 #if defined(_WIN32) || defined(TSFP_NATIVE_NETWORK)
 #include "pc_character_corpses.inc"

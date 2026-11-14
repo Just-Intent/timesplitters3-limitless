@@ -223,6 +223,7 @@
     "tests/graphics/test_update_notice.py",
     "tests/graphics/test_game_restart.py",
     "tests/storage/test_storage_menu.py",
+    "tests/storage/test_mapmaker_validate.py",
     "tests/input/test_text_read_scope.py",
     "tests/input/test_input_icon_import.py",
     "tests/diagnostics/test_trace_filter.py",
