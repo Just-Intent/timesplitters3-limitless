@@ -58,8 +58,10 @@ static unsigned long applied;
 static volatile LONG editing;
 static int menu_mode, menu_button_block;
 /* MapMaker editor mouse (pc_mapmaker_pointer.h): the editor screen owns the pointer. */
-static int mapmaker_pointer_active;
+static int mapmaker_pointer_active, mapmaker_editor;
+static int mapmaker_zoom_up_key, mapmaker_zoom_down_key;
 static PcMapMakerClick mapmaker_click;
+static PcMapMakerZoom mapmaker_zoom;
 static PcTextInput text_input;
 
 void pc_controls_text_mode(uint32_t owner) {
@@ -593,6 +595,10 @@ int pc_controls_key_down(int key)
     if((key==VK_LBUTTON && (menu_mode || (menu_button_block&1))) ||
        (key==VK_RBUTTON && (menu_mode || (menu_button_block&2)))) down=0;
     if (key == VK_LBUTTON && pc_input_terminal_suppresses_left(&input, input.keys[VK_LBUTTON])) down = 0;
+    /* MapMaker editor screen: a wheel notch briefly holds White or Black (zoom). */
+    down=pc_mapmaker_zoom_key(&mapmaker_zoom,menu_mode && mapmaker_editor &&
+                              (replaying || GetForegroundWindow()==window_handle),
+                              key,mapmaker_zoom_up_key,mapmaker_zoom_down_key,down,GetTickCount64());
     ReleaseSRWLockExclusive(&lock);
     return down;
 }
@@ -608,7 +614,7 @@ void pc_controls_menu_mode(int active)
     if(changed) {
         menu_button_block=(input.keys[VK_LBUTTON]?1:0)|(input.keys[VK_RBUTTON]?2:0);
         menu_mode=!!active;
-        if(!menu_mode) mapmaker_pointer_active=0;
+        if(!menu_mode) mapmaker_pointer_active=mapmaker_editor=0;
         pc_reload_reset(&input.reload);
         menu_wheel=0; wheel_remainder=0;
         input.dx=input.dy=0;
@@ -649,6 +655,36 @@ void pc_controls_mapmaker_pointer(int active)
 {
     AcquireSRWLockExclusive(&lock);
     mapmaker_pointer_active = !!active;
+    ReleaseSRWLockExclusive(&lock);
+}
+
+/* Called from the guest menu hook, never while the bindings are evaluated,
+ * so reading the bindings here cannot re-enter the bindings lock. */
+void pc_controls_mapmaker_editor(int active)
+{
+    int keys[PC_ACTION_COUNT], white = 0, black = 0;
+    if (active && pc_settings_prompt_keys(keys)) {
+        white = keys[5];   /* "White button action": zoom (held), wheel up */
+        black = keys[4];   /* "Black button action": zoom (held), wheel down */
+    }
+    AcquireSRWLockExclusive(&lock);
+    mapmaker_editor = !!active;
+    mapmaker_zoom_up_key = white;
+    mapmaker_zoom_down_key = black;
+    ReleaseSRWLockExclusive(&lock);
+}
+
+void pc_controls_mapmaker_zoom(int notches)
+{
+    AcquireSRWLockExclusive(&lock);
+    pc_mapmaker_zoom_add(&mapmaker_zoom, notches, GetTickCount64());
+    ReleaseSRWLockExclusive(&lock);
+}
+
+void pc_controls_mapmaker_row_press(void)
+{
+    AcquireSRWLockExclusive(&lock);
+    pc_mapmaker_row_press(&mapmaker_click);
     ReleaseSRWLockExclusive(&lock);
 }
 

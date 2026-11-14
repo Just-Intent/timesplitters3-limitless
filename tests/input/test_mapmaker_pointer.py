@@ -21,6 +21,21 @@ MUTATIONS = {
     'no-max-clamp': (ADAPTER, 'if(px>FLOAT_AT(b+0x50)) {', 'if(0) {'),
     'wrong-player': (ADAPTER, 'b=MAPMAKER_POINTER_BLOCK+player*MAPMAKER_POINTER_STRIDE;', 'b=MAPMAKER_POINTER_BLOCK;'),
     'held-click-leaks': (POLICY, 'if (active != s->active) s->blocked = left_down;', ''),
+    'row-carries-to-editor': (POLICY, '(s->row && !active && left_down)', '(s->row && left_down)'),
+    'row-latch-sticks': (POLICY, 'if (!left_down) s->blocked = s->row = 0;', 'if (!left_down) s->blocked = 0;'),
+    'no-scroll-clamp': (ADAPTER, 'if(target>last) target=last;', ''),
+    'arrow-no-repeat-delay': (ADAPTER, 'if(now<mapmaker_pointer.grab_next) return;', ''),
+    'thumb-ignores-grab': (ADAPTER, '(y-mapmaker_pointer.grab-s.track0)/(s.track1-s.track0)*s.content);', '(y-s.track0)/(s.track1-s.track0)*s.content);'),
+    'scroll-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu)) return 0;\n    if(!mapmaker_scroll_geometry', 'if(!mapmaker_pointer_enabled()) return 0;\n    if(!mapmaker_scroll_geometry'),
+    'parent-any-menu': (ADAPTER, ' || WORD_AT(parent+0x170)!=menu) return 0;', ') return 0;'),
+    'parent-disabled-rows': (ADAPTER, "if((type==4 || type==7 || type==8) && !(flags&5) &&\n           x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&\n           y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {\n            if(WORD_AT(parent", "if((type==4 || type==7 || type==8) &&\n           x>=FLOAT_AT(item+0x78) && x<FLOAT_AT(item+0x80) &&\n           y>=FLOAT_AT(item+0x7c) && y<FLOAT_AT(item+0x84)) {\n            if(WORD_AT(parent"),
+    'panel-any-menu': (ADAPTER, 'if(WORD_AT(menu+4)==0x0052E9D8u || WORD_AT(menu+4)==0x0052E9E8u) {', 'if(1) {'),
+    'panel-no-a': (ADAPTER, '                pc_controls_mapmaker_row_press();\n                return item;\n            }\n    }', '                return item;\n            }\n    }'),
+    'wheel-scroll-down-is-up': (ADAPTER, 'FLOAT_AT(menu+0x88)-(float)notches*3.f', 'FLOAT_AT(menu+0x88)+(float)notches*3.f'),
+    'wheel-zoom-in-menus': (ADAPTER, 'if(mapmaker_pointer_context(menu)) { pc_controls_mapmaker_zoom(notches);return 1; }', 'pc_controls_mapmaker_zoom(notches);'),
+    'zoom-no-cap': (POLICY, 'if (z->until > now + 1000u) z->until = now + 1000u;', ''),
+    'zoom-no-reset': (POLICY, 'if (dir != z->dir || now >= z->until) { z->dir = dir; z->until = now; }', 'z->dir = dir; if (now >= z->until) z->until = now;'),
+    'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 
 
@@ -62,8 +77,23 @@ def test_pointer_wiring():
     # After the original stick update, before any early return of the menu hook.
     hook = guest.split('void pc_display_menu_mouse_input(void (*original)(void))', 1)[1]
     assert hook.index('original();') < hook.index('mapmaker_pointer_input(menu);') < hook.index('return;')
+    # Editor rows get a real A press instead of the menu-engine confirm.
+    confirm = guest.split('void pc_display_menu_mouse(void (*original)(void))', 1)[1]
+    gate = confirm.index('if(!mapmaker_pointer_row_click()) {')
+    assert gate < confirm.index('menu_mouse_press(menu_mouse_dispatch,0x80u);') < confirm.index('WORD_AT(menu+0xc4)|=0x100010u;')
+    assert 'if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y))\n        mapmaker_pointer_scroll_press(menu,x,y);' in confirm
+    # Both wheel samples (dispatch and layout fallback) go to the editor first.
+    assert guest.count('.wheel && mapmaker_pointer_wheel(menu,') == 2
     for host in HOSTS:
         text = (ROOT / host).read_text(encoding='utf-8')
         assert 'void pc_controls_mapmaker_pointer(int active)' in text
+        assert 'pc_mapmaker_row_press(&mapmaker_click);' in text
+        assert 'void pc_controls_mapmaker_editor(int active)' in text
+        assert 'pc_mapmaker_zoom_add(&mapmaker_zoom,' in text
+        assert 'pc_mapmaker_zoom_key(&mapmaker_zoom,' in text
         click = text.split('int pc_controls_terminal_click(void)', 1)[1].split('return down;', 1)[0]
         assert 'pc_mapmaker_click(&mapmaker_click,' in click
+    # SDL: the editor policy runs for every polled key (Windows: inline).
+    native = (ROOT / 'src/native/input_sdl.c').read_text(encoding='utf-8')
+    key = native.split('int pc_controls_key_down(int vk)', 1)[1].split('\n}', 1)[0]
+    assert 'return mapmaker_key(vk,down,menu);' in key

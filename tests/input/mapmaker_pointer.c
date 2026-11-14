@@ -24,9 +24,27 @@ static PcMenuPointer cursor;
 static int owner_calls, owner_last=-1;
 static PcMenuPointer pc_controls_menu_hover_pointer(void) { return cursor; }
 static void pc_controls_mapmaker_pointer(int active) { owner_calls++; owner_last=active; }
+static int row_presses;
+static void pc_controls_mapmaker_row_press(void) { row_presses++; }
+static int editor_last=-1;
+static void pc_controls_mapmaker_editor(int active) { editor_last=active; }
+static int zoom_notches;
+static void pc_controls_mapmaker_zoom(int notches) { zoom_notches+=notches; }
 static unsigned shape_w,shape_h; /* Auto output shape; 0 = the guest's 4:3 */
 static void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh)
 { *sw=shape_w?shape_w:w;*sh=shape_h?shape_h:h; }
+/* sub_00076EF0(menu,item) highlights a row; record the call instead. */
+static void sub_00076EF0(void) {}
+static uint32_t highlight_menu, highlight_item;
+static uint32_t guest_call(void (*f)(void),int n,...)
+{
+    va_list a;
+    va_start(a,n);
+    if(f==sub_00076EF0 && n==2) { highlight_menu=va_arg(a,uint32_t);highlight_item=va_arg(a,uint32_t);
+        WORD_AT(highlight_menu+0x198)=highlight_item; }
+    va_end(a);
+    return 0;
+}
 #include "pc_mapmaker_pointer.inc"
 
 static int failures;
@@ -60,7 +78,6 @@ int main(void)
 {
     uint32_t before;
     PcMapMakerClick click;
-    (void)GetTickCount64;
     g_xbox_mem_offset=(uintptr_t)memory;
     WORD_AT(0x0079094Cu)=102;
     WORD_AT(0x004E8CF0u)=640;WORD_AT(0x004E8CF4u)=480;
@@ -77,22 +94,22 @@ int main(void)
     set_enabled("0");
     before=checksum();
     game_frame();move(100.f,50.f);game_frame();
-    CHECK(checksum()==before && owner_calls==0);
+    CHECK(checksum()==before && owner_calls==0 && editor_last==-1);
     /* On by default, and for any other value. */
     set_enabled(NULL);
     game_frame();move(101.f,50.f);game_frame();
-    CHECK(owner_calls>0 && NEAR(FLOAT_AT(B+0x20),101.f));
+    CHECK(owner_calls>0 && editor_last==1 && NEAR(FLOAT_AT(B+0x20),101.f));
     set_enabled("2");owner_calls=0;
     game_frame();
     CHECK(owner_calls>0);
-    owner_calls=0;
+    owner_calls=0;editor_last=-1;
     FLOAT_AT(B+0x20)=320.f;FLOAT_AT(B+0x24)=240.f;FLOAT_AT(B+0x18)=0.f;FLOAT_AT(B+0x1c)=0.f;
 
     set_enabled("1");
     /* Other scenes (main menu 101, map play 100) never own the pointer. */
     WORD_AT(0x0079094Cu)=101;before=checksum();
     game_frame();move(120.f,60.f);game_frame();
-    CHECK(checksum()==before && owner_last==0);
+    CHECK(checksum()==before && owner_last==0 && editor_last==0);
     WORD_AT(0x0079094Cu)=100;before=checksum();
     game_frame();move(121.f,60.f);game_frame();
     CHECK(checksum()==before && owner_last==0);
@@ -102,7 +119,7 @@ int main(void)
      * never own the left button as held A. */
     WORD_AT(MENU+0x178)=0x00301000u;
     game_frame();move(130.f,70.f);game_frame();
-    CHECK(owner_last==0 && NEAR(FLOAT_AT(B+0x20),130.f) && NEAR(FLOAT_AT(B+0x24),70.f));
+    CHECK(owner_last==0 && editor_last==1 && NEAR(FLOAT_AT(B+0x20),130.f) && NEAR(FLOAT_AT(B+0x24),70.f));
     WORD_AT(MENU+0x178)=0;WORD_AT(MENU+0x170)=0x006FEE24u;
     move(131.f,70.f);game_frame();
     CHECK(owner_last==0 && NEAR(FLOAT_AT(B+0x20),131.f));
@@ -152,6 +169,175 @@ int main(void)
     WORD_AT(0x007BA9E0u)=PLAYER;
     move(320.f,240.f);game_frame();
 
+    /* Menu scrollbar (UI scale 1 for readable numbers): bar x 280..296, y 80..400,
+     * track 96..384, content 640 over a 320 view, thumb 96..240 at scroll 0. */
+#define SM 0x00310000u
+#define STYLE 0x00311000u
+    FLOAT_AT(0x007BA038u)=1.f;FLOAT_AT(0x007BA188u)=1.f;
+    WORD_AT(SM+0x1c)=STYLE;WORD_AT(STYLE)=0x40u;WORD_AT(STYLE+0x70)=0;
+    FLOAT_AT(STYLE+0x74)=280.f;FLOAT_AT(STYLE+0x78)=296.f;FLOAT_AT(SM+0xe4)=0.f;
+    FLOAT_AT(SM+0x6c)=80.f;FLOAT_AT(SM+0x70)=400.f;FLOAT_AT(SM+0xac)=0.f;
+    FLOAT_AT(SM+0x5c)=640.f;FLOAT_AT(SM+0x84)=0.f;
+    WORD_AT(SM+0x178)=0x00301000u; /* a list has rows: not the editor screen */
+    {
+        MapMakerScroll s;
+        CHECK(mapmaker_scroll_geometry(SM,&s) && NEAR(s.x0,280.f) && NEAR(s.x1,296.f) &&
+              NEAR(s.track0,96.f) && NEAR(s.track1,384.f) && NEAR(s.thumb0,96.f) && NEAR(s.thumb1,240.f));
+    }
+    /* Driven directly through the scroll target (+0x88), never through A. */
+    row_presses=0;FLOAT_AT(SM+0x88)=0.f;FLOAT_AT(SM+0x98)=32.f;
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);           /* down arrow: one step */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),32.f) && mapmaker_pointer.grab_menu==SM && mapmaker_pointer.grab_mode==2);
+    tick+=100;mapmaker_pointer_scroll_drag(SM,390.f,1);      /* held, before the repeat delay */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),32.f));
+    tick+=200;mapmaker_pointer_scroll_drag(SM,390.f,1);      /* repeats */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),64.f));
+    tick+=40;mapmaker_pointer_scroll_drag(SM,390.f,1);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),64.f));
+    tick+=40;mapmaker_pointer_scroll_drag(SM,390.f,1);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),96.f));
+    mapmaker_pointer_scroll_drag(SM,390.f,0);                /* released */
+    tick+=500;mapmaker_pointer_scroll_drag(SM,390.f,1);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),96.f) && mapmaker_pointer.grab_menu==0);
+    mapmaker_pointer_scroll_press(SM,288.f,90.f);            /* up arrow */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),64.f) && mapmaker_pointer.grab_mode==1);
+    mapmaker_pointer_scroll_drag(SM,90.f,0);
+    FLOAT_AT(SM+0x88)=310.f;
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);           /* clamped to content - view */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),320.f));
+    mapmaker_pointer_scroll_drag(SM,390.f,0);
+    FLOAT_AT(SM+0x88)=10.f;
+    mapmaker_pointer_scroll_press(SM,288.f,90.f);            /* clamped to 0 */
+    CHECK(FLOAT_AT(SM+0x88)==0.f);
+    mapmaker_pointer_scroll_drag(SM,90.f,0);
+    FLOAT_AT(SM+0x98)=1000.f;                                /* no sensible step: a tenth of the view */
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),32.f));
+    mapmaker_pointer_scroll_drag(SM,390.f,0);
+    /* Track: centre the view there, then drag from the thumb's middle. */
+    FLOAT_AT(SM+0x88)=0.f;
+    mapmaker_pointer_scroll_press(SM,288.f,300.f);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),(300.f-96.f)/288.f*640.f-160.f) && mapmaker_pointer.grab_mode==3 &&
+          NEAR(mapmaker_pointer.grab,72.f));
+    mapmaker_pointer_scroll_drag(SM,300.f,1);
+    CHECK(NEAR(FLOAT_AT(SM+0x88),(300.f-72.f-96.f)/288.f*640.f));
+    mapmaker_pointer_scroll_drag(SM,300.f,0);
+    /* Thumb: grabbed where pressed; follows the mouse. */
+    FLOAT_AT(SM+0x88)=0.f;
+    mapmaker_pointer_scroll_press(SM,288.f,150.f);
+    CHECK(FLOAT_AT(SM+0x88)==0.f && NEAR(mapmaker_pointer.grab,54.f));
+    mapmaker_pointer_scroll_drag(SM,222.f,1);                /* thumb top 168 -> scroll 160 */
+    CHECK(NEAR(FLOAT_AT(SM+0x88),160.f));
+    mapmaker_pointer_scroll_drag(SM,222.f,0);
+    /* Beside the bar, other scenes, or a style without a bar: nothing. */
+    FLOAT_AT(SM+0x88)=0.f;
+    mapmaker_pointer_scroll_press(SM,100.f,150.f);
+    CHECK(FLOAT_AT(SM+0x88)==0.f && mapmaker_pointer.grab_menu==0);
+    WORD_AT(0x0079094Cu)=101;
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);
+    CHECK(FLOAT_AT(SM+0x88)==0.f);
+    WORD_AT(0x0079094Cu)=102;
+    WORD_AT(STYLE)=0;
+    mapmaker_pointer_scroll_press(SM,288.f,390.f);
+    CHECK(FLOAT_AT(SM+0x88)==0.f);
+    WORD_AT(STYLE)=0x40u;
+    CHECK(row_presses==0);
+    /* Wheel in a menu with a scrollbar: three steps per notch, up is negative. */
+    FLOAT_AT(SM+0x98)=32.f;FLOAT_AT(SM+0x88)=200.f;
+    CHECK(mapmaker_pointer_wheel(SM,-1) && NEAR(FLOAT_AT(SM+0x88),296.f));
+    CHECK(mapmaker_pointer_wheel(SM,2) && NEAR(FLOAT_AT(SM+0x88),104.f));
+    CHECK(mapmaker_pointer_wheel(SM,9) && FLOAT_AT(SM+0x88)==0.f);
+    CHECK(zoom_notches==0);
+    WORD_AT(STYLE)=0;
+    CHECK(!mapmaker_pointer_wheel(SM,1));                  /* no bar: generic wheel keeps it */
+    WORD_AT(STYLE)=0x40u;
+    WORD_AT(0x0079094Cu)=101;
+    CHECK(!mapmaker_pointer_wheel(SM,1));                  /* other scenes: generic wheel */
+    WORD_AT(0x0079094Cu)=102;
+    /* A list without a step of its own, in percent units (UI scale 4.8 at 480
+     * lines): 20 rows of 4.6 in a view of six (27.6) step a tenth of the view. */
+    {
+        float c=FLOAT_AT(SM+0x5c),v0=FLOAT_AT(SM+0x6c),v1=FLOAT_AT(SM+0x70),st=FLOAT_AT(SM+0x98);
+        FLOAT_AT(0x007BA188u)=4.8f;
+        FLOAT_AT(SM+0x5c)=92.f;FLOAT_AT(SM+0x70)=v0+27.6f;FLOAT_AT(SM+0x98)=0.f;FLOAT_AT(SM+0x88)=0.f;
+        CHECK(mapmaker_pointer_wheel(SM,-1) && fabs(FLOAT_AT(SM+0x88)-8.28f)<1e-3);
+        CHECK(mapmaker_pointer_wheel(SM,-9) && fabs(FLOAT_AT(SM+0x88)-64.4f)<1e-3);   /* last six rows */
+        CHECK(mapmaker_pointer_wheel(SM,20) && FLOAT_AT(SM+0x88)==0.f);
+        FLOAT_AT(SM+0x5c)=FLOAT_AT(SM+0x70)-FLOAT_AT(SM+0x6c);
+        CHECK(!mapmaker_pointer_wheel(SM,-1));               /* everything fits: nothing to scroll */
+        FLOAT_AT(SM+0x5c)=c;FLOAT_AT(SM+0x6c)=v0;FLOAT_AT(SM+0x70)=v1;FLOAT_AT(SM+0x98)=st;FLOAT_AT(0x007BA188u)=1.f;
+    }
+    row_presses=0;
+    FLOAT_AT(0x007BA038u)=320.f;FLOAT_AT(0x007BA188u)=240.f;
+    /* Wheel on the editor screen zooms (a short White/Black hold on the host). */
+    CHECK(mapmaker_pointer_wheel(MENU,2) && zoom_notches==2);
+    CHECK(mapmaker_pointer_wheel(MENU,-1) && zoom_notches==1);
+    zoom_notches=0;
+
+    /* Logic list: the active menu is its passive description panel; a click
+     * that missed the panel uses the parent's rows. */
+#define PARENT 0x00330000u
+#define PANEL 0x00331000u
+#define ROW 0x00332000u
+    WORD_AT(PANEL+0x2c)=PARENT;WORD_AT(PARENT+0x170)=PANEL;WORD_AT(PARENT+0x178)=ROW;
+    WORD_AT(ROW)=7;WORD_AT(ROW+4)=0;WORD_AT(ROW+0x28)=0x040E0600u;
+    FLOAT_AT(ROW+0x78)=25.6f;FLOAT_AT(ROW+0x7c)=107.2f;FLOAT_AT(ROW+0x80)=176.f;FLOAT_AT(ROW+0x84)=130.f;
+    row_presses=0;
+    CHECK(mapmaker_pointer_parent_press(PANEL,100.f,120.f)==ROW && row_presses==1 &&
+          highlight_menu==PARENT && highlight_item==ROW);
+    CHECK(!mapmaker_pointer_parent_press(PANEL,100.f,150.f) && row_presses==1);   /* between rows */
+    WORD_AT(ROW+0x28)|=1u;                                                          /* disabled row */
+    CHECK(!mapmaker_pointer_parent_press(PANEL,100.f,120.f) && row_presses==1);
+    WORD_AT(ROW+0x28)&=~1u;
+    WORD_AT(PARENT+0x170)=0;                                                        /* not its child */
+    CHECK(!mapmaker_pointer_parent_press(PANEL,100.f,120.f) && row_presses==1);
+    WORD_AT(PARENT+0x170)=PANEL;
+    WORD_AT(0x0079094Cu)=101;
+    CHECK(!mapmaker_pointer_parent_press(PANEL,100.f,120.f) && row_presses==1);
+    WORD_AT(0x0079094Cu)=102;
+    /* The panel's own entry list (one non-selectable type-8 item): A only. */
+#define LIST 0x00333000u
+    WORD_AT(PANEL+4)=0x0052E9D8u;WORD_AT(PANEL+0x178)=LIST;
+    WORD_AT(LIST)=8;WORD_AT(LIST+4)=0;WORD_AT(LIST+0x28)=0x000C0044u;
+    FLOAT_AT(LIST+0x78)=236.8f;FLOAT_AT(LIST+0x7c)=84.5f;FLOAT_AT(LIST+0x80)=614.4f;FLOAT_AT(LIST+0x84)=200.9f;
+    highlight_menu=0;
+    CHECK(mapmaker_pointer_parent_press(PANEL,330.f,110.f)==LIST && row_presses==2 && highlight_menu==0);
+    CHECK(mapmaker_pointer_parent_press(PANEL,100.f,120.f)==ROW && row_presses==3);  /* parent rows still */
+    CHECK(!mapmaker_pointer_parent_press(PANEL,620.f,110.f) && row_presses==3);
+    WORD_AT(PANEL+4)=0x0052E078u;                                                   /* other menus: no */
+    CHECK(mapmaker_pointer_parent_press(PANEL,330.f,110.f)!=LIST);
+    WORD_AT(PANEL+4)=0;WORD_AT(PANEL+0x178)=0;
+    row_presses=0;
+
+    /* Editor menu rows: a real A press instead of the menu confirm, scene 102 only. */
+    set_enabled("0");
+    CHECK(!mapmaker_pointer_row_click() && row_presses==0);
+    set_enabled("1");
+    WORD_AT(0x0079094Cu)=101;
+    CHECK(!mapmaker_pointer_row_click() && row_presses==0);
+    WORD_AT(0x0079094Cu)=102;
+    CHECK(mapmaker_pointer_row_click() && row_presses==1);
+
+    /* Wheel zoom: each notch holds White (up) or Black (down) for 100 ms. */
+    {
+        PcMapMakerZoom z={0};
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'Z','Z','X',0,1000));
+        pc_mapmaker_zoom_add(&z,1,1000);
+        CHECK(pc_mapmaker_zoom_key(&z,1,'Z','Z','X',0,1050));     /* White held */
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'X','Z','X',0,1050));
+        CHECK(!pc_mapmaker_zoom_key(&z,0,'Z','Z','X',0,1050));    /* outside the editor */
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'Z','Z','X',0,1100));    /* expired */
+        pc_mapmaker_zoom_add(&z,2,1100);pc_mapmaker_zoom_add(&z,1,1150);
+        CHECK(pc_mapmaker_zoom_key(&z,1,'Z','Z','X',0,1390));     /* notches add up */
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'Z','Z','X',0,1400));
+        pc_mapmaker_zoom_add(&z,3,2000);pc_mapmaker_zoom_add(&z,-1,2050); /* reversal starts over */
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'Z','Z','X',0,2060) && pc_mapmaker_zoom_key(&z,1,'X','Z','X',0,2060));
+        CHECK(!pc_mapmaker_zoom_key(&z,1,'X','Z','X',0,2150));
+        pc_mapmaker_zoom_add(&z,40,3000);
+        CHECK(pc_mapmaker_zoom_key(&z,1,'Z','Z','X',0,3999) && !pc_mapmaker_zoom_key(&z,1,'Z','Z','X',0,4000));
+        CHECK(pc_mapmaker_zoom_key(&z,1,'W','Z','X',1,3500));     /* other keys untouched */
+    }
+
     /* Host click policy: held left = held A only while the editor owns it. */
     memset(&click,0,sizeof click);
     CHECK(!pc_mapmaker_click(&click,0,1));      /* outside the editor */
@@ -163,6 +349,22 @@ int main(void)
     CHECK(!pc_mapmaker_click(&click,1,1));      /* list closed, still held: blocked */
     CHECK(!pc_mapmaker_click(&click,1,0));
     CHECK(pc_mapmaker_click(&click,1,1));
+    /* Row press in a list: A held for that press only. */
+    memset(&click,0,sizeof click);
+    CHECK(!pc_mapmaker_click(&click,0,1));      /* press lands on a row ... */
+    pc_mapmaker_row_press(&click);
+    CHECK(pc_mapmaker_click(&click,0,1));       /* ... and holds A */
+    CHECK(pc_mapmaker_click(&click,0,1));
+    CHECK(!pc_mapmaker_click(&click,0,0));      /* release ends it */
+    CHECK(!pc_mapmaker_click(&click,0,1));      /* next press elsewhere: no A */
+    CHECK(!pc_mapmaker_click(&click,0,0));
+    pc_mapmaker_row_press(&click);
+    CHECK(!pc_mapmaker_click(&click,0,0));      /* press already released: nothing */
+    CHECK(!pc_mapmaker_click(&click,0,1));
+    pc_mapmaker_row_press(&click);
+    CHECK(pc_mapmaker_click(&click,0,1));
+    CHECK(!pc_mapmaker_click(&click,1,1));      /* list closed under the held click */
+    CHECK(!pc_mapmaker_click(&click,1,1));
 
     if(failures)return 1;
     puts("mapmaker pointer ok");

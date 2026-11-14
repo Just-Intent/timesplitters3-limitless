@@ -16,6 +16,12 @@ int pc_controls_key_down(int key);
 int pc_controls_terminal_click(void);
 /* MapMaker editor screen owns the game pointer: left button acts as A. */
 void pc_controls_mapmaker_pointer(int active);
+/* A click hit a MapMaker editor menu row: hold A for this press. */
+void pc_controls_mapmaker_row_press(void);
+/* In the MapMaker editor (scene 102): editor key handling and wheel zoom. */
+void pc_controls_mapmaker_editor(int active);
+/* MapMaker editor screen: wheel notches (positive up) become a short zoom hold. */
+void pc_controls_mapmaker_zoom(int notches);
 void pc_controls_menu_mode(int active);
 int pc_controls_in_menu(void);
 PcMenuPointer pc_controls_menu_pointer(void);

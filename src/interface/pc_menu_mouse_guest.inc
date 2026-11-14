@@ -435,6 +435,8 @@ void pc_display_menu_mouse_input(void (*original)(void))
     if(!guest_call(sub_00074760,1,menu)) {restore_registers(&r);return;}
     pc_controls_menu_mode(1);
     s->pointer=pc_controls_menu_pointer();
+    /* MapMaker editor: the wheel zooms the editor screen or scrolls a list. */
+    if(s->pointer.wheel && mapmaker_pointer_wheel(menu,s->pointer.wheel)) s->pointer.wheel=0;
     if((WORD_AT(menu+0xc4)&0x3Fu) && !s->pointer.wheel) menu_mouse.wheel_pending=0;
     s->actions=pc_menu_mouse_actions(&menu_mouse,menu,s->pointer,GetTickCount64());s->sampled=1;
     /* Text-only pages (including long Objectives) scroll in sub_00073750
@@ -524,6 +526,7 @@ void pc_display_menu_mouse(void (*original)(void))
         pointer=menu_mouse_dispatch->pointer;actions=menu_mouse_dispatch->actions;
     } else {
         pointer=pc_controls_menu_pointer();
+        if(pointer.wheel && mapmaker_pointer_wheel(menu,pointer.wheel)) pointer.wheel=0;
         if((WORD_AT(menu+0xc4)&0x3Fu) && !pointer.wheel) menu_mouse.wheel_pending=0;
         actions=pc_menu_mouse_actions(&menu_mouse,menu,pointer,GetTickCount64());
     }
@@ -553,6 +556,10 @@ void pc_display_menu_mouse(void (*original)(void))
         }
     }
     choice_direction=menu_choice_hit(menu,x,y,sw,sh,&hit);
+    /* MapMaker editor: a press on no row tries the logic panel's parent rows,
+     * then a list scrollbar. */
+    if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y))
+        mapmaker_pointer_scroll_press(menu,x,y);
     /* The original dispatcher applies directional repeats after this hook.
      * Do not let a previously held direction fight an actively chosen mouse
      * row. A fresh keyboard/controller direction immediately takes ownership
@@ -579,12 +586,15 @@ void pc_display_menu_mouse(void (*original)(void))
                 menu_mouse.wheel_pending=0;
                 restore_registers(&r);return;
             }
-            if(menu_mouse_dispatch && menu_mouse_dispatch->menu==menu &&
-               !menu_mouse_dispatch->injected) {
-                menu_mouse_press(menu_mouse_dispatch,0x80u);
+            /* MapMaker editor menus act on A, not on this confirm. */
+            if(!mapmaker_pointer_row_click()) {
+                if(menu_mouse_dispatch && menu_mouse_dispatch->menu==menu &&
+                   !menu_mouse_dispatch->injected) {
+                    menu_mouse_press(menu_mouse_dispatch,0x80u);
+                }
+                WORD_AT(menu+0xc4)|=0x100010u; /* confirm press + repeat edge */
+                WORD_AT(menu+0xc8)|=0x10u;
             }
-            WORD_AT(menu+0xc4)|=0x100010u; /* confirm press + repeat edge */
-            WORD_AT(menu+0xc8)|=0x10u;
         }
     }
     if(actions&4) {

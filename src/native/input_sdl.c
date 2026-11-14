@@ -257,15 +257,31 @@ int tsfp_native_key_down(int vk) {
 int pc_controls_accept_pad(void) {
     return !pc_developer_open() && !pc_developer_blocks_player() && atomic_load(&focused) && !pc_settings_capture_blocked();
 }
+/* MapMaker editor mouse and keys (pc_mapmaker_pointer.h), as on Windows. */
+static int mapmaker_pointer_active,mapmaker_editor;
+static int mapmaker_zoom_up_key,mapmaker_zoom_down_key;
+static PcMapMakerClick mapmaker_click;
+static PcMapMakerZoom mapmaker_zoom;
+/* Editor key policy for one polled key; down already includes menu aliases. */
+static int mapmaker_key(int vk,int down,int menu) {
+    pthread_mutex_lock(&camera_lock);
+    int editor=menu && mapmaker_editor && atomic_load(&focused);
+    /* MapMaker editor screen: a wheel notch briefly holds White or Black (zoom). */
+    down=pc_mapmaker_zoom_key(&mapmaker_zoom,editor,vk,
+                              mapmaker_zoom_up_key,mapmaker_zoom_down_key,down,SDL_GetTicks());
+    pthread_mutex_unlock(&camera_lock);
+    return down;
+}
 int pc_controls_key_down(int vk) {
     if(pc_developer_open() || pc_developer_blocks_player())return 0;
     if(pc_settings_capture_blocked())return 0;
     int down=tsfp_native_key_down(vk);
-    if(atomic_load(&menu_active)) {
+    int menu=atomic_load(&menu_active);
+    if(menu) {
         unsigned alias=pc_input_menu_alias((unsigned)vk);
         if(alias)down|=tsfp_native_key_down((int)alias);
     }
-    return down;
+    return mapmaker_key(vk,down,menu);
 }
 void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
     if(e->type==SDL_EVENT_MOUSE_MOTION || e->type==SDL_EVENT_MOUSE_BUTTON_DOWN || e->type==SDL_EVENT_MOUSE_BUTTON_UP) {
@@ -395,18 +411,37 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
 }
 /* Mouse deltas reach the camera wrapper; controller stick input stays intact. */
 void tsfp_native_mouse_sample(XBOX_GAMEPAD *out) {(void)out;}
-/* MapMaker editor mouse (pc_mapmaker_pointer.h), as on Windows. */
-static int mapmaker_pointer_active;
-static PcMapMakerClick mapmaker_click;
 void pc_controls_mapmaker_pointer(int active) {
     pthread_mutex_lock(&camera_lock);
     mapmaker_pointer_active=!!active;
     pthread_mutex_unlock(&camera_lock);
 }
+/* Called from the guest menu hook, never while the bindings are evaluated. */
+void pc_controls_mapmaker_editor(int active) {
+    int keys[PC_ACTION_COUNT],white=0,black=0;
+    if(active && pc_settings_prompt_keys(keys)) {
+        white=keys[5];  /* "White button action": zoom (held), wheel up */
+        black=keys[4];  /* "Black button action": zoom (held), wheel down */
+    }
+    pthread_mutex_lock(&camera_lock);
+    mapmaker_editor=!!active;
+    mapmaker_zoom_up_key=white;mapmaker_zoom_down_key=black;
+    pthread_mutex_unlock(&camera_lock);
+}
+void pc_controls_mapmaker_zoom(int notches) {
+    pthread_mutex_lock(&camera_lock);
+    pc_mapmaker_zoom_add(&mapmaker_zoom,notches,SDL_GetTicks());
+    pthread_mutex_unlock(&camera_lock);
+}
+void pc_controls_mapmaker_row_press(void) {
+    pthread_mutex_lock(&camera_lock);
+    pc_mapmaker_row_press(&mapmaker_click);
+    pthread_mutex_unlock(&camera_lock);
+}
 int pc_controls_terminal_click(void) {
     pthread_mutex_lock(&camera_lock);
     int menu=atomic_load(&menu_active);
-    if(!menu) mapmaker_pointer_active=0;
+    if(!menu) mapmaker_pointer_active=mapmaker_editor=0;
     /* Always evaluated so its held-button block tracks every poll. */
     int mapmaker=pc_mapmaker_click(&mapmaker_click,menu && mapmaker_pointer_active,atomic_load(&keys[1]));
     int down=(!menu && !(menu_button_block&1) && atomic_load(&focused) && atomic_load(&mouse_enabled) &&

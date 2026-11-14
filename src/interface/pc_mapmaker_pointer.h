@@ -4,11 +4,17 @@
  * a held left button is reported as the held A button, so the editor's own
  * select/place/drag handling applies. A button that is already held when
  * ownership starts or ends (the click that closed a list, or entered the
- * editor) is ignored until it is released. */
+ * editor) is ignored until it is released. Clicks on editor menu rows hold A
+ * for that press (pc_mapmaker_row_press). */
 #ifndef TSFP_PC_MAPMAKER_POINTER_H
 #define TSFP_PC_MAPMAKER_POINTER_H
 
 typedef struct PcMapMakerClick { int active, blocked, row; } PcMapMakerClick;
+
+/* A click on a row of an editor menu (pause menu, category list): the editor
+ * reads A itself rather than the menu engine's confirm, so hold A for this
+ * press until the button is released. */
+static inline void pc_mapmaker_row_press(PcMapMakerClick *s) { s->row = 1; }
 
 static inline int pc_mapmaker_click(PcMapMakerClick *s, int active, int left_down)
 {
@@ -18,5 +24,31 @@ static inline int pc_mapmaker_click(PcMapMakerClick *s, int active, int left_dow
     if (!left_down) s->blocked = s->row = 0;
     /* A row press never carries onto the editor screen (list closed under it). */
     return (active && !s->blocked && left_down) || (s->row && !active && left_down);
+}
+
+/* Editor zoom acts while White or Black is held (Z and X by default).
+ * Each wheel notch holds one of them briefly: up holds White, down Black.
+ * Notches in the same direction add up (at most one second); a reversal
+ * starts over. */
+#define PC_MAPMAKER_ZOOM_MS 100u
+typedef struct PcMapMakerZoom { int dir; unsigned long long until; } PcMapMakerZoom;
+static inline void pc_mapmaker_zoom_add(PcMapMakerZoom *z, int notches, unsigned long long now)
+{
+    int dir;
+    unsigned n;
+    if (!notches) return;
+    dir = notches > 0 ? 1 : -1;
+    n = (unsigned)(notches > 0 ? notches : -notches);
+    if (dir != z->dir || now >= z->until) { z->dir = dir; z->until = now; }
+    z->until += (unsigned long long)n * PC_MAPMAKER_ZOOM_MS;
+    if (z->until > now + 1000u) z->until = now + 1000u;
+}
+static inline int pc_mapmaker_zoom_key(const PcMapMakerZoom *z, int editor, int key,
+                                       int up_key, int down_key, int down, unsigned long long now)
+{
+    if (!editor || now >= z->until) return down;
+    if (z->dir > 0 && up_key && key == up_key) return 1;
+    if (z->dir < 0 && down_key && key == down_key) return 1;
+    return down;
 }
 #endif

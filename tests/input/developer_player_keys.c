@@ -11,6 +11,8 @@ static int pc_developer_open(void) {return overlay;}
 static int pc_developer_blocks_player(void) {return freecam;}
 static int pc_settings_capture_blocked(void) {return capture;}
 static int tsfp_native_key_down(int key) {return focused&&key>0&&key<256&&held[key];}
+/* The MapMaker editor key policy has its own fixture (mapmaker_pointer.c). */
+static int mapmaker_key(int vk,int down,int menu) {(void)vk;(void)menu;return down;}
 /* Select the native adapter even when running this isolated fixture on Windows. */
 #undef _WIN32
 #define TSFP_NATIVE_INPUT
