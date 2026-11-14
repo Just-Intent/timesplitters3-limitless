@@ -2,6 +2,10 @@
 
 [Main guide](build-test.md).
 
+MapMaker turret icons: `tests/graphics/test_mapmaker_turret_icons.py` (fixture,
+mutations, wiring, optional supported-XBE instruction checks); see
+[turret icons](mapmaker-turret-icons.md).
+
 ## Game release channels and maintenance publication (2026-10-22)
 
 `tools/release/release_channels.py` owns canonical X.Y.Z[-channel.N] package identity and

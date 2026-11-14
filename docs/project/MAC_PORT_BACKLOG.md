@@ -10489,3 +10489,10 @@ See [evidence](STATUS.md#2026-11-07---issue521-portal-seams).
   Original-XBE Windows CPU fixtures cover60-240/slow/pause; native Mac/Linux
   builds and live boss/U-Genix acceptance remain unverified. See STATUS and
   native-projectiles/native-script-clocks guides for scope and test boundaries.
+
+MapMaker Story turret icons (2026-11-13, `fix/mapmaker-story-turret-icons`):
+shared patch2295 and `src/interface/pc_mapmaker_turret_icons_guest.inc` draw live
+turret icons on MapMaker Story HUDs on every host (opt-out
+`TSFP_MAPMAKER_TURRET_ICONS=0`). Guest-memory only; no Mac adapter is required.
+Windows fixture and original-instruction checks pass; native Mac build and the
+in-game HUD are unverified. See STATUS.

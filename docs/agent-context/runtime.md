@@ -77,7 +77,6 @@ Story co-op integration: [contracts](systems-details.md).
 Audio recovery patches0055-0058: [buffering, lifecycle, format and device contracts](audio-buffers.md).
 Audio release/exit/completion patches2300-2306: [contracts and diagnostics](audio-buffers.md).
 
-
 Patch 2140-native-minigun-intent follows the native weapon wrappers in loader dependency order. It scopes held-primary intent around original US 1C74D0 event 1. Generic shots remain on whole ticks; numeric site 1C7600 normalizes release damping. See native-minigun.md.
 
 `2130-game-dpi-awareness.patch` attaches the Windows game manifest supplied by
@@ -167,9 +166,7 @@ Maintenance commands use `tools/build/` and `tests/repository/`.
 The loader retains its dependency overrides, and recorded old names unwind
 using their stored contents. Keep the five legacy migration patches.
 
-
 Product lowering and its fatal divide boundary are documented in [own tooling](independent.md).
-
 
 Independent tooling: [ownership and validation](independent.md), including compiled inherited SAR sweeps.
 
@@ -423,7 +420,6 @@ checks that distinction, concurrent quiet calls, enabled diagnostics and Windows
 idle cadence; a shared-cache mutation must fail. No process-wide cache or C
 atomic support is introduced. Private alternating native probes measure tracing
 cost only; game pacing requires a separately identified executable and scene.
-
 
 `0420-native-demo-timing.patch` follows the native surface stack and wraps US
 `43220` with `pc_native_demo_guest.inc`. Regenerate guest C: the original is
@@ -685,7 +681,6 @@ consume the tick already awaited by the original guest clock, including games
 that started at native 120/144 before Arm ever ran. Arm still requires a real
 signal and sufficient elapsed time; cheap original frames remain paced.
 
-
 The unverified #105 per-thread flip-gate experiment was excluded from the active
 stack; its recovery copy remains in ignored logs. The verified repair combines scoped
 prompt-read validation with the late-frame pacing correction, not thread-owner
@@ -933,9 +928,7 @@ C fixture and includes production SET_LO16; it does not alter generated code.
 The control-transfer emitter now follows x87 in the additive stack; call ABI,
 local dispatch and table-boundary contracts are in [independent.md](independent.md).
 
-
 Ordinal81 repair/test: [next-packet ABI](kernel-objects.md#guest-next-packet-abi-prerequisite).
-
 
 Request allocation/ownership through0218: [contracts](kernel-objects.md#original-request-storage-and-initialization).
 
@@ -944,15 +937,11 @@ Request allocation/ownership through0218: [contracts](kernel-objects.md#original
 See [Unlock Content](unlock-content.md) for the shared menu, profile extension,
 original predicate hooks and isolated validation routes.
 
-
 Original sharing bridges and ordinal80 cleanup: [contracts and checks](kernel-sharing.md).
-
 
 Original request lifetime/callback prerequisites: [contracts and ABI boundary](request-lifetime.md).
 
-
 Stage0222: [original driver-call composition and opaque stack payload](driver-call.md).
-
 
 Stage0223: [private request construction and completion delivery](transfer-completion.md).
 
@@ -970,10 +959,11 @@ Stages0229/0231: [events and targets](transfer-completion.md). Stage0232: [symbo
 
 Stages0233/0234: [routing](guest-paths.md), [original host storage](host-storage.md).
 
-`2080-tank-driver-controls.patch` wraps 1730E0 through shared
-`pc_tank_guest.inc`. The local keyboard/mouse scope selects signed track input
-and restores actor links after the original call; controller behavior retains
-the original camera-relative branch. See [scope guards](mounted-mouse.md).
+`2080-tank-driver-controls.patch` (1730E0 tank input): [continuation](runtime-continuation.md),
+[scope guards](mounted-mouse.md).
+
+Patch2295 wraps 349E40/349970 so MapMaker Story HUDs draw live turret icons;
+see [turret icons](mapmaker-turret-icons.md).
 
 Stage0235: [original pool imports and native surface retirement](kernel-pool.md).
 
@@ -1015,7 +1005,6 @@ visibility and objective logic remain guest-owned (Refs #338).
 ## Languages
 
 [Language contracts](language-packs.md).
-
 
 0241: [product/ABI](guest-integer-product.md).
 

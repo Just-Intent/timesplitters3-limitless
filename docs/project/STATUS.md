@@ -1,3 +1,13 @@
+MapMaker Story turret icons (2026-11-13, branch fix/mapmaker-story-turret-icons):
+shared patch2295 wraps original HUD 349E40 and turret icon 349970 through
+`src/interface/pc_mapmaker_turret_icons_guest.inc`. In MapMaker Story play the
+HUD reaches the highest gun slots, where the free list places live turrets, and
+skips free blocks. Default on in scene 100; `TSFP_MAPMAKER_TURRET_ICONS=0` keeps
+the original HUD. Windows MSVC: `tests/graphics/test_mapmaker_turret_icons.py`
+fixture, 11 mutation cases and wiring pass; instruction checks pass against the
+supported private US executable. Not run: game build, in-game MapMaker Story HUD,
+native Mac/Linux builds.
+
 Control-preset rollback and high-FPS interaction repairs (2026-11-12,
 branch revert/control-presets; original base e7cb1016, reference c511f1e9 before
 PR528): removes Modern presets, profile button/axis seeding and repair,

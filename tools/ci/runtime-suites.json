@@ -273,6 +273,7 @@
     "tests/graphics/test_quit_menu.py",
     "tests/graphics/test_ui_layout.py",
     "tests/graphics/test_kill_feed.py",
+    "tests/graphics/test_mapmaker_turret_icons.py",
     "tests/graphics/test_camera_feed.py",
     "tests/graphics/test_crane_overlay.py",
     "tests/graphics/test_portal_scissors.py",

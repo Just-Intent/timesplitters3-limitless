@@ -2,6 +2,12 @@
 
 [Main guide](systems.md).
 
+## MapMaker Story turret icons
+
+`src/interface/pc_mapmaker_turret_icons_guest.inc` lets the original Story HUD
+reach live turrets in MapMaker play (scene 100); default on,
+`TSFP_MAPMAKER_TURRET_ICONS=0` keeps the original. See [turret icons](mapmaker-turret-icons.md).
+
 ## Background replacement texture reads
 
 `texture_pack_stream.h` owns a shared single-reader queue for common RHI and

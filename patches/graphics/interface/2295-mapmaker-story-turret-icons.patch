@@ -1,0 +1,21 @@
+--- a/titles/futureperfect/src/recomp_manual.c
++++ b/titles/futureperfect/src/recomp_manual.c
+@@ -1541,8 +1541,18 @@
+ #else
+     sub_001730E0_gen();
+ #endif
+ }
+
++/* MapMaker Story HUD: draw live turret icons, which the original scan of the
++ * lowest gun slots never reaches (TSFP_MAPMAKER_TURRET_ICONS=0: original). */
++#include "pc_mapmaker_turret_icons_guest.inc"
++extern void sub_00349E40_gen(void);
++void sub_00349E40(void)
++{ pc_turret_icons_hud(sub_00349E40_gen); }
++extern void sub_00349970_gen(void);
++void sub_00349970(void)
++{ pc_turret_icons_turret(sub_00349970_gen); }
++
+ extern void sub_0025D520_gen(void);
+ void sub_0025D520(void)
+ {

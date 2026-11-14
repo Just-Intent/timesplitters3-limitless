@@ -1645,6 +1645,14 @@
       ]
     },
     {
+      "name": "2295-mapmaker-story-turret-icons.patch",
+      "path": "patches/graphics/interface/2295-mapmaker-story-turret-icons.patch",
+      "sha256": "bcca328a1eec6ffbfaca6ce505dab11263fa19064a9577dad5fcdddbebdcdc49",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
       "name": "2300-dsound-release-diagnostics.patch",
       "path": "patches/media/2300-dsound-release-diagnostics.patch",
       "sha256": "e7b97c3cbc4936391117b7b3bda5db8abd2a57bfe8ff625fe081cc16044497b4",
