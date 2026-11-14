@@ -199,6 +199,8 @@ Native controls use the same JSON bindings as Windows. Focus the game window:
   (use Fn+F1 if macOS reserves the function key for brightness).
 - **WASD** moves; left mouse fires; right mouse activates the right-stick action;
   **R** reloads, **G** uses the left trigger, **Tab** maps to Xbox Back.
+- The mouse wheel changes weapon. While you look through a zoomable scope it
+  zooms in (wheel up) or out (wheel down) instead, as on Windows.
 - The first unassigned SDL controller also shares player 1. Explicit controllers
   assigned to other players are reserved. Physical controller play is unverified;
   SDL virtual-controller mapping/hotplug has regression coverage.

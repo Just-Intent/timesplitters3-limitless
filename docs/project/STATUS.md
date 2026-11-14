@@ -1,3 +1,13 @@
+Mouse-wheel scope zoom (2026-11-13, branch feature/scope-wheel-zoom from
+c25c2143; MAC-131): while player 1 aims through a zoomable scope, a wheel notch
+bound to Previous/Next weapon briefly holds the zoom-in/zoom-out key instead of
+switching weapon. Shared src/input/pc_scope_wheel.h is called from both input
+adapters. Windows 11 x64, MSVC 14.44: test_scope_wheel.py 14 pass (fixture plus
+ten header mutations, adapter/binding structure); test_mounted_mouse.py and
+test_reload_keys.py pass (7 XBE-dependent skips); pc_controls.c and the patched
+runtime input_bindings.c pass an MSVC /Zs syntax check. Not run: game build,
+in-game zoom feel, native Mac/Linux compile and physical wheel checks.
+
 Control-preset rollback and high-FPS interaction repairs (2026-11-12,
 branch revert/control-presets; original base e7cb1016, reference c511f1e9 before
 PR528): removes Modern presets, profile button/axis seeding and repair,

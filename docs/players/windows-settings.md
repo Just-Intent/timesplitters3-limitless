@@ -181,8 +181,8 @@ Default bindings:
 | Melee / menu back | F, middle mouse, mouse button 4, or Backspace |
 | Throw grenade | G or mouse button 5 |
 | Change weapon | Mouse wheel or left/right arrows |
-| Weapon mode / scope zoom in | Q or Up / Page Up |
-| Change grenade / scope zoom out | V or Down / Page Down |
+| Weapon mode / scope zoom in | Q or Up / Page Up; mouse wheel up while scoped |
+| Change grenade / scope zoom out | V or Down / Page Down; mouse wheel down while scoped |
 | Pause and release cursor | Escape |
 | Show / hide PC Settings menu bar | F1 |
 | Keyboard & mouse settings | F2 |
@@ -201,6 +201,15 @@ Click the game window to recapture the mouse. The recapture click is consumed
 so it does not fire a weapon. Alt-Tab releases the cursor and clears held
 keyboard/mouse inputs. Aim and crouch activation follow the game's profile
 settings. Space is an action key; the original game has no jump action.
+
+While you look through a scope that can zoom (sniper-style scopes, including
+a weapon's scoped secondary mode), each mouse-wheel notch zooms one short step:
+wheel up zooms in and wheel down zooms out, exactly as briefly holding the first
+key bound to zoom in/out. The wheel does not change weapon while scoped. Iron
+sights and ordinary aim keep wheel weapon switching. The redirect applies only
+to a wheel direction bound to Next/Previous weapon and nothing else; a wheel
+rebound to another action keeps that action. Controllers are unaffected, and
+only player 1 (the keyboard and mouse player) is redirected in split screen.
 
 The settings menu saves to `config/pc-controls.json`. Sensitivity is degrees per
 raw mouse count (default `0.10`); lower it for

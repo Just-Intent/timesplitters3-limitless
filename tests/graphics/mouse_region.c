@@ -52,6 +52,14 @@ static PcInput input;
 static double sensitivity=.1;
 static int invert_y,rate=144;
 static int pc_native_rate(void){return rate;}
+/* Scope-wheel state is covered by test_scope_wheel.py; keep it inert here. */
+#define PC_ACTION_COUNT 1
+#define PC_BINDING_SLOTS 1
+static int scope_wheel;
+static int pc_settings_bound_keys(int bound[PC_ACTION_COUNT][PC_BINDING_SLOTS]){(void)bound;return 0;}
+static int pc_scope_view(uint32_t player,uint32_t fov,ptrdiff_t offset){(void)player;(void)fov;(void)offset;return 0;}
+static void pc_scope_wheel_bindings(int *wheel,const int (*bound)[PC_BINDING_SLOTS]){(void)wheel;(void)bound;}
+static void pc_scope_wheel_state(int *wheel,int scope,uint64_t now){(void)wheel;(void)scope;(void)now;}
 #ifdef TEST_SDL
 #define camera_input input
 #define mouse_sensitivity sensitivity

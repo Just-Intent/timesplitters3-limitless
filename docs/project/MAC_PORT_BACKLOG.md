@@ -1142,6 +1142,23 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-127 | Complete launcher language packs | Awaiting validation |
 | MAC-128 | Fresh weapon trigger timing (#434) | Awaiting validation |
 | MAC-129 | Optional SMAA anti-aliasing | Awaiting validation |
+| MAC-131 | Mouse-wheel scope zoom | Awaiting validation |
+
+### MAC-131 - Mouse-wheel scope zoom
+
+- **Status:** Awaiting validation
+- **Behavior:** While player 1 aims through a zoomable scope, a wheel notch bound
+  to Previous/Next weapon briefly holds the bound zoom-in (wheel up) or zoom-out
+  (wheel down) key and does not switch weapon. Iron sights, plain aim, rebound
+  wheels, keyboard zoom keys and controllers are unchanged.
+- **Shared source:** `src/input/pc_scope_wheel.h` owns the scope check, binding
+  rule and hold timing; `pc_settings_bound_keys` in `src/input/pc_bindings.inc`.
+  `src/input/pc_controls.c` and `src/native/input_sdl.c` only call it from their
+  player update, wheel event and key poll. Branch `feature/scope-wheel-zoom`
+  (uncommitted to main). No Mac-specific adapter is needed.
+- **Remaining:** Native Mac and Linux compile, `--test`, and a physical wheel
+  check in a sniper scope (zoom in/out, no weapon switch; iron sights still
+  switch). Windows fixture results do not establish native wheel delivery.
 
 ### MAC-126 - Launcher Discord community button
 

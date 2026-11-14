@@ -12,9 +12,7 @@ and Linux share this policy. See `tests/network/network_eligibility.c`.
 [Developer Tools integration](developer-tools-integration.md).
 
 [Uplink](native-uplink.md);[projectile motion/beam damage](native-projectiles.md).
-[Input](controls-options.md).
-
-[Icons](controls-options.md).
+[Input/icons/wheel](controls-options.md).
 [Display](video-options.md).
 [Tabs](../development/graphics-options.md).
 [exFAT](host-storage.md)

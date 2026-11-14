@@ -6,7 +6,7 @@
 [Tools](developer-tools-integration.md).
 Developer warnings: [launcher](launcher.md).
 [Profile tests](multiplayer-exit.md#validation): saves, late lobby saves, checksum/write errors.
-[Icons](controls-options.md).
+[Icons/wheel](controls-options.md).
 [Effect depth](native-effect-depth.md).
 [Update tests](main-menu-update.md).
 [Weapon FOV](video-options.md#weapon-aperture).

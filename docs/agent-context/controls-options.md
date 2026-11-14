@@ -325,3 +325,30 @@ The headless production sampler fixture fails on the old native path and passes
 on Windows and SDL after the patch. Native SDL self-test also exercises an explicit
 P1 virtual-pad assignment, physical controller tokens, then restores its isolated
 controls configuration. This is synthetic input, not physical Steam Deck acceptance.
+
+## Mouse-wheel scope zoom
+
+While player 1 aims through a zoomable scope, wheel notches bound to Previous/
+Next weapon become short zoom-in/zoom-out key holds instead of weapon switches;
+iron sights and plain aim keep wheel switching. Guest evidence (US XBE):
+`sub_0025E650` (per-player aim/zoom update from `sub_000D5EB0`) toggles aim bit
+`0x20` in player `+0x0C`; when aim starts it sets bit `0x40` only if
+`sub_001B7DF0(player+0x55C)` reports a scope sight (weapon-table flag `0x20`, or
+`0x40` in weapon mode 1). While aiming, held D-pad up/down (`sub_002586C0`) move
+camera `+0x388` by 60 deg/s within `[+0x394, +0x390]` (`sub_001B7D00`;
+`sub_001B7D70` collapses the range when the scope cannot zoom). Zoom is a held
+effect, so each notch is a hold.
+
+`src/input/pc_scope_wheel.h` is shared by both adapters: `pc_scope_view` (player
+`+4 == 0`, bits `0x60`, finite min < max), `pc_scope_wheel_bindings` (a wheel
+direction is redirected only when bound to Previous/Next weapon and nothing else;
+zoom keys are the first non-wheel keys of actions 10/11), 80 ms per notch capped
+at 640 ms, state older than 250 ms ignored, leaving the scope cancels the hold.
+`pc_settings_bound_keys` (`pc_bindings.inc`) exposes every player-1 key slot.
+`pc_controls.c` and `src/native/input_sdl.c` read bindings and scope state before
+their lock in `pc_controls_apply_mouse`, filter wheel notches (`wheel_input` /
+SDL wheel event) and every polled key (`pc_controls_key_down` /
+`tsfp_native_key_down`), and reset on menu/capture changes. Controllers and the
+keyboard zoom keys are unchanged. `tests/input/test_scope_wheel.py`: host fixture,
+ten header mutations, adapter and binding structure checks. Windows fixture
+passes; in-game feel and Mac/Linux compile/wheel checks are pending.
