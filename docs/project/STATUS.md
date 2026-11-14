@@ -1,3 +1,15 @@
+Battle Mech mouse fallback and camera sweep speed (2026-11-13, branch
+fix/mounted-mouse-mech-and-sweep from c25c2143; refs #425): the shared
+pc_mounted.h mech route now turns the mech unscaled when the camera FOV is
+missing or out of range instead of dropping the motion, names each route
+outcome in PcInput.mech_status (both adapters log changes, at most 16 lines),
+and sweeping security cameras keep mouse aim when taken over with a negative
+sweep speed (fabsf of data+5C). Object-handle decoding is unchanged (>>22).
+Windows 11 x64, MSVC 14.44: test_mounted_mouse.py 21 pass, including the
+supported-US-XBE original 37AA70/vehicle/mount routines and their old-route
+mutations; test_reload_keys.py passes. Not run: game build, live Battle Mech
+and security-camera play, native Mac/Linux compile and input checks.
+
 Control-preset rollback and high-FPS interaction repairs (2026-11-12,
 branch revert/control-presets; original base e7cb1016, reference c511f1e9 before
 PR528): removes Modern presets, profile button/axis seeding and repair,

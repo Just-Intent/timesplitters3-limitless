@@ -19,6 +19,7 @@ typedef struct PcInput {
     uint64_t motion_at;
     int wheel_queue, wheel_key;
     uint64_t wheel_until;
+    int mech_status; /* last Battle Mech mouse outcome, PC_MECH_* in pc_mounted.h */
 } PcInput;
 
 /* The final Machine Wars cockpit uses held secondary fire for its minigun.

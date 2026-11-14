@@ -152,6 +152,31 @@ host adapters, and optional original-XBE 37AA70/3797B0 execution. The old-route
 mutation must fail. The original-code fixture proves target survival, direction
 vector updates and controller inputs; it is not a live mission or Mac-input test.
 
+FOV fallback and outcome log: 37AA70 has no FOV input, and the mech view can
+be the script camera ([0x733108], cleared by C6150, aimed by CC170; its type-0x1F
+view CD589 needs a type-8 target). The route therefore uses the camera FOV only
+for zoom scaling: a missing, non-finite or out-of-range FOV turns the mech
+unscaled (as FOV 55) instead of discarding the motion. Each rejection is named
+by a `PC_MECH_*` value in `PcInput.mech_status` (none, moved, no camera target,
+not a character, no mech data, control off, other local slot, read-only or
+non-finite target angles); `pc_mech_status_text` maps it to text. Both
+adapters' `pc_controls_apply_mouse` log a changed, non-none outcome after
+releasing their lock as `[PC-MOUSE]`/`[native-mouse] Battle Mech: ...`, at most
+16 lines per run, so a playtest log shows the failed link if the view still does
+not turn. mech_mouse.c and mouse_region.c check each status, the NaN/500/0 FOV
+fallback and the reset to none; test_mounted_mouse.py checks the bounded,
+unlocked logging in both adapters.
+
+## Camera gun sweep speed
+
+Mode 0x80 guns with data `+8` flag `0x1000000` (sweeping security cameras)
+scale mouse aim by data `+0x5C`. US 246000 also uses `+0x5C` as the sweep's yaw
+speed and negates it at each limit, so a camera taken over mid-sweep can hold a
+negative value; the helper previously rejected it and the mouse stopped. It now
+scales by `fabsf(+0x5C)` (the sign is only sweep direction) and still rejects a
+non-finite value. mounted_mouse.c covers a negative speed turning the same way
+at the same rate. The sweep itself and its operator check are unchanged.
+
 ## Machine Wars final cockpit (scripted mode 0x100)
 
 Live Windows capture on 2026-11-04 identified player mode 0x100, callback

@@ -35,7 +35,7 @@ coverage in runtime CI. Patch2630 follows2620.
 on input-only frames. Fixture-local locks/atomics support standalone non-Windows
 execution. This is synthetic hit-testing, not physical Retina/scene acceptance.
 
-[Linux](linux-game.md); [LAN](system-link.md).
+[Linux](linux-game.md); [LAN](system-link.md); [Mech](mounted-mouse.md).
 
 WSL driver patch direction/repeat/rejection checks use actual GNU patch in
 `test_linux_foundation.py`; see [driver setup](../development/wsl-vulkan.md).

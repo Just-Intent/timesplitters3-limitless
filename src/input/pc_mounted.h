@@ -68,6 +68,21 @@ static inline int pc_vehicle_gun(uintptr_t p,ptrdiff_t offset,PcGuestRegion *reg
     return !operator_address || operator_address==owner;
 }
 
+/* Battle Mech route outcome, kept in PcInput.mech_status for host logs. The
+ * route is not live-verified; the first rejection names the failed link. */
+enum { PC_MECH_NONE, PC_MECH_MOVED, PC_MECH_NO_CAMERA, PC_MECH_NOT_CHARACTER,
+       PC_MECH_NO_DATA, PC_MECH_NO_CONTROL, PC_MECH_OTHER_SLOT, PC_MECH_READONLY,
+       PC_MECH_BAD_ANGLES };
+static inline const char *pc_mech_status_text(int status)
+{
+    static const char *const text[]={"none","target angles moved",
+        "no script camera target ([0x733108]+2AC)","camera target is not a character (+20 != 8)",
+        "no mech data (extra+AA0)","player control off (data+50 = 0)",
+        "controlled by another local slot (data+9C)","target angles not writable",
+        "target angles not finite"};
+    return status>=0 && status<(int)(sizeof text/sizeof text[0])?text[status]:"unknown";
+}
+
 /* -1 leaves ordinary look/terminal handling alone; 0/1 consumes gun-mode
  * motion without/with movement. Mode 0x400 uses the vehicle seat gun above;
  * mode 0x8000 uses the Battle Mech target angles.
@@ -98,6 +113,7 @@ static inline int pc_mounted_mouse_in_region(PcInput *input,uint64_t now,float s
     pc_input_cockpit_context(input,cockpit,now);
     if(!p)return -1;
     mode=*(const uint32_t*)(p+0x114);
+    if(mode!=0x8000)input->mech_status=PC_MECH_NONE;
     if(mode!=0x80 && mode!=0x400 && mode!=0x8000 && mode!=0x100)return -1;
     if(mode==0x100) {
         /* Scripted cameras share this mode. Only Machine Wars' final cockpit
@@ -149,21 +165,28 @@ static inline int pc_mounted_mouse_in_region(PcInput *input,uint64_t now,float s
     if(mode==0x8000) {
         /* US 37AA70 resolves the Battle Mech through C9F50 -> scene+2AC,
          * actor+7C -> extra+AA0. 37A730 records the controlling local slot
-         * at +9C; +50 gates player control. These are not vehicle gun angles. */
+         * at +9C; +50 gates player control. These are not vehicle gun angles.
+         * [0x733108] is the script camera (C6150 clears it, CC170 aims it);
+         * its type-0x1F view (CD589) needs a type-8 target and reads +20/+24. */
         uintptr_t scene_slot=pc_mounted_read(0x00733108,offset,4,region);
         uintptr_t scene=scene_slot?pc_mounted_read(*(const uint32_t*)scene_slot,offset,0x2b0,region):0;
         entity=scene?pc_mounted_read(*(const uint32_t*)(scene+0x2ac),offset,0x80,region):0;
-        if(!entity || *(const uint32_t*)(entity+0x20)!=8)return 0;
+        if(!entity){input->mech_status=PC_MECH_NO_CAMERA;return 0;}
+        if(*(const uint32_t*)(entity+0x20)!=8){input->mech_status=PC_MECH_NOT_CHARACTER;return 0;}
         extra=pc_mounted_read(*(const uint32_t*)(entity+0x7c),offset,0xaa4,region);
         data=extra?pc_mounted_read(*(const uint32_t*)(extra+0xaa0),offset,0x9d,region):0;
-        f=pc_mounted_read(fov_object,offset,0x388,region);
-        if(!data || !f || !*(const uint32_t*)(data+0x50) ||
-           *(const uint8_t*)(data+0x9c)!=*(const uint32_t*)(p+4) ||
-           !pc_guest_memory_in_span(region,data+0x2c,8,1))return 0;
+        if(!data){input->mech_status=PC_MECH_NO_DATA;return 0;}
+        if(!*(const uint32_t*)(data+0x50)){input->mech_status=PC_MECH_NO_CONTROL;return 0;}
+        if(*(const uint8_t*)(data+0x9c)!=*(const uint32_t*)(p+4)){input->mech_status=PC_MECH_OTHER_SLOT;return 0;}
+        if(!pc_guest_memory_in_span(region,data+0x2c,8,1)){input->mech_status=PC_MECH_READONLY;return 0;}
         pitch=*(const float*)(data+0x2c);yaw=*(const float*)(data+0x30);
-        fov=*(const float*)(f+0x384);
-        if(!isfinite(pitch) || !isfinite(yaw) || !isfinite(fov) || fov<1 || fov>120)return 0;
-        scale=sensitivity*(fov<55?fov/55:1);
+        if(!isfinite(pitch) || !isfinite(yaw)){input->mech_status=PC_MECH_BAD_ANGLES;return 0;}
+        /* The original stick route has no FOV input. Use the FOV only for the
+         * shared zoom scaling; a missing or out-of-range camera FOV (the mech
+         * view can be a script camera) must not discard the mouse turn. */
+        f=pc_mounted_read(fov_object,offset,0x388,region);
+        fov=f?*(const float*)(f+0x384):55;
+        scale=sensitivity*(isfinite(fov) && fov>=1 && fov<55?fov/55:1);
         if(!isfinite(dx*scale) || !isfinite(dy*scale))return 0;
         /* Original 37AA70 wraps to 0..360 and limits elevation to 280..10
          * across zero. Clamp in signed space so large mouse packets cannot
@@ -173,6 +196,7 @@ static inline int pc_mounted_mouse_in_region(PcInput *input,uint64_t now,float s
         double next_yaw=fmod(yaw-dx*scale,360.0);
         *(float*)(data+0x2c)=(float)(next_pitch<0?next_pitch+360:next_pitch);
         *(float*)(data+0x30)=(float)(next_yaw<0?next_yaw+360:next_yaw);
+        input->mech_status=PC_MECH_MOVED;
         return 1;
     }
     if(mode==0x80) {
@@ -218,8 +242,11 @@ static inline int pc_mounted_mouse_in_region(PcInput *input,uint64_t now,float s
     if(!isfinite(fov) || fov<1 || fov>120)return 0;
     scale=sensitivity*(fov<55?fov/55:1);
     if(mode==0x80 && (*(const uint32_t*)(data+8)&0x1000000)) {
-        float speed=*(const float*)(data+0x5c);
-        if(!isfinite(speed) || speed<0)return 0;
+        /* +5C is also the sweep's yaw speed: 246000 negates it at each
+         * limit, so a camera taken over mid-sweep can hold a negative
+         * value. Use its magnitude; the sign is sweep direction only. */
+        float speed=fabsf(*(const float*)(data+0x5c));
+        if(!isfinite(speed))return 0;
         scale*=speed;
     }
     pitch=*(const float*)(data+0x1c);yaw=*(const float*)(data+0x24);

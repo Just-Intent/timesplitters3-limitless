@@ -80,6 +80,20 @@ def test_mounted_mouse(tmp_path, fixture):
             assert legacy.returncode != 0 and 'FAIL' in legacy.stderr, legacy.stdout + legacy.stderr
 
 
+@pytest.mark.parametrize('adapter', ['src/input/pc_controls.c', 'src/native/input_sdl.c'])
+def test_adapters_log_battle_mech_outcomes(adapter):
+    # Both hosts name each changed Battle Mech outcome from the shared status,
+    # outside their input lock, and stop after 16 lines.
+    body = re.search(r'void pc_controls_apply_mouse\([^\n]*\).*?\n\}', (ROOT / adapter).read_text(), re.S).group()
+    route = body.find('pc_mounted_mouse_in_region(')
+    before = body.find('mech_status')
+    log = body.find('pc_mech_status_text(')
+    assert 0 <= before < route < log, adapter
+    assert re.search(r'mech_logs\s*<\s*16', body) and 'PC_MECH_NONE' in body, adapter
+    unlock = max(body.rfind('ReleaseSRWLockExclusive(&lock)', 0, log), body.rfind('pthread_mutex_unlock(&camera_lock)', 0, log))
+    assert route < unlock < log, adapter
+
+
 @pytest.mark.skipif(sys.platform not in ('win32', 'darwin'), reason='Host guest-memory guards require Windows or macOS')
 def test_original_mounted_binding(tmp_path):
     import hashlib

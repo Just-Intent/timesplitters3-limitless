@@ -421,9 +421,15 @@ void pc_controls_apply_mouse(uint32_t player,uint32_t fov_object,ptrdiff_t offse
     }
     int terminal=pc_terminal_mouse_in_region(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),player,offset,pc_native_rate()!=0,&region);
     pc_input_terminal_context(&camera_input,terminal>=0,atomic_load(&keys[1]));
+    int mech_before=camera_input.mech_status;
     if(terminal>=0 || pc_mounted_mouse_in_region(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),
             atomic_load(&mouse_invert),player,fov_object,offset,pc_native_rate()!=0,&region)>=0 || !pc_camera_fields_in_region(player,fov_object,offset,&yaw,&pitch,&fov,&region)) {
+        int mech_after=camera_input.mech_status;
         pthread_mutex_unlock(&camera_lock);
+        static unsigned mech_logs;
+        if(mech_after!=mech_before && mech_after!=PC_MECH_NONE && mech_logs<16) {
+            mech_logs++;fprintf(stderr,"[native-mouse] Battle Mech: %s\n",pc_mech_status_text(mech_after));
+        }
         return;
     }
     float old_yaw=*yaw,old_pitch=*pitch;

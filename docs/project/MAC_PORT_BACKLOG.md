@@ -1688,6 +1688,14 @@ vendor detection or authorize closing the issue before publication.
 
 Issue #425 adds shared Battle Mech mouse targeting through the scene-owned mech and its controlling local slot. Windows and SDL use the same guarded helper; no separate native implementation is needed. Windows Release build and 40 focused input/context checks pass, including original supported-US mech input and aim-vector routines at 60/120/180/240 FPS. These are controlled routine tests, not live mech-encounter acceptance. Physical Mac gameplay remains unverified. See [mounted mouse](../agent-context/mounted-mouse.md#battle-mech-mouse-425).
 
+Follow-up (branch `fix/mounted-mouse-mech-and-sweep`, uncommitted to main): the
+shared helper turns the Battle Mech unscaled when the camera FOV is unusable,
+names each mech route outcome (PcInput.mech_status, logged by both adapters,
+at most 16 lines), and keeps sweeping-camera mouse aim with a negative sweep
+speed. No OS adapter change beyond the shared log call. Windows fixtures and
+original-XBE routine tests pass; native Mac/Linux compile and live mech/camera
+checks are pending.
+
 - **#385 vehicle-gunner route (2026-10-29, local candidate):** Shared
   `src/input/pc_mounted.h` follows mode-0x400 occupied seats and their gun table
   for types 3/4. Windows and SDL adapter-body fixtures pass with the same logic;

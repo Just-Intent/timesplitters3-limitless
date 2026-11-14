@@ -32,7 +32,7 @@ PC bar: [state](interaction-input.md#pc-settings-bar-visibility).
 
 [Story](systems-details.md). [Exit/save](multiplayer-exit.md).
 
-[Mech](mounted-mouse.md).
+[Mech/sweep](mounted-mouse.md).
 
 Minigun: [policy](native-minigun.md).
 
