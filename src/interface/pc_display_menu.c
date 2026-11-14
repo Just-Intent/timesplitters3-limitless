@@ -957,6 +957,7 @@ static int audio_font_menu(uint32_t menu)
     return audio_menu && menu==audio_menu && guest_writable(menu,8) && WORD_AT(menu+4u)==0x0052377cu;
 }
 #include "pc_display_ui.inc"
+#include "pc_mapmaker_widescreen.inc"
 static uint32_t bits(float f) { uint32_t u; memcpy(&u,&f,4); return u; }
 #include "pc_settings_spacing.inc"
 #include "pc_kill_feed_guest.inc"

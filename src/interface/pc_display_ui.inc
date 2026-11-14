@@ -20,6 +20,16 @@ static void ui_place(int placement,uint32_t tag)
  * Such a pass still has g_cur_rt == NULL. Its logo, scanlines and alpha mask
  * are texture pixels, not HUD widgets: keep every layer in guest coordinates.
  * Restore the enclosing placement after flushing the final feed batch. */
+/* Run original with all of its 2D draws at one placement, then restore the
+ * enclosing one. Nested scopes (a full-canvas fade inside) restore to this. */
+void pc_display_ui_scope(void (*original)(void),int placement,uint32_t tag)
+{
+    int old=ui_placement;uint32_t old_tag=ui_tag;
+    ui_place(placement,tag);
+    original();
+    ui_place(old,old_tag);
+}
+
 void pc_display_camera_feed(void (*original)(void))
 {
     uint32_t camera=WORD_AT(0x007B0CC0u);
@@ -122,6 +132,8 @@ int pc_display_transition_overlay(void (*original)(void))
     case 0x002BF803u: /* Frontend transition. */
     case 0x002BDA88u: /* Frontend transition backdrop blackout. */
     case 0x002DA4D0u: case 0x002DA715u: /* Menu canvas clear/tint. */
+    case 0x0030A580u: /* MapMaker editor backdrop (sub_0030A550), under its
+                         CENTRE scope (pc_mapmaker_widescreen.inc). */
         break;
     case 0x00155F8Eu: case 0x00156102u: /* Loading picture top/bottom borders. */
     case 0x0015682Du: /* Loading picture fade starts below its top border. */

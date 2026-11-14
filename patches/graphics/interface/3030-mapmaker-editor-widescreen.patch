@@ -1,0 +1,35 @@
+--- a/titles/futureperfect/src/recomp_manual.c
++++ b/titles/futureperfect/src/recomp_manual.c
+@@ -1521,10 +1521,32 @@
+ #else
+     sub_001730E0_gen();
+ #endif
+ }
+ 
++/* MapMaker editor grid view and grid lines: one 2D placement on wide
++ * displays (src/interface/pc_mapmaker_widescreen.inc). */
++extern void sub_00310A20_gen(void);
++void sub_00310A20(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_grid_view(sub_00310A20_gen);
++#else
++    sub_00310A20_gen();
++#endif
++}
++
++extern void sub_0030A550_gen(void);
++void sub_0030A550(void)
++{
++#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
++    pc_mapmaker_grid_lines(sub_0030A550_gen);
++#else
++    sub_0030A550_gen();
++#endif
++}
++
+ extern void sub_0025D520_gen(void);
+ void sub_0025D520(void)
+ {
+ #if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_PROMPTS)
+     pc_auto_look_camera(sub_0025D520_gen);
