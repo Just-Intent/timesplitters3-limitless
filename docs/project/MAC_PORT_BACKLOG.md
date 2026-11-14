@@ -10489,3 +10489,10 @@ See [evidence](STATUS.md#2026-11-07---issue521-portal-seams).
   Original-XBE Windows CPU fixtures cover60-240/slow/pause; native Mac/Linux
   builds and live boss/U-Genix acceptance remain unverified. See STATUS and
   native-projectiles/native-script-clocks guides for scope and test boundaries.
+
+System Link receive bounds (2026-11-13, `fix/system-link-packet-bounds`):
+shared patch2475 and `src/network/pc_net_packet_guard_guest.inc` bound three
+original System Link receive handlers on every host. The wrappers only read guest
+memory and use no OS service, so no Mac adapter is required. Windows fixture and
+original-instruction checks pass; native Mac build and LAN play are unverified.
+See STATUS.

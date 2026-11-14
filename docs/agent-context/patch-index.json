@@ -1939,6 +1939,14 @@
       ]
     },
     {
+      "name": "2475-system-link-packet-bounds.patch",
+      "path": "patches/network/2475-system-link-packet-bounds.patch",
+      "sha256": "dee0bcf2e81fa4b6aae8a83c6b7484783de882344ab04bd87eafa3b9cd1ef02f",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
       "name": "2480-kill-feed-attribution.patch",
       "path": "patches/graphics/interface/2480-kill-feed-attribution.patch",
       "sha256": "c6d3c4bfd11676b9a4c0f425a21e9c4a5f94efa7c9255b92d3247ccaaa1c530c",

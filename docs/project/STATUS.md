@@ -1,3 +1,15 @@
+System Link receive bounds (2026-11-13, branch fix/system-link-packet-bounds):
+shared patch2475 wraps original handlers352DF0
+(message fragment), 3596F0 (turret sync) and357D70 (death effect) through
+`src/network/pc_net_packet_guard_guest.inc`. Out-of-range fragment lengths or
+indices, gun slots past the stock pool, unknown player bytes and a full30-entry
+effect list are dropped the handler's own early-exit way; valid traffic is
+unchanged. Windows MSVC: `tests/network/test_net_packet_guard.py` 16 fixture/
+mutation cases and the wrapper check pass; the original-instruction check passes
+against the supported private US executable. The full patch stack applies to a
+pristine prepared runtime. Not run: game build, live two-machine System Link,
+native Mac/Linux builds.
+
 Control-preset rollback and high-FPS interaction repairs (2026-11-12,
 branch revert/control-presets; original base e7cb1016, reference c511f1e9 before
 PR528): removes Modern presets, profile button/axis seeding and repair,
