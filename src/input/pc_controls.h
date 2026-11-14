@@ -20,6 +20,8 @@ void pc_controls_mapmaker_pointer(int active);
 void pc_controls_mapmaker_row_press(void);
 /* In the MapMaker editor (scene 102): editor key handling and wheel zoom. */
 void pc_controls_mapmaker_editor(int active);
+/* 1 while the MapMaker editor remaps keys (prompts show T for floor up). */
+int pc_controls_mapmaker_editor_active(void);
 /* MapMaker editor screen: wheel notches (positive up) become a short zoom hold. */
 void pc_controls_mapmaker_zoom(int notches);
 /* MapMaker editor: press a button (PC_MAPMAKER_PULSE_*) briefly. */

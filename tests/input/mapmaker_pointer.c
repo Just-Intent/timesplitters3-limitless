@@ -419,6 +419,43 @@ int main(void)
     WORD_AT(0x0079094Cu)=102;
     CHECK(mapmaker_pointer_row_click() && row_presses==1);
 
+    /* Escape acts as B while an editor menu is open, latched per press. */
+    {
+        PcMapMakerEscape esc={0};
+        CHECK(!pc_mapmaker_escape_back(&esc,1,0));   /* editor screen: stays Start */
+        CHECK(!pc_mapmaker_escape_back(&esc,1,1));   /* pause opened under the same press */
+        CHECK(!pc_mapmaker_escape_back(&esc,0,1));
+        CHECK(pc_mapmaker_escape_back(&esc,1,1));    /* in a menu: B */
+        CHECK(pc_mapmaker_escape_back(&esc,1,0));    /* menu closed under the press: still B */
+        CHECK(!pc_mapmaker_escape_back(&esc,0,0));
+        CHECK(!pc_mapmaker_escape_back(&esc,1,0));
+    }
+    CHECK(pc_mapmaker_key(0,0x1B,'F',1,1)==1);   /* outside the editor: Start as bound */
+    CHECK(pc_mapmaker_key(1,0x1B,'F',1,0)==1);   /* editor screen: Escape still Start */
+    CHECK(pc_mapmaker_key(1,'F','F',0,0)==0);
+    CHECK(pc_mapmaker_key(1,0x1B,'F',1,1)==0);   /* menu open: Escape no longer Start */
+    CHECK(pc_mapmaker_key(1,'F','F',0,1)==1);    /* ... but B */
+    CHECK(pc_mapmaker_key(1,'F','F',1,0)==1);    /* F still B */
+    CHECK(pc_mapmaker_key(1,'F','F',0,0)==0);
+    CHECK(pc_mapmaker_key(1,'W','F',1,1)==1);    /* other keys untouched */
+    CHECK(pc_mapmaker_key(1,0x1B,0,1,1)==1);     /* no B key: leave Escape alone */
+    CHECK(pc_mapmaker_key(1,0x1B,0x1B,1,1)==1);  /* Escape is B already */
+    /* Movement keys: up in the editor; strafe left/right alias the D-pad. */
+    {
+        const int keys[4]={'W','S','A','D'};
+        CHECK(pc_mapmaker_move_key(1,'A',keys,1)==0 && pc_mapmaker_move_key(1,'W',keys,1)==0);
+        CHECK(pc_mapmaker_move_key(0,'A',keys,1)==1);            /* outside the editor */
+        CHECK(pc_mapmaker_move_key(1,'E',keys,1)==1);            /* other keys */
+        CHECK(pc_mapmaker_dpad_alias(1,0x25,keys)=='A' && pc_mapmaker_dpad_alias(1,0x27,keys)=='D');
+        CHECK(!pc_mapmaker_dpad_alias(1,0x26,keys) && !pc_mapmaker_dpad_alias(0,0x25,keys));
+    }
+    /* T raises the floor (right trigger) in the editor only. */
+    CHECK(pc_mapmaker_trigger_key(1,0x01,0x01,0,1)==1);   /* fire key (left mouse) reports T */
+    CHECK(pc_mapmaker_trigger_key(1,0x01,0x01,0,0)==0);
+    CHECK(pc_mapmaker_trigger_key(0,0x01,0x01,0,1)==0);   /* outside the editor: Fire as bound */
+    CHECK(pc_mapmaker_trigger_key(1,'G',0x01,1,1)==1);    /* other keys untouched */
+    CHECK(pc_mapmaker_trigger_key(1,'G',0x01,0,1)==0);
+
     /* Wheel zoom: each notch holds White (up) or Black (down) for 100 ms. */
     {
         PcMapMakerZoom z={0};

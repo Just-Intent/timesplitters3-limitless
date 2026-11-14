@@ -260,13 +260,38 @@ int pc_controls_accept_pad(void) {
 /* MapMaker editor mouse and keys (pc_mapmaker_pointer.h), as on Windows. */
 static int mapmaker_pointer_active,mapmaker_editor;
 static int mapmaker_zoom_up_key,mapmaker_zoom_down_key,mapmaker_y_key;
+static int mapmaker_cancel_key,mapmaker_trigger_key,mapmaker_move_keys[4];
+static PcMapMakerEscape mapmaker_escape;
 static Uint64 mapmaker_pulse_until[1];
 static PcMapMakerClick mapmaker_click;
 static PcMapMakerZoom mapmaker_zoom;
-/* Editor key policy for one polled key; down already includes menu aliases. */
+/* The editor replaces the generic menu D-pad aliases with its own. */
+static int mapmaker_editor_open(int menu) {
+    pthread_mutex_lock(&camera_lock);
+    int editor=menu && mapmaker_editor;
+    pthread_mutex_unlock(&camera_lock);
+    return editor;
+}
+/* Editor key policy for one polled key (raw state already read). */
 static int mapmaker_key(int vk,int down,int menu) {
+    if(!mapmaker_editor_open(menu))return down;
+    int escape=tsfp_native_key_down(0x1B),floor_up=tsfp_native_key_down(PC_MAPMAKER_FLOOR_UP_KEY);
+    int alias_down=0;
     pthread_mutex_lock(&camera_lock);
     int editor=menu && mapmaker_editor && atomic_load(&focused);
+    int alias=pc_mapmaker_dpad_alias(editor,vk,mapmaker_move_keys);
+    pthread_mutex_unlock(&camera_lock);
+    /* Read outside the lock: tsfp_native_key_down takes it itself. */
+    if(alias>0 && alias<256) alias_down=tsfp_native_key_down(alias);
+    pthread_mutex_lock(&camera_lock);
+    /* The mouse moves the pointer, so the movement keys no longer do; strafe
+     * left/right step the toolbar as the D-pad. */
+    down=pc_mapmaker_move_key(editor,vk,mapmaker_move_keys,down)||alias_down;
+    /* Escape is B while a menu is open and stays Start on the editor screen. */
+    down=pc_mapmaker_key(editor,vk,mapmaker_cancel_key,down,
+                         pc_mapmaker_escape_back(&mapmaker_escape,escape,!mapmaker_pointer_active));
+    /* T is the floor-up trigger (its usual key, the left button, is A there). */
+    down=pc_mapmaker_trigger_key(editor,vk,mapmaker_trigger_key,down,floor_up);
     /* MapMaker editor: a right click on an empty cell briefly presses Y. */
     if(editor && mapmaker_y_key && vk==mapmaker_y_key &&
        SDL_GetTicks()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_Y]) down=1;
@@ -281,7 +306,7 @@ int pc_controls_key_down(int vk) {
     if(pc_settings_capture_blocked())return 0;
     int down=tsfp_native_key_down(vk);
     int menu=atomic_load(&menu_active);
-    if(menu) {
+    if(menu && !mapmaker_editor_open(menu)) {
         unsigned alias=pc_input_menu_alias((unsigned)vk);
         if(alias)down|=tsfp_native_key_down((int)alias);
     }
@@ -422,16 +447,27 @@ void pc_controls_mapmaker_pointer(int active) {
 }
 /* Called from the guest menu hook, never while the bindings are evaluated. */
 void pc_controls_mapmaker_editor(int active) {
-    int keys[PC_ACTION_COUNT],white=0,black=0,y=0;
+    int keys[PC_ACTION_COUNT],white=0,black=0,y=0,back=0,trigger=0,move[4]={0};
     if(active && pc_settings_prompt_keys(keys)) {
-        white=keys[5];  /* "White button action": zoom (held), wheel up */
-        black=keys[4];  /* "Black button action": zoom (held), wheel down */
+        back=keys[1];   /* "Melee / back (B)": editor menus close on B */
         y=keys[3];      /* "Y action": clears the tile selection */
+        black=keys[4];  /* "Black button action": zoom (held), wheel down */
+        white=keys[5];  /* "White button action": zoom (held), wheel up */
+        trigger=keys[9]; /* "Fire": right trigger, floor up in the editor */
+        for(int i=0;i<4;i++) move[i]=keys[14+i]; /* forward, backward, left, right */
     }
     pthread_mutex_lock(&camera_lock);
     mapmaker_editor=!!active;
+    mapmaker_cancel_key=back;mapmaker_trigger_key=trigger;
     mapmaker_zoom_up_key=white;mapmaker_zoom_down_key=black;mapmaker_y_key=y;
+    memcpy(mapmaker_move_keys,move,sizeof mapmaker_move_keys);
     pthread_mutex_unlock(&camera_lock);
+}
+int pc_controls_mapmaker_editor_active(void) {
+    pthread_mutex_lock(&camera_lock);
+    int active=atomic_load(&menu_active) && mapmaker_editor && mapmaker_trigger_key;
+    pthread_mutex_unlock(&camera_lock);
+    return active;
 }
 void pc_controls_mapmaker_pulse(int button) {
     if(button!=PC_MAPMAKER_PULSE_Y)return;

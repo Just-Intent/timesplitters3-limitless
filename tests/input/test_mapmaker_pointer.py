@@ -48,6 +48,14 @@ MUTATIONS = {
     'tick-back-on-screen': (ADAPTER, ' || mapmaker_pointer_context(menu)) return 0;\n    d=', ') return 0;\n    d='),
     'tick-back-any-scene': (ADAPTER, 'if(!mapmaker_pointer_enabled() || !mapmaker_pointer_scene(menu) || mapmaker_pointer_context(menu)) return 0;\n    d=', 'if(!mapmaker_pointer_enabled() || mapmaker_pointer_context(menu)) return 0;\n    d='),
     'tick-back-no-bit': (ADAPTER, '    WORD_AT(menu+0xc4)|=0x20u;\n    return 1;\n}', '    return 1;\n}'),
+    'escape-still-start': (POLICY, 'if (key == ESCAPE) return escape_back ? 0 : down;', ''),
+    'escape-not-latched': (POLICY, 'if (escape_down && !s->was) s->back = !!menu_open;', 's->back = !!menu_open;'),
+    'escape-back-on-screen': (POLICY, 'if (escape_down && !s->was) s->back = !!menu_open;', 'if (escape_down && !s->was) s->back = 1;'),
+    'escape-not-back': (POLICY, 'if (key == cancel_key) return down || escape_back;', 'if (key == cancel_key) return down;'),
+    'escape-everywhere': (POLICY, 'if (!editor || !cancel_key', 'if (!cancel_key'),
+    'wasd-still-moves': (POLICY, 'for (int i = 0; i < 4; i++) if (move[i] && key == move[i]) return 0;', ''),
+    'no-toolbar-alias': (POLICY, 'return key == LEFT ? move[2] : key == RIGHT ? move[3] : 0;', 'return 0;'),
+    'trigger-everywhere': (POLICY, 'if (!editor || !trigger_key || key != trigger_key) return down;', 'if (!trigger_key || key != trigger_key) return down;'),
     'row-any-scene': (ADAPTER, '(int32_t)WORD_AT(0x0079094Cu)!=MAPMAKER_POINTER_SCENE) return 0;', '0) return 0;'),
 }
 
@@ -116,3 +124,35 @@ def test_pointer_wiring():
     native = (ROOT / 'src/native/input_sdl.c').read_text(encoding='utf-8')
     key = native.split('int pc_controls_key_down(int vk)', 1)[1].split('\n}', 1)[0]
     assert 'return mapmaker_key(vk,down,menu);' in key
+
+
+def test_editor_keys_wiring():
+    bindings = (ROOT / 'src/input/pc_bindings.inc').read_text(encoding='utf-8')
+    # Action order the editor reads: B, Y, Black, White, Fire, movement.
+    assert '"Interact / confirm (A)", "Melee / back (B)", "Reload (X)", "Y action",' in bindings
+    assert '"Black button action", "White button action", "Pause / Start", "Objectives / Back",' in bindings
+    assert '"Throw grenade", "Fire",' in bindings
+    assert '"Move forward", "Move backward", "Strafe left",\n    "Strafe right",' in bindings
+    for host in HOSTS:
+        text = (ROOT / host).read_text(encoding='utf-8')
+        editor = text.split('void pc_controls_mapmaker_editor(int active)', 1)[1].split('\n}', 1)[0]
+        for read in ('keys[1]', 'keys[3]', 'keys[4]', 'keys[5]', 'keys[9]', 'keys[14', 'pc_settings_prompt_keys(keys)'):
+            assert read in editor, (host, read)
+        assert 'int pc_controls_mapmaker_editor_active(void)' in text
+    controls = (ROOT / 'src/input/pc_controls.c').read_text(encoding='utf-8')
+    key = controls.split('int pc_controls_key_down(int key)', 1)[1].split('return down;', 1)[0]
+    # Applied before typing and focus checks, so text entry still wins.
+    assert key.index('down=pc_mapmaker_key(') < key.index('if(text_input.owner && pc_text_key')
+    assert '!mapmaker_pointer_active));' in key  # menu open = editor screen does not own the pointer
+    # WASD is not the D-pad in the editor; T applies after the mouse-button blocks.
+    assert 'down=pc_mapmaker_move_key(1,key,mapmaker_move_keys,down);' in key
+    assert key.index("(key==VK_RBUTTON && (menu_mode") < key.index('down=pc_mapmaker_trigger_key(')
+    native = (ROOT / 'src/native/input_sdl.c').read_text(encoding='utf-8')
+    helper = native.split('static int mapmaker_key(int vk,int down,int menu) {', 1)[1].split('\n}', 1)[0]
+    for call in ('pc_mapmaker_move_key(editor,', 'pc_mapmaker_dpad_alias(editor,', 'pc_mapmaker_key(editor,',
+                 'pc_mapmaker_escape_back(&mapmaker_escape,', 'pc_mapmaker_trigger_key(editor,'):
+        assert call in helper, call
+    sdl_key = native.split('int pc_controls_key_down(int vk)', 1)[1].split('\n}', 1)[0]
+    assert 'if(menu && !mapmaker_editor_open(menu)) {' in sdl_key  # editor aliases replace the menu ones
+    prompts = (ROOT / 'src/input/pc_prompts.c').read_text(encoding='utf-8')
+    assert 'if(pc_controls_mapmaker_editor_active()) keys[9]=PC_MAPMAKER_FLOOR_UP_KEY;' in prompts
