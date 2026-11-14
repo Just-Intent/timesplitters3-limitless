@@ -87,6 +87,8 @@ void pc_display_menu_team_draw(void (*original)(void));
 void pc_display_menu_team_tick(void (*original)(void));
 void pc_display_camera(void (*original)(void));
 void pc_display_camera_feed(void (*original)(void));
+void pc_display_viewfinder(void (*original)(void));   /* WRAP sub_0014BFF0 */
+void pc_display_view_static(void (*original)(void));  /* WRAP sub_000F8DC0 */
 void pc_display_ui(void (*original)(void),uint32_t tag);
 void pc_display_scope(void (*original)(void),uint32_t tag);
 int pc_display_scope_mask(void (*original)(void));

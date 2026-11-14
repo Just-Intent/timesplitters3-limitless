@@ -1,3 +1,18 @@
+Widescreen mounted-gun/camera viewfinder (2026-11-13, branch
+fix/camera-view-widescreen from origin/main c25c2143; port of fork db5ec9ed):
+HUD mode 10's draw `sub_0014BFF0` framed the already-Hor+ mode-0x80 view with
+bars, tint, scanlines and brackets that AUTO placement fitted into the centred
+4:3 box, and the remote-view static `sub_000F8DC0` tiled only that box. Patch
+1505 wraps both; `pc_display_viewfinder` routes their sub_0001EFB0/sub_0001F090/
+sub_00041DC0 primitives STRETCH at 4:3 proportions on wide single full views,
+`pc_display_view_static` scales the tile width and restores the guest random
+sequence. `TSFP_CAMERA_WIDESCREEN=0` restores stock. Windows 11 x64, MSVC
+14.44 fixtures: test_camera_widescreen.py (fixture, 9 mutations, wiring, patch
+hook, runtime manual-scan, private-XBE decoder) passes after WinError 4551
+retries; camera-feed, ghost-actor and UI-layout suites pass with a scratch
+patched runtime. Full stack applies to a pristine prepared runtime. Not run:
+game build, gameplay, native Mac/Linux.
+
 Control-preset rollback and high-FPS interaction repairs (2026-11-12,
 branch revert/control-presets; original base e7cb1016, reference c511f1e9 before
 PR528): removes Modern presets, profile button/axis seeding and repair,

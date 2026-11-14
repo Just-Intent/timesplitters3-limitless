@@ -1026,7 +1026,7 @@ Crossplay: [acceptance](multiplayer-ui.md#physical-windowsmac-online-acceptance)
 
 Markers: test_ui_layout.py; test_patch_updates.py covers 2290/2291.
 
-Mech/cockpit: test_mounted_mouse.py; [scope](mounted-mouse.md).
+Mech/cockpit: test_mounted_mouse.py, test_camera_widescreen.py; [scope](mounted-mouse.md).
 
 Physics: [checks](build-test-details.md#guest-physical-state-regression).
 

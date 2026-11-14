@@ -1285,6 +1285,14 @@
       ]
     },
     {
+      "name": "1505-camera-viewfinder-widescreen.patch",
+      "path": "patches/graphics/interface/1505-camera-viewfinder-widescreen.patch",
+      "sha256": "c8a086c47305b4c1d83bb8780806be0eaf1f69cfc7112931c520492a00e30462",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
       "name": "1520-shared-native-renderer.patch",
       "path": "patches/graphics/rendering/1520-shared-native-renderer.patch",
       "sha256": "4762e98b76381ae6aee71dfd7d55d12aab7f2ea8812c6f918e0d2e6d3b293559",

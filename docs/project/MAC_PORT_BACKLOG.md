@@ -1142,6 +1142,7 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-127 | Complete launcher language packs | Awaiting validation |
 | MAC-128 | Fresh weapon trigger timing (#434) | Awaiting validation |
 | MAC-129 | Optional SMAA anti-aliasing | Awaiting validation |
+| MAC-131 | Widescreen mounted-gun/camera viewfinder | Awaiting validation |
 
 ### MAC-126 - Launcher Discord community button
 
@@ -9587,6 +9588,27 @@ localized gameplay acceptance remains pending. See STATUS's US startup repair.
 MAC-127 PR436 review repair: native package manifests now forward language_packs
 from the native build to the installed top level. Three portable real-writer
 regressions cover enabled/disabled/absent flags; native host CI remains the gate.
+
+### MAC-131 - Widescreen mounted-gun/camera viewfinder
+
+- **Status:** Awaiting validation
+- **Behavior:** On wider-than-4:3 single full views, the mounted-gun/camera
+  viewfinder frame (bars, tint, scanlines, brackets, labels) and the remote-view
+  static fill the window at 4:3 proportions instead of a centred 4:3 box.
+  4:3, split-screen and partial views are unchanged; `TSFP_CAMERA_WIDESCREEN=0`
+  restores stock placement.
+- **Source:** uncommitted at entry creation, branch `fix/camera-view-widescreen`:
+  shared `src/interface/pc_display_ui.inc`, `pc_ui_layout.h`, `pc_display_menu.h`,
+  `pc_tutorial_ui.inc`, additive `1505-camera-viewfinder-widescreen.patch`,
+  `tests/graphics/camera_widescreen.c` and `test_camera_widescreen.py`.
+- **Existing Mac support:** The wrappers are enabled by `TSFP_NATIVE_DISPLAY`
+  as well as PC controls and use existing STRETCH placement in the native GL and
+  common RHI adapters; no new OS adapter is required. The portable regression is
+  registered in the shared runtime suite. Actual Mac rendering is unvalidated.
+- **Acceptance:** Build on Mac and run the regression. At 16:9 and 21:9 use a
+  mounted gun and a camera terminal: frame edges meet the window, static covers
+  it; check 4:3, split-screen and `TSFP_CAMERA_WIDESCREEN=0` remain stock.
+- **PC evidence:** See the widescreen viewfinder entry in docs/project/STATUS.md.
 
 ### MAC-129 - Optional SMAA anti-aliasing
 

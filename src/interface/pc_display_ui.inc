@@ -106,6 +106,164 @@ void pc_display_ui(void (*original)(void),uint32_t tag)
     radar_group=old_radar;
 }
 
+/* Mounted-gun / switch-camera view on a wider-than-4:3 output.
+ * The 3D view is already Hor+ (pc_display_camera; mode 0x80 logs aspect
+ * 1.768 at 16:9). HUD mode 10 (table 0x004E6900 + 10 * 0x1C: update
+ * sub_0012E100, draw sub_0014BFF0) then frames it: from 0x0014C281, single
+ * view only, black 0x7F bars around an inset 3% of the view width
+ * (0x00475CF8) by 15% of its height (0x004765E0), a green tint, a 0x1E
+ * camera tint (sub_00242EE0 guns), scanlines every 3 px, corner brackets
+ * (texture 0x11B), labels and a meter. AUTO placement fits every piece
+ * narrower than the canvas into the centred 4:3 box, so the frame boxed the
+ * view at 4:3 with an untinted world on both sides. While sub_0014BFF0 runs on
+ * a wide single full view, its sub_0001EFB0 / sub_0001F090 primitives draw
+ * STRETCH with pc_ui_viewfinder_x and its sub_00041DC0 labels at the matching
+ * edge placement (pc_ui_viewfinder_text): the frame meets the window edges,
+ * thicknesses and bracket shapes keep 4:3 proportions. The aim reticle before
+ * 0x0014C281 and the tail crosshair (sub_00135620) are unchanged.
+ * sub_0012E100 also raises view effect +0x5C (camera guns +0x50 a tick);
+ * sub_000FE990 draws it as static tiles (sub_000F8DC0, texture 0x336), also
+ * fitted into the 4:3 box: pc_display_view_static covers the window at the
+ * original texel size and leaves the guest random sequence as the original
+ * draw would. 4:3, narrower, split and partial views keep stock placement.
+ * TSFP_CAMERA_WIDESCREEN=0 restores it everywhere. */
+#define VIEWFINDER_FIRST 0x0014C281u
+#define VIEWFINDER_END 0x0014C962u
+static RECOMP_TLS int viewfinder_on;
+static int camera_widescreen_enabled(void)
+{
+    static int state=-1;
+    if(state<0) {
+        const char *v=getenv("TSFP_CAMERA_WIDESCREEN");
+        state=!(v && v[0]=='0' && !v[1]);
+    }
+    return state;
+}
+/* One complete wide single view: what the frame, static and fades require. */
+static int camera_full_view(void)
+{
+    uint32_t view=WORD_AT(0x007E71C8u);
+    float k=pc_display_hud_scale();
+    return camera_widescreen_enabled() && pc_display_wide_now() && k>0.f && k<1.f &&
+        guest_call(sub_001CDAE0,0)==1 && guest_writable(view,0x24) &&
+        WORD_AT(view)==0 && (WORD_AT(view+4u)==639 || WORD_AT(view+4u)==640) &&
+        WORD_AT(view+0x14u)==0 && (WORD_AT(view+0x18u)==479 || WORD_AT(view+0x18u)==480);
+}
+static int viewfinder_caller(uint32_t caller)
+{
+    return viewfinder_on && caller>=VIEWFINDER_FIRST && caller<VIEWFINDER_END;
+}
+/* Integer x0/x1 at frame+4/+12: sub_0001EFB0 (x0,y0,x1,y1,colour) and
+ * sub_0001F090 (x0,y0,x1,y1,u0,v0,u1,v1,colour). */
+static int viewfinder_primitive(void (*original)(void))
+{
+    uint32_t frame=g_esp,caller=WORD_AT(frame),saved[2]={WORD_AT(frame+4u),WORD_AT(frame+12u)};
+    int32_t x[2]={(int32_t)saved[0],(int32_t)saved[1]};
+    int old=ui_placement;uint32_t old_tag=ui_tag;
+    if(!viewfinder_caller(caller))return 0;
+    pc_ui_viewfinder_x(x,pc_display_hud_scale());
+    ui_place(1,caller);
+    WORD_AT(frame+4u)=(uint32_t)x[0];WORD_AT(frame+12u)=(uint32_t)x[1];
+    original();
+    ui_place(old,old_tag);
+    WORD_AT(frame+4u)=saved[0];WORD_AT(frame+12u)=saved[1];
+    return 1;
+}
+/* sub_00041DC0 (x float, y float, text, ...): fit glyphs, anchor the label. */
+static int viewfinder_label(void (*original)(void))
+{
+    uint32_t frame=g_esp,caller=WORD_AT(frame),bits=WORD_AT(frame+4u);
+    int old=ui_placement;uint32_t old_tag=ui_tag;float x;
+    if(!viewfinder_caller(caller))return 0;
+    memcpy(&x,&bits,4);
+    if(!isfinite(x))return 0;
+    ui_place(pc_ui_viewfinder_text(x),caller);
+    original();
+    ui_place(old,old_tag);
+    return 1;
+}
+/* One line per change while a mounted gun/camera view is up, capped. */
+static void camera_view_log(const char *path,uint32_t extra)
+{
+    static uint32_t last[4];static unsigned logs;
+    uint32_t actor=WORD_AT(0x007B0C7Cu),camera=WORD_AT(0x007B0CC0u),view=WORD_AT(0x007E71C8u);
+    uint32_t mode=0,gun=0,kind=0,width=0,height=0,hud=0;
+    float px=0.f,py=0.f;
+    if(guest_writable(actor,0x118))mode=WORD_AT(actor+0x114u);
+    if(guest_writable(actor,0x18)) {
+        uint32_t c=WORD_AT(actor+0x14u);
+        if(guest_writable(c,0x80)) {
+            uint32_t e=WORD_AT(c+0x7Cu);
+            if(guest_writable(e,0xC18))gun=WORD_AT(e+0xC14u);
+        }
+    }
+    if(gun && guest_writable(gun,0x80)) {
+        uint32_t data=WORD_AT(gun+0x7Cu);
+        if(guest_writable(data,0x14))kind=WORD_AT(data+0x10u);
+    }
+    if(guest_writable(view,0x24)) {
+        width=WORD_AT(view+4u)-WORD_AT(view)+1u;height=WORD_AT(view+0x18u)-WORD_AT(view+0x14u)+1u;
+    }
+    if(guest_writable(camera,0x208)) {
+        uint32_t m=WORD_AT(camera+0x204u);
+        if(guest_writable(m,0x18)){memcpy(&px,&WORD_AT(m),4);memcpy(&py,&WORD_AT(m+0x14u),4);}
+    }
+    {float k=pc_display_hud_scale();memcpy(&hud,&k,4);}
+    uint32_t key[4]={(uint32_t)(uintptr_t)path^mode<<8,gun^kind<<24,width<<16^height^hud,extra};
+    if(logs>=32u || !memcmp(key,last,sizeof key))return;
+    memcpy(last,key,sizeof key);logs++;
+    float k;memcpy(&k,&hud,4);
+    fprintf(stderr,"[PC-DISPLAY] Camera view: %s; scene %d, player mode 0x%X, gun 0x%08X kind %u, "
+            "viewport %ux%u, hud scale %.4f, projection x/y %.4f/%.4f (aspect %.4f), detail 0x%X\n",
+            path,(int32_t)WORD_AT(0x0079094Cu),(unsigned)mode,(unsigned)gun,(unsigned)kind,
+            (unsigned)width,(unsigned)height,k,px,py,px!=0.f?py/px:0.f,(unsigned)extra);
+}
+/* WRAP sub_0014BFF0: HUD mode 10 draw (mounted gun / camera viewfinder). */
+void pc_display_viewfinder(void (*original)(void))
+{
+    int old=viewfinder_on;
+    if(!camera_full_view()) {
+        camera_view_log(camera_widescreen_enabled()?"viewfinder stock (4:3, split or partial view)":
+                        "viewfinder stock (TSFP_CAMERA_WIDESCREEN=0)",0);
+        original();return;
+    }
+    camera_view_log("viewfinder frame fills the window (edge-anchored STRETCH)",0);
+    viewfinder_on=1;
+    original();
+    viewfinder_on=old;
+}
+/* WRAP sub_000F8DC0 (texture, x0, y0, x1, y1, alpha): remote-view static. */
+void pc_display_view_static(void (*original)(void))
+{
+    uint32_t frame=g_esp,texture=WORD_AT(frame+4u),table=WORD_AT(0x004B85C8u),record=0,size=0;
+    int32_t x0=(int32_t)WORD_AT(frame+8u),y0=(int32_t)WORD_AT(frame+12u);
+    int32_t x1=(int32_t)WORD_AT(frame+16u),y1=(int32_t)WORD_AT(frame+20u);
+    if(!camera_full_view() || x0!=0 || y0!=0 || (x1!=639 && x1!=640) || (y1!=479 && y1!=480) ||
+       !guest_writable(table,0x10) || (int32_t)texture<=(int32_t)WORD_AT(table+8u) ||
+       (int32_t)texture>=(int32_t)WORD_AT(table+0xCu) ||
+       !guest_writable(0x004E7950u,8) || !guest_writable(0x007497C8u,4)) {
+        original();return;
+    }
+    record=WORD_AT(table)+texture*0x34u;
+    if(!guest_writable(record,0x2C)){original();return;}
+    size=WORD_AT(record+0x24u);
+    unsigned w=size>>16,h=WORD_AT(record+0x28u)>>16,tile=pc_ui_noise_tile(w,pc_display_hud_scale());
+    if(!w || !h || tile==w){original();return;}
+    uint32_t lo=WORD_AT(0x004E7950u),hi=WORD_AT(0x004E7954u),count=WORD_AT(0x007497C8u);
+    uint32_t calls=2u*pc_ui_noise_steps(x0,x1,w)*pc_ui_noise_steps(y0,y1,h);
+    int old=ui_placement;uint32_t old_tag=ui_tag;
+    camera_view_log("view static covers the window (STRETCH, tile width scaled)",texture<<16|w<<8|tile);
+    ui_place(1,0x000F8DC0u);
+    WORD_AT(record+0x24u)=(size&0xFFFFu)|(uint32_t)tile<<16;
+    original();
+    ui_place(old,old_tag); /* Flush while the record still says the tile width. */
+    WORD_AT(record+0x24u)=size;
+    /* The extra tiles used extra random numbers; leave the sequence where
+       the original tiling would have. */
+    pc_ui_rand_advance(&lo,&hi,&count,calls);
+    WORD_AT(0x004E7950u)=lo;WORD_AT(0x004E7954u)=hi;WORD_AT(0x007497C8u)=count;
+}
+
 /* Verified US full-screen fade call sites. Scope the solid rectangle itself:
  * a fade can follow proportional UI in the same deferred sprite batch. Keep
  * opacity, blend state and guest geometry intact, and flush at both boundaries. */
@@ -113,10 +271,12 @@ int pc_display_transition_overlay(void (*original)(void))
 {
     uint32_t frame=g_esp,caller=WORD_AT(frame),view=WORD_AT(0x007E71C8u);
     int loading_band=0;
+    if(viewfinder_primitive(original))return 1;
     switch(caller) {
     case 0x0006F227u: case 0x0006F264u: case 0x0006F2F0u:
     case 0x0006F381u: case 0x0006F3ABu: /* Story fades/tints and blackout. */
     case 0x000FEA07u: /* Additive gameplay white flash (sub_000FE990). */
+    case 0x00137E6Fu: /* Camera-gun remote view dimming (sub_00137E30). */
     case 0x00070755u: /* Loading/startup blackout. */
     case 0x001CF429u: case 0x001CF5E5u: /* Game transition fade out/in. */
     case 0x002BF803u: /* Frontend transition. */
@@ -463,6 +623,7 @@ void pc_display_weapon_effect(void (*original)(void),unsigned kind)
 {
     uint32_t frame=g_esp,caller=WORD_AT(frame),addresses[8],saved[8];
     unsigned points=2;int lock=0,gradient=0,composite=0;
+    if(kind==0 && viewfinder_primitive(original))return;
     if(kind==0) {
         lock=caller==0x0013871Bu || caller==0x0013874Au;
         /* Ghost Gun living-actor reveal (US sub_00122F10): this rectangle

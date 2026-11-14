@@ -178,3 +178,19 @@ Both host adapters apply the shared PcInput policy to keyboard magnitudes only.
 The cockpit context expires after 100 ms and requires its callback, descriptor,
 owner and local slot. Entering with RMB held requires release first. Focus,
 capture and menu gating prevent background fire; normal bindings stay intact.
+
+## Mounted-gun / camera view on a wide display
+
+The mode-0x80 3D view is already Hor+. HUD mode 10 (`0x004E6900` + 10 x 0x1C:
+update `12E100`, draw `14BFF0`) frames it from `14C281` in a single view: 3% x
+15% inset bars, green tint, camera-gun tint, scanlines, 0x11B brackets, labels,
+meter. AUTO placement boxed these at 4:3. `pc_display_viewfinder` (patch
+`1505-camera-viewfinder-widescreen`, wraps `14BFF0`) makes the shared
+`1EFB0`/`1F090` wrappers draw them STRETCH with `pc_ui_viewfinder_x` (edges on
+their sides, pieces fitted about their third) and labels (`41DC0`) at the
+matching edge placement. `pc_display_view_static` (same patch, wraps `F8DC0`)
+scales the static tile width (record +0x26) by the HUD scale under STRETCH and
+restores the guest random state (`4E7950`, `7497C8`). The `137E30` camera-gun
+dimming joins the full-canvas fades. Only wide, single, full views;
+`TSFP_CAMERA_WIDESCREEN=0` restores stock. Logged as `[PC-DISPLAY] Camera
+view:` (32 lines max). Test `tests/graphics/test_camera_widescreen.py`.
