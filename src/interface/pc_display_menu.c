@@ -272,6 +272,30 @@ void pc_display_camera(void (*original)(void))
         *horizontal*=factor*fov_scale/zoom;
         *vertical*=fov_scale/zoom;
     }
+    {
+        /* One line per change of what drives this view (scene, player mode,
+         * camera flags/viewport, factors), capped, so a playtest log shows
+         * the aspect a mounted gun or camera view actually got. */
+        static uint32_t last_key[4];static unsigned logs;
+        uint32_t actor=WORD_AT(0x007B0C7Cu),mode=0,viewport=WORD_AT(0x007E71C8u),vx=0,vy=0;
+        float *projection=(float *)((uintptr_t)matrix+g_xbox_mem_offset),fov=0.f;
+        if(pc_display_writable(&region,g_xbox_mem_offset,actor,0x118)) mode=WORD_AT(actor+0x114u);
+        if(pc_display_writable(&region,g_xbox_mem_offset,viewport,0x1C)) {
+            vx=WORD_AT(viewport+4u)-WORD_AT(viewport);vy=WORD_AT(viewport+0x18u)-WORD_AT(viewport+0x14u);
+        }
+        if(pc_display_writable(&region,g_xbox_mem_offset,player,0x388))
+            memcpy(&fov,(const void *)((uintptr_t)(player+0x384u)+g_xbox_mem_offset),4);
+        uint32_t key[4]={WORD_AT(0x0079094Cu)^(mode<<8),WORD_AT(player+0x21Cu),vx<<16^vy,
+                         (uint32_t)(factor*1000.f)^(uint32_t)(zoom*1000.f)<<12^(uint32_t)(fov_scale*1000.f)<<22};
+        if(logs<48u && memcmp(key,last_key,sizeof key)) {
+            memcpy(last_key,key,sizeof key);logs++;
+            fprintf(stderr,"[PC-DISPLAY] View: scene %d, player mode 0x%X, camera flags 0x%08X, viewport %ux%u, "
+                    "factor %.4f zoom %.4f fov %.4f, projection x/y %.4f/%.4f (aspect %.4f), fov %.1f\n",
+                    (int32_t)WORD_AT(0x0079094Cu),(unsigned)mode,(unsigned)WORD_AT(player+0x21Cu),(unsigned)vx+1u,(unsigned)vy+1u,
+                    factor,zoom,fov_scale,projection[0],projection[5],
+                    projection[0]!=0.f?projection[5]/projection[0]:0.f,fov);
+        }
+    }
 }
 
 void pc_display_perspective_projection(void (*original)(void))

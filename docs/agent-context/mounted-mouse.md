@@ -194,3 +194,6 @@ restores the guest random state (`4E7950`, `7497C8`). The `137E30` camera-gun
 dimming joins the full-canvas fades. Only wide, single, full views;
 `TSFP_CAMERA_WIDESCREEN=0` restores stock. Logged as `[PC-DISPLAY] Camera
 view:` (32 lines max). Test `tests/graphics/test_camera_widescreen.py`.
+`pc_display_camera` also logs each change of scene, player mode, camera flags,
+viewport and factors as `[PC-DISPLAY] View:` with the resulting projection
+aspect (48 lines max), so a log shows the aspect a mounted gun really got.
