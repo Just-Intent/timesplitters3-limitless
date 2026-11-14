@@ -4863,6 +4863,12 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   header, so no Mac-only logic remains. Acceptance on Mac/Linux: place, drag
   and pan with the mouse, wheel zoom, Escape closes editor menus and opens the
   pause menu from the editor screen, T raises the floor; untested in game.
+  Wide displays (branch `feature/mapmaker-editor-widescreen`, uncommitted PR;
+  `pc_mapmaker_widescreen.inc`, patch 3030): the grid view is drawn at CENTRE
+  placement so grid, tiles and pointer line up. Shared display code under
+  `TSFP_PC_CONTROLS`/`TSFP_NATIVE_DISPLAY`; no host adapter. Acceptance: grid
+  lines, tiles and the pointer align at 16:9 and 21:9 on both renderers;
+  untested in game.
 - **Issue #115 follow-up** (`115-bug-audio-menu-sliders-cannot-be-adjusted-with-mouse-pointer`): Windows Music/Sound volume bars now
   accept click-to-set and held dragging in main and paused Audio/Video Options.
   `src/interface/pc_menu_sliders.inc` captures both original painter layouts, reuses the

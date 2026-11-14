@@ -372,3 +372,11 @@ Fixture `tests/input/mapmaker_pointer.c` with mutations and wiring checks in
 `pc_controls_mapmaker_*` hooks, `menu_mouse.c` covers the lighting-list Back
 (`late-lighting-back`), and `developer_player_keys.c` stubs the SDL key helper.
 In-game checks on a stock build, native Mac and Linux remain pending.
+
+Wide displays: `pc_mapmaker_widescreen.inc` (patch 3030, see
+[manual wrappers](runtime-continuation.md#manual-input-and-display-wrappers))
+draws the grid view at CENTRE in scene 102 so grid, tiles and pointer line up;
+`pc_display_ui_scope` in `pc_display_ui.inc` runs a call at one placement and
+restores the enclosing one. Fixture `tests/graphics/mapmaker_widescreen.c`
+(8 mutations in `test_mapmaker_widescreen.py`) drives the production scopes
+through the `ui_layout.c` batch harness at 4:3 to 32:9 and portrait.

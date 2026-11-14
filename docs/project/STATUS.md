@@ -1,3 +1,12 @@
+MapMaker editor widescreen alignment (2026-11-13, branch
+feature/mapmaker-editor-widescreen, based on feature/mapmaker-editor-mouse):
+new runtime patch 3030 wraps sub_00310A20/sub_0030A550 so the editor grid view
+draws at CENTRE on wide displays. The patch applies to a pristine prepared
+runtime with the full stack. Windows `tests/graphics/test_mapmaker_widescreen.py`,
+`test_ui_layout.py`, `test_menu_mouse.py` and `test_fov_settings.py` pass. No
+guest regeneration or game build here (needs the private XBE); not run in game;
+native Mac and Linux host checks not run.
+
 MapMaker editor mouse and keys (2026-11-13, branch
 feature/mapmaker-editor-mouse, based on feature/menu-mouse-confirm): the editor
 pointer follows the mouse; left click is A; rows, logic panel and scrollbars

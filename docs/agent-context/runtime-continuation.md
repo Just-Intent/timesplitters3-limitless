@@ -129,3 +129,22 @@ Stage0241: [original extended product and ABI checks](guest-integer-product.md).
 RTL: [arithmetic/memory](guest-memory-ops.md), [strings](guest-stack-trace.md); [host policy](execution-host.md).
 
 2350: controls-options.md.
+
+## Manual input and display wrappers
+
+`2080-tank-driver-controls.patch` wraps 1730E0 through shared
+`pc_tank_guest.inc`. The local keyboard/mouse scope selects signed track input
+and restores actor links after the original call; controller behavior retains
+the original camera-relative branch. See [scope guards](mounted-mouse.md).
+
+`3030-mapmaker-editor-widescreen.patch` wraps 310A20 (editor grid view) and
+30A550 (backdrop and grid lines) in `recomp_manual.c`, through
+`pc_mapmaker_grid_view`/`pc_mapmaker_grid_lines` in
+`src/interface/pc_mapmaker_widescreen.inc` (included by `pc_display_menu.c`).
+In scene 102 on a non-4:3 display both run at CENTRE placement, so grid lines,
+tiles and the mouse pointer share one 4:3 fit; the backdrop caller 0x0030A580
+stays full-window through `pc_display_transition_overlay`. Other scenes, 4:3
+and `TSFP_MAPMAKER_WIDESCREEN=0` call the originals unchanged. Adding the
+wrappers needs the normal guest regeneration. The patch applies to a pristine
+prepared runtime with the full stack; in-game alignment is unverified.
+See [MapMaker editor mouse](systems-continuation.md#mapmaker-editor-mouse).

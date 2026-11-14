@@ -970,10 +970,8 @@ Stages0229/0231: [events and targets](transfer-completion.md). Stage0232: [symbo
 
 Stages0233/0234: [routing](guest-paths.md), [original host storage](host-storage.md).
 
-`2080-tank-driver-controls.patch` wraps 1730E0 through shared
-`pc_tank_guest.inc`. The local keyboard/mouse scope selects signed track input
-and restores actor links after the original call; controller behavior retains
-the original camera-relative branch. See [scope guards](mounted-mouse.md).
+Manual wrappers 2080 (tank driver) and 3030 (MapMaker grid):
+[contracts](runtime-continuation.md#manual-input-and-display-wrappers).
 
 Stage0235: [original pool imports and native surface retirement](kernel-pool.md).
 
