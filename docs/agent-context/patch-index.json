@@ -2143,7 +2143,7 @@
     {
       "name": "3030-mapmaker-editor-widescreen.patch",
       "path": "patches/graphics/interface/3030-mapmaker-editor-widescreen.patch",
-      "sha256": "a3f443552427fbaff9e43aba86b018c53a58fe6293022ebf09a7c572ad957897",
+      "sha256": "f6bc01e6b1a51095f15910a79f62d4980761a1a17d00d93050cf9c7dedeb5940",
       "targets": [
         "titles/futureperfect/src/recomp_manual.c"
       ]
