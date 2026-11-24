@@ -202,7 +202,7 @@ four more settings after Tough Guy: **Brute** (2x Tough Guy's health),
 **Juggernaut** (4x), **Titan** (8x) and **Colossus** (16x). They combine with
 the Boss setting: a Colossus boss at health x8 has 128 times Tough Guy's
 health. Without the switch, or in the original game, such an AI loads as
-Tough Guy. *Automated tests only.*
+Tough Guy. *Checked in game (2026-11-23).*
 
 ### Every character in the custom character set (`LIMITS`)
 
@@ -247,8 +247,7 @@ With the switch the editor's weapon list (pick a weapon for a slot) also
 offers three weapons the game hides: **Time Grenade**, **TNT** and the
 **Temporal Uplink**. They work in slots, pickups and Story AI weapons; the
 time grenade explodes like a grenade (no slow motion was found in the game's
-code). The front end's profile weapon sets are unchanged. *Automated tests
-only.*
+code). The front end's profile weapon sets are unchanged. *Checked in game (2026-11-23).*
 
 The **Bots** screen of an Arcade match setup (front end and the in-game pause
 menu's setup) has its own page 2 when you play a MapMaker map: see the next
@@ -264,7 +263,7 @@ screen press Down on the last row to see bots **(11-20)**; Up on the first
 row goes back. With the map's own character set, rows 11-20 start as the
 map's slots 11-20; otherwise they start empty and are kept until you quit
 the game (they are not saved in your profile). Ordinary Arcade maps and
-System Link keep 10 bots. *Automated tests only.* Details:
+System Link keep 10 bots. *Checked in game (2026-11-23).* Details:
 [matchbots](mapmaker-matchbots.md).
 
 ### The giant trophy monster from story mission 5 (`LIMITS`)
@@ -342,8 +341,8 @@ its leap and electric attack). Put them in Story AIs and play in Story: each
 gets its story behaviour and animations; any number per map. The map loads
 that mission's small animation file only when the set uses the creature.
 `TSFP_MAPMAKER_CREATURES=0` plays them as ordinary bots. The original game
-plays such a map with bots and shows an empty name in the editor. *Automated
-tests only.* Details: [story creatures](mapmaker-creatures.md).
+plays such a map with bots and shows an empty name in the editor. *Checked in game (2026-11-23).*
+Details: [story creatures](mapmaker-creatures.md).
 
 ### Pit Skeleton and Ragbugs: the mission 6 boss (`LIMITS`)
 
@@ -367,7 +366,7 @@ only.* Details: [pit skeleton](mapmaker-pitboss.md).
 
 **Map Settings** gains a **Clouds** checkbox beside the sky choice. Clouds are
 shown only in play, not in the editor. A map saved with clouds loads normally
-without the switch, just without clouds. *Automated tests only.*
+without the switch, just without clouds. *Checked in game (2026-11-23).*
 
 ### Open-sky tiles (`LIMITS`)
 
@@ -473,7 +472,10 @@ These are on without any switch:
 - **Mounted and vehicle guns:** the mouse aims seat and mounted guns, such as
   the truck gun in *Scotland the Brave*, within the gun's own limits.
 
-Planned, not yet merged: mouse-wheel zoom for weapon scopes.
+- **Weapon scopes:** the mouse wheel zooms a scope in and out instead of
+  changing weapon. Checked in game (2026-11-23).
+- **Widescreen views:** switch cameras and mounted-gun views fill a wide
+  window. Checked in game (2026-11-23).
 
 ## Debug panel (Shift+F9)
 

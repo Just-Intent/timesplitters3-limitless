@@ -3,8 +3,8 @@
 User request (2026-11-03): "Ability to import your own music and make
 available for mapmaker and arcade."
 
-**Status:** implemented with fixture tests only. It has not been built or
-played on either platform. Agent notes:
+**Status:** checked in game on Windows (2026-11-23, user report: imported
+music works). Not run on a Mac. Agent notes:
 [custom-music.md](../agent-context/custom-music.md).
 
 ## Using it

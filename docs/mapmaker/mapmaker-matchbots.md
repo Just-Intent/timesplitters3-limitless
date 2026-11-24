@@ -4,7 +4,7 @@ Status 2026-10-31: implemented in `src/interface/pc_mapmaker_matchbots.inc`
 (area `matchbots`) and `config/guest-code-patches/matchbots.json`,
 fixture-tested (`tests/mapmaker/test_mapmaker_matchbots.py`: 45 mutations
 plus XBE facts; `tests/mapmaker/test_mapmaker_matchbots_classified.py`).
-Not built or played.
+Checked in game on Windows (2026-11-23, user report: 20 bots work).
 
 User request (2026-10-31): more bots per Arcade-style match than the stock 10
 bot rows / 16 characters, so that the 20-slot custom set is useful there too.

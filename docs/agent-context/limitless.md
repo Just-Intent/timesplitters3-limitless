@@ -20,8 +20,8 @@ Tests: `tests/mapmaker/`, `tests/compiler/test_guest_code_patches.py`,
 `tests/input/test_scope_wheel.py`. Mac follow-up: MAC-131 and later.
 <!-- packet:end -->
 
-Fork-only notes, kept out of the size-capped shared guides. Each part names
-the shared guide it extends.
+Fork-only notes; each names the shared guide it extends.
+2026-11-23 in-game confirmations: STATUS.md (docs only).
 MapMaker player/contract docs live in `docs/mapmaker/`; measured results in
 `docs/project/STATUS.md`; Mac follow-up in `docs/project/MAC_PORT_BACKLOG.md`
 (MAC-131 and later).

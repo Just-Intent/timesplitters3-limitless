@@ -1,3 +1,23 @@
+## MapMaker and mouse features: user playtest results (reported 2026-11-23)
+
+Reported by the user from test releases on the second Windows 11 x64 PC
+(release number not stated; the newest local release was
+v0.4.0-mapmaker.82). The agent did not run the game. Confirmed working:
+
+- story creatures: Catacomb Ghost, SecuriDroid XP and Mutant (Story);
+- 20 bots in a MapMaker Arcade match;
+- stronger Story AI health (Brute to Colossus);
+- the hidden weapons (Time Grenade, TNT, Temporal Uplink);
+- the Map Settings Clouds checkbox (listed as unchecked further down);
+- imported music;
+- mouse-wheel scope zoom;
+- widescreen switch-camera and mounted-gun views;
+- launcher MapMaker map export and import (.tsmap).
+
+Still without a recorded in-game check: the mothership, the Disco tileset,
+logic Delay, launcher music import, the damaged-map and System Link fixes,
+System Link, splitscreen and native Mac.
+
 ## MapMaker map report at level start and offline map checker (2026-11-08, not built or played)
 
 Branch `map-validator` from `mapmaker-recon` `4c5cb965`; Windows 11 x64, MSVC

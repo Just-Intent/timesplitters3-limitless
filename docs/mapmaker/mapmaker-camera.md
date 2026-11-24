@@ -3,8 +3,8 @@
 Area `camera` (`src/interface/pc_mapmaker_camera.inc`). Test:
 `tests/mapmaker/test_mapmaker_camera.py` (fixture `mapmaker_camera.c`, plus a
 decoder check of the original bytes that skips without the private XBE).
-Static analysis and fixtures only; not built or played by the agent that
-wrote it. Reported in the v0.4.0-mapmaker.31 playtest.
+Reported in the v0.4.0-mapmaker.31 playtest. Checked in game on Windows
+(2026-11-23, user report: the widescreen views work).
 
 ## 1. The camera keeps sweeping while you control it (fixed)
 

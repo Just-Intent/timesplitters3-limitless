@@ -1,8 +1,8 @@
 # MapMaker map export and import
 
 Status 2026-11-06: implemented in the shared launcher (Saves page), with
-Windows tests passing on synthetic save folders. Not checked in the game
-(the game was never run for this work). The native Mac launcher compiles the
+Windows tests passing on synthetic save folders. Checked with the game on
+Windows (2026-11-23, user report: map transfer works). The native Mac launcher compiles the
 same code but has not been built or tested on a Mac.
 
 ## Where maps live

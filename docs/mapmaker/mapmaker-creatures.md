@@ -4,8 +4,8 @@ Status 2026-11-07: implemented in `src/interface/pc_mapmaker_creatures.inc`
 (area `creatures`) with its table `src/interface/pc_mapmaker_creatures.def`,
 fixture-tested (`tests/mapmaker/mapmaker_creatures.c` +
 `tests/mapmaker/test_mapmaker_creatures.py`: 26 mutations, plus decode, US XBE
-data and story-pak checks of every row). **Not wired, not built, not
-played**: the wrappers are the integrator's (list below). Switch:
+data and story-pak checks of every row). **Checked in game on Windows (2026-11-23, user report: the ghost,
+SecuriDroid and mutant work).** The wrappers are listed below. Switch:
 `TSFP_MAPMAKER_LIMITS=1`; `TSFP_MAPMAKER_CREATURES=0` keeps every creature on
 the MapMaker bot AI. No guest-code table, no fork chunk, no save change.
 Story assets wave 2, items 6, 9, 10 and 15

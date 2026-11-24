@@ -130,7 +130,7 @@ anywhere other than another portrait to confirm the previewed character; on a
 Story mission briefing or an Arcade League / Challenge event page, click
 anywhere (except Back) to start; and
 mouse aiming for mounted and vehicle guns (for example the truck gun in
-*Scotland the Brave*). Planned, not yet merged: mouse-wheel scope zoom.
+*Scotland the Brave*); the mouse wheel zooms weapon scopes.
 
 <a name="start-playing"></a>
 
