@@ -167,7 +167,7 @@ static class LauncherDownloadChecks
                 using(var ranged=new HttpRequestMessage(HttpMethod.Get,url)){ranged.Headers.Range=new RangeHeaderValue(10,null);var reply=local.Answer(ranged);
                     Need(reply.StatusCode==HttpStatusCode.PartialContent && reply.Content.Headers.ContentRange.From==10 && reply.Content.Headers.ContentLength==f.Bytes.Length-10);reply.Dispose();}
                 foreach(string other in new[]{"https://example.com/"+name,"http://github.com/"+ReleaseClient.Repository+"/releases/download/"+tag+"/"+name,
-                    "https://github.com/"+ReleaseClient.UpstreamRepository+"/releases/download/"+tag+"/"+name,"https://api.github.com/repos/"+ReleaseClient.Repository+"/pulls"})
+                    (ReleaseClient.UpstreamRepository==ReleaseClient.Repository?"https://github.com/someone-else/releases/download/"+tag+"/"+name:"https://github.com/"+ReleaseClient.UpstreamRepository+"/releases/download/"+tag+"/"+name),"https://api.github.com/repos/"+ReleaseClient.Repository+"/pulls"})
                     using(var request=new HttpRequestMessage(HttpMethod.Get,other))Need(local.Answer(request).StatusCode==HttpStatusCode.NotFound);
                 foreach(string escape in new[]{"..%2F..%2Freleases.json","..%5Creleases.json","..","%2E%2E"})
                     using(var request=new HttpRequestMessage(HttpMethod.Get,"https://github.com/"+ReleaseClient.Repository+"/releases/download/"+tag+"/"+escape)){
