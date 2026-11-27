@@ -163,7 +163,7 @@ static void nav(const Nav *n)
         if(n->island_from>0 && i==n->island_from) flags=n->weak_link?0x40u:0u;  /* no group link: island */
         if(flags) link((uint32_t)i-1u,(uint32_t)i,flags);
     }
-    link(0,(uint32_t)n->pads+5u,0x10000u);                  /* a link to a pad past the count is ignored */
+    link(0,0x40000000u,0x10000u);  /* a link to a pad past the count is ignored (far past: an unchecked read always faults) */
     for(i=0;i<40;i++) {                                      /* cover pad i belongs to regular pad i + 20 */
         uint32_t p=CPOOL+(uint32_t)i*0x20u;
         WORD_AT(p)=0x2329u+(uint32_t)i;WORD_AT(p+8)=i==5?0xFFFFu:0x3E9u+(uint32_t)i+20u;
