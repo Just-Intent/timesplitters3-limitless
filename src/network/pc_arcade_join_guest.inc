@@ -1,5 +1,15 @@
 /* Reserve storage at round construction; construct remote players on demand.
  * All engine pointers remain local and never enter checkpoints or the wire. */
+/* MapMaker capacity (config/guest-code-patches/actors-list.json) moves the
+ * stock live character list 0x007A3580 and AI table 0x007A2D00 for every
+ * reference in the guest code; host code must follow. Fixtures that model the
+ * stock layout define both before including this file. */
+#ifndef PC_GUEST_ACTOR_LIST
+#define PC_GUEST_ACTOR_LIST 0x00900100u
+#endif
+#ifndef PC_GUEST_AI_TABLE
+#define PC_GUEST_AI_TABLE 0x00900200u
+#endif
 #ifdef TSFP_ARCADE_MIGRATION
 #include "pc_arcade_api.h"
 #include "pc_arcade_join.h"
@@ -145,15 +155,15 @@ static void arcade_join_register_actor(uint32_t actor,uint32_t body)
 {
     const unsigned count=WORD_AT(0x74c37cu);
     if(count>=32u)return;
-    for(unsigned i=0;i<count;i++)if(WORD_AT(0x7a3580u+i*4u)==actor)return;
+    for(unsigned i=0;i<count;i++)if(WORD_AT(PC_GUEST_ACTOR_LIST+i*4u)==actor)return;
     guest_call(sub_0015BCA0,1,body);
     /* A dead bot can already be absent from the registry. Insert its new human
        before the remaining bot rows, without changing any actor's actual ID. */
     unsigned at=count;
-    while(at && WORD_AT(0x7a3580u+(at-1u)*4u)>actor) {
-        WORD_AT(0x7a3580u+at*4u)=WORD_AT(0x7a3580u+(at-1u)*4u);at--;
+    while(at && WORD_AT(PC_GUEST_ACTOR_LIST+(at-1u)*4u)>actor) {
+        WORD_AT(PC_GUEST_ACTOR_LIST+at*4u)=WORD_AT(PC_GUEST_ACTOR_LIST+(at-1u)*4u);at--;
     }
-    WORD_AT(0x7a3580u+at*4u)=actor;
+    WORD_AT(PC_GUEST_ACTOR_LIST+at*4u)=actor;
 }
 static int arcade_join_unlist_actor(uint32_t actor)
 {
@@ -161,8 +171,8 @@ static int arcade_join_unlist_actor(uint32_t actor)
     if(count>32u)return 0;
     unsigned remaining=0;
     for(unsigned i=0;i<count;i++) {
-        const uint32_t entry=WORD_AT(0x7a3580u+i*4u);
-        if(entry!=actor)WORD_AT(0x7a3580u+remaining++*4u)=entry;
+        const uint32_t entry=WORD_AT(PC_GUEST_ACTOR_LIST+i*4u);
+        if(entry!=actor)WORD_AT(PC_GUEST_ACTOR_LIST+remaining++*4u)=entry;
     }
     WORD_AT(0x74c37cu)=remaining;
     return 1;
@@ -210,8 +220,8 @@ void pc_arcade_join_frame(const PcArcadeControlState *control)
             if(slot>=old && slot<old+old_bots) {
                 const unsigned removed=slot-old;
                 for(unsigned i=removed;i+1u<old_bots;i++)
-                    WORD_AT(0x7a2d00u+i*4u)=WORD_AT(0x7a2d00u+(i+1u)*4u);
-                WORD_AT(0x7a2d00u+(old_bots-1u)*4u)=0;
+                    WORD_AT(PC_GUEST_AI_TABLE+i*4u)=WORD_AT(PC_GUEST_AI_TABLE+(i+1u)*4u);
+                WORD_AT(PC_GUEST_AI_TABLE+(old_bots-1u)*4u)=0;
             }
             memset((void *)((uintptr_t)actor+g_xbox_mem_offset),0,0xea0u);
             /* D2FD0's loop clears the current-context global and writes camera

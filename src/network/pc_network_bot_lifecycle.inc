@@ -1,5 +1,15 @@
 /* Generic world removal does not own the actor roster or held models.
  * Guest bot replicas bypass the stock AI retirement that releases them. */
+/* MapMaker capacity (config/guest-code-patches/actors-list.json) moves the
+ * stock live character list 0x007A3580 and AI table 0x007A2D00 for every
+ * reference in the guest code; host code must follow. Fixtures that model the
+ * stock layout define both before including this file. */
+#ifndef PC_GUEST_ACTOR_LIST
+#define PC_GUEST_ACTOR_LIST 0x00900100u
+#endif
+#ifndef PC_GUEST_AI_TABLE
+#define PC_GUEST_AI_TABLE 0x00900200u
+#endif
 void pc_network_bots_remove_body(void (*original)(void))
 {
 #if defined(_WIN32) || defined(TSFP_NATIVE_NETWORK)
@@ -36,8 +46,8 @@ void pc_network_bots_remove_body(void (*original)(void))
     /* A destructor callback can replace storage. Never clear its new owner. */
     if(actor && WORD_AT(0x7356d8u)==pool && WORD_AT(actor)==body) {
         WORD_AT(actor)=0;
-        if(WORD_AT(0x7a2d00u+(slot-humans)*4u)==body)
-            WORD_AT(0x7a2d00u+(slot-humans)*4u)=0;
+        if(WORD_AT(PC_GUEST_AI_TABLE+(slot-humans)*4u)==body)
+            WORD_AT(PC_GUEST_AI_TABLE+(slot-humans)*4u)=0;
     }
 #else
     original();
@@ -50,7 +60,7 @@ static void pc_network_bots_register_body(uint32_t actor,uint32_t body)
     extern void sub_0015BCA0(void);
     const unsigned count=WORD_AT(0x74c37cu);
     if(count>=32u)return;
-    for(unsigned i=0;i<count;i++)if(WORD_AT(0x7a3580u+i*4u)==actor)return;
+    for(unsigned i=0;i<count;i++)if(WORD_AT(PC_GUEST_ACTOR_LIST+i*4u)==actor)return;
     guest_call(sub_0015BCA0,1,body);
 #else
     (void)actor;(void)body;

@@ -46,6 +46,9 @@ int pc_network_arcade_read(void *ctx,uint32_t a,void *out,size_t n){(void)ctx;re
 int pc_network_arcade_write(void *ctx,uint32_t a,const void *v,size_t n,int apply){(void)ctx;return write_guest(&world,a,v,n,apply);}
 static uint32_t reported[4];
 void pc_network_arcade_slots(const uint32_t slots[4]){if(slots)memcpy(reported,slots,sizeof reported);else memset(reported,0,sizeof reported);}
+/* These fixtures model the stock (unrelocated) actor list and AI table. */
+#define PC_GUEST_ACTOR_LIST 0x7a3580u
+#define PC_GUEST_AI_TABLE 0x7a2d00u
 #include "../src/network/pc_arcade_join_guest.inc"
 
 static void construct_slot(unsigned slot){

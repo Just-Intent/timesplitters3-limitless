@@ -190,7 +190,7 @@ def test_area_allocations_are_level_heap():
             found += 1
             args = m.group(3).rstrip(')').split(',')
             assert args[-1].strip().rstrip(')') in ('1u', '1'), f'{path.name}: {m.group(0)}'
-    assert found >= 18                               # actors, grid, limits, objects (12), rooms, worm
+    assert found >= 12                               # actors, grid, limits, objects (6, via one helper), pads, rooms, worm
 
 
 def test_scan_catches_a_heap_0_call():

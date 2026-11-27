@@ -105,7 +105,9 @@ void sub_0007D4F0(void) {}
 /* sets (pc_mapmaker_sets.inc: slot screen, Story AI choice, preload) */
 void sub_00071970(void) {}
 void sub_00074670(void) {}
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it (upstream online menus) */
 void sub_002BE650(void) {}
+#endif
 void sub_002BE300(void) {}  /* sets: slot label, row -> text id */
 void sub_002BFFD0(void) {}
 void sub_000D7780(void) {}
@@ -115,7 +117,10 @@ void sub_002C0310(void) {}
 void sub_00071BE0(void) {}
 #endif
 void sub_002C1830(void) {} void sub_00078320(void) {}
-void sub_000792B0(void) {} void sub_00078380(void) {} void sub_00077140(void) {}
+void sub_000792B0(void) {} void sub_00078380(void) {}
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it (upstream online menus) */
+void sub_00077140(void) {}
+#endif
 void sub_00077360(void) {}
 /* matchbots (pc_mapmaker_matchbots.inc: profile, slot portrait, availability) */
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it */
@@ -135,8 +140,10 @@ void sub_0007D4A0(void) {}
 void sub_000BE860(void) {}
 void sub_00303350(void) {}
 /* weaponset: the 20-row slot pane builder replays the stock builder's calls */
-void sub_00074A00(void) {} void sub_00077110(void) {} void sub_000772E0(void) {}
-void sub_00077320(void) {} void sub_000780E0(void) {} void sub_000781A0(void) {}
+void sub_000772E0(void) {} void sub_00077320(void) {}
+#ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines it (upstream online menus) */
+void sub_00074A00(void) {} void sub_00077110(void) {} void sub_000780E0(void) {} void sub_000781A0(void) {}
+#endif
 void sub_002BF830(void) {}
 #ifndef TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* fov_settings.c defines these */
 void sub_00075B70(void) {} void sub_00075E70(void) {} void sub_00079710(void) {}

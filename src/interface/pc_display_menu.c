@@ -639,8 +639,8 @@ uint32_t pc_network_bots_revive(unsigned slot)
         0u,0u,0u,0u,UINT32_MAX,1u,variant);
     if(!entity || !guest_writable(entity,0x25cu) || WORD_AT(actor)!=entity ||
        WORD_AT(entity+0x7cu)!=actor) return 0;
-    /* AI table: 0x007A2D00 moved to 0x00900200 (actors-list.json actor-aitab-*) */
-    WORD_AT(0x00900200u+(slot-humans)*4u)=entity;
+    /* AI table (relocated by actors-list.json; see pc_network_bot_lifecycle.inc) */
+    WORD_AT(PC_GUEST_AI_TABLE+(slot-humans)*4u)=entity;
     guest_call(sub_000D7570,1,actor);
     pc_network_bots_register_body(actor,entity);
     return entity;

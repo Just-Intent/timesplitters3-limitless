@@ -438,6 +438,9 @@ void pc_network_bots_remove_body(void (*original)(void)){original();}
 #if defined(_WIN32) || defined(TSFP_NATIVE_NETWORK)
 static inline int multiplayer_profile_save(void (*original)(void)){(void)original;return 0;}
 #endif
+/* This fixture models the stock (unrelocated) actor list and AI table. */
+#define PC_GUEST_ACTOR_LIST 0x7a3580u
+#define PC_GUEST_AI_TABLE 0x7a2d00u
 #include "pc_story_lobby.inc"
 #ifdef _WIN32
 #define getenv load_getenv

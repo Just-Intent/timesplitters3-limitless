@@ -119,11 +119,14 @@ static int story_npc_valid(const StoryNpcSpawn *s)
         isfinite(s->armor) && s->armor>=0.f && s->armor<=1000.f &&
         isfinite(s->max_health) && s->max_health>=0.f && s->max_health<=1000.f;
 }
+#ifndef PC_GUEST_ACTOR_LIST /* relocated live list; see pc_network_bot_lifecycle.inc */
+#define PC_GUEST_ACTOR_LIST 0x00900100u
+#endif
 static int story_npc_listed(uint32_t actor)
 {
     unsigned count=WORD_AT(0x0074C37Cu);
     if(count>32u) return 0;
-    for(unsigned i=0;i<count;i++) if(WORD_AT(0x007A3580u+i*4u)==actor) return 1;
+    for(unsigned i=0;i<count;i++) if(WORD_AT(PC_GUEST_ACTOR_LIST+i*4u)==actor) return 1;
     return 0;
 }
 #endif

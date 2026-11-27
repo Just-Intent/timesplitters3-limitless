@@ -223,7 +223,10 @@ MOUSE_STUB(sub_002C4310)
 MOUSE_STUB(sub_001922D0)
 MOUSE_STUB(sub_002E49F0) MOUSE_STUB(sub_002E4A30)
 /* Audio-slider preview calls are covered by menu_mouse.c, not this fixture. */
-MOUSE_STUB(sub_00045C60) MOUSE_STUB(sub_00074720) MOUSE_STUB(sub_00071A60)
+MOUSE_STUB(sub_00045C60)
+/* The Music-slider tick asks for the focused item; none here, so the stock tick runs alone. */
+void sub_00074720(void){g_eax=0;g_esp+=4;}
+void sub_00071A60(void){g_eax=0;g_esp+=4;}
 static unsigned video_sounds,highlight_sounds;
 void sub_00021780(void){uint32_t sound=WORD_AT(g_esp+4);CHECK(sound==0x1234u || sound==0x4321u);if(sound==0x4321u)highlight_sounds++;else video_sounds++;g_esp+=4;}
 #ifdef TSFP_TEST_CONTROLLER_SPEED
@@ -1275,7 +1278,8 @@ int main(int argc,char **argv)
         WORD_AT(g_esp+12)=0x600000;audio_volume_draw();
         MenuSliderTrack *track=&menu_slider_tracks[id==1?MENU_MUSIC:MENU_SOUND];
         CHECK(track->x==378.f && track->y==51.f && track->w==100.f && track->h==8.f);
-        CHECK(track->item==0x200000+id*0x200 && drawn==(id==1?.5f:.75f) && g_esp==0x700004);
+        /* Music draws its position over 16 stock + extra MapMaker ticks (pc_menu_sliders.inc). */
+        CHECK(track->item==0x200000+id*0x200 && drawn==(id==1?(float)8u/(float)MENU_MUSIC_TICKS:.75f) && g_esp==0x700004);
     }
     slider_capture_enabled=0;
     for(int tab=1;tab<4;tab++) {

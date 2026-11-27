@@ -5,6 +5,9 @@
 #include <stdarg.h>
 #define RECOMP_GENERATED_CODE
 #include "recomp_types.h"
+/* These fixtures model the stock (unrelocated) actor list and AI table. */
+#define PC_GUEST_ACTOR_LIST 0x7a3580u
+#define PC_GUEST_AI_TABLE 0x7a2d00u
 ptrdiff_t g_xbox_mem_offset;
 RECOMP_TLS uint32_t g_eax,g_ecx,g_edx,g_esp,g_ebx,g_esi,g_edi,g_ebp,g_seh_ebp;
 RECOMP_TLS RecompXmm g_xmm0,g_xmm1,g_xmm2,g_xmm3,g_xmm4,g_xmm5,g_xmm6,g_xmm7;

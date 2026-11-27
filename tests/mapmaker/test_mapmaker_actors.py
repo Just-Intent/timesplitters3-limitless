@@ -276,3 +276,16 @@ def test_moved_references():
     for a in (lst, ai, _define('MAPMAKER_ACTORS_ATTACH')):
         assert 0x00900004 <= a - 4 and a + n * 12 <= 0x00920000
     assert lst + n * 4 <= ai and ai + n * 4 <= _define('MAPMAKER_ACTORS_ATTACH')
+
+
+def test_host_code_follows_relocated_actor_tables():
+    """Host code that indexes the live list / AI table uses the relocated addresses."""
+    lst, ai = _define('MAPMAKER_ACTORS_LIST'), _define('MAPMAKER_ACTORS_AITAB')
+    for name in ('pc_network_bot_lifecycle.inc', 'pc_arcade_join_guest.inc', 'pc_story_npc.inc'):
+        text = (ROOT / 'src/network' / name).read_text(encoding='utf-8')
+        assert f'#define PC_GUEST_ACTOR_LIST 0x{lst:08X}u' in text, name
+        if 'PC_GUEST_AI_TABLE+' in text:
+            assert f'#define PC_GUEST_AI_TABLE 0x{ai:08X}u' in text, name
+        assert not re.search(r'0x0*7a3580u?\+|0x0*7a2d00u?\+', text, re.I), name
+    menu = (ROOT / 'src/interface/pc_display_menu.c').read_text(encoding='utf-8')
+    assert 'WORD_AT(PC_GUEST_AI_TABLE+(slot-humans)*4u)=entity;' in menu

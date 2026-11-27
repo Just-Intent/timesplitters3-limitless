@@ -104,6 +104,12 @@ Moved from the [systems](systems.md) subsystem table:
 
 | Limitless fork (MapMaker+Disco, scope wheel; `pc_display_menu.h`/`pc_menu_mouse_guest.inc` stubs; rooms 1023+tree+portal passes/light spread/ray step/query/roof two-sided+open view (room diag, box areas, all 2-sided)/route A*/nearest+random pad/pads 16K+lazy groups/objs 2047/links/props/body/bossfloor/walk/bossdraw/boss meter+breath/AIobj:limitless-*; story props (mem-pak textures, lift)/vehicles (lift, reticle)/weapons/robots/tank TNT/creatures+robots(sight+pose gate)/pit(+satellites, eye, sound): limitless-bosses; level-start map report+raised caps: limitless-report; action Delay (logic area, 5 hooks): limitless-logic) | [limitless.md](limitless.md) | `tests/mapmaker/`, `tests/input/test_scope_wheel.py` |
 
+## Relocated actor tables in network code
+
+`config/guest-code-patches/actors-list.json` moves the live character list 0x007A3580 to 0x00900100 and the AI table 0x007A2D00 to 0x00900200 for every guest reference, in every mode. Host code that indexes them uses `PC_GUEST_ACTOR_LIST` / `PC_GUEST_AI_TABLE` (guarded defaults in `src/network/pc_network_bot_lifecycle.inc`, `pc_arcade_join_guest.inc`, `pc_story_npc.inc`; `pc_network_bots_revive` in `pc_display_menu.c`). Fixtures that model the stock layout (`tests/network/bot_lifecycle.c`, `arcade_join_guest.c`, `story_lobby.c`) define the stock addresses first. `tests/mapmaker/test_mapmaker_actors.py::test_host_code_follows_relocated_actor_tables` keeps the defaults equal to the relocation and rejects stock-address indexing in those files. The roster count 0x0074C37C and its 32-entry cap in network sessions are unchanged.
+
+Music slider fixtures: `pc_display_menu_audio_tick` (fork) wraps the stock audio tick and asks `sub_00074720`/`sub_00071A60` for the focused item, and the Music bar draws position/`MENU_MUSIC_TICKS` (24), so `tests/graphics/fov_settings.c` answers "nothing focused" and expects 8/24 for a stock value of 8.
+
 ## Other systems pointers
 
 Battle Mech mouse: [routes, guards, logs](mounted-mouse.md#battle-mech-mouse-425). [Developer Tools integration](developer-tools-integration.md).

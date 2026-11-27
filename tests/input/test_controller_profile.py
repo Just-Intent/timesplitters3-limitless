@@ -21,8 +21,8 @@ def test_pre_preset_factory_defaults():
     keys=config["controllers"][0]["bindings"]
     assert keys["a"]==["key:E","key:SPACE"]
     assert keys["b"]==["key:F","key:MBUTTON"]
-    assert keys["dpad_up"]==["key:UP","key:PAGEUP"]
-    assert keys["dpad_down"]==["key:DOWN","key:PAGEDOWN"]
+    assert keys["dpad_up"]==["key:UP","key:Q"]  # MapMaker zoom in (Up+Q)
+    assert keys["dpad_down"]==["key:DOWN","key:V"]  # MapMaker zoom out (Down+V)
     assert keys["dpad_left"]==["key:LEFT","key:F24"]
     assert keys["dpad_right"]==["key:RIGHT","key:F23"]
 

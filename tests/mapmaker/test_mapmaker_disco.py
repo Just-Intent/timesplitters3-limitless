@@ -356,5 +356,5 @@ def test_wrappers_documented():
         assert f'void pc_mapmaker_disco_{name}(void (*original)(void));' in header
         assert f'void pc_mapmaker_disco_{name}(void (*original)(void)) {{ original(); }}' in stubs
     assert '#include "pc_mapmaker_disco.inc"' in SMX.read_text(encoding='utf-8')
-    workflow = (ROOT / '.github/workflows/runtime-patches.yml').read_text(encoding='utf-8')
-    assert 'tests/mapmaker/test_mapmaker_disco.py' in workflow
+    suites = (ROOT / 'tools/ci/runtime-suites.json').read_text(encoding='utf-8')
+    assert 'tests/mapmaker/test_mapmaker_disco.py' in suites
