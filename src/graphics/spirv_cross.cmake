@@ -7,6 +7,8 @@ function(tsfp_add_spirv_cross target)
     if(NOT result EQUAL 0)
         message(FATAL_ERROR "Verify SPIRV-Cross before building OpenGL: ${error}")
     endif()
+    # The helper prints a native path; Windows backslashes are not valid CMake escapes.
+    file(TO_CMAKE_PATH "${source}" source)
     if(NOT TARGET tsfp_spirv_cross)
         add_library(tsfp_spirv_cross STATIC "${source}/spirv_cross.cpp" "${source}/spirv_parser.cpp"
             "${source}/spirv_cross_parsed_ir.cpp" "${source}/spirv_cfg.cpp" "${source}/spirv_glsl.cpp")
