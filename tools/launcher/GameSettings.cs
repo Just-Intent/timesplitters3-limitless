@@ -86,6 +86,21 @@ namespace TimeSplitters.Launcher
         public int NativeFps;
         public static readonly int[] NativeFrameRates = { 0, 120, 180, 240 };
         public static readonly string[] NativeFrameRateLabels = { "60 FPS (Original)", "120 FPS (Beta)", "180 FPS (Beta)", "240 FPS (Beta)" };
+        // MapMaker Limitless switches. Off/64 match the game's own defaults, so
+        // nothing is exported unless the player opts in. MEMORY_SCALE and the
+        // diagnostic switches stay developer environment variables.
+        public bool MapMakerLimits, MapMakerOverlap, MapMakerStackItems;
+        public const int MapMakerAliveDefault = 64, MapMakerAliveMin = 1, MapMakerAliveMax = 64;
+        public int MapMakerAlive = MapMakerAliveDefault;
+        public static readonly int[] MapMakerAliveChoices = { 64, 48, 32, 24, 20 };
+        public static string MapMakerAliveLabel(int alive)
+        { return alive == MapMakerAliveDefault ? "64 (Default)" : alive == 20 ? "20 (Original game)" : alive.ToString(CultureInfo.InvariantCulture); }
+        static bool LauncherFlag(Dictionary<string, object> launcher, string key, string label)
+        {
+            object value; if (!launcher.TryGetValue(key, out value)) return false;
+            Core.Require(value is bool, label + " must be true or false. No settings were changed.");
+            return (bool)value;
+        }
         bool SupportsExtendedDisplay
         {
             get {
@@ -227,6 +242,15 @@ namespace TimeSplitters.Launcher
                 {
                     Core.Require(value is bool, "Skip startup splash screens must be true or false. No settings were changed.");
                     model.SkipStartupSplashes = (bool)value;
+                }
+                model.MapMakerLimits = LauncherFlag(launcher, "mapmaker_limits", "Raised MapMaker limits");
+                model.MapMakerOverlap = LauncherFlag(launcher, "mapmaker_overlap", "Overlapping MapMaker tiles");
+                model.MapMakerStackItems = LauncherFlag(launcher, "mapmaker_stack_items", "Stacked MapMaker items");
+                if (launcher.TryGetValue("mapmaker_alive", out value))
+                {
+                    Core.Require((value is int || value is long) && Convert.ToInt64(value) >= MapMakerAliveMin && Convert.ToInt64(value) <= MapMakerAliveMax,
+                        "MapMaker characters alive at once must be a whole number from 1 to 64. No settings were changed.");
+                    model.MapMakerAlive = Convert.ToInt32(value, CultureInfo.InvariantCulture);
                 }
             }
             if (model.document.TryGetValue("debug", out value))
@@ -451,6 +475,7 @@ namespace TimeSplitters.Launcher
             Core.Require(LanguagePacks.Contains(LanguagePack), "Choose a supported game language pack.");
             Core.Require(loading || LanguagePack == "en" || CanSelectLanguagePack, "Update the game to a release with language-pack support before selecting another language.");
             Core.Require(NativeFrameRates.Contains(NativeFps), "Choose 60 FPS (Original), 120 FPS (Beta), 180 FPS (Beta), or 240 FPS (Beta).");
+            Core.Require(MapMakerAlive >= MapMakerAliveMin && MapMakerAlive <= MapMakerAliveMax, "MapMaker characters alive at once must be from 1 to 64.");
             ulong discordId;
             Core.Require((!DiscordEnabled && DiscordApplicationId.Length == 0) ||
                 (Regex.IsMatch(DiscordApplicationId, @"\A[1-9][0-9]{16,19}\z") && UInt64.TryParse(DiscordApplicationId, out discordId)),
@@ -559,6 +584,10 @@ namespace TimeSplitters.Launcher
             Map(value)["skip_startup_splashes"] = SkipStartupSplashes;
             Map(value)["renderer"] = Renderer;
             Map(value)["enhanced_textures"] = EnhancedTextures;
+            Map(value)["mapmaker_limits"] = MapMakerLimits;
+            Map(value)["mapmaker_overlap"] = MapMakerOverlap;
+            Map(value)["mapmaker_stack_items"] = MapMakerStackItems;
+            Map(value)["mapmaker_alive"] = MapMakerAlive;
             Map(value)["language_pack"] = LanguagePack;
             if (!document.TryGetValue("debug", out value)) document["debug"] = value = new Dictionary<string, object>();
             Map(value)["show_counter"] = ShowCounter;
@@ -584,6 +613,15 @@ namespace TimeSplitters.Launcher
             foreach (string file in Files) originals[file] = Read(Core.PathIn(root, file));
             runtime = payload[2];
         }
+        public Dictionary<string, string> MapMakerEnvironment()
+        {
+            var values = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (MapMakerLimits) values["TSFP_MAPMAKER_LIMITS"] = "1";
+            if (MapMakerOverlap) values["TSFP_MAPMAKER_OVERLAP"] = "1";
+            if (MapMakerStackItems) values["TSFP_MAPMAKER_STACK_ITEMS"] = "1";
+            if (MapMakerAlive != MapMakerAliveDefault) values["TSFP_MAPMAKER_ALIVE"] = MapMakerAlive.ToString(CultureInfo.InvariantCulture);
+            return values;
+        }
         public static ProcessStartInfo StartInfo(string root)
         {
             var model = Load(root, null); model.Validate();
@@ -604,7 +642,7 @@ namespace TimeSplitters.Launcher
             foreach (string key in info.EnvironmentVariables.Keys.Cast<string>().ToArray())
                 if (key.StartsWith("RECOMP_", StringComparison.OrdinalIgnoreCase) || key.StartsWith("TSFP_", StringComparison.OrdinalIgnoreCase)) info.EnvironmentVariables.Remove(key);
             foreach (var pair in new Dictionary<string, string> {
-                {"TSFP_CRASH_DIR","Logs/Crashes"}, {"RECOMP_GAME_DIR",LauncherPlatform.Data(root)}, {"RECOMP_SAVE_DIR",LauncherPlatform.Saves(root)}, {"RECOMP_INPUT_CONFIG",Files[0]}, {"RECOMP_FFMPEG_DIR","Bin"}, {"RECOMP_DISPLAY_CONFIG",Files[2]}, {"TSFP_DISPLAY_CONFIG",Files[1]}, {"TSFP_TEXTURE_PACK_DIR",LauncherPlatform.Textures(root)}, {"TSFP_ONLINE_SETTINGS","Settings/pc-online.json"} }) info.EnvironmentVariables[pair.Key] = Core.PathIn(root, pair.Value);
+                {"TSFP_CRASH_DIR","Logs/Crashes"}, {"RECOMP_GAME_DIR",LauncherPlatform.Data(root)}, {"RECOMP_SAVE_DIR",LauncherPlatform.Saves(root)}, {"RECOMP_INPUT_CONFIG",Files[0]}, {"RECOMP_FFMPEG_DIR","Bin"}, {"RECOMP_DISPLAY_CONFIG",Files[2]}, {"TSFP_DISPLAY_CONFIG",Files[1]}, {"TSFP_TEXTURE_PACK_DIR",LauncherPlatform.Textures(root)}, {"TSFP_MUSIC_DIR",LauncherPlatform.Music(root)}, {"TSFP_ONLINE_SETTINGS","Settings/pc-online.json"} }) info.EnvironmentVariables[pair.Key] = Core.PathIn(root, pair.Value);
             info.EnvironmentVariables["TSFP_GAME_UPDATE_NOTICE"] = GameUpdateNotice.Path(root);
             info.EnvironmentVariables["TSFP_GAME_INSTALLED_VERSION"] = Core.InstalledVersion(root);
             info.EnvironmentVariables["TSFP_CRASH_EXTENDED"] = CrashReports.ExtendedForNextLaunch ? "1" : "0";
@@ -625,6 +663,9 @@ namespace TimeSplitters.Launcher
             info.EnvironmentVariables["RECOMP_MOUSE_INVERT_Y"] = model.InvertY ? "1" : "0";
             info.EnvironmentVariables["RECOMP_MOUSE_SENSITIVITY"] = model.Sensitivity.ToString("R", CultureInfo.InvariantCulture);
             info.EnvironmentVariables["TSFP_TEXTURE_MODE"] = model.EnhancedTextures ? "4k" : "classic";
+            // Inherited TSFP_MAPMAKER_* values were stripped above; only the
+            // saved launcher choices reach the game, and nothing when off.
+            foreach (var pair in model.MapMakerEnvironment()) info.EnvironmentVariables[pair.Key] = pair.Value;
             #if MACOS || LINUX
             NativeHost.Configure(info,root);
 #endif

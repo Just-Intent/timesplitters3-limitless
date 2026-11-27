@@ -24,6 +24,19 @@ namespace TimeSplitters.Launcher
         public event Action<string> OpenFolder;
         public event Action<string> OpenSaveLocation;
         public Func<Task<string>> PickSaveFolder;
+        // Host file pickers for map transfer: export receives a suggested file name; both return null on cancel.
+        public Func<string,Task<string>> PickMapExportFile;
+        public Func<Task<string>> PickMapImportFile;
+        public readonly ComboBox MapChoices=new ComboBox {Name="MapChoices"};
+        public readonly Button ExportMap, ImportMap, OpenMapExports;
+        readonly TextBlock mapDetails;
+        // Imported music (MusicLibrary): the host's multi-select WAV/MP3 picker (null on
+        // cancel) and its removal to the Recycle Bin or Trash.
+        public Func<Task<string[]>> PickMusicFiles;
+        public Action<string> RecycleMusic;
+        public readonly ComboBox MusicChoices=new ComboBox {Name="MusicChoices"};
+        public readonly Button ImportMusic, RemoveMusic, OpenMusic;
+        readonly TextBlock musicDetails;
         readonly TextBlock location;
         readonly string root;readonly bool preview,installationLockHeld;
         readonly StackPanel body=new StackPanel();readonly TextBlock status,summary,details;
@@ -53,6 +66,46 @@ namespace TimeSplitters.Launcher
             var restoreActions=new WrapPanel();restore.Children.Add(restoreActions);
             Restore=Button("Restore selected backup","RestoreSaveBackup");restoreActions.Children.Add(Restore);
             Refresh=Button("Refresh list","RefreshSaveBackups");restoreActions.Children.Add(Refresh);
+            var maps=PageTheme.Section(body,"MapMaker maps","Export a map to a .tsmap file to share it, or move it to another computer or save folder. Importing adds a copy and never replaces a map.");
+            maps.Children.Add(MapChoices);mapDetails=PageTheme.Text("No maps found in this save folder.",12,"#B4C7D8");mapDetails.Name="MapDetails";mapDetails.Margin=new Thickness(0,10,0,12);maps.Children.Add(mapDetails);
+            var mapActions=new WrapPanel();maps.Children.Add(mapActions);
+            ExportMap=Button("Export map...","ExportMap");mapActions.Children.Add(ExportMap);
+            ImportMap=Button("Import map...","ImportMap");mapActions.Children.Add(ImportMap);
+            OpenMapExports=Button("Open map exports","OpenMapExports");mapActions.Children.Add(OpenMapExports);
+            MapChoices.SelectionChanged+=(s,e)=>SelectMap();OpenMapExports.Click+=(s,e)=>Open(MapTransfer.ExportFolder);
+            ExportMap.Click+=async(s,e)=>{
+                var map=MapChoices.SelectedItem as MapEntry;if(map==null || !map.Valid || stop!=null)return;
+                if(preview){Report("Preview only. No maps were exported.");return;}
+                string target=null;
+                if(PickMapExportFile!=null){try {target=await PickMapExportFile(MapTransfer.SafeFileName(map.Name)+MapTransfer.Extension);}catch(Exception ex){Report(ex.Message);return;}if(target==null)return;}
+                await Run(async token=>{string written=await Task.Run(()=>MapTransfer.Export(root,map.Folder,target,installationLockHeld),token);return "Exported "+map.Name+" to "+written+". Your saves are unchanged.";});
+            };
+            ImportMap.Click+=async(s,e)=>{
+                if(stop!=null)return;if(preview){Report("Preview only. No maps were imported.");return;}
+                if(PickMapImportFile==null){Report("Choosing a map file is not available here.");return;}
+                string source;try {source=await PickMapImportFile();}catch(Exception ex){Report(ex.Message);return;}if(source==null)return;
+                await Run(async token=>{
+                    var progress=Reporter();var added=await Task.Run(()=>MapTransfer.Import(root,source,progress,token,installationLockHeld),token);
+                    return "Imported map as "+added.Name+". Your saves were backed up first; no existing map was changed.";
+                });
+            };
+            var music=PageTheme.Section(body,"Imported music","WAV and MP3 tracks for MapMaker's Map Settings and Arcade's music choice. Importing copies the files; your originals stay where they are.");
+            music.Children.Add(MusicChoices);musicDetails=PageTheme.Text("No imported music yet.",12,"#B4C7D8");musicDetails.Name="MusicDetails";musicDetails.Margin=new Thickness(0,10,0,12);music.Children.Add(musicDetails);
+            var musicActions=new WrapPanel();music.Children.Add(musicActions);
+            ImportMusic=Button("Import music...","ImportMusic");musicActions.Children.Add(ImportMusic);
+            RemoveMusic=Button("Remove track...","RemoveMusic");musicActions.Children.Add(RemoveMusic);
+            OpenMusic=Button("Open music folder","OpenMusicFolder");musicActions.Children.Add(OpenMusic);
+            MusicChoices.SelectionChanged+=(s,e)=>SelectMusic();RemoveMusic.Click+=(s,e)=>ConfirmRemoveMusic();
+            OpenMusic.Click+=(s,e)=>{try {if(!preview)Directory.CreateDirectory(MusicLibrary.Folder(root));Open(LauncherPlatform.Music(root));}catch(Exception ex){Report(ex.Message);}};
+            ImportMusic.Click+=async(s,e)=>{
+                if(stop!=null)return;if(preview){Report("Preview only. No music was imported.");return;}
+                if(PickMusicFiles==null){Report("Choosing music files is not available here.");return;}
+                string[] sources;try {sources=await PickMusicFiles();}catch(Exception ex){Report(ex.Message);return;}if(sources==null || sources.Length==0)return;
+                await Run(async token=>{
+                    var progress=Reporter();var added=await Task.Run(()=>MusicLibrary.Import(root,sources,progress,token,installationLockHeld),token);
+                    return added.Length==1?"Imported "+added[0].Name+". Choose it in Map Settings or Arcade's music list.":"Imported "+added.Length+" tracks. Choose them in Map Settings or Arcade's music list.";
+                });
+            };
             PageTheme.Details(body,"About backups & storage",
                 PageTheme.Text("Backups remain on this computer until you remove them. Empty virtual-disk regions are omitted, so logical size may exceed storage used.",12),
                 PageTheme.Text("Automatic backups run before game updates and restores. Game files, settings and your ISO are kept.",12)).Name="SaveStorageDetails";
@@ -79,6 +132,7 @@ namespace TimeSplitters.Launcher
                 string id=(Choices.SelectedItem as SaveBackup)==null?null:((SaveBackup)Choices.SelectedItem).Id;
                 var items=preview?new SaveBackup[0]:SaveBackups.List(root,Report);Choices.Items.Clear();foreach(var item in items)Choices.Items.Add(item);
                 Choices.SelectedItem=items.FirstOrDefault(i=>i.Id==id)??items.FirstOrDefault();
+                ReloadMaps();ReloadMusic();
                 summary.Text=items.Length==0?"No backups yet. Select Back up now to protect your progress.":items.Length+" restore point(s) · "+(items.Sum(i=>i.StoredBytes)/1048576.0).ToString("0.0")+" MiB stored";
                 Select();
             }catch(Exception ex){Report("Backup list: "+ex.Message);Restore.IsEnabled=false;}
@@ -87,6 +141,51 @@ namespace TimeSplitters.Launcher
         {
             var item=Choices.SelectedItem as SaveBackup;Restore.IsEnabled=item!=null;
             details.Text=item==null?"No restore point selected.":item.Files+" file(s) · "+(item.StoredBytes/1048576.0).ToString("0.0")+" MiB archive · "+(item.LogicalBytes/1073741824.0).ToString("0.00")+" GiB logical saves";
+        }
+        void ReloadMaps()
+        {
+            string folder=(MapChoices.SelectedItem as MapEntry)==null?null:((MapEntry)MapChoices.SelectedItem).Folder;
+            MapEntry[] maps;mapDetails.Text="";
+            try {maps=preview?new MapEntry[0]:MapTransfer.List(SaveLocations.Resolve(root));}
+            catch(Exception ex){if(!(ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException))throw;maps=new MapEntry[0];mapDetails.Text="Maps: "+ex.Message;}
+            MapChoices.Items.Clear();foreach(var map in maps)MapChoices.Items.Add(map);
+            MapChoices.SelectedItem=maps.FirstOrDefault(m=>m.Folder==folder)??maps.FirstOrDefault();SelectMap();
+        }
+        void SelectMap()
+        {
+            var map=MapChoices.SelectedItem as MapEntry;ExportMap.IsEnabled=map!=null && map.Valid;
+            if(map==null){if(!mapDetails.Text.StartsWith("Maps: ",StringComparison.Ordinal))mapDetails.Text="No maps found in this save folder.";return;}
+            mapDetails.Text=!map.Valid?"This map cannot be exported: "+map.Problem:
+                map.Pieces+" pieces, "+map.Tier+" file"+(map.BodySize>MapTransfer.Tiers[0]?" (larger than the original game can load)":"")+", save folder "+map.Folder;
+        }
+        void ReloadMusic()
+        {
+            string name=(MusicChoices.SelectedItem as MusicTrack)==null?null:((MusicTrack)MusicChoices.SelectedItem).Name;
+            MusicTrack[] tracks;musicDetails.Text="";
+            try {tracks=preview?new MusicTrack[0]:MusicLibrary.List(root);}
+            catch(Exception ex){if(!(ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException))throw;tracks=new MusicTrack[0];musicDetails.Text="Music: "+ex.Message;}
+            MusicChoices.Items.Clear();foreach(var track in tracks)MusicChoices.Items.Add(track);
+            MusicChoices.SelectedItem=tracks.FirstOrDefault(t=>t.Name==name)??tracks.FirstOrDefault();SelectMusic();
+        }
+        void SelectMusic()
+        {
+            var track=MusicChoices.SelectedItem as MusicTrack;RemoveMusic.IsEnabled=track!=null;
+            if(track==null){if(!musicDetails.Text.StartsWith("Music: ",StringComparison.Ordinal))musicDetails.Text="No imported music yet. Import WAV or MP3 files to use them in MapMaker and Arcade.";return;}
+            musicDetails.Text=MusicChoices.Items.Count+" of "+MusicLibrary.MaxTracks+" tracks · "+(track.Bytes/1048576.0).ToString("0.0")+" MiB · "+(track.Name.EndsWith(".mp3",StringComparison.OrdinalIgnoreCase)?"MP3":"WAV");
+        }
+        void ConfirmRemoveMusic()
+        {
+            var track=MusicChoices.SelectedItem as MusicTrack;if(track==null || stop!=null)return;
+            if(preview){Report("Preview only. No music was removed.");return;}
+            var prompt=new StackPanel {VerticalAlignment=VerticalAlignment.Center,MaxWidth=560};confirmation.Child=prompt;
+            prompt.Children.Add(PageTheme.Text("Remove this track?",24));
+            var text=PageTheme.Text(track.Name+"\n\nIt moves to the Recycle Bin (Trash on Mac). Maps and the Arcade choice that use it play the level's own music instead.",14);text.Margin=new Thickness(0,16,0,20);prompt.Children.Add(text);
+            var buttons=new WrapPanel();prompt.Children.Add(buttons);Button no=Button("Keep track","CancelMusicRemove"),yes=Button("Remove track","ConfirmMusicRemove");PageTheme.Primary(yes);buttons.Children.Add(no);buttons.Children.Add(yes);
+            body.IsEnabled=false;Ui.Show(confirmation,true);
+            no.Click+=(s,e)=>{Ui.Show(confirmation,false);body.IsEnabled=true;};
+            yes.Click+=async(s,e)=>{Ui.Show(confirmation,false);body.IsEnabled=true;await Run(async token=>{
+                await Task.Run(()=>MusicLibrary.Remove(root,track.Name,RecycleMusic,installationLockHeld),token);return "Removed "+track.Name+".";
+            });};
         }
         void ConfirmLocation(string selected)
         {

@@ -160,6 +160,10 @@ uses the same runtime/XBE/Python pins, complete patch stack and generator as
 Windows/Mac. It keeps one game build in `build/linux/game`, with source/binary/
 compatibility receipts in BUILD.json. Game data is read from the supplied
 existing directory, not copied. Use Clang in the native Ubuntu working checkout.
+Limitless fork: `--generate` passes `--guest-patches config/guest-code-patches`
+like tsfp.ps1 and build-native-mac.py (MapMaker guest-code table); the
+title CMake also receives the fork's last-applied 2160 music adapter. A Linux
+build of the fork has not been made or run.
 Final patch2402 extends the title/input/audio guards after2401 and selects only
 OS-specific Linux files. Shared SDL input/audio, binding/settings/debug models,
 textures, gameplay patches and Xbox/Vulkan frontend compile directly.

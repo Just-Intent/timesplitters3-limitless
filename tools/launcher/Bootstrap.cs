@@ -179,7 +179,7 @@ namespace TimeSplitters.Launcher
                 </Grid></Grid>
               </Window>");
             WindowTheme.Attach(Window,()=>true);
-            ((TextBlock)Window.FindName("Version")).Text = "LAUNCHER v" + LauncherVersion.Value;
+            ((TextBlock)Window.FindName("Version")).Text = "LAUNCHER v" + LauncherVersion.Value + (LocalReleaseSource.Active ? " · TEST-ONLY LOCAL RELEASE SOURCE" : "");
             using (var icon = Assembly.GetExecutingAssembly().GetManifestResourceStream("launcher.ico"))
                 Window.Icon = BitmapFrame.Create(icon, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
             var open = (Button)Window.FindName("Continue");

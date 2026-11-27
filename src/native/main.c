@@ -7,6 +7,7 @@
 #include "../network/pc_discord.h"
 #include "../network/pc_online.h"
 #include "../gameplay/pc_native_rate.h"
+#include "../runtime/guest_extension.h"
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,9 +88,19 @@ static int guest_main(void *unused)
     printf("[NATIVE-BOOT] TimeSplitters: Future Perfect — macOS ARM64\n");
 #endif
     printf("[NATIVE-BOOT] XBE loaded: %ld bytes; saves: %s\n", size, saves);
+    tsfp_guest_extension_reserve();
     if (!xbox_MemoryLayoutInit(data, (size_t)size)) {
         fprintf(stderr, "[NATIVE-BOOT] Xbox memory initialization failed\n");
         free(data); return 1;
+    }
+    {
+        uint32_t extension_va, extension_size;
+        if (!tsfp_guest_extension_ready(&extension_va, &extension_size)) {
+            fprintf(stderr, "[NATIVE-BOOT] Guest memory extension is at 0x%08X (%u bytes), "
+                    "but the game code was generated for 0x%08X\n",
+                    extension_va, extension_size, (unsigned)TSFP_GUEST_EXTENSION_VA);
+            free(data); return 1;
+        }
     }
     g_xbox_mem_offset = xbox_GetMemoryOffset();
     tsfp_native_crash_memory((uint64_t)g_xbox_mem_offset);

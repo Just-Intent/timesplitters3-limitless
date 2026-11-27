@@ -35,7 +35,7 @@ namespace TimeSplitters.Launcher
             AvaloniaXamlLoader.Load(this);NativeApplication.ApplyWindowIcon(this);Artwork();
             Find<ContentControl>("GameChannelPickerHost").Content=channelPicker.View;
             channelPicker.SetReleases(Array.Empty<Release>(),GameChannels.Read(root),GameChannels.ReadPreviewTrack(root));
-            Label("LauncherVersionLabel","LAUNCHER "+LauncherVersion.Value+"  /  "+LauncherPlatform.HostName);
+            Label("LauncherVersionLabel","LAUNCHER "+LauncherVersion.Value+"  /  "+LauncherPlatform.HostName+(LocalReleaseSource.Active?"  /  TEST-ONLY LOCAL RELEASE SOURCE":""));
             textureUpdatesState=new TextureUpdateCheck(root);textureUpdatesState.Changed+=()=>Ui.Post(TextureCheckChanged);
             Click("HomeNav",()=>Page("CommandCenter"));Click("SettingsNav",ShowSettings);Click("NewsNav",()=>Run(News));
             Click("RepairNav",()=>Maintenance());Click("SupportNav",()=>NativeHost.Open("https://github.com/"+ReleaseClient.Repository+"/issues"));
@@ -81,7 +81,7 @@ namespace TimeSplitters.Launcher
         T Find<T>(string name) where T:Control { return this.FindControl<T>(name)??throw new InvalidOperationException("Missing launcher control: "+name); }
         void Click(string name,Action action){Find<Button>(name).Click+=(s,e)=>{try{action();}catch(Exception ex){Status(ex.Message);}};}
         void Label(string name,string value){Find<TextBlock>(name).Text=value;}
-        void Status(string message){Label("StatusText",message);if(!render)LauncherLog.Write(root,message);appearance?.Refresh();}
+        void Status(string message){Label("StatusText",LocalReleaseSource.Decorate(message));if(!render)LauncherLog.Write(root,message);appearance?.Refresh();}
         internal bool GameRunning { get { return gameRunning; } }
         internal bool AppearanceGameRunning {get{return gameRunning||Core.GameRunning(root);}}
         internal void AppearanceRefreshPlayAvailability(bool running){
@@ -103,6 +103,14 @@ namespace TimeSplitters.Launcher
             foreach(var pair in new[]{("HomeNav","CommandCenter"),("NewsNav","NewsHost"),("SettingsNav","SettingsHost"),("RepairNav","MaintenanceHost"),("SavesNav","SavesHost")}){var nav=Find<Button>(pair.Item1);nav.Background=Brush.Parse(name==pair.Item2?"#1D3A55":"Transparent");nav.Foreground=Brush.Parse(name==pair.Item2?"#65C7FF":"#DFE9F2");}
             foreach(var p in new[]{"CommandCenter","NewsHost","SettingsHost","MaintenanceHost","VersionsHost","SavesHost"})Find<Control>(p).IsVisible=p==name;appearance?.Page(name);}
         void OpenFolder(string name){var path=Core.PathIn(root,name);if(!Directory.Exists(path)){Status("This folder has not been created yet.");return;}NativeHost.Open(path);}
+        // macOS removal adapter for imported music: the user's Trash, under a free name.
+        static void MoveToTrash(string path)
+        {
+            string trash=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".Trash");Directory.CreateDirectory(trash);
+            string stem=Path.GetFileNameWithoutExtension(path),extension=Path.GetExtension(path),target=Path.Combine(trash,stem+extension);
+            for(int n=2;File.Exists(target)||Directory.Exists(target);n++)target=Path.Combine(trash,stem+" "+n+extension);
+            File.Move(path,target);
+        }
         void Artwork()
         {
             foreach(var pair in new[]{("HeroPhoto","launcher-banner.png"),("HeroBackdrop","launcher-backdrop.png"),("HeroTitle","launcher-logo.png"),("SidebarLogo","launcher-logo.png"),("SidebarSubtitle","launcher-logo.png")}){
@@ -221,7 +229,7 @@ namespace TimeSplitters.Launcher
 #if LINUX
                 if(deckControls!=null)return await deckControls.PickFolder("Choose your save folder");
 #endif
-                var picked=await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions {Title="Choose TimeSplitters save folder",AllowMultiple=false});return picked.FirstOrDefault()?.TryGetLocalPath();};savesPage.BusyChanged+=value=>{busy=value;Refresh();};Find<ContentControl>("SavesHost").Content=savesPage.View;}savesPage.Reload();Page("SavesHost");}
+                var picked=await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions {Title="Choose TimeSplitters save folder",AllowMultiple=false});return picked.FirstOrDefault()?.TryGetLocalPath();};savesPage.PickMapExportFile=async name=>{var picked=await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {Title="Export MapMaker map",SuggestedFileName=name,DefaultExtension="tsmap",ShowOverwritePrompt=true,FileTypeChoices=new[]{new FilePickerFileType("TimeSplitters map"){Patterns=new[]{"*.tsmap"}}}});return picked?.TryGetLocalPath();};savesPage.PickMapImportFile=async()=>{var picked=await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions {Title="Import MapMaker map",AllowMultiple=false,FileTypeFilter=new[]{new FilePickerFileType("TimeSplitters map"){Patterns=new[]{"*.tsmap"}}}});return picked.FirstOrDefault()?.TryGetLocalPath();};savesPage.PickMusicFiles=async()=>{var picked=await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions {Title="Import music",AllowMultiple=true,FileTypeFilter=new[]{new FilePickerFileType("Music (WAV, MP3)"){Patterns=MusicLibrary.PickerPatterns.Split(';')}}});var paths=picked.Select(p=>p.TryGetLocalPath()).Where(p=>p!=null).ToArray();return paths.Length==0?null:paths;};savesPage.RecycleMusic=MoveToTrash;savesPage.BusyChanged+=value=>{busy=value;Refresh();};Find<ContentControl>("SavesHost").Content=savesPage.View;}savesPage.Reload();Page("SavesHost");}
         void ShowSettings(){if(gameRunning||busy){Status("Close the game and finish operations before changing settings.");return;}if(settings==null){settings=new SettingsPage(new ResourceDictionary(),root,render,textureUpdatesState);settings.TextureBusyChanged+=value=>{busy=value;Refresh();};settings.Saved+=()=>{Status("Settings saved.");Refresh();};settings.Cancelled+=()=>{Page("CommandCenter");Find<ContentControl>("SettingsHost").Content=null;settings=null;Status("Unsaved settings discarded.");};Find<ContentControl>("SettingsHost").Content=settings.View;}Page("SettingsHost");}
         async Task News()
         {

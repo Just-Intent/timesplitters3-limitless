@@ -14,6 +14,20 @@ void pc_controls_attach(HWND window);
 int pc_controls_message(HWND window, UINT message, WPARAM wp, LPARAM lp, LRESULT *result);
 int pc_controls_key_down(int key);
 int pc_controls_terminal_click(void);
+/* MapMaker editor screen owns the game pointer: left button acts as A. */
+void pc_controls_mapmaker_pointer(int active);
+/* A click hit a MapMaker editor menu row: hold A for this press. */
+void pc_controls_mapmaker_row_press(void);
+/* In the MapMaker editor: Escape acts as the first Back key. */
+void pc_controls_mapmaker_editor(int active);
+/* 1 while the MapMaker editor prototype remaps keys (prompts show T for floor up). */
+int pc_controls_mapmaker_editor_active(void);
+/* MapMaker editor screen: wheel notches (positive up) become a short zoom hold. */
+void pc_controls_mapmaker_zoom(int notches);
+/* MapMaker editor: press A or Back (PC_MAPMAKER_PULSE_*) briefly. */
+void pc_controls_mapmaker_pulse(int button);
+/* MapMaker resource table: 1 while its toggle key (I) is down and bound to no action. */
+int pc_controls_mapmaker_table_key(void);
 void pc_controls_menu_mode(int active);
 int pc_controls_in_menu(void);
 PcMenuPointer pc_controls_menu_pointer(void);

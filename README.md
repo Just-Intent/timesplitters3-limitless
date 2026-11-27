@@ -133,6 +133,17 @@ Availability depends on your platform and installed game version. Check the
 launcher's **Release notes**, [platform status](#platform-status) and
 [measured progress](docs/project/STATUS.md) for support and known limits.
 
+## MapMaker extensions
+
+Optional MapMaker additions, off by default. Turn them on in the launcher's
+**Settings → MapMaker** tab: raised limits (1023 tiles, 500 items, 511 Story
+AI, sixteen floors on an 80x80 grid), overlapping tiles, stacked items, story
+bosses, creatures, props and vehicles, open-sky tiles, extra skies, weather
+and music, imported music, and logic delays. The editor is also fully usable
+with mouse and keyboard. Maps within the original limits keep the original
+format; larger maps need these extensions and can't be sent over System Link.
+See the [MapMaker guide](docs/mapmaker/mapmaker-limitless.md).
+
 ## Multiplayer
 
 ### Local split-screen

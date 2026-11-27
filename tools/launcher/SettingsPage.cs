@@ -88,8 +88,8 @@ namespace TimeSplitters.Launcher
         readonly CheckBox dialogueFocus;
         readonly ComboBox impactRange;
         readonly TextBox sensitivity, width, height, discordId;
-        readonly CheckBox enabled, invert, fullscreen, vrr, vsync, fps, skipSplashes, developerTools, discordEnabled, enhancedTextures, ambientOcclusion, shaderCache;
-        readonly ComboBox device, resolution, aspect, scale, filtering, frameRate, languagePack, msaa, edgeSmoothing, supersampling, renderer;
+        readonly CheckBox enabled, invert, fullscreen, vrr, vsync, fps, skipSplashes, developerTools, discordEnabled, enhancedTextures, ambientOcclusion, shaderCache, mapMakerLimits, mapMakerOverlap, mapMakerStackItems;
+        readonly ComboBox device, resolution, aspect, scale, filtering, frameRate, languagePack, msaa, edgeSmoothing, supersampling, renderer, mapMakerAlive;
         readonly TextBlock performanceAdvice,developerToolsShortcut;
         readonly StackPanel consoleScalePanel;
         readonly Button[,] bindingButtons = new Button[GameSettings.Actions.Length,GameSettings.BindingSlots];
@@ -400,6 +400,19 @@ namespace TimeSplitters.Launcher
             presence.Children.Add(Text("Keep Discord open with activity sharing enabled. Applies on your next launch with a compatible game build.",12));
             PageTheme.Details(presence,"Set up Discord activity",discordHelp).Name="DiscordSetupDetails";
             tabs.Items.Add(new TabItem { Header="Discord",Content=Scroll(discord) });
+            var mapmaker=new SettingsTiles("MapMakerCards");
+            var limitless=Section(mapmaker,"MapMaker extensions","Optional MapMaker extensions. All off keeps the original editor.");
+            mapMakerLimits=Check("Raised MapMaker limits",model.MapMakerLimits);mapMakerLimits.Name="MapMakerLimits";limitless.Children.Add(mapMakerLimits);
+            limitless.Children.Add(Hint("More tiles, items, Story AI, keycards, props, turrets, teleporters and logic; sixteen floors on an 80×80 grid; any unlocked character in MapMaker Story; Story AI duplicates and linked copies; and the Clouds checkbox."));
+            mapMakerOverlap=Check("Overlapping tiles",model.MapMakerOverlap);mapMakerOverlap.Name="MapMakerOverlap";limitless.Children.Add(mapMakerOverlap);
+            limitless.Children.Add(Hint("Tiles can be placed over other tiles. Expect visual seams, gaps in the sky, one-way walls and AI pathing problems where pieces overlap."));
+            mapMakerStackItems=Check("Stacked items",model.MapMakerStackItems);mapMakerStackItems.Name="MapMakerStackItems";limitless.Children.Add(mapMakerStackItems);
+            limitless.Children.Add(Hint("Several pickups or props can share one grid cell and spawn on the same spot. Teleporters, start points and flags never stack."));
+            mapMakerAlive=Choices(GameSettings.MapMakerAliveChoices.Select(GameSettings.MapMakerAliveLabel).ToArray(),GameSettings.MapMakerAliveLabel(model.MapMakerAlive));
+            mapMakerAlive.Name="MapMakerAlive";Field(limitless,"Characters alive at once (MapMaker Story)",mapMakerAlive);
+            limitless.Children.Add(Hint("Lower this if large MapMaker Story maps run slowly. 20 matches the original game."));
+            limitless.Children.Add(Text("Maps beyond the original limits need these extensions to open and cannot be sent over System Link. Keep backups of maps you care about. Changes apply on your next game launch.",12));
+            tabs.Items.Add(new TabItem { Header="MapMaker",Content=Scroll(mapmaker) });
             var audioPanel=new SettingsTiles("AudioCards");
             var volumes=Section(audioPanel,"Volume","100% preserves the original mix. These controls work with Enhanced Audio on or off.");
             for(int i=0;i<audioVolumes.Length;i++) {
@@ -449,8 +462,8 @@ namespace TimeSplitters.Launcher
             foreach(TabItem tab in tabs.Items){tab.Padding=new Thickness(10,8,10,8);tab.MinHeight=36;}
             foreach(var cards in new[]{controls,graphics,viewHud,general,discord,audioPanel})cards.Reflow();
             foreach(var entry in new[]{sensitivity,width,height,discordId})Ui.TextChanged(entry,RefreshSaveState);
-            foreach(var check in new[]{enabled,invert,fullscreen,vrr,vsync,fps,skipSplashes,developerTools,discordEnabled,enhancedTextures,enhancedAudio,spatialAudio,extendedGunfire,environmentalAudio,ambientAudio,dialogueFocus,ambientOcclusion,shaderCache})Ui.CheckedChanged(check,RefreshSaveState);
-            foreach(var choice in new[]{device,scale,filtering,frameRate,languagePack,msaa,edgeSmoothing,supersampling,impactRange,renderer})choice.SelectionChanged+=(s,e)=>RefreshSaveState();
+            foreach(var check in new[]{mapMakerLimits,mapMakerOverlap,mapMakerStackItems,enabled,invert,fullscreen,vrr,vsync,fps,skipSplashes,developerTools,discordEnabled,enhancedTextures,enhancedAudio,spatialAudio,extendedGunfire,environmentalAudio,ambientAudio,dialogueFocus,ambientOcclusion,shaderCache})Ui.CheckedChanged(check,RefreshSaveState);
+            foreach(var choice in new[]{mapMakerAlive,device,scale,filtering,frameRate,languagePack,msaa,edgeSmoothing,supersampling,impactRange,renderer})choice.SelectionChanged+=(s,e)=>RefreshSaveState();
             Ui.ValueChanged(fov,RefreshSaveState);
             Ui.ValueChanged(crosshairSize,RefreshSaveState);
         }
@@ -464,6 +477,7 @@ namespace TimeSplitters.Launcher
                 spatialAudio.IsChecked,extendedGunfire.IsChecked,environmentalAudio.IsChecked,ambientAudio.IsChecked,
                 audioVolumes.Select(slider=>(int)Math.Round(slider.Value)).ToArray(),
                 dialogueFocus.IsChecked,impactRange.SelectedIndex,renderer.SelectedIndex,
+                mapMakerLimits.IsChecked,mapMakerOverlap.IsChecked,mapMakerStackItems.IsChecked,mapMakerAlive.SelectedIndex,
                 controllerDeadzones.Select(x=>(int)Math.Round(x.Value)).ToArray(),device.SelectedIndex,localDevices.Select(x=>x.SelectedIndex).ToArray(),scale.SelectedIndex,filtering.SelectedIndex,frameRate.SelectedIndex,languagePack.SelectedIndex,msaa.SelectedIndex,edgeSmoothing.SelectedIndex,supersampling.SelectedIndex,
                 (int)Math.Round(fov.Value),(int)Math.Round(crosshairSize.Value),Enumerable.Range(0,GameSettings.Actions.Length).Select(i=>model.Binding(i)).ToArray()});
         }
@@ -474,6 +488,7 @@ namespace TimeSplitters.Launcher
             status.Foreground=save.IsEnabled?Muted:Accent;
             status.Text=save.IsEnabled?"Unsaved changes. Save to apply on your next launch.":"Settings saved. Changes apply on your next launch.";
         }
+        static TextBlock Hint(string text) { var hint=Text(text,12);hint.Foreground=Muted;hint.Margin=new Thickness(28,0,0,8);return hint; }
         static string KeyName(string token) { return GameSettings.BindingLabel(token); }
         void RefreshBindings() { for(int i=0;i<GameSettings.Actions.Length;i++) { var keys=model.Binding(i); for(int j=0;j<GameSettings.BindingSlots;j++) { bindingButtons[i,j].Content=KeyName(keys[j]);bindingButtons[i,j].Foreground=KeyName(keys[j])=="Unbound"?Muted:Ink; } } UpdateDeveloperToolsShortcut();RefreshSaveState(); }
         void UpdateDeveloperToolsShortcut()
@@ -629,6 +644,11 @@ namespace TimeSplitters.Launcher
                 model.LanguagePack=GameSettings.LanguagePacks[languagePack.SelectedIndex];
                 model.Renderer=GameSettings.Renderers[renderer.SelectedIndex];
                 model.SkipStartupSplashes=skipSplashes.IsChecked==true;
+                model.MapMakerLimits=mapMakerLimits.IsChecked==true;model.MapMakerOverlap=mapMakerOverlap.IsChecked==true;model.MapMakerStackItems=mapMakerStackItems.IsChecked==true;
+                var aliveLabel=Convert.ToString(mapMakerAlive.SelectedItem,CultureInfo.InvariantCulture);
+                int alive=GameSettings.MapMakerAliveDefault;
+                for(int n=GameSettings.MapMakerAliveMin;n<=GameSettings.MapMakerAliveMax;n++) if(GameSettings.MapMakerAliveLabel(n)==aliveLabel) alive=n;
+                model.MapMakerAlive=alive;
                 model.DeveloperToolsEnabled=developerTools.IsChecked==true;
                 model.DiscordEnabled=discordEnabled.IsChecked==true;model.DiscordApplicationId=discordId.Text.Trim();
                 model.Scale=Int32.Parse((string)scale.SelectedItem); model.Anisotropy=Int32.Parse((string)filtering.SelectedItem);

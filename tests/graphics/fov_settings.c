@@ -204,6 +204,12 @@ static int controls_test_menu_active=1;
 int pc_controls_in_menu(void) {return controls_test_menu_active;}
 void pc_controls_menu_mode(int active) { (void)active; CHECK(0); }
 PcMenuPointer pc_controls_menu_pointer(void) { CHECK(0); return (PcMenuPointer){0}; }
+void pc_controls_mapmaker_pointer(int active) { (void)active; }
+void pc_controls_mapmaker_row_press(void) {}
+void pc_controls_mapmaker_editor(int active) { (void)active; }
+void pc_controls_mapmaker_zoom(int notches) { (void)notches; }
+void pc_controls_mapmaker_pulse(int button) { (void)button; }
+int pc_controls_mapmaker_table_key(void) { return 0; }
 static int tab_pointer_enabled;
 static PcMenuPointer tab_pointer;
 PcMenuPointer pc_controls_menu_hover_pointer(void) { CHECK(tab_pointer_enabled);return tab_pointer; }
@@ -217,7 +223,7 @@ MOUSE_STUB(sub_002C4310)
 MOUSE_STUB(sub_001922D0)
 MOUSE_STUB(sub_002E49F0) MOUSE_STUB(sub_002E4A30)
 /* Audio-slider preview calls are covered by menu_mouse.c, not this fixture. */
-MOUSE_STUB(sub_00045C60)
+MOUSE_STUB(sub_00045C60) MOUSE_STUB(sub_00074720) MOUSE_STUB(sub_00071A60)
 static unsigned video_sounds,highlight_sounds;
 void sub_00021780(void){uint32_t sound=WORD_AT(g_esp+4);CHECK(sound==0x1234u || sound==0x4321u);if(sound==0x4321u)highlight_sounds++;else video_sounds++;g_esp+=4;}
 #ifdef TSFP_TEST_CONTROLLER_SPEED
@@ -519,6 +525,9 @@ static float drawn;
 void sub_000814B0(void) { uint32_t b=WORD_AT(g_esp+4);memcpy(&drawn,&b,4);g_esp+=4; }
 void sub_00154FE0(void) { g_eax=WORD_AT(g_esp+4);g_esp+=4; }
 void sub_00079B70(void) { returned++;g_esp+=4; }
+void sub_0003DFA0(void) {}
+#define TSFP_FIXTURE_DEFINES_UNLOCK_STUBS /* sub_001CD040, sub_0003D7B0 stubbed above */
+#include "mapmaker_area_stubs.h"
 void sub_00079D60_gen(void) {
     unsigned id=WORD_AT(g_esp+8);CHECK(id<256 || id==UINT32_MAX);
     if(page==DISPLAY_HOME && id>=20 && id<=21)CHECK(!strncmp((char *)(g_xbox_mem_offset+WORD_AT(g_esp+4)),"\vs75",4));

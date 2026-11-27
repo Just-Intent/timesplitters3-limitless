@@ -2,6 +2,7 @@
 
 from project_paths import source_file as repo_file
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -133,6 +134,13 @@ def test_original_vehicle_mouse(tmp_path, legacy):
     previous = dict(vars(config))
     try:
         config.configure_from_xbe(str(xbe))
+        # Limitless: object handles are slot << 21 (config/guest-code-patches/handles.json).
+        patched = bytearray(image)
+        for e in json.loads((ROOT / 'config/guest-code-patches/handles.json').read_text(encoding='utf-8'))['patches']:
+            off = config.va_to_file_offset(int(e['address'], 16))
+            assert patched[off:off + len(e['original_hex']) // 2].hex() == e['original_hex'], e['id']
+            patched[off:off + len(e['new_hex']) // 2] = bytes.fromhex(e['new_hex'])
+        image = bytes(patched)
         functions = {a: dict(name=f'sub_{a:08X}', end=end) for a, end in
                      ((0xd2470, 0xd2b7e), (0x17a440, 0x17aa1a), (0x17a0a0, 0x17a111),
                       (0x151650, 0x15178f), (0x152090, 0x15211d),

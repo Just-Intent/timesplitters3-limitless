@@ -121,6 +121,18 @@ namespace TimeSplitters.Launcher
 
     public sealed partial class LauncherWindow
     {
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
+        struct FileOperation { public IntPtr Window; public uint Function; public string From, To; public ushort Flags; public bool Aborted; public IntPtr Mappings; public string Title; }
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern int SHFileOperationW(ref FileOperation operation);
+        // Windows removal adapter for imported music: the Recycle Bin, without prompts.
+        static void RecycleFile(string path)
+        {
+            // FO_DELETE with FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT.
+            var operation=new FileOperation {Function=3,From=Path.GetFullPath(path)+"\0\0",Flags=0x0040|0x0010|0x0400|0x0004};
+            int result=SHFileOperationW(ref operation);
+            if(result!=0 || operation.Aborted)throw new IOException("Windows could not move "+Path.GetFileName(path)+" to the Recycle Bin (error "+result+").");
+        }
         public readonly Window Window;
         readonly string root;
         readonly bool previewMode;
@@ -166,7 +178,7 @@ namespace TimeSplitters.Launcher
         string NewsGameVersion { get { return installed.Length>0?installed:gameInstalled?"Unversioned":""; } }
         TextureUpdateCheck textureUpdatesState;bool closed;
         void TextureCheckChanged(){if(closed)return;var label=Find<TextBlock>("TextureUpdateStatus");label.Text=textureUpdatesState.Status;label.ToolTip=textureUpdatesState.Details;label.Visibility=label.Text.Length>0?Visibility.Visible:Visibility.Collapsed;if(settings!=null)settings.RefreshTextureCheck();}
-        public void SetStatus(string value) { Text("StatusText", value);if(Appearance!=null)Appearance.RefreshState(); }
+        public void SetStatus(string value) { Text("StatusText", LocalReleaseSource.Decorate(value));if(Appearance!=null)Appearance.RefreshState(); }
         public LauncherWindow(string path, bool preview)
             : this(path,preview,new ReleaseClient()) { }
         internal LauncherWindow(string path,bool preview,ReleaseClient releases)
@@ -186,7 +198,7 @@ namespace TimeSplitters.Launcher
             WindowTheme.Attach(Window);
             using (var icon = Assembly.GetExecutingAssembly().GetManifestResourceStream("launcher.ico"))
                 Window.Icon = BitmapFrame.Create(icon, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-            Text("LauncherVersionLabel", "TSFP  /  COMMUNITY PC PROJECT  /  LAUNCHER v" + LauncherVersion.Value);
+            Text("LauncherVersionLabel", "TSFP  /  COMMUNITY PC PROJECT  /  LAUNCHER v" + LauncherVersion.Value + (LocalReleaseSource.Active ? "  /  TEST-ONLY LOCAL RELEASE SOURCE" : ""));
             using (var logo = Assembly.GetExecutingAssembly().GetManifestResourceStream("launcher-logo.png"))
             {
                 if (logo != null)
@@ -401,10 +413,14 @@ namespace TimeSplitters.Launcher
             if(busy || (!previewMode && Core.GameRunning())) { SetStatus("Close the game before managing saves.");return; }
             if(settings!=null)settings.DismissPrompt();
             if(savesPage==null) {
-                savesPage=new SavesPage(root,previewMode);
+                savesPage=new SavesPage(root,previewMode,true);   /* this window holds the installation lock */
                 savesPage.OpenFolder+=relative=>OpenFolder(relative);
                 savesPage.OpenSaveLocation+=path=>{Directory.CreateDirectory(path);Process.Start(new ProcessStartInfo(path){UseShellExecute=true});};
                 savesPage.PickSaveFolder=()=>{using(var picker=new System.Windows.Forms.FolderBrowserDialog {Description="Choose an empty folder or an existing TimeSplitters save folder."})return Task.FromResult(picker.ShowDialog()==System.Windows.Forms.DialogResult.OK?picker.SelectedPath:null);};
+                savesPage.PickMapExportFile=name=>{var picker=new Microsoft.Win32.SaveFileDialog {Title="Export MapMaker map",FileName=name,DefaultExt=MapTransfer.Extension,Filter="TimeSplitters map (*.tsmap)|*.tsmap",OverwritePrompt=true,AddExtension=true};return Task.FromResult(picker.ShowDialog(Window)==true?picker.FileName:null);};
+                savesPage.PickMapImportFile=()=>{var picker=new Microsoft.Win32.OpenFileDialog {Title="Import MapMaker map",Filter="TimeSplitters map (*.tsmap)|*.tsmap",CheckFileExists=true,Multiselect=false};return Task.FromResult(picker.ShowDialog(Window)==true?picker.FileName:null);};
+                savesPage.PickMusicFiles=()=>{var picker=new Microsoft.Win32.OpenFileDialog {Title="Import music",Filter="Music (*.wav;*.mp3)|"+MusicLibrary.PickerPatterns,CheckFileExists=true,Multiselect=true};return Task.FromResult(picker.ShowDialog(Window)==true?picker.FileNames:null);};
+                savesPage.RecycleMusic=RecycleFile;
                 savesPage.BusyChanged+=value=>{busy=value;Refresh();};
                 Find<ContentControl>("SavesHost").Content=savesPage.View;
             }

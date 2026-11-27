@@ -1926,6 +1926,15 @@ validation until Mac checks pass. Do not infer Mac support from Windows results.
 | MAC-128 | Fresh weapon trigger timing (#434) | Awaiting validation |
 | MAC-129 | Optional SMAA anti-aliasing | Awaiting validation |
 | MAC-131 | Optional V-Sync | Awaiting validation |
+| MAC-132 | MapMaker capacity meter probe (debug instrumentation) | Awaiting validation |
+| MAC-133 | Compile-only Windows build mode | Not applicable |
+| MAC-134 | MapMaker editor mouse controls (on by default) | Awaiting validation |
+| MAC-135 | MapMaker raised level memory budget (opt-in) | Awaiting validation |
+| MAC-136 | MapMaker capacity stage A: AI pools and editor limits | Awaiting validation |
+| MAC-137 | Launcher MapMaker settings tab | Awaiting validation |
+| MAC-138 | MapMaker map export/import (.tsmap) | Awaiting validation |
+| MAC-139 | Imported music (MapMaker and Arcade) | Awaiting validation |
+| MAC-140 | MapMaker debug panel (Shift+F9) | Awaiting validation |
 
 ### MAC-126 - Launcher Discord community button
 
@@ -2469,6 +2478,8 @@ vendor detection or authorize closing the issue before publication.
 
 
 ### MAC-001 — Direct-camera mouse look
+
+- **Mouse-wheel scope zoom (branch `scope-wheel-zoom` off mapmaker-recon df56a044, uncommitted to main):** shared `src/input/pc_scope_wheel.h` turns wheel notches bound to Next/Previous weapon into short zoom-in/zoom-out key holds while player 1 is in a zoomable scope (player `+0x0C` bits `0x60`, camera range `+0x394 < +0x390`). `src/input/pc_controls.c` and `src/native/input_sdl.c` both call it (player update, wheel event, key poll); no Mac-specific adaptation is needed. Windows fixture `tests/input/test_scope_wheel.py` passes; Windows in-game zoom feel, Mac compile and physical Mac wheel checks are pending.
 
 Issue #425 adds shared Battle Mech mouse targeting through the scene-owned mech and its controlling local slot. Windows and SDL use the same guarded helper; no separate native implementation is needed. Windows Release build and 40 focused input/context checks pass, including original supported-US mech input and aim-vector routines at 60/120/180/240 FPS. These are controlled routine tests, not live mech-encounter acceptance. Physical Mac gameplay remains unverified. See [mounted mouse](../agent-context/mounted-mouse.md#battle-mech-mouse-425).
 
@@ -5660,6 +5671,19 @@ to retain V1 display compatibility. Windows model/UI regression coverage is in
   browsing and Select/Back/right-click cancellation; cover clipped/invisible
   portraits, focus loss, resize, stale draws and other players. Local Windows
   System Link portrait/variant selection and confirm/cancel were verified.
+  The MapMaker map browser (main menu > MapMaker > Load map, descriptor
+  0x0052EA88; `src/interface/pc_menu_mapmaker_browser.inc`, branch `mapmaker-load-mouse`) acts on
+  a row click in the shared input hook, before its tick: a click highlights a
+  map and a click on the highlighted map loads it. It is shared source with no
+  host adapter of its own; it reaches Mac wherever the shared menu input hook
+  runs. Acceptance: load by double click, keyboard/controller unchanged,
+  damaged maps ignored; untested in game on either host.
+  The Story mission briefing (0x005238C0) and Arcade League / Challenge event
+  briefing (0x00523870) confirm on any fresh left click off the footer
+  (`src/interface/pc_menu_briefing.inc`, branch `menu-briefing-click`, uncommitted
+  PR). Shared source in the same input hook, no host adapter; acceptance: click
+  starts the mission / opens character select, footer Back and right-click go
+  back; untested in game on either host.
 - **Issue #115 follow-up** (`115-bug-audio-menu-sliders-cannot-be-adjusted-with-mouse-pointer`): Windows Music/Sound volume bars now
   accept click-to-set and held dragging in main and paused Audio/Video Options.
   `src/interface/pc_menu_sliders.inc` captures both original painter layouts, reuses the
@@ -11487,3 +11511,215 @@ this Windows host. Measured Windows outcomes and compiler limits are in
 Status: implemented in shared source; native Mac acceptance pending. Video Options stages the same Vulkan/OpenGL preference as the launcher and Apply & Restart immediately hands off to a replacement process after shutdown. Shared menu/persistence/restart code is in pc_display_menu.c, pc_bindings.inc and pc_game_restart.inc. NativeHost and vulkan_sdk retain verified dormant loader metadata so an OpenGL-launched Mac game can switch back to Vulkan. Legacy GL-only builds omit the selector. Windows process/menu/persistence checks and the supported Linux build/GTK persistence test pass. Mac launcher compile passes, while native Mac game compile, physical GPU round trips, save/session preservation and failure handling remain required before claiming native acceptance. See docs/agent-context/opengl-recovery.md#in-game-renderer-restart. Source: current task branch, not published.
 
 Renderer menu alignment (2026-11-23, current branch): the user superseded immediate restart with the same staged Apply / Later / Restart Now flow as other advanced graphics options. Shared native menu, renderer preference reader and selected-backend restart apply to Windows/Linux/common Mac; legacy GL-only builds omit the row. Native Mac visual/process round-trip acceptance remains pending.
+### MAC-132 — MapMaker capacity meter probe (debug instrumentation)
+
+- **Status:** Awaiting validation
+- **PC behavior:** Off by default. With `TSFP_MAPMAKER_PROBE` flags (runner option
+  `--mapmaker-probe`), the read-only probe logs MapMaker meter calls
+  (`sub_0030C210`) and the bars they draw through `sub_000814B0` to
+  `TSFP_MAPMAKER_PROBE_LOG`. It changes no game state. See `docs/mapmaker/mapmaker-meter-probe.md`.
+- **PC source:** Branch `mapmaker-recon`; shared `src/interface/pc_mapmaker_probe.inc`, hook in
+  `src/interface/pc_menu_sliders.inc`, wrapper `patches/*-mapmaker-meter-probe.patch`, runner
+  option in `tools/testing/testing_profile.py`; fixture `tests/mapmaker/mapmaker_probe.c`.
+- **PC validation:** Asset-free fixture and patch-stack tests pass on Linux (gcc).
+  The Windows build compiled and the game runs. The Windows/MSVC fixture failed
+  two checks because the log was written in text mode (CRLF; roadmap MM-1). The log
+  is now binary; the Windows recheck is pending. Flag 8 (menu layout and click
+  capture) was added through the existing menu hook. No probe log captured yet.
+- **Existing Mac support:** The wrapper is enabled for `TSFP_NATIVE_DISPLAY` and the
+  probe compiles in the shared menu adapter; `tools/testing/test-native-mac.py` accepts
+  `--mapmaker-probe`. Not compiled or run on a Mac.
+- **Mac adaptation needed:** None identified (standard C file I/O, no OS adapter).
+- **Mac acceptance checks:** Build native Mac (regeneration expected), run
+  `tools/testing/test-native-mac.py --unlocked-profile --mapmaker-probe 3`, open MapMaker,
+  place a tile and confirm a record with a changed fraction appears in
+  `private/test-saves/native-mac/mapmaker-probe.log`; confirm no log without the option.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-133 — Compile-only Windows build mode
+
+- **Status:** Not applicable
+- **PC behavior:** `tsfp.ps1 -Action Build -CompileOnly` compiles every target but
+  does not run locally built test programs, for Windows hosts where Smart App
+  Control blocks unsigned executables. Skipped checks are reported and recorded;
+  the executable is not sealed as a tested build.
+- **PC source:** Branch `mapmaker-recon`; `tsfp.ps1`, `tests/repository/test_compile_only_build.py`,
+  `docs/development/building.md`.
+- **PC validation:** Static script checks pass on Linux; Windows PowerShell checks
+  and a real compile-only build on the Legion are pending.
+- **Existing Mac support:** `tools/build/build-native-mac.py` is a separate builder and is
+  unchanged; locally compiled binaries are not quarantined by Gatekeeper.
+- **Mac adaptation needed:** None. This works around a Windows application-control
+  policy in the Windows-only build script; no shared game behavior changes.
+- **Mac acceptance checks:** None beyond existing native build checks.
+- **Mac implementation and evidence:** Not applicable.
+
+### MAC-134 — MapMaker editor mouse controls (on by default)
+
+- **Status:** Awaiting validation
+- **PC behavior:** On the MapMaker editor screen (scene 102) the mouse drives
+  the game's own pointer, left click is A, menus, scrollbars, wheel zoom/scroll,
+  right-drag and edge panning, right-click rotate/deselect work by mouse; a still
+  mouse leaves controller movement alone. On by default; `TSFP_MAPMAKER_POINTER=0`
+  turns it off. Confirmed complete on Windows 2026-10-23.
+- **PC source:** Branch `mapmaker-recon`; shared `src/interface/pc_mapmaker_pointer.inc`
+  (called from `pc_display_menu_mouse_input`), host policy
+  `src/interface/pc_mapmaker_pointer.h`, `pc_controls_mapmaker_pointer` and the click path
+  in `src/input/pc_controls.c`; fixture `tests/mapmaker/mapmaker_pointer.c`.
+- **PC validation:** Fixture and mutations pass on Windows/MSVC. In-game run pending.
+- **Existing Mac support:** `src/native/input_sdl.c` implements
+  `pc_controls_mapmaker_pointer` and adds the held-A path to its
+  `pc_controls_terminal_click`. Not compiled or run on a Mac.
+- **Mac adaptation needed:** Escape-as-Back in the editor is Windows-only
+  (`pc_controls_mapmaker_editor` is a no-op in input_sdl.c); port it through
+  `tsfp_native_key_down`. Scrollbar and panning are shared guest-side code.
+- **Mac acceptance checks:** Native Mac build (controls on by default);
+  open the editor, hover and click a toolbar icon and a grid cell; confirm the
+  controller still moves the pointer when the mouse is still.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-135 — MapMaker raised level memory budget (opt-in)
+
+- **Status:** Awaiting validation
+- **PC behavior:** With `TSFP_MAPMAKER_MEMORY_SCALE=N` (2..8) the MapMaker
+  editor's level memory estimate is divided by N, so N times as much fits
+  before the meter fills; other limits unchanged. Off by default.
+- **PC source:** Branch `mapmaker-recon`; `patches/*-mapmaker-meter-raise.patch`
+  (wrappers of `sub_002FA060`/`sub_002FA0D0`, enabled for `TSFP_NATIVE_DISPLAY`
+  too), `src/interface/pc_mapmaker_budget.inc`; fixture `tests/mapmaker/mapmaker_budget.c`.
+- **PC validation:** Fixture and mutations pass on Windows/MSVC; in-game
+  validation pending.
+- **Existing Mac support:** Shared guest-side code; nothing Mac-specific.
+- **Mac adaptation needed:** None identified (guest regeneration on first build).
+- **Mac acceptance checks:** Native Mac build; with the variable set to 2,
+  place past the old limit; play the map with probe flag 32 and check the
+  minimum free memory stays positive.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-136 — MapMaker capacity stage A: AI pools and editor limits
+
+- **Status:** Awaiting validation
+- **PC behavior:** When a MapMaker map is played the AI navigation pools are
+  enlarged (on by default; `TSFP_MAPMAKER_POOLS=0` = original). With
+  `TSFP_MAPMAKER_LIMITS=1` the editor allows pads 4800, links 12000, pad
+  groups 600 and 200 items, with raised per-category maxima (pickups and
+  movers/props x4); turrets, cover pads and pieces unchanged. Probe flag 64 logs pool,
+  object and tag counts. The editor item pool (2120) comes from the shared
+  guest-code patch table, applied by both builds.
+- **PC source:** Branch `mapmaker-recon`; `patches/*-mapmaker-meter-stagea.patch`
+  (wrappers of `sub_0009A140`/`sub_002FA720`), `src/interface/pc_mapmaker_limits.inc`;
+  fixture `tests/mapmaker/mapmaker_limits.c`.
+- **PC validation:** Fixture and mutations pass on Windows/MSVC; in-game
+  validation pending.
+- **Existing Mac support:** Shared guest-side code; nothing Mac-specific.
+- **Mac adaptation needed:** None identified (guest regeneration on first build).
+- **Mac acceptance checks:** Native Mac build; with limits on, place past 300
+  pad groups; play with probe flags 96 and check counts and free memory.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-137 — Launcher MapMaker settings tab
+
+- **Status:** Awaiting validation
+- **PC behavior:** Game settings gains a **MapMaker** tab: Raised MapMaker
+  limits, Overlapping tiles, Stacked items (off by default) and Characters
+  alive at once (64 default). Choices persist as `launcher.mapmaker_*` in the
+  install's pc-controls.json. Launch strips inherited `TSFP_*`/`RECOMP_*` as
+  before, then exports only the chosen `TSFP_MAPMAKER_*` switches.
+- **PC source:** Branch `launcher-mapmaker-settings` (uncommitted to main);
+  `tools/launcher/GameSettings.cs`, `tools/launcher/SettingsPage.cs`,
+  `tools/playable-launch.ps1`; tests `tests/launcher/launcher_settings.cs`,
+  `tests/launcher/test_launcher_startup.py`, Mac `tools/launcher/macos/NativeTests.cs`.
+- **PC validation:** Windows launcher and its test program compile; running the
+  compiled tests was not possible on the maintainer PC (unsigned executables
+  are blocked). In-game check pending.
+- **Existing Mac support:** Shared model, page and StartInfo; the Avalonia
+  launcher compiles the same `SettingsPage.cs`. On a checkout the keys go to
+  `config/pc-controls.json` beside the existing launcher keys.
+- **Mac adaptation needed:** None identified.
+- **Mac acceptance checks:** Native launcher build and `--test`; open Settings →
+  MapMaker, save, confirm the keys and that Play exports only chosen switches.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-138 — MapMaker map export/import (.tsmap)
+
+- **Status:** Awaiting validation
+- **PC behavior:** The launcher Saves page lists the MapMaker maps of the active
+  save folder, exports one to a portable `.tsmap` file and imports a `.tsmap`
+  as a new map (renamed on collision, CRC and signature recomputed). Import
+  refuses while the game runs, holds the save lock and makes a save backup
+  first. See `docs/mapmaker/mapmaker-map-transfer.md`.
+- **PC source:** Branch `map-transfer` (uncommitted to main);
+  `tools/launcher/MapTransfer.cs`, `tools/launcher/SavesPage.cs`,
+  `tools/launcher/SaveBackups.cs`, `tools/launcher/Launcher.cs`; tests
+  `tests/launcher/launcher_maps.cs`, `tests/launcher/launcher_shared_ui.cs`.
+- **PC validation:** Windows shared UI checks pass (38 groups, including the
+  five map transfer groups and the Saves page map test), 2026-11-06. Loading
+  an imported map in the game is not verified.
+- **Existing Mac support:** Shared model and page; `NativeLauncher.csproj`
+  compiles `MapTransfer.cs` and `launcher_maps.cs`; `NativeWindow.cs`
+  supplies Avalonia save/open file pickers.
+- **Mac adaptation needed:** None identified beyond the pickers already added.
+- **Mac acceptance checks:** Native launcher build and `--test` (shared UI);
+  export a map with the save picker and import it with the open picker.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-139 — Imported music (MapMaker and Arcade)
+
+- **Status:** Awaiting validation
+- **PC behavior:** WAV and MP3 files in the music folder (`TSFP_MUSIC_DIR`; `Music`
+  in an install, `private/music` in a checkout) are offered as
+  `Imported:` rows in MapMaker's Map Settings music list and in Arcade's
+  music choice, and play on host output slot 273 in place of the level music.
+- **PC source:** Branch `custom-music` (uncommitted to main);
+  `src/interface/pc_custom_music.h`, `src/interface/pc_mapmaker_custommusic.inc`,
+  `patches/media/0059-custom-music-voice.patch`, `src/native/audio_sdl.c`,
+  launcher `GameSettings.cs`/`LauncherPlatform.cs`/`Core.cs`, `tools/play-native-mac.py`.
+  MP3 (branch `music-mp3`, uncommitted to main): `src/interface/pc_music_codec.c`,
+  `patches/media/2160-custom-music-codec.patch`; launcher import `MusicLibrary.cs`,
+  `SavesPage.cs`, `Launcher.cs`, `macos/NativeWindow.cs`.
+  Music slider ticks past 16 (branch `music-slider`, uncommitted to main):
+  `src/interface/pc_menu_sliders.inc`, `pc_display_menu.c` lookup 0x002C3720,
+  `pc_custom_music.h` `slider_extra=`; shared, compiled under
+  `TSFP_NATIVE_DISPLAY` like the other menu sliders, so no Mac adapter.
+- **PC validation:** Fixture tests only ([STATUS](STATUS.md#imported-music-for-mapmaker-and-arcade-2026-11-03-not-built-or-played)); no game run.
+- **Existing Mac support:** Shared code; POSIX `dirent`/`pthread` paths and the
+  SDL slot count are in place; the Mac launcher exports `TSFP_MUSIC_DIR`.
+- **Mac adaptation needed:** MP3: the native Mac build has no FFmpeg headers
+  or libraries (as for movies, MAC-009), so `pc_music_codec.c` builds as its
+  stub and only WAV is listed. Needed: an FFmpeg (or other) decoder for the
+  same `pc_music_codec_*` adapter (the dlopen path already names `.dylib`
+  files), packaged in the Mac game. Launcher: Avalonia multi-select picker
+  and `~/.Trash` move are written but not built on a Mac.
+- **Mac acceptance checks:** Native build; `tests/media/test_custom_music.py`
+  and the stub case of `tests/media/test_music_codec.py` on macOS; launcher
+  NativeTests (music cases); import/remove from the Mac launcher; play a map
+  and an Arcade level with an imported track; `tests/input/test_menu_mouse.py`
+  and the `-fsyntax-only` menu compile; Music past 16 in the pause menu.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.
+
+### MAC-140 — MapMaker debug panel (Shift+F9)
+
+- **Status:** Awaiting validation
+- **PC behavior:** Off by default. The Debug option "Show MapMaker debug panel"
+  or Shift+F9 during play shows a text panel (frame split, draws and texture
+  binds per frame, characters/AI/engine objects, pads/cover/links/groups,
+  rooms, Level heap and nav block, player position) refreshed four times a
+  second; each Shift+F9 also logs one `[PC-DEBUG] MapMaker panel:` line.
+- **PC source:** Branch `debug-overlay` (uncommitted to main); shared
+  `src/diagnostics/pc_debug_panel.h`, `pc_debug.c`, `pc_debug_options.def`,
+  `src/interface/pc_mapmaker_panel.inc`, `pc_developer_sidebar.inc`,
+  `pc_developer_guest.inc`; Windows key in
+  `patches/diagnostics/2640-mapmaker-debug-panel.patch`.
+- **PC validation:** Fixture tests only (`tests/diagnostics/test_debug_panel.py`,
+  `tests/mapmaker/test_mapmaker_panel.py`, `tests/input/test_developer_tools.py`);
+  not built or played.
+- **Existing Mac support:** Shared code. The SDL adapter (`src/native/input_sdl.c`)
+  maps Shift+F9 and its self-test covers it; the panel uses the shared sidebar
+  canvas drawn by both the RHI and legacy GL adapters; the option appears in
+  the Cocoa Debug dialog through the shared definition list.
+- **Mac adaptation needed:** None expected. Legacy GL has no HLE renderer
+  reading, so the frame split and draw counts show "--" there.
+- **Mac acceptance checks:** Native build; `--test` SDL input self-test;
+  `tests/diagnostics/test_debug_panel.py` model case on macOS; Shift+F9 in a
+  MapMaker map shows the panel and logs the line; option persists in the Cocoa dialog.
+- **Mac implementation and evidence:** Pending; no Apple Silicon host available.

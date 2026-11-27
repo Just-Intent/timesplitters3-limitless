@@ -92,6 +92,10 @@ def build_commands(args, xbe, analysis_json):
         lift.extend(['--game-name', args.game_name])
     if args.trace_all_entries:
         lift.append('--trace-all-entries')
+    # Verified guest-code patches keep instruction boundaries, so only the
+    # lift stage reads them and the disassembly stays valid.
+    if getattr(args, 'guest_patches', None):
+        lift.extend(['--guest-patches', str(Path(args.guest_patches).resolve())])
     symbols = xbe.with_name(xbe.stem + '_xdk_symbols.json')
     if symbols.is_file():
         lift.extend(['--hle-symbols', str(symbols)])
@@ -123,7 +127,7 @@ def main(argv=None):
     for flag in ('trace-all-entries', 'text-only', 'all', 'dry-run'):
         parser.add_argument('--' + flag, action='store_true')
     parser.add_argument('--split', type=int, default=1000)
-    for option in ('gen-dir', 'work-dir', 'project', 'game-name', 'json'):
+    for option in ('gen-dir', 'work-dir', 'project', 'game-name', 'json', 'guest-patches'):
         parser.add_argument('--' + option)
     parser.add_argument('--from', dest='start', choices=STAGES, default='parse')
     parser.add_argument('--only', choices=STAGES)

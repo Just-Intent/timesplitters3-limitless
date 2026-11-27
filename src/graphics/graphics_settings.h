@@ -43,28 +43,40 @@ static long pc_graphics_pack(const TsfpGraphicsOptions *o)
            (o->ambient_occlusion << 10) | (o->shader_cache << 11) |
            (o->supersampling << 12);
 }
+/* First use only: the settings file (its 32 KB path buffer lives here, so the
+ * per-draw fast path below has no large stack frame to probe). */
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static long pc_graphics_load_state(void)
+{
+    long state;
+    TsfpGraphicsOptions o=tsfp_graphics_defaults();
+    char path[32768];FILE *file;
+#ifdef TSFP_GRAPHICS_DEFAULT_ANISOTROPY
+    int legacy=TSFP_GRAPHICS_DEFAULT_ANISOTROPY;
+    if(legacy>=1 && legacy<=16)o.anisotropy=legacy;
+#endif
+    if(pc_graphics_path(path,sizeof path) && (file=fopen(path,"rb"))!=NULL) {
+        tsfp_graphics_read(file,&o);fclose(file);
+    }
+    state=pc_graphics_pack(&o);
+#ifdef _WIN32
+    long previous=_InterlockedCompareExchange(&pc_graphics_state,state,-1);
+    if(previous>=0) state=previous;
+#else
+    long expected=-1;
+    if(!__atomic_compare_exchange_n(&pc_graphics_state,&expected,state,0,__ATOMIC_RELEASE,__ATOMIC_ACQUIRE)) state=expected;
+#endif
+    return state;
+}
 TsfpGraphicsOptions pc_graphics_get(void)
 {
     long state=pc_graphics_atomic_read();
     TsfpGraphicsOptions o=tsfp_graphics_defaults();
-    if(state<0) {
-        char path[32768];FILE *file;
-#ifdef TSFP_GRAPHICS_DEFAULT_ANISOTROPY
-        int legacy=TSFP_GRAPHICS_DEFAULT_ANISOTROPY;
-        if(legacy>=1 && legacy<=16)o.anisotropy=legacy;
-#endif
-        if(pc_graphics_path(path,sizeof path) && (file=fopen(path,"rb"))!=NULL) {
-            tsfp_graphics_read(file,&o);fclose(file);
-        }
-        state=pc_graphics_pack(&o);
-#ifdef _WIN32
-        long previous=_InterlockedCompareExchange(&pc_graphics_state,state,-1);
-        if(previous>=0) state=previous;
-#else
-        long expected=-1;
-        if(!__atomic_compare_exchange_n(&pc_graphics_state,&expected,state,0,__ATOMIC_RELEASE,__ATOMIC_ACQUIRE)) state=expected;
-#endif
-    }
+    if(state<0) state=pc_graphics_load_state();
     o.msaa=(int)(state&15);o.edge_smoothing=(int)((state>>4)&1);
     o.anisotropy=(int)((state>>5)&31);o.ambient_occlusion=(int)((state>>10)&1);
     o.shader_cache=(int)((state>>11)&1);o.supersampling=(int)((state>>12)&3);return o;

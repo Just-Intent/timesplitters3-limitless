@@ -29,6 +29,7 @@ from bundle_online import bundle
 from release_channels import identity as release_identity
 from build_textures import ensure_pack, optional_identity, zip_entries, write_zip, write_source_files
 from windows_vulkan import verify as verify_windows_dxc
+from project_repository import ISSUES_URL, URL as PROJECT_URL
 
 ROOT = _layout_root
 
@@ -40,11 +41,34 @@ def main():
     parser.add_argument('--with-textures', action='store_true', help='Explicitly bundle the audited enhanced pack (offline distribution)')
     parser.add_argument('--without-textures', action='store_true', help='Make a smaller package without enhanced textures')
     parser.add_argument('--texture-pack', type=Path, help='Use this audited compiled pack instead of the committed repository pack')
+    parser.add_argument('--build-root', type=Path, help='Checkout holding build/windows/Release and external/ts3FPrecomp '
+                        '(default: this checkout; useful from a source-only worktree)')
+    parser.add_argument('--local-preview', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:
-        release_identity(args.version, publishing=True)
+        release_identity(args.version, publishing=not args.local_preview)
     except ValueError as error:
         parser.error(str(error))
+    # --local-preview is used only by tools/release/make-local-release.py for a TEST-ONLY
+    # local release source. It accepts the compile-only build record instead of a
+    # network seal, builds the launcher without private artwork or its test run
+    # (run separately), and labels README/BUILD.json as an unvalidated preview.
+    build_root = (args.build_root or ROOT).resolve()
+    release_dir = build_root / 'build/windows/Release'
+    preview = None
+    if args.local_preview:
+        record = build_root / 'build/windows/compile-only-build.json'
+        preview = {'channel': 'local test release source (TSFP_LAUNCHER_RELEASE_SOURCE)', 'validated': False,
+                   'note': 'Not a published or validated release.'}
+        if record.is_file():
+            compiled = json.loads(record.read_text(encoding='utf-8'))
+            preview.update(build_mode=compiled.get('mode'), tests_run=compiled.get('tests_run'),
+                           network_sealed=compiled.get('network_sealed'), build_source_commit=compiled.get('source_commit'),
+                           build_source_changes=compiled.get('source_changes'), skipped_checks=compiled.get('skipped', []))
+            if compiled.get('executable_sha256'):
+                preview['executable_sha256'] = compiled['executable_sha256']
+        else:
+            preview['build_mode'] = 'unknown (no compile-only-build.json record)'
     if args.without_textures and (args.texture_pack or args.with_textures):
         parser.error('--texture-pack cannot be combined with --without-textures')
     if not re.fullmatch(r'v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?', args.version):
@@ -53,8 +77,13 @@ def main():
         parser.error('Numeric prerelease identifiers must not contain leading zeros.')
     name = f'TimeSplitters-Future-Perfect-PC-{args.version}-windows-x64'
     # Only a successfully built executable with matching content can be packaged.
-    subprocess.run([os.sys.executable, str(ROOT/'tools/build/network-identity.py'), '--verify',
-                    '--executable', str(ROOT/'build/windows/Release/futureperfect_recomp.exe')], check=True)
+    if preview is None:
+        subprocess.run([os.sys.executable, str(ROOT/'tools/build/network-identity.py'), '--verify',
+                        '--executable', str(release_dir/'futureperfect_recomp.exe')], check=True)
+    elif preview.get('executable_sha256'):
+        actual = hashlib.sha256((release_dir/'futureperfect_recomp.exe').read_bytes()).hexdigest()
+        if actual != preview['executable_sha256']:
+            raise RuntimeError('futureperfect_recomp.exe differs from build/windows/compile-only-build.json; rebuild first.')
     texture_rows, textures = [], optional_identity(ROOT)
     if args.with_textures or args.texture_pack:
         _, texture_rows, textures = ensure_pack(ROOT, args.texture_pack)
@@ -65,18 +94,19 @@ def main():
     gl_compiler = spirv_cross.verify(ROOT)
     stage = args.output.resolve() / name
     stage.mkdir(parents=True, exist_ok=False)
-    upstream = ROOT / 'external/ts3FPrecomp'
+    upstream = build_root / 'external/ts3FPrecomp'
 
     powershell = Path(os.environ.get('SystemRoot', r'C:\Windows')) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
     subprocess.run([str(powershell), '-NoProfile', '-ExecutionPolicy', 'Bypass',
-                    '-File', str(ROOT/'tools/build/build-launcher.ps1'), '-RequireArtwork', '-Test'], check=True)
+                    '-File', str(ROOT/'tools/build/build-launcher.ps1')] +
+                   ([] if preview is not None else ['-RequireArtwork', '-Test']), check=True)
 
     def copy(source, dest):
         target = stage / dest
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
 
-    copy(ROOT / 'build/windows/Release/futureperfect_recomp.exe', 'Bin/futureperfect_recomp.exe')
+    copy(release_dir / 'futureperfect_recomp.exe', 'Bin/futureperfect_recomp.exe')
     for dxc_name in ('dxcompiler.dll', 'dxil.dll'):
         copy(windows_dxc/'bin/x64'/dxc_name, 'Bin/'+dxc_name)
     for dxc_name in ('LICENSE-LLVM.txt', 'LICENSE-MIT.txt', 'LICENSE-MS.txt'):
@@ -85,7 +115,7 @@ def main():
     copy(gl_compiler/'LICENSE', 'Licenses/SPIRV-Cross-OpenGL.txt')
     copy(ROOT/'config/build/spirv-cross.json', 'Support/Graphics/spirv-cross-pin.json')
     copy(gl_compiler/'receipt.json', 'Support/Graphics/spirv-cross-receipt.json')
-    copy(ROOT / 'build/windows/Release/tsfp_crash_helper.exe', 'Bin/tsfp_crash_helper.exe')
+    copy(release_dir / 'tsfp_crash_helper.exe', 'Bin/tsfp_crash_helper.exe')
     copy(ROOT/'build/launcher/TimeSplitters Launcher.exe', 'TimeSplitters Launcher.exe')
     copy(ROOT/'build/launcher/Bin/TimeSplitters.App.exe', 'Bin/TimeSplitters.App.exe')
     copy(ROOT/'build/launcher/Support/Launcher/manifest.json', 'Support/Launcher/manifest.json')
@@ -118,7 +148,7 @@ def main():
     copy(ROOT / 'tools/launcher/GameMonogram.NOTICE.txt', 'Licenses/Game-icon-lettering.txt')
     copy(ROOT / 'assets/ui/input-icons/ATTRIBUTION.md', 'Licenses/Keyboard-mouse-icons.txt')
     copy(ROOT / 'vendor/smaa/LICENSE.txt', 'Licenses/SMAA.txt')
-    online = bundle(ROOT, stage, copy)
+    online = bundle(ROOT, stage, copy, local_preview=preview is not None)
     # Include the exact local source edits used for this test package, since
     # those may not yet exist at the source_commit recorded below.
     source_dir = stage/'Source'
@@ -138,7 +168,11 @@ def main():
         f'{subprocess.check_output(["git", "-C", str(upstream), "rev-parse", "HEAD"], text=True).strip()}\n'
         'See the project README and requirements-release.txt for build and packaging instructions.\n',
         encoding='utf-8')
-    (stage / 'README.txt').write_text(f'''TimeSplitters: Future Perfect PC {args.version} - {release_identity(args.version)['name']}
+    warning = '' if preview is None else (
+        'TEST-ONLY LOCAL PREVIEW. Not a published or validated release. Built in\n'
+        f"{preview.get('build_mode')} mode; tests run: {preview.get('tests_run')}; network sealed:\n"
+        f"{preview.get('network_sealed')}. See BUILD.json \"preview\" for provenance.\n\n")
+    (stage / 'README.txt').write_text(warning + f'''TimeSplitters: Future Perfect PC {args.version} - {release_identity(args.version)['name']}
 
 Requires 64-bit Windows 10/11 and your own US Xbox game files.
 Extract this entire ZIP to a writable folder. Open TimeSplitters Launcher.exe.
@@ -188,14 +222,14 @@ and copy those four folders over. Do not overwrite your settings with defaults.
 This is an experimental native recompilation, not the original source code.
 Startup and short first-mission gameplay have been checked; a full campaign
 playthrough has not. Expect compatibility issues. Report the steps to reproduce
-and relevant Logs at https://github.com/TheDoffman/timesplitters-future-perfect-pc/issues
+and relevant Logs at {ISSUES_URL}
 
 Game data, the ISO, saves, and personal settings are not included in this ZIP.
 Supported default.xbe SHA-256:
 3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc
 
 Source and build instructions:
-https://github.com/TheDoffman/timesplitters-future-perfect-pc
+{PROJECT_URL}
 Runtime source: https://github.com/nemonicicon/ts3FPrecomp/tree/d90c92988a9f99d0580d2ca3f7efd6ec3a7b7845
 SDL source: https://github.com/libsdl-org/SDL/tree/fa2c02bb6e21974a89ea9824bc53c9932abe5f9c
 FFmpeg 8.1 shared LGPL build: https://github.com/BtbN/FFmpeg-Builds
@@ -213,9 +247,10 @@ Third-party notices are in Licenses. Microsoft Visual C++ runtime is bundled.
         'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         'source_changes': subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).splitlines(),
         'online': online,
+        **({'preview': preview} if preview is not None else {}),
         'textures': textures,
         'upstream_commit': subprocess.check_output(['git', '-C', str(upstream), 'rev-parse', 'HEAD'], text=True).strip(),
-        'ffmpeg_archive_sha256': '1689da96399f372cfee985b3f2b9d74685892078059bc37764388f49e3118bdb',
+        'ffmpeg_archive_sha256': '3e47bda1607740550141e37c0e49d1e5182b34699f15adfd137ee266d346811a',
         'graphics_backends': ['d3d11', 'vulkan'],
         'graphics_default': 'vulkan',
         'dxc': json.loads((windows_dxc/'receipt.json').read_text()),
@@ -240,7 +275,7 @@ Third-party notices are in Licenses. Microsoft Visual C++ runtime is bundled.
     from importlib.util import spec_from_file_location, module_from_spec
     spec = spec_from_file_location('crash_symbols', Path(__file__).with_name('crash-symbols.py'))
     symbols = module_from_spec(spec); spec.loader.exec_module(symbols)
-    symbols.archive(args.output.resolve() / (name + '-symbols.zip'), root=ROOT)
+    symbols.archive(args.output.resolve() / (name + '-symbols.zip'), root=ROOT, build=release_dir)
     print(json.dumps({'archive': str(archive_path), 'bytes': archive_path.stat().st_size, 'sha256': digest, 'stage': str(stage)}, indent=2))
 
 

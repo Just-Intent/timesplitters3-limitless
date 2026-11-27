@@ -129,6 +129,8 @@ def _parser():
     parser.add_argument('--hle-impl', action='append')
     parser.add_argument('--exclude-manual', nargs='?', const='')
     parser.add_argument('--force-return', action='append', default=[])
+    parser.add_argument('--guest-patches', metavar='PATH',
+                        help='Verified guest-code patch table (JSON file or folder); any entry that does not verify stops the lift')
     for flag in ('skip-binary-check', 'trace-all-entries'):
         parser.add_argument('--'+flag, action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true')
@@ -257,7 +259,7 @@ def _run(args):
         seh_prolog=_address(args.seh_prolog) if args.seh_prolog else None,
         seh_epilog=_address(args.seh_epilog) if args.seh_epilog else None,
         icall_sites_json_path=args.icall_sites or str(output / 'icall_sites.json'),
-        types_header=args.types_header)
+        types_header=args.types_header, guest_patches_path=args.guest_patches)
     if args.list_categories:
         list_categories(translator)
         return 0
@@ -278,6 +280,11 @@ def _run(args):
         directory = Path(args.gen_dir or runtime / 'src/game/recomp/gen')
         manual, manual_names = _manual_overrides(translator, args, runtime)
         replacements, variables, wanted = _hook_plan(translator, args, runtime, manual)
+        # A guest patch in a function that is not lifted would do nothing.
+        inert = sorted(translator.guest_patch_functions & (manual | set(replacements)))
+        if inert:
+            raise ValueError('Guest patches target functions that are not lifted (hand-written or replaced): '
+                             + ', '.join(f'0x{address:08X}' for address in inert))
         if args.only_hle_thunks:
             _refresh(translator, directory, replacements, variables, wanted, manual_names)
             return 0

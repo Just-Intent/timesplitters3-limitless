@@ -319,6 +319,8 @@ not trigger the installer's unchanged rejection of linked installation paths.
 Mac Online formula notices now use the existing flat `.txt` license layout;
 notice bytes and the installer's protected-file rules stay unchanged.
 
+MapMaker map export/import (.tsmap) lives on the Saves page through shared MapTransfer.cs, with WPF/Avalonia file pickers supplied by each host; see [map transfer](map-transfer.md) (1023-piece cap since .57). Import backs up first (reason `Before map import`).
+
 Save-folder selection and custom-volume backup/restore now share SaveLocations.cs; see [save locations](save-locations.md). SavesPage exposes native Windows/Mac folder pickers and explicit copy without deleting original saves.
 
 README download buttons now use stable platform ZIP aliases. Launcher publication
@@ -358,10 +360,18 @@ that `Data`, `Settings`, `Saves`, `Bin` and root checkout paths are interchangea
 `DownloadTransfer.cs`: transfers; `InstallationMaintenance.cs`: repairs;
 `GameSessions.cs`: game launch/lifetime; `GameSettings.cs`/`SettingsPage.cs`:
 settings; `TexturePack.cs`/`TextureDownload.cs`: optional textures.
+`TSFP_MUSIC_DIR` = `LauncherPlatform.Music` (`Music`; Mac checkout
+`private/music`), a protected install-root name: [imported music](custom-music.md).
+`MusicLibrary.cs` (Saves page "Imported music") imports/lists/removes WAV/MP3 there;
+hosts supply the multi-select picker and the Recycle Bin/Trash adapter.
 `GameSettings.NativeFps` stores original(0)/120/180/240 beta selection in a separate
 `pc-frame-rate.ini` and exports `TSFP_NATIVE_FPS`; it needs a compatible game
 build and does not revive interpolation or change the console interrupt clock.
 Legacy144 sidecars load as120 without writes; explicit save uses the new preset.
+`GameSettings.MapMaker*` (Settings → MapMaker tab, both hosts) stores
+`launcher.mapmaker_limits/overlap/stack_items/alive` in pc-controls.json and
+`MapMakerEnvironment()` adds only the chosen `TSFP_MAPMAKER_*` after StartInfo's
+inherited-variable strip; `tools/playable-launch.ps1` mirrors it.
 Launcher version and game version are separate. A source commit is not a
 published release. Use `tools/ci/launcher-compatibility.py --local` for API-free
 shared checks, plus affected host lifecycle/build checks. Never start publishing
@@ -485,9 +495,11 @@ DPI and keyboard acceptance still require a native host.
 
 `SavesPage.cs` is shared WPF/Avalonia UI under `SavesHost`; both navigation adapters
 route Saves there and lock other operations while its cancellable work runs.
-`SavesPage` receives the native Mac window’s lifetime installation-lock ownership;
-its busy state serializes save work without reacquiring `mac.lock`. Standalone
-backup/restore callers still acquire the installation lock, as do Windows calls.
+`SavesPage` receives the launcher window's lifetime installation-lock ownership on
+both hosts (`mac.lock` on Mac; the installation mutex, held on the Windows UI thread),
+so its worker-thread save work does not reacquire it: a Windows mutex is per thread and
+a worker waited 30 s and failed ("Another launcher is using this installation").
+Standalone backup/restore callers still acquire the installation lock.
 `SaveBackups.cs` archives only `LauncherPlatform.Saves(root)` into `Backups/Saves`.
 It records UTC/date, game version and reason, hashes metadata and nonzero 64 KiB
 blocks, omits empty regions and verifies the completed archive before publishing
@@ -669,6 +681,8 @@ refresh's upstream empty response has not been independently attributed.
 `repo-context.py` exempts only valid version data inside both existing AUTO blocks;
 question/schema, marker, publisher and workflow changes still require guides.
 
+MapMaker settings tab: [limitless-shared](limitless-shared.md#mapmaker-settings-tab).
+
 ## Weapon-slot bindings
 
 `GameSettings` appends weapon-slot actions from embedded
@@ -787,26 +801,8 @@ ancestor. Launcher tags, drafts, future versions and nonancestor previews are
 excluded. tests/launcher/test_publish_release.py verifies baseline selection and generated
 notes payload/range through the existing release test route. No host adapters change.
 
-Story branch preview preparation: `0.4.0-story-coop.1` uses channel ID
-`story-coop` and display name `Story Co-op Preview`. It follows the existing
-clean/pushed branch publisher, optional-texture policy and immutable preview tags.
-This version preparation is not publication or native Mac Online acceptance.
+Release repository and test-only local source: [limitless-shared](limitless-shared.md#release-repository-and-test-only-local-source).
 
-
-Preview packaging follow-up: `Core.AtomicReplace` is shared by metadata,
-`GameSessions` records and `GameSettings` writes. The original atomic replacement
-runs on every host. Windows retries only IO errors32/33/1175, while both paths
-still exist, for at most20 waits of50ms. Other errors, missing paths and
-non-Windows failures propagate immediately. No destination delete/copy fallback
-is used; existing backup arguments and session WriteThrough flushing remain.
-Microsoft documents1175 as retaining both original names;1176/1177 can move or
-remove names and are deliberately not retried:
-[ReplaceFile](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew).
-`launcher_updates.cs` covers real locked-file recovery with backup retention,
-synthetic1175 recovery, bounded permanent failure and immediate1176 rejection.
-Existing download/session/settings suites exercise the shared callers.
-Generated preview notes now direct users to Preview, then the named Testing
-track, matching the shared launcher UI. `test_publish_release.py` checks this.
 ## Online companion icon
 
 `IconBuilder.WriteMultiplayer` reuses the launcher/game aperture and supplies a

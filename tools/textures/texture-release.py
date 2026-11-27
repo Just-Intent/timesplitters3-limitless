@@ -33,7 +33,8 @@ import urllib.request
 import zipfile
 
 ROOT = _layout_root
-REPO = 'TheDoffman/timesplitters-future-perfect-pc'
+from project_repository import REPOSITORY  # noqa: E402  shared release source (tools/)
+REPO = REPOSITORY
 BUDGET = 6 * 1024**3
 PART_LIMIT = 64 * 1024**2
 RAW_PART_LIMIT = 48 * 1024**2

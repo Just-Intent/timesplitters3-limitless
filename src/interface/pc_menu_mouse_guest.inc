@@ -41,6 +41,107 @@ static void menu_mouse_press(MenuMouseDispatch *s,uint32_t buttons)
     WORD_AT(s->pressed_address)|=buttons;
 }
 
+/* The resource table (pc_mapmaker_restable.inc, below) owns the meter wrapper. */
+#define MAPMAKER_RESTABLE 1
+#include "pc_mapmaker_probe.inc"
+#include "pc_mapmaker_pointer.inc"
+#include "pc_mapmaker_budget.inc"
+#include "pc_mapmaker_limits.inc"
+#include "pc_mapmaker_skelvis.inc"   /* skeleton draw log; hooks in rooms, openview, tank, bigdraw, realbosses */
+#include "pc_mapmaker_bossroom.inc"  /* giant bosses drawn through the camera's room (called by rooms buckets) */
+/* MapMaker capacity area includes (begin) */
+#include "pc_mapmaker_memory.inc"
+#include "pc_mapmaker_pads.inc"
+#include "pc_mapmaker_container.inc"
+#include "pc_mapmaker_objects.inc"
+#include "pc_mapmaker_report.inc"
+#include "pc_mapmaker_validate.inc"
+#include "pc_mapmaker_editor.inc"
+#include "pc_mapmaker_rooms.inc"
+#include "pc_mapmaker_actors.inc"
+#include "pc_mapmaker_story_character.inc"
+#include "pc_mapmaker_aitemplates.inc"
+#include "pc_mapmaker_grid.inc"
+#include "pc_mapmaker_widescreen.inc"
+#include "pc_mapmaker_bugfix.inc"
+#include "pc_mapmaker_sky.inc"
+#include "pc_mapmaker_skymask.inc"
+#include "pc_mapmaker_roof.inc"
+#include "pc_mapmaker_tileflags.inc"
+#include "pc_mapmaker_skymusic.inc"
+#include "pc_mapmaker_camera.inc"
+#include "pc_mapmaker_openview.inc"
+#include "pc_mapmaker_bosses.inc"
+#include "pc_mapmaker_characters.inc"
+#include "pc_mapmaker_realbosses.inc"
+#include "pc_mapmaker_robot.inc"
+#include "pc_mapmaker_crowe.inc"
+#include "pc_mapmaker_tank.inc"
+#include "pc_mapmaker_khallos.inc"
+#include "pc_mapmaker_worm.inc"
+#include "pc_mapmaker_mothership.inc"
+#include "pc_mapmaker_bigdraw.inc"
+#include "pc_mapmaker_sets.inc"
+#include "pc_mapmaker_matchbots.inc"
+#include "pc_mapmaker_weaponset.inc"
+#include "pc_mapmaker_storyprops.inc"
+#include "pc_mapmaker_vehicles.inc"
+#include "pc_mapmaker_creatures.inc"
+#include "pc_mapmaker_pitboss.inc"
+#include "pc_mapmaker_tilesets.inc"
+#include "pc_mapmaker_restable.inc"
+#include "pc_mapmaker_logic.inc"
+#include "pc_mapmaker_panel.inc"
+/* MapMaker capacity area includes (end) */
+
+/* Every area hook is reached through this gate (generated wrappers in
+ * patches/*-mapmaker-meter-wrappers.patch). For diagnosis:
+ *   TSFP_MAPMAKER_AREA_OFF=container,pads  run those areas' originals instead
+ *   TSFP_MAPMAKER_AREA_TRACE=1             log each hook's first 4 calls per
+ *                                          return address to stderr */
+int pc_mapmaker_area_enabled(const char *area,const char *hook)
+{
+    static int initialized,trace;
+    static char off[256];
+    static struct { const char *hook; uint32_t ret; unsigned calls; } seen[256];
+    static unsigned seen_n;
+    size_t n=strlen(area);
+    const char *p;
+    int enabled=1;
+    if(!initialized) {
+        const char *o=getenv("TSFP_MAPMAKER_AREA_OFF"),*t=getenv("TSFP_MAPMAKER_AREA_TRACE");
+        initialized=1;
+        if(o) { off[0]=',';strncpy(off+1,o,sizeof off-3);strcat(off,","); }
+        trace=t && t[0]=='1';
+    }
+    for(p=off;off[0] && (p=strstr(p,area))!=NULL;p+=n)
+        if(p[-1]==',' && p[n]==',') { enabled=0;break; }
+    /* The container, actors, story, grid and rooms code patches assume their
+     * hooks (buffer sizes, the AI cap in code is 63 and only the hook keeps 30,
+     * the Story character gate byte is 0 = choose freely until a hook sets it,
+     * the grid settings block is empty until its hook writes it, light rooms
+     * past 0xFF live in the rooms hooks' side table in every scene), so those
+     * areas cannot be switched off; the request is ignored and said so once. */
+    if(!enabled) {
+        static const char *const fixed[]={"container","actors","story","grid","rooms"};
+        static int warned[sizeof fixed/sizeof fixed[0]];
+        for(unsigned i=0;i<sizeof fixed/sizeof fixed[0];i++) if(!strcmp(area,fixed[i])) {
+            if(!warned[i]) { warned[i]=1;fprintf(stderr,"[mapmaker-area] %s cannot be switched off; ignored\n",area);fflush(stderr); }
+            enabled=1;break;
+        }
+    }
+    if(trace) {
+        uint32_t ret=guest_writable(g_esp,4)?WORD_AT(g_esp):0u;
+        unsigned i;
+        for(i=0;i<seen_n && !(seen[i].hook==hook && seen[i].ret==ret);i++) {}
+        if(i==seen_n && seen_n<sizeof seen/sizeof seen[0]) { seen[i].hook=hook;seen[i].ret=ret;seen_n++; }
+        if(i<seen_n && seen[i].calls++<4) {
+            fprintf(stderr,"[mapmaker-area] %s %s ret=0x%08X%s\n",area,hook,ret,enabled?"":" (off)");
+            fflush(stderr);
+        }
+    }
+    return enabled;
+}
 #include "pc_menu_sliders.inc"
 static void menu_team_arrow(unsigned direction);
 #include "pc_menu_choices.inc"
@@ -86,6 +187,9 @@ static int menu_mouse_can_close_pause(uint32_t menu)
 void pc_display_menu_mouse_mode(void)
 {
     int enabled=menu_mouse_context();
+    mapmaker_probe_heap(); /* read-only; inert unless TSFP_MAPMAKER_PROBE has flag 32 */
+    mapmaker_probe_pools(); /* read-only; flag 64 */
+    pc_mapmaker_sky_room_mask_flush(); /* summary of TSFP_MAPMAKER_ROOM_MASK_CLEAR; idle otherwise */
     pc_controls_menu_mode(enabled);
     if(!enabled)pc_controls_text_mode(0);
     if(!enabled) {
@@ -408,6 +512,8 @@ static int menu_mouse_footer_hit(uint32_t menu,float x,float y,unsigned sw,unsig
 
 #include "pc_menu_team.inc"
 #include "pc_menu_characters.inc"
+#include "pc_menu_mapmaker_browser.inc"
+#include "pc_menu_briefing.inc"
 
 /* Footer shortcuts are handled by the menu's tick callback BEFORE row
  * navigation. Supply their edges just after original pad input is gathered. */
@@ -424,6 +530,8 @@ void pc_display_menu_mouse_input(void (*original)(void))
     if(settings_owner>=0)WORD_AT(menu+0x3c)=1u | (1u<<(unsigned)settings_owner);
     original();
     if(settings_owner>=0)WORD_AT(menu+0x3c)=mask;
+    mapmaker_pointer_input(menu); /* MapMaker mouse; TSFP_MAPMAKER_POINTER=0 turns it off */
+    mapmaker_table_input(menu);   /* MapMaker resource table: a click on it or I toggles it */
     menu_text_input(menu);
     if(!s || s->sampled || s->menu!=menu || !menu_mouse_context() || !guest_writable(menu,0x23c) ||
        WORD_AT(menu+0x38)!=0 || WORD_AT(menu+0x1b0)!=3) return;
@@ -431,8 +539,11 @@ void pc_display_menu_mouse_input(void (*original)(void))
     if(!guest_call(sub_00074760,1,menu)) {restore_registers(&r);return;}
     pc_controls_menu_mode(1);
     s->pointer=pc_controls_menu_pointer();
+    if(s->pointer.wheel && mapmaker_pointer_wheel(menu,s->pointer.wheel)) s->pointer.wheel=0; /* prototype */
     if((WORD_AT(menu+0xc4)&0x3Fu) && !s->pointer.wheel) menu_mouse.wheel_pending=0;
     s->actions=pc_menu_mouse_actions(&menu_mouse,menu,s->pointer,GetTickCount64());s->sampled=1;
+    /* MapMaker lighting list: its tick reads Back before the row hook. */
+    if((s->actions&4) && mapmaker_pointer_tick_back(menu)) s->actions&=~4u;
     /* Text-only pages (including long Objectives) scroll in sub_00073750
      * using held Up/Down, before the later row-navigation hook. One wheel
      * notch supplies one tick; original input clears it on the next tick. */
@@ -458,7 +569,7 @@ void pc_display_menu_mouse_input(void (*original)(void))
             WORD_AT(menu+0xc8)|=action;
             s->actions=0; /* a footer click must never also select a row */
             menu_mouse.mouse_navigation=1;
-        }
+        } else if(!menu_map_browser_click(s,menu,x,y)) menu_briefing_click(s,menu);
     }
     restore_registers(&r);
 }
@@ -505,7 +616,9 @@ void pc_display_menu_mouse(void (*original)(void))
     unsigned actions,sw,sh,choice_direction;
     GuestRegisters r;
     PcMenuPointer pointer;
+    uint32_t caller=WORD_AT(g_esp);
     original();
+    mapmaker_probe_menu(menu,caller); /* read-only; inert unless TSFP_MAPMAKER_PROBE has flag 8 */
     if(!menu_mouse_context() || !guest_writable(menu,0x23c) ||
        WORD_AT(menu+0x38)!=0 || WORD_AT(menu+0x1b0)!=3) {
         if(menu_slider_owner.menu==menu) menu_slider_drag=0;
@@ -521,6 +634,7 @@ void pc_display_menu_mouse(void (*original)(void))
         pointer=menu_mouse_dispatch->pointer;actions=menu_mouse_dispatch->actions;
     } else {
         pointer=pc_controls_menu_pointer();
+        if(pointer.wheel && mapmaker_pointer_wheel(menu,pointer.wheel)) pointer.wheel=0; /* prototype */
         if((WORD_AT(menu+0xc4)&0x3Fu) && !pointer.wheel) menu_mouse.wheel_pending=0;
         actions=pc_menu_mouse_actions(&menu_mouse,menu,pointer,GetTickCount64());
     }
@@ -550,6 +664,9 @@ void pc_display_menu_mouse(void (*original)(void))
         }
     }
     choice_direction=menu_choice_hit(menu,x,y,sw,sh,&hit);
+    mapmaker_probe_click(menu,x,y,hit,actions); /* read-only diagnostic */
+    if(!hit && (actions&2) && !mapmaker_pointer_parent_press(menu,x,y))
+        mapmaker_pointer_scroll_press(menu,x,y); /* MapMaker prototype */
     /* The original dispatcher applies directional repeats after this hook.
      * Do not let a previously held direction fight an actively chosen mouse
      * row. A fresh keyboard/controller direction immediately takes ownership
@@ -576,15 +693,19 @@ void pc_display_menu_mouse(void (*original)(void))
                 menu_mouse.wheel_pending=0;
                 restore_registers(&r);return;
             }
+            /* MapMaker editor menus act on A, not on this confirm (prototype). */
+            if(!mapmaker_pointer_row_click()) {
             if(menu_mouse_dispatch && menu_mouse_dispatch->menu==menu &&
                !menu_mouse_dispatch->injected) {
                 menu_mouse_press(menu_mouse_dispatch,0x80u);
             }
             WORD_AT(menu+0xc4)|=0x100010u; /* confirm press + repeat edge */
             WORD_AT(menu+0xc8)|=0x10u;
+            }
         }
     }
-    if(actions&4) {
+    /* The MapMaker editor screen uses the right button to pan (prototype). */
+    if((actions&4) && !(mapmaker_pointer_enabled() && mapmaker_pointer_context(menu))) {
         if(menu_mouse_dispatch && menu_mouse_dispatch->menu==menu &&
            menu_mouse_can_close_pause(menu)) menu_mouse_dispatch->close_pause=menu;
         else WORD_AT(menu+0xc4)|=0x20u; /* original submenu Back action */
@@ -599,8 +720,437 @@ void pc_display_menu_team_draw(void (*original)(void)) { original(); }
 void pc_display_menu_team_tick(void (*original)(void)) { original(); }
 void pc_display_menu_choice_arrow(void (*original)(void),unsigned direction) { (void)direction;original(); }
 void pc_display_menu_audio_draw(void (*original)(void),int compact) { (void)compact;original(); }
+void pc_display_menu_audio_tick(void (*original)(void)) { original(); }
 void pc_display_menu_sensitivity_draw(void (*original)(void)) { original(); }
 void pc_display_menu_slider_bar(void (*original)(void)) { original(); }
+void pc_display_mapmaker_meter(void (*original)(void)) { original(); }
+void pc_display_mapmaker_memory(void (*original)(void)) { original(); }
+void pc_display_mapmaker_pools(void (*original)(void)) { original(); }
+void pc_display_mapmaker_limits(void (*original)(void)) { original(); }
+int pc_mapmaker_area_enabled(const char *area,const char *hook) { (void)area;(void)hook;return 1; }
+/* MapMaker capacity area stubs (begin) */
+void pc_mapmaker_pads_nearest(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_random(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_cover_lookup(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_pointer(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_runtime_new(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_tile_load(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_editor_id(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_editor_groups(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_editor_item_pads(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_group_matrix(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_group_distance(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_group_route(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_stitch(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_group_node(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_pad_node(void (*original)(void)) { original(); }
+void pc_mapmaker_pads_cover_topup(void (*original)(void)) { original(); }
+void pc_mapmaker_container_frontend_init(void (*original)(void)) { original(); }
+void pc_mapmaker_container_editor_init(void (*original)(void)) { original(); }
+void pc_mapmaker_container_undo_ring(void (*original)(void)) { original(); }
+void pc_mapmaker_container_load(void (*original)(void)) { original(); }
+void pc_mapmaker_container_save_async(void (*original)(void)) { original(); }
+void pc_mapmaker_container_save_sign(void (*original)(void)) { original(); }
+void pc_mapmaker_container_save_sync(void (*original)(void)) { original(); }
+void pc_mapmaker_container_crc(void (*original)(void)) { original(); }
+void pc_mapmaker_container_crc_check(void (*original)(void)) { original(); }
+void pc_mapmaker_container_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_container_compiled_size(void (*original)(void)) { original(); }
+void pc_mapmaker_container_find(void (*original)(void)) { original(); }
+void pc_mapmaker_container_net_send(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_turret_create(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_create(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_turret_init(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_list_add(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_register(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_pool(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_twin_pool(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_teleporters(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_tag(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_physics(void (*original)(void)) { original(); }
+void pc_mapmaker_objects_prop_break(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_top(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_sai_add(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_load(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_level_load(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_logic_can_add(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_logic_full(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_objective(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_node_room(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_logic_room(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_logic_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_free_place(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_free_move(void (*original)(void)) { original(); }
+void pc_mapmaker_editor_sai_point(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_ray_step(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_light_spread(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_portal_link(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_tree(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_query(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_piece(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_props(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_light_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_light_unlink(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_light_colour(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_light_link(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_light_create(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_buckets(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_view_lists(void (*original)(void)) { original(); }
+void pc_mapmaker_rooms_bucket_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_spawn_gate(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pool(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pool_clear(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_placed(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_list_add(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_list_readd(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_type(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_team_ai(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_group(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_team(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_pick_group_ai(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_enemies(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_kill(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_score(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_deaths(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_create(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_blip(void (*original)(void)) { original(); }
+void pc_mapmaker_actors_effects(void (*original)(void)) { original(); }
+void pc_mapmaker_story_char_roster(void (*original)(void)) { original(); }
+void pc_mapmaker_story_char_preview(void (*original)(void)) { original(); }
+void pc_mapmaker_story_char_confirm(void (*original)(void)) { original(); }
+void pc_mapmaker_story_char_config(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_rows(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_close(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_open(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_delete(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_load(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_level(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_event(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_remove(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_spawn_gate(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_alert(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_menu_item(void (*original)(void)) { original(); }
+void pc_mapmaker_aitemplates_removed(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_alloc(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_insert(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_remove(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_lookup(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_placement(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_floor_sound(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_floor_bar(void (*original)(void)) { original(); }
+void pc_mapmaker_overlap_cell(void (*original)(void)) { original(); }
+void pc_mapmaker_stack_find(void (*original)(void)) { original(); }
+void pc_mapmaker_stack_cell(void (*original)(void)) { original(); }
+void pc_mapmaker_stack_valid(void (*original)(void)) { original(); }
+void pc_mapmaker_stack_sai_point(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_view(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_lines(void (*original)(void)) { original(); }
+void pc_mapmaker_grid_preview_floor(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_net_fragment(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_turret_sync(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_net_death(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_bot_goal(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_bugfix_hud_turret(void (*original)(void)) { original(); }
+void pc_mapmaker_validate_level(void (*original)(void)) { original(); }
+void pc_mapmaker_sky_clouds(void (*original)(void)) { original(); }
+void pc_mapmaker_sky_settings(void (*original)(void)) { original(); }
+void pc_mapmaker_sky_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_sky_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_probe_room_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_probe_prop_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_sky_room_mask(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_mask(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_reduced(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_piece_new(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_load(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_move(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_copy(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_piece_free(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_format(void (*original)(void)) { original(); }
+void pc_mapmaker_tileflags_tiles(void (*original)(void)) { original(); }
+void pc_mapmaker_tileflags_build(void (*original)(void)) { original(); }
+void pc_mapmaker_tileflags_tick(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_play(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_rooms(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_roof_tick(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_rows(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_load(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_level(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_weather_load(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_weather_start(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_music(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_sky_built(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_weather_frame(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_weather_list(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_haze(void (*original)(void)) { original(); }
+void pc_mapmaker_skymusic_grain_colour(void (*original)(void)) { original(); }
+void pc_mapmaker_camera_gun_update(void (*original)(void)) { original(); }
+void pc_mapmaker_openview_walk(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_skel_flames(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_picker_end(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_pick(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_highlight(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_row_of(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_row_text(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_text(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_model_request(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_meter(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_level(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_princess(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_risen(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_throw(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_event(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_message(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_tag(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_fx(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_face(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_create(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_skel_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_walk_fight(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_walk_message(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_walk_damage(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_walk_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_realbosses_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_level(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_nav(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_music(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_event(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_fx(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_handler(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_message(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_callback(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_damage(void (*original)(void)) { original(); }
+void pc_mapmaker_robot_goal(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_level(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_fight(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_near(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_sparks(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_part(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_event(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_fx(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_meter(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_think(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_message(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_hit(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_eggs(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_cells(void (*original)(void)) { original(); }
+void pc_mapmaker_crowe_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_mine(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_update(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_wake(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_area(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_target(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_state(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_wreck(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_event(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_text(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_request(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_gun(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_create(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_spawn(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_slot7(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_slot2(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_damage(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_bar(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_tank_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_request(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_update(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_damage(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_event(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_text(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_flame(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_flash(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_shot(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_sound(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_engine(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_rider(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_rider_pose(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_create(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_sound_load(void (*original)(void)) { original(); }
+void pc_mapmaker_khallos_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_level(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_tick(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_tag(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_hit(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_fx(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_props(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_extra(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_script(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_register(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_gone(void (*original)(void)) { original(); }
+void pc_mapmaker_worm_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_request(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_update(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_text(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_slot10(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_damage(void (*original)(void)) { original(); }
+void pc_mapmaker_mothership_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_request(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_textures(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_level(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_princess(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_message(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_event(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_meter(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_logic(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_failure(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_ragbug(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_boss_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_coll_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_rack_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_bottle_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_bandage_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_bottle_damage(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_fire_type(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_smoke_type(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_pitboss_sound_load(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_rows(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_close(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_delete(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_load(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_level(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_hud(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_health_rows(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_meters(void (*original)(void)) { original(); }
+void pc_mapmaker_bosses_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_characters_eligible(void (*original)(void)) { original(); }
+void pc_mapmaker_characters_preload(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_load(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_changed(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_screen(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_set_ptr(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_editor_set(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_store(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_sai_choice(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_play_set(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_preload(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_match_start(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_icon(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_build(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_row_draw(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_row_action(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_pane(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_pick(void (*original)(void)) { original(); }
+void pc_mapmaker_sets_spawn_masks(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_live(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_match_start(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_screen(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_open(void (*original)(void)) { original(); }
+void pc_mapmaker_matchbots_store(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_unlock(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_load(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_reset(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_changed(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_held(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_build(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_screen(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_get(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_set(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_options(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_title(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_sai_choice(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_play_set(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_slot(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_weapon_veto(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_ammo_veto(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_pickup(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_preload(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_row(void (*original)(void)) { original(); }
+void pc_mapmaker_weaponset_label(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_textures(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_load(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_category(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_build(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_turret_options(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_preload_model(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_model(void (*original)(void)) { original(); }
+void pc_mapmaker_storyprops_gun_type(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_compile(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_load(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_category(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_build(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_mount(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_textures(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_preload_model(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_def(void (*original)(void)) { original(); }
+void pc_mapmaker_vehicles_create(void (*original)(void)) { original(); }
+void pc_mapmaker_creatures_robot_sight(void (*original)(void)) { original(); }
+void pc_mapmaker_creatures_robot_weapon(void (*original)(void)) { original(); }
+void pc_mapmaker_creatures_robot_muzzle(void (*original)(void)) { original(); }
+void pc_mapmaker_creatures_robot_pose(void (*original)(void)) { original(); }
+void pc_mapmaker_creatures_anims(void (*original)(void)) { original(); }
+void pc_mapmaker_creatures_request(void (*original)(void)) { original(); }
+void pc_mapmaker_creatures_create(void (*original)(void)) { original(); }
+void pc_mapmaker_creatures_ai_start(void (*original)(void)) { original(); }
+void pc_mapmaker_bigdraw_rect(void (*original)(void)) { original(); }
+void pc_mapmaker_skelvis_frustum(void (*original)(void)) { original(); }
+void pc_mapmaker_tilesets_menu_row(void (*original)(void)) { original(); }
+void pc_mapmaker_disco_textures(void (*original)(void)) { original(); }
+void pc_mapmaker_disco_menu_close(void (*original)(void)) { original(); }
+void pc_mapmaker_disco_stream(void (*original)(void)) { original(); }
+void pc_mapmaker_tilesets_play_pak(void (*original)(void)) { original(); }
+void pc_mapmaker_memory_heap_alloc(void (*original)(void)) { original(); }
+void pc_mapmaker_memory_heap_alloc_aligned(void (*original)(void)) { original(); }
+void pc_mapmaker_memory_arena(void (*original)(void)) { original(); }
+void pc_mapmaker_memory_level_reset(void (*original)(void)) { original(); }
+void pc_display_viewfinder(void (*original)(void)) { original(); }
+void pc_display_view_static(void (*original)(void)) { original(); }
+void pc_custom_music_channel(void (*original)(void)) { original(); }
+void pc_custom_music_arcade_rows(void (*original)(void)) { original(); }
+void pc_custom_music_arcade_show(void (*original)(void)) { original(); }
+void pc_custom_music_arcade_store(void (*original)(void)) { original(); }
+void pc_custom_music_restart(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_setup(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_fire(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_rows(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_done(void (*original)(void)) { original(); }
+void pc_mapmaker_logic_actions(void (*original)(void)) { original(); }
+/* MapMaker capacity area stubs (end) */
 static int menu_mouse_profile_text(void (*original)(void)) { (void)original;return 0; }
 void pc_display_menu_mouse_mode(void) {}
 static int menu_mouse_footer_text(void) { return 0; }

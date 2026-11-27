@@ -3541,6 +3541,484 @@ not run. Repository-context refresh/check and whitespace checks passed.
 No runtime changes, game build or listening acceptance in this census step.
 See [scope, ordered acceptance and initial estimates](../development/audio-overhaul.md).
 
+
+## MapMaker and mouse features: user playtest results (reported 2026-11-23)
+
+Reported by the user from test releases on the second Windows 11 x64 PC
+(release number not stated; the newest local release was
+v0.4.0-mapmaker.82). The agent did not run the game. Confirmed working:
+
+- story creatures: Catacomb Ghost, SecuriDroid XP and Mutant (Story);
+- 20 bots in a MapMaker Arcade match;
+- stronger Story AI health (Brute to Colossus);
+- the hidden weapons (Time Grenade, TNT, Temporal Uplink);
+- the Map Settings Clouds checkbox (listed as unchecked further down);
+- imported music;
+- mouse-wheel scope zoom;
+- widescreen switch-camera and mounted-gun views;
+- launcher MapMaker map export and import (.tsmap).
+
+Still without a recorded in-game check: the mothership, the Disco tileset,
+logic Delay, launcher music import, the damaged-map and System Link fixes,
+System Link, splitscreen and native Mac.
+
+## MapMaker map report at level start and offline map checker (2026-11-08, not built or played)
+
+Branch `map-validator` from `mapmaker-recon` `4c5cb965`; Windows 11 x64, MSVC
+x64 fixtures only. New: `src/interface/pc_mapmaker_report.inc`, called by the
+existing level-setup validator hook (no new WRAP), logs one bounded map report
+(counts vs caps, near-limit line, at most 20 problems with grid positions);
+`tools/testing/map_report.py` checks `.tsmap`/`anicemap.mkr` files offline.
+Validation: `tests/mapmaker/test_mapmaker_report.py` (fixed + 35 mutations,
+cap and wiring checks), `test_map_report_tool.py` (incl. the item-category
+table against the private XBE), `test_mapmaker_validate.py`, menu-mouse whole
+chain. The offline checker ran on the ignored probe saves (`private/test-saves/
+mapmaker-probe`): unplaced Story AI and a lone teleporter were reported.
+Unverified: game build, the in-game report text and grid positions, cover-pad
+owner tracing in play, Mac. Details: `docs/mapmaker/mapmaker-report.md`.
+
+## Upstream sync to v0.5.3+ (`db029630`) (2026-11-07, built, not played)
+
+Branch `upstream-sync-2` from fork `main`/`mapmaker-recon` `8ba2dc43` merges
+TheDoffman `main` `db029630` (game v0.5.3 plus later fixes, launcher 1.5.2;
+385 commits: Linux x64, Developer Tools (F1), SMAA/MSAA/AO/supersampling,
+language packs, Story co-op network patches, kill feed, keycap prompts,
+local player devices, Machine Wars cockpit mouse). Windows 11 x64, MSVC
+14.44. Fork changes kept: guest-code tables, MapMaker patches/source,
+Saves-page map transfer and music import, MapMaker launcher settings, scope
+wheel, Up+Q/Down+V zoom defaults. Fork Mac backlog IDs renumbered
+MAC-126..133 -> MAC-131..138 (upstream took 126-130; later MAC-132..140, upstream took 131). `2160-custom-music-codec`
+was rebased to a stable mid-file CMake anchor and is applied last; the Linux
+build and launcher project now include the fork's guest-code table and
+MapTransfer/MusicLibrary sources.
+
+Checks: full stack applies to a fresh prepared runtime (168 files);
+`check-tables.py` verified; `repo-context.py check --base 8ba2dc43` current;
+launcher `build-launcher.ps1 -Test` passed; repository, compiler/input/media/
+launcher fixtures and MapMaker fixed cases passed except as noted.
+Resolved: the `*-mapmaker-meter-story-chain.patch` (generated with the wrapper
+patch) renames upstream's `sub_000DAC30`/`sub_0015F8C0` wrappers to
+`*_upstream`, and the MapMaker chain calls them. After merging recon `bb9f6a47`
+(build .52), a compile-only Windows build linked (`e9ea6768...`), launcher
+`-Test` passed, and the MapMaker, music, Disco, menu and repository suites
+passed (Smart App Control blocks rerun); the historical Mac-network upgrade
+fixture skips the story-chain patch with the story patches.
+Not run: gameplay, Mac/Linux builds, full MapMaker mutation sweeps.
+
+## MapMaker debug panel, Shift+F9 (2026-11-08, not built or played)
+
+Branch `debug-overlay` from `4c5cb965`; Windows 11 x64, MSVC x64 fixtures only.
+New: Debug option `show_mapmaker_panel` and Shift+F9 (Windows overlay frame,
+patch 2640; SDL adapter) show a panel of frame split, draws/texture binds per
+frame, characters/AI/engine objects, pads/cover/links/groups, rooms (visible,
+camera room, room queries/s), Level heap/nav block and player position; each
+toggle logs one `[PC-DEBUG] MapMaker panel:` line (at most once a second).
+Validation: `tests/diagnostics/test_debug_panel.py` (model + Windows store,
+10 mutations, wiring), `tests/mapmaker/test_mapmaker_panel.py` (fixed + 10
+mutations), `test_developer_tools.py` input cases, `test_menu_mouse.py`,
+`test_debug_settings_model.py`, `test_mapmaker_restable.py`; the 2640 patch
+applies (and reverses) on the current patched runtime files. Not run here:
+`test_fov_settings.py` and the original-routine developer cases (they need
+the runtime checkout inside this worktree). Unverified: game build on both
+hosts, the panel on screen, its numbers against a real map, Mac fixtures.
+
+## MapMaker Disco tileset variant and Abstract tile textures (2026-11-07, not built or played)
+
+Branch `disco-variant` from `c0b951a1`; Windows 11 x64, MSVC x64 fixtures only.
+New: Map Settings "Disco" row (Virtual + info flag bit 31), alias of five
+Virtual tile texture ids to `arcademem/l_56_arm.pak` textures in play and in
+the editor, Disco sky/music defaults; Abstract maps also mount
+`arcademem/l_102m.pak` (their tile textures were never mounted in play).
+Validation: `tests/mapmaker/test_mapmaker_disco.py` (fixed + 40 mutations,
+decoder proof of the free bit, XBE bytes, pak audit against local game data),
+`test_mapmaker_tilesets.py` (fixed + 41 mutations), and the sky, skymusic,
+custommusic, validate, editor, menu-mouse, limits and container suites
+(WinError 4551 flakes rerun). Unverified: game build and run on both hosts,
+the in-game Disco look, the editor stream reload, Abstract textures in play,
+Mac fixtures. Details: `docs/mapmaker/mapmaker-disco-variant.md`.
+
+## Imported music for MapMaker and Arcade (2026-11-03, not built or played)
+
+MP3 support and launcher import (2026-11-07, branch `music-mp3` from
+`8ce1001a`; Windows 11 x64, MSVC x64 fixtures; not built or played):
+`.mp3` tracks are decoded by `src/interface/pc_music_codec.c` through the
+already shipped FFmpeg 8.1 avcodec/avutil/swresample (no avformat); the
+launcher Saves page imports/lists/removes WAV/MP3. Fixture results:
+`tests/media/test_music_codec.py` fixed + stub + 9 mutations passed against the
+pinned FFmpeg package (MP3s generated by its ffmpeg.exe/libmp3lame);
+`tests/media/test_custom_music.py`, `tests/mapmaker/test_mapmaker_custommusic.py`
+and `test_mapmaker_skymusic.py` fixed cases passed, with mutation sweeps cut
+short by WinError 4551 / endpoint protection (rerun pending). Launcher
+`-Test` result: see the commit report. Unverified: game build/run, Mac build
+(MP3 is WAV-only there until an FFmpeg adapter, MAC-139), Mac launcher.
+
+Loudness after .50 "still quiet" (2026-11-07, branch `music-loud` from
+`8ba2dc43`; Windows 11 x64, MSVC fixtures; not built or played): at slider
+11/16 stock level music reached XAudio2 at -11.35 dB (m48/m50 `level -1135`)
+and the imported track at -3.25 dB on the same master; offline, 60 s of stock
+packets from `musicts.pak` measured -16.3 LUFS and the user's MP3 -9.9 LUFS
+(ffmpeg ebur128), so the import was already ~14.5 LU louder. Added the
+`gain_db=` trim in `pc-music.ini` (+ soft-clipped sample boost) and a level
+log line; default unchanged. `test_custom_music.py` fixed + 43 mutations and
+`test_mapmaker_custommusic.py` / `test_music_codec.py` passed (WinError 4551
+reruns). Unverified: the game build and what the player hears.
+
+Music slider past 16 (2026-11-07, branch `music-slider` from `24e64c03`;
+Windows 11 x64, MSVC fixtures; not built or played): the Audio Options Music
+bar (Settings and pause menu) has 24 steps; 0..16 stay stock, each step past
+16 adds 1.5 dB to imported music (`slider_extra=` in `pc-music.ini`, sum with
+`gain_db=` capped at +12 dB); the profile's word stays 0..16; stock music is
+unchanged past 16. Passed: `test_menu_mouse.py` fixed + 15 mutations (7 new),
+`test_custom_music.py` fixed + 51 mutations (8 new),
+`test_mapmaker_custommusic.py` incl. the new XBE check
+`test_stock_music_slider_code`, `test_mapmaker_restable.py`,
+`test_mapmaker_probe.py`, and the Windows `fov_settings.c` fixture built
+against the main checkout's runtime headers (this worktree has no
+`external/`). Unrun: the macOS `-fsyntax-only` menu compile, any game run.
+
+## MapMaker Story AI points past piece 255 restored on editor reload (2026-11-06, not built or played)
+
+v0.4.0-mapmaker.39/.40: on maps of more than 256 pieces, Story AIs placed on
+pieces 256+ vanished from the editor after test play or reopening and one drew
+at the pointer in every toolbar slot. Cause and fix in
+docs/mapmaker/mapmaker-editor.md ("Story AI points on pieces past 255"): the
+saved piece index is one byte; `pc_mapmaker_editor_sai_point` (new WRAP
+sub_00332330) re-decodes a failed point on the pieces with the same low byte.
+Save format unchanged. Validation: tests/mapmaker/test_mapmaker_editor.py
+(fixed + 49 mutations) on Windows x64 MSVC; game not built or run; Mac fixture
+not run.
+
+## MapMaker resource panel: collapsed, click/I toggle, aligned columns (2026-11-03, not built or played)
+
+Source: branch restable-compact from mapmaker-recon 04cc2691, Windows 11 x64, MSVC fixtures only.
+After playtest feedback (rows unaligned, tight and large), the table is one line by default
+(`+ Fullest: <row> used/max`), expanded by a click on it (A press over the game pointer, taken
+from the editor until release) or the I key when unbound; expanded rows are short titles plus
+right-aligned values measured with `sub_0003FCF0`, at 60% with an 11.5-unit (or glyph + 1.5)
+pitch over a `sub_0001EFB0` backdrop. `test_mapmaker_restable.py`: 66 passed (fixed, 64
+mutations detected, wiring). Also passed: test_menu_mouse, test_mapmaker_pointer, _probe, _limits,
+test_mounted_mouse, test_reload_keys, test_scope_wheel (WinError 4551 launches rerun). Not run:
+test_fov_settings (needs the external runtime's `recomp_pad.h`), game build, the panel in game at any aspect (glyphs `+`/`-`,
+measure with `\vs60`), Mac build of the `input_sdl.c` key. Playtest:
+docs/mapmaker/mapmaker-restable.md "Playtest checks".
+
+## MapMaker resource table (2026-11-03, not built or played)
+
+Source: branch resource-table from mapmaker-recon a5947b1d, Windows 11 x64, MSVC fixtures only.
+With `LIMITS` the editor meter (`sub_0030C210`, existing probe wrapper) draws 15 rows of
+used/max from the editor's own checks (`mapmaker_limits_view`, per-category counts, Story AI,
+logic); `test_mapmaker_restable.py` 41 passed (fixed, 39 mutations detected, wiring). Also
+passed: test_mapmaker_limits, _probe, _budget, test_menu_mouse. Not run here: test_fov_settings
+(needs the external runtime checkout), game build, editor display at any aspect, Mac. Playtest:
+docs/mapmaker/mapmaker-restable.md "Playtest checks".
+
+## MapMaker placed pickups 120 -> 768 (2026-11-02, not built or played)
+
+Source: branch objects-high from mapmaker-recon 04496239, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. The m36 playtest lost placed health and armour: placed pickups share a
+120-record table (`[0x00732E60]`, full test 0x000C1DC7). `config/guest-code-patches/objects.json`
+`obj-pickups-*` raise table, clear and test to 768 in every scene (+140 KB Level heap, story
+included). Negative handles of slots 512+ ruled out by decode (no signed handle test). Barrels not
+exploding: not explained. check-tables "table verified" (1519 entries). Not run: game build, MapMaker
+play, story levels, Mac. Playtest: docs/agent-context/limitless-caps.md "Placed pickups".
+
+## MapMaker piece cap 255 -> 511 (2026-11-02, not built or played)
+
+Source: branch cap-511 from mapmaker-recon a9c05312, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. `MAPMAKER_ROOMS_MAX` and `MAPMAKER_LIMIT_PIECES` are 511 (behind
+`TSFP_MAPMAKER_LIMITS=1`). New `config/guest-code-patches/level.json` grows the level fill pass
+`sub_00240C50` frame 0x1030 -> 0x1090: its per-piece stack array held 500 pieces (entry 500 was the
+return address; the validator allowed 505), now 512, and the validator's level bound is 512. Sky
+mask switch covers 512 rooms. The editor logs `[MAPMAKER] placement refused: <cap> n of m`. Light
+and medium tiles stop at 511 pieces; the heaviest-memory tiles stop on the memory estimate at 386
+(scale 8; 511 need `TSFP_MAPMAKER_ARENA_MB=6`). Defaults unchanged (no measurement). check-tables
+"table verified" (1516 entries); tests/mapmaker + test_menu_mouse + test_guest_code_patches: 3094
+passed, 1 skipped, 10 WinError 4551 failures that pass on rerun. Not run: game build, story levels,
+MapMaker play, Mac. Playtest: docs/mapmaker/mapmaker-rooms.md "What to test in play" (M1..M4, R1..R6).
+
+## Camera and mounted-gun view on widescreen (2026-11-02, not built or played)
+
+Source: branch camera-widescreen from mapmaker-recon 6513a37e, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. v0.4.0-mapmaker.34 report: a switch-held camera's view stays 4:3. The .34
+log shows the mode-0x80 3D view already Hor+ (aspect 1.768). Cause (US code): HUD mode 10's draw
+`sub_0014BFF0` frames the view with bars, tint, scanlines and brackets that AUTO placement fitted
+into the centred 4:3 box, and the remote-view static `sub_000F8DC0` tiled only that box. New shared
+wrappers `pc_display_viewfinder` (sub_0014BFF0) and `pc_display_view_static` (sub_000F8DC0), plus
+routing in the existing sub_0001EFB0 / sub_0001F090 / sub_00041DC0 wrappers, fill a wide single
+view at 4:3 proportions and keep the guest random sequence; 4:3, split and partial views unchanged
+(docs/mapmaker/mapmaker-camera.md). `[PC-DISPLAY] Camera view:` logs the path. Tests:
+test_camera_widescreen.py (fixture + 9 mutations, wiring; decoder passed against the main checkout
+XBE), tests/graphics, mapmaker widescreen/camera, mounted and menu mouse: all passed after WinError
+4551 retries (52 skipped). Not run: game, live camera, story CCTV, Mac.
+
+## MapMaker switch cameras (2026-11-02, not built or played)
+
+Source: branch camera-control from mapmaker-recon 87e134d6, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. v0.4.0-mapmaker.31 report: a switch-held camera keeps sweeping. Cause
+(US code): `sub_00246000` sweeps state 2 without checking the operator; the stock skip bit (data+8
+bit 0) is set on mount only for flag 0x20. New area `camera` wraps `sub_00246000` in scene 100 and
+holds that bit while the reciprocal operator links hold; `pc_mounted.h` now scales by |+5C| (the
+negated sweep speed dropped mouse aim). The 4:3 camera view and the ~10-floor cut from the bottom
+floor are not explained offline; `[PC-DISPLAY] View:` and `[mapmaker] camera:` lines log them
+(docs/mapmaker/mapmaker-camera.md). Tests: test_mapmaker_camera.py (fixture + 7 mutations, decoder),
+test_mounted_mouse.py, test_menu_mouse.py, cutscene-letterbox/decal/camera-feed (production camera
+hook), openview, widescreen, bigdraw, fov: 108 passed, 9 skipped (no XBE in worktree; the camera
+decoder test passed against the main checkout XBE). Not run: full tests/mapmaker, game, live camera, Mac.
+
+## MapMaker rooms machinery for 511 (stages 7-10, 2026-11-02, not built or played)
+
+Source: branch rooms-511 from mapmaker-recon ddb76a38, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. Stage 7 moves the six views to a 0x3000 stride with the per-room shadow
+inside it; stage 9 repacks the rooms tables for 512 rooms / 0x20D ids; stage 8 renumbers the special
+room ids to 0x200..0x20C; stage 10 grows the model table to 0xB08. All run in every scene; the editor
+limit stays 255. check-tables "table verified" after each stage; rooms, buckets, camera, openview,
+roof, skymask, objects, probe, sky music and boss-area tests pass (last run 997 of 1005; the 8 mutation
+failures passed on rerun, transient). Not run: full tests/mapmaker, game
+build, story levels, MapMaker play, Mac. Playtest list: docs/mapmaker/mapmaker-rooms.md "What to test
+in play" (R1..R6).
+
+## MapMaker rooms 241 -> 255 (2026-11-01, not built or played)
+
+Source: branch room-cap-255 from mapmaker-recon f0483586, Windows 11 x64, MSVC fixtures and the
+private-XBE decoder only. Stage 2 relocates the per-id drawn flag 0x7B5180; stage 3 adds a light room
+side table (5 wrappers); stage 4 renumbers the special room ids to 0x100..0x10C in every scene and
+resizes the per-id, light, view-shadow and model tables; stage 5 raises `MAPMAKER_LIMIT_PIECES` to
+255 behind `TSFP_MAPMAKER_LIMITS=1`. check-tables "table verified" after each stage; rooms, limits,
+objects, probe, openview and the decoder tests pass. Full `tests/mapmaker` run: 2661 passed; the
+failures were WinError 4551 (application control) and two realbosses mutations
+(`skel-stale-pointer`, `late-past-cap`) that fail the same way without these changes. Not run: game
+build, story levels (stages 2-4 are not gated), MapMaker play at 255, Mac. Playtest list:
+docs/mapmaker/mapmaker-rooms.md "What to test in play".
+
+## MapMaker tile caps audit and link raise (2026-11-01, not built or played)
+
+Source: branch from mapmaker-recon 9cac7579, Windows 11 x64, MSVC fixtures only. With
+`TSFP_MAPMAKER_LIMITS=1` the editor link limit is 12,000 (was 8800): 241 pieces of the heaviest
+stock tile (46 links) need 11,086, so 8800 refused heavy tiles before the 241-piece limit. Link pool
+16,112 entries, below the int16 A* limit. Pieces = visibility rooms (241, byte room ids) are now
+the only cap on tiles; going past it needs word room ids (docs/mapmaker/mapmaker-rooms.md). Tests:
+`tests/mapmaker/test_mapmaker_limits.py` (fixture + 27 mutations, incl. 241 heaviest tiles allowed and
+4 link mutations), objects, pads, rooms, budget, probe, validate and the decoder checks passed in full,
+plus the unmutated build of every other MapMaker fixture; check-tables "table verified". Not run: game build,
+in-game placement of 191+ heavy tiles, Mac.
+
+## MapMaker v0.4.0-mapmaker.20: in-game checks (2026-11-01)
+
+Local preview v0.4.0-mapmaker.20 (exe SHA-256 prefix 3b302ef8, source e5cc7189) on the second Windows 11 PC,
+with screenshots. Confirmed: the giant skeleton's fire shows; the Crow walker now appears (created in pool
+slot 2, story AI class 0x100000); the giant robot spawns and runs at the player. Found: the giant skeleton,
+the Crow walker and the split Crowe are drawn stretched (Crowe also on its side); the robot and Crowe do not
+attack; the castle tank never appears (its guard-robot placeholder stays a bot). Log causes: the pak mount
+table was at 29 of 30 slots (the robot and Crowe paks were refused, so both ran as bots on human anims;
+stretching also appeared in mapmaker.16 at 29 slots, not at 28); the tank models 0x281/0x297/0x298 are not
+in the scene-100 resource table. Fix after .20: the mount table moves to 64 slots (paktable.json); the tank
+resource entries are being added on the tank branch.
+
+## MapMaker v0.4.0-mapmaker.17 and .18: in-game checks (2026-11-01)
+
+Local previews on the second Windows 11 PC. v0.4.0-mapmaker.18 (exe SHA-256 prefix 31911b8b, source 0325b04f):
+the right-click tile roof menu works (user-confirmed: "The tiles flags are working great!").
+v0.4.0-mapmaker.17 (exe prefix 63c55caf, source cdfa1ef8): the giant skeleton now stands at its spawn
+floor (log: floor height -9.49); its fire breath plays the animation but shows no fire and does not hurt
+(cause found for the missing fire: the mission 5 particle draw runs only in scenes 1/17; fixed after .18);
+the Crow walker does not appear: its pak and level state load, but no AI start was logged for it (cause
+not found yet; the next build logs real-boss character creation and AI starts).
+
+## MapMaker v0.4.0-mapmaker.16: in-game checks (2026-11-01)
+
+Local preview v0.4.0-mapmaker.16 (exe SHA-256 prefix b95069b4, source cc7ee51b) on the second Windows 11 PC.
+Confirmed by the user: duplicated Story AIs keep their boss settings; the custom weapon set shows 20 slots
+and a weapon from slot 7 can be placed; the hidden Abstract tileset loads. Found: the giant skeleton
+hovers one floor above its spawn and part of its body stretches across the map; the game froze (guest
+frames stopped, no crash report; window closed before the 60 s hang watchdog) right after the skeleton's
+feeble throw fired, in a play with both real bosses in custom-set slots 11 and 12. Cause found for the
+hover: the mission 5 fight sets the boss height to 0 every frame (0x0029D06B); fixed after .16 (spawn
+height restored, see mapmaker-realbosses.md). The freeze cause is not confirmed; the next build skips a
+throw whose aim is not a finite point and logs every throw.
+
+## MapMaker giant skeleton: in-game check (2026-10-31)
+
+Local preview v0.4.0-mapmaker.13 (exe SHA-256 prefix dc838fb3, source 1c7350ff) on the second Windows 11 PC:
+the giant skeleton boss works in MapMaker Story play (user-confirmed). An earlier mapmaker.12 log showed the
+skeleton falling back to bot behaviour (lv1_6.pak not mounted) with the skeleton in custom-set slot 0 and the
+trophy monster in slot 1; that set check is being re-verified.
+
+## MapMaker boss names in slots 11-20 and weapon set: in-game checks (2026-10-31)
+
+Local preview v0.4.0-mapmaker.12 (exe SHA-256 prefix 27a46650, source 991aac91) on the second Windows
+11 PC: Story AI character choice shows the real-boss names for custom-set slots 11-20 (user-confirmed).
+Not working: the custom weapon set screen still shows six slots and does not page (mapmaker.11 and .12).
+
+## MapMaker lighting list right-click: in-game check (2026-10-31)
+
+Local preview v0.4.0-mapmaker.9 (exe SHA-256 prefix dc2e0e9f) on the second Windows 11 PC: a right click
+closes the open editor lighting list, as for the other lists (user-confirmed). Found: Story AI character
+choice shows no name and a time-crystal icon for custom-set slots 11-20; the giant trophy monster shows
+its boss bar with Boss set to Off.
+
+## MapMaker open-air tiles and trophy monster meter: in-game checks (2026-10-31)
+
+Launcher-installed local preview v0.4.0-mapmaker.7 (exe SHA-256 prefix 5c3a356b, source f5ff50de) on the
+second Windows 11 PC. Confirmed by the user: Open roof and Open air tiles show the sky in play (Open air
+without walls); the overhead meter on the giant trophy monster is gone. Found: hover label still reads
+"1.Small Open"; after play and return to the editor, copying a marked tile turns all marked tiles plain;
+right-click outside the open lighting list does not close it (other main lists do).
+
+## MapMaker boss bars and alternate-fire key: in-game checks (2026-10-31)
+
+Launcher-installed local previews v0.4.0-mapmaker.3 to .6 on the second Windows 11 PC. Confirmed by
+the user: several boss bars show at once; the health levels above Tough Guy work; the 20-slot
+custom set is available in the editor; the giant trophy monster works (its overhead meter was then
+hidden and made a per-AI choice); boss bars drain (mapmaker.6); Q changes weapon mode again.
+
+## MapMaker widescreen editor and briefing clicks: in-game checks (2026-10-31)
+
+Launcher-installed local preview v0.4.0-mapmaker.1 (exe SHA-256 prefix 4b5baad7, source 92c02652),
+run by the user on the second Windows 11 PC in a widescreen window. Confirmed: the MapMaker editor
+grid, tiles and pointer stay aligned in widescreen; a left click confirms the story mission and
+arcade/challenge event briefings. Found: the MapMaker custom bot set offers no large characters
+(giant robot etc.), so Boss Story AI with big characters could not be tried yet.
+
+## MapMaker sixteen floors: fixtures only (2026-11-01)
+
+Branch `more-floors` (base ee5560b8), Windows 11 x64, MSVC fixtures: floors -2..13 and an
+80x80x17 editor grid with `TSFP_MAPMAKER_LIMITS=1`, the 3D view's floor up raised to 13,
+the floor menu at 16 bars (5 in stock mode). `tests/mapmaker/test_mapmaker_grid.py` (fixture,
+mutations, decoder checks, old-map load and high-floor round trip) and the roof fixture's
+floor-13 case pass; `check-tables.py` verified the guest-code tables. Not built or run in the
+game: menu layout, high-floor connections, the 3D view and play on floors 5..13 are unchecked.
+
+## MapMaker features: in-game checks (2026-10-31)
+
+Branch `mapmaker-recon`, compile-only builds run by the user on the second
+Windows 11 PC with `TSFP_MAPMAKER_LIMITS=1` (switches via the transfer
+folder's `Run-Test.ps1`).
+
+- Build c1a94e23 (source 35c28c9c): clicking a map in MapMaker > Load map
+  loads it; every unlocked character is offered in MapMaker Story;
+  overlapping tiles work with `TSFP_MAPMAKER_OVERLAP=1`; seven floors and the
+  80x80 grid work; Story AI Duplicate works; mouse aim on the Scotland the
+  Brave truck gun works. Stacked items still showed the red X (fixed in the
+  next build); the character screen could not confirm by click (fixed next);
+  linked copies made an extra "All X" entry (redesigned next). No crash
+  (the two crash dumps in that log folder came from an older build).
+- Build 64042eae (source df56a044): the character screen confirms with a
+  left click anywhere; stacked items drop onto an occupied tile with
+  `TSFP_MAPMAKER_STACK_ITEMS=1`; linked copies (leader plus numbered copies)
+  work; `TSFP_MAPMAKER_ROOM_MASK_CLEAR=2000000` removes tile roofs in play,
+  confirming room-mask bit 25 as the ceiling.
+
+Not yet checked in game: the Clouds checkbox, System Link with the bug
+fixes, `TSFP_MAPMAKER_ALIVE`, splitscreen, native Mac.
+
+## MapMaker capacity raise: combined play test (2026-10-30)
+
+Branch `mapmaker-recon`, compile-only build 97f4ad5a (source commit; exe
+SHA-256 prefix e6fa1115), run with `TSFP_MAPMAKER_LIMITS=1` on a second
+Windows 11 PC (Smart App Control blocks unsigned builds on the development
+PC). Tested by the user: MapMaker editor and play on 236-piece maps with 200
+items and 102+ Story AI, up to 64 characters in MapMaker story play, team
+deathmatch, and the first story mission including the exploding barrels
+that crashed build 06aed2de. No crashes; probe flag 64 showed 462 of 1000
+objects, 46 live turrets, 2184 cover pads, 236 of 241 rooms and a minimum of
+5.56 MB free, with no guard drops. Not tested: System Link, splitscreen,
+native Mac, other story levels. Limits and status:
+`research/capacity-raise-plan.md`.
+
+## MapMaker probe: menu/click capture and binary log (2026-10-22)
+
+Branch `mapmaker-recon`. In the first Windows play session, the game ran with
+the full isolated launch settings (`RECOMP_TRACE_BUDGET=0`, redirected output,
+isolated saves, `RECOMP_INPUT_CONFIG`). Movement, firing and the
+keyboard-driven MapMaker cursor worked. The MapMaker category-toolbar icons
+did not respond to clicks (MM-4).
+
+- Added probe flag `8` (read-only, default off): while scene 100 is active it
+  logs each menu laid out by `sub_00073750` (caller, descriptor, state,
+  rectangle, and each item's type, flags, callback, rectangle and raw bytes)
+  and each left click's game-UI pointer position and hit item. It uses the
+  already-wrapped menu hook, so no regeneration is needed. Menu-mouse
+  behaviour is unchanged.
+- MM-1: the probe log is now opened in binary mode. The fixture now checks for
+  `\r`.
+- Runner `--mapmaker-probe` accepts 1–15.
+
+Linux validation: `tests/mapmaker/test_mapmaker_probe.py` (fixed case and five
+mutations) and `tests/input/test_menu_mouse.py` pass. Full CI native list on Ubuntu
+24.04: 393 passed, 55 skipped, and the same 24 pre-existing renderer/timing
+failures and errors as the baseline. Pending on Windows: rebuild, the fixture
+recheck and a probe log from MapMaker.
+
+## Windows instrumented-build first launch (2026-10-22, reported)
+
+Lenovo Legion, Windows 11 Pro, MSVC v143, branch `mapmaker-recon` at `c6f4fb8`,
+compile-only build. Smart App Control allowed `futureperfect_recomp.exe` to run.
+
+- **Black screen (MM-2, under investigation):** launched directly with
+  `RECOMP_GAME_DIR` set. The PC Settings menu and version text render, but the
+  main menu never appears. The process is responsive, with no WER or
+  Application Error events. The console shows continuous `[TRACE]` output,
+  repeatedly from `sub_0002D480`, `sub_003C848C`, `sub_003DC0D0`, `sub_003DC0E0`
+  and `sub_003DC200`. A native stack showed `shadow_wndproc`, USER32 and the
+  Bitdefender hook DLL `bdhkm64.dll`.
+- **Direct launch versus the official path:** the direct launch did not use
+  `RECOMP_TRACE_BUDGET=0`, file-redirected output or the project save path
+  that the official path sets. No source change has been made.
+- **Probe fixture (MM-1):** `tests/mapmaker/test_mapmaker_probe.py` failed its
+  `repeats=11` and cap checks under MSVC. This is unrelated to MM-2.
+
+Gameplay, MapMaker and probe output remain unverified on Windows.
+
+## Compile-only Windows build mode (2026-10-22)
+
+Branch `mapmaker-recon`. On the Windows 11 Lenovo Legion, `tsfp.ps1 -Action Build`
+compiled successfully but stopped when it ran `tsfp_pc_network_test.exe`: Smart
+App Control (enforced `VerifiedAndReputableDesktop`, Code Integrity event 3077)
+blocks locally built unsigned programs. Security policy is unchanged.
+
+Added `tsfp.ps1 -Action Build -CompileOnly`. Game validation, texture audit,
+patching, regeneration, configure and the unchanged `cmake --build` target list
+still run and fail on error. Only executing built programs is skipped
+(`ghost_targets.py`/`d3d8_replay.exe`, twelve `tsfp_*_test.exe`, and the network
+seal). These are listed as `SKIPPED (not run)` and recorded in
+`build/windows/compile-only-build.json`. The default build is unchanged apart
+from removing that record after its tests pass. No CMake custom or post-build
+command runs generated programs. Regeneration, when needed, still runs the
+Setup-built `XbSymbolDatabaseCLI`.
+
+Validation (Ubuntu 24.04, Python 3.12.3): `tests/repository/test_compile_only_build.py`
+8 passed, with 2 Windows PowerShell cases skipped; three script mutations were
+each caught. The CI native list gave 392 passed, 55 skipped, 19 failed and
+5 errors; the 24 failures and errors are identical to the established baseline.
+Not yet done: the Windows PowerShell tests and a real compile-only build on the
+Legion. A compile-only executable is untested, and Smart App Control may also
+block it.
+
+## MapMaker capacity meter probe (E1 instrumentation, 2026-10-22)
+
+Branch `mapmaker-recon` (from main `141f440`). Added read-only, default-off
+logging of the MapMaker meter: a pass-through wrapper for the meter painter
+`sub_0030C210` (new `*-mapmaker-meter-probe.patch`) scopes the bars it draws
+through the already-wrapped `sub_000814B0`. Shared source
+`src/interface/pc_mapmaker_probe.inc`; runner option `--mapmaker-probe` in
+`tools/testing/testing_profile.py` and `tools/testing/test-native-mac.py`. No capacity limit,
+save, setting or guest state is changed. Usage: `docs/mapmaker/mapmaker-meter-probe.md`.
+
+Validation on Ubuntu 24.04 x86-64, GCC 13.3, Python 3.12.3, pinned runtime
+`d90c929`, no game data:
+
+- Full patch stack including the new patch applies (`tools/build/apply-patches.py`);
+  upstream `manual_scan` lists `sub_0030C210` as defined and wrapped.
+- `tests/mapmaker/test_mapmaker_probe.py`: fixed case and four mutations (guest write,
+  missing scope, on by default, uncapped log) behave as expected.
+- Same CI native list as the reconnaissance baseline: 384 passed, 53 skipped,
+  19 failed, 5 errors. The 24 failures/errors are identical to the baseline on
+  unmodified main (renderer/RHI/timing fixtures that CI builds only on Windows
+  and macOS); no new failures.
+
+Not yet done: Windows build with guest regeneration, MSVC compilation of the
+fixture, and any in-game MapMaker run. Mac compilation and runs are pending
+(MAC-132). Fixture results are not evidence of in-game meter behaviour.
 ## 2026-11-07 - Uplink throw impulse at native FPS (Windows user verified)
 
 Base a24c3b60, branch fix/uplink-throw-rate, uncommitted. The original
@@ -9484,6 +9962,19 @@ other-device synchronization remain unverified; MAC-018 tracks acceptance.
 The local executable SHA-256 is
 `f3f8cefb6218b21a1ce7f76a54dc2c116c87d82d779ad75f30050e2255f4ae5d`.
 No release or main merge is performed.
+
+## Battle Mech mouse follow-up - 2026-11-01
+
+The user reported the Machine Wars mech view still does not turn with the
+mouse. Branch from `mapmaker-recon` `9cac7579` (includes #431). Offline
+US-XBE review found no failing link in the #431 route (see the mounted-mouse
+guide); the cause is unproven. The mech route now ignores an unusable camera
+FOV (scale only) and both adapters log the first outcome per change as
+`[PC-MOUSE] Battle Mech: ...`. Windows: focused mounted/terminal suite 20
+passed including original-XBE fixtures; the region fixture gained inert
+scope-wheel stubs (it no longer compiled after the scope-wheel change).
+`test_menu_mouse.py` fails to link `sub_00096330` on this base, unrelated.
+No game build, launch, live mission or Mac host check was run.
 
 ## Battle Mech mouse aiming (#425) - 2026-10-30
 

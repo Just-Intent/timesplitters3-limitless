@@ -241,7 +241,16 @@ def prepare_run(root,run):
     return environment
 
 
-def play(root,run,seconds,*,allow_save_drive_changes=False):
+def mapmaker_probe_environment(root,run,flags):
+    """Read-only MapMaker meter logging (src/interface/pc_mapmaker_probe.inc); 0 disables."""
+    if flags is None or flags==0:return {}
+    if not 1<=flags<=255:raise ValueError('MapMaker probe flags must be between 1 and 255')
+    log=contained(root,Path(run)/'mapmaker-probe.log','private/test-saves')
+    if log.is_symlink():raise ValueError('Unexpected MapMaker probe log')
+    return dict(TSFP_MAPMAKER_PROBE=str(flags),TSFP_MAPMAKER_PROBE_LOG=str(log))
+
+
+def play(root,run,seconds,mapmaker_probe=None,*,allow_save_drive_changes=False):
     """Bounded Windows session, with capped logs and an exclusive run marker."""
     if os.name!='nt':raise ValueError('Use the isolated native runner on macOS')
     if not 1<=seconds<=600:raise ValueError('Duration must be between 1 and 600 seconds')
@@ -249,6 +258,7 @@ def play(root,run,seconds,*,allow_save_drive_changes=False):
     if hashlib.sha256((root/'private/game/default.xbe').read_bytes()).hexdigest()!=XBE_SHA256:
         raise ValueError('Unsupported game executable')
     env=prepare_run(root,run)
+    env.update(mapmaker_probe_environment(root,run,mapmaker_probe))
     if allow_save_drive_changes:
         # Explicit human drive-selection testing only. Automated sessions stay
         # locked even when the parent process has disabled the lock.
@@ -344,6 +354,8 @@ def main():
     parser.add_argument('--prepare',type=Path,help='Restore a test copy beneath private/test-saves')
     parser.add_argument('--play',action='store_true',help='Run a bounded Windows test with a disposable copy')
     parser.add_argument('--seconds',type=int,default=120,help='Play duration, 1–600 seconds (default 120)')
+    parser.add_argument('--mapmaker-probe',type=int,metavar='FLAGS',
+        help='Read-only MapMaker log in the test directory: 1 meter, 2 memory snapshots, 4 other MapMaker bars, 8 menu layouts/clicks, 16 budgets with 1, 32 heap state, 64 AI pad pools, 128 room prop draws (add flags)')
     parser.add_argument('--allow-save-drive-changes',action='store_true',
         help='Manual play only: allow selecting and immediately using another save drive')
     args=parser.parse_args()
@@ -351,10 +363,11 @@ def main():
         parser.error('--allow-save-drive-changes requires --play')
     if args.seed:print('Created',create_fixture(ROOT,args.seed))
     if args.play:
-        raise SystemExit(play(ROOT,args.prepare or ROOT/'private/test-saves/quick-test',args.seconds,
+        raise SystemExit(play(ROOT,args.prepare or ROOT/'private/test-saves/quick-test',args.seconds,args.mapmaker_probe,
                              allow_save_drive_changes=args.allow_save_drive_changes))
     elif args.prepare:
         env=prepare_run(ROOT,args.prepare)
+        env.update(mapmaker_probe_environment(ROOT,args.prepare,args.mapmaker_probe))
         print(json.dumps({k:v for k,v in env.items() if k.startswith(('RECOMP_','TSFP_'))},indent=2))
     elif not args.seed:
         fixture,_=check_fixture(ROOT);print('Verified',fixture)

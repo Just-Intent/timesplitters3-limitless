@@ -6,6 +6,9 @@
 [UI](controls-options.md); [feed](../development/arcade-kill-feed.md).
 [Sun/query scopes3064](fidelity-comparison.md); [Aim](hud-sizing.md).
 [Depth](native-effect-depth.md).
+[Imported music](custom-music.md): `media/0059-custom-music-voice.patch` (slot 273,
+`RECOMP_AUDIO_SLOT_MUSIC`); `media/2160-custom-music-codec.patch` (last in
+`patch_records`) adds the MP3 adapter `pc_music_codec.c`. 0056: [audio](audio-buffers.md).
 [Linux](linux-game.md); [MSAA](smaa.md).
 [MP hooks](multiplayer-exit.md)
 2465 wraps356800 for rewards;
@@ -771,6 +774,8 @@ crane patch's RHI hunk applies shared `pc_ui_vignette_clip` to a temporary
 rectangle before scaling; it never changes the guest-readable scissor state.
 Legacy GL uses the same helper. This prevents the amplified right/bottom gap.
 
+Fork sections: [limitless.md](limitless.md).
+
 ## Character effects update gate
 
 `pc_native_numeric.h` maps the US1260C0 whole-tick load to positive live game
@@ -904,10 +909,6 @@ bound across frames see arrivals and queue-full retries without rebinding every
 draw. The streaming patch must follow 0350-texture-toggle.patch, which creates this
 binding helper. The texture runtime fixture compiles that actual patched helper.
 
-Keep this patch LF on disk before refreshing its index. A CRLF working copy
-produced a different hash/target spelling from the normalized Git blob; the
-Linux CI context check exposed it. Runtime behavior was unaffected.
-
 Future Perfect reaches host_Swap from its HLE shadow frame boundary. A pump in
 dev_Present alone does not run for that path. Keep the completion call in the
 common resolve function, after the skipped-Swap guard; tests execute both actual
@@ -931,45 +932,18 @@ Ordinal81 repair/test: [next-packet ABI](kernel-objects.md#guest-next-packet-abi
 
 Request allocation/ownership through0218: [contracts](kernel-objects.md#original-request-storage-and-initialization).
 
-## Profile early-access hooks
+Profile early-access hooks: [continuation](runtime-continuation.md#profile-early-access-hooks).
 
-See [Unlock Content](unlock-content.md) for the shared menu, profile extension,
-original predicate hooks and isolated validation routes.
+## Upstream-defined MapMaker wrappers
 
-
-Original sharing bridges and ordinal80 cleanup: [contracts and checks](kernel-sharing.md).
-
-
-Original request lifetime/callback prerequisites: [contracts and ABI boundary](request-lifetime.md).
-
-
-Stage0222: [original driver-call composition and opaque stack payload](driver-call.md).
-
-
-Stage0223: [private request construction and completion delivery](transfer-completion.md).
-
-Stage0224: [host-owned FIFO request scheduling](transfer-completion.md#host-owned-request-queue).
-
-Stage0225: [StartIo callback composition and acceptance](transfer-completion.md#startio-callback-composition); maintained maps include the new provider.
-
-Stage0226: [exclusive waiting membership and device queue mirrors](transfer-completion.md#device-queue-mirrors).
-
-Stage0227: [persistent device queue lifetime and scoped scheduler APIs](transfer-completion.md#persistent-device-queue-lifetime).
-
-Stage0228: [read-only caller-owned request adoption and range lifetime](transfer-completion.md#caller-owned-request-adoption).
-
-Stages0229/0231: [events and targets](transfer-completion.md). Stage0232: [symbolic links](symbolic-links.md).
-
-Stages0233/0234: [routing](guest-paths.md), [original host storage](host-storage.md).
-
-`2080-tank-driver-controls.patch` wraps 1730E0 through shared
-`pc_tank_guest.inc`. The local keyboard/mouse scope selects signed track input
-and restores actor links after the original call; controller behavior retains
-the original camera-relative branch. See [scope guards](mounted-mouse.md).
-
-Stage0235: [original pool imports and native surface retirement](kernel-pool.md).
-
-Stage0236: [original absolute-time codec and guest calendar imports](kernel-time.md).
+When an upstream patch already defines `void sub_X(void)` in `recomp_manual.c`
+(story NPC 2250/2260: `sub_000DAC30`, `sub_0015F8C0`), the fork's generator
+emits `*-mapmaker-meter-story-chain.patch` (sorts just before
+`-meter-wrappers`), renaming upstream's definition to `sub_X_upstream`; the
+innermost MapMaker layer calls it instead of `sub_X_gen`. Upstream's body keeps
+its `TSFP_PC_CONTROLS` gate and `_gen` fallback, so every config links. Any
+chained function still defined once our block is removed is detected
+automatically. `test_fresh_checkout_and_repeated_build` checks uniqueness.
 
 ## Native Online integration (2026-10-30)
 
@@ -994,6 +968,9 @@ original execution and records bounded model/node/depth history through the shar
 capture adapters. It is diagnostic instrumentation, not a fix for #410. See
 [crash evidence](crash-evidence.md) for capture scope and platform limits.
 
+`2630-buffered-stderr.patch`: title stderr buffered while the crash helper runs.
+`2640-mapmaker-debug-panel.patch`: overlay-frame Shift+F9 and the panel's renderer reading ([systems](systems.md#mapmaker-debug-panel)).
+
 Allocation-history hook details: [crash evidence](crash-evidence.md). The shared
 allocator observer is diagnostic-only; backing allocation ownership and guest
 model suballocation lifetime remain distinct concepts.
@@ -1003,6 +980,7 @@ the first outline draw's projected midpoint. Shared PcUiWorldAnchor retains that
 anchor for labels and resets at placement boundaries; viewport/scissor share it.
 Both common backends and legacy GL consume the helper. Original world projection,
 visibility and objective logic remain guest-owned (Refs #338).
+MapMaker wrapper/table notes (incl. tilesets, multi-boss areas, set slot masks, tile caps, open-air view, 16 floors, sandstorm haze, camera frame, nav block, physics bodies, set screens, tile roof menu, skies/music, open air, skeleton frustum log, object create guard, music restart, Disco variant, story props + textures, hidden weapons, tank TNT, room tree, save memo, creatures, link stitch guard, portal passes, route A*, vehicles, room light spread, ray step, pit boss, robot fire log, pad Layout C, roof palette hooks removed, skeleton flames, robot sight log, nearest/random pad, pit bone draw, robot pose gate, pit sounds; closed-tile wall link reverted; logic Delay): [limitless](limitless.md).
 
 ## Languages
 

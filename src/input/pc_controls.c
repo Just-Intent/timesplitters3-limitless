@@ -10,6 +10,9 @@
 #include "pc_reload_guest.h"
 #include "pc_mounted.h"
 #include "pc_terminal.h"
+#include "pc_mounted.h"
+#include "pc_scope_wheel.h"
+#include "pc_mapmaker_pointer.h"
 #include "pc_native_rate.h"
 #include "pc_settings.h"
 #include "pc_developer.h"
@@ -56,7 +59,14 @@ static int wheel_remainder;
 static unsigned long applied;
 static volatile LONG editing;
 static int menu_mode, menu_button_block;
+static int mapmaker_pointer_active, mapmaker_editor, mapmaker_cancel_key, mapmaker_trigger_key;
+static int mapmaker_zoom_up_key, mapmaker_zoom_down_key, mapmaker_move_keys[4], mapmaker_y_key;
+static PcMapMakerZoom mapmaker_zoom;
+static ULONGLONG mapmaker_pulse_until[1];
+static PcMapMakerClick mapmaker_click;
+static PcMapMakerEscape mapmaker_escape;
 static PcTextInput text_input;
+static PcScopeWheel scope_wheel; /* wheel zoom while player 1 is scoped */
 
 void pc_controls_text_mode(uint32_t owner) {
     if(pc_developer_open())owner=0;
@@ -138,7 +148,10 @@ static void wheel_input(int steps)
         if(menu_wheel<-8) menu_wheel=-8;
         menu_wheel_at=GetTickCount64();
         if(steps)pc_settings_capture_key(steps>0?0x86:0x87);
-    } else pc_input_wheel(&input,steps);
+    } else if(input.focused && input.captured) {
+        /* In a zoomable scope, notches bound to weapon switching zoom instead. */
+        pc_input_wheel(&input,pc_scope_wheel_input(&scope_wheel,steps,GetTickCount64()));
+    }
 }
 
 static void replay_tick(void)
@@ -190,6 +203,7 @@ static void capture(HWND window, int on)
 {
     AcquireSRWLockExclusive(&lock);
     pc_input_capture(&input, enabled && on && !menu_mode);
+    pc_scope_wheel_reset(&scope_wheel);
     wheel_remainder = 0;
     menu_wheel = 0;
     /* Replays need the same logical capture/motion state, without confining
@@ -578,10 +592,23 @@ int pc_controls_key_down(int key)
     down = pc_input_down(&input, (unsigned)key, GetTickCount64());
     if(key>0 && key<256 && developer_blocked[key])down=0;
     /* Custom menus may read D-pad edges instead of the WASD analogue stick. */
-    if(menu_mode) {
+    if(menu_mode && mapmaker_editor) {
+        /* MapMaker editor: the mouse moves the pointer, so the movement keys
+         * no longer do; strafe left/right step the toolbar as the D-pad. */
+        int alias;
+        down=pc_mapmaker_move_key(1,key,mapmaker_move_keys,down);
+        alias=pc_mapmaker_dpad_alias(1,key,mapmaker_move_keys);
+        if(alias>0 && alias<256 && !developer_blocked[alias])
+            down|=pc_input_down(&input,(unsigned)alias,GetTickCount64());
+    } else if(menu_mode) {
         unsigned alias=pc_input_menu_alias((unsigned)key);
         if(alias && !developer_blocked[alias]) down|=pc_input_down(&input,alias,GetTickCount64());
     }
+    /* A menu is open when the editor screen does not own the pointer. */
+    down=pc_mapmaker_key(menu_mode && mapmaker_editor,key,mapmaker_cancel_key,down,
+                         pc_mapmaker_escape_back(&mapmaker_escape,
+                             pc_input_down(&input,VK_ESCAPE,GetTickCount64()),
+                             !mapmaker_pointer_active));
     if(text_input.owner && pc_text_key((unsigned)key))down=0;
     down=down && (replaying || GetForegroundWindow()==window_handle);
     if(!input.keys[VK_LBUTTON]) menu_button_block &= ~1;
@@ -589,6 +616,19 @@ int pc_controls_key_down(int key)
     if((key==VK_LBUTTON && (menu_mode || (menu_button_block&1))) ||
        (key==VK_RBUTTON && (menu_mode || (menu_button_block&2)))) down=0;
     if (key == VK_LBUTTON && pc_input_terminal_suppresses_left(&input, input.keys[VK_LBUTTON])) down = 0;
+    down=pc_mapmaker_trigger_key(menu_mode && mapmaker_editor,key,mapmaker_trigger_key,down,
+                                 pc_input_down(&input,PC_MAPMAKER_FLOOR_UP_KEY,GetTickCount64()) &&
+                                 (replaying || GetForegroundWindow()==window_handle));
+    if(menu_mode && mapmaker_editor && mapmaker_y_key && key==mapmaker_y_key &&
+       GetTickCount64()<mapmaker_pulse_until[PC_MAPMAKER_PULSE_Y] &&
+       (replaying || GetForegroundWindow()==window_handle)) down=1;
+    down=pc_mapmaker_zoom_key(&mapmaker_zoom,menu_mode && mapmaker_editor &&
+                              (replaying || GetForegroundWindow()==window_handle),
+                              key,mapmaker_zoom_up_key,mapmaker_zoom_down_key,down,GetTickCount64());
+    /* Scoped: the weapon-switch wheel keys stay up and a notch holds zoom. */
+    down=pc_scope_wheel_key(&scope_wheel,key,down,
+                            !menu_mode && !text_input.owner && input.focused && input.captured &&
+                            (replaying || GetForegroundWindow()==window_handle),GetTickCount64());
     ReleaseSRWLockExclusive(&lock);
     return down;
 }
@@ -604,6 +644,8 @@ void pc_controls_menu_mode(int active)
     if(changed) {
         menu_button_block=(input.keys[VK_LBUTTON]?1:0)|(input.keys[VK_RBUTTON]?2:0);
         menu_mode=!!active;
+        if(!menu_mode) mapmaker_pointer_active=mapmaker_editor=0;
+        pc_scope_wheel_reset(&scope_wheel);
         pc_reload_reset(&input.reload);
         menu_wheel=0; wheel_remainder=0;
         input.dx=input.dy=0;
@@ -640,15 +682,94 @@ PcMenuPointer pc_controls_menu_pointer(void) {PcMenuPointer empty={0};return pc_
 /* Drawing must not consume wheel packets or advance the input replay. */
 PcMenuPointer pc_controls_menu_hover_pointer(void) {PcMenuPointer empty={0};return pc_developer_open()?empty:menu_pointer(0);}
 
+void pc_controls_mapmaker_pointer(int active)
+{
+    AcquireSRWLockExclusive(&lock);
+    mapmaker_pointer_active = !!active;
+    ReleaseSRWLockExclusive(&lock);
+}
+
+/* Called from the guest menu hook, never while the bindings are evaluated,
+ * so reading the Back binding here cannot re-enter the bindings lock. */
+void pc_controls_mapmaker_editor(int active)
+{
+    int keys[PC_ACTION_COUNT], back = 0, trigger = 0, white = 0, black = 0, move[4] = {0};
+    if (active && pc_settings_prompt_keys(keys)) {
+        /* "Melee / back (B)": editor menus close on B; Back is the 3D view. */
+        back = keys[1];
+        for (int i = 0; i < 4; i++) move[i] = keys[14 + i]; /* forward, backward, left, right */
+        trigger = keys[9]; /* "Fire": right trigger, floor up in the editor */
+        white = keys[5];   /* zoom (held), wheel up */
+        black = keys[4];   /* zoom (held), wheel down */
+    }
+    AcquireSRWLockExclusive(&lock);
+    mapmaker_editor = !!active;
+    mapmaker_cancel_key = back;
+    mapmaker_trigger_key = trigger;
+    mapmaker_zoom_up_key = white;
+    mapmaker_zoom_down_key = black;
+    mapmaker_y_key = active ? keys[3] : 0; /* "Y action": clears the tile selection */
+    memcpy(mapmaker_move_keys, move, sizeof mapmaker_move_keys);
+    ReleaseSRWLockExclusive(&lock);
+}
+
+void pc_controls_mapmaker_pulse(int button)
+{
+    if (button != PC_MAPMAKER_PULSE_Y) return;
+    AcquireSRWLockExclusive(&lock);
+    mapmaker_pulse_until[button] = GetTickCount64() + PC_MAPMAKER_PULSE_MS;
+    ReleaseSRWLockExclusive(&lock);
+}
+
+/* Polled from the guest meter input (pc_mapmaker_restable.inc), which checks
+ * for the editor screen itself; never while the bindings are evaluated. */
+int pc_controls_mapmaker_table_key(void)
+{
+    int bound[PC_ACTION_COUNT][PC_BINDING_SLOTS], have, down;
+    if (InterlockedCompareExchange(&editing, 0, 0)) return 0;
+    have = pc_settings_bound_keys(bound);
+    AcquireSRWLockExclusive(&lock);
+    down = !text_input.owner && (replaying || GetForegroundWindow() == window_handle) &&
+           pc_input_down(&input, PC_MAPMAKER_TABLE_KEY, GetTickCount64());
+    ReleaseSRWLockExclusive(&lock);
+    return pc_mapmaker_table_key(down, have ? &bound[0][0] : NULL, PC_ACTION_COUNT * PC_BINDING_SLOTS);
+}
+
+void pc_controls_mapmaker_zoom(int notches)
+{
+    AcquireSRWLockExclusive(&lock);
+    pc_mapmaker_zoom_add(&mapmaker_zoom, notches, GetTickCount64());
+    ReleaseSRWLockExclusive(&lock);
+}
+
+int pc_controls_mapmaker_editor_active(void)
+{
+    int active;
+    AcquireSRWLockShared(&lock);
+    active = menu_mode && mapmaker_editor && mapmaker_trigger_key;
+    ReleaseSRWLockShared(&lock);
+    return active;
+}
+
+void pc_controls_mapmaker_row_press(void)
+{
+    AcquireSRWLockExclusive(&lock);
+    pc_mapmaker_row_press(&mapmaker_click);
+    ReleaseSRWLockExclusive(&lock);
+}
+
 int pc_controls_terminal_click(void)
 {
-    int down;
+    int down, mapmaker;
     if(pc_developer_open())return 0;
     if (InterlockedCompareExchange(&editing, 0, 0)) return 0;
     AcquireSRWLockExclusive(&lock);
     replay_tick();
+    /* Always evaluated so its held-button block tracks every poll. */
+    mapmaker = pc_mapmaker_click(&mapmaker_click, menu_mode && mapmaker_pointer_active,
+                                 input.keys[VK_LBUTTON]);
     down = (replaying || GetForegroundWindow() == window_handle) &&
-           pc_input_terminal_click(&input, input.keys[VK_LBUTTON]);
+           (pc_input_terminal_click(&input, input.keys[VK_LBUTTON]) || mapmaker);
     ReleaseSRWLockExclusive(&lock);
     return down;
 }
@@ -656,9 +777,14 @@ int pc_controls_terminal_click(void)
 void pc_controls_apply_mouse(uint32_t player, uint32_t fov_object, ptrdiff_t memory_offset)
 {
     float *yaw, *pitch, fov, old_yaw, old_pitch;
-    int changed, terminal;
+    int changed, terminal, bound[PC_ACTION_COUNT][PC_BINDING_SLOTS], have_bound, scope;
     if (InterlockedCompareExchange(&editing, 0, 0)) return;
+    /* Read bindings and guest scope state before taking the controls lock. */
+    have_bound = pc_settings_bound_keys(bound);
+    scope = pc_scope_view(player, fov_object, memory_offset);
     AcquireSRWLockExclusive(&lock);
+    pc_scope_wheel_bindings(&scope_wheel, have_bound ? (const int (*)[PC_BINDING_SLOTS])bound : NULL);
+    pc_scope_wheel_state(&scope_wheel, scope, GetTickCount64());
     replay_tick();
     if (!(replaying || GetForegroundWindow() == window_handle)) {
         ReleaseSRWLockExclusive(&lock);
@@ -680,9 +806,17 @@ void pc_controls_apply_mouse(uint32_t player, uint32_t fov_object, ptrdiff_t mem
     }
     terminal = pc_terminal_mouse_in_region(&input, GetTickCount64(), sensitivity, player, memory_offset, pc_native_rate()!=0,&region);
     pc_input_terminal_context(&input, terminal >= 0, input.keys[VK_LBUTTON]);
+    int mech_before = input.mech_status, mech_after;
     if (terminal >= 0 || pc_mounted_mouse_in_region(&input, GetTickCount64(), sensitivity, invert_y,
             player, fov_object, memory_offset, pc_native_rate()!=0,&region) >= 0 || !pc_camera_fields_in_region(player,fov_object,memory_offset,&yaw,&pitch,&fov,&region)) {
+        mech_after = input.mech_status;
         ReleaseSRWLockExclusive(&lock);
+        /* Name the first Battle Mech outcome after each change (bounded). */
+        static unsigned mech_logs;
+        if (mech_after != mech_before && mech_after != PC_MECH_NONE && mech_logs < 16) {
+            mech_logs++;
+            fprintf(stderr, "[PC-MOUSE] Battle Mech: %s\n", pc_mech_status_text(mech_after));
+        }
         return;
     }
     old_yaw = *yaw; old_pitch = *pitch;

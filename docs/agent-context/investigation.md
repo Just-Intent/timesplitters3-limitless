@@ -200,7 +200,8 @@ filename sorting. Independent translation-moves, translation-integer, translatio
 translation-product are final, after radial stick deadzone and title instrumentation
 that their removed handlers contain. Historical fixtures omit replacements until
 the complete-stack upgrade. Update the ordering assertion when intentionally
-adding another final patch.
+adding another final patch; media `2160-custom-music-codec.patch` (imported MP3
+music) is now the last one.
 
 ## Working note (not committed)
 
@@ -451,6 +452,10 @@ Crash diagnostics adds the allocation-history patch after allocator dependencies
 the repository-order fixture includes this final observer hook before source
 layout. Normalize new patches to LF before refreshing the index: local CRLF
 bytes hash differently from Git-normalized checkout bytes on CI hosts.
+
+The fork adds a `limitless` topic (`limitless.md`) for its MapMaker, guest-code
+table and scope-wheel notes, owned separately so the shared guides stay under the
+context size cap and upstream merges stay clean.
 
 The root texture rules record the user's 2026-11-01 original-based upscale
 request and active-pack choice. For that task, preserve prior hybrid artwork

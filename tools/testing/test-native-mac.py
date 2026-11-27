@@ -140,6 +140,8 @@ def main():
     parser.add_argument('--profile-without-validation', action='store_true',
                         help='With --profile-frames, measure Vulkan without validation-layer overhead; not a validation pass')
     parser.add_argument('--fps', type=int, choices=(60,), help='Override the native display target for this test only')
+    parser.add_argument('--mapmaker-probe', type=int, metavar='FLAGS',
+                        help='Read-only MapMaker log in the test directory: 1 meter, 2 memory snapshots, 4 other MapMaker bars, 8 menu layouts/clicks, 16 budgets with 1, 32 heap state, 64 AI pad pools, 128 room prop draws (add flags)')
     parser.add_argument('--vulkan-driver',choices=('moltenvk','kosmickrisp'),
                         help='Temporary Vulkan driver override; default comes from BUILD.json')
     args = parser.parse_args()
@@ -183,6 +185,9 @@ def run_probe(args, test, env, exe, kind):
         if trace.is_symlink():raise SystemExit('Unexpected trace file')
         trace.write_text('')
         env['TSFP_NATIVE_TRACE_RENDER'] = str(trace)
+    if getattr(args, 'mapmaker_probe', None):
+        from testing_profile import mapmaker_probe_environment
+        env.update(mapmaker_probe_environment(ROOT, test, args.mapmaker_probe))
     if args.capture:
         env.update(capture_environment(ROOT))
     logs = ROOT / 'logs'

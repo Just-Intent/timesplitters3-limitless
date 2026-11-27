@@ -20,6 +20,7 @@ foreach ($name in @($info.EnvironmentVariables.Keys)) {
 }
 # Optional authored pack; installing it later needs no launcher changes.
 $info.EnvironmentVariables['TSFP_TEXTURE_PACK_DIR'] = Join-Path $gameRoot 'Textures'
+$info.EnvironmentVariables['TSFP_MUSIC_DIR'] = Join-Path $gameRoot 'Music'
 $info.EnvironmentVariables['TSFP_TEXTURE_MODE'] = 'classic'
 $info.EnvironmentVariables['TSFP_CRASH_DIR'] = Join-Path $logRoot 'Crashes'
 $info.EnvironmentVariables['RECOMP_GAME_DIR'] = Join-Path $gameRoot 'Data'
@@ -32,6 +33,15 @@ $info.EnvironmentVariables['TSFP_DISCORD_CONFIG'] = Join-Path $gameRoot 'Setting
 $info.EnvironmentVariables['RECOMP_TRACE_BUDGET'] = '0'
 $skipSplashes = $controls.launcher -and $controls.launcher.skip_startup_splashes -eq $true
 $info.EnvironmentVariables['RECOMP_XMV_PLAY'] = if ($skipSplashes) { '0' } else { '1' }
+# Same MapMaker switches as the launcher's GameSettings.StartInfo; off exports nothing.
+if ($controls.launcher) {
+    foreach ($pair in @(@('mapmaker_limits','TSFP_MAPMAKER_LIMITS'), @('mapmaker_overlap','TSFP_MAPMAKER_OVERLAP'), @('mapmaker_stack_items','TSFP_MAPMAKER_STACK_ITEMS'))) {
+        $flag = $controls.launcher.($pair[0])
+        if ($flag -is [bool] -and $flag) { $info.EnvironmentVariables[$pair[1]] = '1' }
+    }
+    $alive = $controls.launcher.mapmaker_alive
+    if ($alive -is [int] -and $alive -ge 1 -and $alive -lt 64) { $info.EnvironmentVariables['TSFP_MAPMAKER_ALIVE'] = [string]$alive }
+}
 $info.EnvironmentVariables['RECOMP_PC_MOUSE'] = if ($controls.mouse.enabled) { '1' } else { '0' }
 $info.EnvironmentVariables['RECOMP_MOUSE_INVERT_Y'] = if ($controls.mouse.invert_y) { '1' } else { '0' }
 $info.EnvironmentVariables['RECOMP_MOUSE_SENSITIVITY'] = $sensitivity.ToString('R', [Globalization.CultureInfo]::InvariantCulture)

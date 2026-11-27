@@ -279,3 +279,19 @@ Shared UI tests cover switching, cancellation, retired/malformed preferences,
 inherited overrides, compatibility rejection and legacy defaults. The Windows
 settings child receives both actual environments. GPU/game acceptance remains
 separate; see docs/agent-context/opengl-recovery.md for current host evidence.
+
+## Test-only local release source
+
+To exercise a fresh install without publishing, build a local release folder on
+Windows (`python tools/release/make-local-release.py [--build-root <checkout>]
+[--with-textures]`; default output `build/local-release/<tag>`). It contains
+`releases.json`, the game runtime ZIP and the launcher ZIP with `.sha256` files,
+`launcher-update.json`, `RELEASE-NOTES.md`, `SHA256SUMS.txt` and
+`Use-local-release-source.cmd`. The game build keeps its compile-only provenance
+(BUILD.json `preview`, README warning) and is a prerelease, so select the
+**Preview** channel. Set `TSFP_LAUNCHER_RELEASE_SOURCE` to that folder (or drag
+`TimeSplitters Launcher.exe` onto the `.cmd`) before starting the launcher; the
+status line then shows `TEST ONLY: local release source`. Unset it to return to
+GitHub (`ReleaseClient.Repository`, `tools/project_repository.py`). The asset-free
+regressions cover the local source; a real fresh install still needs a manual
+run on the target PC.

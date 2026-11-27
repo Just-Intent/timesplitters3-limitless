@@ -83,7 +83,7 @@ void pc_settings_defaults(PcSettings *s)
     static const int keys[PC_ACTION_COUNT][PC_BINDING_SLOTS] = {
         {'E',VK_SPACE}, {'F',VK_MBUTTON}, {'R'}, {'Y'},
         {'X'}, {'Z'}, {VK_ESCAPE}, {VK_TAB}, {'G',VK_XBUTTON2}, {VK_LBUTTON},
-        {VK_UP,VK_PRIOR}, {VK_DOWN,VK_NEXT}, {VK_LEFT,VK_F24}, {VK_RIGHT,VK_F23},
+        {VK_UP,'Q'}, {VK_DOWN,'V'}, {VK_LEFT,VK_F24}, {VK_RIGHT,VK_F23},
         {'W'}, {'S'}, {'A'}, {'D'}, {VK_CONTROL,'C'}, {0}, {0}, {0}, {0}, {VK_RBUTTON},
 #define PC_WEAPON_SLOT(n,key) {key},
 #include "pc_weapon_slots.def"
@@ -177,6 +177,24 @@ int pc_settings_prompt_keys(int keys[PC_ACTION_COUNT])
         if(g_ctl[0].bind[i].src[j].kind==SRC_KEY) {
             keys[i]=g_ctl[0].bind[i].src[j].arg;
             available=1; break;
+        }
+    }
+    ReleaseSRWLockShared(&g_pc_bindings_lock);
+    return available;
+}
+
+/* Every key bound on player 1, by action and slot: the mouse-wheel scope
+   zoom (pc_scope_wheel.h) redirects only a wheel bound to weapon switching. */
+int pc_settings_bound_keys(int keys[PC_ACTION_COUNT][PC_BINDING_SLOTS])
+{
+    int i,j,available=0;
+    recomp_bindings_init();
+    memset(keys,0,PC_ACTION_COUNT*sizeof *keys);
+    AcquireSRWLockShared(&g_pc_bindings_lock);
+    for(i=0;i<CONTROL_COUNT;i++) for(j=0;j<g_ctl[0].bind[i].count && j<PC_BINDING_SLOTS;j++) {
+        if(g_ctl[0].bind[i].src[j].kind==SRC_KEY) {
+            keys[i][j]=g_ctl[0].bind[i].src[j].arg;
+            available=1;
         }
     }
     ReleaseSRWLockShared(&g_pc_bindings_lock);

@@ -104,8 +104,10 @@ class BasicBlock:
 
 
 class Disassembler:
-    def __init__(self):
+    def __init__(self, operand_overrides=None):
         self._cs = make_decoder()
+        # {address: [(operand index, value)]} from guest_code_patches.
+        self._overrides = dict(operand_overrides or {})
 
     def _decode_instruction(self, decoded):
         result = Instruction(decoded.address, decoded.size, decoded.mnemonic,
@@ -134,6 +136,9 @@ class Disassembler:
                 result.call_target = result.operands[0].imm
             elif result.is_branch:
                 result.jump_target = result.operands[0].imm
+        if result.address in self._overrides:
+            from guest_code_patches import override_operands
+            override_operands(result, self._overrides)
         return result
 
     @staticmethod

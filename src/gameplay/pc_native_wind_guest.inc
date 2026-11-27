@@ -5,11 +5,20 @@
 #include "pc_native_wind_owners.h"
 #include "pc_native_wind_clock.h"
 static PcWindOwners wind_owners;
+/* The MapMaker objects area also wraps US0A5CE0. In the PC game build its
+ * generated chain (meter-wrappers patch, sub_000A5CE0_mapmaker) runs inside
+ * this wrapper and then calls the original; fixtures call original directly. */
+#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
+void sub_000A5CE0_mapmaker(void);
+#define PC_NATIVE_WIND_REGISTER_ORIGINAL(original) ((void)(original),sub_000A5CE0_mapmaker())
+#else
+#define PC_NATIVE_WIND_REGISTER_ORIGINAL(original) (original)()
+#endif
 static void pc_native_wind_register_guest(void (*original)(void))
 {
 #define W_WORD(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
     uint32_t owner=W_WORD(g_esp+4u),slot=W_WORD(g_esp+8u),callback=W_WORD(g_esp+12u);
-    original();
+    PC_NATIVE_WIND_REGISTER_ORIGINAL(original);
     if(slot==3)pc_wind_owner_register(&wind_owners,g_xbox_mem_offset,W_WORD(0x79094Cu),owner,
         callback==0x1DDF10u?W_WORD(owner+0x7Cu):0,
         callback==0x1DDF10u?W_WORD(owner+0x2Cu):0,callback==0x1DDF10u);

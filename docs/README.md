@@ -16,7 +16,8 @@ or [repository layout](development/repository-layout.md) for source and local fi
 | Test and release | [Test profiles](development/testing-profile.md), [CI](development/ci.md), [releasing](release/releasing.md), [launcher releases](release/launcher-releases.md), [launcher compatibility](release/launcher-compatibility.md) |
 | Investigate internals | [Subsystem map](agent-context/README.md), [patch maintenance](../patches/README.md), [online bot investigation](analysis/online-bots-investigation.md) |
 | Check progress | [Measured status](project/STATUS.md), [Mac backlog](project/MAC_PORT_BACKLOG.md) |
+| Use MapMaker Limitless (fork) | [Player guide](mapmaker/mapmaker-limitless.md), per-area notes in `mapmaker/`, [fork architecture](development/architecture.md), [fork build and test](development/build-and-test.md), [roadmap](development/development-roadmap.md) |
 
-Player guides live in `players/`; update callers and relative links when moving
+Player guides live in `players/`; the fork's MapMaker notes live in `mapmaker/`; update callers and relative links when moving
 a guide. Historical external links may refer to its previous repository path. Technical subsystem notes belong in `agent-context/`;
 documentation screenshots and download buttons belong in `assets/`.

@@ -72,7 +72,7 @@ def fingerprint(runtime):
     result = {p.relative_to(runtime).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in sorted(paths)}
     project = Path(__file__).resolve().parents[2]
-    for name in ('xbe_image.py', 'xbe_kernel_exports.def', 'recomp_image.py', 'x86_decode.py', 'x86_flow.py', 'x86_recovery.py', 'x86_functions.py', 'recomp_symbols.py', 'analysis_cache.py', 'analysis_config.py', 'analysis_output.py', 'analysis_runner.py', 'xdk_catalog.py', 'compile_pipeline.py', 'function_evidence.py', 'function_categories.py', 'function_catalog.py', 'c_source_scan.py', 'generation_output.py', 'translation_decode.py', 'translation_layout.py', 'translation_hooks.py', 'branch_feedback.py', 'unresolved_report.py', 'translation_operands.py', 'translation_moves.py', 'translation_integer.py', 'translation_bits.py', 'translation_product.py', 'translation_bitops.py', 'translation_exchange.py', 'translation_compare.py', 'translation_strings.py', 'translation_conditions.py', 'translation_sse.py', 'translation_mmx.py', 'translation_x87.py', 'translation_control.py', 'translation_lifting.py', 'translation_context.py', 'translation_helpers.py', 'translation_names.py', 'translation_host_symbols.txt', 'translation_host_symbols.json', 'translation_batch.py', 'translation_discovery.py', 'translation_function.py', 'translation_continuation.py', 'continuation_index.py', 'continuation_output.py', 'translation_cli.py'):
+    for name in ('xbe_image.py', 'xbe_kernel_exports.def', 'recomp_image.py', 'x86_decode.py', 'x86_flow.py', 'x86_recovery.py', 'x86_functions.py', 'recomp_symbols.py', 'analysis_cache.py', 'analysis_config.py', 'analysis_output.py', 'analysis_runner.py', 'xdk_catalog.py', 'compile_pipeline.py', 'function_evidence.py', 'function_categories.py', 'function_catalog.py', 'c_source_scan.py', 'generation_output.py', 'translation_decode.py', 'translation_layout.py', 'translation_hooks.py', 'branch_feedback.py', 'unresolved_report.py', 'translation_operands.py', 'translation_moves.py', 'translation_integer.py', 'translation_bits.py', 'translation_product.py', 'translation_bitops.py', 'translation_exchange.py', 'translation_compare.py', 'translation_strings.py', 'translation_conditions.py', 'translation_sse.py', 'translation_mmx.py', 'translation_x87.py', 'translation_control.py', 'translation_lifting.py', 'translation_context.py', 'translation_helpers.py', 'translation_names.py', 'translation_host_symbols.txt', 'translation_host_symbols.json', 'translation_batch.py', 'translation_discovery.py', 'translation_function.py', 'translation_continuation.py', 'continuation_index.py', 'continuation_output.py', 'translation_cli.py', 'guest_code_patches.py'):
         result['project/tools/' + name] = hashlib.sha256(
             (repo_file(project, 'tools', name)).read_bytes()).hexdigest()
     for name in ('recomp_types.h', 'tsfp_branch_feedback.h', 'guest_context_execution.h', 'guest_x86_context.h'):
@@ -93,8 +93,20 @@ def fingerprint(runtime):
         declarations.update(pattern.findall(source.read_text(encoding='utf-8')))
     result['hle-declarations'] = hashlib.sha256(
         json.dumps(sorted(declarations)).encode('utf-8')).hexdigest()
+    # Verified guest-code patches are applied by the lift, so editing the
+    # project's table must regenerate the guest C.
+    tables = guest_patch_table(runtime)
+    digest = hashlib.sha256()
+    for table in sorted(tables.glob('*.json')) if tables.is_dir() else ():
+        digest.update(table.name.encode('utf-8') + b'\0' + table.read_bytes() + b'\0')
+    result['guest-code-patches'] = digest.hexdigest() if tables.is_dir() else 'absent'
     result.update(context_outputs(runtime))
     return result
+
+
+def guest_patch_table(runtime):
+    """The project's tables folder, two levels above the runtime checkout (external/<runtime>)."""
+    return Path(runtime).resolve().parents[1] / 'config/guest-code-patches'
 
 
 def marker(runtime):

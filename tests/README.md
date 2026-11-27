@@ -7,6 +7,7 @@
 | `gameplay/` | Timing, animation, physics and bounded real-game acceptance. |
 | `graphics/` | Renderer, shader, surface, overlay and UI contracts. |
 | `input/` | Keyboard, mouse, controller, prompts and settings behavior. |
+| `mapmaker/` | MapMaker Limitless capacity areas, editor controls and guest-code tables (fork). |
 | `network/` | Online, networking, bot synchronization and Discord. |
 | `media/` | Audio timing/output and movie playback. |
 | `textures/` | Texture encoding, loaders, modes and optional-pack policy. |

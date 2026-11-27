@@ -6,7 +6,7 @@
 #include <stdarg.h>
 #include <string.h>
 #define CHECK(x) do { if(!(x)) { fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x);exit(1); } } while(0)
-static uint32_t memory[0x800000/4],g_esp,g_ebx,g_esi,g_ebp,g_edi,g_ecx,g_edx;
+static uint32_t memory[0x800000/4],g_esp,g_ebx,g_esi,g_ebp,g_edi,g_ecx,g_edx,g_eax;
 static intptr_t g_xbox_mem_offset;
 #define WORD_AT(a) (*(uint32_t *)((uintptr_t)(a)+g_xbox_mem_offset))
 typedef struct GuestRegisters { uint32_t sp,c,d,di; } GuestRegisters;
@@ -19,7 +19,9 @@ void sub_0007DB20(void) {} void sub_0007C410(void) {}
 void sub_0007C300(void) {} void sub_0007C390(void) {}
 void sub_0007C4F0(void) {} void sub_0007CDE0(void) {}
 void sub_000746D0(void) {} void sub_0007CCA0(void) {}
-void sub_00071940(void) {}
+void sub_00071940(void) {} void sub_0003DFA0(void) {}
+#include "mapmaker_area_stubs.h"
+uint32_t xbox_HeapAlloc(uint32_t size,uint32_t alignment) { (void)size;(void)alignment;return 0; }
 static PcMenuPointer cursor;
 static int active=1,mode,original_calls,selections;
 static int centered_controls;
@@ -29,7 +31,11 @@ static void settings_tabs_footer(uint32_t menu) {(void)menu;}
 static void settings_tabs_footer_style(uint32_t menu,uint32_t sx,uint32_t sy,uint32_t colour) {(void)menu;(void)sx;(void)sy;(void)colour;}
 static int closed_pause,in_dispatch,changed_tab;
 static unsigned long long tick=1000;
-static unsigned long long GetTickCount64(void) {return tick;}
+#ifdef _WIN32
+#include <windows.h>   /* declared once here (the imported-music player includes it too) */
+#endif
+static unsigned long long menu_test_tick64(void) {return tick;}
+#define GetTickCount64() menu_test_tick64()
 static int footer_enabled=1,measure_profile;
 static int profile_keyboard=1;
 static int pc_prompts_keyboard_active(void) {return profile_keyboard;}
@@ -53,9 +59,18 @@ void sub_00045390(void) {mode=15;}
 void sub_00045820(void) {mode=16;}
 void sub_00045C60(void) {mode=13;}
 void sub_00021780(void) {mode=14;}
+void sub_00074720(void) {mode=17;}
+void sub_00071A60(void) {mode=18;}
+static uint32_t audio_menu_active=1,audio_focus;
 static PcMenuPointer pc_controls_menu_pointer(void) { PcMenuPointer p=cursor;cursor.wheel=0;return p; }
 static PcMenuPointer pc_controls_menu_hover_pointer(void) { return cursor; }
 static void pc_controls_menu_mode(int on) { mode=on; }
+static void pc_controls_mapmaker_pointer(int on) { (void)on; }
+static void pc_controls_mapmaker_row_press(void) {}
+static void pc_controls_mapmaker_editor(int on) { (void)on; }
+static void pc_controls_mapmaker_zoom(int n) { (void)n; }
+static void pc_controls_mapmaker_pulse(int b) { (void)b; }
+static int pc_controls_mapmaker_table_key(void) { return 0; }
 void d3d8_display_output_shape(unsigned w,unsigned h,unsigned *sw,unsigned *sh)
 { (void)w;(void)h;*sw=shape_w;*sh=shape_h; }
 void sub_00074760(void) { mode=5; }
@@ -74,6 +89,8 @@ static uint32_t guest_call(void (*fn)(void),unsigned n,...)
     if(fn==sub_00045820) {CHECK(n==1);++sensitivity_previews;return 0;}
     if(fn==sub_00045C60) {CHECK(n==0);++music_previews;return 0;}
     if(fn==sub_00021780) {CHECK(n==1);++sound_previews;return 0;}
+    if(fn==sub_00074720) {CHECK(n==1);return audio_menu_active;}
+    if(fn==sub_00071A60) {CHECK(n==1);return audio_focus;}
     if(fn==sub_002E49F0) {CHECK(n==0);return 0;}
     if(fn==sub_002E4A30) {CHECK(n==0);return 3;}
     va_start(ap,n);menu=va_arg(ap,uint32_t);
@@ -104,6 +121,10 @@ static uint32_t guest_call(void (*fn)(void),unsigned n,...)
     WORD_AT(menu+0x198)=item; ++selections; return 0;
 }
 #include "menu_guest_region.h"
+/* The widescreen editor scope (pc_mapmaker_widescreen.inc) needs the display
+ * layer, which this fixture does not compile: a 4:3 display, no rescoping. */
+int pc_display_wide_now(void) { return 0; }
+void pc_display_ui_scope(void (*original)(void),int placement,uint32_t tag) { (void)placement;(void)tag;original(); }
 static unsigned video_click_sounds;
 static void menu_video_click_sound(uint32_t menu,uint32_t item)
 {(void)menu;(void)item;++video_click_sounds;}
@@ -245,6 +266,7 @@ static void audio_tests(void)
         menu_slider_set(&mix_track,MENU_AUDIO_MIX+i,125.f);
         CHECK(slider_mix_index==i && slider_mix_value==25);
     }
+    CHECK(pc_music_slider_extra_set(0));
     active=1;navigation=0;WORD_AT(0x79094c)=101;
     WORD_AT(0x4e8cf0)=640;WORD_AT(0x4e8cf4)=480;
     WORD_AT(m+0x1b0)=3;WORD_AT(m+0x178)=music;WORD_AT(music+4)=sound;
@@ -260,16 +282,18 @@ static void audio_tests(void)
         MenuSliderTrack *t=&menu_slider_tracks[0];
         CHECK(t->x==225 && t->w==215 && t->h==(layout?10:20));
         WORD_AT(0x5236bc)=16;WORD_AT(0x5236c0)=16;
+        /* Music: 24 positions over the same bar; the word keeps 0..16 */
         cursor.x=ox+(t->x+t->w*.25f)*scale;cursor.y=oy+(t->y+2)*scale;
         run(m);cursor.left=1;run(m);
-        CHECK(WORD_AT(0x5236bc)==4 && WORD_AT(m+0x198)==music);
+        CHECK(WORD_AT(0x5236bc)==6 && pc_music_slider_extra()==0 && WORD_AT(m+0x198)==music);
         CHECK(!(WORD_AT(m+0xc4)&0x10) && menu_slider_drag==music);
         unsigned previews=music_previews;run(m);CHECK(music_previews==previews);
         cursor.x=ox+(t->x+t->w*.75f)*scale;cursor.y=oy+(t->y+105)*scale;cursor.wheel=-1;
-        run(m);CHECK(WORD_AT(0x5236bc)==12 && WORD_AT(0x5236c0)==16);
+        run(m);CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==2 && WORD_AT(0x5236c0)==16);
         CHECK(WORD_AT(m+0x198)==music && !(WORD_AT(m+0xc4)&0x001F001F));
-        cursor.x=ox+(t->x-30)*scale;run(m);CHECK(WORD_AT(0x5236bc)==0);
-        cursor.x=ox+(t->x+t->w+30)*scale;run(m);CHECK(WORD_AT(0x5236bc)==16);
+        cursor.x=ox+(t->x-30)*scale;run(m);CHECK(WORD_AT(0x5236bc)==0 && pc_music_slider_extra()==0);
+        cursor.x=ox+(t->x+t->w+30)*scale;run(m);
+        CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==PC_MUSIC_SLIDER_EXTRA_MAX);
         cursor.left=0;run(m);CHECK(!menu_slider_drag);
         t=&menu_slider_tracks[1];cursor.x=ox+(t->x+t->w*.5f)*scale;cursor.y=oy+(t->y+2)*scale;
         run(m);cursor.left=1;run(m);CHECK(WORD_AT(0x5236c0)==8);
@@ -293,6 +317,116 @@ static void audio_tests(void)
     CHECK(music_previews && sound_previews);
     CHECK(pc_menu_slider_value(-1,0,100,16)==0 && pc_menu_slider_value(101,0,100,16)==16);
     CHECK(pc_menu_slider_value(NAN,0,100,16)==0 && pc_menu_slider_value(1,0,0,16)==0);
+}
+/* The audio painter's call to the bar primitive sub_000814B0: fraction =
+ * word x 1/16 at [esp+4], from 0x002C35F4 (return 0x002C35F9) or the compact
+ * 0x002C3704 (0x002C3709). */
+static uint32_t bar_return=0x002C35F9u;
+static float bar_fraction;
+static void audio_bar_painter(void)
+{
+    uint32_t frame=g_esp;
+    g_esp=0x1900;WORD_AT(g_esp)=bar_return;
+    FLOAT_AT(g_esp+4)=(float)WORD_AT(0x5236bc)*.0625f;
+    WORD_AT(g_esp+8)=225;WORD_AT(g_esp+12)=130;WORD_AT(g_esp+16)=215;WORD_AT(g_esp+20)=20;
+    pc_display_menu_slider_bar(audio_draw_original);CHECK(g_esp==0x1904);
+    bar_fraction=FLOAT_AT(0x1904);
+    g_esp=frame+4;
+}
+static float audio_bar(uint32_t m,uint32_t row,uint32_t id,int compact)
+{
+    WORD_AT(row)=4;WORD_AT(row+0x88)=m;WORD_AT(row+0x14)=id;
+    FLOAT_AT(0x7000)=180;FLOAT_AT(0x7004)=100;FLOAT_AT(0x7008)=460;FLOAT_AT(0x700c)=160;
+    g_esp=0x1800;WORD_AT(g_esp+4)=m;WORD_AT(g_esp+8)=row;WORD_AT(g_esp+12)=0x7000;
+    bar_fraction=-1;
+    pc_display_menu_audio_draw(audio_bar_painter,compact);CHECK(g_esp==0x1804);
+    return bar_fraction;
+}
+/* Stock sub_002C3720 for the focused item: Left (0x40000) first, then Right
+ * (0x80000), clamped 0..16; a change calls sub_00045C60 and the click. */
+static void audio_tick_original(void)
+{
+    uint32_t menu=WORD_AT(g_esp+4),c4=WORD_AT(menu+0xc4),v=WORD_AT(0x5236bc),old=v;
+    if(audio_menu_active && WORD_AT(audio_focus+0x14)==1 && !(WORD_AT(audio_focus+0x28)&1u)) {
+        if(c4&0x40000u) v=(int32_t)v-1<=0?0:v-1;
+        else if(c4&0x80000u) v=v+1>=16?16:v+1;
+        WORD_AT(0x5236bc)=v;
+        if(v!=old) {++music_previews;++sound_previews;}
+    }
+    g_esp+=4;
+}
+static void audio_key(uint32_t m,uint32_t keys)
+{
+    WORD_AT(m+0xc4)=keys;g_esp=0x1800;WORD_AT(g_esp+4)=m;
+    pc_display_menu_audio_tick(audio_tick_original);CHECK(g_esp==0x1804);
+    WORD_AT(m+0xc4)=0;
+    CHECK(WORD_AT(0x5236bc)<=16);                    /* the profile's word never past 16 */
+}
+static void music_ini(char *out,size_t bytes)
+{
+    const char *display=getenv("TSFP_DISPLAY_CONFIG");
+    CHECK(display && strlen(display)+16<bytes);
+    snprintf(out,bytes,"%s",display);
+    char *slash=strrchr(out,'/'),*back=strrchr(out,'\\');
+    if(back>slash) slash=back;
+    snprintf(slash?slash+1:out,bytes-(size_t)(slash?slash+1-out:0),"pc-music.ini");
+}
+static void music_slider_tests(void)
+{
+    const uint32_t m=0x2000,music=0x3000,sound=0x3400;
+    const uint32_t left=0x40000u,right=0x80000u;
+    char path[600],text[256]={0};
+    FILE *f;
+    memset(memory,0,sizeof memory);
+    WORD_AT(0x7ba16c)=1;WORD_AT(0x7ba178)=0x6000;WORD_AT(0x6008)=42;
+    WORD_AT(music+0x14)=1;WORD_AT(sound+0x14)=3;audio_focus=music;audio_menu_active=1;
+    music_ini(path,sizeof path);
+    f=fopen(path,"wb");CHECK(f);if(f) {fputs("TSFP_MUSIC_V1\narcade=x.wav\ngain_db=-3\n",f);fclose(f);}
+    pc_music_extra_live=-1;CHECK(pc_music_slider_extra()==0);
+    /* bar: position / 24 in both layouts; other bars and callers untouched */
+    for(unsigned position=0;position<=MENU_MUSIC_TICKS;position++) {
+        WORD_AT(0x5236bc)=position<16?position:16;
+        pc_music_extra_live=position>16?(int)position-16:0;
+        float want=(float)position/24.f;
+        CHECK(audio_bar(m,music,1,0)==want && audio_bar(m,music,1,1)==want && want<=1.f);
+        bar_return=0x002C3709u;CHECK(audio_bar(m,music,1,1)==want);bar_return=0x002C35F9u;
+    }
+    WORD_AT(0x5236bc)=8;pc_music_extra_live=0;
+    CHECK(audio_bar(m,sound,3,0)==.5f);                /* the Sound bar keeps 16 steps */
+    bar_return=0x002EA3E0u;CHECK(audio_bar(m,music,1,0)==.5f);bar_return=0x002C35F9u;
+    audio_bar_painter();CHECK(bar_fraction==.5f);      /* outside an audio row */
+    WORD_AT(0x5236bc)=11;CHECK(audio_bar(m,music,1,0)==11.f/24.f);
+    /* keys: 0..16 exactly as stock, then Right adds ticks up to 8 */
+    WORD_AT(0x5236bc)=15;pc_music_slider_extra_set(0);
+    unsigned clicks=sound_previews,previews=music_previews;
+    audio_key(m,right);CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==0);
+    CHECK(sound_previews==clicks+1 && music_previews==previews+1);
+    audio_key(m,right);CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==1);
+    CHECK(sound_previews==clicks+2 && music_previews==previews+1);   /* click only: stock volume unchanged */
+    for(int i=0;i<10;i++) audio_key(m,right);
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==8 && sound_previews==clicks+9);
+    f=fopen(path,"rb");CHECK(f);if(f) {CHECK(fread(text,1,sizeof text-1,f)>0);fclose(f);}
+    CHECK(!strcmp(text,"TSFP_MUSIC_V1\narcade=x.wav\ngain_db=-3.00\nslider_extra=8\n"));
+    pc_music_extra_live=-1;CHECK(pc_music_slider_extra()==8);  /* read back */
+    audio_key(m,left|right);                           /* Left first, as stock */
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==7 && music_previews==previews+3);
+    for(int i=0;i<7;i++) audio_key(m,left);
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==0);
+    audio_key(m,left);CHECK(WORD_AT(0x5236bc)==15 && pc_music_slider_extra()==0);
+    /* only the focused, enabled Music item of an active menu */
+    WORD_AT(0x5236bc)=16;pc_music_slider_extra_set(3);
+    WORD_AT(music+0x28)=1;audio_key(m,right);audio_key(m,left);
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==3);
+    WORD_AT(music+0x28)=0;audio_focus=sound;audio_key(m,right);CHECK(pc_music_slider_extra()==3);
+    audio_focus=music;audio_menu_active=0;audio_key(m,right);CHECK(pc_music_slider_extra()==3);
+    audio_menu_active=1;audio_key(m,0);CHECK(pc_music_slider_extra()==3);
+    /* a profile below 16 ignores the stored ticks; reaching 16 again starts at 16 */
+    WORD_AT(0x5236bc)=11;CHECK(menu_music_position()==11 && audio_bar(m,music,1,0)==11.f/24.f);
+    for(int i=0;i<5;i++) audio_key(m,right);
+    CHECK(WORD_AT(0x5236bc)==16 && pc_music_slider_extra()==0 && menu_music_position()==16);
+    pc_music_slider_extra_set(99);CHECK(pc_music_slider_extra()==PC_MUSIC_SLIDER_EXTRA_MAX);
+    pc_music_slider_extra_set(-4);CHECK(pc_music_slider_extra()==0);
+    remove(path);
 }
 /* Simulate the original sensitivity painter calling its shared bar primitive.
  * The uneven width represents translated labels; the adapter must use exactly
@@ -604,8 +738,19 @@ static void character_tests(void)
         CHECK(WORD_AT(0x78a248)==2 && WORD_AT(0x78a140)==12 && !early_action);
         CHECK(g_ecx==123 && g_edx==456 && g_edi==789);
         unsigned previews=character_previews;run(parent);CHECK(character_previews==previews);
+        /* A second click on the previewed portrait confirms it (Select). */
+        cursor.left=0;run(parent);character_capture(child);cursor.left=1;run(parent);
+        CHECK((early_source&0x80u) && character_previews==previews && WORD_AT(0x78a248)==2);
+        run(parent);CHECK(!(early_source&0x80u));
+        /* The previewed portrait gives way to the 3D model: a click anywhere
+         * off the portraits and footer Back confirms the previewed character. */
+        cursor.left=0;run(parent);character_capture(child);cursor.x=width*.5f+150;cursor.left=1;run(parent);
+        CHECK(early_source&0x80u);CHECK(!(early_source&0x100u));
+        CHECK(character_previews==previews);CHECK(WORD_AT(0x78a248)==2);
+        cursor.left=0;cursor.x=width*.5f-210;run(parent);
         cursor.left=0;run(parent);character_capture(child);cursor.x=width*.5f-140;
         cursor.left=1;run(parent);CHECK(WORD_AT(0x78a150)==1 && WORD_AT(0x78a140)==13 && WORD_AT(0x78a144)==1);
+        CHECK(!(early_source&0x80u)); /* another portrait previews, never confirms */
         cursor.left=0;run(parent);character_capture(child);cursor.wheel=-1;run(parent);
         CHECK(WORD_AT(0x78a248)==0); /* wheel wraps and never confirms */
         cursor.wheel=1;run(parent);CHECK(WORD_AT(0x78a248)==2 && WORD_AT(0x78a150)==1);
@@ -636,12 +781,163 @@ static void character_tests(void)
 
     }
 }
+/* MapMaker > Load map: ordinary rows, but the browser tick (sub_0032BDD0)
+ * reads Confirm before the row hook, so the click must act in the input hook. */
+static void map_browser_tests(void)
+{
+    const uint32_t m=0x2000,files=0x9000;
+    uint32_t rows[3]={0x3000,0x3200,0x3400};
+    memset(memory,0,sizeof memory);memset(&menu_mouse,0,sizeof menu_mouse);
+    active=1;shape_w=16;shape_h=9;WORD_AT(0x76b0fc)=0;
+    WORD_AT(0x79094c)=101;WORD_AT(0x4e8cf0)=640;WORD_AT(0x4e8cf4)=480;
+    WORD_AT(0x7e71c8)=0x4000;WORD_AT(0x4000+4)=640;WORD_AT(0x4000+0x18)=480;
+    WORD_AT(m+4)=0x52ea88;WORD_AT(m+0x1b0)=3;WORD_AT(m+0x178)=rows[0];
+    FLOAT_AT(m+0xe4)=100;FLOAT_AT(m+0xe8)=70;FLOAT_AT(m+0xec)=540;FLOAT_AT(m+0xf0)=400;
+    WORD_AT(0x778d38)=files;WORD_AT(files+8)=3;
+    for(unsigned i=0;i<3;i++) {
+        uint32_t r=rows[i];
+        WORD_AT(r)=7;WORD_AT(r+4)=i<2?rows[i+1]:0;WORD_AT(r+0x14)=i;WORD_AT(r+0x28)=0x20900;
+        FLOAT_AT(r+0x78)=200;FLOAT_AT(r+0x7c)=100+40.f*i;FLOAT_AT(r+0x80)=440;FLOAT_AT(r+0x84)=140+40.f*i;
+    }
+    /* UI y = cursor.y/1.5 at 1280x720; row 1 spans 140..180. */
+    cursor=(PcMenuPointer){640,240,1280,720,1,0,0,0};
+    run(m);run(m);WORD_AT(m+0x198)=rows[0]; /* keyboard left row 0 highlighted */
+    unsigned before=selections;
+    cursor.left=1;run(m);
+    CHECK(WORD_AT(m+0x198)==rows[1] && selections==before+1);
+    CHECK(!early_action && !(early_source&0x80u) && !WORD_AT(m+0xc4)); /* highlight only */
+    run(m);CHECK(!early_action && selections==before+1); /* held press does nothing */
+    cursor.left=0;run(m);cursor.left=1;run(m);
+    CHECK(early_action==0x10 && (early_source&0x80u) && WORD_AT(m+0x198)==rows[1]);
+    CHECK(selections==before+1); /* confirm before the tick, no second row click */
+    run(m);CHECK(!early_action);
+    /* Hover still highlights through the shared row hook, without confirming. */
+    cursor.left=0;cursor.y=300;run(m);CHECK(WORD_AT(m+0x198)==rows[2] && !early_action);
+    cursor.left=1;run(m);CHECK(early_action==0x10);cursor.left=0;run(m);
+    /* Damaged (flag 1) rows, ids past the file count and other scenes are ignored. */
+    WORD_AT(rows[2]+0x28)|=1;WORD_AT(m+0x198)=rows[0];before=selections;
+    cursor.left=1;run(m);CHECK(!early_action && WORD_AT(m+0x198)==rows[0] && selections==before);
+    cursor.left=0;run(m);WORD_AT(rows[2]+0x28)&=~1u;WORD_AT(files+8)=2;
+    cursor.left=1;run(m);CHECK(!early_action); /* only the shared (late) row click */
+    cursor.left=0;run(m);WORD_AT(files+8)=3;WORD_AT(0x79094c)=102;
+    CHECK(!menu_map_browser_row(m,320,200));WORD_AT(0x79094c)=101;
+    WORD_AT(m+4)=0x52ea98;CHECK(!menu_map_browser_row(m,320,200));
+    WORD_AT(m+4)=0x52ea88;CHECK(menu_map_browser_row(m,320,200)==rows[2]);
+    CHECK(!menu_map_browser_row(m,90,200) && !menu_map_browser_row(m,320,50));
+    /* Wheel keeps the shared row navigation (the engine scrolls to the row). */
+    cursor.wheel=-1;run(m);CHECK(WORD_AT(m+0xc4)==0x20002 && !early_action);
+    cursor.wheel=0;menu_mouse.wheel_pending=0;
+}
+
+/* Story / Arcade League / Challenge briefings hold only flag-4 display items,
+ * so no row is hit: a fresh left click off the footer is the menu Confirm
+ * (+0x1BC callback), delivered before the tick like a footer Select. */
+static void briefing_setup(uint32_t m,uint32_t descriptor,uint32_t confirm)
+{
+    const uint32_t text=0x3000,custom=0x3200;
+    memset(memory,0,sizeof memory);memset(&menu_mouse,0,sizeof menu_mouse);
+    memset(menu_mouse_footer,0,sizeof menu_mouse_footer);
+    active=1;shape_w=16;shape_h=9;navigation=0;footer_enabled=1;WORD_AT(0x76b0fc)=0;
+    WORD_AT(0x79094c)=101;WORD_AT(0x4e8cf0)=640;WORD_AT(0x4e8cf4)=480;
+    WORD_AT(0x7e71c8)=0x4000;WORD_AT(0x4000+4)=640;WORD_AT(0x4000+0x18)=480;
+    WORD_AT(m+4)=descriptor;WORD_AT(m+0x1bc)=confirm;WORD_AT(m+0x1b0)=3;
+    WORD_AT(m+0x178)=text;WORD_AT(m+0x198)=0;
+    FLOAT_AT(m+0xe4)=100;FLOAT_AT(m+0xe8)=70;FLOAT_AT(m+0xec)=540;FLOAT_AT(m+0xf0)=400;
+    WORD_AT(text)=7;WORD_AT(text+4)=custom;WORD_AT(text+0x28)=0x20d04;
+    FLOAT_AT(text+0x78)=120;FLOAT_AT(text+0x7c)=100;FLOAT_AT(text+0x80)=520;FLOAT_AT(text+0x84)=300;
+    WORD_AT(custom)=8;WORD_AT(custom+0x28)=4;
+    FLOAT_AT(custom+0x78)=120;FLOAT_AT(custom+0x7c)=300;FLOAT_AT(custom+0x80)=520;FLOAT_AT(custom+0x84)=380;
+    for(unsigned i=0;i<4;i++) {
+        WORD_AT(m+0x128+i*16)=i;WORD_AT(m+0x12c+i*16)=0x6000+i;WORD_AT(m+0x130+i*16)=0;
+    }
+    WORD_AT(0x6000)=0x41;
+}
+static void briefing_tests(void)
+{
+    const uint32_t m=0x2000;
+    const uint32_t pages[2][2]={{0x5238c0,0x2beaa0},{0x523870,0x2d5f10}};
+    for(unsigned page=0;page<2;page++) {
+        briefing_setup(m,pages[page][0],pages[page][1]);
+        unsigned before=selections;
+        /* UI (320,200) is on the text row; (60,40) is empty background. */
+        cursor=(PcMenuPointer){640,300,1280,720,1,0,0,0};run(m);run(m);
+        cursor.left=1;run(m);
+        CHECK(early_action==0x10 && (early_source&0x80u) && (early_held&0x10));
+        CHECK(selections==before && !WORD_AT(m+0x198)); /* no row selected */
+        run(m);CHECK(!early_action && !(early_source&0x80u)); /* held press */
+        cursor.left=0;run(m);cursor.x=640+(60-320)*1.5f;cursor.y=40*1.5f;run(m);
+        cursor.left=1;run(m);CHECK(early_action==0x10 && (early_source&0x80u));
+        cursor.left=0;run(m);WORD_AT(0x76b0fc)=1;cursor.left=1;run(m);
+        CHECK(early_action==0x10 && (early_source&0x80u)); /* network pad block */
+        WORD_AT(0x76b0fc)=0;cursor.left=0;run(m);
+        /* Footer prompts keep their own actions: Back (slot 1) and the online
+         * leaderboard (slot 2) are tested before the briefing click. */
+        for(unsigned slot=1;slot<3;slot++) {
+            cursor.x=640.f+(90.f+110.f*(float)slot-320.f)*1.5f;cursor.y=438.f*1.5f;
+            run(m);capture_footer(m);cursor.left=1;run(m);
+            CHECK(early_action==(0x10u<<slot) && !(WORD_AT(m+0xc4)&0x10));
+            if(slot==1) CHECK((early_source&0x120u)==0x120u);
+            else CHECK((early_source&0x10u) && !(early_source&0x80u));
+            cursor.left=0;run(m);
+        }
+        /* Right-click stays Back through the shared row hook. */
+        cursor.x=640;cursor.y=300;cursor.right=1;run(m);
+        CHECK(!early_action && (WORD_AT(m+0xc4)&0x20) && !(WORD_AT(m+0xc4)&0x10));
+        cursor.right=0;run(m);
+        /* The wheel scrolls the text page without confirming. */
+        WORD_AT(m+0x40)=8;cursor.wheel=-1;run(m);
+        CHECK((early_held&0xf)==2 && !early_action && !(WORD_AT(m+0xc4)&0x10));
+        run(m);WORD_AT(m+0x40)=0;menu_mouse.wheel_pending=0;
+        /* Other pages and scenes keep the shared rule (flag-4 items: no click). */
+        const uint32_t others[][2]={{0x523860,0x2d5f10},{0x5238d0,0x2cad20},
+            {pages[page][0],0x2cad20},{pages[!page][0],pages[page][1]}};
+        for(unsigned n=0;n<4;n++) {
+            WORD_AT(m+4)=others[n][0];WORD_AT(m+0x1bc)=others[n][1];
+            cursor.left=0;run(m);cursor.left=1;run(m);
+            CHECK(!early_action && !(early_source&0x80u) && !(WORD_AT(m+0xc4)&0x10));
+        }
+        WORD_AT(m+4)=pages[page][0];WORD_AT(m+0x1bc)=pages[page][1];
+        for(int scene=100;scene<=102;scene+=2) {
+            WORD_AT(0x79094c)=(uint32_t)scene;CHECK(!menu_briefing_page(m));
+        }
+        WORD_AT(0x79094c)=101;CHECK(menu_briefing_page(m));
+        cursor.left=0;run(m);cursor.left=1;run(m);CHECK(early_action==0x10);
+        cursor.left=0;run(m);
+    }
+}
+
+/* MapMaker lighting list (0x0052DFF0) and its colour sub-lists: their tick
+ * reads Back before the row hook, so a right click is Back right after the
+ * input read; other editor lists keep the shared row hook's Back. */
+static void mapmaker_back_tests(void)
+{
+    const uint32_t m=0x2000;
+    const uint32_t lists[]={0x52dff0,0x52e000,0x52e020,0x52e030,0x52e040,0x52ddfc,0x52de0c,0x52e078};
+    for(unsigned n=0;n<8;n++) {
+        briefing_setup(m,lists[n],0);WORD_AT(0x79094c)=102;
+        cursor=(PcMenuPointer){1200,700,1280,720,1,0,0,0};run(m);run(m); /* outside the list */
+        cursor.right=1;run(m);
+        if(n<5) CHECK(early_action==0x20 && WORD_AT(m+0xc4)==0x20);
+        else CHECK(!early_action && WORD_AT(m+0xc4)==0x20);
+        run(m);CHECK(!WORD_AT(m+0xc4)); /* held: once per click */
+        cursor.right=0;run(m);
+        cursor.x=640;cursor.y=300;cursor.right=1;run(m);  /* inside: the same Back */
+        CHECK(WORD_AT(m+0xc4)==0x20 && (n<5)==(early_action==0x20));
+        cursor.right=0;run(m);
+    }
+    WORD_AT(0x79094c)=101;cursor.right=1;run(m);     /* outside MapMaker: shared rule */
+    CHECK(!early_action && WORD_AT(m+0xc4)==0x20);
+    cursor.right=0;run(m);
+}
 
 int main(void)
 {
     const uint32_t m=0x2000,item=0x3000,v=0x4000;
     float x,y;
     PcMenuPointer p={960,540,1920,1080,1,0,0,0};
+    /* The Music slider's ticks past 16 persist in pc-music.ini beside this
+     * path: the test must give a disposable one (never config/). */
+    CHECK(getenv("TSFP_DISPLAY_CONFIG") && *getenv("TSFP_DISPLAY_CONFIG"));
     CHECK(pc_menu_mouse_position(p,16.f/9,640,480,&x,&y) && x==320 && y==240);
     p.x=480;CHECK(pc_menu_mouse_position(p,16.f/9,640,480,&x,&y) && fabsf(x-106.6667f)<.001f);
     p=(PcMenuPointer){1720,720,3440,1440,1,0,0,0};
@@ -901,10 +1197,14 @@ int main(void)
     cursor.left=0;run(m);WORD_AT(m+4)=0;cursor.left=1;run(m);CHECK(!early_action);
     CHECK(original_calls>10);
     audio_tests();
+    music_slider_tests();
     setting_slider_tests();
     choice_tests();
     team_tests();
     character_tests();
+    map_browser_tests();
+    briefing_tests();
+    mapmaker_back_tests();
     settings_owner_tests();
     puts("PASS: menu pointer mapping, selection, click lifetime and gameplay isolation");
     return 0;

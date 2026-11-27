@@ -1,0 +1,347 @@
+{
+  "patches": [
+    {
+      "id": "matchbots-variant-00066CE8",
+      "kind": "operand",
+      "function": "0x000668F0",
+      "address": "0x00066CE8",
+      "original_hex": "0fbe8744e47d00",
+      "operand": 1,
+      "value": "0x009040C0",
+      "reason": "movsx eax, byte ptr [edi + 0x7de444]: live match per-actor variant bytes 0x007DE444 (16) -> 0x009040C0 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-00066CEF",
+      "kind": "operand",
+      "function": "0x000668F0",
+      "address": "0x00066CEF",
+      "original_hex": "0fb69f14e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx ebx, byte ptr [edi + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-00068DCF",
+      "kind": "operand",
+      "function": "0x00068830",
+      "address": "0x00068DCF",
+      "original_hex": "888124e47d00",
+      "operand": 0,
+      "value": "0x00904040",
+      "reason": "mov byte ptr [ecx + 0x7de424], al: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-000CF285",
+      "kind": "operand",
+      "function": "0x000CF230",
+      "address": "0x000CF285",
+      "original_hex": "8a8e14e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "mov cl, byte ptr [esi + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-000CF29B",
+      "kind": "operand",
+      "function": "0x000CF230",
+      "address": "0x000CF29B",
+      "original_hex": "0fb68614e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx eax, byte ptr [esi + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-variant-000D3212",
+      "kind": "operand",
+      "function": "0x000D2FD0",
+      "address": "0x000D3212",
+      "original_hex": "0fbe8744e47d00",
+      "operand": 1,
+      "value": "0x009040C0",
+      "reason": "movsx eax, byte ptr [edi + 0x7de444]: live match per-actor variant bytes 0x007DE444 (16) -> 0x009040C0 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-000D3219",
+      "kind": "operand",
+      "function": "0x000D2FD0",
+      "address": "0x000D3219",
+      "original_hex": "0fb69f14e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx ebx, byte ptr [edi + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-000D53F5",
+      "kind": "operand",
+      "function": "0x000D50E0",
+      "address": "0x000D53F5",
+      "original_hex": "0fb68014e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx eax, byte ptr [eax + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-000D75F4",
+      "kind": "operand",
+      "function": "0x000D7570",
+      "address": "0x000D75F4",
+      "original_hex": "0fb68224e47d00",
+      "operand": 1,
+      "value": "0x00904040",
+      "reason": "movzx eax, byte ptr [edx + 0x7de424]: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-variant-001483B0",
+      "kind": "operand",
+      "function": "0x00148310",
+      "address": "0x001483B0",
+      "original_hex": "0fbe9644e47d00",
+      "operand": 1,
+      "value": "0x009040C0",
+      "reason": "movsx edx, byte ptr [esi + 0x7de444]: live match per-actor variant bytes 0x007DE444 (16) -> 0x009040C0 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-001483B7",
+      "kind": "operand",
+      "function": "0x00148310",
+      "address": "0x001483B7",
+      "original_hex": "0fb68614e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx eax, byte ptr [esi + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-00158C46",
+      "kind": "operand",
+      "function": "0x00158BC0",
+      "address": "0x00158C46",
+      "original_hex": "0fb6843114e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx eax, byte ptr [ecx + esi + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-0015C675",
+      "kind": "operand",
+      "function": "0x0015C560",
+      "address": "0x0015C675",
+      "original_hex": "0fb6843014e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx eax, byte ptr [eax + esi + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-001B5BF0",
+      "kind": "operand",
+      "function": "0x001B5BB0",
+      "address": "0x001B5BF0",
+      "original_hex": "0fb68614e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx eax, byte ptr [esi + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-variant-002B5205",
+      "kind": "operand",
+      "function": "0x002B51E0",
+      "address": "0x002B5205",
+      "original_hex": "0fbe943044e47d00",
+      "operand": 1,
+      "value": "0x009040C0",
+      "reason": "movsx edx, byte ptr [eax + esi + 0x7de444]: live match per-actor variant bytes 0x007DE444 (16) -> 0x009040C0 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-002B520D",
+      "kind": "operand",
+      "function": "0x002B51E0",
+      "address": "0x002B520D",
+      "original_hex": "0fb68c3014e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx ecx, byte ptr [eax + esi + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-002EC36D",
+      "kind": "operand",
+      "function": "0x002EC340",
+      "address": "0x002EC36D",
+      "original_hex": "889024e47d00",
+      "operand": 0,
+      "value": "0x00904040",
+      "reason": "mov byte ptr [eax + 0x7de424], dl: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-002EDF7B",
+      "kind": "operand",
+      "function": "0x002EDDC0",
+      "address": "0x002EDF7B",
+      "original_hex": "888a24e47d00",
+      "operand": 0,
+      "value": "0x00904040",
+      "reason": "mov byte ptr [edx + 0x7de424], cl: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-002EDFDA",
+      "kind": "operand",
+      "function": "0x002EDDC0",
+      "address": "0x002EDFDA",
+      "original_hex": "888224e47d00",
+      "operand": 0,
+      "value": "0x00904040",
+      "reason": "mov byte ptr [edx + 0x7de424], al: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-0033ACDE",
+      "kind": "operand",
+      "function": "0x0033ACB0",
+      "address": "0x0033ACDE",
+      "original_hex": "0fb68824e47d00",
+      "operand": 1,
+      "value": "0x00904040",
+      "reason": "movzx ecx, byte ptr [eax + 0x7de424]: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-0033ACF2",
+      "kind": "operand",
+      "function": "0x0033ACB0",
+      "address": "0x0033ACF2",
+      "original_hex": "889024e47d00",
+      "operand": 0,
+      "value": "0x00904040",
+      "reason": "mov byte ptr [eax + 0x7de424], dl: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-difficulty-00350E52",
+      "kind": "operand",
+      "function": "0x00350DC0",
+      "address": "0x00350E52",
+      "original_hex": "0fb69134e47d00",
+      "operand": 1,
+      "value": "0x00904080",
+      "reason": "movzx edx, byte ptr [ecx + 0x7de434]: live match per-actor difficulty bytes 0x007DE434 (16) -> 0x00904080 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-character-003588AB",
+      "kind": "operand",
+      "function": "0x003586A0",
+      "address": "0x003588AB",
+      "original_hex": "0fb68214e47d00",
+      "operand": 1,
+      "value": "0x00904000",
+      "reason": "movzx eax, byte ptr [edx + 0x7de414]: live match per-actor character bytes 0x007DE414 (16) -> 0x00904000 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-00359C7F",
+      "kind": "operand",
+      "function": "0x00359AA0",
+      "address": "0x00359C7F",
+      "original_hex": "888224e47d00",
+      "operand": 0,
+      "value": "0x00904040",
+      "reason": "mov byte ptr [edx + 0x7de424], al: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-0035ADDF",
+      "kind": "operand",
+      "function": "0x0035AD90",
+      "address": "0x0035ADDF",
+      "original_hex": "888224e47d00",
+      "operand": 0,
+      "value": "0x00904040",
+      "reason": "mov byte ptr [edx + 0x7de424], al: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-team-0035D34F",
+      "kind": "operand",
+      "function": "0x0035D150",
+      "address": "0x0035D34F",
+      "original_hex": "889124e47d00",
+      "operand": 0,
+      "value": "0x00904040",
+      "reason": "mov byte ptr [ecx + 0x7de424], dl: live match per-actor team bytes 0x007DE424 (16) -> 0x00904040 (64; pc_mapmaker_matchbots_live keeps 0..15 equal to the block and adds bots 17+)"
+    },
+    {
+      "id": "matchbots-pairs-0015E0F5",
+      "kind": "operand",
+      "function": "0x0015E090",
+      "address": "0x0015E0F5",
+      "original_hex": "83c20a",
+      "operand": 1,
+      "value": "0x14",
+      "reason": "edx, 0xa: sub_0015E090 column clear of the character pair table [0x0074C368] outside story mode: humans + 10 -> humans + 20 characters (arcade bots up to 20)"
+    },
+    {
+      "id": "matchbots-pairs-0015E76C",
+      "kind": "operand",
+      "function": "0x0015E4F0",
+      "address": "0x0015E76C",
+      "original_hex": "83c10a",
+      "operand": 1,
+      "value": "0x14",
+      "reason": "ecx, 0xa: sub_0015E4F0 clear of the character pair table [0x0074C368] outside story mode: humans + 10 -> humans + 20 characters (arcade bots up to 20)"
+    },
+    {
+      "id": "matchbots-pairs-0015E7DF",
+      "kind": "operand",
+      "function": "0x0015E7C0",
+      "address": "0x0015E7DF",
+      "original_hex": "83c10a",
+      "operand": 1,
+      "value": "0x14",
+      "reason": "ecx, 0xa: sub_0015E7C0 allocation of the character pair table [0x0074C368] outside story mode: humans + 10 -> humans + 20 characters (arcade bots up to 20)"
+    },
+    {
+      "id": "matchbots-rank-copy-end",
+      "kind": "operand",
+      "function": "0x00064C60",
+      "address": "0x00064CAB",
+      "original_hex": "81f900e57d00",
+      "operand": 1,
+      "value": "0x00904140",
+      "reason": "cmp ecx, 0x7de500: sub_00064C60 copies 16 rank bytes of a System Link score message into the rank table; it keeps copying 16 into the moved table (its site is \"keep\" in matchbots-rank)"
+    },
+    {
+      "id": "matchbots-rank",
+      "kind": "relocate",
+      "old": "0x007DE4C0",
+      "size": "0x40",
+      "new": "0x00904100",
+      "new_size": "0x100",
+      "sites": {
+        "0x0006416C": "keep",
+        "0x00064190": "keep",
+        "0x000641B5": "keep",
+        "0x000644C0": "keep",
+        "0x000647B9": "offset",
+        "0x000648A4": "keep",
+        "0x00064ABB": "offset",
+        "0x00064BF5": "offset",
+        "0x00064C96": "offset",
+        "0x00064CAB": "keep",
+        "0x0013DD60": "offset",
+        "0x0013DEAA": "offset",
+        "0x0013DF6E": "offset",
+        "0x0013F6B0": "offset",
+        "0x0013F790": "offset",
+        "0x002E6FA0": "offset",
+        "0x002E7290": "offset",
+        "0x002E7420": "offset",
+        "0x002F0780": "offset",
+        "0x002F0F70": "offset",
+        "0x002F0FB1": "offset",
+        "0x002F1460": "offset",
+        "0x002F14B2": "offset",
+        "0x002F1600": "offset",
+        "0x002F165E": "offset",
+        "0x002F29F0": "offset",
+        "0x002F2AFF": "offset",
+        "0x002F2B48": "offset",
+        "0x002F6980": "offset",
+        "0x002F71E0": "offset",
+        "0x00357B23": "offset"
+      },
+      "data_ok": [],
+      "reason": "rank table: one dword per place, 16 (sub_000646B0/sub_00064810 fill it for humans + bots); 64 so more than 16 characters cannot write the team scores 0x007DE500 that follow it (kept)"
+    }
+  ]
+}

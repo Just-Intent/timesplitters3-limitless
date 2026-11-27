@@ -17,6 +17,7 @@ typedef struct tsfp_image_info {
     uint32_t title_id, region;
     uint32_t tls_directory, tls_start, tls_bytes, tls_zero_fill, tls_index;
     char title[121]; /* At most 40 UTF-16 units, encoded as UTF-8 plus NUL. */
+    uint32_t extension_va, extension_size; /* Reserved block; 0 when none. */
 } tsfp_image_info;
 
 /* Input bytes must remain immutable throughout either call. Metadata is
@@ -38,4 +39,14 @@ tsfp_image_result tsfp_image_load(const void *file, size_t size, void *ram,
 tsfp_image_result tsfp_image_bootstrap(const tsfp_image_info *info, size_t limit,
                                       uint32_t *low_shift, uint32_t *tls_total);
 const char *tsfp_image_result_name(tsfp_image_result result);
+/* A title may reserve a zeroed block of guest memory directly after its image,
+ * at an address fixed when its code is generated, so that tables the lifted
+ * code addresses absolutely can be relocated there and grown (the project's
+ * config/guest-code-patches tables). Call before inspection/loading. The block
+ * starts at the image end rounded up to 64 KB, counts as part of the image
+ * (image_end/image_hi), and so moves the runtime's low services up by its size.
+ * bytes is rounded up to 64 KB; 0 removes the reservation. */
+void tsfp_image_set_extension(uint32_t bytes);
+/* The block placed by the last successful tsfp_image_load; 0 when none. */
+uint32_t tsfp_image_extension(uint32_t *size);
 #endif

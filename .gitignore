@@ -44,6 +44,8 @@ xbox_kernel.log
 # Native launcher state in a development checkout.
 /.launcher/
 
+# Agent worktrees (local, one per parallel task)
+/.claude/worktrees/
 # Save archives contain personal progress and stay local.
 /Backups/
 *.tsfpsave
@@ -68,3 +70,5 @@ xbox_kernel.log
 /tests/network/test_online_migration.py
 /tests/network/test_arcade_service.py
 /tests/network/test_online_dashboard.py
+/config/pc-music.ini
+/config/pc-music.ini.tmp

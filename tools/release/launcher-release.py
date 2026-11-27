@@ -31,7 +31,7 @@ import zipfile
 from release_notes import read_release_notes
 
 ROOT = _layout_root
-REPOSITORY = 'TheDoffman/timesplitters-future-perfect-pc'
+from project_repository import REPOSITORY  # noqa: E402  shared release source (tools/)
 PLATFORMS = ('windows-x64', 'macos-arm64', 'linux-x64')
 VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z.-]+))?\Z')
 

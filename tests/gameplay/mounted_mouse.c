@@ -32,6 +32,11 @@ int main(void)
     U(0x31008)=0x1000000;F(0x3105c)=1.6f;
     MOVE(10,10);CHECK(pc_mounted_mouse(&input,1001,.1f,1,0x10000,0x40000,offset,0)==1);
     CHECK(fabsf(F(0x31024)+.8f)<.001f && fabsf(F(0x3101c)-29.2f)<.001f);
+    /* The sweep negates +5C at each limit: a camera taken over mid-sweep
+     * still turns the same way at the same speed (MapMaker camera). */
+    F(0x3101c)=30;F(0x31024)=0;F(0x3105c)=-1.6f;
+    MOVE(10,10);CHECK(pc_mounted_mouse(&input,1002,.1f,1,0x10000,0x40000,offset,0)==1);
+    CHECK(fabsf(F(0x31024)+.8f)<.001f && fabsf(F(0x3101c)-29.2f)<.001f);
     /* Exact authored fixed axes and full-circle guns retain their semantics. */
     U(0x31008)=0;F(0x40384)=55;F(0x31034)=F(0x31038)=15;
     F(0x3103c)=-180;F(0x31040)=180;F(0x31024)=179;
@@ -71,8 +76,8 @@ int main(void)
     U(0x10114)=0x2000;MOVE(10,20);CHECK(APPLY()==-1 && input.dx==10);
     input.dx=input.dy=0;
     /* Vehicle seat ownership is independent of C14 and character names. */
-    U(0x10114)=0x400;U(0x2002c)=77;U(0x21c08)=0x400001;
-    U(0x72f5e8)=0x70000;U(0x70314)=0x400001;U(0x70364)=0x71000;
+    U(0x10114)=0x400;U(0x2002c)=77;U(0x21c08)=0x200001;
+    U(0x72f5e8)=0x70000;U(0x70314)=0x200001;U(0x70364)=0x71000;
     U(0x71140)=4;U(0x71164)=2;U(0x71154)=0x31000;
     const uint32_t seat=0x71070+3*0x34;
     U(seat)=77;U(seat+0x30)=4;U(seat+0x2c)=1;

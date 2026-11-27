@@ -1,0 +1,720 @@
+/* Asset-free contract for src/interface/pc_mapmaker_roof.inc (MapMaker "Open roof" and
+ * "Open air" tiles): inert without TSFP_MAPMAKER_LIMITS=1 and outside the
+ * editor; a flagged piece's masks lose the ceiling (and side) bits (the
+ * flags come from the tile roof menu; the tile-8 palette presets 46/47 are
+ * gone, and the palette, text and caption calls have no hook); rebuilds store
+ * the mark in record word +0x26 and the open mask in +8; loads put the marks
+ * back; reused pieces and resets forget them; placing/picking up copies a
+ * piece and the mark follows it to the copy (place -> save -> play reads +8
+ * -> reload); freed pieces forget it; a flagged piece's grid label "%d.%s"
+ * keeps its number and gets the flag after the name; records with item
+ * sub-records (start points) are
+ * walked whole, so a play -> editor reload -> copy -> play round trip keeps
+ * every open tile; Open air (bounded) saves the walls (mark 0x5203), shows
+ * none in the editor view and leaves the side nodes out of the play draw of
+ * exactly its rooms; rooms marked two-sided (by the open-air view) draw
+ * their geometry with prop +0x28 bit 0x40000 for the call only; a map with
+ * an Open air (unbounded) tile kills live
+ * characters 20 units below its lowest floor through sub_000BD090; every
+ * hook pops only its return address. */
+#define TSFP_MAPMAKER_ROOF_TEST 1
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static uint32_t memory[0x00A00000/4], g_eax, g_ecx, g_edx, g_esp;
+static uintptr_t g_xbox_mem_offset;
+#define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+#define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
+typedef struct GuestRegisters { uint32_t a,c,d,sp; } GuestRegisters;
+static void save_registers(GuestRegisters *r) { r->a=g_eax;r->c=g_ecx;r->d=g_edx;r->sp=g_esp; }
+static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r->d;g_esp=r->sp; }
+void sub_0003DFA0(void) { g_ecx=6; }
+/* sub_000BD090(entity): the stock kill-now helper; here it records the call
+ * and sets the health to 0 as sub_000BABA0 does. */
+void sub_000BD090(void) { g_ecx=7; }
+/* sub_00087310(box, out, max): room query; answers rooms_answer rooms and
+ * remembers the box. */
+void sub_00087310(void) { g_ecx=8; }
+static int rooms_answer=1;
+static unsigned nqueries;
+static float query_box[6];
+static uint32_t killed[8];
+static unsigned nkilled;
+static uint32_t guest_call(void (*f)(void),int n,...)
+{
+    va_list a;
+    uint32_t x;
+    va_start(a,n);x=n>0?va_arg(a,uint32_t):0u;va_end(a);
+    if(f==sub_00087310 && n==3) {
+        nqueries++;
+        memcpy(query_box,(char *)memory+x,sizeof query_box);
+        return (uint32_t)rooms_answer;
+    }
+    if(f==sub_000BD090 && n==1) {
+        if(nkilled<8u) killed[nkilled]=x;
+        nkilled++;
+        *(float *)((char *)memory+x+0x1CC)=0.0f;
+    }
+    return 0;
+}
+static uint32_t heap_result=0x00300000u;
+static int heap_calls;
+uint32_t xbox_HeapAlloc(uint32_t bytes,uint32_t alignment)
+{
+    uint32_t p=heap_result;
+    (void)alignment;heap_calls++;
+    if(p) { memset((char *)memory+p,0xCD,bytes);heap_result+=0x1000u; }
+    return p;
+}
+#include "pc_mapmaker_budget.inc"
+#include "pc_mapmaker_limits.inc"
+#include "pc_mapmaker_roof.inc"
+
+static int failures, esp_errors;
+#define ESP0 0x00600000u
+#define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
+static void set_env(const char *name,const char *value)
+{
+#ifdef _WIN32
+    _putenv_s(name,value?value:"");
+#else
+    if(value)setenv(name,value,1); else unsetenv(name);
+#endif
+    memset(&mapmaker_limits,0,sizeof mapmaker_limits);
+}
+
+/* ---- fake guest ---------------------------------------------------------- */
+#define ED 0x00100000u            /* editor object [0x007844A8] */
+#define PIECES 0x00110000u        /* editor pieces, 0x48 bytes */
+#define C 0x00200000u             /* container */
+#define BASE_TILE 8u              /* Small Open */
+#define NAME 0x00131000u          /* a tile name string */
+
+static void hook(void (*fn)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t arg0,uint32_t arg1)
+{
+    uint32_t r=g_eax;
+    g_esp=ESP0;WORD_AT(ESP0)=ret;WORD_AT(ESP0+4)=arg0;WORD_AT(ESP0+8)=arg1;
+    g_eax=r;
+    fn(orig);
+    if(g_esp!=ESP0+4u) { fprintf(stderr,"esp %+d after a hook\n",(int)(g_esp-ESP0));esp_errors++; }
+    g_esp=ESP0;
+}
+static uint32_t piece(unsigned i) { return PIECES+i*0x48u; }
+static void make_piece(unsigned i,uint32_t tile,int x,int y,int z,int rot,uint32_t next)
+{
+    uint32_t p=piece(i);
+    memset((char *)memory+p,0,0x48);
+    FLOAT_AT(p)=(float)x;FLOAT_AT(p+4)=(float)y;FLOAT_AT(p+8)=(float)z;
+    WORD_AT(p+0xC)=(uint32_t)rot;WORD_AT(p+0x10)=tile;WORD_AT(p+0x40)=next;
+}
+/* sub_002FC680 / sub_002FC470. */
+static uint32_t mask_value;
+static void mask_original(void) { g_eax=mask_value;g_esp+=4u; }
+static uint32_t mask(uint32_t p) { mask_value=0xFFFFFFFFu;hook(pc_mapmaker_roof_mask,mask_original,0x00300CA9u,p,0);return g_eax; }
+static uint32_t reduced(uint32_t p) { mask_value=0x0B000000u;hook(pc_mapmaker_roof_reduced,mask_original,0x00300BFBu,p,0);return g_eax; }
+
+/* sub_003006C0: writes one record per list piece: 0x28 bytes + pads*8
+ * (+0x24, here tile % 3 pads) + the piece's items (count +0x1E; here the
+ * fixture's piece word +0x3C), item k being ((k+1)*4 + 0x1B) & ~3 bytes of
+ * junk with its count byte +0x14 = k+1 (0x00300D60, 0x00300D93..0x0030116E). */
+static int skew;
+#define ITEM_BYTES(k) ((((k)+1u)*4u+0x1Bu)&~3u)
+static void compile_original(void)
+{
+    uint32_t c=WORD_AT(g_esp+4),p=WORD_AT(0x0078400Cu),r=c+0x10u,start,first=p;
+    memset((char *)memory+c,0,0x2000);
+    WORD_AT(c)=0x00C77667u;WORD_AT(c+4)=0x12Du;
+    WORD_AT(c+8)=0x00C77668u;WORD_AT(c+12)=0;              /* (empty) info chunk */
+    WORD_AT(r)=0x00C77669u;start=r+8u;r=start;
+    for(;p;p=WORD_AT(p+0x40)) {
+        uint32_t pads=WORD_AT(p+0x10)%3u,items=WORD_AT(p+0x3C),k;
+        WORD_AT(r)=WORD_AT(p+0x10)+(skew && p==first?1u:0u);
+        WORD_AT(r+4)=((uint32_t)(int32_t)FLOAT_AT(p)&0xFFu)|((uint32_t)(int32_t)FLOAT_AT(p+4)&0xFFu)<<8|
+                     ((uint32_t)(int32_t)FLOAT_AT(p+8)&0xFFu)<<16|(WORD_AT(p+0xC)&0xFFu)<<24;
+        WORD_AT(r+8)=0x03FFFFFFu;
+        WORD_AT(r+0x1C)=items<<16;
+        WORD_AT(r+0x24)=0x28u+pads*8u;
+        r+=0x28u+pads*8u;
+        for(k=0;k<items;k++) {
+            memset((char *)memory+r,0x77,ITEM_BYTES(k));
+            *((unsigned char *)memory+r+0x14)=(unsigned char)(k+1u);
+            r+=ITEM_BYTES(k);
+        }
+    }
+    WORD_AT(start-4)=r-start;
+    WORD_AT(r)=0x00C7766Au;
+    g_esp+=4u;
+}
+static void compile(void) { hook(pc_mapmaker_roof_compile,compile_original,0x00313B01u,C,3u); }
+static uint32_t record(unsigned n)
+{
+    uint32_t r=C+0x18u;
+    while(n--) {
+        uint32_t items=WORD_AT(r+0x1C)>>16,k;
+        r+=WORD_AT(r+0x24)&0xFFFFu;
+        for(k=0;k<items;k++) r+=ITEM_BYTES(k);
+    }
+    return r;
+}
+/* The editor start after a play (sub_00302A60 -> sub_00301A90 at
+ * 0x00303076): a new heap, so new piece pointers, made in record order. */
+static void reload_pieces(unsigned base,unsigned n)
+{
+    unsigned i;
+    for(i=0;i<n;i++) {
+        uint32_t r=record(i),xyz=WORD_AT(r+4);
+        make_piece(base+i,WORD_AT(r),(int8_t)(xyz&0xFFu),(int8_t)(xyz>>8&0xFFu),(int8_t)(xyz>>16&0xFFu),
+                   (int8_t)(xyz>>24),i+1u<n?piece(base+i+1u):0u);
+        WORD_AT(piece(base+i)+0x3C)=WORD_AT(r+0x1C)>>16;
+    }
+    WORD_AT(0x0078400Cu)=piece(base);
+}
+
+static void plain_original(void) { g_esp+=4u; }
+static void load_original(void) { g_esp+=4u; }   /* the pieces are made by the test */
+static void load(void) { hook(pc_mapmaker_roof_load,load_original,0x0032BB6Eu,C,0); }
+static int count_record(uint32_t r,void *ctx) { (void)r;(void)ctx;return 1; }
+static uint32_t new_result;
+static void new_original(void) { g_eax=new_result;g_esp+=4u; }
+
+/* sub_003037A0 / pickup: the editor copies the 0x48 bytes into a new piece,
+ * then sub_002F95E0(old, new) (move) or sub_00308120(src, dst) (copy), and
+ * frees the old one with sub_00308480. */
+static void copy_bytes(uint32_t from,uint32_t to) { memcpy((char *)memory+to,(char *)memory+from,0x48); }
+static void move_piece(uint32_t from,uint32_t to)
+{
+    copy_bytes(from,to);
+    hook(pc_mapmaker_roof_move,plain_original,0x00303883u,from,to);
+}
+static void copy_piece(uint32_t from,uint32_t to)
+{
+    copy_bytes(from,to);
+    hook(pc_mapmaker_roof_copy,plain_original,0x002F9BBBu,from,to);
+}
+static void free_piece(uint32_t p) { hook(pc_mapmaker_roof_piece_free,plain_original,0x00308579u,p,0); }
+/* sub_0008A780 0x0008A91D: play takes the record's +8 as the room mask. */
+static uint32_t play_mask(unsigned n) { return WORD_AT(record(n)+8); }
+
+/* sub_00151030(format, ...) at 0x00311724: "%d.%s" with the tile number and
+ * the name; returns the number it printed. */
+static uint32_t printed,printed_name;
+static void format_original(void) { printed=WORD_AT(g_esp+8);printed_name=WORD_AT(g_esp+12);g_esp+=4u; }
+static uint32_t format(uint32_t ret,uint32_t fmt,uint32_t number,uint32_t name)
+{
+    g_esp=ESP0;WORD_AT(ESP0)=ret;WORD_AT(ESP0+4)=fmt;WORD_AT(ESP0+8)=number;WORD_AT(ESP0+12)=name;
+    pc_mapmaker_roof_format(format_original);
+    if(g_esp!=ESP0+4u) { fprintf(stderr,"esp %+d after the format hook\n",(int)(g_esp-ESP0));esp_errors++; }
+    g_esp=ESP0;
+    return printed;
+}
+/* ---- play ---------------------------------------------------------------- */
+/* sub_0008A780: one 0x68-byte build entry per record (rooms +0x14, first room
+ * +0x28, mask +0x44 = record +8), then sub_00085710(entry) in record order. */
+#define BUILDS 0x00170000u
+static unsigned build_rooms[8]={1,2,1,3,1,1,1,1},skew_at=99u;
+static void rooms_original(void) { g_esp+=4u; }
+static int count_into(uint32_t r,void *ctx) { (void)r;(*(int *)ctx)++;return 1; }
+static void play_original(void)
+{
+    uint32_t save=g_esp,base=0;
+    int n=0;                                      /* the stock builder needs no end chunk */
+    unsigned k;
+    (void)mapmaker_roof_records(C,count_into,&n);
+    for(k=0;n>0 && k<(unsigned)n && k<8u;k++) {
+        uint32_t b=BUILDS+k*0x68u;
+        memset((char *)memory+b,0,0x68);
+        WORD_AT(b+0x14)=build_rooms[k];WORD_AT(b+0x28)=base;WORD_AT(b+0x44)=WORD_AT(record(k)+8)^(k==skew_at?1u:0u);
+        base+=build_rooms[k];
+        g_esp=0x00620000u;WORD_AT(g_esp)=0x0008AC76u;WORD_AT(g_esp+4)=b;
+        pc_mapmaker_roof_rooms(rooms_original);
+        if(g_esp!=0x00620004u) esp_errors++;
+    }
+    g_esp=save;g_esp+=4u;
+}
+static void play(void) { hook(pc_mapmaker_roof_play,play_original,0x00312E50u,0,0); }
+/* Room r (1-based): geometry prop (+4 inst, +0x34 r, 16-bit model +0x94 =
+ * 0x907+r next to another word +0x96), instance [inst] = prop, inst+0x30 =
+ * mask, inst+4 = node header (count; nodes of 0xC8 bytes before it, mask
+ * +0x5C). sub_0008F6B0(inst, ...) draws. */
+#define NODES 0x001C0000u
+#define PROPS 0x001A0000u
+#define INSTS 0x001B0000u
+static uint32_t inst_of(unsigned room) { return INSTS+room*0x40u; }
+static uint32_t prop_of(unsigned room) { return PROPS+room*0x100u; }
+static void make_room(unsigned room,uint32_t mask)
+{
+    uint32_t pr=prop_of(room),in=inst_of(room);
+    memset((char *)memory+pr,0,0x100);memset((char *)memory+in,0,0x40);
+    uint32_t header=NODES+room*0x1000u;
+    WORD_AT(pr+4)=in;WORD_AT(pr+0x34)=room;WORD_AT(pr+0x94)=0x00050000u|(0x907u+room);WORD_AT(in)=pr;WORD_AT(in+0x30)=mask;
+    /* nodes: the floor (bit 24), one always drawn (0), a wall (bit 0) */
+    WORD_AT(in+4)=header;WORD_AT(header)=3u;
+    WORD_AT(header-3u*0xC8u+0x5Cu)=0x01000000u;WORD_AT(header-2u*0xC8u+0x5Cu)=0;WORD_AT(header-1u*0xC8u+0x5Cu)=0x00000001u;
+}
+static uint32_t drawn_mask,drawn_flags;
+static void draw_original(void) { drawn_mask=WORD_AT(WORD_AT(g_esp+4)+0x30);drawn_flags=WORD_AT(WORD_AT(WORD_AT(g_esp+4))+0x28);g_esp+=4u; }
+static uint32_t draw(unsigned room) { drawn_mask=drawn_flags=0;hook(pc_mapmaker_roof_draw,draw_original,0x0008FA11u,inst_of(room),0);return drawn_mask; }
+/* The label over the grid for the piece under the cursor (or held). */
+static const char *label(void)
+{
+    uint32_t n=format(MAPMAKER_ROOF_RET_HOVER_FORMAT,MAPMAKER_ROOF_HOVER_FORMAT,1u,NAME);
+    if(n!=1u) return "renumbered";
+    return printed_name==NAME?"stock":(const char *)memory+printed_name;
+}
+static uint32_t view_mask(uint32_t p) { mask_value=0xFFFFFFFFu;hook(pc_mapmaker_roof_mask,mask_original,MAPMAKER_ROOF_RET_VIEW,p,0);return g_eax; }
+/* sub_0003C440 (game tick) and the live characters 0x00900100 / count
+ * [0x0074C37C]: entity = [actor], entity +0x7C = actor, health +0x1CC,
+ * y +0x68. */
+#define ACTORS 0x00180000u
+#define ENTS 0x00190000u
+static int ticks;
+static void tick_original(void) { ticks++;g_esp+=4u; }
+static void tick(void) { hook(pc_mapmaker_roof_tick,tick_original,0x0003D3CFu,0,0); }
+static uint32_t ent_of(unsigned i) { return ENTS+i*0x400u; }
+static void make_actor(unsigned i,float y,float health)
+{
+    uint32_t a=ACTORS+i*0x10u,e=ent_of(i);
+    WORD_AT(0x00900100u+i*4u)=a;WORD_AT(a)=e;WORD_AT(e+0x7C)=a;FLOAT_AT(e+0x68)=y;FLOAT_AT(e+0x1CC)=health;
+}
+
+int main(void)
+{
+    uint32_t p;
+    g_xbox_mem_offset=(uintptr_t)memory;
+    WORD_AT(0x007844A8u)=ED;WORD_AT(0x00784014u)=C;WORD_AT(ED+0x200)=1;
+    strcpy((char *)memory+NAME,"Small Open");
+    make_piece(0,3,1,1,0,0,piece(1));make_piece(1,BASE_TILE,2,1,0,1,piece(2));make_piece(2,7,3,1,1,2,0);
+    WORD_AT(piece(0)+0x3C)=2u;                              /* a start point and a weapon on the first tile */
+    WORD_AT(0x0078400Cu)=piece(0);
+
+    /* ---- limits off: stock ---- */
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);set_env("TSFP_MAPMAKER_POOLS",NULL);
+    WORD_AT(0x0079094Cu)=102u;
+    mapmaker_roof_set(piece(1),MAPMAKER_ROOF_OPEN_AIR);   /* even a stale mark does nothing */
+    CHECK(mask(piece(1))==0xFFFFFFFFu && reduced(piece(1))==0x0B000000u);
+    WORD_AT(ED+0x2F18)=piece(1);
+    CHECK(!strcmp(label(),"stock") && heap_calls==0);
+    WORD_AT(ED+0x2F18)=0;
+    compile();
+    CHECK((WORD_AT(record(1)+0x24)>>16)==0 && WORD_AT(record(1)+8)==0x03FFFFFFu);
+    mapmaker_roof_test_reset();
+
+    /* ---- limits on, editor: flagged pieces (the tile roof menu marks them) ---- */
+    set_env("TSFP_MAPMAKER_LIMITS","1");
+    make_piece(20,BASE_TILE,5,6,0,0,0);p=piece(20);
+    mapmaker_roof_set(p,MAPMAKER_ROOF_OPEN_AIR);
+    make_piece(21,BASE_TILE,5,6,0,0,0);WORD_AT(ED+0x2F7C)=piece(21);
+    mapmaker_roof_set(piece(21),MAPMAKER_ROOF_OPEN_ROOF);
+
+    /* masks */
+    CHECK(mask(p)==~0x02FFFFFFu && reduced(p)==0x09000000u);
+    CHECK(mask(WORD_AT(ED+0x2F7C))==~0x02000000u);
+    CHECK(mask(piece(0))==0xFFFFFFFFu && reduced(piece(0))==0x0B000000u);
+    WORD_AT(0x0079094Cu)=100u;
+    CHECK(mask(p)==0xFFFFFFFFu && reduced(p)==0x0B000000u);
+    WORD_AT(0x0079094Cu)=102u;
+
+    /* place: the held piece is copied into a new list piece; the mark moves
+     * with it, the freed held piece forgets it (reused pointer stays closed) */
+    {
+        uint32_t held=WORD_AT(ED+0x2F7C),placed=piece(30),dup=piece(31),list=WORD_AT(0x0078400Cu);
+        move_piece(held,placed);
+        CHECK(mapmaker_roof_mode(placed)==MAPMAKER_ROOF_OPEN_ROOF);
+        free_piece(held);
+        CHECK(mapmaker_roof_mode(held)==0 && mapmaker_roof.freed==1u);
+        CHECK(mask(placed)==~0x02000000u);
+        WORD_AT(piece(2)+0x40)=placed;WORD_AT(placed+0x40)=0;
+        FLOAT_AT(placed)=4.0f;FLOAT_AT(placed+4)=2.0f;
+        WORD_AT(ED+0x2F18)=placed;                             /* the label over the grid */
+        CHECK(!strcmp(label(),"Small Open (No Roof)"));
+        WORD_AT(ED+0x2F18)=piece(0);
+        CHECK(!strcmp(label(),"stock"));
+        WORD_AT(ED+0x2F18)=placed;
+        CHECK(format(0x00311000u,MAPMAKER_ROOF_HOVER_FORMAT,1u,NAME)==1u && printed_name==NAME);   /* another caller */
+        CHECK(format(MAPMAKER_ROOF_RET_HOVER_FORMAT,0x0049F838u,1u,NAME)==1u && printed_name==NAME); /* another format */
+        WORD_AT(0x0079094Cu)=100u;CHECK(!strcmp(label(),"stock"));WORD_AT(0x0079094Cu)=102u;      /* not the editor */
+        WORD_AT(ED+0x2F18)=piece(0);
+        /* save (rebuild, here the hand-over in scene 100): marker and open
+         * mask in the record; play reads +8 */
+        WORD_AT(0x0079094Cu)=100u;compile();WORD_AT(0x0079094Cu)=102u;
+        CHECK((WORD_AT(record(3)+0x24)>>16)==0x5201u);
+        CHECK(play_mask(3)==(0x03FFFFFFu&~0x02000000u) && (play_mask(3)&0x01000000u));
+        CHECK(play_mask(0)==0x03FFFFFFu && play_mask(1)==0x03FFFFFFu && play_mask(2)==0x03FFFFFFu);
+        /* copy (pick up a copy): both keep the mark */
+        copy_piece(placed,dup);
+        CHECK(mapmaker_roof_mode(dup)==MAPMAKER_ROOF_OPEN_ROOF && mapmaker_roof_mode(placed)==MAPMAKER_ROOF_OPEN_ROOF);
+        free_piece(dup);
+        CHECK(mapmaker_roof_mode(dup)==0 && mapmaker_roof_mode(placed)==MAPMAKER_ROOF_OPEN_ROOF);
+        copy_piece(piece(0),dup);                              /* a closed source marks nothing */
+        CHECK(mapmaker_roof_mode(dup)==0);
+        /* reload: the reset forgets, the load matches the record again */
+        hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+        CHECK(mapmaker_roof_mode(placed)==0);
+        load();
+        CHECK(mapmaker_roof_mode(placed)==MAPMAKER_ROOF_OPEN_ROOF);
+        compile();
+        CHECK((WORD_AT(record(3)+0x24)>>16)==0x5201u && play_mask(3)==(0x03FFFFFFu&~0x02000000u));
+        /* open air through the same path: walls and ceiling gone, floor kept */
+        mapmaker_roof_set(placed,MAPMAKER_ROOF_OPEN_AIR);
+        move_piece(placed,dup);free_piece(placed);
+        CHECK(mapmaker_roof_mode(dup)==MAPMAKER_ROOF_OPEN_AIR && mapmaker_roof_mode(placed)==0);
+        WORD_AT(piece(2)+0x40)=dup;
+        compile();
+        CHECK((WORD_AT(record(3)+0x24)>>16)==0x5202u && play_mask(3)==0x01000000u);
+        WORD_AT(piece(2)+0x40)=0;WORD_AT(0x0078400Cu)=list;
+        mapmaker_roof_set(dup,0);
+    }
+
+    /* rebuild: the placed list piece 1 is open air */
+    mapmaker_roof_set(piece(1),MAPMAKER_ROOF_OPEN_AIR);
+    compile();
+    CHECK((WORD_AT(record(1)+0x24)>>16)==0x5202u);
+    CHECK((WORD_AT(record(1)+0x24)&0xFFFFu)==0x28u+8u*(BASE_TILE%3u));
+    CHECK(WORD_AT(record(1)+8)==(0x03FFFFFFu&~0x02FFFFFFu));
+    CHECK((WORD_AT(record(0)+0x24)>>16)==0 && WORD_AT(record(0)+8)==0x03FFFFFFu);
+    CHECK((WORD_AT(record(2)+0x24)>>16)==0 && WORD_AT(record(2)+8)==0x03FFFFFFu);
+    CHECK(mapmaker_roof.mismatch==0u);
+    skew=1;compile();skew=0;                                /* records not in list order: nothing stored */
+    CHECK(mapmaker_roof.mismatch==1u && (WORD_AT(record(1)+0x24)>>16)==0 && WORD_AT(record(1)+8)==0x03FFFFFFu);
+
+    /* reset forgets; load restores from the records */
+    compile();
+    hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+    CHECK(mapmaker_roof.marked==0u && mapmaker_roof_mode(piece(1))==0);
+    load();
+    CHECK(mapmaker_roof_mode(piece(1))==MAPMAKER_ROOF_OPEN_AIR && mapmaker_roof_mode(piece(0))==0 && mapmaker_roof_mode(piece(2))==0);
+    CHECK(mapmaker_roof.restored==2u);                       /* 1 from the place test */
+    hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+    FLOAT_AT(piece(1)+4)=9.0f;                              /* moved: no match */
+    load();
+    CHECK(mapmaker_roof_mode(piece(1))==0 && mapmaker_roof.unmatched==1u);
+    FLOAT_AT(piece(1)+4)=1.0f;
+    WORD_AT(record(1)+0x24)=(WORD_AT(record(1)+0x24)&0xFFFFu)|0x52070000u;   /* unknown mode: ignored */
+    load();
+    CHECK(mapmaker_roof_mode(piece(1))==0 && mapmaker_roof.unmatched==1u);
+    WORD_AT(record(1)+0x24)=(WORD_AT(record(1)+0x24)&0xFFFFu)|0x52010000u;
+    WORD_AT(C)=0;load();                                    /* refused container: nothing */
+    CHECK(mapmaker_roof_mode(piece(1))==0);
+    WORD_AT(C)=0x00C77667u;load();
+    CHECK(mapmaker_roof_mode(piece(1))==MAPMAKER_ROOF_OPEN_ROOF);
+    CHECK(mapmaker_roof_records(C,count_record,NULL)==3);
+    WORD_AT(record(0)+0x24)=0x0010u;load();                 /* malformed record size: stops */
+    CHECK(mapmaker_roof.restored==3u && mapmaker_roof_records(C,count_record,NULL)==-1);
+    WORD_AT(record(0)+0x24)=0x1000u;
+    CHECK(mapmaker_roof_records(C,count_record,NULL)==-1);  /* past the chunk */
+
+    /* a reused piece pointer starts closed */
+    new_result=piece(1);
+    hook(pc_mapmaker_roof_piece_new,new_original,0x003021C6u,3u,0);
+    CHECK(mapmaker_roof_mode(piece(1))==0);
+
+    /* ---- play -> editor -> copy -> play (v0.4.0-mapmaker.7 report) ----
+     * A start point (items) on the first tile, open tiles after it, one
+     * open tile with an item of its own. */
+    hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+    make_piece(40,3,0,0,0,0,piece(41));WORD_AT(piece(40)+0x3C)=3u;
+    make_piece(41,BASE_TILE,1,0,0,0,piece(42));
+    make_piece(42,BASE_TILE,2,0,0,1,piece(43));WORD_AT(piece(42)+0x3C)=1u;
+    make_piece(43,7,3,0,0,0,0);
+    WORD_AT(0x0078400Cu)=piece(40);
+    mapmaker_roof_set(piece(41),MAPMAKER_ROOF_OPEN_ROOF);mapmaker_roof_set(piece(42),MAPMAKER_ROOF_OPEN_AIR);
+    {
+        unsigned long long mism=mapmaker_roof.mismatch;
+        compile();                                          /* Play: the hand-over (sub_00312DF0) */
+        CHECK(mapmaker_roof.mismatch==mism);
+        CHECK((WORD_AT(record(1)+0x24)>>16)==0x5201u && (WORD_AT(record(2)+0x24)>>16)==0x5202u);
+        CHECK((WORD_AT(record(0)+0x24)>>16)==0 && (WORD_AT(record(3)+0x24)>>16)==0);
+        CHECK(play_mask(1)==(0x03FFFFFFu&~0x02000000u) && play_mask(2)==0x01000000u && play_mask(3)==0x03FFFFFFu);
+        /* back to the editor: new pieces from the records */
+        hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+        reload_pieces(50,4);
+        load();
+        CHECK(mapmaker_roof_mode(piece(51))==MAPMAKER_ROOF_OPEN_ROOF && mapmaker_roof_mode(piece(52))==MAPMAKER_ROOF_OPEN_AIR);
+        CHECK(mapmaker_roof_mode(piece(50))==0 && mapmaker_roof_mode(piece(53))==0);
+        CHECK(mapmaker_roof_mode(piece(41))==0 && mapmaker_roof_mode(piece(42))==0);
+        /* the label over the grid: the piece under the cursor, else the held one */
+        WORD_AT(ED+0x2F18)=piece(51);WORD_AT(ED+0x2F7C)=0;
+        CHECK(!strcmp(label(),"Small Open (No Roof)"));
+        WORD_AT(ED+0x2F18)=piece(50);
+        CHECK(!strcmp(label(),"stock"));
+        /* copy the open-air tile: a held copy, placed as a new piece */
+        copy_piece(piece(52),piece(54));WORD_AT(ED+0x2F7C)=piece(54);WORD_AT(ED+0x2F18)=0;
+        CHECK(!strcmp(label(),"Small Open (Open Air, Unbounded)"));      /* the held piece */
+        WORD_AT(ED+0x2F7C)=0;
+        CHECK(!strcmp(label(),"stock"));                                  /* nothing under the cursor */
+        move_piece(piece(54),piece(55));free_piece(piece(54));
+        FLOAT_AT(piece(55))=4.0f;WORD_AT(piece(53)+0x40)=piece(55);WORD_AT(piece(55)+0x40)=0;
+        CHECK(mapmaker_roof_mode(piece(55))==MAPMAKER_ROOF_OPEN_AIR && mapmaker_roof_mode(piece(52))==MAPMAKER_ROOF_OPEN_AIR);
+        compile();                                          /* Play again */
+        CHECK(mapmaker_roof.mismatch==mism);
+        CHECK((WORD_AT(record(1)+0x24)>>16)==0x5201u && (WORD_AT(record(2)+0x24)>>16)==0x5202u &&
+              (WORD_AT(record(4)+0x24)>>16)==0x5202u);
+        CHECK(play_mask(1)==(0x03FFFFFFu&~0x02000000u) && play_mask(2)==0x01000000u && play_mask(4)==0x01000000u);
+        CHECK(play_mask(0)==0x03FFFFFFu && play_mask(3)==0x03FFFFFFu);
+        /* and back once more (undo and Load map reload through the same loader) */
+        hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+        reload_pieces(60,5);
+        load();
+        CHECK(mapmaker_roof_mode(piece(61))==MAPMAKER_ROOF_OPEN_ROOF && mapmaker_roof_mode(piece(62))==MAPMAKER_ROOF_OPEN_AIR &&
+              mapmaker_roof_mode(piece(64))==MAPMAKER_ROOF_OPEN_AIR && mapmaker_roof_mode(piece(60))==0 && mapmaker_roof_mode(piece(63))==0);
+        CHECK(mapmaker_roof_records(C,count_record,NULL)==5);
+    }
+
+    /* ---- Open air (bounded) and (unbounded) in play ---------------------- */
+    hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+    WORD_AT(0x0079094Cu)=102u;
+    make_piece(80,3,0,0,0,0,piece(81));
+    make_piece(81,BASE_TILE,1,0,0,0,piece(82));
+    make_piece(82,9,2,0,-1,0,piece(83));                    /* the lowest floor, -1 */
+    make_piece(83,10,3,0,1,0,0);
+    WORD_AT(0x0078400Cu)=piece(80);
+    mapmaker_roof_set(piece(81),MAPMAKER_ROOF_OPEN_BOUNDED);mapmaker_roof_set(piece(83),MAPMAKER_ROOF_OPEN_BOUNDED);
+    CHECK(mask(piece(81))==~0x02000000u);                  /* saved: walls kept */
+    CHECK(view_mask(piece(81))==~0x02FFFFFFu);             /* editor view: no walls */
+    CHECK(view_mask(piece(80))==0xFFFFFFFFu);
+    CHECK(reduced(piece(81))==0x09000000u);
+    compile();
+    CHECK((WORD_AT(record(1)+0x24)>>16)==0x5203u && (WORD_AT(record(3)+0x24)>>16)==0x5203u);
+    CHECK(play_mask(1)==(0x03FFFFFFu&~0x02000000u) && play_mask(3)==(0x03FFFFFFu&~0x02000000u) && play_mask(2)==0x03FFFFFFu);
+    /* the label: a bounded tile 8 keeps its name with a suffix and its own number */
+    WORD_AT(ED+0x2F18)=piece(81);
+    CHECK(!strcmp(label(),"Small Open (Open Air, Bounded)"));
+    WORD_AT(ED+0x2F18)=0;
+    /* the mark loads back */
+    hook(pc_mapmaker_roof_reset,plain_original,0x00301B4Fu,0,0);
+    load();
+    CHECK(mapmaker_roof_mode(piece(81))==MAPMAKER_ROOF_OPEN_BOUNDED && mapmaker_roof_mode(piece(83))==MAPMAKER_ROOF_OPEN_BOUNDED &&
+          !mapmaker_roof_mode(piece(80)) && !mapmaker_roof_mode(piece(82)));
+    /* play: rooms 0 | 1,2 | 3 | 4,5,6 (indices); bounded pieces 1 and 3 */
+    WORD_AT(0x0079094Cu)=100u;
+    mapmaker_roof_play.twosided[0]=1;mapmaker_roof_play.twosided_rooms=1;   /* left from another map */
+    play();
+    CHECK(mapmaker_roof_play.rooms==5u && !mapmaker_roof_play.building && !mapmaker_roof_play.kill);
+    CHECK(!mapmaker_roof_play.twosided_rooms && !mapmaker_roof_play.twosided[0]);
+    CHECK(!mapmaker_roof_play.hide[0] && mapmaker_roof_play.hide[1]==0x00FFFFFFu && mapmaker_roof_play.hide[2]==0x00FFFFFFu &&
+          !mapmaker_roof_play.hide[3] && mapmaker_roof_play.hide[4] && mapmaker_roof_play.hide[6] && !mapmaker_roof_play.hide[7]);
+    {
+        unsigned r;
+        for(r=1;r<=8u;r++) make_room(r,0x01FFFFFFu);
+    }
+    CHECK(draw(2)==0x01000000u && WORD_AT(inst_of(2)+0x30)==0x01FFFFFFu);     /* drawn without walls, restored */
+    CHECK(mapmaker_roof_play.shown[1] && !mapmaker_roof_play.shown[0]);
+    {
+        unsigned total=9,hidden=9;
+        mapmaker_roof_count_hidden(inst_of(2),0x01FFFFFFu,0x00FFFFFFu,&total,&hidden);
+        CHECK(total==3u && hidden==1u);
+        mapmaker_roof_count_hidden(inst_of(2),0x01000000u,0x00FFFFFFu,&total,&hidden);
+        CHECK(total==3u && hidden==0u);                     /* the wall was not drawn anyway */
+    }
+    CHECK(draw(3)==0x01000000u && draw(5)==0x01000000u && draw(7)==0x01000000u);
+    CHECK(draw(1)==0x01FFFFFFu && draw(4)==0x01FFFFFFu && draw(8)==0x01FFFFFFu);
+    WORD_AT(prop_of(2)+0x94)=0x123u;                       /* another prop of that room */
+    CHECK(draw(2)==0x01FFFFFFu);
+    WORD_AT(prop_of(2)+0x94)=0x00050909u;WORD_AT(prop_of(2)+4)=0x00123400u;
+    CHECK(draw(2)==0x01FFFFFFu);
+    WORD_AT(prop_of(2)+4)=inst_of(2);
+    WORD_AT(0x0079094Cu)=102u;                              /* not in play */
+    CHECK(draw(2)==0x01FFFFFFu);
+    WORD_AT(0x0079094Cu)=100u;
+    /* two-sided rooms (pc_mapmaker_openview.inc marks them): the geometry
+     * prop carries +0x28 bit 0x40000 during the draw only; a bounded room
+     * can be both; a prop that has the bit already keeps it */
+    CHECK(!mapmaker_roof_play.twosided_rooms);              /* the play build cleared them */
+    mapmaker_roof_play.twosided[0]=mapmaker_roof_play.twosided[1]=mapmaker_roof_play.twosided[3]=1;
+    mapmaker_roof_play.twosided_rooms=3;
+    WORD_AT(prop_of(1)+0x28)=0x00000100u;
+    CHECK(draw(1)==0x01FFFFFFu && drawn_flags==0x00040100u && WORD_AT(prop_of(1)+0x28)==0x00000100u);
+    CHECK(draw(2)==0x01000000u && drawn_flags==0x00040000u && WORD_AT(prop_of(2)+0x28)==0 &&
+          WORD_AT(inst_of(2)+0x30)==0x01FFFFFFu);
+    CHECK(draw(3)==0x01000000u && drawn_flags==0);          /* bounded, not two-sided */
+    CHECK(draw(8)==0x01FFFFFFu && drawn_flags==0);          /* neither */
+    WORD_AT(prop_of(4)+0x28)=0x00040000u;
+    CHECK(draw(4)==0x01FFFFFFu && drawn_flags==0x00040000u && WORD_AT(prop_of(4)+0x28)==0x00040000u);
+    WORD_AT(prop_of(4)+0x28)=0;
+    WORD_AT(prop_of(1)+0x94)=0x123u;                       /* another prop of that room */
+    CHECK(draw(1)==0x01FFFFFFu && drawn_flags==0x00000100u);
+    WORD_AT(prop_of(1)+0x94)=0x00050908u;
+    WORD_AT(0x0079094Cu)=102u;                              /* not in play */
+    CHECK(draw(1)==0x01FFFFFFu && drawn_flags==0x00000100u);
+    WORD_AT(0x0079094Cu)=100u;
+    {   /* a map with two-sided rooms and no bounded room */
+        unsigned saved=mapmaker_roof_play.rooms;
+        mapmaker_roof_play.rooms=0;
+        CHECK(draw(1)==0x01FFFFFFu && drawn_flags==0x00040100u && WORD_AT(prop_of(1)+0x28)==0x00000100u);
+        mapmaker_roof_play.rooms=saved;
+    }
+    WORD_AT(prop_of(1)+0x28)=0;
+    /* no unbounded tile: no kill height */
+    make_actor(0,-1000.0f,100.0f);WORD_AT(0x0074C37Cu)=1u;
+    ticks=0;tick();
+    CHECK(ticks==1 && nkilled==0);
+    /* an entry whose mask differs from its record: logged, still hidden
+     * (the order is fixed by the code) */
+    skew_at=1u;play();skew_at=99u;
+    CHECK(mapmaker_roof_play.rooms==5u && mapmaker_roof_play.mismatch==1u && draw(2)==0x01000000u);
+    /* a record walk that fails after the records keeps them */
+    {
+        uint32_t end=record(4);
+        CHECK(WORD_AT(end)==0x00C7766Au);
+        WORD_AT(end)=0x00C77670u;WORD_AT(end+4)=0x7FFFFFF0u;     /* no end chunk, a bad size */
+        play();
+        CHECK(mapmaker_roof_play.pieces==4u);CHECK(mapmaker_roof_play.malformed==1u);CHECK(mapmaker_roof_play.rooms==5u);CHECK(draw(2)==0x01000000u);
+        WORD_AT(end)=0x00C7766Au;WORD_AT(end+4)=0;
+    }
+    /* limits off: nothing */
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);play();set_env("TSFP_MAPMAKER_LIMITS","1");
+    CHECK(mapmaker_roof_play.rooms==0u && draw(2)==0x01FFFFFFu);
+    /* an unbounded tile on floor -1: characters below y -25 die once */
+    mapmaker_roof_set(piece(82),MAPMAKER_ROOF_OPEN_AIR);
+    WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
+    CHECK((WORD_AT(record(2)+0x24)>>16)==0x5202u && play_mask(2)==0x01000000u);
+    play();
+    CHECK(mapmaker_roof_play.kill && mapmaker_roof_play.low==-1 && mapmaker_roof_play.high==1 && mapmaker_roof_play.kill_y==-25.0f &&
+          mapmaker_roof_play.out_y==-10.0f && mapmaker_roof_play.rooms==5u);
+    /* sixteen floors: a piece on floor 13 (record byte +6 = 13, y 65) only
+     * raises the high floor; the kill heights follow the lowest floor */
+    FLOAT_AT(piece(83)+8)=13.0f;
+    WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
+    CHECK(((WORD_AT(record(3)+4)>>16)&0xFFu)==13u);
+    play();
+    CHECK(mapmaker_roof_play.kill && mapmaker_roof_play.low==-1 && mapmaker_roof_play.high==13 &&
+          mapmaker_roof_play.kill_y==-25.0f && mapmaker_roof_play.out_y==-10.0f && mapmaker_roof_play.rooms==5u);
+    make_actor(0,65.0f,100.0f);WORD_AT(0x0074C37Cu)=1u;
+    {
+        int k;
+        ticks=0;
+        for(k=0;k<70;k++) tick();
+        CHECK(nkilled==0 && FLOAT_AT(ent_of(0)+0x1CC)==100.0f);   /* standing on floor 13 */
+    }
+    FLOAT_AT(piece(83)+8)=-2.0f;                            /* now the lowest floor: -2 */
+    WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
+    play();
+    CHECK(mapmaker_roof_play.low==-2 && mapmaker_roof_play.high==0 && mapmaker_roof_play.kill_y==-30.0f);
+    FLOAT_AT(piece(83)+8)=1.0f;
+    WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
+    play();
+    CHECK(mapmaker_roof_play.low==-1 && mapmaker_roof_play.high==1 && mapmaker_roof_play.kill_y==-25.0f);
+    make_actor(0,-26.0f,100.0f);make_actor(1,-24.0f,100.0f);make_actor(2,-500.0f,0.0f);make_actor(3,-500.0f,50.0f);
+    WORD_AT(ent_of(3)+0x7C)=0;                             /* not a live character entry */
+    WORD_AT(0x00900100u+4u*4u)=0;WORD_AT(0x0074C37Cu)=5u;
+    ticks=0;tick();
+    CHECK(ticks==1 && nkilled==1 && killed[0]==ent_of(0));
+    tick();
+    CHECK(ticks==2 && nkilled==1);                          /* dead stays dead */
+    FLOAT_AT(ent_of(1)+0x68)=-30.0f;
+    WORD_AT(0x0079094Cu)=102u;tick();
+    CHECK(nkilled==1);                                      /* not in play */
+    make_actor(10,-40.0f,100.0f);                           /* past the first entries */
+    WORD_AT(0x0079094Cu)=100u;WORD_AT(0x0074C37Cu)=1000u;tick();
+    CHECK(nkilled==3 && killed[1]==ent_of(1) && killed[2]==ent_of(10));   /* count bounded to 64 */
+    WORD_AT(0x0074C37Cu)=2u;
+    /* below the floors but above the kill height: dies after 60 ticks there;
+     * standing on the lowest floor (y -5) or one floor down exactly never */
+    {
+        int k;
+        make_actor(0,-12.0f,100.0f);make_actor(1,-9.0f,100.0f);
+        for(k=0;k<59;k++) tick();
+        CHECK(nkilled==3);
+        FLOAT_AT(ent_of(0)+0x68)=-5.0f;tick();               /* back on a floor: the count restarts */
+        FLOAT_AT(ent_of(0)+0x68)=-12.0f;
+        for(k=0;k<59;k++) tick();
+        CHECK(nkilled==3);
+        tick();
+        CHECK(nkilled==4 && killed[3]==ent_of(0));
+        for(k=0;k<100;k++) tick();
+        CHECK(nkilled==4 && FLOAT_AT(ent_of(1)+0x1CC)==100.0f);
+    }
+    /* human players from their player structs ([0x007B0C48] + i*0x1584,
+     * entity +0x14, +4 < 0 empty), counted once when also in the live list */
+    {
+        int k;
+        uint32_t pl=0x001D0000u;
+        WORD_AT(0x007B0C48u)=pl;WORD_AT(0x00790950u)=2u;
+        make_actor(20,-5.0f,100.0f);make_actor(21,-50.0f,100.0f);
+        WORD_AT(pl+4)=0;WORD_AT(pl+0x14)=ent_of(20);                       /* player 0 */
+        WORD_AT(pl+0x1584u+4)=0xFFFFFFFFu;WORD_AT(pl+0x1584u+0x14)=ent_of(21);  /* empty slot */
+        WORD_AT(0x00900100u+0u)=0;WORD_AT(0x00900100u+4u)=0;              /* not in the live list */
+        WORD_AT(0x0074C37Cu)=2u;
+        tick();
+        CHECK(nkilled==4 && FLOAT_AT(ent_of(21)+0x1CC)==100.0f);           /* empty slot ignored */
+        FLOAT_AT(ent_of(20)+0x68)=-30.0f;tick();
+        CHECK(nkilled==5 && killed[4]==ent_of(20));                       /* a human not in the live list */
+        /* a human also in the live list (checked once, as the human) */
+        make_actor(0,-12.0f,100.0f);WORD_AT(pl+0x14)=ent_of(0);
+        for(k=0;k<59;k++) tick();
+        CHECK(nkilled==5);
+        tick();
+        CHECK(nkilled==6 && killed[5]==ent_of(0));
+        /* outside every room: dies after 8 room queries (every 6 ticks) that
+         * find no room, at any height; one query that finds a room resets it */
+        make_actor(20,0.0f,100.0f);FLOAT_AT(ent_of(20)+0x64)=10.0f;FLOAT_AT(ent_of(20)+0x6C)=20.0f;
+        WORD_AT(pl+0x14)=ent_of(20);
+        WORD_AT(0x00900100u)=0;WORD_AT(0x0074C37Cu)=1u;
+        nqueries=0;
+        for(k=0;k<120;k++) tick();
+        CHECK(nkilled==6 && nqueries>=20u && nqueries<=22u);              /* in a room: alive */
+        CHECK(query_box[0]==9.7f && query_box[1]==0.25f && query_box[2]==19.7f &&
+              query_box[3]==10.3f && query_box[4]==1.5f && query_box[5]==20.3f);
+        rooms_answer=0;
+        for(k=0;k<30;k++) tick();
+        rooms_answer=1;tick();tick();tick();tick();tick();tick();             /* back in a room */
+        rooms_answer=0;
+        for(k=0;k<42;k++) tick();
+        CHECK(nkilled==6);
+        for(k=0;k<6;k++) tick();
+        CHECK(nkilled==7 && killed[6]==ent_of(20) && FLOAT_AT(ent_of(20)+0x68)==0.0f);
+        /* dropping outside every room: dead at the first query that finds no room */
+        FLOAT_AT(ent_of(20)+0x1CC)=100.0f;mapmaker_roof_play.noroom[64]=0;
+        rooms_answer=1;for(k=0;k<12;k++) tick();
+        FLOAT_AT(ent_of(20)+0x68)=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-2.0f;rooms_answer=0;
+        for(k=0;k<6;k++) tick();
+        CHECK(nkilled==8 && killed[7]==ent_of(20));
+        /* just under the floor (a slope, a step down): only the 8-query rule */
+        FLOAT_AT(ent_of(20)+0x1CC)=100.0f;FLOAT_AT(ent_of(20)+0x68)=(float)mapmaker_roof_play.low*MAPMAKER_ROOF_FLOOR_HEIGHT-1.0f;
+        rooms_answer=1;for(k=0;k<12;k++) tick();rooms_answer=0;
+        for(k=0;k<12;k++) tick();
+        CHECK(nkilled==8);
+        for(k=0;k<48;k++) tick();
+        CHECK(nkilled==9);
+        /* the mansion worm is never killed under the floor */
+        FLOAT_AT(ent_of(20)+0x1CC)=100.0f;FLOAT_AT(ent_of(20)+0x68)=-30.0f;
+        *(uint16_t *)((uintptr_t)(ent_of(20)+0x94u)+g_xbox_mem_offset)=0x5EAu;
+        for(k=0;k<120;k++) tick();
+        CHECK(nkilled==9);
+        *(uint16_t *)((uintptr_t)(ent_of(20)+0x94u)+g_xbox_mem_offset)=0;
+        FLOAT_AT(ent_of(20)+0x68)=0.0f;rooms_answer=1;mapmaker_roof_play.noroom[64]=0;
+        nkilled=7;
+        /* no query memory: the room rule is off */
+        {
+            uint32_t q=mapmaker_roof_play.query;
+            mapmaker_roof_play.query=0;FLOAT_AT(ent_of(20)+0x1CC)=100.0f;
+            for(k=0;k<120;k++) tick();
+            CHECK(nkilled==7);
+            mapmaker_roof_play.query=q;
+        }
+        rooms_answer=1;
+        WORD_AT(0x00790950u)=0;
+    }
+    /* the next map without unbounded tiles has no kill height */
+    mapmaker_roof_set(piece(82),0);
+    WORD_AT(0x0079094Cu)=102u;compile();WORD_AT(0x0079094Cu)=100u;
+    play();
+    FLOAT_AT(ent_of(1)+0x1CC)=100.0f;tick();
+    CHECK(!mapmaker_roof_play.kill && nkilled==7);
+    WORD_AT(0x0079094Cu)=102u;
+    mapmaker_roof_set(piece(81),0);mapmaker_roof_set(piece(83),0);
+
+    /* no memory for the label copy: the stock label */
+    mapmaker_roof.suffixed=0;heap_result=0;
+    mapmaker_roof_set(piece(81),MAPMAKER_ROOF_OPEN_ROOF);WORD_AT(ED+0x2F18)=piece(81);
+    CHECK(!strcmp(label(),"stock"));
+    WORD_AT(ED+0x2F18)=0;mapmaker_roof_set(piece(81),0);
+
+    if(failures || esp_errors) { fprintf(stderr,"%d failures, %d esp errors\n",failures,esp_errors);return 1; }
+    puts("mapmaker roof ok");
+    return 0;
+}

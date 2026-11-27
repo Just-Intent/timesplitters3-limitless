@@ -56,6 +56,7 @@ repo or local runtime automatically. Advice is a hypothesis until locally tested
 | Launcher UI, install/update, versions, platform paths | [Launcher](launcher.md) |
 | Build/generate, test selection, isolation, CI | [Build and test](build-test.md) |
 | Debugging, repeat searches, compaction, Sol handoff | [Investigation](investigation.md) |
+| Limitless fork: MapMaker capacity, guest-code tables, scope wheel | [Limitless](limitless.md) |
 | Sol requests for missing code, revisions, limits | [Evidence retrieval](evidence.md) |
 
 See [the #105 run review](issue-105-review.md) for the evidence behind this map.

@@ -90,7 +90,8 @@ static void audio_volume_draw(void)
             uint32_t light=guest_call(sub_00154FE0,2,0x69737f7fu,WORD_AT(menu+0xf4));
             menu_slider_capture(id==1?MENU_MUSIC:MENU_SOUND,menu,item,(float)x,(float)y,100.f,8.f);
             unsigned value=WORD_AT(id==1?0x5236bcu:0x5236c0u);if(value>16)value=16;
-            guest_call(sub_000814B0,9,bits((float)value/16.f),(uint32_t)x,(uint32_t)y,
+            float fraction=id==1?(float)menu_music_position()/(float)MENU_MUSIC_TICKS:(float)value/16.f;
+            guest_call(sub_000814B0,9,bits(fraction),(uint32_t)x,(uint32_t)y,
                        100u,8u,dark,dark,light,0u);
         }
     }
@@ -175,6 +176,7 @@ static void audio_native_action(void (*original)(void))
 static void audio_options_back(void){audio_native_action(sub_002C3D30);}
 static void audio_options_accept(void){audio_native_action(sub_002C3AC0);}
 static void audio_options_cancel(void){audio_native_action(sub_002C3BF0);}
+static void audio_music_tick(void){pc_display_menu_audio_tick(sub_002C3720);}
 static void audio_options_tick(void)
 {
     GuestRegisters saved;save_registers(&saved);uint32_t menu=WORD_AT(g_esp+4);
@@ -193,7 +195,8 @@ static void audio_options_tick(void)
         if(WORD_AT(audio_mix_rows[index]+0xc8)!=before)settings_tabs_sound(8);
     }
     /* Native tick reads IDs0/2/5 even while their records are hidden. */
-    audio_link_rows(1);guest_call(sub_002C3720,1,menu);audio_link_rows(0);
+    /* audio_music_tick: the Music slider's ticks past 16 (pc_menu_sliders.inc). */
+    audio_link_rows(1);guest_call(audio_music_tick,1,menu);audio_link_rows(0);
     if(direction)audio_change_tab((audio_page+(direction<0?3:1))%4);
     restore_registers(&saved);g_esp+=4;
 }

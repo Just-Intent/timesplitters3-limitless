@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "loaderSha256": "ba50a65d14f67202824e25dd6015c720eaf4fc1d6c01f01ed485d83c9e160fb8",
+  "loaderSha256": "faff2060bac95a0f882de17daef39938745900232ea6d6575e944631b0c60286",
   "patches": [
     {
       "name": "0010-dsound-audio-timing.patch",
@@ -123,6 +123,15 @@
       "targets": [
         "src/hle/hle_dsound.c",
         "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
+      "name": "0059-custom-music-voice.patch",
+      "path": "patches/media/0059-custom-music-voice.patch",
+      "sha256": "6bc1fada268bd0ddd6c6cfa639a11441b0b0ded6992f57db6138b6f25a5c6d23",
+      "targets": [
+        "src/hle/audio_output.h",
+        "src/hle/audio_output_xaudio2.cpp"
       ]
     },
     {
@@ -2133,6 +2142,23 @@
       ]
     },
     {
+      "name": "2630-buffered-stderr.patch",
+      "path": "patches/diagnostics/2630-buffered-stderr.patch",
+      "sha256": "ed8fe11bcc4999957843c6875899ad03e23005b16768e0ed5fe8d3cf53fba492",
+      "targets": [
+        "titles/futureperfect/src/main.c"
+      ]
+    },
+    {
+      "name": "2640-mapmaker-debug-panel.patch",
+      "path": "patches/diagnostics/2640-mapmaker-debug-panel.patch",
+      "sha256": "3ea6ed7c19be5c64d410d5c4ddbd41b2fcc11ae1ff86fc3911d1b9de00cf40df",
+      "targets": [
+        "src/hle/hle_d3d8.c",
+        "src/hle/hle_d3d8_texture.c"
+      ]
+    },
+    {
       "name": "2720-viewmodel-shoulder-visibility.patch",
       "path": "patches/graphics/rendering/2720-viewmodel-shoulder-visibility.patch",
       "sha256": "3fa1241997be6bdc22fbed01c638376fcd1b68a4b065224633196595c897cf46",
@@ -2298,6 +2324,54 @@
       "sha256": "2e1bcb8f23a4a35c7fbde74f08659fdb8675a10d7340c95c624e620e1e9e1a14",
       "targets": [
         "tools/recomp/test_x87_classification.py"
+      ]
+    },
+    {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-probe.patch",
+      "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-probe.patch",
+      "sha256": "786faaa5d3cd5ec9c01b97d1a1ec7f20145029b54838809c88409e62f4284bdd",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-raise.patch",
+      "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-raise.patch",
+      "sha256": "8774e4f37a91626160aa9d999eec4e90e31b31bfc04d43c8e25fc8e7d4b4ecba",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-stagea.patch",
+      "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-stagea.patch",
+      "sha256": "1708e624c653c1de723896c1274512fa99d95b113a18dec073a7350abd650b23",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-story-chain.patch",
+      "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-story-chain.patch",
+      "sha256": "0f790e306ec4150a3f4da03d159de44c9e3eab2a1c774c79b4cb8333da8d53f6",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch",
+      "path": "patches/graphics/interface/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch",
+      "sha256": "9647c82bd64121e2790bcc4da300ea50cf08ee3e97005a666750a09fff9d9250",
+      "targets": [
+        "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
+      "name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-guest-memory-extension.patch",
+      "path": "patches/platform/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-guest-memory-extension.patch",
+      "sha256": "49d01691275a0094dd1477ac4a84293087cc02339cc55cb93cb61d2297e2395c",
+      "targets": [
+        "titles/futureperfect/src/main.c"
       ]
     },
     {
@@ -4090,6 +4164,14 @@
       "targets": [
         "src/d3d/d3d8_device.c",
         "titles/futureperfect/src/recomp_manual.c"
+      ]
+    },
+    {
+      "name": "2160-custom-music-codec.patch",
+      "path": "patches/media/2160-custom-music-codec.patch",
+      "sha256": "ac44c0cacd1a23e30c78ff56a75cb280d817b4806c58739117a71709b7d3265d",
+      "targets": [
+        "titles/futureperfect/CMakeLists.txt"
       ]
     }
   ]

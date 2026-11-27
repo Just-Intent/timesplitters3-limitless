@@ -1,0 +1,563 @@
+/* Asset-free contract for src/interface/pc_mapmaker_creatures.inc (story
+ * creatures wave 2: the generic deployer driven by pc_mapmaker_creatures.def).
+ * Fake guest memory holds a map container (map info with the map's own set,
+ * the sets chunk with slots 11-20), the rows' registration tables, the anim
+ * id map, the character table, the resource map/table and the pak mounts.
+ * The fake originals pop their return address like the lifted callees and
+ * every hook call checks esp. */
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static uint32_t memory[0x00A00000/4], g_eax, g_ecx, g_edx, g_esp;
+static uintptr_t g_xbox_mem_offset;
+#define WORD_AT(a) (*(uint32_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+#define FLOAT_AT(a) (*(float *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+#define BYTE_AT(a) (*(uint8_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+#define HALF_AT(a) (*(uint16_t *)((uintptr_t)(uint32_t)(a)+g_xbox_mem_offset))
+static int guest_writable(uint32_t p,size_t n) { return p>=0x1000 && p<sizeof memory && n<=sizeof memory-p; }
+typedef struct GuestRegisters { uint32_t a,c,d,sp; } GuestRegisters;
+static void save_registers(GuestRegisters *r) { r->a=g_eax;r->c=g_ecx;r->d=g_edx;r->sp=g_esp; }
+static void restore_registers(GuestRegisters *r) { g_eax=r->a;g_ecx=r->c;g_edx=r->d;g_esp=r->sp; }
+void sub_0003DFA0(void) { g_ecx=1; }
+void sub_0005A130(void) { g_ecx=2; }
+void sub_00062260(void) { g_ecx=3; }
+void sub_000A5E40(void) { g_ecx=4; }
+void sub_000631C0(void) { g_ecx=5; }
+void sub_0015E120(void) { g_ecx=6; }
+void sub_00061570(void) { g_ecx=7; }
+
+#define ESP0 0x00600000u
+#define CONT 0x00100000u
+#define POOL 0x00400000u
+#define RECS 0x00480000u
+#define RESTAB 0x00500000u
+#define REQ_READ 0x00510000u
+#define REQ_NONE 0x00510100u
+
+static int failures;
+#define CHECK(x) do { if(!(x)) { fprintf(stderr,"%s:%d: CHECK(%s)\n",__FILE__,__LINE__,#x);failures++; } } while(0)
+
+static uint32_t mounted_paths[8],requests[16];
+static unsigned nmounted,nmounts,nrequests,originals;
+static int mount_fails,models_read,sight=1;
+static unsigned sight_calls;
+static int fire_event;
+static uint32_t guest_call(void (*f)(void),int n,...)
+{
+    va_list a;
+    uint32_t x[4]={0},r=0;
+    int i;
+    va_start(a,n);
+    for(i=0;i<n && i<4;i++) x[i]=va_arg(a,uint32_t);
+    va_end(a);
+    if(f==sub_00062260) {
+        unsigned k;
+        r=0xFFFFFFFFu;
+        for(k=0;k<nmounted;k++) if(mounted_paths[k]==x[0]) r=k;
+    } else if(f==sub_0005A130) {
+        CHECK(n==1);
+        nmounts++;
+        if(!mount_fails) { if(nmounted<8u) mounted_paths[nmounted++]=x[0]; WORD_AT(0x006D7880u)++;r=1u; }
+    } else if(f==sub_000A5E40) { CHECK(n==1);if(nrequests<16u) requests[nrequests]=x[0]; nrequests++; }
+    else if(f==sub_000631C0) r=models_read?REQ_READ:REQ_NONE;
+    else if(f==sub_0015E120) { CHECK(n==2 && x[1]==0u);sight_calls++;r=(uint32_t)sight; }
+    else if(f==sub_00061570) { CHECK(n==2 && x[1]==0x200u);r=(uint32_t)fire_event; }
+    return r;
+}
+#include "pc_mapmaker_budget.inc"
+#include "pc_mapmaker_limits.inc"
+#include "pc_mapmaker_creatures.inc"
+
+static void set_env(const char *name,const char *value)
+{
+#ifdef _WIN32
+    _putenv_s(name,value?value:"");
+#else
+    if(value) setenv(name,value,1); else unsetenv(name);
+#endif
+    memset(&mapmaker_limits,0,sizeof mapmaker_limits);
+    crt.read=0;
+}
+static uint32_t call_hook(void (*hook)(void (*)(void)),void (*orig)(void),uint32_t ret,uint32_t a0,uint32_t a1,int line)
+{
+    uint32_t sp=g_esp;
+    g_esp-=12u;WORD_AT(g_esp)=ret;WORD_AT(g_esp+4u)=a0;WORD_AT(g_esp+8u)=a1;
+    hook(orig);
+    if(g_esp!=sp-8u) { fprintf(stderr,"%s:%d: esp %+d\n",__FILE__,line,(int)(g_esp-(sp-8u)));failures++; }
+    g_esp=sp;
+    return g_eax;
+}
+#define CALL(h,o,ret,a0,a1) call_hook(h,o,ret,a0,a1,__LINE__)
+static void fake_plain(void) { originals++;g_esp+=4u; }
+/* the robot weapon path: sub_002B8F90 -> sub_001BB5C0 -> sub_00088C60 (return 0x001BC420) */
+static int fire_now,muzzle_hit;
+static unsigned weapon_calls;
+static void fake_ray(void) { g_eax=(uint32_t)muzzle_hit;g_esp+=4u; }
+static void fake_fire(void)
+{
+    uint32_t sp=g_esp;
+    int keep=muzzle_hit;
+    muzzle_hit=1;                                       /* another ray in the fire code: not the muzzle test */
+    g_esp-=4u;WORD_AT(g_esp)=0x001BB9A0u;
+    pc_mapmaker_creatures_robot_muzzle(fake_ray);
+    CHECK(g_esp==sp);
+    muzzle_hit=keep;
+    g_esp-=4u;WORD_AT(g_esp)=0x001BC420u;
+    pc_mapmaker_creatures_robot_muzzle(fake_ray);
+    CHECK(g_esp==sp);
+    g_esp+=4u;
+}
+/* sub_0025FB70: one sight ray per call, results from a list (0 = nothing hit) */
+static uint32_t vis_hits[64];
+static unsigned vis_n;
+static void fake_vray(void) { g_eax=vis_hits[vis_n++%64u];g_esp+=4u; }
+static void fake_oray(void) { g_eax=0x00570000u;g_esp+=4u; }
+/* a ray that first meets a character body (while it collides), then the player */
+static uint32_t body_obj=0x00590000u,far_obj=0x005A0000u;
+static unsigned bray_calls;
+static int far_first;
+static void fake_bray(void)
+{
+    bray_calls++;
+    if(far_first) g_eax=far_obj;
+    else g_eax=(WORD_AT(body_obj+0x28u)&0x20u)?body_obj:0x00570000u;
+    g_esp+=4u;
+}
+static void fake_bsight(void)
+{
+    uint32_t sp=g_esp;
+    g_esp-=4u;WORD_AT(g_esp)=0x00260134u;
+    pc_mapmaker_creatures_robot_muzzle(fake_bray);
+    CHECK(g_esp==sp);
+    g_esp+=4u;
+}
+/* sub_00283730: the pose row it sees */
+static uint32_t seen_row[8];
+static void fake_pose(void)
+{
+    memcpy(seen_row,(const void *)((uintptr_t)(0x00520838u+2u*0x20u)+g_xbox_mem_offset),sizeof seen_row);
+    g_esp+=4u;
+}
+static void fake_sight(void)
+{
+    uint32_t sp=g_esp;
+    g_esp-=4u;WORD_AT(g_esp)=0x0025FF00u;                /* another ray of the update: not counted */
+    pc_mapmaker_creatures_robot_muzzle(fake_oray);
+    CHECK(g_esp==sp);
+    g_esp-=4u;WORD_AT(g_esp)=0x00260134u;
+    pc_mapmaker_creatures_robot_muzzle(fake_vray);
+    CHECK(g_esp==sp);
+    g_esp+=4u;
+}
+static void fake_weapon(void)
+{
+    uint32_t sp=g_esp,ent=WORD_AT(g_esp+4u);
+    weapon_calls++;
+    (void)ent;
+    if(fire_now) {                                      /* sub_001BB5C0 (not wrapped: the runtime defines it) */
+        g_esp-=4u;WORD_AT(g_esp)=0x002B9850u;
+        fake_fire();
+        CHECK(g_esp==sp);
+    }
+    g_esp+=4u;
+}
+/* sub_000DAC30: the character table models the call saw */
+static uint32_t seen_model[2];
+static void fake_create(void)
+{
+    uint32_t id=WORD_AT(g_esp+4u);
+    originals++;
+    seen_model[0]=WORD_AT(0x0053A3CCu+id*0x30u+4u);seen_model[1]=WORD_AT(0x0053A3CCu+id*0x30u+8u);
+    g_eax=0x00777000u;
+    g_esp+=4u;
+}
+/* sub_0015B830: what the record held when the original ran */
+static uint32_t seen_class[2];
+static void fake_ai_start(void)
+{
+    uint32_t a=WORD_AT(g_esp+4u),rec=WORD_AT(a+0xBF0u);
+    originals++;
+    seen_class[0]=WORD_AT(rec);seen_class[1]=WORD_AT(rec+4u);
+    g_esp+=4u;
+}
+
+/* ---- the map ----------------------------------------------------------- */
+static void chunk(uint32_t *c,uint32_t tag,uint32_t size)
+{
+    WORD_AT(*c)=tag;WORD_AT(*c+4u)=size;*c+=8u+size;
+}
+/* The map: set index setno, members ids[0..n-1] (slots 1-10 in the map info, 11+ in the sets chunk). */
+static void map(uint32_t setno,const uint16_t *ids,unsigned n)
+{
+    uint32_t c=CONT+8u,info,sets;
+    unsigned k;
+    memset((void *)((uintptr_t)CONT+g_xbox_mem_offset),0,0x2000u);
+    WORD_AT(0x00784014u)=CONT;WORD_AT(CONT)=0x00C77667u;
+    info=c+8u;chunk(&c,0x00C77668u,0x40u);
+    HALF_AT(info+0x14u)=(uint16_t)setno;BYTE_AT(info+0x16u)=(uint8_t)(n<10u?n:10u);
+    for(k=0;k<n && k<10u;k++) { HALF_AT(info+0x18u+k*4u)=ids[k];BYTE_AT(info+0x1Bu+k*4u)=0xFFu; }
+    if(n>10u) {
+        sets=c+8u;chunk(&c,0x00C776F5u,0x30u);
+        HALF_AT(sets)=1u;BYTE_AT(sets+2u)=10u;BYTE_AT(sets+3u)=(uint8_t)(n-10u);
+        for(k=10u;k<n;k++) HALF_AT(sets+4u+(k-10u)*4u)=ids[k];
+    }
+    chunk(&c,0x00C7766Cu,0x50u);                        /* a Story AI chunk */
+    WORD_AT(c)=0x00C7766Au;WORD_AT(c+4u)=0;
+}
+static void anim_map_clear(void)
+{
+    memset((void *)((uintptr_t)0x007E03C0u+g_xbox_mem_offset),0xFF,0xC03u*2u);
+}
+/* register (map) every kept anim id of row k: as sub_001CA2F0 would after the mount */
+static void anim_map_row(unsigned k,uint16_t slot)
+{
+    unsigned i;
+    for(i=0;i<crt_kinds[k].n;i++)
+        HALF_AT(0x007E03C0u+HALF_AT(crt_kinds[k].table+(crt_kinds[k].first+i)*0x18u+0x10u)*2u)=slot;
+}
+static void tables(void)
+{
+    unsigned k,i;
+    for(k=0;k<CRT_KINDS;k++)
+        for(i=0;i<crt_kinds[k].count;i++)
+            HALF_AT(crt_kinds[k].table+i*0x18u+0x10u)=(uint16_t)(0x100u+k*0x100u+i);
+}
+/* character table: models for the carriers and the looks */
+static void chars(void)
+{
+    static const uint32_t m[][3]={{0x2Fu,0x619u,0xFFFFFFFFu},{0x30u,0x619u,0xFFFFFFFFu},{0x4Du,0x607u,0xFFFFFFFFu},
+                                  {0x17u,0x5C8u,0x5C9u},{0x59u,0x613u,0x614u}};
+    unsigned k;
+    for(k=0;k<sizeof m/sizeof m[0];k++) { WORD_AT(0x0053A3CCu+m[k][0]*0x30u+4u)=m[k][1];WORD_AT(0x0053A3CCu+m[k][0]*0x30u+8u)=m[k][2]; }
+    /* resource rows for the look models: path and LOD path, not yet loaded */
+    WORD_AT(0x00791D4Cu)=RESTAB;
+    memset((void *)((uintptr_t)0x008CA000u+g_xbox_mem_offset),0xFF,0xA00u*2u);
+    {
+        static const uint32_t looks[]={0x5C8u,0x5C9u,0x613u,0x614u};
+        for(k=0;k<4u;k++) {
+            HALF_AT(0x008CA000u+looks[k]*2u)=(uint16_t)k;
+            WORD_AT(RESTAB+k*0x30u+0x4u)=0;WORD_AT(RESTAB+k*0x30u+0x10u)=0x00520000u+k*0x40u;WORD_AT(RESTAB+k*0x30u+0x14u)=0;
+        }
+    }
+    WORD_AT(REQ_READ+0x10u)=0x00530000u;WORD_AT(REQ_NONE+0x10u)=0;
+}
+static uint32_t actor(unsigned i,uint32_t id)
+{
+    uint32_t a=POOL+i*0xEA0u,rec=RECS+i*0x100u;
+    HALF_AT(a+0x48u)=(uint16_t)id;WORD_AT(a+0xBF0u)=rec;
+    WORD_AT(rec)=0x11000000u;WORD_AT(rec+4u)=0;WORD_AT(rec+8u)=0x1000u+i;
+    return a;
+}
+static unsigned kind_of(uint32_t id) { return crt_kind_of(id); }
+#define SK8 kind_of(0x62u)
+#define SD7 kind_of(0x36u)
+#define GHOST kind_of(0x2Fu)
+#define MUT kind_of(0x30u)
+#define SECB kind_of(0x4Du)
+#define PIT kind_of(0x31u)
+#define RAG kind_of(0xB0u)
+
+int main(void)
+{
+    uint32_t a;
+    unsigned k;
+    g_xbox_mem_offset=(uintptr_t)memory;
+    g_esp=ESP0;
+    tables();chars();anim_map_clear();
+    {
+        static const uint16_t set[]={0x0C,0x2F,0x44,0x4D,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x30};   /* 0x30 in slot 12 */
+        map(0x11u,set,sizeof set/sizeof set[0]);
+    }
+    /* the table: seven rows, as documented (Prometheus 159/160 first; the pit fight's two last, pc_mapmaker_pitboss.inc) */
+    CHECK(CRT_KINDS==7u);
+    CHECK(SK8==0 && SD7==1 && GHOST==2 && SECB==3 && MUT==4 && PIT==5 && RAG==6 &&
+          kind_of(0x17u)==CRT_KINDS && kind_of(0x59u)==CRT_KINDS && kind_of(0x28u)==CRT_KINDS);
+    CHECK(kind_of(0xAAu)==CRT_KINDS && kind_of(0xA9u)==CRT_KINDS);           /* the Arcade twins stay stock */
+    CHECK(crt_kinds[SK8].lo==0x10000004u && crt_kinds[SK8].hi==0 && crt_kinds[SK8].look==CRT_NO_LOOK && crt_kinds[SK8].row==159u);
+    CHECK(crt_kinds[SD7].lo==0 && crt_kinds[SD7].hi==0 && crt_kinds[SD7].look==CRT_NO_LOOK && crt_kinds[SD7].row==160u);   /* bot AI */
+    CHECK(crt_kinds[SK8].pak==0x0047E65Cu && crt_kinds[SK8].first==0 && crt_kinds[SK8].n==crt_kinds[SK8].count);
+    CHECK(crt_kinds[GHOST].lo==0x50000000u && crt_kinds[GHOST].hi==0 && crt_kinds[GHOST].look==0x17u);
+    CHECK(crt_kinds[SECB].lo==0x10000000u && crt_kinds[SECB].hi==0x4000u && crt_kinds[SECB].look==CRT_NO_LOOK);
+    CHECK(crt_kinds[MUT].lo==0x10000000u && crt_kinds[MUT].hi==0x8000u && crt_kinds[MUT].look==0x59u);
+    CHECK(crt_kinds[PIT].lo==0x10000000u && crt_kinds[PIT].hi==0x20000u && crt_kinds[PIT].look==0x28u && crt_kinds[PIT].pak==crt_kinds[RAG].pak);
+    CHECK(crt_kinds[RAG].lo==0x10000000u && crt_kinds[RAG].hi==0x200000u && crt_kinds[RAG].look==CRT_NO_LOOK);
+
+    /* ---- switch off: every hook is the original, nothing else --------- */
+    set_env("TSFP_MAPMAKER_LIMITS",NULL);
+    WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=10u;
+    originals=0;
+    CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+    CALL(pc_mapmaker_creatures_request,fake_plain,0x0015E7C5u,0,0);
+    CHECK(originals==2 && nmounts==0 && nrequests==0);
+    a=actor(0,0x2Fu);
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x11000000u && WORD_AT(RECS)==0x11000000u);
+    CALL(pc_mapmaker_creatures_create,fake_create,0x000D7800u,0x2Fu,0);
+    CHECK(seen_model[0]==0x619u);
+    set_env("TSFP_MAPMAKER_LIMITS","1");
+    set_env("TSFP_MAPMAKER_POOLS","0");                  /* limits need the pools */
+    CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+    CHECK(nmounts==0);
+    set_env("TSFP_MAPMAKER_POOLS",NULL);
+
+    /* ---- other scenes and modes: stock --------------------------------- */
+    WORD_AT(0x0079094Cu)=6u;
+    CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+    a=actor(0,0x4Du);
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(nmounts==0 && seen_class[0]==0x11000000u);
+    WORD_AT(0x0079094Cu)=100u;BYTE_AT(0x007DE455u)=3u;
+    CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+    CHECK(nmounts==0);
+    BYTE_AT(0x007DE455u)=10u;
+
+    /* ---- a preset set: no creature --------------------------------------- */
+    {
+        static const uint16_t set[]={0x2F,0x4D,0x30};
+        map(3u,set,3u);
+        CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+        CHECK(nmounts==0);
+        WORD_AT(0x00784014u)=0;                          /* unreadable: no mount either */
+        CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+        CHECK(nmounts==0);
+    }
+
+    /* ---- a set with one creature: only its pak --------------------------- */
+    {
+        static const uint16_t set[]={0x0C,0x4D};
+        map(0x11u,set,2u);
+        WORD_AT(0x006D7880u)=20u;
+        CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+        CHECK(nmounts==1 && nmounted==1 && mounted_paths[0]==0x0049DA84u);
+        nmounts=0;nmounted=0;
+    }
+
+    /* ---- the map's own set ----------------------------------------------- */
+    {
+        static const uint16_t set[]={0x0C,0x2F,0x44,0x4D,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x30};
+        map(0x11u,set,sizeof set/sizeof set[0]);
+    }
+    WORD_AT(0x006D7880u)=60u;                            /* 4 of 64 free: refused */
+    CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+    CHECK(nmounts==0);
+    WORD_AT(0x006D7880u)=20u;
+    mount_fails=1;
+    CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+    CHECK(nmounts==3 && nmounted==0);
+    mount_fails=0;nmounts=0;
+    CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+    CHECK(nmounts==3 && nmounted==3 && WORD_AT(0x006D7880u)==23u);
+    CHECK(mounted_paths[0]==0x0049D968u && mounted_paths[1]==0x0049DA84u && mounted_paths[2]==0x0049DB58u);
+    CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);   /* again: nothing more */
+    CHECK(nmounts==3);
+
+    /* ---- request: the look's models when the look is not in the set ----- */
+    nrequests=0;
+    CALL(pc_mapmaker_creatures_request,fake_plain,0x0015E7C5u,0,0);
+    CHECK(nrequests==2 && requests[0]==0x613u && requests[1]==0x614u);   /* 0x17 is a member: its preload asks */
+
+    /* ---- create: the look's models for this call only --------------------- */
+    models_read=0;
+    CALL(pc_mapmaker_creatures_create,fake_create,0x000D7800u,0x30u,0);
+    CHECK(seen_model[0]==0x619u && seen_model[1]==0xFFFFFFFFu);     /* not read: its own */
+    models_read=1;
+    CALL(pc_mapmaker_creatures_create,fake_create,0x000D7800u,0x30u,0);
+    CHECK(seen_model[0]==0x613u && seen_model[1]==0x614u && g_eax==0x00777000u);
+    CHECK(WORD_AT(0x0053A3CCu+0x30u*0x30u+4u)==0x619u && WORD_AT(0x0053A3CCu+0x30u*0x30u+8u)==0xFFFFFFFFu);   /* put back */
+    CALL(pc_mapmaker_creatures_create,fake_create,0x000D7800u,0x2Fu,0);
+    CHECK(seen_model[0]==0x5C8u && seen_model[1]==0x5C9u && WORD_AT(0x0053A3CCu+0x2Fu*0x30u+4u)==0x619u);
+    HALF_AT(0x008CA000u)=4u;WORD_AT(RESTAB+4u*0x30u+0x4u)=1u;   /* a ready model 0 (character 0xFF has 0/0) */
+    CALL(pc_mapmaker_creatures_create,fake_create,0x000D7800u,0x4Du,0);   /* own look */
+    CHECK(seen_model[0]==0x607u);
+    CALL(pc_mapmaker_creatures_create,fake_create,0x000D7800u,0x17u,0);   /* not a creature */
+    CHECK(seen_model[0]==0x5C8u);
+    WORD_AT(RESTAB+0x4u)=1u;models_read=0;                  /* loaded before: no request data needed */
+    WORD_AT(RESTAB+0x30u+0x4u)=1u;
+    CALL(pc_mapmaker_creatures_create,fake_create,0x000D7800u,0x2Fu,0);
+    CHECK(seen_model[0]==0x5C8u);
+
+    /* ---- ai_start: the class once the kept anims resolve ---------------- */
+    a=actor(0,0x2Fu);
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);      /* anims not registered */
+    anim_map_row(GHOST,0x40u);
+    HALF_AT(0x007E03C0u+HALF_AT(crt_kinds[GHOST].table+(crt_kinds[GHOST].first+3u)*0x18u+0x10u)*2u)=0xFFFFu;   /* one missing */
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x11000000u);
+    anim_map_row(GHOST,0x40u);anim_map_row(SECB,0x41u);anim_map_row(MUT,0x42u);
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x50000000u && seen_class[1]==0);
+    for(k=1;k<4u;k++) {                                       /* several per map */
+        a=actor(k,0x2Fu);
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x50000000u && WORD_AT(RECS+k*0x100u)==0x50000000u);
+    }
+    a=actor(4,0x4Du);
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x10000000u && seen_class[1]==0x4000u);
+    a=actor(5,0x30u);
+    HALF_AT(RECS+5u*0x100u+0x18u)=2u;                         /* an editor weapon: kept (no built-in weapon row) */
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x10000000u && seen_class[1]==0x8000u); CHECK(HALF_AT(RECS+5u*0x100u+0x18u)==2u);
+    a=actor(6,0x59u);                                         /* the Arcade Freak: stock */
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);
+    a=actor(7,0x17u);                                         /* an Arcade zombie: stock */
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x11000000u);
+    WORD_AT(POOL+8u*0xEA0u+0xBF0u)=0;HALF_AT(POOL+8u*0xEA0u+0x48u)=0x2Fu;     /* no record */
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,POOL+8u*0xEA0u,0);
+    /* ---- the Prometheus robots: the story robot class, animrb.pak as every level mounts it ---- */
+    {
+        static const uint16_t set[]={0x0C,0x62,0x36,0xAA};
+        unsigned before=nmounts;
+        map(0x11u,set,4u);
+        mounted_paths[nmounted++]=0x0047E65Cu;                /* stock: pak/anim/animrb.pak */
+        CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+        CHECK(nmounts==before);                                 /* already mounted: nothing more */
+        CALL(pc_mapmaker_creatures_request,fake_plain,0x0015E7C5u,0,0);
+        a=actor(9,0x62u);
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x11000000u);                      /* its anims not registered yet: bot */
+        anim_map_row(SK8,0x43u);                                /* the whole animrb table (shared with SD/7) */
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x10000004u && seen_class[1]==0);
+        CHECK(HALF_AT(RECS+9u*0x100u+0x18u)==0xFFFFu);          /* its editor weapon list dropped: the rocket launcher */
+        a=actor(10,0x36u);
+        HALF_AT(RECS+10u*0x100u+0x18u)=3u;
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x11000000u && seen_class[1]==0);   /* SD/7: the bot AI and its editor weapon */
+        CHECK(HALF_AT(RECS+10u*0x100u+0x18u)==3u);
+        a=actor(11,0x62u);                                      /* several per map */
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x10000004u);
+        a=actor(12,0xAAu);                                      /* the Arcade rocket robot: stock */
+        CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+        CHECK(seen_class[0]==0x11000000u);
+        nmounted--;
+    }
+    /* pak not mounted (another level's mount table): bot */
+    nmounted=0;
+    a=actor(0,0x4Du);
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x11000000u);
+    nmounted=3;
+
+    /* ---- Prometheus fire log: a fire pose that launches or not ---------- */
+    {
+        uint32_t ent=0x00560000u,ctl=0x00561000u,ai=actor(13,0x62u);
+        static const uint16_t set[]={0x0C,0x62};
+        map(0x11u,set,2u);
+        mounted_paths[nmounted++]=0x0047E65Cu;
+        crt_rb.n=1u;crt_rb.r[0].ai=0x1234u;                                  /* the last level's robot */
+        CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);         /* level start: log state reset */
+        WORD_AT(ent+0x7Cu)=ai;WORD_AT(ent+4u)=ctl;
+        HALF_AT(0x007E03C0u+0x9A7u*2u)=50u;WORD_AT(0x007DE664u+50u*8u)=0x00181C00u;   /* bigbotrocketadvfire: a fire pose */
+        HALF_AT(0x007E03C0u+0x9A2u*2u)=51u;WORD_AT(0x007DE664u+51u*8u)=0x00081800u;   /* bigbotsstandtoadv: not */
+        WORD_AT(ai+0x94u)=0x43u;FLOAT_AT(ai+0xAF4u)=250.0f;
+        /* pose 1: no sight, the weapon code never fires */
+        WORD_AT(ctl+0xD4u)=0x9A7u;sight=0;sight_calls=0;fire_now=0;
+        for(k=0;k<5u;k++) CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        CHECK(sight_calls==5u && weapon_calls==5u);
+        WORD_AT(ctl+0xD4u)=0x9A2u;
+        CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);   /* the pose ends: logged */
+        /* pose 2: sight, one fire call, the muzzle ray hits */
+        WORD_AT(ctl+0xD4u)=0x9A7u;sight=1;FLOAT_AT(ai+0xAF4u)=64.0f;fire_now=1;muzzle_hit=1;fire_event=1;
+        CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        fire_now=0;
+        WORD_AT(ctl+0xD4u)=0x9A2u;CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        /* pose 3: launched */
+        WORD_AT(ctl+0xD4u)=0x9A7u;fire_now=1;muzzle_hit=0;FLOAT_AT(ai+0xAF4u)=30.0f;
+        CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        WORD_AT(ctl+0xD4u)=0x9A2u;fire_now=0;CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,ent,0);
+        CHECK(crt_rb.n==1u && crt_rb.r[0].launched==1u && crt_rb.r[0].declined==2u && crt_rb.r[0].events==1u && crt_rb.r[0].tests==1u);
+        fire_event=0;
+        /* the sight update: one robot's rays counted, the first 64 summed up once */
+        {
+            unsigned j;
+            WORD_AT(0x007356D8u)=POOL;WORD_AT(0x00790950u)=1u;WORD_AT(POOL)=0x00570000u;WORD_AT(ai)=ent;
+            WORD_AT(0x00580000u+0x20u)=3u;
+            for(j=0;j<64u;j++) vis_hits[j]=j<40u?0x00570000u:j<60u?0x00580000u:0u;
+            WORD_AT(0x007A3500u)=13u;
+            for(j=0;j<64u;j++) CALL(pc_mapmaker_creatures_robot_sight,fake_sight,0x0015E9A3u,0,0);
+            CHECK(crt_rb.r[0].rays==64u && crt_rb.r[0].player==40u && crt_rb.r[0].other==20u && crt_rb.r[0].clear==4u && crt_rb.r[0].told==1u);
+            WORD_AT(0x007A3500u)=14u;                                          /* a ghost's turn: not counted */
+            HALF_AT(POOL+14u*0xEA0u+0x48u)=0x2Fu;
+            CALL(pc_mapmaker_creatures_robot_sight,fake_sight,0x0015E9A3u,0,0);
+            CHECK(crt_rb.r[0].rays==64u && crt_rb.seeing==0 && crt_rb.n==1u);
+            /* the robot's own body in the way: passed through, its collidable bit back after */
+            WORD_AT(0x007A3500u)=13u;
+            FLOAT_AT(ent+0x64u)=10.0f;FLOAT_AT(ent+0x6Cu)=20.0f;
+            WORD_AT(body_obj+0x20u)=8u;WORD_AT(body_obj+0x28u)=0x00000121u;FLOAT_AT(body_obj+0x64u)=11.0f;FLOAT_AT(body_obj+0x6Cu)=21.0f;
+            WORD_AT(far_obj+0x20u)=8u;WORD_AT(far_obj+0x28u)=0x20u;FLOAT_AT(far_obj+0x64u)=16.0f;FLOAT_AT(far_obj+0x6Cu)=20.0f;
+            bray_calls=0;
+            CALL(pc_mapmaker_creatures_robot_sight,fake_bsight,0x0015E9A3u,0,0);
+            CHECK(bray_calls==2u && crt_rb.r[0].player==41u && WORD_AT(body_obj+0x28u)==0x00000121u && crt_rb.r[0].body==1u);
+            far_first=1;bray_calls=0;                                            /* a character 6 units away: a real blocker */
+            CALL(pc_mapmaker_creatures_robot_sight,fake_bsight,0x0015E9A3u,0,0);
+            CHECK(bray_calls==1u && crt_rb.r[0].other==21u && WORD_AT(far_obj+0x28u)==0x20u);
+            far_first=0;
+            WORD_AT(body_obj+0x28u)=0x00000101u;bray_calls=0;                    /* not collidable: the ray never stops there anyway */
+            CALL(pc_mapmaker_creatures_robot_sight,fake_bsight,0x0015E9A3u,0,0);
+            CHECK(bray_calls==1u && crt_rb.r[0].player==42u);
+            WORD_AT(POOL)=body_obj;WORD_AT(body_obj+0x28u)=0x00000121u;bray_calls=0;   /* the player next to it: seen, not skipped */
+            CALL(pc_mapmaker_creatures_robot_sight,fake_bsight,0x0015E9A3u,0,0);
+            CHECK(bray_calls==1u && crt_rb.r[0].player==43u);
+            WORD_AT(POOL)=0x00570000u;
+        }
+        /* the pose row: the non-firing poses while it cannot see, for the handler call only */
+        {
+            uint32_t row=0x00520838u+2u*0x20u;
+            static const uint32_t stock[8]={0x99Eu,0x9A0u,0x9A7u,0x9A7u,0x9A2u,0xFFFFFFFFu,0xFFFFFFFFu,0x9A5u};
+            memcpy((void *)((uintptr_t)row+g_xbox_mem_offset),stock,sizeof stock);
+            sight=0;
+            CALL(pc_mapmaker_creatures_robot_pose,fake_pose,0x0027FAA5u,ent,0);
+            CHECK(seen_row[2]==0x9A6u && seen_row[3]==0x9A6u && seen_row[7]==0x99Eu && seen_row[0]==0x99Eu && seen_row[4]==0x9A2u);
+            CHECK(!memcmp((const void *)((uintptr_t)row+g_xbox_mem_offset),stock,sizeof stock) && crt_rb.r[0].hold==1u);
+            sight=1;
+            CALL(pc_mapmaker_creatures_robot_pose,fake_pose,0x0027FAA5u,ent,0);
+            CHECK(seen_row[2]==0x9A7u && seen_row[7]==0x9A5u);
+            sight=0;
+            {
+                uint32_t other=actor(15,0x2Fu),e3=0x00563000u;                    /* not the rocket robot */
+                WORD_AT(e3+0x7Cu)=other;
+                CALL(pc_mapmaker_creatures_robot_pose,fake_pose,0x0027FAA5u,e3,0);
+                CHECK(seen_row[2]==0x9A7u);
+            }
+            sight=1;
+        }
+        /* not a class-4 robot row (a ghost): untouched, no sight test */
+        {
+            uint32_t other=actor(14,0x2Fu),e2=0x00562000u;
+            unsigned before=sight_calls;
+            WORD_AT(e2+0x7Cu)=other;WORD_AT(e2+4u)=ctl;WORD_AT(ctl+0xD4u)=0x9A7u;
+            CALL(pc_mapmaker_creatures_robot_weapon,fake_weapon,0x001B8C5Fu,e2,0);
+            CHECK(sight_calls==before && crt_rb.n==1u);
+        }
+        /* the muzzle hook elsewhere: only the original */
+        CALL(pc_mapmaker_creatures_robot_muzzle,fake_ray,0x001DCCC6u,0,0);
+        CHECK(crt_rb.r[0].hits==0u);
+        nmounted--;
+    }
+
+    /* ---- opt out --------------------------------------------------------- */
+    set_env("TSFP_MAPMAKER_CREATURES","0");
+    a=actor(0,0x4Du);
+    CALL(pc_mapmaker_creatures_ai_start,fake_ai_start,0x0015BA00u,a,0);
+    CHECK(seen_class[0]==0x11000000u);
+    nmounts=0;nrequests=0;nmounted=0;
+    CALL(pc_mapmaker_creatures_anims,fake_plain,0x0005C506u,0,0);
+    CALL(pc_mapmaker_creatures_request,fake_plain,0x0015E7C5u,0,0);
+    CHECK(nmounts==0 && nrequests==0);
+    models_read=1;
+    CALL(pc_mapmaker_creatures_create,fake_create,0x000D7800u,0x30u,0);
+    CHECK(seen_model[0]==0x619u);
+    set_env("TSFP_MAPMAKER_CREATURES",NULL);
+
+    if(failures) { fprintf(stderr,"%d failures\n",failures);return 1; }
+    printf("ok\n");
+    return 0;
+}

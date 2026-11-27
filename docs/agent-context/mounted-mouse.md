@@ -152,6 +152,44 @@ host adapters, and optional original-XBE 37AA70/3797B0 execution. The old-route
 mutation must fail. The original-code fixture proves target survival, direction
 vector updates and controller inputs; it is not a live mission or Mac-input test.
 
+Follow-up (user report: mech view still fixed). Static US-XBE review confirms
+the route: 37A730 is the only 0x8000 setter; D5EB0 always calls the D2B80 hook
+before D5C70 -> 37AA70; 37B720 state 5 keeps +2C/+30 and copies them to
++20/+24 while +50 is set; camera type 0x1F (CCAB0 case CD589) requires a
+type-8 target and aims through 3797B0 from +20/+24. [0x733108] is the script
+camera (C6150 clears it, CC170 aims it). No failing link was proven offline.
+The route no longer rejects an unusable camera FOV (37AA70 has no FOV input;
+it now only scales). PcInput.mech_status names the outcome and both adapters
+log each change once ("[PC-MOUSE] Battle Mech: ..."), so the next playtest
+log identifies a failed link. Live mission behavior remains unverified.
+
+## MapMaker switch cameras (v0.4.0-mapmaker.31 report)
+
+A MapMaker camera (item types 0x35..0x37, switch link 0x18 in `33F0E0`) is
+this mode-0x80 actor; the switch mounts it through `3391D0` -> `B76B0`. Its
+update `246000` sweeps in state 2 (+58/+5C per tick between +34..+38 and
++3C..+40, speed negated at a limit) without checking +D8. Stock skips the
+state machine only on data+8 bit 0, which `3391D0` sets when flag 0x20 is set.
+`pc_mapmaker_camera.inc` sets that bit around `246000` in scene 100 while the
+reciprocal operator links hold, then restores it. With flag 0x1000000 the
+helper scales by |+5C|: the sweep's negated speed no longer drops mouse aim.
+`mounted_mouse.c` covers the negative speed; `test_mapmaker_camera.py` the hold.
+
+## Mounted-gun / camera view on a wide display
+
+The mode-0x80 3D view is already Hor+ (`[PC-DISPLAY] View:` aspect 1.768 at
+16:9). HUD mode 10 (`0x004E6900` + 10 x 0x1C: update `12E100`, draw `14BFF0`)
+frames it from `14C281` in a single view: 3% x 15% inset bars, green tint,
+camera-gun tint, scanlines, 0x11B brackets, labels, meter. AUTO placement
+boxed these at 4:3. `pc_display_viewfinder` (WRAP `14BFF0`) makes the shared
+`1EFB0`/`1F090` wrappers draw them STRETCH with `pc_ui_viewfinder_x` (edges
+on their sides, pieces fitted about their third) and labels (`41DC0`) at the
+matching edge placement. `pc_display_view_static` (WRAP `F8DC0`) scales the
+static tile width (record +0x26) by the HUD scale under STRETCH and restores
+the guest random state (`4E7950`, `7497C8`). Only wide, single, full views;
+`TSFP_CAMERA_WIDESCREEN=0` restores stock. Logged as `[PC-DISPLAY] Camera
+view:`. Test `tests/graphics/test_camera_widescreen.py`; see mapmaker-camera.md.
+
 ## Machine Wars final cockpit (scripted mode 0x100)
 
 Live Windows capture on 2026-11-04 identified player mode 0x100, callback

@@ -63,7 +63,8 @@ def main():
     if args.generate:
         run(sys.executable,'-m','tools.xdk_symbols',xbe,cwd=runtime)
         run(sys.executable,'scripts/recompile.py',xbe,'--work-dir',ROOT/'private/pipeline',
-            '--project','titles/futureperfect','--game-name','TimeSplitters: Future Perfect','--trace-all-entries',cwd=runtime)
+            '--project','titles/futureperfect','--game-name','TimeSplitters: Future Perfect','--trace-all-entries',
+            '--guest-patches',ROOT/'config/guest-code-patches',cwd=runtime)
         run(sys.executable,ROOT/'tools/build/recomp-generation.py',runtime,'--record')
     run(sys.executable,ROOT/'tools/build/recomp-generation.py',runtime)
     run(sys.executable,ROOT/'tools/build/network-identity.py','--runtime',runtime,'--game',game,'--output',build/'generated')

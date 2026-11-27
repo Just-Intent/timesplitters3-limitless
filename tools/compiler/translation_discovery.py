@@ -41,7 +41,7 @@ class FunctionDiscovery:
     def __init__(self, xbe_data, func_db, label_db=None, classification_db=None,
                  abi_db=None, seh_prolog=None, seh_epilog=None, setjmp_fn=None,
                  longjmp_fn=None, trace_functions=None, trace_all_entries=False,
-                 icall_sites=None, force_returns=None):
+                 icall_sites=None, force_returns=None, operand_overrides=None):
         from translation_context import Lifter
         self.xbe_data = xbe_data
         self.func_db = func_db
@@ -52,7 +52,7 @@ class FunctionDiscovery:
         self.force_returns = dict(force_returns or {})
         self.trace_functions = set(trace_functions or ())
         self.trace_all_entries = bool(trace_all_entries)
-        self.disasm = Disassembler()
+        self.disasm = Disassembler(operand_overrides)
         self.lifter = Lifter(func_db=func_db, label_db=self.label_db, abi_db=self.abi_db,
             xbe_data=xbe_data, seh_prolog=seh_prolog, seh_epilog=seh_epilog,
             setjmp_fn=setjmp_fn, longjmp_fn=longjmp_fn)

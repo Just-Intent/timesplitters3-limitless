@@ -7,6 +7,9 @@ param(
     [string]$InputSequence,
     [switch]$SystemLink,
     [switch]$SkipTextures,
+    # Build only: compile every target but do not execute locally built test
+    # programs (for hosts whose application control blocks unsigned binaries).
+    [switch]$CompileOnly,
     [string[]]$Peers,
     [ValidateSet('Debug', 'Release', 'RelWithDebInfo')]
     [string]$Configuration = 'Release',
@@ -27,6 +30,8 @@ $buildRoot = Join-Path $projectRoot 'build\windows'
 $exe = Join-Path $buildRoot "$Configuration\futureperfect_recomp.exe"
 $revision = 'd90c92988a9f99d0580d2ca3f7efd6ec3a7b7845'
 $expectedHash = '3CFD001A84FC3E08175D6C4B2E42EBF49577A089B5D0BD87AC724F61A41816BC'
+$compileOnlyRecord = Join-Path $buildRoot 'compile-only-build.json'
+if ($CompileOnly -and $Action -ne 'Build') { throw '-CompileOnly applies only to -Action Build.' }
 
 function Invoke-Checked {
     param([string]$Program, [string[]]$Arguments)
@@ -41,6 +46,31 @@ function Invoke-Checked {
     }
     finally { $ErrorActionPreference = $previousErrorPreference }
     if ($exitCode -ne 0) { throw "$Program failed (exit $exitCode)." }
+}
+
+# A compile-only build is untested: record exactly what was not run and never
+# report it as a passing build. Sealing for System Link/packaging is withheld.
+function Write-CompileOnlyReport {
+    param([string]$Root, [string]$Executable, [string]$Record, [string[]]$Skipped)
+    if (!(Test-Path -LiteralPath $Executable -PathType Leaf)) {
+        throw "Compile-only build did not produce $Executable."
+    }
+    $hash = (Get-FileHash -LiteralPath $Executable -Algorithm SHA256).Hash.ToLowerInvariant()
+    $details = [ordered]@{
+        schema = 1; mode = 'compile-only'; tests_run = $false; network_sealed = $false
+        executable = $Executable; executable_sha256 = $hash
+        source_commit = (& git -C $Root rev-parse HEAD)
+        source_changes = @(& git -C $Root status --porcelain)
+        skipped = @($Skipped)
+    }
+    $encoding = New-Object Text.UTF8Encoding $false
+    [IO.File]::WriteAllText($Record, (($details | ConvertTo-Json -Depth 4) + "`n"), $encoding)
+    $summary = 'COMPILE-ONLY BUILD: {0} build checks were NOT run. This executable is untested and is not sealed for System Link, online play or packaging.'
+    Write-Warning ($summary -f $Skipped.Count)
+    foreach ($check in $Skipped) { Write-Output "SKIPPED (not run): $check" }
+    Write-Output "Compiled (untested): $Executable"
+    Write-Output "SHA-256: $hash"
+    Write-Output "Compile-only record: $Record"
 }
 
 function Assert-Game {
@@ -153,7 +183,8 @@ try {
                     Invoke-Checked $envPython @('-m', 'tools.xdk_symbols', $xbe)
                     Invoke-Checked $envPython @('scripts/recompile.py', $xbe,
                         '--work-dir', (Join-Path $privateRoot 'pipeline'), '--project', 'titles/futureperfect',
-                        '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries')
+                        '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries',
+                        '--guest-patches', (Join-Path $projectRoot 'config\guest-code-patches'))
                     Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\build\recomp-generation.py'), $toolRoot, '--record')
                 }
                 'Build' {
@@ -178,11 +209,16 @@ try {
                     $generatorChanged = $LASTEXITCODE -ne 0
                     if ($missingWrappers.Count -or $generatorChanged) {
                         Write-Output 'Runtime hooks or generator changed; refreshing generated game code before building.'
+                        if ($CompileOnly) {
+                            # Generation is required and is not skipped in compile-only mode.
+                            Write-Output 'Note: regeneration runs the locally built XbSymbolDatabaseCLI (tools.xdk_symbols); if application control blocks it, the build stops here.'
+                        }
                         # Corrected per-title symbols must replace the cached scan before lifting.
                         Invoke-Checked $envPython @('-m', 'tools.xdk_symbols', (Join-Path $gameRoot 'default.xbe'))
                         Invoke-Checked $envPython @('scripts/recompile.py', (Join-Path $gameRoot 'default.xbe'),
                             '--work-dir', (Join-Path $privateRoot 'pipeline'), '--project', 'titles/futureperfect',
-                            '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries')
+                            '--game-name', 'TimeSplitters: Future Perfect', '--trace-all-entries',
+                            '--guest-patches', (Join-Path $projectRoot 'config\guest-code-patches'))
                         Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\build\recomp-generation.py'), $toolRoot, '--record')
                     }
                     Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\build\network-identity.py'))
@@ -200,49 +236,63 @@ try {
                     foreach ($dll in @('dxcompiler.dll', 'dxil.dll')) {
                         Copy-Item -LiteralPath (Join-Path $toolRoot "third_party/dxc/bin/x64/$dll") -Destination (Join-Path $buildRoot "$Configuration/$dll")
                     }
-                    Invoke-Checked $envPython @((Join-Path $projectRoot 'tests/graphics/ghost_targets.py'),
-                        (Join-Path $buildRoot "xboxrecomp/src/replay/$Configuration/d3d8_replay.exe"), '--backend', 'd3d11')
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_network_test.exe") @()
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_discord_test.exe") @()
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_hang_policy_test.exe") @()
-                    Invoke-Checked (Join-Path $buildRoot "xboxrecomp\src\d3d\$Configuration\tsfp_pc_clear_test.exe") @()
-                    Invoke-Checked (Join-Path $buildRoot "xboxrecomp\src\d3d\$Configuration\tsfp_texture_format_test.exe") @()
-                    $textureTest = Join-Path $buildRoot "xboxrecomp\src\d3d\$Configuration\tsfp_texture_toggle_test.exe"
-                    $textureTestRoot = Join-Path $buildRoot 'texture-toggle-tests'
-                    New-Item -ItemType Directory -Force -Path $textureTestRoot | Out-Null
-                    foreach ($mode in @('classic', '4k', 'missing', 'implicit')) {
-                        Invoke-Checked $textureTest @($textureTestRoot, $mode)
+                    if ($CompileOnly) {
+                        # Every target above was compiled; only executing them is skipped.
+                        Write-CompileOnlyReport -Root $projectRoot -Executable $exe -Record $compileOnlyRecord -Skipped @(
+                            'tests/graphics/ghost_targets.py running d3d8_replay.exe (GPU replay regression)',
+                            'tsfp_pc_network_test.exe', 'tsfp_pc_discord_test.exe', 'tsfp_hang_policy_test.exe',
+                            'tsfp_pc_clear_test.exe', 'tsfp_texture_format_test.exe',
+                            'tsfp_texture_toggle_test.exe (classic, 4k, missing, implicit)',
+                            'tsfp_pc_display_test.exe', 'tsfp_pc_prompts_test.exe (default and controller-profile)', 'tsfp_save_paths_test.exe',
+                            'tsfp_pc_controls_test.exe', 'tsfp_pc_settings_test.exe', 'tsfp_pc_debug_test.exe',
+                            'network-identity.py --seal-executable (System Link/online/packaging seal)')
                     }
-                    $testRoot = Join-Path $projectRoot 'build\path-tests'
-                    $testConfig = Join-Path $projectRoot 'tests\fixtures\pc-controls.json'
-                    New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_display_test.exe") @(
-                        (Join-Path $testRoot 'pc-display-test.ini'))
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_prompts_test.exe") @($testConfig)
-                    $controllerConfig = Join-Path $testRoot 'controller-profile.json'
-                    $controllerDocument = Get-Content -LiteralPath (Join-Path $projectRoot 'config\pc-controls.default.json') -Raw | ConvertFrom-Json
-                    $controllerDocument.controllers[0].device = 'gamepad:0'
-                    [IO.File]::WriteAllText($controllerConfig, ($controllerDocument | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_prompts_test.exe") @($controllerConfig, 'controller-profile')
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_save_paths_test.exe") @($testRoot)
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_controls_test.exe") @(
-                        $testConfig, $testRoot)
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_settings_test.exe") @(
-                        $testConfig, $testRoot)
-                    Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_debug_test.exe") @(
-                        $testConfig, $testRoot)
-                    # Only successful tests reach cleanup; retain failures for diagnosis.
-                    $cleanupPath = (Resolve-Path -LiteralPath $testRoot).ProviderPath
-                    $expectedTestRoot = Join-Path ([IO.Path]::GetFullPath($projectRoot)) 'build\path-tests'
-                    if ($cleanupPath -ne $expectedTestRoot -or
-                        ((Get-Item -LiteralPath $cleanupPath).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-                        throw "Refusing to clean an unexpected test directory: $cleanupPath"
+                    else {
+                        Invoke-Checked $envPython @((Join-Path $projectRoot 'tests/graphics/ghost_targets.py'),
+                            (Join-Path $buildRoot "xboxrecomp/src/replay/$Configuration/d3d8_replay.exe"), '--backend', 'd3d11')
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_network_test.exe") @()
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_discord_test.exe") @()
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_hang_policy_test.exe") @()
+                        Invoke-Checked (Join-Path $buildRoot "xboxrecomp\src\d3d\$Configuration\tsfp_pc_clear_test.exe") @()
+                        Invoke-Checked (Join-Path $buildRoot "xboxrecomp\src\d3d\$Configuration\tsfp_texture_format_test.exe") @()
+                        $textureTest = Join-Path $buildRoot "xboxrecomp\src\d3d\$Configuration\tsfp_texture_toggle_test.exe"
+                        $textureTestRoot = Join-Path $buildRoot 'texture-toggle-tests'
+                        New-Item -ItemType Directory -Force -Path $textureTestRoot | Out-Null
+                        foreach ($mode in @('classic', '4k', 'missing', 'implicit')) {
+                            Invoke-Checked $textureTest @($textureTestRoot, $mode)
+                        }
+                        $testRoot = Join-Path $projectRoot 'build\path-tests'
+                        $testConfig = Join-Path $projectRoot 'tests\fixtures\pc-controls.json'
+                        New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_display_test.exe") @(
+                            (Join-Path $testRoot 'pc-display-test.ini'))
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_prompts_test.exe") @($testConfig)
+                        $controllerConfig = Join-Path $testRoot 'controller-profile.json'
+                        $controllerDocument = Get-Content -LiteralPath (Join-Path $projectRoot 'config\pc-controls.default.json') -Raw | ConvertFrom-Json
+                        $controllerDocument.controllers[0].device = 'gamepad:0'
+                        [IO.File]::WriteAllText($controllerConfig, ($controllerDocument | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_prompts_test.exe") @($controllerConfig, 'controller-profile')
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_save_paths_test.exe") @($testRoot)
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_controls_test.exe") @(
+                            $testConfig, $testRoot)
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_settings_test.exe") @(
+                            $testConfig, $testRoot)
+                        Invoke-Checked (Join-Path $buildRoot "$Configuration\tsfp_pc_debug_test.exe") @(
+                            $testConfig, $testRoot)
+                        # Only successful tests reach cleanup; retain failures for diagnosis.
+                        $cleanupPath = (Resolve-Path -LiteralPath $testRoot).ProviderPath
+                        $expectedTestRoot = Join-Path ([IO.Path]::GetFullPath($projectRoot)) 'build\path-tests'
+                        if ($cleanupPath -ne $expectedTestRoot -or
+                            ((Get-Item -LiteralPath $cleanupPath).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                            throw "Refusing to clean an unexpected test directory: $cleanupPath"
+                        }
+                        Add-Type -AssemblyName Microsoft.VisualBasic
+                        [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
+                            $cleanupPath, 'OnlyErrorDialogs', 'SendToRecycleBin', 'ThrowException')
+                        Write-Output 'Build tests passed; temporary build/path-tests data recycled.'
+                        if (Test-Path -LiteralPath $compileOnlyRecord) { Remove-Item -LiteralPath $compileOnlyRecord }
+                        Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\build\network-identity.py'), '--seal-executable', $exe)
                     }
-                    Add-Type -AssemblyName Microsoft.VisualBasic
-                    [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
-                        $cleanupPath, 'OnlyErrorDialogs', 'SendToRecycleBin', 'ThrowException')
-                    Write-Output 'Build tests passed; temporary build/path-tests data recycled.'
-                    Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\build\network-identity.py'), '--seal-executable', $exe)
                     Invoke-Checked $envPython @((Join-Path $projectRoot 'tools\release\crash-symbols.py'), '--build-dir', (Join-Path $buildRoot $Configuration))
                 }
                 { $_ -in 'Run', 'SmokeTest' } {

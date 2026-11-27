@@ -1,0 +1,487 @@
+# MapMaker real story boss: the far-future giant robot (story mission 10)
+
+Status: implemented in `src/interface/pc_mapmaker_robot.inc` (area `robot`),
+fixture-tested (`tests/mapmaker/test_mapmaker_robot.py`: 137 mutations, plus
+decode and US XBE data checks of every site below). Wired in mapmaker-recon;
+**up to four robots per map**, each with its own state (see
+[Several robots](#several-robots)): the four new wrappers for that are not
+wired yet (see [Wrappers for the integrator](#wrappers-for-the-integrator)). Switch: `TSFP_MAPMAKER_LIMITS=1`;
+`TSFP_MAPMAKER_REAL_BOSS=0` keeps the robot on the normal bot AI.
+
+Research basis: `logs/limits/features/real-bosses.md` section 6 (main
+checkout, ignored). CONFIRMED = seen in the decode or XBE data (and checked by
+the test); INFERRED = reasoning, needs a playtest.
+
+## What the robot is
+
+| | value (CONFIRMED) |
+|---|---|
+| character id | 0x42 (no Arcade-table row; `sub_002BE270(0x42)` == 0, so the stock slot reload drops its variant) |
+| character table 0x0053A3CC + 0x42*0x30 | voice set 0x0053A0C8 (the Arcade giant robot's, id 0xA8), model 0x5F2 `chrs/FF2GiantRobot`, no LOD, story-only flag 0x2000000 (skipped in scene 100 by `sub_000A5E40`) |
+| model file | `pak/chr.pak`, mounted in MapMaker play (research). INFERRED: the same mesh as the Arcade giant robot (`giantrobot_arcade`, same file size) |
+| story AI class | AI +0x14 = 0x80000, +0x10 = 0: `sub_0027D590` 0x0027DDF5 -> `sub_00293730(entity)` (call 0x0027DE18, its only caller); message handler `sub_00294520` (0x0027D402 / call 0x0027D447) |
+| animations | `giantrob_startthroughdoor` 0x807, `giantrob_walkcycle` 0x808, `giantrob_death` 0x809, named only by `pak/stream/lv14/anim/lv14.pak` (string 0x0049DC78, 258 KB, table 0x0047E938 x 0x29 registered at 0x001CA316). No id shared with lv1_3, lv1_6 or lv81. (`lv5_4.pak` names other giantrob ids 0x792..0x794 for a scene-5 cameo the boss does not use.) |
+| per-level state | `sub_00292630`: `[0x0078B1DC]` = `sub_0003DFA0(0x4C, 1)`, then `sub_00292550` sets every field. The handler dereferences it unchecked (0x002937DC). Particles: the shared 800 x 0x28 block `[0x0078B0D0]` (`sub_002A62C0`) |
+| where stock makes them | `sub_0025F720` (story level init) for **scene 14 only** (jump table case 0x0025F760: `sub_0028D6D0`, `sub_00292630`, `sub_002A62C0`). Scene 5 gets none. `sub_0028D6D0` is the split Crowe's block `[0x0075F5E8]`; no robot function reads it, nor the walker/skeleton states |
+| boss bar | `sub_0014CC80` case 0x0014D06F for model 0x5F2, no scene test, label text 0x163D (level-local id) |
+
+### The fight (CONFIRMED unless marked)
+
+States (AI +0x20, table 0x002944FC): 0 intro (0x00293847: damage callback
+`sub_000BC470`, particle setup, health +0x1CC/+0x1D8 = 55.0, story focus
+0x002938A9); 1 door entry (0x002938B4): plays `giantrob_startthroughdoor`
+until `sub_00059DD0` says the animation ended. This "scripted door entry" is
+only an animation: no level door or tagged object is involved, so it
+completes anywhere (INFERRED: its root motion walks the robot a few units
+forward from its spawn point). 2-5 walk and attacks (projectiles through
+`sub_00292BF0`, `sub_00292FA0`, `sub_00293100`, the stock projectile
+`sub_000EA9C0`); 6 death.
+
+- No scene read in any robot function; the only direct callee of the
+  handler that reads the scene is the level event `sub_002274C0`. The message
+  handler and the callbacks `sub_000BC470`, `sub_002926B0`, `sub_002936C0`
+  call nothing that reads it.
+- No forced height: no robot function stores to entity +0x68 (unlike the
+  skeleton's 0x0029D06B).
+- No tagged-object lookup (`sub_0023FF20`) is reachable from the fight.
+- Distances are from the robot's and the first player's positions
+  (`[0x007B0C48]+0x14`, copied into the state each frame).
+- **Hangar pads**: the walk compares the first player's pad position
+  (pad table `[0x00715F2C]`, stride 0x20) against hangar coordinates (230,
+  265, 2, -2) to pick one of the pad ids 0x46E, 0x6A4, 0x465, 0x466, 0x473,
+  0x468, 0x690; `sub_0009CC40(id)` (binary search, -1 when missing) is
+  called once as an existence test, and only when the id was found a second
+  time to fetch the index (0x00293981, 0x00293CE0). A missing id falls back
+  to the player's own pad (actor +0x678). MapMaker pad ids are 0x3E9 + i
+  (mapmaker-pads.md), so a map with more than 124 pads would hold such ids at
+  arbitrary places.
+- Damage callback `sub_002936C0`: health -= damage (floor 0); only the first
+  player's hits set the state's aggro flag +0x38.
+- Death: message 2 (unless already in state 6) gives the kill credit, shakes
+  nearby players' views, sets state +0x48 = 1 (0x00294697), plays a sound,
+  `giantrob_death` 0x809 and AI +0x9D0 = 6, returns -1 (no generic death).
+  No scene test. State 6 spawns explosions (`sub_002A7B90`) every frame,
+  raises character-table field +0x20 of id 0x42 by 0.075 per frame up to
+  3.5 (global data; generic code `sub_000D2FD0`/`sub_000DAC30` also writes
+  that field; INFERRED: a shade/glow, not traced further), and once the death
+  animation has ended **every frame** calls `sub_000462B0(0)` (music track 0,
+  `[0x004D1850]`), level event 2 (`sub_002274C0(2, 0.5)`, 0x002944E0) and
+  clears the focus. It is never removed; mission 10 moves on through its
+  level script instead.
+- Explosions are drawn by `sub_00292650`, called by the frame
+  `sub_001CEBC0` only in scene 14 (0x001CEE49 .. 0x001CEE58), only when a
+  level object tagged 'MECH' exists (null-checked) and state +0x48 == 1, and
+  not in story split screen: `sub_00019D70(1)`, `sub_002A7F30([[0x007B0CC0]+0x208], 2.5)`.
+  `sub_002A7F30` only draws (its stores are to its frame). Particles age only
+  inside the spawn calls.
+- Soft restart: `sub_0015E4F0` (from the scene loop's restart path
+  `sub_001CDD60`, which runs after the level was initialised) tail-jumps to
+  `sub_0025F6A0`, which resets the robot state with `sub_00292550` only in
+  scene 14. Restart audit after .31 (the bosses' restart bug,
+  [Khallos](mapmaker-khallos.md)): this area is **not affected**. Its level
+  hook `sub_0025F720` does not run on "START restart", but `sub_0025F6A0`
+  does (`sub_001CDD60` 0x001CDD74 -> `sub_0015E4F0` -> 0x0015E7B1), so
+  `pc_mapmaker_robot_reset` resets every block, its statics and `removed`;
+  the restarted robot keeps its instance by record and gets its class again
+  at its AI start (fixture: "the same one again (restart)" and the soft
+  restart case). Its other per-level counters only bound log lines.
+- No overhead meter: the robot never calls `sub_0012C800`, so it gets no
+  +0x268 record and `sub_0014D1F0` draws no meter on it.
+
+## What the area does (scene 100, story mode, switch on)
+
+| WRAP | function | what it does |
+|---|---|---|
+| `sub_001C8540` | `pc_mapmaker_robot_anims` | after the original: when the map's custom set (index 0x11; slots 1-10 in map-info chunk 0x00C77668, 11-20 in the sets chunk 0x00C776F5) holds 0x42, or the container cannot be read, and lv14.pak is not mounted (`sub_00062260`; the split Crowe area may already have mounted it) and two of the 30 mount slots stay free: `sub_0005A130(lv14.pak)`, the stock per-level anim pak call (whole file into the level heap, unmounted with the level) |
+| `sub_0025F720` | `pc_mapmaker_robot_level` | before the original: `[0x0078B0D0]` = 0 (in scene 100 it can only be an earlier level's dangling block). After: forget the previous level's robots; for such a map, when no particle block exists yet (the realbosses skeleton/walker make one), `sub_002A62C0` (32 KB); then four state blocks: each time `[0x0078B1DC]` = 0 and `sub_00292630` (a fresh 76-byte block, set by `sub_00292550`), kept while the pointer is usable. Outside any robot `[0x0078B1DC]` holds the first block |
+| `sub_0015B830` | `pc_mapmaker_robot_ai_start` | before the original: pool entry with character 0x42 (or entity model 0x5F2), lv14.pak mounted and this level's state in place: record +0/+4 = 0/0x80000, and the robot gets the next free state block (its statics start at 0). Beyond the blocks made (four) a robot keeps the MapMaker class (logged). The same record again (restart) keeps its block |
+| `sub_00293730` | `pc_mapmaker_robot_handler` | the robot's AI (dispatcher 0x0027DE18, entity arg 1): runs with that robot's globals (see Several robots); before it, the hold (.44, geometric since .45) puts back a robot that walked through an opening lower than it |
+| `sub_00294520` | `pc_mapmaker_robot_message` | its messages (0x0027D447, entity arg 1): same |
+| `sub_002926B0` | `pc_mapmaker_robot_callback` | the slot-2 callback its door entry installs (0x002938EE, entity arg 1): same |
+| `sub_002936C0` | `pc_mapmaker_robot_damage` | its damage callback (0x00293923, hit record arg 1, entity at +0): same |
+| `sub_0009CC40` | `pc_mapmaker_robot_nav` | for the seven existence tests in the handler (returns 0x00293949, 0x00293BC9, 0x00293C10, 0x00293C2B, 0x00293C64, 0x00293C9E, 0x00293CD0) with this level's robot: -1, so the robot always walks to the player's pad. Every other caller (and the two index fetches, unreachable then) runs the original |
+| `sub_000462B0` | `pc_mapmaker_robot_music` | the death's music change (return 0x002944D9): dropped, the map keeps its track |
+| `sub_002274C0` | `pc_mapmaker_robot_event` | the death's level event 2 (return 0x002944E5) is the map's own logic marker 2 in MapMaker: dropped; the robot whose code is running (the swap knows it) is removed with `sub_0015DDA0` (the skeleton's stock death call, as the walker port) and a story focus still on it is cleared. Once per robot |
+| `sub_00126560` | `pc_mapmaker_robot_fx` | after the original (only the call returning to 0x001CEE8C): while any of this level's robots is dying (its own state +0x48 == 1) and not yet removed (once a frame: one shared particle block), and not in story split screen: `sub_00019D70(1)`, `sub_002A7F30(view, 2.5)` as `sub_00292650` |
+| `sub_0025F6A0` | `pc_mapmaker_robot_reset` | after the original, with this level's state blocks: for each, `sub_00292550` on it as scene 14 does (pointer put back after), its statics cleared, and the robot counts as not removed again |
+| `sub_0014CC80` | `pc_mapmaker_robot_hud` | chain INSIDE `pc_mapmaker_bosses_hud`: when the focus is one of this level's robots, the focus is cleared for the original and restored after, so the stock bar (with level text 0x163D as label) never shows; the bosses area then draws its Boss bar for a Boss-flagged robot (its name, multipliers), none otherwise |
+
+## Openings lower than the robot (v0.4.0-mapmaker.40)
+
+User report: "giant robots being able to follow the player through walls
+which exceed their height as long as there is some opening/door on the
+ground".
+
+Cause (CONFIRMED, decode): in every walk frame the handler sets actor
++0x684 to the player's pad (the hangar ids are -1, above) and calls the
+stock walk goal `sub_0015D500(entity, [actor+0x684])` (0x00293D22, return
+0x00293D27), which routes over the human-sized pad graph. MapMaker pads and
+links come from the tile templates and the stitches through each
+connection, so every doorway has a link; the robot's collision does not
+stop it there.
+
+Options considered: filtering the stock A* by clearance needs the robot's
+height inside the group and pad searches and the precomputed group distance
+matrix (`sub_00275F70`), which all AIs share; stopping at the first low
+opening and fighting from range alone leaves a robot stuck when a tall way
+round exists. Chosen: **its own reachable pad set, with steering**
+(`pc_mapmaker_robot_goal`, WRAP `sub_0015D500`, only that call):
+
+- Once per level the area reads the pads (`[0x00715F2C]` x `[0x007B6664]`,
+  0x20 each: +4 bit 0 used, +0xA room from the pad snap, +0xC position) and
+  the used links (`[0x00715F30]` x `[0x007B6660]`, 0x14 each: +0 flags
+  0x10000, +4/+8 pad indices; `sub_0009A2C0`, `sub_0009A5B0`). A link between
+  pads of two rooms crosses the portal joining them nearest to its midpoint
+  (room record `[0x00708788]` + room x 0xB4, +4 -> {count, ids}; portal
+  `[[0x0070878C]+id*4]`: +0/+4 rooms, +0x14 int16 vertex count, +0x18
+  vertices of 0xC, `sub_0008C620`/`sub_0008BDD0`); its opening is the
+  vertices' y extent. Links inside one room, with an unknown room or with no
+  portal between the rooms (teleporters) stay open (stock).
+- The robot's height is its entity box top (+0x1AC centre y + +0x1C4 half
+  height, read as at 0x0006B61D..0x0006B68F); 6.0 when that is not between 1 and 40 (INFERRED).
+  A link is passable when its opening is at least the height - 0.25.
+- From the robot's pad (actor +0x678) a breadth-first search gives the pads
+  it reaches (again whenever it stands on a pad outside the set). A player
+  pad outside the set is replaced by the reachable used pad nearest to it:
+  the robot walks to the opening and stays there, attacking by its stock
+  distance rules.
+- When the set has blocked links, the goal is steered: hop distances to the
+  goal over passable links, and the robot gets the next pad on that path,
+  one link at a time (it stays where it is when no passable link leads on).
+- The replaced goal is written to the call's argument and to actor +0x684
+  (so the stock goal compare in `sub_0015D500` sees one goal, and the
+  handler's arrival test re-picks the player's pad on arrival); the argument
+  slot is put back after.
+
+Logs (`[mapmaker] robot:`): once per level `giant robot height h (entity
+box top; openings of at least h-0.25 let it through), c links cross a
+portal`, then `link pad a (room r) - pad b (room s): opening o -> closed|open`
+for up to 32 of them; `giant robot k (height h) reaches n of m pads from pad
+p; b links through openings lower than it blocked (c room crossings)` at most
+4 times per robot and level, `cannot fit to the player's pad: it waits at the
+nearest pad it reaches` and `steps one link it fits through toward its goal`
+(budgeted).
+
+INFERRED (playtest): that MapMaker portals are the doorway's shape (if a
+tile side is one portal, a robot taller than a floor passes no side of a
+one-floor tile, and one shorter passes every side); the robot's box height;
+that pad steps look smooth (one link at a time since .42). Tests: `low_door()` in
+`tests/mapmaker/mapmaker_robot.c` (a robot facing a low door with and
+without a tall way round, a door as tall as it, the box fallback and a small
+robot, an unknown room, other callers and entities), the `goal-*`
+mutations and the decode test `test_walk_goal_and_pad_graph`.
+
+Health display, as the other real bosses: Boss Off = no health shown; Boss
+bar = the bosses area's bottom bar; Sub-boss bar = the bosses area's meter
+(no +0x268 record, so `pc_mapmaker_bosses_meters` draws it; lifted over its top
+since .68, [bosses](mapmaker-bosses.md#every-boss-type-stabilization-after-v040-mapmaker68)). The handler sets health 55 in state 0; the bosses area
+rescales a maximum the game set again (bosses.inc), so its multiplier still
+applies (INFERRED from that rule).
+
+Save format: unchanged. The robot is a stock custom-set member (word id 0x42,
+variant -1). A stock game or an older build spawns id 0x42 with the stock
+MapMaker class on the robot model (INFERRED: the human-rig animations, as the
+other real bosses' stage 1).
+
+### Still through a one-floor opening (v0.4.0-mapmaker.42)
+
+User report: "Robots still walked through a one-floor opening." The user's
+.41 log (`logs/m42.err`) shows the height and the blocking were right:
+height 14.51 (the box half size is the model radius, 6.5 in
+`chrs/FF2GiantRobot.xbr` +0x30, against 1.0 for human models: CONFIRMED from
+chr.pak), 6 links closed, 9 of 234 pads reached from pad 101. Yet the robot
+later stood on pad 38 and others outside its set, and each pad it stands on
+(actor +0x678) is advanced by `sub_0015D500` to the route's next pad
+(0x0015D84F) after `sub_0015A180` arrives, so it left the set over a closed
+link.
+
+Cause (CONFIRMED in code, the exact hop INFERRED from the log): .41 steered
+only the end of each leg (the last pad of the robot's room, the substitute
+pad). The stock route to that pad, `sub_001596F0` (group path
+`sub_0009B540`, then pad path `sub_0009BAE0`, recomputed every walk frame
+because the handler clears +0x9A8/+0x9AC), runs over every link, so a leg
+inside the robot's room, or to a substitute pad, could cut through the
+one-floor door.
+
+Fix: the goal is always the next pad on the robot's own passable path, a
+direct link it fits through, so the stock route has only that link to take.
+INFERRED: the stock route to an adjacent pad is the direct link (shortest).
+Not covered: an opening inside one room (no portal between two rooms) still
+counts as open.
+
+Tests: `one_floor_door()` (the real height 8.01 + 6.5, a one-floor door 4.5
+and a three-floor opening 15 between two rooms; every hop is checked to be a
+link that fits; the door as short a way as the hall; no tall way round: it
+waits at the door; a one-floor robot passes), mutations `goal-steer-whole-leg`,
+`goal-steer-any-link`, `goal-no-tell`.
+
+### Stacked floors and the hold (v0.4.0-mapmaker.44)
+
+User report: the robot (14.5 units tall) still walks through openings one
+floor (5 units) tall; a multi-floor open area built from stacked tiles should
+let it through only where at least three stacked floors are open. The .43 log
+(`logs/m43.err`): `opening 5.00 -> closed` for **every** inter-tile link, `reaches
+9 of 234 pads`, `cannot fit to the player's pad`, yet the robots stood on pads
+far outside their sets afterwards (robot 0 pads 81 then 54, robot 2 pads 101,
+38, 53).
+
+Two causes:
+
+1. **Openings measured per portal** (CONFIRMED by the log): every MapMaker
+   tile side is its own portal of one floor, so a tall open area is a column of
+   one-floor portals between different rooms, and no opening ever measured more
+   than 5. Fix: `rbt_stacked` combines the portals stacked above the doorway
+   portal: a portal whose bottom is within 0.3 of the current top, whose
+   vertices lie within 0.3 of the doorway's vertical plane, sharing at least
+   half of the shorter span, and whose rooms are the rooms above the current
+   ones on each side (the same room, or joined to it by a floor portal, less
+   than 1 unit tall: an open floor) raises the opening; up to 8 floors. A floor slab between two doors
+   (no floor portal between the rooms above each other) ends the column. A portal
+   less than 1 unit tall (an open floor or ceiling) is no doorway: open. Of
+   several portals over one spot between the same two rooms, the lowest is
+   the doorway. Each portal's result is cached per level.
+2. **The robot is not moved by its pads** (CONFIRMED in the decode,
+   `test_root_motion_move_before_handler`): the dispatcher calls
+   `sub_0015F0D0(entity)` at 0x0027DE12, just before the handler
+   (0x0027DE18). It takes the current animation's root motion (model
+   `[entity+4]` +0xFC.., 0x0015F137), turns it by the facing, moves the
+   entity with the collision move `sub_000D9230` (0x0015F850), stores
+   +0x64/+0x68/+0x6C (0x0015F861..0x0015F871) and sets its room +0x34 again
+   from the position (`sub_0015AB80`, 0x0015F889; stores 0x0015ACC6,
+   0x0015AE36). States 2-5 all keep the walk cycle 0x808 playing (0x00293A95,
+   0x00293D9A, 0x00293EC2, 0x00293FA9), and the attack states 3-5 are chosen
+   by straight-line distance to the player (squared 350/164/64/400 at
+   0x002939E9..0x00293A3C) and call no walk goal, so the robot walks on
+   wherever it faces. The pad it stands on (+0x678) is only snapped to its
+   position afterwards (`sub_00159E50`), which is why the log showed pads
+   outside its set. INFERRED: the exact crossings were such attack-state walks
+   (or the turn toward the target in `sub_0015CD00`) near a door.
+
+   Fix, the **hold** (`rbt_hold`, in `pc_mapmaker_robot_handler` before the
+   original, no new wrapper): each frame, when the robot's room +0x34 differs
+   from the previous frame's and the opening between the two rooms (the
+   stacked opening of their portal nearest the move's midpoint) is lower than
+   the robot's height - 0.25, its previous position and room are written back,
+   so its AI and the rest of the frame see it on its own side. A move of more
+   than 6 units in one frame (teleport), an unknown room or two rooms joined by
+   no portal are kept; the restart reset and its AI start (respawn) forget the
+   previous position; a removed robot is not held.
+
+Logs: the first line gains `d doorways with open floors stacked above`;
+`giant robot k held in room a: the opening to room b is o, lower than it (h)`
+at most 4 times per robot and level.
+
+INFERRED (playtest): that MapMaker's open floors between stacked tiles are
+portals (the room test), that writing the position and room back has no other
+stale state (the stock move writes the same fields), and that holding at the
+doorway looks acceptable (the robot keeps walking into the doorway and is put
+back each frame while it faces it). Not covered: an opening inside one room.
+
+Tests: `stacked_floors()` (three open floors pass; one, two, slabs between,
+a missing middle door, doors elsewhere on the wall or on another wall do not;
+one tall room on both sides or on one side; slabs on the other side do not) and `hold()` (held at a one-floor doorway, the AI sees
+the restored position; kept: teleports, no room, after the restart reset or a
+respawn, removed robots, other entities, mission 10, three open floors, a
+one-floor robot), mutations `stack-*` and `hold-*`.
+
+### The room follows the eye: a geometric hold (v0.4.0-mapmaker.45)
+
+User report (.44): "Giant robots still walked through one floor opening."
+
+Cause (CONFIRMED, decode, `test_room_traced_at_the_eye`): the .44 hold waited
+for the room +0x34 to change, and at a low doorway it does not. The ordinary
+root-motion walk (actor +0x2C without 0x10000; the pad route at 0x0015F6D2 is
+the other branch) moves the robot with `sub_000D9230` at 0x0015F47A, stores
+the position at 0x0015F697..0x0015F6B4 and calls `sub_0015AB80(entity, 0)` at
+0x0015F6C5. That traces the room from the last eye point (actor
++0xAF8..+0xB00) to the position's y + `[[entity+4]+0x10]+0x34` + 0.65
+(`[0x0047CFE0]`, 0x0015AD96..0x0015ADA1) with `sub_00088430` (0x0015AE24),
+which moves to the next room only when that segment crosses a portal's plane
+(normal +8, 0x0008851C..0x00088597) inside its polygon (edge tests
+0x00088760..0x00088798). A giant's eye is far above a one-floor (5) doorway,
+so the eye segment hits the wall above it, the room stays the old one while
+the feet walk through, and the hold never ran. (The robot's actual eye height
+is model data: INFERRED above 5; the new log line prints it.) Assumptions 2-4
+of the report were checked: the only stores are +0x64/+0x68/+0x6C (and the eye
+point, now put back too); the jump skip only covers more than 6 units a
+frame.
+
+Fix: `rbt_hold` no longer uses rooms. Once per level `rbt_walls_build` lists
+every portal at least 1 unit tall (doorways; floor openings skipped) with its
+plane (Newell normal from its vertices, either winding) and bounds. Each frame
+the move from the previous position to the new one, `RBT_HOLD_KNEE` (1.0)
+above the feet, is tested against them (`rbt_cross`): sides of the plane
+change and the crossing point lies inside the polygon (even-odd, projected).
+When the lowest stacked opening (`rbt_stacked`) of a portal passed is lower
+than height - 0.25, the previous position is written back, the room too when
+it changed, and the actor's eye point is moved back by the same amount (the
+next room trace starts there). Through a tall enough opening, nothing changes.
+Unknown rooms no longer skip the test; teleports (more than 6) still do.
+
+Logs (per robot and level): `giant robot k (height h): its room is traced e
+above its feet; doorways are tested 1.00 above them` (e = -1 when the model
+data cannot be read); at most 4 `giant robot k held at (x, y, z): it walked
+into portal p (rooms a-b), opening o, lower than it (h); its room read r, kept
+s` and 4 `giant robot k passed portal p (rooms a-b), opening o, at (x, y, z);
+its room r -> s`. A held line with r equal to s confirms the eye cause.
+Every 600 handler frames, when a count changed (at most 40 per robot and
+level): `giant robot k after f frames: h holds, p passes, l frames its pad's
+room was not its room; at (x, y, z) room r, pad q (room s)`; lag frames are
+the eye lag.
+
+The .44 log (`logs/m44.err`) agrees: each robot rebuilt its pad set from pad
+208/209 (`reaches 9 of 234 pads`), the far side of the 5.00 links pad 25/26
+(room 3) - pad 208/209 (room 64), before its first `held in room 3: the
+opening to room 64` line. Its feet were already through while +0x34 still
+read room 3; the room-change hold fired only when the eye trace caught up,
+holding it on the wrong side.
+
+INFERRED (playtest): that the robot's centre passes inside the doorway's
+portal polygon (portals are the door outlines), and that knee height is
+inside every MapMaker doorway. Tests: `hold()` adds the room unchanged (the
+.45 case), no room known, beside the doorway, a floor above, a triangular
+portal (outside the polygon inside its bounds, then through it the other
+way) and the eye point put back; mutations `hold-room-change-only`,
+`hold-eye-*`, `cross-*`, `summary-*`.
+
+## Several robots
+
+User request (v0.4.0-mapmaker.25): "Only one giant robot acting under
+appropriate logic when creating multiple." Stock keeps the robot's fight
+state behind globals, so the first port allowed one. Decode (CONFIRMED,
+`test_robot_per_instance_globals`):
+
+| global | users | per robot? |
+|---|---|---|
+| `[0x0078B1DC]` state pointer (0x4C block) | only the robot's functions: `sub_00292550/2630/2650/26B0/2BF0`, `sub_00293100/3660/36C0`, the handler, the message handler | **yes**: one block each, the pointer swapped |
+| `[0x0075F5EC]` shot counter | `sub_00293100` only | **yes**: swapped |
+| `[0x0075F5F0]`, `[0x0075F5F4]` walk / attack timers | the handler only (`sub_002B26F0` reads `[0x0075F5F4 + i*4]` as an unrelated table) | **yes**: swapped |
+| `[0x0078B0D0]` particle block, `[0x0078B0CC..0x0078B188]` its cursor and spawn parameters | the particle module `sub_002A62F0/65A0/7B90/7D60/7F30` (also the realbosses skeleton/walker) | **no**: the same parameters for every robot; one pool. A robot's intro re-arms the pool (`sub_002A65A0`), so a second robot's intro during the first one's death restarts those explosions (cosmetic) |
+| `[0x0078B080..0x0078B098]` effects blocks | `sub_002A8300..` (the split Crowe's effects); no robot code reaches them | untouched |
+| `[0x0075F5E8]` split Crowe block | never read or written by robot code | untouched: the robot's swap is independent of any Crowe swap |
+| story focus `+0xFF4`, level event 2, music | the handler | focus: whichever robot set it last (the bar hook hides the stock bar for any robot); event and music dropped, removal by the running robot |
+
+Every state reader is reached only from four entries (CONFIRMED): the
+handler (dispatcher 0x0027DE18), the message handler (0x0027D447), and the
+two callbacks the handler installs (slot-2 callback `sub_002926B0` at
+0x002938EE, damage `sub_002936C0` at 0x00293923); plus the scene-14 draw and
+the restart reset, which this area replaces in scene 100. Each of the four
+is wrapped: the entity (or the hit record's +0) names the robot (its AI's
+pool entry and spawn record); the wrapper saves the current pointer and
+statics, loads that robot's, runs the original, keeps the robot's statics
+and puts the previous values back. Nested entries (one robot's code reaching
+another's messages) stack. An entity that is not one of this level's robots
+(mission 10, a fifth robot on the bot class, a reused pool entry) runs the
+original untouched. Removal: event 2 removes the robot whose code is running.
+
+Cap: four (four 76-byte blocks per level; the statics live in the area).
+Change `RBT_MAX` to raise it.
+
+## Risks (INFERRED, need a playtest)
+
+- **Size**: a giant model on MapMaker tiles: it may not fit through
+  doorways; the walk targets the player's pad, so it may push into walls.
+  Add it to the bigdraw list or it is cut at portal edges.
+- **Door-entry root motion**: `giantrob_startthroughdoor` may move it
+  forward from the spawn point into a wall; spawn it with room in front.
+- **Memory**: lv14.pak is 258 KB of level heap (more than lv1_3/lv1_6/lv81);
+  the state and particles add 32 KB. With the skeleton and walker also in a
+  map the heap use grows accordingly; no measurement yet.
+- **Particles shared**: the skeleton, the walker and the robot share
+  `[0x0078B0D0]`. With the walker in the same map its beam draw also draws the
+  block, so the robot's explosions may be drawn twice (brighter). After the
+  robot is removed its leftover particles are not drawn (they would freeze).
+- **Several robots**: each walks to the player's pad, so they bunch up; the
+  door-entry animations all play at the start. The shared particle pool (see
+  above) is the only shared fight state.
+- **Pads**: walking to the player's pad is a simplification of the hangar
+  waypoints; the attacks themselves are unchanged.
+- **Split Crowe**: the split Crowe area (separate branch) also needs lv14.pak
+  and scene-14 globals; both areas check the mount first. If it allocates
+  the particle block too, keep one allocation (see integrator notes).
+
+## Wrappers for the integrator
+
+Include `pc_mapmaker_robot.inc` in `src/interface/pc_menu_mouse_guest.inc`
+after `pc_mapmaker_realbosses.inc` (it is self-contained; the order only
+matters for the shared `#include`s). Declare every function in
+`src/interface/pc_display_menu.h`. Area name `robot`. New WRAP entries (layer
+order relative to existing wrappers in parentheses):
+
+| WRAP | function | chain |
+|---|---|---|
+| `sub_001C8540` | `pc_mapmaker_robot_anims` | any order with `pc_mapmaker_realbosses_anims` |
+| `sub_0025F720` | `pc_mapmaker_robot_level` | **outer** of `pc_mapmaker_realbosses_level` (so its clear of `[0x0078B0D0]` runs first and a block the skeleton/walker made is reused; inner works but leaks one 32 KB block) |
+| `sub_0015B830` | `pc_mapmaker_robot_ai_start` | any order with `pc_mapmaker_realbosses_ai_start` (different ids) |
+| `sub_00293730` | `pc_mapmaker_robot_handler` | **new (several robots)**: robot AI handler (cdecl entity) |
+| `sub_00294520` | `pc_mapmaker_robot_message` | **new (several robots)**: robot message handler (cdecl entity, ...) |
+| `sub_002926B0` | `pc_mapmaker_robot_callback` | **new (several robots)**: robot slot-2 callback (cdecl entity); reached through a stored pointer, so the lifted function itself is wrapped |
+| `sub_002936C0` | `pc_mapmaker_robot_damage` | **new (several robots)**: robot damage callback (cdecl hit record); same |
+| `sub_0009CC40` | `pc_mapmaker_robot_nav` | new wrapper |
+| `sub_000462B0` | `pc_mapmaker_robot_music` | new wrapper |
+| `sub_0015D500` | `pc_mapmaker_robot_goal` | **new (v0.4.0-mapmaker.40)**: the AI walk goal (cdecl entity, pad index; 63 callers, the hook acts only for return 0x00293D27) |
+| `sub_002274C0` | `pc_mapmaker_robot_event` | any order with `pc_mapmaker_realbosses_event` (different return addresses) |
+| `sub_00126560` | `pc_mapmaker_robot_fx` | any order with `pc_mapmaker_realbosses_fx` |
+| `sub_0025F6A0` | `pc_mapmaker_robot_reset` | new wrapper (the call is a lifted tail jump from `sub_0015E4F0`, which reaches the wrapper as a call, as `sub_0029CEF0` does) |
+| `sub_0014CC80` | `pc_mapmaker_robot_hud` | **inside** `pc_mapmaker_bosses_hud` (any order with `pc_mapmaker_realbosses_hud`) |
+
+Guest calls made (need `extern` symbols only, no table entries):
+`sub_00062260`, `sub_0005A130`, `sub_00292630`, `sub_002A62C0`,
+`sub_00292550`, `sub_0015DDA0`, `sub_00019D70`, `sub_002A7F30`.
+
+Additions in `src/interface/pc_mapmaker_realbosses.inc` (not edited here),
+mirroring the Crow walker's row 152:
+
+- `#define RBS_ROBOT_ID 0x42u`, `RBS_ROBOT_MODEL 0x5F2u`, `RBS_ROBOT_ROW 153u`,
+  `RBS_ROBOT_TEXT 0x52420042u`, `RBS_ROBOT_LABEL "Giant Robot"`,
+  `RBS_ROBOT_STANDIN 0xA8u` (Arcade giant robot, row 90: preview stand-in).
+- a label allocator `rbs_robot_label()` (as `rbs_walk_label`).
+- `picker_end`: a fourth row 153 (same flags 0x20900 / callback 0x002C1C90, enabled).
+- `pick`: row 153 -> id 0x42, variant -1.
+- `rbs_preview_row`: 153 -> `rbs_arcade_row(RBS_ROBOT_STANDIN)`.
+- `row_of`: id 0x42 -> row 153 (reload/name) or the stand-in (preview).
+- `row_text`: row 153 -> `RBS_ROBOT_TEXT`; `text`: `RBS_ROBOT_TEXT` -> the label.
+- `model_request` (optional, log only): model 0x5F2.
+- `hud`/`meter` model lists: **no change needed** (the robot area clears the
+  focus itself, and the robot has no meter record). Adding 0x5F2 there is
+  harmless (it is never noted in `rbs.real`, so those hooks run the original).
+- The anim/level/ai_start set scan needs no change (the robot area scans the
+  set itself).
+
+Also: `src/interface/pc_mapmaker_bigdraw.inc` `BIGDRAW_ROBOT 0x5F2u` in its
+model test (whole height on screen), and the sets-names test if it lists the
+synthetic rows. After merging, refresh `docs/agent-context` (the owning
+guide for MapMaker areas) and regenerate the wrapper patch.
+
+## User test steps
+
+1. Editor: custom character set shows "Giant Robot"; picking it shows the
+   Arcade giant robot in the preview; save and reload keep it.
+2. Play a story map with a Giant Robot Story AI: the log shows "mounted
+   lv14.pak", "giant robot state allocated", "gets its story AI (class
+   0x80000)". It walks through its door-entry animation, then walks toward
+   the player and fires.
+3. Boss flag on: one bottom Boss bar with the AI's name; Boss Off: no health.
+4. Kill it: it plays its death with explosions, then disappears ("defeated:
+   removed"); the map's music keeps playing; logic objectives on marker 2 are
+   not triggered.
+5. Two to four robots in one map: each walks in, attacks and dies on its own
+   (log: "gets its story AI (class 0x80000) and state", slot in the high
+   half); killing one removes only that one; a fifth is a normal bot
+   (logged). Restart the level after a death: all fight again.
+6. Story mission 10 still plays stock (all hooks test scene 100).
+7. v0.4.0-mapmaker.40: a Giant Robot in a tall hall (two-floor tiles or open
+   air) with only a normal door to the player's room: it walks to the door
+   and attacks from there, never through it (log: `reaches n of m pads`,
+   `cannot fit to the player's pad`). Add a tall opening elsewhere: it walks
+   round through that (`steps one link it fits through toward its goal`).
+8. v0.4.0-mapmaker.42: the same hall with one-floor doors on several sides
+   and the player moving behind them for a minute: the robot never stands
+   beyond a door (`reaches n of m pads from pad p` repeats only with the same
+   n and a pad of its own hall), and the level's first lines list each portal
+   link `closed` (one floor) or `open` (three floors).
+9. v0.4.0-mapmaker.44: a hall of three stacked tiles open on all floors next
+   to a one-floor door: the robot walks through the three-floor opening and
+   never through the door, even while attacking a player behind it (log:
+   `doorways with open floors stacked above` > 0, `held in room a` near the
+   door). With a floor slab between the stacked tiles it passes neither.

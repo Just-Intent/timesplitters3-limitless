@@ -10,13 +10,15 @@ namespace TimeSplitters.Launcher
     {
         // Cloud Files markers describe storage, not a redirected pathname.
         // Keep every other reparse tag (including unknown tags) rejected.
-        // The native Mac window owns mac.lock for its entire lifetime. Its busy
-        // state serializes save work; standalone callers still acquire that lock.
+        // The launcher window owns the installation lock for its entire lifetime
+        // (mac.lock on Mac; the installation mutex on Windows, taken on the UI
+        // thread in Launcher.cs). Its busy state serializes save work, so save
+        // work it starts on a worker thread must not ask again: a Windows mutex
+        // is per thread, and the worker would wait 30 s and fail ("Another
+        // launcher is using this installation"). Standalone callers still lock.
         public static IDisposable AcquireSaveLock(string root,bool installationLockHeld)
         {
-#if MACOS || LINUX
             if(installationLockHeld)return null;
-#endif
             return AcquireUpdateLock(root);
         }
         public static bool IsCloudTag(uint tag) { return (tag & 0xFFFF0FFFu) == 0x9000001Au; }
@@ -73,6 +75,7 @@ namespace TimeSplitters.Launcher
         public static string[] Settings(string root) { return Checkout(root)?new[]{"config/pc-controls.json","config/pc-display.ini","private/native-settings/runtime.conf","config/pc-discord.ini","config/pc-frame-rate.ini","config/pc-audio.ini","config/pc-graphics.ini","config/pc-audio-mix.ini","config/pc-textures.ini"}:new[]{"Settings/pc-controls.json","Settings/pc-display.ini","Settings/runtime.conf","Settings/pc-discord.ini","Settings/pc-frame-rate.ini","Settings/pc-audio.ini","Settings/pc-graphics.ini","Settings/pc-audio-mix.ini","Settings/pc-textures.ini"}; }
         public static string Data(string root) { return Checkout(root)?"private/game":"Data"; }
         public static string Saves(string root) { return Checkout(root)?"private/saves":"Saves"; }
+        public static string Music(string root) { return Checkout(root)?"private/music":"Music"; }
         public static string Textures(string root) { return Checkout(root)?(Directory.Exists(Path.Combine(root,"assets","textures"))?"assets/textures":"private/texture-remaster/pack"):"Textures"; }
         public static void CopyFile(string source,string target) {
             string temporary=target+"."+Guid.NewGuid().ToString("N")+".tmp";
@@ -144,6 +147,7 @@ namespace TimeSplitters.Launcher
         public static string[] Settings(string root) { return new[]{"Settings/pc-controls.json","Settings/pc-display.ini","Settings/runtime.conf","Settings/pc-discord.ini","Settings/pc-frame-rate.ini","Settings/pc-audio.ini","Settings/pc-graphics.ini","Settings/pc-audio-mix.ini","Settings/pc-textures.ini"}; }
         public static string Data(string root) { return "Data"; }
         public static string Saves(string root) { return "Saves"; }
+        public static string Music(string root) { return "Music"; }
         public static string Textures(string root) { return "Textures"; }
         public static void CopyFile(string source,string target) { AntivirusErrors.Copy(source,target,true); }
         public static void Executable(string path) { }

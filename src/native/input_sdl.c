@@ -12,6 +12,9 @@
 #include "pc_reload_guest.h"
 #include "pc_mounted.h"
 #include "pc_terminal.h"
+#include "pc_mounted.h"
+#include "pc_scope_wheel.h"
+#include "pc_mapmaker_pointer.h"
 #include "pc_native_rate.h"
 #include "pc_debug.h"
 #include "pc_input.h"
@@ -51,6 +54,7 @@ static unsigned menu_button_block;
 static float menu_wheel_remainder;
 static Uint64 menu_wheel_at;
 static PcTextInput text_input;
+static PcScopeWheel scope_wheel; /* under camera_lock: wheel zoom while scoped */
 int pc_controls_weapon_slots_active(void) {
     pthread_mutex_lock(&camera_lock);
     int active=!pc_developer_blocks_player() && atomic_load(&focused) && captured && !atomic_load(&menu_active) && !text_input.owner;
@@ -107,6 +111,7 @@ void pc_controls_menu_mode(int active) {
         menu_button_block=(menu_pointer_state.left?1u:0u)|(menu_pointer_state.right?2u:0u);
         menu_pointer_state.wheel=0;menu_wheel_remainder=0;
         camera_input.dx=camera_input.dy=0;
+        pc_scope_wheel_reset(&scope_wheel);
         pc_reload_reset(&camera_input.reload);
         atomic_store(&menu_active,!!active);
         atomic_store(&menu_capture_request,active?1:2);
@@ -206,12 +211,14 @@ static void release_all(void) {
     pthread_mutex_lock(&camera_lock);
     menu_pointer_state.valid=menu_pointer_state.left=menu_pointer_state.right=menu_pointer_state.wheel=0;
     menu_button_block=0;menu_wheel_remainder=0;
+    pc_scope_wheel_reset(&scope_wheel);
     text_input.head=text_input.count=0;
     pc_reload_reset(&camera_input.reload);memset(camera_input.keys,0,sizeof camera_input.keys);
     pthread_mutex_unlock(&camera_lock);
 }
 void tsfp_native_settings_release_input(SDL_Window *window) {release_all();set_capture(window,0);}
 int tsfp_native_input_focused(void) {return atomic_load(&focused);}
+static int native_key_state(int vk);
 int pc_controls_developer_keys(unsigned char down[256]) {
     memset(down,0,256);
     int focus=atomic_load(&focused);
@@ -235,6 +242,15 @@ int tsfp_native_key_down(int vk) {
     int typing=text_input.owner && pc_text_key((unsigned)vk);
     pthread_mutex_unlock(&camera_lock);
     if(typing)return 0;
+    int down=native_key_state(vk);
+    /* Scoped: the weapon-switch wheel keys stay up and a notch holds zoom. */
+    pthread_mutex_lock(&camera_lock);
+    down=pc_scope_wheel_key(&scope_wheel,vk,down,!atomic_load(&menu_active) && !text_input.owner,
+                            SDL_GetTicks());
+    pthread_mutex_unlock(&camera_lock);
+    return down;
+}
+static int native_key_state(int vk) {
     if(vk==1 || vk==2) {
         pthread_mutex_lock(&camera_lock);
         int blocked=atomic_load(&menu_active) || (menu_button_block&(vk==1?1u:2u));
@@ -318,7 +334,11 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
         if(typing) { atomic_store(&keys[vk],0);if(down)pc_prompts_keyboard();return; }
         if(vk){atomic_store(&keys[vk],down);reload_key_event(vk,down);}
         if(down && !e->key.repeat)pc_prompts_keyboard();
-        if(down && !e->key.repeat && e->key.scancode==SDL_SCANCODE_F9){pc_debug_toggle_fps();return;}
+        if(down && !e->key.repeat && e->key.scancode==SDL_SCANCODE_F9){
+            /* Shift+F9: MapMaker debug panel (shared with the Windows overlay frame). */
+            if(e->key.mod&SDL_KMOD_SHIFT)pc_debug_toggle_mapmaker();else pc_debug_toggle_fps();
+            return;
+        }
         if(down && !e->key.repeat && e->key.scancode==SDL_SCANCODE_F12 && window){
             tsfp_native_settings_release_input(window);tsfp_native_crash_inhibit(1);pc_debug_show(NULL);tsfp_native_crash_inhibit(0);return;
         }
@@ -377,8 +397,13 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
     }
     if(e->type==SDL_EVENT_MOUSE_WHEEL && captured && !atomic_load(&menu_active) && atomic_load(&focused)) {
         if(e->wheel.y)pc_prompts_keyboard();
-        if(e->wheel.y>0){atomic_store(&keys[0x86],1);reload_key_event(0x86,1);}
-        if(e->wheel.y<0){atomic_store(&keys[0x87],1);reload_key_event(0x87,1);}
+        /* In a zoomable scope, notches bound to weapon switching zoom instead. */
+        int steps=e->wheel.y>0?1:e->wheel.y<0?-1:0;
+        pthread_mutex_lock(&camera_lock);
+        steps=pc_scope_wheel_input(&scope_wheel,steps,SDL_GetTicks());
+        pthread_mutex_unlock(&camera_lock);
+        if(steps>0){atomic_store(&keys[0x86],1);reload_key_event(0x86,1);}
+        if(steps<0){atomic_store(&keys[0x87],1);reload_key_event(0x87,1);}
     }
     if(e->type==SDL_EVENT_MOUSE_MOTION && captured && !atomic_load(&menu_active) && atomic_load(&focused)) {
         if(e->motion.xrel || e->motion.yrel)pc_prompts_keyboard();
@@ -394,16 +419,48 @@ void tsfp_native_input_event(const SDL_Event *e,SDL_Window *window) {
 }
 /* Mouse deltas reach the camera wrapper; controller stick input stays intact. */
 void tsfp_native_mouse_sample(XBOX_GAMEPAD *out) {(void)out;}
+static int mapmaker_pointer_active;
+static PcMapMakerClick mapmaker_click;
+void pc_controls_mapmaker_pointer(int active) {
+    pthread_mutex_lock(&camera_lock);
+    mapmaker_pointer_active=!!active;
+    pthread_mutex_unlock(&camera_lock);
+}
+/* Escape-as-Back in the editor is Windows-only for now (MAC-134). */
+void pc_controls_mapmaker_editor(int active) { (void)active; }
+int pc_controls_mapmaker_editor_active(void) { return 0; }
+void pc_controls_mapmaker_zoom(int notches) { (void)notches; }
+void pc_controls_mapmaker_pulse(int button) { (void)button; }
+/* The resource table toggle key, as on Windows (pc_mapmaker_pointer.h). */
+int pc_controls_mapmaker_table_key(void) {
+    int bound[PC_ACTION_COUNT][PC_BINDING_SLOTS],have=pc_settings_bound_keys(bound);
+    return pc_mapmaker_table_key(tsfp_native_key_down(PC_MAPMAKER_TABLE_KEY),have?&bound[0][0]:NULL,
+                                 PC_ACTION_COUNT*PC_BINDING_SLOTS);
+}
+void pc_controls_mapmaker_row_press(void) {
+    pthread_mutex_lock(&camera_lock);
+    pc_mapmaker_row_press(&mapmaker_click);
+    pthread_mutex_unlock(&camera_lock);
+}
 int pc_controls_terminal_click(void) {
     pthread_mutex_lock(&camera_lock);
-    int down=!atomic_load(&menu_active) && !(menu_button_block&1) && atomic_load(&focused) && atomic_load(&mouse_enabled) &&
-             pc_input_terminal_click(&camera_input,atomic_load(&keys[1]));
+    int menu=atomic_load(&menu_active);
+    if(!menu) mapmaker_pointer_active=0;
+    int mapmaker=pc_mapmaker_click(&mapmaker_click,menu && mapmaker_pointer_active,atomic_load(&keys[1]));
+    int down=(!menu && !(menu_button_block&1) && atomic_load(&focused) && atomic_load(&mouse_enabled) &&
+             pc_input_terminal_click(&camera_input,atomic_load(&keys[1]))) ||
+             (mapmaker && atomic_load(&focused));
     pthread_mutex_unlock(&camera_lock);
     return down;
 }
 void pc_controls_apply_mouse(uint32_t player,uint32_t fov_object,ptrdiff_t offset) {
     float *yaw,*pitch,fov;
+    /* Read bindings and guest scope state before taking camera_lock. */
+    int bound[PC_ACTION_COUNT][PC_BINDING_SLOTS],have_bound=pc_settings_bound_keys(bound);
+    int scope=pc_scope_view(player,fov_object,offset);
     pthread_mutex_lock(&camera_lock);
+    pc_scope_wheel_bindings(&scope_wheel,have_bound?(const int (*)[PC_BINDING_SLOTS])bound:NULL);
+    pc_scope_wheel_state(&scope_wheel,scope,SDL_GetTicks());
     camera_input.focused=atomic_load(&focused)&&atomic_load(&mouse_enabled)&&!atomic_load(&menu_active);
     /* No guest callbacks run before this local mapping snapshot expires. */
     PcGuestRegion region=pc_camera_mouse_region(player,fov_object,offset);
@@ -421,9 +478,15 @@ void pc_controls_apply_mouse(uint32_t player,uint32_t fov_object,ptrdiff_t offse
     }
     int terminal=pc_terminal_mouse_in_region(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),player,offset,pc_native_rate()!=0,&region);
     pc_input_terminal_context(&camera_input,terminal>=0,atomic_load(&keys[1]));
+    int mech_before=camera_input.mech_status;
     if(terminal>=0 || pc_mounted_mouse_in_region(&camera_input,SDL_GetTicks(),atomic_load(&mouse_sensitivity),
             atomic_load(&mouse_invert),player,fov_object,offset,pc_native_rate()!=0,&region)>=0 || !pc_camera_fields_in_region(player,fov_object,offset,&yaw,&pitch,&fov,&region)) {
+        int mech_after=camera_input.mech_status;
         pthread_mutex_unlock(&camera_lock);
+        static unsigned mech_logs;
+        if(mech_after!=mech_before && mech_after!=PC_MECH_NONE && mech_logs<16) {
+            mech_logs++;fprintf(stderr,"[native-mouse] Battle Mech: %s\n",pc_mech_status_text(mech_after));
+        }
         return;
     }
     float old_yaw=*yaw,old_pitch=*pitch;
@@ -552,6 +615,9 @@ int tsfp_native_input_test(void) {
     pc_debug_get(&debug_now);ok &= debug_now.show_fps==!debug_before.show_fps;
     e.type=SDL_EVENT_KEY_UP;e.key.repeat=false;tsfp_native_input_event(&e,NULL);
     pc_debug_get(&debug_now);ok &= debug_now.show_fps==!debug_before.show_fps;
+    e.type=SDL_EVENT_KEY_DOWN;e.key.mod=SDL_KMOD_LSHIFT;tsfp_native_input_event(&e,NULL);
+    pc_debug_get(&debug_now);ok &= debug_now.show_fps==!debug_before.show_fps && debug_now.show_mapmaker_panel==!debug_before.show_mapmaker_panel;
+    e.type=SDL_EVENT_KEY_UP;tsfp_native_input_event(&e,NULL);e.key.mod=0;
     pc_debug_set(&debug_before);
     e.type=SDL_EVENT_KEY_DOWN;e.key.scancode=SDL_SCANCODE_DOWN;tsfp_native_input_event(&e,NULL);
     recomp_bindings_sample(0,&pad);ok &= !!(pad.wButtons&XBOX_GAMEPAD_DPAD_DOWN);

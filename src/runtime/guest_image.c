@@ -104,6 +104,19 @@ static void title_utf8(char out[121], const unsigned char *in)
     out[at]=0;
 }
 
+static uint32_t extension_bytes, loaded_extension_va, loaded_extension_size;
+
+void tsfp_image_set_extension(uint32_t bytes)
+{
+    extension_bytes = bytes > 0xffff0000u ? 0xffff0000u : (bytes + 0xffffu) & ~0xffffu;
+}
+
+uint32_t tsfp_image_extension(uint32_t *size)
+{
+    if (size) *size = loaded_extension_size;
+    return loaded_extension_va;
+}
+
 static tsfp_image_result inspect(image_reader *r, size_t limit)
 {
     const unsigned char *f=r->file, *p;
@@ -186,6 +199,13 @@ static tsfp_image_result inspect(image_reader *r, size_t limit)
             !mapped(r,r->info.tls_index,4) ||
             (uint64_t)r->info.tls_bytes+r->info.tls_zero_fill>UINT32_MAX-19u) return TSFP_IMAGE_TLS;
     }
+    if (extension_bytes) {
+        uint64_t va=(image_end+0xffffu)&~UINT64_C(0xffff), end=va+extension_bytes;
+        if (end>limit) return TSFP_IMAGE_DESTINATION;
+        r->info.extension_va=(uint32_t)va; r->info.extension_size=extension_bytes;
+        r->info.image_end=(uint32_t)end;
+        if (end>r->info.image_hi) r->info.image_hi=(uint32_t)end;
+    }
     return TSFP_IMAGE_OK;
 }
 
@@ -231,6 +251,8 @@ tsfp_image_result tsfp_image_load(const void *file, size_t size, void *ram,
         if (copy) memcpy(dest+va,r.file+word(s+12),copy);
         if (vn>copy) memset(dest+va+copy,0,vn-copy);
     }
+    if (r.info.extension_size) memset(dest+r.info.extension_va,0,r.info.extension_size);
+    loaded_extension_va=r.info.extension_va; loaded_extension_size=r.info.extension_size;
     *info=r.info;
     return TSFP_IMAGE_OK;
 }

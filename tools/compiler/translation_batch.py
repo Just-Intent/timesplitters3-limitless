@@ -78,7 +78,7 @@ class BatchTranslator:
                  identified_json_path=None, abi_json_path=None, output_dir=None,
                  seh_prolog=None, seh_epilog=None, trace_functions=None,
                  trace_all_entries=False, icall_sites_json_path=None, force_returns=None,
-                 *, function_translator_type=None, types_header=None):
+                 *, function_translator_type=None, types_header=None, guest_patches_path=None):
         self.xbe_path=xbe_path
         self.xbe_data=Path(xbe_path).read_bytes()
         self.title=xbe_title(self.xbe_data,xbe_path)
@@ -97,6 +97,15 @@ class BatchTranslator:
         self.icall_sites={}
         for key,record in (_optional_records(icall_sites_json_path) or {}).items():
             if not record.get('saturated'):self.icall_sites[_hex(key)]=[_hex(target) for target in record.get('targets',[])]
+        # Verified guest-code patches (guest_code_patches.py): the lifter
+        # decodes this patched copy; the XBE on disk is never written.
+        operand_overrides={};self.guest_patch_functions=set()
+        if guest_patches_path:
+            from guest_code_patches import load_guest_patches, apply_guest_patches
+            table=load_guest_patches(guest_patches_path)
+            self.xbe_data,operand_overrides,self.guest_patch_functions=apply_guest_patches(table,self.xbe_data,self.func_db)
+            print(f"Guest patches: {len(table['patches'])} verified in {len(self.guest_patch_functions)} functions "
+                  f"({Path(guest_patches_path).name})",file=sys.stderr)
         found=seh(self.func_db,self.xbe_data,verbose=True) if seh_prolog is None or seh_epilog is None else ((),())
         self.seh_prolog=found[0] if seh_prolog is None else seh_prolog
         self.seh_epilog=found[1] if seh_epilog is None else seh_epilog
@@ -106,7 +115,7 @@ class BatchTranslator:
         self.translator=factory(self.xbe_data,self.func_db,self.label_db,self.classification_db,self.abi_db,
             seh_prolog=self.seh_prolog,seh_epilog=self.seh_epilog,setjmp_fn=save,longjmp_fn=resume,
             trace_functions=trace_functions,trace_all_entries=trace_all_entries,icall_sites=self.icall_sites,
-            force_returns=force_returns)
+            force_returns=force_returns,operand_overrides=operand_overrides)
         for method in ('discover_static_indirect_targets','discover_cfg_ownership','discover_jump_table_entries'):
             getattr(self.translator,method)()
 

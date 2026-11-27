@@ -328,8 +328,14 @@ def test_upgrade_previous_controls_with_newer_input_features(checkout):
                           '1250-sniper-scope-coverage.patch',
                           '1280-weapon-aim-overlays.patch',
                           '1300-special-weapon-overlays.patch',
-                          '1320-transition-overlay.patch'):
-            continue  # Requires the display wrapper, absent in this historical state.
+                          '1320-transition-overlay.patch',
+                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-probe.patch',
+                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-raise.patch',
+                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-stagea.patch',
+                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-story-chain.patch',
+                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-mapmaker-meter-wrappers.patch',
+                          '2160-custom-music-codec.patch'):
+            continue  # Requires the display wrapper / native test block, absent in this historical state.
         if patch.name.endswith(('-keyboard-settings-menu.patch', '-keyboard-weapon-slots.patch', '-controller-profile-routing.patch', '-keyboard-reload-buffer.patch', '-radial-stick-deadzone.patch', '-keycap-prompts.patch', '-local-player-devices.patch', '-controller-reconnect-identity.patch')):
             continue  # Needs shared-input locks/display wrappers absent in the old snapshot.
         if patch.name.endswith(('-144-fps.patch', '-presentation-timing.patch', '-interpolation-recovery.patch', '-shared-presentation-integration.patch', '-fixed-60-fps.patch', '-late-frame-pacing.patch', '-native-frame-timing.patch', '-native-interp-retirement.patch', '-native-numeric-policy.patch', '-native-animation-scope.patch', '-native-input-ticks.patch', '-native-script-events.patch', '-native-frame-decay.patch', '-native-camera-timing.patch', '-native-weapon-event-scope.patch', '-native-npc-weapon-event-scope.patch', '-native-npc-animation-shots.patch', '-native-npc-aim-timing.patch', '-native-kind35-projectile-timing.patch', '-native-rocket-projectile-timing.patch', '-native-projectile-families.patch', '-native-object-pause.patch', '-native-object-rocking.patch', '-native-light-preview.patch', '-native-visual-time.patch', '-native-movie-pacing.patch', '-native-frame-rate-settings.patch','-native-live-frame-rate.patch', '-display-rounded-highlight.patch', '-native-surface-trace.patch', '-native-surface-fractional.patch', '-native-surface-precision.patch', '-native-surface-copy.patch', '-native-surface-constants.patch', '-native-surface-coefficients.patch', '-native-surface-preservation.patch', '-native-vehicle-physics.patch', '-native-surface-live.patch', '-native-surface-float32.patch', '-native-flip-handoff.patch', '-native-surface-capture.patch', '-native-surface-render.patch', '-native-demo-timing.patch', '-native-wind-history.patch', '-native-minigun-intent.patch', '-native-player-trigger-event.patch', '-native-trace-quiet.patch')):
@@ -428,7 +434,8 @@ def test_upgrade_existing_mac_stack_with_networking(checkout, tmp_path):
                                   '1060-pc-network-bot-bounds.patch',
                                   '1070-pc-network-bot-authority.patch',
                                   '1080-pc-network-bot-presentation.patch',
-                                  '1110-pc-network-bot-capacity.patch') and not patch.name.endswith(tuple('-'+name+'.patch' for name in STORY_PATCHES)):
+                                  '1110-pc-network-bot-capacity.patch') and not patch.name.endswith(tuple('-'+name+'.patch' for name in STORY_PATCHES)) \
+                and not patch.name.endswith('-mapmaker-meter-story-chain.patch'):  # renames the story patches' wrappers, so it needs them
             shutil.copyfile(patch, old_patches / patch.name)
     # The trace depends on network wrapper context; like the network patches,
     # it belongs to the full migration, not the historical Mac-only fixture.

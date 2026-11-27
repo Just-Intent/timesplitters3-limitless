@@ -148,8 +148,8 @@ repair (skips without foreground focus). `pc_debug_game.py` uses center bounds.
 <!-- packet:end -->
 
 SDL tests (`tools/build/build-native-mac.py --test`) cover the two-slot E/Space
-cap, requested capture, release and frame-applied mouse disable. They preserve
-bindings; physical input remains unverified.
+cap, requested capture, release and frame-applied mouse disable. Bindings kept;
+physical input unverified.
 
 CI: `runtime-patches.yml` keeps `PR validation` required and fail-closed.
 Patch/native suites use three fixture-preserving shards per Windows/Mac host;
@@ -159,8 +159,8 @@ host CPU suites, no GPU/launcher acceptance). XML/job summaries retain failures.
 See [preflight, shard coverage and timing](../development/ci.md). Launcher/Linux/
 issue/texture ownership is unchanged. Native45m/30m; patch30m timeouts remain.
 
-`test_push_gather.py`: full original-reference gathering, fresh bytes, failures,
-guard pages, large buffers and32-bit wrapping. Both native CI hosts run it.
+`test_push_gather.py`: original-ref gathering, fresh bytes, failures,
+guard pages, large buffers and32-bit wrapping. Both CI hosts run it.
 See [pushed-array checks and timing scope](vertex-expand.md#pushed-array-gathering).
 
 `test_zero_base_indices.py`: old/new HLE parity, fresh indices, failures, stream
@@ -180,7 +180,7 @@ remain separate checks.
 callback mutations. Fast results and finite fallback results are bit-exact;
 fallback arithmetic destinations allow quiet-NaN payload variation (also seen
 with fast entry disabled). Rejected inputs leave all bits/FP flags unchanged.
-Public fixtures/mutations run on both hosts; US-body tests need the private XBE.
+Fixtures/mutations (+triggers/walk) run on both hosts; US-body tests need the XBE.
 Camera/mothership/spawn/rigid fixtures include the shared helper.
 
 Crash capture/heartbeat and bounded Windows sharing retries: `test_crash_capture.py`.
@@ -227,7 +227,7 @@ eligibility and exact whole/catch-up fallback. Ten-minute native240 time totals
 must be bit-equal to Original60; per-frame float addition fails this precision
 check. Independent missing-scope and missing-pause-guard controls fail. The public
 clock fixture covers dispatcher/restoration on both CI hosts. Private US XBE
-cases skip without the asset; they do not establish physical Mac gameplay.
+cases skip without the asset; they don't establish physical Mac gameplay.
 Copied numeric-policy fixtures must resolve all relative helper includes,
 including `pc_native_statistics_guest.h`, before mutation compilation.
 
@@ -269,10 +269,10 @@ every cadence phase at normal/quarter speed, retaining the legacy missed-event
 control. Keep references/tolerances and verify rate coverage when extending.
 Mouse cadence/surface math cover240; math is not live water. Mounted/terminal
 tests check permissions, bounded queries, 125..8000Hz input and clock/cache/consume
-mutations. Private-XBE skips do not establish Mac execution of lifted routines.
+mutations. Private-XBE skips don't establish Mac execution of lifted routines.
 
 `test_sample_chains.py`: depth/saturation/counts and mutation controls on both
-hosts; Mac does not execute Windows stack walking.
+hosts; Mac doesn't execute Windows stack walking.
 Runner timing includes16ms test-input polling; normal play does not. Its
 `replay_tick` file opens are harness overhead.
 
@@ -284,7 +284,7 @@ Windows `test-online-bot-motion.py`: isolated 0/120/180/240 peers.
 Results transitions: `--post-results-seconds`/`--inspect-results-tabs`/`--rematch`.
 `--require-rematch-results` compares round-two results after reset checks.
 `test_network_bot_results.py`: US routines and AI mutations.
-Async reads do not measure latency.
+Async reads don't measure latency.
 
 Dual-host `test_launcher_release.py` / `test_publish_release.py` cover
 Stable/alpha baselines, pagination/completeness, notes and scope/merge/rename/
@@ -300,7 +300,7 @@ composition/cleanup through240, slow/pause/jitter/live switches and old-path
 controls. Scale tests use real matrix helpers; allocation/draws are absent.
 `native_character_trace.c` tests copied status3 update pairs, identity/frame/
 scene guards, removal, invalid/unreadable values and8192row/8MiB bounds. The
-original scale fixture also runs with tracing enabled and a failed file open;
+original scale fixture runs with tracing enabled and a failed file open;
 stdout/behavior stay identical and open failure is latched. The clock fixture
 matches production's manual TLS include order so missing register declarations
 fail locally. Paired matrices surround126029->120AB0, after timer advancement;
@@ -314,16 +314,16 @@ mixed pieces and untouched rejection. `native_surface_cache.c` executes original
 normal/quarter speed and pause, checking U/V velocity/travel against a closed
 form authored recurrence. Independent mutations remove damping, force or travel
 normalization; GPU calls remain spies. Force-table sampling is controlled, so
-these checks do not certify live varying forcing or rendered-material parity.
+these checks don't certify live varying forcing or rendered-material parity.
 
 ### Native vehicle integration and diagnostic checks
 
 `tests/gameplay/test_native_vehicle_timing.py` runs portable byte-load, physics-scope,
 partition and lowering contracts on both CI hosts. With the verified private US
-XBE it also lifts the original dispatcher, spring/linear/rest routines, rigid
+XBE it lifts the original dispatcher, spring/linear/rest routines, rigid
 clock/solver/integrator, publisher, bounds, sleep/wake, camera and driver at
 60/120/144/180/240.
-Private-XBE skips on CI do not certify those routines on Mac.
+Private-XBE skips on CI don't certify those routines on Mac.
 
 - `native_rigid_motion.c` checks forces, drag, quaternion/position publication,
   controlled support contacts, RNG isolation and secondary-step boundaries at
@@ -350,7 +350,7 @@ Private-XBE skips on CI do not certify those routines on Mac.
 - `native_spawn_motion.c` executes original joint-history and spawn routines
   through real velocity/momentum setters. Check all carried-clock phases,
   signed/rotated inheritance, missing history/allocation and pause. The legacy
-  mutation fails at native120; controlled services do not certify live models.
+  mutation fails at native120; controlled services don't certify live models.
 - `native_vehicle_actor_impact.c` connects original velocity publication to
   queued actor contact, impact and suspension helpers. Old division/gate-only
   mutations fail; geometry/effect callbacks are controlled.
@@ -474,7 +474,7 @@ missing-store mutation fails. Private-XBE cases skip CI. `display_memory.c`
 tests real host protection/bounds, multi-page spans and the production display
 adapter; retaining its snapshot across calls must fail. Win guard is included.
 `guest_span.c` checks private/mapped pages, permission changes, cold/cross-page
-fallback and released mappings. Windows additionally checks failed page queries
+fallback and released mappings. Windows checks failed page queries
 and disabled-fast-path/write-permission/page-boundary negative controls.
 Registered projection/cutscene suites cover both hosts; query savings alone
 do not establish FPS improvement.
@@ -511,7 +511,7 @@ link and do not restore the removed enhancement issue form. The existing Windows
 empty diagnostics payload and unchanged bug-report round trip. These run in the
 already registered issue-form and launcher workflows; native Mac builds consume
 the same `DiagnosticIssueDraft.cs` URL policy.
-The mocked version-refresh PR creation check also verifies that the generated
+The mocked version-refresh PR creation check verifies that the generated
 description preserves Ideas routing instead of referring to a removed form.
 Version-only bumps use launcher release-policy, compatibility and both-host
 package checks without LFS hydration. They do not prove publication.
@@ -598,7 +598,7 @@ Profile typing and Enter were confirmed by the user with isolated Test Lab saves
 
 ## Auto display regression checks
 
-`test_pc_display_modes.py` also compiles shared Auto policy through stub SDL
+`test_pc_display_modes.py` compiles shared Auto policy through stub SDL
 snapshots on Windows and Mac; this tests policy, not Cocoa or actual atomics.
 The Windows-specific fixture compiles the model against deterministic
 monitor/window adapters: secondary fullscreen desktop size, windowed resize,
@@ -613,8 +613,8 @@ self-test recognizes Auto. Physical Retina/multi-display checks need Mac.
 The historical controls-only fixture in `test_patch_updates.py` excludes
 `-auto-display.patch` until the complete-stack migration installs its display,
 cutscene and fullscreen-effect prerequisites. It then asserts effective-size
-hooks in the migrated title and renderer, preservation of local edits, and
-idempotent reapplication. Fresh/current-stack tests still apply the Auto patch.
+hooks in the migrated title and renderer, local-edit preservation and
+idempotent reapplication. Fresh/current-stack tests apply the Auto patch.
 
 ## Crane vignette validation (#221)
 
@@ -643,10 +643,10 @@ not omit the patch from fresh/current-stack or renderer regression tests.
 ## Mounted gun input regression
 
 `python -m pytest tests/gameplay/test_mounted_mouse.py tests/input/test_terminal_mouse.py -q`
-runs the existing CI-selected suite. See [mounted ownership and validation](mounted-mouse.md)
+runs the CI-selected suite. See [mounted ownership and validation](mounted-mouse.md)
 for original guest mount/dismount execution, host-memory/adapter tests, timing
 mutations, and physical Windows/Mac acceptance limits. #385 adds instance-name,
-operator-versus-AI-target and inaccessible-operator regression cases.
+operator-vs-AI-target, inaccessible-operator and negative-speed cases.
 
 ## Launcher stalled-network regression
 
@@ -666,9 +666,8 @@ patches until full-stack migration; fresh stacks apply all patches.
 `test_text_read_scope.py` covers scoped queries, nesting, fresh writes and
 mutations; Windows prompt fixtures verify actual page protections and ABI.
 
-The PR #285 CI index check also caught three pre-existing Windows patch files
-with residual CRLF bytes despite their LF attributes. They were normalized to
-the exact committed Git blobs and the index refreshed. Patch record hashes
+PR #285's CI index check caught three Windows patch files with residual CRLF
+bytes despite LF attributes; they were normalized to the committed blobs. Patch record hashes
 identify actual bytes: refresh from canonical attribute-compliant files, keeping
 the explicitly binary watermark patch unchanged. Local index success alone
 does not prove a fresh checkout has the same patch bytes.
@@ -681,8 +680,9 @@ clean command reads stdin without a destination filename: an existing pointer
 filename can supply the wrong size and truncate the streamed DDS. Exact pointer
 hash/size comparison remains mandatory. `tests/textures/test_build_textures.py` covers
 first export and updating an existing pointer with a DDS larger than 1 KiB.
-`test_texture_release.py` checks format/hash/privacy and package limits.
-No game launch is required for this export-only change.
+Use `tests/textures/test_texture_release.py` for format/hash/privacy and package limits;
+no game launch. `tools/textures/tileset-survey.py` (read-only) lists
+model texture ids; PNGs go only to `private/`.
 
 ## Original character icon policy
 
@@ -808,10 +808,10 @@ Python cases; there is no game or native launcher behavior change.
 ## Weapon-slot selection checks
 
 `test_weapon_slots.py` checks shared key state and guest selection on both hosts:
-press/held/focus/menu input, expiry, empty/grouped slots and local-player guards.
-Windows Build's `pc_settings.c` checks migration and last-slot persistence;
-launcher tests cover defaults, conflicts, Unbound, moving keys and reset.
-Input-hook edits require supported regeneration; animations need gameplay checks.
+press/held/focus/menu input, expiry, empty/grouped slots, local-player guards.
+`pc_settings.c`: migration, last slot; launcher: defaults, conflicts, Unbound,
+moves, reset; `test_scope_wheel.py` copies src/runtime, src/interface headers.
+Input-hook edits need supported regeneration; animations need gameplay checks.
 
 ## Themed keyboard editor checks
 
@@ -998,7 +998,7 @@ fixture (`vehicle_mouse_guest.c`) runs original seat dispatch, gun update and ca
 math, and rejects the old mouse route. This is separate from live mission acceptance;
 see [mounted and vehicle mouse contracts](mounted-mouse.md).
 
-The mounted original-vehicle fixture additionally runs 1730E0 track output and
+The mounted original-vehicle fixture also runs 1730E0 track output and
 link restoration across camera headings, forward/reverse and steering. Original
 CA040 camera coverage now includes nonzero driver pitch; its original custom
 ABI saves ESI, while the pitch branch uses other registers as scratch. Existing
@@ -1021,8 +1021,8 @@ Crossplay: [acceptance](multiplayer-ui.md#physical-windowsmac-online-acceptance)
 
 Markers: test_ui_layout.py; test_patch_updates.py covers 2290/2291.
 
-Mech/cockpit: test_mounted_mouse.py; [scope](mounted-mouse.md).
 
+Mech/cockpit: test_mounted_mouse.py; [scope](mounted-mouse.md). MapMaker: [notes](limitless-shared.md).
 Physics: [checks](build-test-details.md#guest-physical-state-regression).
 
 [Story flag and Clang fixtures](build-test-details.md#story-release-flag-regression).

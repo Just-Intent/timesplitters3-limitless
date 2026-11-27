@@ -118,6 +118,7 @@ void pc_display_tutorial_text(void (*original)(void))
 {
     if(pc_story_lobby_title(original)) return;
     if(menu_mouse_profile_text(original)) return;
+    if(viewfinder_label(original)) return;
     uint32_t frame=g_esp,saved=WORD_AT(frame+4),saved_y=WORD_AT(frame+8),color=WORD_AT(frame+16);
     uint32_t icon_x=WORD_AT(0x7e7270),icon_y=WORD_AT(0x7e7280);int icon_scaled=0;
     /* The loading-picture label uses this shared font entry, independently of

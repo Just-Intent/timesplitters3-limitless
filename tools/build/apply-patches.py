@@ -375,6 +375,12 @@ def patch_records(paths):
         paths.remove(actor_names)
         paths.append(actor_names)
 
+    # Imported music's MP3 adapter appends to the title CMake file after the
+    # native online and Linux blocks (fork patch; keep it last).
+    music_codec = by_name.get('2160-custom-music-codec.patch')
+    if music_codec:
+        paths.remove(music_codec)
+        paths.append(music_codec)
     records = []
     for patch in paths:
         # Native boot wraps the SDK library block; networking adds a separate

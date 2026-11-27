@@ -94,9 +94,8 @@ slots; XAudio/SDL expose lifetime failure-category counters in the periodic
 DSOUND health report and an idempotent normal-exit summary. Windows WM_QUIT
 runs registered cleanup, matching the SDL close path. Tail drain: [contracts](audio-buffers.md).
 `audio_output.h` owns `RECOMP_AUDIO_DEFAULT_GAIN` (0.5, about -6 dB).
-XAudio applies it once to the master; SDL applies it once per stream. This
-quiets the output at 100% without changing saved Music/Sound sliders, their
-curves or relative mix. An explicit `RECOMP_AUDIO_GAIN` still overrides it.
+XAudio applies it once to the master, SDL once per stream: quieter at 100%,
+saved Music/Sound sliders, curves and mix unchanged. Explicit `RECOMP_AUDIO_GAIN` overrides it.
 Find the connecting patch by symbol/path using `tools/repo-context.py find`.
 
 Consult `docs/development/shared-platform.md` for shared versus adapter responsibilities.
@@ -204,7 +203,7 @@ the UI fixture tests both callers and guards, while Mac scenes remain unverified
 
 Reload #337 and interaction #357 use advancing-time admission at their exact
 US compare sites; see [input consumers and validation](interaction-input.md).
-Keyboard reload buffering additionally uses `pc_reload_input.h`, owned by
+Keyboard reload buffering also uses `pc_reload_input.h`, owned by
 `PcInput`, and US state snapshots in `pc_reload_guest.h`. Win32 and SDL publish
 press/release events under input locks, including collapsed down/up events.
 The shared sampler applies configured key roles before merging pad input.
@@ -360,15 +359,16 @@ time, not GPU completion. Reading/validation/fallback and live texture switching
 are unchanged. Logging occurs after the measured end, can perturb subsequent
 frames and is capped at 8,192 rows/below 4 MiB; do not use it as clean pacing data.
 Cached rows have zero read/image/view stages and retain existing request/cache state.
-The legacy GL path also closes a trace with `path_rejected` for an oversized path.
+Legacy GL also closes a trace with `path_rejected` for an oversized path.
 Older `2230901` traces began after hashing and excluded cached calls.
-See `docs/textures/textures.md` and the runtime tests for usage and failure/bound checks.
+See `docs/textures/textures.md` and runtime tests for usage and failure/bound checks.
 
 | Area | Start here (tracked root unless noted) | Useful checks/docs |
 | --- | --- | --- |
 | Bindings, input prompts | `src/input/pc_controls.c`, `pc_input.c`, `pc_bindings.inc`, `pc_prompts.c` | `tests/input/pc_controls.c`, `tests/input/pc_prompts.c`, `docs/players/windows-settings.md` |
 | Mouse/menu handling | `src/interface/pc_menu_mouse_guest.inc`, `pc_menu_choices.inc`, `pc_menu_sliders.inc`, `pc_menu_team.inc` | `tests/input/test_menu_mouse.py`, `test_terminal_mouse.py`, `test_ui_layout.py` |
 | Auto-look / camera / cutscene | `src/gameplay/pc_auto_look_guest.inc`, `pc_camera.h`, `pc_cutscene.h`, `pc_ui_layout.h` | `tests/gameplay/test_auto_look.py`, `test_cutscene_letterbox.py`, `test_camera_feed.py` |
+| MapMaker extensions | [limitless-shared](limitless-shared.md) | `tests/mapmaker/` |
 | Display model and native UI | `src/interface/pc_display.c`, `pc_display_*.inc`, `pc_settings.c`, `src/native/` | `tests/graphics/test_pc_display_modes.py`, `test_debug_settings_model.py` |
 | GPU clear / screen copies / sampling | `src/graphics/pc_clear_rhi.inc`, `src/graphics/`, runtime `src/d3d/` | `tests/graphics/test_rhi_menu_sampling.py`, `tests/rhi/`, `docs/development/shared-platform.md` |
 | Texture loading and formats | `src/textures/texture_pack.c`, `texture_pack_format.h`, `texture_pack_io.h`, `texture_pack_stream.h`, `texture_mode.c` | `tests/textures/test_texture_runtime.py`, `tests/textures/texture_pack_tools.py` |
@@ -609,7 +609,7 @@ Native mode accepts finite positive game-float time at `4E794C`; Original60
 retains its whole-time gate at `4E7944`. Both consume/rebase mouse batches with
 `pc_input_consume_motion`, preventing fresh packets from expiring against a
 previous batch timestamp. Paused/invalid native time consumes without aiming.
-The helper still handles only mounted-gun mode `0x80`, not vehicle-seat mode `0x8000`.
+Signed +5C speed, sweep hold, wide viewfinder/static: mounted-mouse.md.
 For #385 field provenance, bounded access and original-code regression coverage,
 see [mounted-gun ownership](mounted-mouse.md). The AI target and instance name
 must not authorize or exclude player mouse aim.
@@ -762,9 +762,9 @@ Mouse to both main Settings and paused Options. It uses the original menu
 builders, callbacks, highlights and footer navigation. The controller-style
 bindings pages draw a keyboard/mouse diagram with primary/alternate columns;
 `pc_keyboard_menu_model.h` partitions all 34 actions across short pages.
-`PC_BINDING_SLOTS` is two in the shared model and native dialogs; old keyboard
-profiles use their first two sources without modifying disk until saved.
-Controller profiles keep their existing source capacity.
+`PC_BINDING_SLOTS` is two (shared model, native dialogs); D-pad up/down
+default to Up+Q / Down+V. Old keyboard profiles use their first two sources
+(disk unchanged until saved; not migrated); controller profiles keep theirs.
 
 For gameplay stick axes, the shared binding sampler uses
 `pc_input_radial_axis_magnitude` from `pc_input.c` on both left and right
@@ -963,3 +963,4 @@ time on model refresh, reset queued output, then normalize in the new region. Pa
 stay intact until resume; a running seek beyond the loop end resumes at start.
 `audio_buffer_regions.c` checks production-decoded PCM, fractional clocks/refusal,
 tiny/multiple wraps, pause/live/rate/seek and unchanged source bytes.
+

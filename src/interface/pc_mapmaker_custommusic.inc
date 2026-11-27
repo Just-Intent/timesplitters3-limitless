@@ -1,0 +1,441 @@
+/* US 45410066: imported music in MapMaker's and Arcade's music choices
+ * (docs/mapmaker/mapmaker-custom-music.md; host side pc_custom_music.h).
+ * Included by pc_mapmaker_skymusic.inc, whose rows/compile/load/music hooks
+ * call the cmu_* functions below; three wrappers of its own (area "music").
+ *
+ * Stock facts (CONFIRMED in the disassembly, docs table):
+ *  - sub_00045DE0(eax = music id, [esp+4] tileset/level id, [esp+8]/[esp+0xC]
+ *    the two jingles) starts the level music: channel 0 gets eax, 1 and 2
+ *    the jingles (sub_00045D80 -> sub_00028890(channel, id); id 0 = silence,
+ *    [0x0064BD40 + 4 ch] = -1). Callers: MapMaker play 0x00045FB7 (return
+ *    0x00045FBC; eax is the profile's Arcade choice unless that entry is -1,
+ *    then the map's own index, sub_00045E60) and stock Arcade 0x00045F46
+ *    (return 0x00045F4B; eax = jukebox[[0x007613D0]]).
+ *  - sub_000289C0(channel) plays a channel: [0x004B9134] = channel; the end of
+ *    a match plays a jingle channel (1 or 2) this way.
+ *  - Music pause: sub_00045AB0 (pause) stores [0x006D5EB8] = 1 and
+ *    sub_00045AF0 (resume) 0, unconditionally, before tail-jumping to the
+ *    player's pause/resume (sub_00028A40/A50 -> 0x0064BD98 sub_00029EA0/
+ *    EE0); sub_00045A50 reads it back. The player's own +0x28 is a state
+ *    (0 idle, 1 pause before start, 2 playing, 3 stopped by sub_00029B40), not
+ *    a pause flag: it is 3 after the menu music stops, which held every
+ *    imported track silent before 2026-11-07. Music slider [0x005236BC] 0..16 (default 11):
+ *    sub_00045B60 = slider/16 x 100 x track level (0x00535858: 60..70) / 100.
+ *  - Arcade setup menu sub_002C78F0: item 0xE (text 0x1831) gets the 58
+ *    jukebox rows with sub_000717D0(text) (values = row numbers 0..57) in a
+ *    loop that runs only when ebx is 0; the next call is sub_00071BE0
+ *    (return 0x002C8047). sub_002C71C0(menu, profile) shows [0x007613D4] in
+ *    item 0xE (+0xC8); sub_002C7430(menu, flag, profile) stores item 0xE in
+ *    [0x007613D4], [0x007613D0] and profile +0x114 (row 0 = level music).
+ *
+ * Design:
+ *  - MapMaker (TSFP_MAPMAKER_LIMITS=1, scene 102): after the 28 extra stock
+ *    rows, one row per present track (value 0x100 + list index, label
+ *    "Imported: name"). The rebuild leaves the stock fallback -1 (the
+ *    tileset's music; pc_mapmaker_skymusic.inc writes it for any value past
+ *    57) and appends chunk 0x00C776F7 {word 1, byte length, byte 0, 64-byte
+ *    file name} before the terminator. A stock build skips the unknown chunk
+ *    by its size and plays the tileset music, so the map is NOT moved to the
+ *    64 KB tier (pc_mapmaker_container.inc). The editor load turns the name
+ *    back into the row; a missing file leaves the tileset music.
+ *  - Arcade: rows "Imported: name" after the 58 stock rows (values 58..),
+ *    each mapped to its list index. A store of such a row keeps the name in
+ *    pc-music.ini and writes row 0 (level music) to the three stock fields,
+ *    so the profile, System Link and a stock build never see it; the menu's
+ *    show step moves item 0xE back to the imported row.
+ *  - Play: at sub_00045DE0 any imported track stops. From the MapMaker or
+ *    Arcade caller, the Arcade choice (only when the guest's choice is row 0)
+ *    or else the map's chunk (only when the map's index is -1) names the
+ *    track; if the file is present and the game's music is on (sub_00045A70
+ *    returns 0) the host player starts and eax becomes 0, so channel 0 is
+ *    silent and the jingles stay stock. The player ends the track when the
+ *    scene changes or a jingle channel starts (WRAP sub_000289C0), follows
+ *    the slider and pauses with the game's music.
+ * Requires the includer's WORD_AT, guest_call, g_eax, g_ebx, g_esp,
+ * g_xbox_mem_offset, xbox_HeapAlloc, MAPMAKER_PTR_OK, mapmaker_limits_read. */
+#define PC_CUSTOM_MUSIC_IMPLEMENTATION 1
+#include "pc_custom_music.h"
+
+#define CMU_TAG 0x00C776F7u                 /* fork-only; no game code uses it */
+#define CMU_END 0x00C7766Au
+#define CMU_MAGIC 0x00C77667u
+#define CMU_VERSION 0x12Du
+#define CMU_INFO 0x00C77668u
+#define CMU_CHUNK 0x44u                     /* +0 word 1, +2 length, +3 0, +4 name[64] */
+#define CMU_SCAN 0x7FFE0u                   /* container body (pc_mapmaker_container.inc) */
+#define CMU_SAVE_COMPILE_RET 0x0032C6FFu
+#define CMU_VALUE 0x100u                    /* editor music value of list entry k: 0x100 + k */
+#define CMU_SCENE 0x0079094Cu
+#define CMU_EDITOR 0x007844A8u
+#define CMU_CONTAINER 0x00784014u
+#define CMU_ED_MUSIC 0x210u
+#define CMU_RET_MAP 0x00045FBCu             /* sub_00045EB0 0x00045FB7 -> sub_00045DE0 */
+#define CMU_RET_ARCADE 0x00045F4Bu          /* sub_00045EB0 0x00045F46 -> sub_00045DE0 */
+#define CMU_RET_ARCADE_ROWS 0x002C8047u     /* sub_002C78F0 0x002C8042 -> sub_00071BE0 */
+#define CMU_ARCADE_ITEM 0x0Eu
+#define CMU_ITEM_VALUE 0xC8u
+#define CMU_PROFILE_MUSIC 0x114u
+#define CMU_ARCADE_FIRST 58u                /* rows 0..57 are the jukebox list */
+#define CMU_ARCADE_INDEX 0x007613D0u
+#define CMU_ARCADE_SHOWN 0x007613D4u
+#define CMU_SETUP_LINK 0x00761404u          /* sub_00045E60: profile choice used when set ... */
+#define CMU_MODE 0x007DE455u                /* ... and this byte is not 10 */
+#define CMU_SLIDER 0x005236BCu              /* music volume 0..16 */
+#define CMU_SLIDER_MAX 16u
+#define CMU_PAUSE 0x006D5EB8u               /* 1 between sub_00045AB0 (pause music) and sub_00045AF0 */
+#define CMU_LABEL_BYTES 56u
+#define CMU_PREFIX "Imported: "
+#define CMU_AWAY_TICKS 100u                 /* ~1.5 s of player steps off the play scene end the track */
+#define CMU_JINGLE_MIN_TICKS 60u            /* a jingle holds the track at least ~0.9 s ... */
+#define CMU_JINGLE_MAX_TICKS 2000u          /* ... and at most ~30 s */
+#define CMU_PLAYER_STATE 0x0064BDC0u        /* stock player 0x0064BD98 +0x28: 2 while its stream plays */
+#define CMU_PLAYING 2u
+#define CMU_RET_JINGLE_A 0x0006709Bu        /* sub_00067xxx end of match: sub_00045A00(2) ... */
+#define CMU_RET_JINGLE_B 0x000670B4u        /* ... sub_00045A00(1) (win/lose flags 0x007DE45C) */
+#define CMU_LOG_KINDS 32u
+#define CMU_LOG_EACH 8u
+#define CMU_INFO_MUSIC 0x0Eu                /* map info word: jukebox index, -1 tileset (sub_00045E60) */
+
+extern void sub_00071800(void),sub_000717D0(void),sub_00071940(void),sub_00069640(void),sub_00045A70(void);
+
+static struct {
+    PcMusicList list;
+    int scanned, arcade_loaded;
+    uint32_t labels;                        /* guest: CMU_LABEL_BYTES per list entry */
+    unsigned offer[PC_MUSIC_MAX_TRACKS], offered;   /* Arcade rows 58.. -> list entry */
+    char arcade[PC_MUSIC_NAME_MAX];         /* the Arcade choice, "" = stock */
+    volatile uint32_t scene;                /* scene the track plays in */
+    const char *seen[CMU_LOG_KINDS];        /* log budget per message (pointer identity) */
+    unsigned char seen_count[CMU_LOG_KINDS];
+    unsigned offered_logged;                /* Map Settings rows: logged when the count changes */
+    char level[PC_MUSIC_NAME_MAX];          /* the track this level plays: a restart starts it again */
+    volatile int jingle;                    /* a mid-level jingle holds the track */
+    unsigned away, jingle_ticks;            /* player thread only */
+    uint32_t away_scene;
+} cmu;
+
+/* Each message has its own budget, so a message repeated by every list
+ * build can never use up the lines a later play decision needs. */
+static int cmu_budget(const char *what)
+{
+    unsigned k;
+    for(k=0;k<CMU_LOG_KINDS && cmu.seen[k];k++)
+        if(cmu.seen[k]==what) return cmu.seen_count[k]<CMU_LOG_EACH ? (cmu.seen_count[k]++,1) : 0;
+    if(k==CMU_LOG_KINDS) return 0;
+    cmu.seen[k]=what;cmu.seen_count[k]=1;
+    return 1;
+}
+static void cmu_log(const char *what,const char *name,int a)
+{
+    if(!cmu_budget(what)) return;
+    fprintf(stderr,"[music] %s: %s (%d)\n",what,name?name:"",a);
+    fflush(stderr);
+}
+static uint8_t *cmu_byte(uint32_t a) { return (uint8_t *)((uintptr_t)a+g_xbox_mem_offset); }
+static uint32_t cmu_label(unsigned k) { return cmu.labels+k*CMU_LABEL_BYTES; }
+
+/* Rescan the folder; entries keep their index, so stored values stay valid. */
+static unsigned cmu_scan(void)
+{
+    unsigned k,n=pc_music_scan(&cmu.list);
+    cmu.scanned=1;
+    if(!cmu.list.count) return 0;            /* no folder or no tracks: nothing to label */
+    if(!cmu.labels && !(cmu.labels=xbox_HeapAlloc(PC_MUSIC_MAX_TRACKS*CMU_LABEL_BYTES,4u))) {
+        cmu_log("no memory for the row labels","",0);
+        return 0;
+    }
+    for(k=0;k<cmu.list.count;k++) {
+        char text[PC_MUSIC_LABEL_MAX];
+        pc_music_label(cmu.list.name[k],text,sizeof text);
+        snprintf((char *)cmu_byte(cmu_label(k)),CMU_LABEL_BYTES,"%s%s",CMU_PREFIX,text);
+    }
+    return n;
+}
+static void cmu_arcade_read(void)
+{
+    if(cmu.arcade_loaded) return;
+    cmu.arcade_loaded=1;
+    if(!pc_music_arcade_load(cmu.arcade,sizeof cmu.arcade)) cmu.arcade[0]=0;
+}
+
+/* ---- the map chunk ----------------------------------------------------- */
+/* The terminator of a container, or 0; *chunk gets the first CMU_TAG data,
+ * *info the map-info data. */
+static uint32_t cmu_walk(uint32_t c,uint32_t *chunk,uint32_t *info)
+{
+    uint32_t p,end;
+    unsigned steps;
+    if(chunk) *chunk=0;
+    if(info) *info=0;
+    if(!c || !MAPMAKER_PTR_OK(c,CMU_SCAN+8u) || WORD_AT(c)!=CMU_MAGIC || WORD_AT(c+4u)!=CMU_VERSION) return 0;
+    end=c+CMU_SCAN;
+    for(p=c+8u,steps=0;steps<0x40000u && end-p>=8u;steps++) {
+        uint32_t t=WORD_AT(p),size=WORD_AT(p+4u);
+        if(t==CMU_END) return p;
+        if(size>end-p-8u) return 0;
+        if(t==CMU_TAG && chunk && !*chunk && size>=CMU_CHUNK) *chunk=p+8u;
+        if(t==CMU_INFO && info && !*info && size>=0x24Cu) *info=p+8u;
+        p+=8u+size;
+    }
+    return 0;
+}
+/* The track a container names, or 0. */
+static int cmu_chunk_name(uint32_t c,char *out)
+{
+    uint32_t data;
+    unsigned n;
+    if(!cmu_walk(c,&data,NULL) || !data) return 0;
+    n=cmu_byte(data+2u)[0];
+    if(cmu_byte(data)[0]!=1u || cmu_byte(data)[1]!=0 || !n || n>=PC_MUSIC_NAME_MAX) return 0;
+    memcpy(out,cmu_byte(data+4u),n);
+    out[n]=0;
+    return pc_music_name_ok(out);
+}
+
+/* Map Settings' music list (scene 102, switch on), after the extra rows. */
+static void cmu_rows(void)
+{
+    unsigned k,n=0;
+    cmu_scan();                              /* files added since the last list show up */
+    if(!cmu.labels) return;
+    for(k=0;k<cmu.list.count;k++)
+        if(cmu.list.present[k]) { guest_call(sub_00071800,2,cmu_label(k),CMU_VALUE+k);n++; }
+    if(n && n!=cmu.offered_logged) { cmu.offered_logged=n;cmu_log("imported tracks offered in Map Settings","",(int)n); }
+}
+
+/* After the rebuild (sub_003006C0): append the chunk when the editor's music
+ * is an imported row. ret = the rebuild's return address. */
+static void cmu_compile(uint32_t c,uint32_t ret)
+{
+    uint32_t ed=WORD_AT(CMU_EDITOR),m,term,info,used,data,nterm;
+    const char *name;
+    size_t n;
+    if(!MAPMAKER_PTR_OK(ed,CMU_ED_MUSIC+4u)) return;
+    m=WORD_AT(ed+CMU_ED_MUSIC);
+    if(m<CMU_VALUE || m-CMU_VALUE>=cmu.list.count) return;
+    name=cmu.list.name[m-CMU_VALUE];
+    if(!(term=cmu_walk(c,NULL,&info)) || !info) return;
+    used=WORD_AT(info+0x248u);
+    if(term!=c+used-8u || used+8u+CMU_CHUNK+4u>CMU_SCAN) { cmu_log("no room for the imported track; not saved",name,(int)used);return; }
+    n=strlen(name);
+    WORD_AT(term)=CMU_TAG;WORD_AT(term+4u)=CMU_CHUNK;data=term+8u;
+    memset(cmu_byte(data),0,CMU_CHUNK);
+    cmu_byte(data)[0]=1u;cmu_byte(data+2u)[0]=(uint8_t)n;
+    memcpy(cmu_byte(data+4u),name,n);
+    nterm=data+CMU_CHUNK;
+    WORD_AT(nterm)=CMU_END;WORD_AT(nterm+4u)=nterm-c;
+    used=nterm-c+8u;
+    WORD_AT(info+0x248u)=used;
+    if(g_eax) {
+        g_eax=used;
+        if(ret==CMU_SAVE_COMPILE_RET && !(g_eax&0xFFFFu)) g_eax|=4u;   /* as the container hook */
+    }
+}
+
+/* After the editor load (sub_00301A90, scene 102, switch on). */
+static void cmu_load(uint32_t c)
+{
+    uint32_t ed=WORD_AT(CMU_EDITOR);
+    char name[PC_MUSIC_NAME_MAX];
+    int k;
+    if(!MAPMAKER_PTR_OK(ed,CMU_ED_MUSIC+4u) || !cmu_chunk_name(c,name)) return;
+    cmu_scan();
+    if((k=pc_music_find(&cmu.list,name))<0) { cmu_log("map's imported track is missing; tileset music",name,0);return; }
+    WORD_AT(ed+CMU_ED_MUSIC)=CMU_VALUE+(uint32_t)k;
+}
+
+/* ---- play -------------------------------------------------------------- */
+/* Player thread: guest reads only. */
+/* The scene word can leave the play scene for a moment in a level (m48.err
+ * 18020: a fight, no level change); only CMU_AWAY_TICKS steps in a row end the
+ * track, and the track is held silent meanwhile. A jingle (cmu.jingle) holds
+ * it until the stock player's stream stops playing. */
+static int cmu_watch(void *context,float *gain,int *paused)
+{
+    uint32_t slider,scene=WORD_AT(CMU_SCENE);
+    (void)context;
+    slider=WORD_AT(CMU_SLIDER);
+    *gain=(float)(slider>CMU_SLIDER_MAX?CMU_SLIDER_MAX:slider)/(float)CMU_SLIDER_MAX;
+    *paused=WORD_AT(CMU_PAUSE)!=0;
+    if(scene!=cmu.scene) {
+        if(!cmu.away++) cmu.away_scene=scene;
+        if(cmu.away>=CMU_AWAY_TICKS) {
+            fprintf(stderr,"[music] watch: the scene word left the play scene %u for %u (now %u): track ended\n",
+                    cmu.scene,cmu.away_scene,scene);
+            fflush(stderr);
+            return 0;
+        }
+        *paused=1;
+        return 1;
+    }
+    if(cmu.away) {
+        fprintf(stderr,"[music] watch: the scene word was %u for %u player steps; track kept\n",cmu.away_scene,cmu.away);
+        fflush(stderr);
+        cmu.away=0;
+    }
+    if(cmu.jingle) {
+        cmu.jingle_ticks++;
+        if(cmu.jingle_ticks<CMU_JINGLE_MIN_TICKS ||
+           (WORD_AT(CMU_PLAYER_STATE)==CMU_PLAYING && cmu.jingle_ticks<CMU_JINGLE_MAX_TICKS)) *paused=1;
+        else {
+            fprintf(stderr,"[music] watch: jingle over after %u player steps; imported track resumes\n",cmu.jingle_ticks);
+            fflush(stderr);
+            cmu.jingle=0;
+        }
+    }
+    return 1;
+}
+
+/* Starts the level's track; 1 when it plays. */
+static int cmu_play(const char *name,uint32_t scene)
+{
+    cmu.scene=scene;cmu.away=0;cmu.jingle=0;cmu.jingle_ticks=0;
+    if(!pc_music_start(name,cmu_watch,NULL)) { cmu_log("imported track did not start",pc_music_error(),0);cmu_log("the track that did not start",name,0);return 0; }
+    if(name!=cmu.level) snprintf(cmu.level,sizeof cmu.level,"%s",name);
+    return 1;
+}
+
+/* One play decision (ret = sub_00045DE0's return address). */
+static void cmu_trace(const char *why,uint32_t ret,uint32_t scene,uint32_t eax,int chunk,int own,int arcade)
+{
+    if(!cmu_budget(why)) return;
+    fprintf(stderr,"[music] play: %s (ret 0x%08X, scene %u, eax %d, map chunk %s, map music %d, arcade %d)\n",
+            why,ret,scene,(int)eax,chunk?"yes":"no",own,arcade);
+    fflush(stderr);
+}
+
+/* WRAP sub_00045DE0, before pc_mapmaker_skymusic.inc's own rule; returns 1
+ * when an imported track plays (eax is then 0). sub_00045EB0 0x00045F7A
+ * passes sub_00045E60's result: the map's info word +0x0E, or a setup's
+ * stock Arcade choice ([0x00761404] set, mode byte not 10, jukebox entry of
+ * profile +0x114 not -1). The map's imported track is the author's explicit
+ * choice, so it plays whenever the map's own word is -1 and its chunk names a
+ * present file, even over a stock setup choice; an imported Arcade choice
+ * (profile row 0) comes first. Every silent return is logged once per reason. */
+static int cmu_music(int limits)
+{
+    uint32_t ret=MAPMAKER_PTR_OK(g_esp,4u)?WORD_AT(g_esp):0u,scene=WORD_AT(CMU_SCENE),eax=g_eax,info=0;
+    char map_name[PC_MUSIC_NAME_MAX];
+    const char *name=NULL,*why=NULL;
+    int arcade,chunk=0,own=-2;
+    if(pc_music_playing()) cmu_trace("new level music: imported track ended",ret,scene,eax,0,0,0);
+    pc_music_stop();                         /* a new level music ends an imported track */
+    cmu.level[0]=0;                          /* until this level picks one */
+    if(ret!=CMU_RET_MAP && ret!=CMU_RET_ARCADE) return 0;
+    if(ret==CMU_RET_ARCADE) arcade=WORD_AT(CMU_ARCADE_INDEX)==0u;
+    else {
+        uint32_t profile=WORD_AT(CMU_SETUP_LINK) && cmu_byte(CMU_MODE)[0]!=0x0Au ? guest_call(sub_00069640,0) : 0u;
+        arcade=profile && MAPMAKER_PTR_OK(profile,CMU_PROFILE_MUSIC+4u) && WORD_AT(profile+CMU_PROFILE_MUSIC)==0u;
+    }
+    cmu_scan();
+    if(arcade) {
+        cmu_arcade_read();
+        if(cmu.arcade[0]) {
+            if(pc_music_find(&cmu.list,cmu.arcade)>=0) name=cmu.arcade;
+            else cmu_log("Arcade's imported track is missing",cmu.arcade,0);
+        }
+    }
+    if(!name && ret==CMU_RET_MAP) {
+        uint32_t c=WORD_AT(CMU_CONTAINER);
+        chunk=cmu_chunk_name(c,map_name);
+        if(cmu_walk(c,NULL,&info) && info) own=(int)(int16_t)(uint16_t)WORD_AT(info+CMU_INFO_MUSIC);
+        if(!limits) why="MapMaker limits are off; stock music";
+        else if(scene!=100u) why="not a MapMaker play scene; stock music";
+        else if(!chunk) why="the map names no imported track; stock music";
+        else if(own!=-1) why="the map's own music is a stock row; stock music";
+        else if(pc_music_find(&cmu.list,map_name)<0) { cmu_log("map's imported track is missing; tileset music",map_name,0);return 0; }
+        else {
+            name=map_name;
+            if(eax!=0xFFFFFFFFu) cmu_trace("the map's imported track replaces the setup's stock choice",ret,scene,eax,chunk,own,arcade);
+        }
+    } else if(!name) why="Arcade: no imported choice; stock music";
+    if(!name) { cmu_trace(why,ret,scene,eax,chunk,own,arcade);return 0; }
+    if(guest_call(sub_00045A70,0)) { cmu_log("music is switched off",name,0);return 0; }
+    if(!cmu_play(name,scene)) return 0;
+    cmu_log(name==cmu.arcade?"Arcade: imported track":"map: imported track",name,(int)scene);
+    g_eax=0;
+    return 1;
+}
+
+/* WRAP sub_000289C0 (play music channel [esp+4]; its only caller is
+ * sub_00045A00, whose own return address is at [esp+0x10]). The end-of-match
+ * jingles (sub_00045A00 returning to 0x0006709B/0x000670B4) end the imported
+ * track; any other jingle channel holds it until the stock stream stops
+ * (cmu_watch), then it resumes where it was. */
+void pc_custom_music_channel(void (*original)(void))
+{
+    if(MAPMAKER_PTR_OK(g_esp,0x14u) && WORD_AT(g_esp+4u)!=0u && pc_music_playing()) {
+        uint32_t from=WORD_AT(g_esp+0x10u);
+        if(from==CMU_RET_JINGLE_A || from==CMU_RET_JINGLE_B) {
+            pc_music_stop();
+            cmu_log("end-of-match jingle: imported track ended","",(int)WORD_AT(g_esp+4u));
+        } else {
+            cmu.jingle_ticks=0;cmu.jingle=1;
+            cmu_log("jingle channel: imported track held until it ends","",(int)WORD_AT(g_esp+4u));
+        }
+    }
+    original();
+}
+
+/* WRAP sub_001CDD60 (the level restart, no args; sub_0003D440): the restart
+ * plays no level music (no sub_00045DE0), so the level's imported track
+ * starts again from its beginning. */
+void pc_custom_music_restart(void (*original)(void))
+{
+    original();
+    if(!cmu.level[0] || WORD_AT(CMU_SCENE)!=100u) return;
+    if(cmu_play(cmu.level,100u)) cmu_log("level restart: imported track started again",cmu.level,0);
+}
+
+/* WRAP sub_00071BE0: after the Arcade music rows (return 0x002C8047, the
+ * row loop ran: ebx 0), add the imported rows. */
+void pc_custom_music_arcade_rows(void (*original)(void))
+{
+    unsigned k;
+    if(MAPMAKER_PTR_OK(g_esp,4u) && WORD_AT(g_esp)==CMU_RET_ARCADE_ROWS && g_ebx==0u) {
+        cmu_scan();
+        cmu.offered=0;
+        if(cmu.labels)
+            for(k=0;k<cmu.list.count;k++)
+                if(cmu.list.present[k]) { guest_call(sub_000717D0,1,cmu_label(k));cmu.offer[cmu.offered++]=k; }
+    }
+    original();
+}
+
+/* WRAP sub_002C71C0 (menu, profile): show the imported Arcade choice. */
+void pc_custom_music_arcade_show(void (*original)(void))
+{
+    uint32_t menu=MAPMAKER_PTR_OK(g_esp,8u)?WORD_AT(g_esp+4u):0u,item;
+    unsigned p;
+    int k;
+    original();
+    cmu_arcade_read();
+    if(!menu || !cmu.offered || !cmu.arcade[0] || (k=pc_music_find(&cmu.list,cmu.arcade))<0) return;
+    for(p=0;p<cmu.offered && cmu.offer[p]!=(unsigned)k;p++) {}
+    if(p==cmu.offered || !(item=guest_call(sub_00071940,2,menu,CMU_ARCADE_ITEM)) || !MAPMAKER_PTR_OK(item,CMU_ITEM_VALUE+4u)) return;
+    WORD_AT(item+CMU_ITEM_VALUE)=CMU_ARCADE_FIRST+p;
+}
+
+/* WRAP sub_002C7430 (menu, flag, profile): keep an imported row host-side. */
+void pc_custom_music_arcade_store(void (*original)(void))
+{
+    uint32_t menu=0,profile=0,item,v;
+    if(MAPMAKER_PTR_OK(g_esp,16u)) { menu=WORD_AT(g_esp+4u);profile=WORD_AT(g_esp+12u); }
+    original();
+    if(!menu || !(item=guest_call(sub_00071940,2,menu,CMU_ARCADE_ITEM)) || !MAPMAKER_PTR_OK(item,CMU_ITEM_VALUE+4u)) return;
+    cmu_arcade_read();
+    v=WORD_AT(item+CMU_ITEM_VALUE);
+    if(v>=CMU_ARCADE_FIRST && v-CMU_ARCADE_FIRST<cmu.offered) {
+        const char *name=cmu.list.name[cmu.offer[v-CMU_ARCADE_FIRST]];
+        WORD_AT(CMU_ARCADE_SHOWN)=0;WORD_AT(CMU_ARCADE_INDEX)=0;
+        if(MAPMAKER_PTR_OK(profile,CMU_PROFILE_MUSIC+4u)) WORD_AT(profile+CMU_PROFILE_MUSIC)=0;
+        if(strcmp(cmu.arcade,name)) {
+            strcpy(cmu.arcade,name);
+            if(!pc_music_arcade_save(name)) cmu_log("Arcade choice not saved",name,0);
+            cmu_log("Arcade: imported track chosen",name,(int)v);
+        }
+    } else if(cmu.arcade[0]) {
+        cmu.arcade[0]=0;
+        if(!pc_music_arcade_save("")) cmu_log("Arcade choice not cleared","",0);
+    }
+}
