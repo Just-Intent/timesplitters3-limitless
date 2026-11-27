@@ -1,3 +1,35 @@
+## Linux launcher architecture and installer (2026-11-27)
+
+**Implemented; native launcher CI verified.** On main base84e0bf271 after
+PR #618, tools/launcher/LauncherPlatform.cs selects Linux x64/ARM64 for game
+assets, self-updates and checkout paths; NativeHost checks both ELF CPU and
+manifest platform. LinuxInstaller.cs reuses the shared verified installation
+transaction for Install-Linux.sh rather than adding another updater policy.
+Windows and Mac continue using their existing platform adapters and UI; neither
+needs a new architecture picker or Linux bootstrap. The publication verifier
+now requires four tested packages plus one Linux installer (22 assets).
+PR #619 run46056835145 atd349c7dac passes all four native launcher hosts and
+complete package verification. ARM64 and x64 Linux each pass bootstrap, native
+adapter, texture, shared UI and real installer/repair/restart checks. Windows
+and Mac retain their native adapter/UI coverage; no Mac-specific implementation
+is needed. Physical ARM64 game/GPU and Deck acceptance remain pending. No release
+or version bump is included. See STATUS.md for evidence; source remains on the
+follow-up task branch.
+
+## Native Linux ARM64 contribution (#615, 2026-11-27)
+
+**Linux extension implemented; no new Mac adaptation required.** Functional build
+revision c0b1a826d adds Linux ARM64 ucontext/MMIO, crash metadata, patch 2413 CPU/test
+selection and a pinned developer cross-build. macOS retains its existing ARM64
+decoder/device policy and Darwin adapter, with no duplicated game logic or
+changed defaults. Full ARM64 Linux and x64 Linux builds pass; both linked MMIO
+tests pass (ARM64 under QEMU). Portable MSVC and Linux host/crash/patch/context
+tests pass. Native Mac build/gameplay and physical ARM64 Linux acceptance were
+not performed. The 150-second x64 Story gameplay regression passes with both pause/resume
+cycles confirmed, reviewed captures and zero Vulkan validation errors; see
+STATUS.md for exact provenance. Validated locally; no ARM64 launcher/package
+or release has been published.
+
 ## Mansion lighting/query contamination (2026-11-26)
 
 **Shared fix implemented locally; native Mac CPU checks passed.** Host feedback

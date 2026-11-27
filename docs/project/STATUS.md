@@ -1,3 +1,95 @@
+## 2026-11-27 - Linux launcher CPU selection and single installer (implemented; publication pending)
+
+Follow-up branch feature/linux-launcher-architecture starts at main merge
+84e0bf271 (PR #618, discussion #615). That integration passed all 22 selected
+CI checks before merge. Its broad local Linux preflight still exposes ten
+unchanged desktop fixture assumptions (clock_gettime feature macro, Windows
+CMake path and Mach-O linker flags); those are not a passing full Linux preflight.
+
+The current launcher now selects native x64/ARM64 game and self-update assets,
+checks ELF/manifest architecture and uses the matching checkout build path.
+One Linux installer detects the CPU, verifies the matching package, then uses
+the existing launcher's lock/recovery/install transaction. CI adds a native
+Linux ARM64 launcher runner alongside x64, Windows and Mac. Version 1.7.2 is
+unchanged; no new release or README installer download has been published.
+
+Windows bootstrap/release/compatibility/CI/context checks pass: 184 tests and
+54 subtests (test-only GIT_CONFIG_COUNT=0 avoids the desktop environment's empty
+Git config values disappearing in Windows Python subprocesses). Native Linux
+x64 launcher adapters, 68 shared UI groups, package install/repair/restart and
+automatic-installer idempotence/lock/personal-file checks pass under Xvfb.
+The ARM64 launcher cross-publishes successfully with the locked runtime graph.
+The real x64 bootstrap hands the actual package to the native installer CLI,
+installs and repeats without rewriting the executable or a personal fixture.
+The actual ARM64 installer CLI also passes under QEMU with the target sysroot:
+correct ARM64 package, repeated install and personal-file preservation. This is
+emulated CPU/installation evidence, not native desktop or GPU acceptance.
+A source --check attempt is blocked by the existing private/game symlink (the
+launcher deliberately rejects linked installation paths); the fixture remains.
+PR #619 run46056835145 atd349c7dac passes native Windows x64, Mac ARM64,
+Linux x64 and Linux ARM64 launcher builds/tests/packages and complete release
+verification from the same revision. Both Linux hosts pass 24 bootstrap cases,
+20 texture installer cases, 68 shared UI groups, real package installation,
+repeated install/repair/lock/personal-file checks, copied helper recovery and
+rendered launcher restart. The first ARM64 run exposed an x64-only checkout
+marker in the shared texture fixture; NativeBuildScript now supplies its native
+marker without weakening the private-pack assertion. All 22 publication assets
+verify; this validation run publishes nothing. All 23 selected CI checks,
+including the broader Windows/Mac runtime and patch suites, Linux/Mac GPU
+contracts and PR validation gate, pass on that revision. The following commit
+only records these observed results and wraps player documentation. Physical ARM64
+Linux gameplay/GPU and Steam Deck acceptance remain unverified.
+
+## 2026-11-27 - Native Linux ARM64 integration (local)
+
+Integrated DCKcode's [discussion #615](https://github.com/TheDoffman/timesplitters-future-perfect-pc/discussions/615)
+contribution e01fe553a8d1f031f12d54dea344a42bcca8a518 on base 5f459a959,
+branch feature/linux-arm64. Functional build revision: c0b1a826da9e2b761d95e3d6ebffa150cc9c5bd4.
+Local validation was performed before integration; this change does not publish a release.
+
+Linux ARM64 now has Linux ucontext fault recovery through the shared ARM64
+MMIO decoder/device policy, correct crash registers/platform metadata and a
+cross-build script. Patch 2413 adds ARM64 CPU/test selection and retains x64 tests.
+Main's newer patch 3064 renderer ordering is preserved. Integration corrects fresh
+setup ordering, incremental patch verification, target pkg-config isolation and
+SPIRV-Cross preparation. Archived DXC build -1 matches the contributor checksum;
+rolling build -2 requires GLIBC 2.43, newer than the target sysroot's 2.41.
+Pinned Debian 13 GTK development packages complete Valve's SDK without host
+installation or package maintainer scripts.
+
+Ubuntu/WSL2 x64, kernel 6.18.58.1 and Clang 18.1.3 build both complete games with
+Debug assertions/symbols and optimized code. Runtime pin: d90c92988a9f99d0580d2ca3f7efd6ec3a7b7845.
+US XBE verified as SHA256 3cfd001a84fc3e08175d6c4b2e42ebf49577a089b5d0bd87ac724f61a41816bc.
+ARM64 uses Steam Runtime 4.0.20261021.265997 and DXC 1.10.2605.37-1; its AArch64 ELF
+matches receipt SHA256 f7af40986c7bfe79e58b9ae2df3e8e7c10c01ce441cd6f172c732ad8bb382551.
+The actual linked ARM64 MMIO test passes under QEMU 8.2.2 with the target sysroot
+(protected writes, NV2A/CRTC acknowledgement and AC97 reset); the linked x64 test
+also passes. This is CPU fault recovery under emulation, not ARM GPU acceptance.
+
+Linux: 58 host/crash/MMIO tests and 82 patch/context/migration tests pass, with
+2 optional skips. Windows: 7 portable tests pass with 1 Linux-only skip; final
+patch application and context checks pass. The slow duplicate broad Windows
+patch suite was stopped after its Linux equivalent passed. No new Windows or
+Mac full game build was performed; Darwin's adapter is unchanged.
+
+Linux x64 gameplay passes a 150.17-second isolated Test Lab Story run at 1280x720
+with Vulkan 1.4, llvmpipe/LLVM 20.1.2 and validation enabled. Recorded 4,200 guest
+frames and successful presents, zero skipped/failed presents and zero Vulkan
+validation errors; bounded shutdown returns 0. Synthetic mouse fire/turn,
+movement, held-input focus loss, weapon change and reload were exercised.
+Story state confirms gameplay from 51.227s, pause/resume at 80.407/83.416s and
+130.240/133.755s. Reviewed captures show the first-level environment, weapon and
+HUD; this is not a full campaign or a physical input/audio test. The canonical
+fixture verifies unchanged before/after, and disposable test disks were recycled.
+X64 executable SHA256: ea0a67966166440c9cfe4e13f521e8055b2c90b59b1fd2d6a7edaa9b8f7c17f9.
+Evidence remains ignored under logs/arm64-validation and
+private/captures/arm64-integration in the Windows task worktree.
+
+This is an ARM64 developer build, with no ARM64 launcher or release package.
+Physical Retroid/ArmadaOS gameplay, GPU/audio/controller acceptance and handheld
+FPS remain unverified. The x64 checks do not establish ARM64 gameplay or Mac
+visual parity. No duplicate game-data extract was created.
+
 ## 2026-11-26 - Mansion lighting and rectangle repair (local)
 
 On investigate/mansion-white-rectangles, base eec4cb2bf, for

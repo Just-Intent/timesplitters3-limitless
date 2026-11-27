@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "loaderSha256": "faff2060bac95a0f882de17daef39938745900232ea6d6575e944631b0c60286",
+  "loaderSha256": "2d874cb7a61e3ed57ef47b30b50f70fbb01c72c627444dde8e0ca710d0a56418",
   "patches": [
     {
       "name": "0010-dsound-audio-timing.patch",
@@ -3871,6 +3871,14 @@
         "src/hle/hle_xmv_play.c",
         "src/input/CMakeLists.txt",
         "src/video/CMakeLists.txt"
+      ]
+    },
+    {
+      "name": "2413-linux-arm64-native-game.patch",
+      "path": "patches/platform/2413-linux-arm64-native-game.patch",
+      "sha256": "fd05fb096939bb9ef7d228582687830b4fbe54d9f1f0feb86267292381505779",
+      "targets": [
+        "titles/futureperfect/CMakeLists.txt"
       ]
     },
     {
