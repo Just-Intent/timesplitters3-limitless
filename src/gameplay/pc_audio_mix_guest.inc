@@ -13,16 +13,20 @@ static void pc_audio_mix_script(void (*original)(void))
     original();
 #endif
 }
+/* sub_00045820 is also wrapped by the MapMaker extensions (meter-wrappers patch,
+ * generated as sub_00045820_mapmaker): run that chain, which ends in the
+ * original, inside this one. */
+void sub_00045820_mapmaker(void);
 static void pc_audio_mix_actor(void (*original)(void))
 {
 #if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
     uint32_t caller;memcpy(&caller,(const void *)((uintptr_t)g_esp+g_xbox_mem_offset),4);
     int speech=pc_audio_actor_speech_caller(caller);
     unsigned token=speech?pc_audio_scope_enter(PC_AUDIO_DIALOGUE,g_esp):0;
-    original();
+    ((void)(original),sub_00045820_mapmaker());
     if(speech)pc_audio_scope_leave(token);
 #else
-    original();
+    ((void)(original),sub_00045820_mapmaker());
 #endif
 }
 static void pc_audio_mix_stream(void (*original)(void))

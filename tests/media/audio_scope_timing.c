@@ -25,6 +25,8 @@ void sub_00045820_gen(void)
 void sub_000299C0_gen(void)
 {assert(pc_audio_scope_bus(g_esp)==expected);original_calls++;g_eax=456;g_esp+=4;}
 void sub_00045820(void);
+/* Stand-in for the MapMaker chain (meter-wrappers patch): ends in the original. */
+void sub_00045820_mapmaker(void){sub_00045820_gen();}
 void sub_00046D80_gen(void)
 {
     assert(pc_audio_scope_bus(g_esp)==expected);original_calls++;

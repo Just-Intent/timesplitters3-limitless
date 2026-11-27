@@ -3472,7 +3472,7 @@
 +}
 +
 +extern void sub_00045820_gen(void);
-+void sub_00045820(void)
++void sub_00045820_mapmaker(void)
 +{
 +#if defined(TSFP_PC_CONTROLS) || defined(TSFP_NATIVE_DISPLAY)
 +    if(pc_mapmaker_area_enabled("khallos","pc_mapmaker_khallos_sound")) pc_mapmaker_khallos_sound(sub_00045820_gen);
