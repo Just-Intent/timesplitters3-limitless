@@ -8,10 +8,10 @@ Tests: `test_launcher_release.py`, `test_publish_release.py`; no OS adapter chan
 [Cold startup network ordering and tests](launcher-startup.md). Both launcher
 hosts use shared TextureUpdateCheck.StartAfter; request ordering changes only.
 
-Launcher-only1.7.2 preparation (2026-11-24) follows published1.7.1: startup
-ordering and console severity fixes, with reviewed versioned emoji-free notes.
-Use the official three-host workflow and verify15 assets/aliases. Game0.7.1 is
-unchanged; no game build/publication. [Procedure](../release/launcher-releases.md).
+Launcher1.8.0/game0.7.2 preparation (2026-11-27) follows published1.7.2/0.7.1.
+Versioned notes cover redesign, setup and Linux CPU selection. Use the official
+four-platform workflow; verify22 assets/aliases. Installation/update formats
+and optional textures are unchanged. [Procedure](../release/launcher-releases.md).
 
 Renderer restart metadata and shared preference: [in-game flow](opengl-recovery.md#in-game-renderer-restart).
 
@@ -68,12 +68,11 @@ Stable launcher owns Latest; the game uses latest=false. The public0.7.0-beta.1
 remains immutable historical preview material. This supersedes the integration-only
 version hold below; future releases must query GitHub for unused versions.
 
-README review (2026-11-20) aligns native Arcade multiplayer, published Mac game
-requirements (0.7.0 needs macOS27+, distinct from source-renderer selection),
-Linux launcher entry point, Graphics/Enhanced textures and Tools & Logs labels.
-The pinned docs/assets/render-launcher-preview.ps1 renders the1.7.0 interface
-with isolated Stable/sample0.7.0 data; docs/assets/README.md records provenance.
-These are documentation updates; no runtime or launcher behavior changed.
+README now previews published1.8.0 with isolated sample0.7.2/Stable data.
+`docs/assets/render-launcher-preview.ps1` checks the published Windows assembly
+hash and renders LauncherAppearance at1184x684. Provenance: docs/assets/README.md.
+README links the verified Linux installer; ARM64 launcher availability remains
+separate from source-only ARM64 game support. Documentation only; no behavior change.
 
 The Windows game package README now describes the native Multiplayer menu,
 community relay without player port forwarding, and the distinct private-server
