@@ -74,6 +74,14 @@ public static class LauncherAppearanceChecks
             Console.WriteLine("PASS working layout: real catalog -> Install -> checksum rejection -> Retry; personal files kept");
             endpoint.Offline=true;Await(ui.AppearanceCheck());Need(ui.AppearanceCommand=="RetryButton","offline failure did not retain real recovery");endpoint.Offline=false;
             ui.AppearanceNavigate("Game settings");var settings=ui.AppearanceSettings;Need(settings!=null,"settings were not reachable");
+            // Category buttons are labelled from the real tab headers: MapMaker opens the
+            // MapMaker switches, and Audio still opens Audio & language.
+            var title=Tree(settings.View).OfType<TextBlock>().First(text=>text.Name=="MinimalCategoryTitle");
+            Func<string,Button> category=wanted=>Tree(settings.View).OfType<Button>().First(candidate=>System.Windows.Automation.AutomationProperties.GetName(candidate)==wanted);
+            // Stop at the page: the test window itself is never shown.
+            Func<FrameworkElement,bool> shown=item=>{for(DependencyObject node=item;node!=null && node!=settings.View;node=LogicalTreeHelper.GetParent(node)){var element=node as UIElement;if(element!=null && element.Visibility!=Visibility.Visible)return false;}return true;};
+            Click(category("MapMaker"));Need(title.Text=="MapMaker" && shown(Named<CheckBox>(settings.View,"MapMakerLimits")),"MapMaker switches were not under the MapMaker category");
+            Click(category("Audio & language"));Need(title.Text=="Audio & language" && !shown(Named<CheckBox>(settings.View,"MapMakerLimits")),"Audio category showed MapMaker switches");
             var vsync=Named<CheckBox>(settings.View,"VSync");bool initial=vsync.IsChecked==true;vsync.IsChecked=!initial;
             var back=Tree(settings.View).OfType<Button>().First(b=>System.Windows.Automation.AutomationProperties.GetName(b)=="Back to Launcher tools");Click(back);ui.AppearanceNavigate("Game settings");Need(ui.AppearanceSettings==settings && vsync.IsChecked==!initial,"Back lost the native settings draft");
             Click(Named<Button>(settings.View,"SettingsSaveButton"));Need(GameSettings.Load(root,null).VSync==!initial,"real settings did not persist");

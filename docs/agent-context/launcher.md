@@ -371,6 +371,8 @@ Legacy144 sidecars load as120 without writes; explicit save uses the new preset.
 `launcher.mapmaker_limits/overlap/stack_items/alive` in pc-controls.json and
 `MapMakerEnvironment()` adds only the chosen `TSFP_MAPMAKER_*` after StartInfo's
 inherited-variable strip; `tools/playable-launch.ps1` mirrors it.
+`MinimalSettings` names its category bar from the tab headers (MapMaker after
+Textures), so an added tab cannot shift later labels.
 Launcher version and game version are separate. A source commit is not a
 published release. Use `tools/ci/launcher-compatibility.py --local` for API-free
 shared checks, plus affected host lifecycle/build checks. Never start publishing

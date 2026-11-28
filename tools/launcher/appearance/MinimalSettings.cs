@@ -19,7 +19,10 @@ public sealed class MinimalSettings
     readonly List<Button> categories=new List<Button>();
     readonly TextBlock heading;
     readonly List<FrameworkElement> categoryViews=new List<FrameworkElement>();
-    readonly Dictionary<int,string> names=new Dictionary<int,string> {{0,"Controls"},{1,"Graphics"},{2,"Discord"},{3,"Audio & language"},{4,"View & HUD"},{5,"General"},{6,"Textures"}};
+    // Category names come from the tab headers, so an extra tab (such as MapMaker)
+    // cannot shift the labels of the tabs after it.
+    readonly Dictionary<int,string> names=new Dictionary<int,string>();
+    static readonly string[] order={"Controls","Graphics","Audio & language","View & HUD","Textures","MapMaker","Discord","General"};
     static Brush B(string value){return (Brush)new BrushConverter().ConvertFromString(value);}
     static T Private<T>(SettingsPage p,string name) where T:class{return typeof(SettingsPage).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic).GetValue(p) as T;}
     static IEnumerable<DependencyObject> Tree(DependencyObject root){yield return root;foreach(var c in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>().ToArray())foreach(var d in Tree(c))yield return d;}
@@ -54,10 +57,12 @@ public sealed class MinimalSettings
         var toolsButton=new Button {Content="←  Back to Launcher tools",FontSize=11,MinHeight=38,Background=B("#173A59"),BorderBrush=B("#4779A0"),BorderThickness=new Thickness(1),Foreground=B("#DFEAF4"),Padding=new Thickness(12,9,12,9),HorizontalContentAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,20,0),ToolTip="Return to Launcher tools. Your unsaved settings stay in this session."};
         System.Windows.Automation.AutomationProperties.SetName(toolsButton,"Back to Launcher tools");
         toolsButton.Click+=(s,e)=>tools();
-        var choices=new UniformGrid {Rows=1,Columns=7};frame.Children.Add(choices);
-        foreach(int index in new[]{0,1,3,4,6,2,5}){
-            if(index>=tabs.Items.Count)continue;int captured=index;
-            var button=new Button {Content=index==3?"Audio":names[index],ToolTip=names[index],Tag=index,HorizontalContentAlignment=HorizontalAlignment.Center,Padding=new Thickness(8,8,8,8),Margin=new Thickness(0),FontSize=12,MinHeight=34,BorderThickness=new Thickness(0,0,0,1),Background=Brushes.Transparent,Foreground=B("#B4C7D8")};
+        for(int i=0;i<tabs.Items.Count;i++)names[i]=Convert.ToString(((TabItem)tabs.Items[i]).Header);
+        var shown=order.Select(n=>names.FirstOrDefault(p=>p.Value==n)).Where(p=>p.Value!=null).Select(p=>p.Key).Concat(names.Keys.Where(k=>!order.Contains(names[k]))).ToArray();
+        var choices=new UniformGrid {Rows=1,Columns=shown.Length};frame.Children.Add(choices);
+        foreach(int index in shown){
+            int captured=index;
+            var button=new Button {Content=names[index]=="Audio & language"?"Audio":names[index],ToolTip=names[index],Tag=index,HorizontalContentAlignment=HorizontalAlignment.Center,Padding=new Thickness(8,8,8,8),Margin=new Thickness(0),FontSize=12,MinHeight=34,BorderThickness=new Thickness(0,0,0,1),Background=Brushes.Transparent,Foreground=B("#B4C7D8")};
             System.Windows.Automation.AutomationProperties.SetName(button,names[index]);
             button.Click+=(s,e)=>{page.SelectTab(captured);var scroll=categoryViews[captured] as ScrollViewer;if(scroll!=null)scroll.ScrollToHome();Refresh();};categories.Add(button);choices.Children.Add(button);
         }
@@ -84,7 +89,7 @@ public sealed class MinimalSettings
                 if(section.Name.StartsWith("Settings") && caption!=null){
                     border.Background=Brushes.Transparent;border.BorderThickness=new Thickness(0,0,0,1);border.BorderBrush=B("#263C50");border.Padding=new Thickness(0,12,0,16);border.Margin=new Thickness(0,0,0,6);
                     if(header.Children.Count>1 && header.Children[1] is TextBlock){var help=(TextBlock)header.Children[1];help.Visibility=Visibility.Collapsed;caption.ToolTip=help.ToolTip??help.Text;System.Windows.Automation.AutomationProperties.SetHelpText(section,Convert.ToString(help.ToolTip??help.Text));}
-                    section.IsExpanded=caption.Text=="Input & mouse"||caption.Text=="Display"||caption.Text=="Frame rate"||caption.Text=="Volume"||caption.Text=="Listening options"||caption.Text=="Camera"||caption.Text=="HUD"||caption.Text=="Startup"||caption.Text=="Game language"||caption.Text=="Enhanced textures"||caption.Text=="Discord Rich Presence";
+                    section.IsExpanded=caption.Text=="Input & mouse"||caption.Text=="Display"||caption.Text=="Frame rate"||caption.Text=="Volume"||caption.Text=="Listening options"||caption.Text=="Camera"||caption.Text=="HUD"||caption.Text=="Startup"||caption.Text=="Game language"||caption.Text=="Enhanced textures"||caption.Text=="Discord Rich Presence"||caption.Text=="MapMaker extensions";
                 }
             }
             if(border==null || !(border.Child is StackPanel))continue;
